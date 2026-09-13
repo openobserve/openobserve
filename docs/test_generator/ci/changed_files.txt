@@ -1,0 +1,9 @@
+tests/api-testing/tests/alerts/test_composite_alerts.py
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js
+tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js

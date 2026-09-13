@@ -1,0 +1,12 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev-authored suite (builder/list/preview/detail) already covers plan areas A, B, C, D, E(partial), F, G, H and parks the three known UNWIRED gaps (A4/A5/A6b) as test.fixme. Two reachable scenarios are still missing and both belong in the existing builder spec (plan areas E and the Workflow-1 create path): (1) the E1 'warning counts as firing' OSwitch toggle — selector alerts-composite-warning-counts-as-firing is WIRED in CompositeAlertForm.vue:223-227 but has no page-object accessor and no test; (2) the end-to-end UI create-save happy path (Workflow 1) — every composite is currently created via the API helper createCompositeAlert, so the create wizard's save button (POST) is never exercised through the UI. Appending two new test() blocks to alerts-composite-builder.spec.js reuses its existing imports, describe block, beforeEach/afterEach and children() helper. File is already registered in ci_matrix.json, so needs_registration is false."
+}

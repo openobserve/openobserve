@@ -1,0 +1,22 @@
+{
+  "feature_slug": "composite-alerts",
+  "feature_title": "Composite Alerts",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-composite-builder.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "tests/ui-testing/pages/alertsPages/compositeAlertsPage.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js",
+    "tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

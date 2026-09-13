@@ -28,7 +28,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
   uniq, createChildAlerts, createCompositeAlert,
-  deleteAlertsCascade, seedAlertFixturesOnce,
+  deleteAlertsCascade, findAlertId, seedAlertFixturesOnce,
 } = require('../utils/alerts-api-helpers.js');
 
 test.describe('Composite alerts — builder', {
@@ -305,6 +305,37 @@ test.describe('Composite alerts — builder', {
       .toBe('treat_as_true');
   });
 
+  test('E1 · toggling warning-counts-as-firing flips the flag and re-runs validation', async ({ page }) => {
+    const [a, b] = await children(page, 'e1', 2);
+    await openBuilderWith(page, [a, b]);
+    await expect(pm.compositeAlertsPage.preview()).toBeVisible();
+
+    // The flag defaults ON; assert it before flipping so a silently-dead switch
+    // can't masquerade as a successful toggle.
+    await expect(pm.compositeAlertsPage.warningCountsAsFiring())
+      .toHaveAttribute('aria-checked', 'true');
+
+    const validations = [];
+    await page.route('**/alerts/composites/validate', async (route) => {
+      validations.push(route.request().postDataJSON());
+      await route.continue();
+    });
+
+    await pm.compositeAlertsPage.warningCountsAsFiring().click();
+
+    await expect(pm.compositeAlertsPage.warningCountsAsFiring())
+      .toHaveAttribute('aria-checked', 'false');
+    // The change re-fires validation with the new flag, mirroring the stale-policy
+    // watcher in E5.
+    await expect
+      .poll(() => validations.at(-1)?.composite_condition?.warning_counts_as_firing)
+      .toBe(false);
+    // A valid draft: the toggle must not invalidate the expression, and Save
+    // must stay reachable (server validation still reports valid).
+    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
+    await expect(pm.compositeAlertsPage.save()).toBeEnabled();
+  });
+
   // ===================== F · edit round-trip =====================
 
   test('F3 · editing an existing composite reloads its children and expression', async ({ page }) => {
@@ -342,5 +373,43 @@ test.describe('Composite alerts — builder', {
     expect(expression).toContain(`{${b.id}}`);
     expect(expression).not.toMatch(/\b[A-J]\b/); // no lettered form leaks to the API
     expect(JSON.stringify(submitted)).not.toContain(a.name);
+  });
+
+  // ===================== P0 · create-save happy path (Workflow 1) =====================
+
+  test('P0 · composite is created end-to-end from the wizard and appears in the list', async ({ page }) => {
+    const [a, b] = await children(page, 'c_new', 2);
+    const name = uniq('c_new_parent');
+
+    await pm.compositeAlertsPage.openCreate();
+    await pm.compositeAlertsPage.chooseCompositeType();
+    await pm.compositeAlertsPage.addChildById(a);
+    await pm.compositeAlertsPage.addChildById(b);
+    await pm.compositeAlertsPage.setName(name);
+
+    // Save is gated on server validation returning valid — wait for it to open
+    // rather than racing the validate round-trip.
+    await expect(pm.compositeAlertsPage.save()).toBeEnabled();
+    await pm.compositeAlertsPage.save().click();
+
+    // The wizard may or may not auto-navigate; poll the list read until the new
+    // composite resolves to a real id, then confirm it under the Composite tab.
+    let id;
+    await expect
+      .poll(async () => {
+        id = await findAlertId(page, name);
+        return id;
+      }, { timeout: 30000 })
+      .toBeTruthy();
+    created.push(id);
+
+    await pm.compositeAlertsPage.openList();
+    await pm.compositeAlertsPage.openListTab('composite');
+
+    await expect(pm.compositeAlertsPage.listBadge(id)).toBeVisible();
+    await expect(pm.compositeAlertsPage.listChildCount(id)).toContainText('2');
+    // The Composite tab is a type filter: the plain children must not appear under it.
+    await expect(pm.compositeAlertsPage.listBadge(a.id)).toHaveCount(0);
+    await expect(pm.compositeAlertsPage.listBadge(b.id)).toHaveCount(0);
   });
 });

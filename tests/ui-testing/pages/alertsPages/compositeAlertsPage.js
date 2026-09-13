@@ -47,6 +47,7 @@ export class CompositeAlertsPage {
       typeTab: '[data-test="add-alert-type-tab-composite"]',
       form: '[data-test="alerts-composite-form"]',
       save: '[data-test="add-alert-submit-btn"]',
+      nameField: '[data-test="add-alert-name-input-input"]',
 
       // ---- child selector ---------------------------------------------
       childAdd: '[data-test="alerts-composite-child-add"]',
@@ -75,6 +76,7 @@ export class CompositeAlertsPage {
       // ---- settings -----------------------------------------------------
       stalePolicyBase: 'alerts-composite-stale-policy',
       stalePolicyHelp: '[data-test="alerts-composite-stale-policy-help"]',
+      warningCountsAsFiring: '[data-test="alerts-composite-warning-counts-as-firing-btn"]',
 
       // ---- live preview --------------------------------------------------
       preview: '[data-test="alerts-composite-preview"]',
@@ -234,6 +236,11 @@ export class CompositeAlertsPage {
 
   save() {
     return this.page.locator(this.locators.save);
+  }
+
+  /** Fill the wizard's alert name — the composite page object does not own it. */
+  async setName(name) {
+    await this.page.locator(this.locators.nameField).fill(name);
   }
 
   /**
@@ -476,6 +483,15 @@ export class CompositeAlertsPage {
 
   stalePolicyHelp() {
     return this.page.locator(this.locators.stalePolicyHelp);
+  }
+
+  /**
+   * The "warning counts as firing" OSwitch. Resolves to the `-btn` node, which
+   * is the role="switch" button and carries `aria-checked` — click it to toggle,
+   * or assert its `aria-checked` for the current flag.
+   */
+  warningCountsAsFiring() {
+    return this.page.locator(this.locators.warningCountsAsFiring);
   }
 
   /** @param {'use_last_state'|'treat_as_false'|'treat_as_true'} value */

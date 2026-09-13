@@ -1,0 +1,30 @@
+{
+  "feature_slug": "composite-alerts",
+  "feature_title": "Composite Alerts",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-composite-builder.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "tests/ui-testing/pages/alertsPages/compositeAlertsPage.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js",
+    "tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "OSS. None of the 9 changed paths live under enterprise-owned directories (no enterprise/, o2_enterprise/, or src/enterprise/). Every file is under tests/ — Playwright E2E specs, a page object, an API-test file, and the CI matrix — which are shared OSS test assets. No enterprise keyword (cipher/SSO/SAML/RBAC/SDR) appears in any changed path or symbol name.",
+    "skip": "Not skipped. The change is test-only but it adds and refactors dev-authored Playwright E2E specs under tests/ui-testing/playwright-tests/Alerts/ for the Composite Alerts feature. The dev-authored-tests rule means this is not an automatic skip: existing_tests_in_diff is set (route = enhance) and the Architect will read and extend these specs. There is no explicit opt-out — the trigger comment is empty and no tests-added label was supplied.",
+    "e2e": "E2E is warranted. The specs exercise a user-facing Alerts UI flow: a composite alert builder with child add/remove and a boolean expression editor (AND/OR/NOT/grouping), plus list, detail, and preview views. The data-test selectors map to web/src Alerts components. Although the diff itself contains no web/src edits, the tests verify a real user-facing UI flow that the pipeline should validate and potentially strengthen.",
+    "area": "Alerts. All five Playwright specs live in tests/ui-testing/playwright-tests/Alerts/ and the page object in tests/ui-testing/pages/alertsPages/, matching the existing Alerts shard and the sibling alerts-*.spec.js naming convention.",
+    "group": "Alerts. The ci_matrix.json diff adds the four new alerts-composite-*.spec.js files to the run_files list that already contains alerts-priority-tags.spec.js, alerts-multialert-ui.spec.js, alert-library.spec.js and alerts-add-alert-org-identifier.spec.js — the 'Alerts' testfolder shard (also referenced as the 'Alerts' key in the enterprise overlay's append section).",
+    "existing_tests": "Four Playwright E2E specs are added under tests/ui-testing/playwright-tests/Alerts/ (alerts-composite-builder.spec.js, alerts-composite-detail.spec.js, alerts-composite-list.spec.js, alerts-composite-preview.spec.js) while alerts-composite-ui.spec.js is deleted as the suite is split out. These are genuine E2E specs targeting the new composite-alerts feature, so existing_tests_in_diff=true. The changed tests/api-testing/tests/alerts/test_composite_alerts.py is a Python API test, not E2E coverage, and is not counted toward this flag."
+  }
+}

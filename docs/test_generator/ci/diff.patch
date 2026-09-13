@@ -1,0 +1,2425 @@
+===== COMPLETE LIST OF CHANGED FILES (9 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/api-testing/tests/alerts/test_composite_alerts.py
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js
+tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js
+tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js
+===== END CHANGED FILES =====
+
+diff --git a/tests/api-testing/tests/alerts/test_composite_alerts.py b/tests/api-testing/tests/alerts/test_composite_alerts.py
+index 817f1136cd6..cb6e9c78045 100644
+--- a/tests/api-testing/tests/alerts/test_composite_alerts.py
++++ b/tests/api-testing/tests/alerts/test_composite_alerts.py
+@@ -726,3 +726,174 @@ def test_openapi_exposes_composite_create_validate_preview_and_references(
+         "referenced_by_composite_count",
+     ):
+         assert token in serialized
++
++
++def test_validate_rejects_empty_single_operand_and_malformed_expressions(
++    client: OpenObserveClient, composite_prereqs: dict[str, Any]
++):
++    """The four ways a composite expression can be unusable, each a 400.
++
++    The UI blocks these locally before it ever calls validate, so the server
++    contract is only reachable from here — a regression would surface as a
++    saved composite that can never evaluate.
++    """
++    child_a, child_b, _ = composite_prereqs["child_ids"]
++    cases = {
++        "empty": "",
++        "single_operand": f"{{{child_a}}}",
++        "trailing_operator": f"{{{child_a}}} && ",
++        "unbalanced_group": f"{{{child_a}}} && ({{{child_b}}}",
++    }
++    for label, expression in cases.items():
++        response = client.post(
++            "alerts/composites/validate",
++            prefix="api/v2/",
++            json={
++                "composite_condition": {
++                    "expression": expression,
++                    "warning_counts_as_firing": True,
++                    "stale_child_policy": "use_last_state",
++                },
++                "folder_id": composite_prereqs["folder_id"],
++            },
++        )
++        assert response.status_code == 400, f"{label}: {response.text}"
++        assert response.json()["code"] == "composite_invalid_expression", (
++            f"{label}: {response.text}"
++        )
++
++
++def test_composite_cannot_reference_itself(
++    client: OpenObserveClient, composite_prereqs: dict[str, Any]
++):
++    """A self-edge is the shortest cycle and must be refused like any other.
++
++    Only expressible on update: create has no id to point at yet, so nothing
++    upstream of this test can exercise it.
++    """
++    child_a, child_b, _ = composite_prereqs["child_ids"]
++    name = unique_name("cmp_self_ref")
++    composite = _tracked_create(
++        client,
++        composite_prereqs,
++        _composite_payload(name=name, child_ids=[child_a, child_b]),
++    )
++
++    response = client.put(
++        f"alerts/{composite}?folder={composite_prereqs['folder_id']}",
++        prefix="api/v2/",
++        json=_composite_payload(name=name, child_ids=[composite, child_b]),
++    )
++    assert response.status_code == 409, response.text
++    assert response.json()["code"] == "composite_cycle", response.text
++
++    # The refusal must be total: the stored definition is untouched.
++    response = client.get(
++        f"alerts/{composite}?folder={composite_prereqs['folder_id']}", prefix="api/v2/"
++    )
++    assert response.status_code == 200, response.text
++    expression = response.json()["composite_condition"]["expression"]
++    assert composite not in expression, expression
++
++
++def test_child_cap_is_enforced_on_both_validate_and_create(
++    client: OpenObserveClient, composite_prereqs: dict[str, Any]
++):
++    """Eleven children is refused by validate AND by the write path.
++
++    Enforcing this only on validate would leave the cap bypassable by any
++    client that skips the preview call, which is every client except the UI.
++    """
++    folder_id = composite_prereqs["folder_id"]
++    child_ids = list(composite_prereqs["child_ids"])
++    for index in range(len(child_ids), 11):
++        child_name = unique_name(f"cmp_cap_child_{index}")
++        payload = _alert_payload(
++            name=child_name,
++            folder_id=folder_id,
++            template=composite_prereqs["template"],
++            destination=composite_prereqs["destination"],
++            enabled=False,
++        )
++        response = client.post(f"alerts?folder={folder_id}", prefix="api/v2/", json=payload)
++        assert response.status_code == 200, response.text
++        child_id = _find_by_name(client, child_name)["alert_id"]
++        child_ids.append(child_id)
++        composite_prereqs["child_ids"].append(child_id)
++    assert len(child_ids) == 11
++
++    over_cap = " && ".join(f"{{{child_id}}}" for child_id in child_ids)
++    response = client.post(
++        "alerts/composites/validate",
++        prefix="api/v2/",
++        json={
++            "composite_condition": {
++                "expression": over_cap,
++                "warning_counts_as_firing": True,
++                "stale_child_policy": "use_last_state",
++            },
++            "folder_id": folder_id,
++        },
++    )
++    assert response.status_code == 400, response.text
++
++    response = client.post(
++        f"alerts?folder={folder_id}",
++        prefix="api/v2/",
++        json=_composite_payload(name=unique_name("cmp_over_cap"), child_ids=child_ids),
++    )
++    assert response.status_code >= 400, response.text
++
++    # Exactly ten is the boundary and must still be accepted.
++    at_cap = _tracked_create(
++        client,
++        composite_prereqs,
++        _composite_payload(name=unique_name("cmp_at_cap"), child_ids=child_ids[:10]),
++    )
++    row = next(item for item in _list(client) if item["alert_id"] == at_cap)
++    assert row["child_count"] == 10, row
++
++
++def test_composite_timeline_returns_child_lanes_plus_a_result_lane(
++    client: OpenObserveClient, composite_prereqs: dict[str, Any]
++):
++    """The detail page's timeline reads every lane off this one response.
++
++    The result lane is keyed by the COMPOSITE's own id; the UI uses that to
++    tell the aggregate row apart from the children, so the key matters as much
++    as the values.
++    """
++    child_a, child_b, _ = composite_prereqs["child_ids"]
++    composite = _tracked_create(
++        client,
++        composite_prereqs,
++        _composite_payload(name=unique_name("cmp_timeline"), child_ids=[child_a, child_b]),
++    )
++
++    to_micros = 1_800_000_000_000_000
++    from_micros = to_micros - 14_400_000_000
++    response = client.get(
++        f"alerts/{composite}/composite-timeline?from={from_micros}&to={to_micros}",
++        prefix="api/v2/",
++    )
++    assert response.status_code == 200, response.text
++
++    body = response.json()
++    assert body["from"] < body["to"], body
++    assert sorted(lane["alert_id"] for lane in body["children"]) == sorted([child_a, child_b]), body
++    assert body["result"]["alert_id"] == composite, body
++
++    for lane in body["children"] + [body["result"]]:
++        assert lane["accessible"] is True, lane
++        # Always serialised, empty when nothing has changed in the window.
++        assert isinstance(lane["transitions"], list), lane
++        # `current_level` and `level_since` are omitted, NOT null, until the lane
++        # has been evaluated once; the UI falls back to "nodata" on absence, so
++        # asserting presence here would contradict the real contract.
++        if "current_level" in lane:
++            assert isinstance(lane["current_level"], str) and lane["current_level"], lane
++
++    # Children carry the slot index the UI letters them by (A, B, …); the result
++    # lane deliberately has none, which is how it is told apart from a child.
++    assert sorted(lane["slot"] for lane in body["children"]) == [0, 1], body
++    assert "slot" not in body["result"], body
+diff --git a/tests/ui-testing/ci-matrix/ci_matrix.json b/tests/ui-testing/ci-matrix/ci_matrix.json
+index 11872ac4a04..7a81744ada9 100644
+--- a/tests/ui-testing/ci-matrix/ci_matrix.json
++++ b/tests/ui-testing/ci-matrix/ci_matrix.json
+@@ -16,7 +16,11 @@
+       "alerts-priority-tags.spec.js",
+       "alerts-multialert-ui.spec.js",
+       "alert-library.spec.js",
+-      "alerts-add-alert-org-identifier.spec.js"
++      "alerts-add-alert-org-identifier.spec.js",
++      "alerts-composite-builder.spec.js",
++      "alerts-composite-list.spec.js",
++      "alerts-composite-preview.spec.js",
++      "alerts-composite-detail.spec.js"
+     ],
+     "disabled": [
+       {
+diff --git a/tests/ui-testing/pages/alertsPages/compositeAlertsPage.js b/tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
+index 66205cb943d..5649468927a 100644
+--- a/tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
++++ b/tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
+@@ -1,5 +1,26 @@
+ // Copyright 2026 OpenObserve Inc.
+ 
++/**
++ * Composite alerts page object.
++ *
++ * SELECTOR CONTRACT
++ * -----------------
++ * O2 form components render the consumer's `data-test` on a WRAPPER and put the
++ * interactive node on a suffixed child. Targeting the wrapper silently fails
++ * (Playwright cannot fill a div), so every accessor here resolves to the real
++ * node:
++ *
++ *   OInput / OTextarea -> `${dt}-field`     (the native input/textarea)
++ *   OSelect            -> `${dt}-trigger`   (opens), `${dt}-option` (rows,
++ *                                            each mirroring `data-test-value`)
++ *   OSwitch            -> `${dt}-btn`
++ *
++ * The child picker is an "Add alert" button plus one lettered OSelect slot per
++ * child — there is NO search-and-pick field. Slots are positional: index 0 is
++ * always A, and the expression the user edits is lettered ("A && B") while the
++ * stored form is `{alert_id}`.
++ */
++
+ import { expect } from '@playwright/test';
+ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+ 
+@@ -7,39 +28,125 @@ export class CompositeAlertsPage {
+   constructor(page) {
+     this.page = page;
+     this.locators = {
+-      typeSelect: '[data-test="add-alert-type-tab-composite"]',
+-      childSearch: '[data-test="alerts-composite-child-search-field"]',
+-      childOption: (id) => `[data-test="alerts-composite-child-option-${id}"]`,
++      // ---- alert list -------------------------------------------------
++      listTab: (tab) => `[data-test="alert-list-tab-${tab}"]`,
++      listBadge: (id) => `[data-test="alert-list-composite-badge-${id}"]`,
++      listChildCount: (id) => `[data-test="alert-list-child-count-${id}"]`,
++      listExpression: (id) => `[data-test="alert-list-composite-expression-${id}"]`,
++      listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
++      listEnableToggle: (name) => `[data-test="alert-list-${name}-pause-start-alert"]`,
++
++      // ---- references drawer ------------------------------------------
++      referenceChip: '[data-test="alerts-composite-reference-chip"]',
++      referenceDrawer: '[data-test="alerts-composite-reference-drawer"]',
++      referenceConflict: '[data-test="alerts-composite-reference-conflict"]',
++      referenceParent: (id) => `[data-test="alerts-composite-reference-parent-${id}"]`,
++      referenceClose: '[data-test="alerts-composite-reference-close"]',
++
++      // ---- create / edit form -----------------------------------------
++      typeTab: '[data-test="add-alert-type-tab-composite"]',
++      form: '[data-test="alerts-composite-form"]',
++      save: '[data-test="add-alert-submit-btn"]',
++
++      // ---- child selector ---------------------------------------------
++      childAdd: '[data-test="alerts-composite-child-add"]',
+       childCap: '[data-test="alerts-composite-child-cap"]',
+-      expressionSummary: '[data-test="alerts-composite-expression-summary"]',
+-      expressionUnused: '[data-test="alerts-composite-expression-unused"]',
++      childEmpty: '[data-test="alerts-composite-child-empty"]',
++      selectedChild: (id) => `[data-test="alerts-composite-selected-child-${id}"]`,
++      // OSelect base: selectOption() derives -trigger/-popover/-search/-option.
++      childSelectBase: (id) => `alerts-composite-child-select-${id}`,
++      childRemove: (id) => `[data-test="alerts-composite-child-remove-${id}"]`,
++
++      // ---- expression builder ------------------------------------------
++      expressionLive: '[data-test="alerts-composite-expression-live"]',
++      expressionInput: '[data-test="alerts-composite-expression-input-field"]',
++      expressionInsert: (id) => `[data-test="alerts-composite-expression-insert-${id}"]`,
+       expressionAnd: '[data-test="alerts-composite-expression-and"]',
+       expressionOr: '[data-test="alerts-composite-expression-or"]',
+       expressionNot: '[data-test="alerts-composite-expression-not"]',
+       expressionOpenGroup: '[data-test="alerts-composite-expression-open-group"]',
+       expressionCloseGroup: '[data-test="alerts-composite-expression-close-group"]',
+-      advancedExpression: '[data-test="alerts-composite-expression-advanced-field"]',
++      expressionUnused: '[data-test="alerts-composite-expression-unused"]',
++      operandTray: (id) => `[data-test="alerts-composite-operand-tray-${id}"]`,
++      expressionError: '[data-test="alerts-composite-expression-error"]',
++      advancedToggle: '[data-test="alerts-composite-expression-advanced-toggle"]',
++      advancedField: '[data-test="alerts-composite-expression-advanced-field"]',
++
++      // ---- settings -----------------------------------------------------
++      stalePolicyBase: 'alerts-composite-stale-policy',
++      stalePolicyHelp: '[data-test="alerts-composite-stale-policy-help"]',
++
++      // ---- live preview --------------------------------------------------
++      preview: '[data-test="alerts-composite-preview"]',
+       previewResult: '[data-test="alerts-composite-preview-result"]',
+-      previewRow: (id) => `[data-test="alerts-composite-preview-child-${id}"]`,
+-      save: '[data-test="add-alert-submit-btn"]',
+-      listCompositeTab: '[data-test="tab-composite"]',
+-      listBadge: (id) => `[data-test="alert-list-composite-badge-${id}"]`,
+-      listChildCount: (id) => `[data-test="alert-list-child-count-${id}"]`,
+-      listReferenceCount: (id) => `[data-test="alert-list-reference-count-${id}"]`,
+-      detailResult: '[data-test="alerts-composite-detail-result"]',
++      previewSteps: '[data-test="alerts-composite-preview-steps"]',
++      previewWarning: (code) => `[data-test="alerts-composite-preview-warning-${code}"]`,
++      previewStale: (id) => `[data-test="alerts-composite-preview-stale-${id}"]`,
++      previewError: (code) => `[data-test="alerts-composite-preview-error-${code}"]`,
++
++      // ---- detail --------------------------------------------------------
++      detail: '[data-test="alerts-composite-detail"]',
++      detailExpressionLive: '[data-test="alerts-composite-detail-expression-live"]',
+       detailExpression: '[data-test="alerts-composite-detail-expression"]',
+-      detailChildren: '[data-test="alerts-composite-detail-children-table"]',
++      detailConfig: '[data-test="alerts-composite-detail-config"]',
++      detailStalePolicy: '[data-test="alerts-composite-detail-stale-policy"]',
+       detailChild: (id) => `[data-test="alerts-composite-detail-child-${id}"]`,
++      detailChildLink: (id) => `[data-test="alerts-composite-detail-child-link-${id}"]`,
++      detailStaleReason: (id) => `[data-test="alerts-composite-detail-stale-reason-${id}"]`,
+       missingJob: '[data-test="alerts-composite-detail-missing-job"]',
+-      referenceChip: '[data-test="alerts-composite-reference-chip"]',
+-      referenceConflict: '[data-test="alerts-composite-reference-conflict"]',
+-      referenceParent: (id) => `[data-test="alerts-composite-reference-parent-${id}"]`,
+-      referenceClose: '[data-test="alerts-composite-reference-close"]',
++
++      // ---- status timeline -------------------------------------------------
++      timeline: '[data-test="alerts-composite-timeline"]',
++      timelineWindow: (w) => `[data-test="alerts-composite-timeline-window-${w}"]`,
++      timelineLevel: (id) => `[data-test="alerts-composite-timeline-level-${id}"]`,
++      timelineEmpty: '[data-test="alerts-composite-timeline-empty"]',
+     };
+   }
+ 
+-  listCompositeTab() {
+-    return this.page.locator(this.locators.listCompositeTab);
++  // ===================== navigation =====================
++
++  async openList() {
++    await this.page.goto(`/web/alerts?org_identifier=${getOrgIdentifier()}&folder=default`);
++  }
++
++  async openCreate() {
++    await this.page.goto(`/web/alerts/add?org_identifier=${getOrgIdentifier()}&folder=default`);
++  }
++
++  async openEdit(id) {
++    await this.page.goto(`/web/alerts/edit/${id}?org_identifier=${getOrgIdentifier()}&folder=default`);
++  }
++
++  async openDetail(id) {
++    await this.page.goto(`/web/alerts/detail/${id}?org_identifier=${getOrgIdentifier()}&folder=default`);
++  }
++
++  // ===================== alert list =====================
++
++  listTab(tab = 'composite') {
++    return this.page.locator(this.locators.listTab(tab));
++  }
++
++  /**
++   * Switch the list's type filter and wait for the refetch it triggers.
++   *
++   * Waits on the list request rather than a fixed delay: a sleep long enough
++   * for a loaded shared env is dead time on every other run, and still too
++   * short on the slowest one.
++   */
++  async openListTab(tab = 'composite') {
++    const refetched = this.page
++      .waitForResponse(
++        (response) =>
++          /\/api\/v2\/[^/]+\/alerts\?/.test(response.url()) && response.status() === 200,
++        { timeout: 30000 },
++      )
++      .catch(() => null);
++    await this.listTab(tab).click();
++    await refetched;
++    // reka-ui ToggleGroupItem reports on/off, not the active/inactive that
++    // OTab uses — asserting 'active' here silently never matches.
++    await expect(this.listTab(tab)).toHaveAttribute('data-state', 'on');
+   }
+ 
+   listBadge(id) {
+@@ -50,76 +157,262 @@ export class CompositeAlertsPage {
+     return this.page.locator(this.locators.listChildCount(id));
+   }
+ 
++  listExpression(id) {
++    return this.page.locator(this.locators.listExpression(id));
++  }
++
+   listReferenceCount(id) {
+     return this.page.locator(this.locators.listReferenceCount(id));
+   }
+ 
+-  childNameCell(name) {
+-    return this.page.getByText(name, { exact: false });
++  listEnableToggle(name) {
++    return this.page.locator(this.locators.listEnableToggle(name));
+   }
+ 
+-  expressionSummary() {
+-    return this.page.locator(this.locators.expressionSummary);
++  /** The whole table row a composite occupies, reached via its badge. */
++  listRow(id) {
++    return this.page.locator(this.locators.listBadge(id)).locator('xpath=ancestor::tr[1]');
+   }
+ 
+-  advancedExpression() {
+-    return this.page.locator(this.locators.advancedExpression);
++  // ===================== references drawer =====================
++
++  referenceChip() {
++    return this.page.locator(this.locators.referenceChip);
+   }
+ 
+-  childSearch() {
+-    return this.page.locator(this.locators.childSearch);
++  referenceDrawer() {
++    return this.page.locator(this.locators.referenceDrawer);
+   }
+ 
+-  childOption(id) {
+-    return this.page.locator(this.locators.childOption(id));
++  referenceConflict() {
++    return this.page.locator(this.locators.referenceConflict);
+   }
+ 
+-  childCap() {
+-    return this.page.locator(this.locators.childCap);
++  referenceParent(id) {
++    return this.page.locator(this.locators.referenceParent(id));
+   }
+ 
+-  expressionUnused() {
+-    return this.page.locator(this.locators.expressionUnused);
++  referenceClose() {
++    return this.page.locator(this.locators.referenceClose);
+   }
+ 
+-  save() {
+-    return this.page.locator(this.locators.save);
++  async openReferences() {
++    await this.referenceChip().first().click();
++    await expect(this.referenceDrawer()).toBeVisible();
+   }
+ 
+-  detailResult() {
+-    return this.page.locator(this.locators.detailResult);
++  /**
++   * Delete a row from the list and return WITHOUT asserting the outcome.
++   *
++   * `alertManagement.searchAndDeleteAlert` waits for the "Alert deleted" toast,
++   * which never arrives when the alert is a composite child — the delete is
++   * refused with 409 and the references drawer opens instead. Blocked deletes
++   * are exactly what these specs assert, so the caller decides what success
++   * means here.
++   */
++  async attemptRowDelete(name) {
++    const kebab = this.page.locator(`[data-test="alert-list-${name}-more-options"]`);
++    await kebab.waitFor({ state: 'visible', timeout: 20000 });
++    await kebab.click();
++    const remove = this.page.locator(`[data-test="alert-list-${name}-delete-alert"]`);
++    await remove.waitFor({ state: 'visible', timeout: 10000 });
++    await remove.click();
++    await this.page
++      .locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]')
++      .click();
+   }
+ 
+-  detailExpression() {
+-    return this.page.locator(this.locators.detailExpression);
++  // ===================== form shell =====================
++
++  form() {
++    return this.page.locator(this.locators.form);
+   }
+ 
+-  detailChildren() {
+-    return this.page.locator(this.locators.detailChildren);
++  typeTab() {
++    return this.page.locator(this.locators.typeTab);
+   }
+ 
+-  detailChild(id) {
+-    return this.page.locator(this.locators.detailChild(id));
++  save() {
++    return this.page.locator(this.locators.save);
+   }
+ 
+-  missingJob() {
+-    return this.page.locator(this.locators.missingJob);
++  /**
++   * Switch the wizard to Composite mode and wait until it can actually accept a
++   * child.
++   *
++   * Entering composite mode kicks off an async fetch of every candidate alert,
++   * and "Add alert" is a no-op until it lands — it picks the first unselected
++   * option and silently returns when there are none. Waiting only for the form
++   * to render therefore races, and the race is the common case on a cold page.
++   */
++  async chooseCompositeType() {
++    const optionsLoaded = this.waitForChildOptions();
++    await this.typeTab().click();
++    await expect(this.form()).toBeVisible();
++    await optionsLoaded;
+   }
+ 
+-  referenceChip() {
+-    return this.page.locator(this.locators.referenceChip);
++  /** Resolve once the candidate-children fetch has returned. */
++  waitForChildOptions(timeout = 30000) {
++    return this.page
++      .waitForResponse(
++        (response) =>
++          /\/api\/v2\/[^/]+\/alerts\?/.test(response.url())
++          && response.url().includes('alert_type=all')
++          && response.status() === 200,
++        { timeout },
++      )
++      .catch(() => null);
+   }
+ 
+-  referenceParent(id) {
+-    return this.page.locator(this.locators.referenceParent(id));
++  // ===================== child selector =====================
++
++  childAdd() {
++    return this.page.locator(this.locators.childAdd);
+   }
+ 
+-  referenceClose() {
+-    return this.page.locator(this.locators.referenceClose);
++  childCap() {
++    return this.page.locator(this.locators.childCap);
+   }
+ 
+-  referenceConflict() {
+-    return this.page.locator(this.locators.referenceConflict);
++  childEmpty() {
++    return this.page.locator(this.locators.childEmpty);
++  }
++
++  selectedChild(id) {
++    return this.page.locator(this.locators.selectedChild(id));
++  }
++
++  childRemove(id) {
++    return this.page.locator(this.locators.childRemove(id));
++  }
++
++  /** Slot rows in visual order; index 0 is slot A. */
++  selectedChildRows() {
++    return this.page.locator('[data-test^="alerts-composite-selected-child-"]');
++  }
++
++  /**
++   * Append the next unselected alert. The button picks the first free option
++   * itself, so the caller cannot choose — use `replaceChild` to pin an id.
++   */
++  async addChild() {
++    await this.childAdd().click();
++  }
++
++  /**
++   * Pick a value from an O2 OSelect by its `data-test-value`.
++   *
++   * Two things make the naive open-then-click flaky, and both bite only at
++   * scale or in sequence:
++   *
++   *   - A searchable OSelect renders a windowed list, so an option can be
++   *     absent from the DOM entirely until the search box narrows to it. The
++   *     child picker hits this as soon as the org holds more than a screenful
++   *     of alerts, which is any parallel run.
++   *   - Reka keeps the popover mounted through its close animation, and while
++   *     it is there it intercepts pointer events. A second selection opened
++   *     before that unmount races it and the click lands on the dying overlay.
++   *
++   * @param {string} base  the consumer `data-test` on the OSelect
++   * @param {string} value the option's `data-test-value`
++   * @param {string} [searchText] typed into the search box when the select has one
++   */
++  async selectOption(base, value, searchText) {
++    const popover = this.page.locator(`[data-test="${base}-popover"]`);
++    const option = this.page.locator(`[data-test="${base}-option"][data-test-value="${value}"]`);
++
++    await this.page.locator(`[data-test="${base}-trigger"]`).click();
++    await expect(popover).toBeVisible();
++
++    if (searchText) {
++      const search = this.page.locator(`[data-test="${base}-search"]`);
++      if (await search.count()) await search.fill(searchText);
++    }
++    await expect(option).toBeVisible();
++    await option.click();
++
++    await expect(popover).toBeHidden();
++  }
++
++  /**
++   * Repoint an occupied slot at `next`, keeping the slot's position/letter.
++   *
++   * `next` is the whole {id, name} child, not an id: the name is what gets
++   * typed into the select's search box. Passing a bare id used to surface as a
++   * 15s locator timeout with no hint of the real cause, so it is rejected here.
++   */
++  async replaceChild(currentId, next) {
++    if (typeof next !== 'object' || !next?.id || !next?.name) {
++      throw new TypeError(
++        `replaceChild expects a {id, name} child, received ${JSON.stringify(next)}`,
++      );
++    }
++    await this.selectOption(this.locators.childSelectBase(currentId), next.id, next.name);
++    await expect(this.selectedChild(next.id)).toBeVisible();
++  }
++
++  /**
++   * Add a slot, then point it at `child`.
++   *
++   * Two steps because "Add alert" takes the first unselected option rather than
++   * one the caller chooses — so pinning a specific child always means adding,
++   * then replacing whatever landed there.
++   *
++   * @param {{id: string, name: string}} child
++   */
++  async addChildById(child) {
++    if (typeof child !== 'object' || !child?.id || !child?.name) {
++      throw new TypeError(
++        `addChildById expects a {id, name} child, received ${JSON.stringify(child)}`,
++      );
++    }
++    const before = await this.selectedChildRows().count();
++    await this.addChild();
++    await expect(this.selectedChildRows()).toHaveCount(before + 1);
++    if (await this.selectedChild(child.id).count()) return;
++    const landedOn = await this.selectedChildRows().nth(before).getAttribute('data-test');
++    const currentId = landedOn.replace('alerts-composite-selected-child-', '');
++    await this.replaceChild(currentId, child);
++  }
++
++  async removeChild(id) {
++    await this.childRemove(id).click();
++    await expect(this.selectedChild(id)).toHaveCount(0);
++  }
++
++  /**
++   * The options a slot currently offers, as alert ids.
++   *
++   * Only what the select has RENDERED: a searchable OSelect windows its list,
++   * so treat this as "does not offer" evidence for a small fixture set, never
++   * as the complete option universe.
++   */
++  async optionIdsFor(id) {
++    const base = this.locators.childSelectBase(id);
++    const popover = this.page.locator(`[data-test="${base}-popover"]`);
++    await this.page.locator(`[data-test="${base}-trigger"]`).click();
++    await expect(popover).toBeVisible();
++    const ids = await this.page
++      .locator(`[data-test="${base}-option"]`)
++      .evaluateAll((nodes) => nodes.map((n) => n.getAttribute('data-test-value')));
++    await this.page.keyboard.press('Escape');
++    await expect(popover).toBeHidden();
++    return ids;
++  }
++
++  // ===================== expression builder =====================
++
++  expressionLive() {
++    return this.page.locator(this.locators.expressionLive);
++  }
++
++  expressionInput() {
++    return this.page.locator(this.locators.expressionInput);
++  }
++
++  expressionInsert(id) {
++    return this.page.locator(this.locators.expressionInsert(id));
+   }
+ 
+   expressionAnd() {
+@@ -142,40 +435,156 @@ export class CompositeAlertsPage {
+     return this.page.locator(this.locators.expressionCloseGroup);
+   }
+ 
++  expressionUnused() {
++    return this.page.locator(this.locators.expressionUnused);
++  }
++
++  operandTray(id) {
++    return this.page.locator(this.locators.operandTray(id));
++  }
++
++  expressionError() {
++    return this.page.locator(this.locators.expressionError);
++  }
++
++  advancedToggle() {
++    return this.page.locator(this.locators.advancedToggle);
++  }
++
++  advancedField() {
++    return this.page.locator(this.locators.advancedField);
++  }
++
++  /** Overwrite the lettered expression ("A && B"), not the stored `{id}` form. */
++  async fillExpression(lettered) {
++    await this.expressionInput().fill(lettered);
++  }
++
++  /** Reveal the raw `{id}` textarea. Idempotent. */
++  async openAdvanced() {
++    if (await this.advancedField().count()) return;
++    await this.advancedToggle().click();
++    await expect(this.advancedField()).toBeVisible();
++  }
++
++  async fillAdvancedExpression(raw) {
++    await this.openAdvanced();
++    await this.advancedField().fill(raw);
++  }
++
++  // ===================== settings =====================
++
++  stalePolicyHelp() {
++    return this.page.locator(this.locators.stalePolicyHelp);
++  }
++
++  /** @param {'use_last_state'|'treat_as_false'|'treat_as_true'} value */
++  async selectStalePolicy(value) {
++    await this.selectOption(this.locators.stalePolicyBase, value);
++    await expect.poll(() => this.stalePolicyValue()).toBe(value);
++  }
++
++  async stalePolicyValue() {
++    return this.page
++      .locator('[data-test="alerts-composite-stale-policy"]')
++      .getAttribute('data-value');
++  }
++
++  // ===================== live preview =====================
++
++  preview() {
++    return this.page.locator(this.locators.preview);
++  }
++
+   previewResult() {
+     return this.page.locator(this.locators.previewResult);
+   }
+ 
+-  renamedChildText(text) {
+-    return this.page.getByText(text);
++  previewSteps() {
++    return this.page.locator(this.locators.previewSteps);
+   }
+ 
+-  bodyHasNoHorizontalOverflow() {
+-    return this.page.locator('body').evaluate((body) => body.scrollWidth <= body.clientWidth);
++  /** One row per operand, then the result row last. */
++  previewStepRows() {
++    return this.previewSteps().locator('li');
+   }
+ 
+-  async openCreate() {
+-    await this.page.goto(`/web/alerts/add?org_identifier=${getOrgIdentifier()}&folder=default`);
++  previewWarning(code) {
++    return this.page.locator(this.locators.previewWarning(code));
+   }
+ 
+-  async openEdit(id) {
+-    await this.page.goto(`/web/alerts/edit/${id}?org_identifier=${getOrgIdentifier()}&folder=default`);
++  previewStale(id) {
++    return this.page.locator(this.locators.previewStale(id));
+   }
+ 
+-  async openDetail(id) {
+-    await this.page.goto(`/web/alerts/detail/${id}?org_identifier=${getOrgIdentifier()}&folder=default`);
++  previewError(code) {
++    return this.page.locator(this.locators.previewError(code));
+   }
+ 
+-  async chooseCompositeType() {
+-    await this.page.locator(this.locators.typeSelect).click();
++  // ===================== detail =====================
++
++  detail() {
++    return this.page.locator(this.locators.detail);
++  }
++
++  detailExpression() {
++    return this.page.locator(this.locators.detailExpression);
++  }
++
++  detailExpressionLive() {
++    return this.page.locator(this.locators.detailExpressionLive);
++  }
++
++  detailConfig() {
++    return this.page.locator(this.locators.detailConfig);
++  }
++
++  detailStalePolicy() {
++    return this.page.locator(this.locators.detailStalePolicy);
++  }
++
++  detailChild(id) {
++    return this.page.locator(this.locators.detailChild(id));
++  }
++
++  detailChildLink(id) {
++    return this.page.locator(this.locators.detailChildLink(id));
++  }
++
++  detailStaleReason(id) {
++    return this.page.locator(this.locators.detailStaleReason(id));
++  }
++
++  missingJob() {
++    return this.page.locator(this.locators.missingJob);
++  }
++
++  // ===================== status timeline =====================
++
++  timeline() {
++    return this.page.locator(this.locators.timeline);
+   }
+ 
+-  async searchAndSelect(name, id) {
+-    await this.page.locator(this.locators.childSearch).fill(name);
+-    await this.page.locator(this.locators.childOption(id)).click();
++  timelineWindow(w) {
++    return this.page.locator(this.locators.timelineWindow(w));
+   }
+ 
+-  async expectPreviewChild(id, pattern) {
+-    await expect(this.page.locator(this.locators.previewRow(id))).toContainText(pattern);
++  timelineLevel(id) {
++    return this.page.locator(this.locators.timelineLevel(id));
++  }
++
++  timelineEmpty() {
++    return this.page.locator(this.locators.timelineEmpty);
++  }
++
++  /** @param {'1h'|'4h'|'1d'} w */
++  async selectTimelineWindow(w) {
++    await this.timelineWindow(w).click();
++  }
++
++  // ===================== shared assertions =====================
++
++  bodyHasNoHorizontalOverflow() {
++    return this.page.locator('body').evaluate((body) => body.scrollWidth <= body.clientWidth);
+   }
+ }
+diff --git a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js
+new file mode 100644
+index 00000000000..33567ec29d1
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-builder.spec.js
+@@ -0,0 +1,346 @@
++// Copyright 2026 OpenObserve Inc.
++
++/**
++ * Composite alerts — child selector, expression builder, settings and the
++ * edit round-trip (plan areas B, C, E and F).
++ *
++ * WHY THIS FILE EXISTS
++ * --------------------
++ * The builder keeps TWO representations of the same expression in sync: the
++ * lettered form the user types ("A && B") and the `{alert_id}` form that is
++ * stored and sent. Slot position is what binds them — index 0 is A — so any
++ * change to the child list has to rewrite the expression in lockstep.
++ *
++ * That rewrite is where the sharp edges are. Removing a child has to drop its
++ * operand AND any negation applied to it, then collapse whatever residue that
++ * leaves (empty groups, dangling operators); removing from the backend's nested
++ * canonical form can leave the parens unbalanced, in which case the component
++ * deliberately falls back to a flat AND join rather than block Save on an
++ * expression the user never typed.
++ *
++ * None of that is observable from a unit test of the helper alone, because the
++ * fallback only triggers on shapes the SERVER produces. These drive the real
++ * form against real saved alerts.
++ */
++
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const PageManager = require('../../pages/page-manager.js');
++const testLogger = require('../utils/test-logger.js');
++const {
++  uniq, createChildAlerts, createCompositeAlert,
++  deleteAlertsCascade, seedAlertFixturesOnce,
++} = require('../utils/alerts-api-helpers.js');
++
++test.describe('Composite alerts — builder', {
++  tag: ['@alerts', '@alerts-composite', '@P0'],
++}, () => {
++  let pm;
++  let created = [];
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    pm = new PageManager(page);
++    created = [];
++    await seedAlertFixturesOnce(page);
++    await navigateToBase(page);
++  });
++
++  test.afterEach(async ({ page }, testInfo) => {
++    // Surfaced, not asserted: a leak is an env/cleanup problem, not a defect in
++    // the behaviour under test, so it must not turn a green test red — but it
++    // must not be invisible either, which is what discarding this return was.
++    const leaked = await deleteAlertsCascade(page, created);
++    if (leaked.length) {
++      testLogger.error('fixture cleanup leaked alerts', { leaked, test: testInfo.title });
++    }
++  });
++
++  async function children(page, prefix, count) {
++    const made = await createChildAlerts(page, prefix, count);
++    created.push(...made.map((c) => c.id));
++    return made;
++  }
++
++  /** Open the wizard in composite mode with `ids` already in slots A, B, … */
++  async function openBuilderWith(page, picks) {
++    await pm.compositeAlertsPage.openCreate();
++    await pm.compositeAlertsPage.chooseCompositeType();
++    for (const child of picks) await pm.compositeAlertsPage.addChildById(child);
++  }
++
++  // ===================== B · child selector =====================
++
++  test('B1/B2 · composite type tab is offered and starts with an empty slot list', async ({ page }) => {
++    await pm.compositeAlertsPage.openCreate();
++    await expect(pm.compositeAlertsPage.typeTab()).toBeVisible();
++
++    await pm.compositeAlertsPage.chooseCompositeType();
++    await expect(pm.compositeAlertsPage.childEmpty()).toBeVisible();
++    await expect(pm.compositeAlertsPage.childCap()).toContainText('0');
++    // Two children are the minimum, so an empty form can never be saved.
++    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
++  });
++
++  test('B3/B4 · adding children fills lettered slots in order', async ({ page }) => {
++    const [a, b] = await children(page, 'b3', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await expect(pm.compositeAlertsPage.selectedChild(a.id)).toContainText('A');
++    await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
++    await expect(pm.compositeAlertsPage.childEmpty()).toHaveCount(0);
++    await expect(pm.compositeAlertsPage.childCap()).toContainText('2');
++  });
++
++  test('B6 · a slot never offers a child that is already selected elsewhere', async ({ page }) => {
++    const [a, b, c] = await children(page, 'b6', 3);
++    await openBuilderWith(page, [a, b]);
++
++    const options = await pm.compositeAlertsPage.optionIdsFor(a.id);
++    expect(options).toContain(a.id); // its own value stays selectable
++    expect(options).toContain(c.id);
++    expect(options).not.toContain(b.id);
++  });
++
++  test('B7 · replacing a child keeps the slot position and its letter', async ({ page }) => {
++    const [a, b, c] = await children(page, 'b7', 3);
++    await openBuilderWith(page, [a, b]);
++
++    await pm.compositeAlertsPage.replaceChild(a.id, c);
++
++    await expect(pm.compositeAlertsPage.selectedChild(c.id)).toContainText('A');
++    await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
++    await expect(pm.compositeAlertsPage.selectedChild(a.id)).toHaveCount(0);
++    // Slot A still reads as A in the expression, so the lettering is unchanged.
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A.*B/);
++  });
++
++  test('B5 · the cap stops at ten children', async ({ page }) => {
++    const made = await children(page, 'b5', 11);
++    await pm.compositeAlertsPage.openCreate();
++    await pm.compositeAlertsPage.chooseCompositeType();
++
++    for (let i = 0; i < 10; i += 1) await pm.compositeAlertsPage.addChild();
++
++    await expect(pm.compositeAlertsPage.childCap()).toContainText('10');
++    await expect(pm.compositeAlertsPage.selectedChildRows()).toHaveCount(10);
++    await expect(pm.compositeAlertsPage.childAdd()).toBeDisabled();
++    expect(made).toHaveLength(11); // an eleventh exists and still cannot be added
++  });
++
++  test('B8 · removing a child also removes its operand from the expression', async ({ page }) => {
++    const [a, b, c] = await children(page, 'b8', 3);
++    await openBuilderWith(page, [a, b, c]);
++    await pm.compositeAlertsPage.fillExpression('A && B && C');
++
++    await pm.compositeAlertsPage.removeChild(b.id);
++
++    // B is gone and C has been relettered into the freed slot.
++    const expression = await pm.compositeAlertsPage.expressionInput().inputValue();
++    expect(expression).toMatch(/^\s*A\s*&&\s*B\s*$/);
++    await expect(pm.compositeAlertsPage.selectedChild(c.id)).toContainText('B');
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++  });
++
++  test('B9 · removing a negated operand drops the NOT with it', async ({ page }) => {
++    const [a, b, c] = await children(page, 'b9', 3);
++    await openBuilderWith(page, [a, b, c]);
++    await pm.compositeAlertsPage.fillExpression('A && !B && C');
++
++    await pm.compositeAlertsPage.removeChild(b.id);
++
++    // A dangling "!" would make the draft unparseable and block Save.
++    const expression = await pm.compositeAlertsPage.expressionInput().inputValue();
++    expect(expression).not.toContain('!');
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++  });
++
++  // ===================== C · expression builder =====================
++
++  test('C1 · two children auto-apply the default AND expression', async ({ page }) => {
++    const [a, b] = await children(page, 'c1', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++    await expect(pm.compositeAlertsPage.expressionLive()).toBeVisible();
++  });
++
++  test('C3/C4 · palette buttons append operators and operands', async ({ page }) => {
++    const [a, b] = await children(page, 'c3', 2);
++    await openBuilderWith(page, [a, b]);
++    await pm.compositeAlertsPage.fillExpression('');
++
++    await pm.compositeAlertsPage.expressionInsert(a.id).click();
++    await pm.compositeAlertsPage.expressionOr().click();
++    await pm.compositeAlertsPage.expressionNot().click();
++    await pm.compositeAlertsPage.expressionInsert(b.id).click();
++
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A || ! B');
++  });
++
++  test('C3b · group buttons append parentheses', async ({ page }) => {
++    const [a, b, c] = await children(page, 'c3b', 3);
++    await openBuilderWith(page, [a, b, c]);
++    await pm.compositeAlertsPage.fillExpression('A &&');
++
++    await pm.compositeAlertsPage.expressionOpenGroup().click();
++    await pm.compositeAlertsPage.expressionInsert(b.id).click();
++    await pm.compositeAlertsPage.expressionOr().click();
++    await pm.compositeAlertsPage.expressionInsert(c.id).click();
++    await pm.compositeAlertsPage.expressionCloseGroup().click();
++
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue('A && ( B || C )');
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++  });
++
++  test('C5 · the lettered form round-trips to the stored id form', async ({ page }) => {
++    const [a, b] = await children(page, 'c5', 2);
++    await openBuilderWith(page, [a, b]);
++    await pm.compositeAlertsPage.fillExpression('B || A');
++
++    await pm.compositeAlertsPage.openAdvanced();
++
++    // The advanced textarea is the same expression in `{id}` form, operands in
++    // the order typed — proof the letters are bound to slots, not to sort order.
++    const raw = await pm.compositeAlertsPage.advancedField().inputValue();
++    expect(raw).toBe(`{${b.id}} || {${a.id}}`);
++  });
++
++  test('C6 · editing the advanced form updates the lettered form', async ({ page }) => {
++    const [a, b] = await children(page, 'c6', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await pm.compositeAlertsPage.fillAdvancedExpression(`{${a.id}} || {${b.id}}`);
++
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*\|\|\s*B/);
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++  });
++
++  test('C7 · unbalanced parentheses invalidate the draft and disable Save', async ({ page }) => {
++    const [a, b] = await children(page, 'c7', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await pm.compositeAlertsPage.fillExpression('( A && B');
++
++    await expect(pm.compositeAlertsPage.expressionError()).toBeVisible();
++    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
++  });
++
++  test('C8 · an unused child is offered in the tray and places on click', async ({ page }) => {
++    const [a, b, c] = await children(page, 'c8', 3);
++    await openBuilderWith(page, [a, b, c]);
++
++    await pm.compositeAlertsPage.fillExpression('A && B');
++
++    await expect(pm.compositeAlertsPage.expressionUnused()).toBeVisible();
++    await expect(pm.compositeAlertsPage.operandTray(c.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
++
++    await pm.compositeAlertsPage.operandTray(c.id).click();
++
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/C/);
++    await expect(pm.compositeAlertsPage.expressionUnused()).toHaveCount(0);
++  });
++
++  test('C9 · a duplicated operand invalidates the draft', async ({ page }) => {
++    const [a, b] = await children(page, 'c9', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await pm.compositeAlertsPage.fillExpression('A && A');
++
++    // B is now unused AND A is used twice; either alone is enough to block Save.
++    await expect(pm.compositeAlertsPage.expressionError()).toBeVisible();
++    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
++  });
++
++  test('C13 · every operator control carries an accessible name', async ({ page }) => {
++    const [a, b] = await children(page, 'c13', 2);
++    await openBuilderWith(page, [a, b]);
++
++    for (const control of [
++      pm.compositeAlertsPage.expressionAnd(),
++      pm.compositeAlertsPage.expressionOr(),
++      pm.compositeAlertsPage.expressionNot(),
++      pm.compositeAlertsPage.expressionOpenGroup(),
++      pm.compositeAlertsPage.expressionCloseGroup(),
++      pm.compositeAlertsPage.expressionInsert(a.id),
++      pm.compositeAlertsPage.childRemove(b.id),
++    ]) {
++      await expect(control).toHaveAccessibleName(/.+/);
++    }
++  });
++
++  // ===================== E · settings =====================
++
++  test('E2/E3 · stale policy offers three options and explains the active one', async ({ page }) => {
++    const [a, b] = await children(page, 'e2', 2);
++    await openBuilderWith(page, [a, b]);
++
++    expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('use_last_state');
++    const initialHelp = await pm.compositeAlertsPage.stalePolicyHelp().textContent();
++
++    await pm.compositeAlertsPage.selectStalePolicy('treat_as_false');
++    expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('treat_as_false');
++    await expect(pm.compositeAlertsPage.stalePolicyHelp()).not.toHaveText(initialHelp);
++
++    await pm.compositeAlertsPage.selectStalePolicy('treat_as_true');
++    expect(await pm.compositeAlertsPage.stalePolicyValue()).toBe('treat_as_true');
++  });
++
++  test('E5 · changing a setting re-runs validation against the server', async ({ page }) => {
++    const [a, b] = await children(page, 'e5', 2);
++    await openBuilderWith(page, [a, b]);
++    await expect(pm.compositeAlertsPage.preview()).toBeVisible();
++
++    const validations = [];
++    await page.route('**/alerts/composites/validate', async (route) => {
++      validations.push(route.request().postDataJSON());
++      await route.continue();
++    });
++
++    await pm.compositeAlertsPage.selectStalePolicy('treat_as_true');
++
++    await expect
++      .poll(() => validations.at(-1)?.composite_condition?.stale_child_policy)
++      .toBe('treat_as_true');
++  });
++
++  // ===================== F · edit round-trip =====================
++
++  test('F3 · editing an existing composite reloads its children and expression', async ({ page }) => {
++    const [a, b] = await children(page, 'f3', 2);
++    const parent = await createCompositeAlert(page, uniq('f3_parent'), [a.id, b.id]);
++    created.push(parent.id);
++
++    await pm.compositeAlertsPage.openEdit(parent.id);
++
++    await expect(pm.compositeAlertsPage.selectedChild(a.id)).toContainText('A');
++    await expect(pm.compositeAlertsPage.selectedChild(b.id)).toContainText('B');
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
++    await expect(pm.compositeAlertsPage.expressionError()).toHaveCount(0);
++  });
++
++  test('F4 · saving an edit submits operand ids, never display names', async ({ page }) => {
++    const [a, b] = await children(page, 'f4', 2);
++    const parent = await createCompositeAlert(page, uniq('f4_parent'), [a.id, b.id]);
++    created.push(parent.id);
++
++    let submitted;
++    await page.route(`**/api/v2/*/alerts/${parent.id}*`, async (route) => {
++      if (route.request().method() !== 'PUT') return route.continue();
++      submitted = route.request().postDataJSON();
++      await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
++    });
++
++    await pm.compositeAlertsPage.openEdit(parent.id);
++    await expect(pm.compositeAlertsPage.expressionInput()).toHaveValue(/A\s*&&\s*B/);
++    await pm.compositeAlertsPage.save().click();
++
++    await expect.poll(() => submitted).toBeTruthy();
++    const expression = submitted.composite_condition.expression;
++    expect(expression).toContain(`{${a.id}}`);
++    expect(expression).toContain(`{${b.id}}`);
++    expect(expression).not.toMatch(/\b[A-J]\b/); // no lettered form leaks to the API
++    expect(JSON.stringify(submitted)).not.toContain(a.name);
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js
+new file mode 100644
+index 00000000000..e0f4d791fc4
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-detail.spec.js
+@@ -0,0 +1,306 @@
++// Copyright 2026 OpenObserve Inc.
++
++/**
++ * Composite alerts — detail view and status timeline (plan areas G and H).
++ *
++ * WHY THIS FILE EXISTS
++ * --------------------
++ * The detail page answers "why is this firing?", and the honest answer often
++ * depends on state the expression does not show: a child whose freshness
++ * deadline expired, one that errored on its last run, or a composite that is
++ * enabled but has no scheduler job behind it and so will never evaluate at all.
++ *
++ * The missing-job banner is the sharpest of those — an enabled composite with
++ * no job is silently dead, and this banner is the only place that is ever said.
++ *
++ * MOCKING POLICY
++ * --------------
++ * Structure (children, links, config read-back) is driven live. Only states a
++ * fixture cannot reach on demand — stale reasons, evaluation errors, a missing
++ * scheduler job, an unreadable child — are injected by rewriting the detail
++ * response. The contracts behind them are asserted live in the pytest suite at
++ * tests/api-testing/tests/alerts/test_composite_alerts.py.
++ */
++
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const PageManager = require('../../pages/page-manager.js');
++const testLogger = require('../utils/test-logger.js');
++const {
++  uniq, compositeAlert, createAlert, findAlertId, createChildAlerts,
++  deleteAlertsCascade, seedAlertFixturesOnce,
++} = require('../utils/alerts-api-helpers.js');
++
++test.describe('Composite alerts — detail', {
++  tag: ['@alerts', '@alerts-composite', '@P0'],
++}, () => {
++  let pm;
++  let created = [];
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    pm = new PageManager(page);
++    created = [];
++    await seedAlertFixturesOnce(page);
++    await navigateToBase(page);
++  });
++
++  test.afterEach(async ({ page }, testInfo) => {
++    // Surfaced, not asserted: a leak is an env/cleanup problem, not a defect in
++    // the behaviour under test, so it must not turn a green test red — but it
++    // must not be invisible either, which is what discarding this return was.
++    const leaked = await deleteAlertsCascade(page, created);
++    if (leaked.length) {
++      testLogger.error('fixture cleanup leaked alerts', { leaked, test: testInfo.title });
++    }
++  });
++
++  /**
++   * Two children plus a composite over them.
++   *
++   * `conditionOverrides` is merged INTO the generated composite_condition rather
++   * than replacing it — replacing drops the expression the helper built from the
++   * child ids, and the API rejects an empty one.
++   */
++  async function seedComposite(page, prefix, conditionOverrides = {}) {
++    const [a, b] = await createChildAlerts(page, prefix, 2);
++    created.push(a.id, b.id);
++    const name = uniq(`${prefix}_parent`);
++    const payload = compositeAlert(name, [a.id, b.id]);
++    payload.composite_condition = { ...payload.composite_condition, ...conditionOverrides };
++    const response = await createAlert(page, payload);
++    expect(response.status(), await response.text()).toBe(200);
++    const id = await findAlertId(page, name);
++    created.push(id);
++    return { a, b, parent: { id, name } };
++  }
++
++  /**
++   * Rewrite the composite's own detail response before the page reads it.
++   *
++   * Matched by regex, not glob: `get_by_alert_id` appends `?folder=` only when a
++   * folder is passed, so a pattern requiring the query string silently misses
++   * the request and the test then asserts against unpatched live data. The
++   * `(\?|$)` anchor also keeps this off sibling paths like /composite-timeline.
++   */
++  async function patchDetail(page, id, mutate) {
++    let patched = 0;
++    await page.route(new RegExp(`/api/v2/[^/]+/alerts/${id}(\\?|$)`), async (route) => {
++      if (route.request().method() !== 'GET') return route.continue();
++      const response = await route.fetch();
++      const body = await response.json();
++      mutate(body);
++      patched += 1;
++      await route.fulfill({ response, json: body });
++    });
++    return () => patched;
++  }
++
++  // ===================== G · detail view =====================
++
++  test('G1/G3 · children render as lettered cards and the config reads back', async ({ page }) => {
++    const { a, b, parent } = await seedComposite(page, 'g1');
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.detail()).toBeVisible();
++    await expect(pm.compositeAlertsPage.detailChild(a.id)).toContainText('A');
++    await expect(pm.compositeAlertsPage.detailChild(a.id)).toContainText(a.name);
++    await expect(pm.compositeAlertsPage.detailChild(b.id)).toContainText('B');
++    await expect(pm.compositeAlertsPage.detailExpressionLive()).toBeVisible();
++
++    // The config block resolves ids back to names — the list never does this.
++    await expect(pm.compositeAlertsPage.detailExpression()).toContainText(a.name);
++    await expect(pm.compositeAlertsPage.detailExpression()).toContainText(b.name);
++  });
++
++  test('G2 · a child link points at that child, carrying its folder', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'g2');
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    const link = pm.compositeAlertsPage.detailChildLink(a.id);
++    await expect(link).toBeVisible();
++    await expect(link).toHaveAttribute('href', new RegExp(`/alerts/detail/${a.id}\\?folder=`));
++  });
++
++  test('G4 · the stale policy the composite was saved with reads back', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'g4', {
++      warning_counts_as_firing: false,
++      stale_child_policy: 'treat_as_false',
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.detailConfig()).toBeVisible();
++    await expect(pm.compositeAlertsPage.detailStalePolicy()).toContainText('treat_as_false');
++  });
++
++  test('G5 · an enabled composite with no scheduler job is called out', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'g5');
++    const patches = await patchDetail(page, parent.id, (body) => {
++      body.enabled = true;
++      body.scheduler_job_present = false;
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.missingJob()).toBeVisible();
++    expect(patches(), 'detail response was never patched').toBeGreaterThan(0);
++  });
++
++  test('G5b · a disabled composite is not accused of a missing job', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'g5b');
++    const patches = await patchDetail(page, parent.id, (body) => {
++      body.enabled = false;
++      body.scheduler_job_present = false;
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    // A paused composite has no job on purpose; warning about it is noise.
++    await expect(pm.compositeAlertsPage.detail()).toBeVisible();
++    await expect(pm.compositeAlertsPage.missingJob()).toHaveCount(0);
++    // Without this the assertion above also passes when the route never fired.
++    expect(patches(), 'detail response was never patched').toBeGreaterThan(0);
++  });
++
++  test('G6 · an expired freshness deadline is named on the child card', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'g6');
++    const patches = await patchDetail(page, parent.id, (body) => {
++      body.children[0] = {
++        ...body.children[0],
++        level: 'critical',
++        last_outcome: 'firing',
++        stale: true,
++        truth: true,
++        stale_reason: 'freshness_expired',
++        policy_decision: 'used_last_state',
++      };
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.detailStaleReason(a.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.detailChild(a.id)).toContainText(/stale|fresh/i);
++    expect(patches(), 'detail response was never patched').toBeGreaterThan(0);
++  });
++
++  test('G8 · an unreadable child degrades to its id instead of crashing', async ({ page }) => {
++    const { a, b, parent } = await seedComposite(page, 'g8');
++    const patches = await patchDetail(page, parent.id, (body) => {
++      body.children[0] = { alert_id: a.id, accessible: false };
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    // The page must still render: the readable sibling and the config survive.
++    await expect(pm.compositeAlertsPage.detail()).toBeVisible();
++    await expect(pm.compositeAlertsPage.detailChild(a.id)).toContainText(a.id);
++    await expect(pm.compositeAlertsPage.detailChildLink(a.id)).toHaveCount(0);
++    await expect(pm.compositeAlertsPage.detailChild(b.id)).toContainText(b.name);
++    expect(patches(), 'detail response was never patched').toBeGreaterThan(0);
++  });
++
++  test('G9 · a very long child name does not push the page sideways', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'g9');
++    const longName = `checkout_${'regional_database_failover_'.repeat(8)}`;
++    const patches = await patchDetail(page, parent.id, (body) => {
++      body.children[0] = { ...body.children[0], name: longName };
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.detailChild(a.id)).toContainText(longName);
++    expect(await pm.compositeAlertsPage.bodyHasNoHorizontalOverflow()).toBeTruthy();
++    expect(patches(), 'detail response was never patched').toBeGreaterThan(0);
++  });
++
++  // ===================== H · status timeline =====================
++
++  test('H1/H5 · the timeline renders a lane per child plus the result', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'h1');
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.timeline()).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineWindow('1h')).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineWindow('4h')).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineWindow('1d')).toBeVisible();
++    // The legend is the only key to the segment colours.
++    await expect(pm.compositeAlertsPage.timeline()).toContainText(/firing/i);
++  });
++
++  test('H2 · switching the window refetches over the new range', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'h2');
++    const ranges = [];
++    await page.route('**/composite-timeline*', async (route) => {
++      const url = new URL(route.request().url());
++      ranges.push(Number(url.searchParams.get('to')) - Number(url.searchParams.get('from')));
++      await route.continue();
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++    await expect.poll(() => ranges.length).toBeGreaterThan(0);
++    const initial = ranges.at(-1);
++
++    await pm.compositeAlertsPage.selectTimelineWindow('1d');
++
++    await expect.poll(() => ranges.at(-1)).toBeGreaterThan(initial);
++    // 4h default -> 1d is a six-fold widening, not an arbitrary change.
++    expect(ranges.at(-1)).toBe(86_400_000_000);
++  });
++
++  test('H3 · an empty timeline says so rather than rendering nothing', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'h3');
++    await page.route('**/composite-timeline*', async (route) => {
++      await route.fulfill({
++        status: 500,
++        contentType: 'application/json',
++        body: JSON.stringify({ message: 'unavailable' }),
++      });
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.timelineEmpty()).toBeVisible();
++    // A failed fetch must not take the rest of the detail page down with it.
++    await expect(pm.compositeAlertsPage.detailConfig()).toBeVisible();
++  });
++
++  test('H4 · lanes carry the current level of each accessible child', async ({ page }) => {
++    const { a, b, parent } = await seedComposite(page, 'h4');
++    await page.route('**/composite-timeline*', async (route) => {
++      const to = Date.now() * 1000;
++      const from = to - 14_400_000_000;
++      await route.fulfill({
++        status: 200,
++        contentType: 'application/json',
++        body: JSON.stringify({
++          from,
++          to,
++          children: [
++            {
++              alert_id: a.id, name: a.name, accessible: true, slot: 0, current_level: 'critical',
++              transitions: [{ at: from + 3_600_000_000, from_level: 'ok', to_level: 'critical' }],
++            },
++            {
++              alert_id: b.id, name: b.name, accessible: true, slot: 1, current_level: 'ok',
++              transitions: [],
++            },
++          ],
++          result: {
++            alert_id: parent.id, name: parent.name, accessible: true, current_level: 'critical',
++            transitions: [{ at: from + 3_600_000_000, from_level: 'ok', to_level: 'critical' }],
++          },
++        }),
++      });
++    });
++
++    await pm.compositeAlertsPage.openDetail(parent.id);
++
++    await expect(pm.compositeAlertsPage.timelineLevel(a.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineLevel(b.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineLevel(parent.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.timelineEmpty()).toHaveCount(0);
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js
+new file mode 100644
+index 00000000000..6d738889776
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-list.spec.js
+@@ -0,0 +1,237 @@
++// Copyright 2026 OpenObserve Inc.
++
++/**
++ * Composite alerts — alert list and references drawer (plan area A).
++ *
++ * WHY THIS FILE EXISTS
++ * --------------------
++ * The list row is assembled by a hand-maintained, field-by-field mapping, and a
++ * field the mapping forgets is invisible no matter what the API returns. Two
++ * live bugs are exactly that failure (o2-enterprise#2619 and #2620), so these
++ * assertions are pinned to what the API demonstrably sends rather than to what
++ * the table happens to render today.
++ *
++ * The delete-conflict path gets first-class coverage because it is the only
++ * thing preventing a user from dissolving a composite by deleting its children
++ * out from under it.
++ */
++
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const PageManager = require('../../pages/page-manager.js');
++const testLogger = require('../utils/test-logger.js');
++const {
++  uniq, urls, api, createChildAlerts, createCompositeAlert, listAlerts,
++  deleteAlertsCascade, seedAlertFixturesOnce,
++} = require('../utils/alerts-api-helpers.js');
++
++test.describe('Composite alerts — list', {
++  tag: ['@alerts', '@alerts-composite', '@P0'],
++}, () => {
++  let pm;
++  let created = [];
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    pm = new PageManager(page);
++    created = [];
++    await seedAlertFixturesOnce(page);
++    await navigateToBase(page);
++  });
++
++  test.afterEach(async ({ page }, testInfo) => {
++    // Surfaced, not asserted: a leak is an env/cleanup problem, not a defect in
++    // the behaviour under test, so it must not turn a green test red — but it
++    // must not be invisible either, which is what discarding this return was.
++    const leaked = await deleteAlertsCascade(page, created);
++    if (leaked.length) {
++      testLogger.error('fixture cleanup leaked alerts', { leaked, test: testInfo.title });
++    }
++  });
++
++  /** Two children plus a composite over them. */
++  async function seedComposite(page, prefix) {
++    const [a, b] = await createChildAlerts(page, prefix, 2);
++    created.push(a.id, b.id);
++    const parent = await createCompositeAlert(page, uniq(`${prefix}_parent`), [a.id, b.id]);
++    expect(parent.response.status(), await parent.response.text()).toBe(200);
++    created.push(parent.id);
++    return { a, b, parent };
++  }
++
++  test('A1/A2 · the Composite tab lists composites with a badge and child count', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'a1');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.compositeAlertsPage.openListTab('composite');
++
++    await expect(pm.compositeAlertsPage.listBadge(parent.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.listChildCount(parent.id)).toContainText('2');
++
++    // The tab is a filter: plain children must not appear under it.
++    await expect(pm.compositeAlertsPage.listBadge(a.id)).toHaveCount(0);
++  });
++
++  test('A3 · a composite row has no stream to show', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'a3');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.compositeAlertsPage.openListTab('composite');
++
++    await expect(pm.compositeAlertsPage.listRow(parent.id)).toContainText('--');
++  });
++
++  test.fixme('A4 · a composite row shows its trigger expression (o2-enterprise#2620)', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'a4');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.compositeAlertsPage.openListTab('composite');
++
++    // The list response carries no expression under any key, so the cell's
++    // `v-if` suppresses it entirely. Un-fixme once the backend sends one.
++    await expect(pm.compositeAlertsPage.listExpression(parent.id)).toBeVisible();
++  });
++
++  test.fixme('A5 · a referenced child shows a "referenced by" chip (o2-enterprise#2619)', async ({ page }) => {
++    const { a } = await seedComposite(page, 'a5');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.alertsPage.searchAlert(a.name);
++
++    // The API sends referenced_by_composite_count; the scheduled-row mapping
++    // drops it, so the chip never renders. Un-fixme once the mapping copies it.
++    await expect(pm.compositeAlertsPage.listReferenceCount(a.id)).toBeVisible();
++    await expect(pm.compositeAlertsPage.referenceChip()).toBeVisible();
++  });
++
++  test('A5b · the API supplies the reference count the chip needs', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'a5b');
++
++    // Guards the contract behind #2619 so a backend regression cannot hide
++    // behind the front-end bug while that one is still open.
++    const rows = await listAlerts(page);
++    expect(rows.find((r) => r.alert_id === a.id).referenced_by_composite_count).toBe(1);
++    expect(rows.find((r) => r.alert_id === parent.id).child_count).toBe(2);
++  });
++
++  test('A9 · deleting a referenced child is blocked and names the parent', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'a9');
++    let status = null;
++    page.on('response', (response) => {
++      if (response.url().includes(`/alerts/${a.id}`) && response.request().method() === 'DELETE') {
++        status = response.status();
++      }
++    });
++
++    await pm.compositeAlertsPage.openList();
++    await pm.alertsPage.searchAlert(a.name);
++    await pm.compositeAlertsPage.attemptRowDelete(a.name);
++
++    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
++    await expect(pm.compositeAlertsPage.referenceConflict()).toBeVisible();
++    await expect(pm.compositeAlertsPage.referenceParent(parent.id)).toBeVisible();
++    await expect.poll(() => status).toBe(409);
++
++    // The child must survive a refused delete.
++    expect(await listAlerts(page)).toEqual(
++      expect.arrayContaining([expect.objectContaining({ alert_id: a.id })]),
++    );
++  });
++
++  test('A7 · the conflict drawer navigates to the blocking parent', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'a7');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.alertsPage.searchAlert(a.name);
++    await pm.compositeAlertsPage.attemptRowDelete(a.name);
++    await expect(pm.compositeAlertsPage.referenceParent(parent.id)).toBeVisible();
++
++    await pm.compositeAlertsPage.referenceParent(parent.id).click();
++
++    await expect(page).toHaveURL(new RegExp(parent.id));
++  });
++
++  test('A6 · the conflict drawer is labelled and dismissable from the keyboard', async ({ page }) => {
++    const { a } = await seedComposite(page, 'a6');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.alertsPage.searchAlert(a.name);
++    await pm.compositeAlertsPage.attemptRowDelete(a.name);
++    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
++
++    // Reachable and operable without a mouse. Deliberately does NOT assert
++    // that opening the drawer MOVES focus here — see A6b.
++    const close = pm.compositeAlertsPage.referenceClose();
++    await expect(close).toHaveAccessibleName(/.+/);
++    await close.focus();
++    await expect(close).toBeFocused();
++
++    await page.keyboard.press('Enter');
++    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeHidden();
++  });
++
++  test.fixme('A6b · opening the conflict drawer moves focus into it (o2-enterprise#2622)', async ({ page }) => {
++    const { a } = await seedComposite(page, 'a6b');
++
++    await pm.compositeAlertsPage.openList();
++    await pm.alertsPage.searchAlert(a.name);
++    await pm.compositeAlertsPage.attemptRowDelete(a.name);
++    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
++
++    // Focus is never moved into the drawer, so a keyboard user is left on the
++    // alert-list search input behind it, with no indication it appeared.
++    //
++    // Cause is in ODrawer, not here: handleOpenAutoFocus() calls
++    // event.preventDefault() unconditionally — suppressing reka-ui's own focus
++    // placement — then focuses the first input/textarea in the drawer BODY,
++    // falling back to its primary button. This drawer has neither (body is
++    // link buttons, show-close is false and the control lives in
++    // #header-right), so focus is suppressed and nothing replaces it. The bare
++    // `autofocus` attribute on the close button is all that remains, and that
++    // is not dependable for dynamically inserted content: it holds locally and
++    // never fires in CI. The fix is an explicit focus() on open, and it applies
++    // to every ODrawer whose content is not a form.
++    await expect(pm.compositeAlertsPage.referenceClose()).toBeFocused();
++  });
++
++  test('A10 · removing the parent first frees its children for deletion', async ({ page }) => {
++    const { a, parent } = await seedComposite(page, 'a10');
++
++    const blocked = await api(page, 'delete', `${urls().v2}/alerts/${a.id}?folder=default`);
++    expect(blocked.status()).toBe(409);
++
++    const removeParent = await api(page, 'delete', `${urls().v2}/alerts/${parent.id}?folder=default`);
++    expect(removeParent.status(), await removeParent.text()).toBe(200);
++
++    const freed = await api(page, 'delete', `${urls().v2}/alerts/${a.id}?folder=default`);
++    expect(freed.status(), await freed.text()).toBe(200);
++
++    created = created.filter((id) => id !== parent.id && id !== a.id);
++
++    await pm.compositeAlertsPage.openList();
++    await pm.compositeAlertsPage.openListTab('composite');
++    await expect(pm.compositeAlertsPage.listBadge(parent.id)).toHaveCount(0);
++  });
++
++  test('A12 · a composite can be enabled and disabled again from its row', async ({ page }) => {
++    const { parent } = await seedComposite(page, 'a12');
++    const enabled = async () =>
++      (await listAlerts(page)).find((row) => row.alert_id === parent.id)?.enabled;
++
++    await pm.compositeAlertsPage.openList();
++    await pm.compositeAlertsPage.openListTab('composite');
++    await expect(pm.compositeAlertsPage.listBadge(parent.id)).toBeVisible();
++
++    const toggle = pm.compositeAlertsPage.listEnableToggle(parent.name);
++    await expect(toggle).toBeVisible();
++    expect(await enabled(), 'fixtures are created paused').toBe(false);
++
++    await toggle.click();
++    await expect.poll(enabled).toBe(true);
++
++    // The return trip is the half that actually matters: enabling a composite
++    // creates a scheduler job, and disabling has to tear it down again rather
++    // than leaving an orphan behind.
++    await toggle.click();
++    await expect.poll(enabled).toBe(false);
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js
+new file mode 100644
+index 00000000000..735a959458e
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-preview.spec.js
+@@ -0,0 +1,253 @@
++// Copyright 2026 OpenObserve Inc.
++
++/**
++ * Composite alerts — live preview (plan area D).
++ *
++ * WHY THIS FILE EXISTS
++ * --------------------
++ * The preview is the only place a user learns that a composite they are about
++ * to save will not behave as it reads: a child that is disabled, has never been
++ * evaluated, or whose last state is stale all produce an expression that is
++ * syntactically perfect and operationally wrong.
++ *
++ * MOCKING POLICY
++ * --------------
++ * The validate CONTRACT is asserted live in the pytest suite at
++ * tests/api-testing/tests/alerts/test_composite_alerts.py. This
++ * file asserts the RENDER, and mocks only the states that cannot be HELD long
++ * enough to drive a form: staleness needs a freshness deadline to pass, a
++ * validation outage needs a server that is down, and "never evaluated" survives
++ * only until the scheduler reaches the child — seconds, on a live env.
++ *
++ * A disabled child IS stable, so D3 runs fully live. The two files never mock
++ * the same side of the same assertion.
++ */
++
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const PageManager = require('../../pages/page-manager.js');
++const testLogger = require('../utils/test-logger.js');
++const {
++  uniq, simpleAlert, createAlert, findAlertId, createChildAlerts,
++  deleteAlertsCascade, seedAlertFixturesOnce,
++} = require('../utils/alerts-api-helpers.js');
++
++const VALIDATE_ROUTE = '**/alerts/composites/validate';
++
++test.describe('Composite alerts — live preview', {
++  tag: ['@alerts', '@alerts-composite', '@P0'],
++}, () => {
++  let pm;
++  let created = [];
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    pm = new PageManager(page);
++    created = [];
++    await seedAlertFixturesOnce(page);
++    await navigateToBase(page);
++  });
++
++  test.afterEach(async ({ page }, testInfo) => {
++    // Surfaced, not asserted: a leak is an env/cleanup problem, not a defect in
++    // the behaviour under test, so it must not turn a green test red — but it
++    // must not be invisible either, which is what discarding this return was.
++    const leaked = await deleteAlertsCascade(page, created);
++    if (leaked.length) {
++      testLogger.error('fixture cleanup leaked alerts', { leaked, test: testInfo.title });
++    }
++  });
++
++  async function children(page, prefix, count) {
++    const made = await createChildAlerts(page, prefix, count);
++    created.push(...made.map((c) => c.id));
++    return made;
++  }
++
++  async function disabledChild(page, prefix) {
++    const name = uniq(prefix);
++    await createAlert(page, { ...simpleAlert(name), enabled: false });
++    const id = await findAlertId(page, name);
++    created.push(id);
++    return { id, name };
++  }
++
++  async function openBuilderWith(page, picks) {
++    await pm.compositeAlertsPage.openCreate();
++    await pm.compositeAlertsPage.chooseCompositeType();
++    for (const child of picks) await pm.compositeAlertsPage.addChildById(child);
++  }
++
++  /** A validate response shaped like the server's, with `children` overridden. */
++  const validationBody = (expression, kids, extra = {}) => ({
++    valid: true,
++    canonical_expression: expression,
++    result: false,
++    result_level: 'ok',
++    warnings: [],
++    errors: [],
++    children: kids,
++    ...extra,
++  });
++
++  test('D1/D5/D6 · a valid draft renders a verdict and a step per operand', async ({ page }) => {
++    const [a, b] = await children(page, 'd1', 2);
++    await openBuilderWith(page, [a, b]);
++
++    await expect(pm.compositeAlertsPage.preview()).toBeVisible();
++    await expect(pm.compositeAlertsPage.previewResult()).toBeVisible();
++    await expect(pm.compositeAlertsPage.previewResult()).toHaveAttribute('aria-live', 'polite');
++
++    // One step per operand plus the result row.
++    const steps = pm.compositeAlertsPage.previewStepRows();
++    await expect(steps).toHaveCount(3);
++    await expect(steps.nth(0)).toContainText(a.name);
++    await expect(steps.nth(1)).toContainText(b.name);
++    await expect(steps.nth(2)).toContainText('A && B');
++  });
++
++  test('D2 · a never-evaluated child raises its warning', async ({ page }) => {
++    const [a, b] = await children(page, 'd2', 2);
++
++    // Mocked, not live: a fresh alert IS never-evaluated, but only until the
++    // scheduler reaches it — on this env that is a few seconds, well inside the
++    // time it takes to drive the form. Asserting it live races the scheduler and
++    // loses. The contract that the server emits this code lives in
++    // tests/api-testing/tests/alerts/test_composite_alerts.py
++    // (test_validate_returns_canonical_expression_and_all_child_diagnostics).
++    await page.route(VALIDATE_ROUTE, async (route) => {
++      const expression = `{${a.id}} && {${b.id}}`;
++      await route.fulfill({
++        status: 200,
++        contentType: 'application/json',
++        body: JSON.stringify(validationBody(expression, [
++          {
++            alert_id: a.id, accessible: true, name: a.name, alert_type: 'scheduled',
++            folder_id: 'default', enabled: true, level: null, level_at: null,
++            stale: true, truth: false,
++          },
++          {
++            alert_id: b.id, accessible: true, name: b.name, alert_type: 'scheduled',
++            folder_id: 'default', enabled: true, level: 'ok', stale: false, truth: false,
++          },
++        ], {
++          warnings: [{ code: 'child_never_evaluated', child_alert_id: a.id }],
++        })),
++      });
++    });
++
++    await openBuilderWith(page, [a, b]);
++
++    await expect(pm.compositeAlertsPage.previewWarning('child_never_evaluated')).toBeVisible();
++  });
++
++  test('D3 · a disabled child raises its warning', async ({ page }) => {
++    const [a] = await children(page, 'd3', 1);
++    const off = await disabledChild(page, 'd3_disabled');
++    await openBuilderWith(page, [a, off]);
++
++    await expect(pm.compositeAlertsPage.previewWarning('child_disabled')).toBeVisible();
++  });
++
++  test('D4 · a stale child under use-last-state names the child and the level it kept', async ({ page }) => {
++    const [a, b] = await children(page, 'd4', 2);
++
++    await page.route(VALIDATE_ROUTE, async (route) => {
++      const expression = `{${a.id}} && {${b.id}}`;
++      await route.fulfill({
++        status: 200,
++        contentType: 'application/json',
++        body: JSON.stringify(validationBody(expression, [
++          {
++            alert_id: a.id, accessible: true, name: a.name, alert_type: 'scheduled',
++            folder_id: 'default', enabled: true, level: 'critical', stale: true, truth: true,
++            stale_reason: 'freshness_expired', policy_decision: 'used_last_state',
++          },
++          {
++            alert_id: b.id, accessible: true, name: b.name, alert_type: 'scheduled',
++            folder_id: 'default', enabled: true, level: 'ok', stale: false, truth: false,
++          },
++        ])),
++      });
++    });
++
++    await openBuilderWith(page, [a, b]);
++
++    const banner = pm.compositeAlertsPage.previewStale(a.id);
++    await expect(banner).toBeVisible();
++    await expect(banner).toContainText(a.name);
++    await expect(banner).toContainText(/critical/i);
++  });
++
++  test('D7 · a validation failure surfaces as an error banner', async ({ page }) => {
++    const [a, b] = await children(page, 'd7', 2);
++
++    await page.route(VALIDATE_ROUTE, async (route) => {
++      await route.fulfill({
++        status: 500,
++        contentType: 'application/json',
++        body: JSON.stringify({ message: 'validation_unavailable' }),
++      });
++    });
++
++    await openBuilderWith(page, [a, b]);
++
++    // The component turns a thrown request into a synthetic invalid preview
++    // rather than leaving the last good result on screen.
++    await expect(pm.compositeAlertsPage.previewError('validation_unavailable')).toBeVisible();
++    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
++  });
++
++  test('D8 · a slow validation never overwrites a newer one', async ({ page }) => {
++    const [a, b] = await children(page, 'd8', 2);
++    const STALE_CODE = 'stale_response_should_be_ignored';
++    let received = 0;
++    let staleFulfilled = false;
++
++    await page.route(VALIDATE_ROUTE, async (route) => {
++      received += 1;
++      const mine = received;
++      const body = validationBody(`{${a.id}} && {${b.id}}`, [
++        {
++          alert_id: a.id, accessible: true, name: a.name, alert_type: 'scheduled',
++          folder_id: 'default', enabled: true, level: 'ok', stale: false, truth: false,
++        },
++        {
++          alert_id: b.id, accessible: true, name: b.name, alert_type: 'scheduled',
++          folder_id: 'default', enabled: true, level: 'ok', stale: false, truth: false,
++        },
++      ], {
++        // The FIRST response is slow and claims the draft is invalid. If the
++        // component applied responses in arrival order it would clobber the
++        // newer, valid result and wrongly disable Save.
++        valid: mine !== 1,
++        errors: mine === 1 ? [{ code: STALE_CODE }] : [],
++      });
++      if (mine === 1) await new Promise((resolve) => setTimeout(resolve, 6000));
++      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
++      if (mine === 1) staleFulfilled = true;
++    });
++
++    await openBuilderWith(page, [a, b]);
++    await expect.poll(() => received).toBe(1);
++
++    // Force a SECOND validation while the first is still in flight, via a
++    // setting rather than the child list or the expression: those two can only
++    // be changed into a state the local validator rejects, and a locally
++    // invalid draft short-circuits before the request is ever sent — leaving
++    // nothing for the newer response to win.
++    await pm.compositeAlertsPage.selectStalePolicy('treat_as_false');
++    await expect.poll(() => received).toBeGreaterThan(1);
++
++    // Wait for the stale reply to actually LAND, not merely to have been
++    // received: the handler counts a request before it sleeps, so polling on
++    // arrivals would assert against a preview the stale payload had never
++    // reached, and the test would pass even against a component that applies
++    // responses in arrival order.
++    await expect.poll(() => staleFulfilled, { timeout: 30000 }).toBe(true);
++
++    await expect(pm.compositeAlertsPage.previewError(STALE_CODE)).toHaveCount(0);
++    // The newer, valid result is what survived — so Save is still reachable.
++    await expect(pm.compositeAlertsPage.previewResult()).toBeVisible();
++    await expect(pm.compositeAlertsPage.save()).toBeEnabled();
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js b/tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js
+deleted file mode 100644
+index 9fdc38e3aa5..00000000000
+--- a/tests/ui-testing/playwright-tests/Alerts/alerts-composite-ui.spec.js
++++ /dev/null
+@@ -1,237 +0,0 @@
+-// Copyright 2026 OpenObserve Inc.
+-
+-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+-const PageManager = require('../../pages/page-manager.js');
+-const testLogger = require('../utils/test-logger.js');
+-const {
+-  uniq, urls, api, simpleAlert, compositeAlert,
+-  createAlert, findAlertId, deleteAlerts, seedAlertFixtures,
+-} = require('../utils/alerts-api-helpers.js');
+-
+-test.describe('Composite alerts — UI scenarios', {
+-  tag: ['@alerts', '@alerts-composite', '@P0'],
+-}, () => {
+-  let pm;
+-  let created = [];
+-
+-  test.beforeEach(async ({ page }, testInfo) => {
+-    testLogger.testStart(testInfo.title, testInfo.file);
+-    pm = new PageManager(page);
+-    created = [];
+-    await seedAlertFixtures(page);
+-    await navigateToBase(page);
+-  });
+-
+-  test.afterEach(async ({ page }) => {
+-    await deleteAlerts(page, [...created].reverse());
+-  });
+-
+-  async function createChild(page, name, enabled = false) {
+-    const payload = simpleAlert(name);
+-    payload.enabled = enabled;
+-    const response = await createAlert(page, payload);
+-    expect(response.status(), await response.text()).toBe(200);
+-    const id = await findAlertId(page, name);
+-    expect(id).toBeTruthy();
+-    created.push(id);
+-    return { id, name };
+-  }
+-
+-  async function createCompositeFixture(page, children, overrides = {}) {
+-    const name = uniq('composite_ui');
+-    const response = await createAlert(
+-      page,
+-      compositeAlert(name, children.map((child) => child.id), overrides),
+-    );
+-    expect(response.status(), await response.text()).toBe(200);
+-    const id = await findAlertId(page, name);
+-    expect(id).toBeTruthy();
+-    created.push(id);
+-    return { id, name };
+-  }
+-
+-  test('list exposes Composite filter, badge, expression, child count, and reference count', async ({ page }) => {
+-    const first = await createChild(page, uniq('composite_list_a'));
+-    const second = await createChild(page, uniq('composite_list_b'));
+-    const childComposite = await createCompositeFixture(page, [first, second]);
+-    const parent = await createCompositeFixture(page, [
+-      { id: childComposite.id, name: childComposite.name },
+-      first,
+-    ]);
+-
+-    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
+-    await pm.compositeAlertsPage.listCompositeTab().click();
+-
+-    await expect(pm.compositeAlertsPage.listBadge(parent.id)).toBeVisible();
+-    await expect(pm.compositeAlertsPage.listChildCount(parent.id)).toContainText('2');
+-    await expect(pm.compositeAlertsPage.listReferenceCount(childComposite.id)).toContainText('1');
+-    await expect(pm.compositeAlertsPage.childNameCell(first.name)).toBeVisible();
+-  });
+-
+-  test('child search enforces the ten-child cap and does not append to a custom expression', async ({ page }) => {
+-    const children = [];
+-    for (let index = 0; index < 11; index += 1) {
+-      children.push(await createChild(page, uniq(`composite_cap_${index}`)));
+-    }
+-
+-    await pm.compositeAlertsPage.openCreate();
+-    await pm.compositeAlertsPage.chooseCompositeType();
+-    for (const child of children.slice(0, 2)) {
+-      await pm.compositeAlertsPage.searchAndSelect(child.name, child.id);
+-    }
+-    await expect(pm.compositeAlertsPage.expressionSummary()).toContainText('AND');
+-
+-    await pm.compositeAlertsPage.advancedExpression().fill(
+-      `{${children[0].id}} || ({${children[1].id}} && !{${children[2].id}})`,
+-    );
+-    await expect(pm.compositeAlertsPage.expressionSummary()).toContainText(/OR.*\(.*AND.*NOT/s);
+-
+-    for (const child of children.slice(2, 10)) {
+-      await pm.compositeAlertsPage.searchAndSelect(child.name, child.id);
+-    }
+-    await pm.compositeAlertsPage.childSearch().fill(children[10].name);
+-    await expect(pm.compositeAlertsPage.childOption(children[10].id)).toHaveAttribute('aria-disabled', 'true');
+-    await expect(pm.compositeAlertsPage.childCap()).toContainText('10');
+-    await expect(pm.compositeAlertsPage.expressionUnused()).toBeVisible();
+-    await expect(pm.compositeAlertsPage.save()).toBeDisabled();
+-  });
+-
+-  test('live preview explains Warning, stale use-last-state, disabled, and never evaluated children', async ({ page }) => {
+-    const children = [];
+-    for (let index = 0; index < 4; index += 1) {
+-      children.push(await createChild(page, uniq(`composite_preview_${index}`)));
+-    }
+-    await page.route('**/api/v2/*/alerts/composites/validate', async (route) => {
+-      await route.fulfill({
+-        status: 200,
+-        contentType: 'application/json',
+-        body: JSON.stringify({
+-          valid: true,
+-          canonical_expression: children.map((child) => `{${child.id}}`).join(' && '),
+-          result: false,
+-          result_level: 'ok',
+-          warnings: [
+-            { code: 'child_disabled', child_alert_id: children[2].id },
+-            { code: 'child_never_evaluated', child_alert_id: children[3].id },
+-          ],
+-          errors: [],
+-          children: [
+-            { alert_id: children[0].id, name: children[0].name, accessible: true, enabled: true, level: 'warning', stale: false, truth: true },
+-            { alert_id: children[1].id, name: children[1].name, accessible: true, enabled: true, level: 'critical', stale: true, truth: true, stale_reason: 'freshness_expired', policy_decision: 'used_last_state' },
+-            { alert_id: children[2].id, name: children[2].name, accessible: true, enabled: false, level: 'ok', stale: false, truth: false },
+-            { alert_id: children[3].id, name: children[3].name, accessible: true, enabled: true, level: null, level_at: null, stale: true, truth: false },
+-          ],
+-        }),
+-      });
+-    });
+-
+-    await pm.compositeAlertsPage.openCreate();
+-    await pm.compositeAlertsPage.chooseCompositeType();
+-    for (const child of children) {
+-      await pm.compositeAlertsPage.searchAndSelect(child.name, child.id);
+-    }
+-
+-    await pm.compositeAlertsPage.expectPreviewChild(children[0].id, /warning.*true/i);
+-    await pm.compositeAlertsPage.expectPreviewChild(children[1].id, /freshness.*expired.*last.*critical/i);
+-    await pm.compositeAlertsPage.expectPreviewChild(children[2].id, /disabled/i);
+-    await pm.compositeAlertsPage.expectPreviewChild(children[3].id, /never.*evaluated/i);
+-  });
+-
+-  test('edit round-trip displays renamed children but submits the same operand IDs', async ({ page }) => {
+-    const first = await createChild(page, uniq('composite_identity_a'));
+-    const second = await createChild(page, uniq('composite_identity_b'));
+-    const composite = await createCompositeFixture(page, [first, second]);
+-    let submitted;
+-
+-    await page.route(`**/api/v2/*/alerts/${composite.id}*`, async (route) => {
+-      if (route.request().method() === 'PUT') {
+-        submitted = route.request().postDataJSON();
+-        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+-        return;
+-      }
+-      const response = await route.fetch();
+-      const body = await response.json();
+-      body.children[0].name = 'Renamed child with a very long display name';
+-      body.children[0].folder_id = 'moved-folder';
+-      await route.fulfill({ response, json: body });
+-    });
+-
+-    await pm.compositeAlertsPage.openEdit(composite.id);
+-    await expect(pm.compositeAlertsPage.renamedChildText('Renamed child with a very long display name')).toBeVisible();
+-    await pm.compositeAlertsPage.save().click();
+-
+-    await expect.poll(() => submitted).toBeTruthy();
+-    expect(submitted.composite_condition.expression).toContain(`{${first.id}}`);
+-    expect(submitted.composite_condition.expression).toContain(`{${second.id}}`);
+-    expect(JSON.stringify(submitted)).not.toContain('Renamed child with a very long display name');
+-  });
+-
+-  test('detail why-firing view shows links, explicit stale policy, and enabled-only job warning', async ({ page }) => {
+-    const longName = `checkout_${'regional_database_failover_'.repeat(8)}`;
+-    const first = await createChild(page, longName);
+-    const second = await createChild(page, uniq('composite_detail_b'));
+-    const composite = await createCompositeFixture(page, [first, second]);
+-
+-    await page.route(`**/api/v2/*/alerts/${composite.id}*`, async (route) => {
+-      const response = await route.fetch();
+-      const body = await response.json();
+-      body.enabled = true;
+-      body.scheduler_job_present = false;
+-      body.evaluation = { result: true, level: 'critical', evaluated_at: 1786500015000000 };
+-      body.children[0] = { ...body.children[0], level: 'critical', last_outcome: 'firing', stale: true, truth: true, stale_reason: 'freshness_expired', policy_decision: 'used_last_state' };
+-      await route.fulfill({ response, json: body });
+-    });
+-
+-    await pm.compositeAlertsPage.openDetail(composite.id);
+-    await expect(pm.compositeAlertsPage.detailResult()).toContainText(/critical/i);
+-    await expect(pm.compositeAlertsPage.detailExpression()).toContainText(longName);
+-    await expect(pm.compositeAlertsPage.detailChildren()).toBeVisible();
+-    await expect(pm.compositeAlertsPage.detailChild(first.id)).toContainText(/freshness.*expired.*last.*critical/i);
+-    await expect(pm.compositeAlertsPage.detailChild(first.id).getByRole('link')).toHaveAttribute('href', new RegExp(first.id));
+-    await expect(pm.compositeAlertsPage.missingJob()).toBeVisible();
+-
+-    await page.evaluate(() => document.documentElement.classList.add('dark'));
+-    await expect(pm.compositeAlertsPage.detailChildren()).toBeVisible();
+-    expect(await pm.compositeAlertsPage.bodyHasNoHorizontalOverflow()).toBeTruthy();
+-  });
+-
+-  test('reference chip and delete 409 open the same navigable parent list', async ({ page }) => {
+-    const first = await createChild(page, uniq('composite_delete_a'));
+-    const second = await createChild(page, uniq('composite_delete_b'));
+-    const parent = await createCompositeFixture(page, [first, second]);
+-
+-    await page.goto(`/web/alerts?org_identifier=${urls().org}&folder=default`);
+-    await pm.alertsPage.searchAlert(first.name);
+-    await pm.compositeAlertsPage.referenceChip().click();
+-    await expect(pm.compositeAlertsPage.referenceParent(parent.id)).toBeVisible();
+-    await expect(pm.compositeAlertsPage.referenceClose()).toBeFocused();
+-
+-    await pm.alertsPage.deleteAlertByRow(first.name);
+-    await expect(pm.compositeAlertsPage.referenceConflict()).toBeVisible();
+-    await pm.compositeAlertsPage.referenceParent(parent.id).click();
+-    await expect(page).toHaveURL(new RegExp(`/alerts/detail/${parent.id}`));
+-  });
+-
+-  test('builder controls are keyboard reachable and screen-reader labelled', async ({ page }) => {
+-    const first = await createChild(page, uniq('composite_a11y_a'));
+-    const second = await createChild(page, uniq('composite_a11y_b'));
+-    await pm.compositeAlertsPage.openCreate();
+-    await pm.compositeAlertsPage.chooseCompositeType();
+-    await pm.compositeAlertsPage.searchAndSelect(first.name, first.id);
+-    await pm.compositeAlertsPage.searchAndSelect(second.name, second.id);
+-
+-    for (const control of [
+-      pm.compositeAlertsPage.expressionAnd(),
+-      pm.compositeAlertsPage.expressionOr(),
+-      pm.compositeAlertsPage.expressionNot(),
+-      pm.compositeAlertsPage.expressionOpenGroup(),
+-      pm.compositeAlertsPage.expressionCloseGroup(),
+-    ]) {
+-      await expect(control).toHaveAccessibleName(/.+/);
+-    }
+-    await pm.compositeAlertsPage.expressionAnd().focus();
+-    await page.keyboard.press('Tab');
+-    await expect(pm.compositeAlertsPage.expressionOr()).toBeFocused();
+-    await expect(pm.compositeAlertsPage.previewResult()).toHaveAttribute('aria-live', 'polite');
+-  });
+-});
+diff --git a/tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js b/tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js
+index 9b75354dbd6..952d36d4aa3 100644
+--- a/tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js
++++ b/tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js
+@@ -129,14 +129,93 @@ async function getCompositeReferences(page, alertId) {
+   return api(page, 'get', `${urls().v2}/alerts/${encodeURIComponent(alertId)}/composite-references`);
+ }
+ 
++/**
++ * Create `count` plain scheduled alerts in one go and return [{id, name}].
++ *
++ * The ten-child cap and the server-side child-limit cases both need more
++ * children than is tolerable to create one await at a time, so these are
++ * issued concurrently and resolved against a single list read.
++ */
++async function createChildAlerts(page, prefix, count) {
++  const names = Array.from({ length: count }, (_, i) => uniq(`${prefix}_${i}`));
++  const responses = await Promise.all(
++    names.map((name) => createAlert(page, simpleAlert(name))),
++  );
++
++  // Fail here, loudly, rather than handing back {id: undefined}. An undefined
++  // id flows into a composite expression as the literal string "{undefined}"
++  // and only surfaces much later as an unexplained locator timeout.
++  const rejected = responses
++    .map((response, i) => ({ name: names[i], status: response.status() }))
++    .filter(({ status }) => status < 200 || status >= 300);
++  if (rejected.length) {
++    throw new Error(
++      `createChildAlerts: ${rejected.length}/${count} creates failed: `
++      + rejected.map((r) => `${r.name} -> ${r.status}`).join(', '),
++    );
++  }
++
++  const byName = new Map((await listAlerts(page)).map((a) => [a.name, a.alert_id]));
++  const missing = names.filter((name) => !byName.get(name));
++  if (missing.length) {
++    throw new Error(
++      `createChildAlerts: created but absent from the list read (raise page_size?): ${missing.join(', ')}`,
++    );
++  }
++  return names.map((name) => ({ name, id: byName.get(name) }));
++}
++
++/**
++ * Create a composite over `childIds` and return {response, id, name}.
++ *
++ * `response` is handed back unasserted so a caller can examine a deliberate
++ * rejection; `id` is undefined in that case. A 2xx with no resolvable id is
++ * never legitimate, though, so that combination throws.
++ */
++async function createCompositeAlert(page, name, childIds, overrides = {}) {
++  const response = await createAlert(page, compositeAlert(name, childIds, overrides));
++  const id = await findAlertId(page, name);
++  if (response.ok() && !id) {
++    throw new Error(`createCompositeAlert: "${name}" saved but absent from the list read`);
++  }
++  return { response, name, id };
++}
++
+ async function listAlerts(page) {
+-  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=100`)).json()).list || [];
++  // 1000, not 100: parallel workers each hold up to 11 child fixtures, and a
++  // name lookup that silently falls off page 1 is what made bad ids possible.
++  return (await (await api(page, 'get', `${urls().v2}/alerts?folder=default&page_size=1000`)).json()).list || [];
+ }
+ 
+ async function findAlertId(page, name) {
+   return (await listAlerts(page)).find((a) => a.name === name)?.alert_id;
+ }
+ 
++/**
++ * `seedAlertFixtures`, but at most once per worker process.
++ *
++ * The seed is idempotent, so calling it in every `beforeEach` is harmless in
++ * principle — but it is three API calls plus an ingest per test, and against a
++ * SHARED dev env that multiplies into real contention once specs run in
++ * parallel. Playwright gives each worker its own module registry, so a
++ * module-level promise collapses it to one seed per worker while keeping full
++ * parallelism.
++ *
++ * Deliberately separate from `seedAlertFixtures`: specs that assert on freshly
++ * ingested rows need the per-test ingest, and silently taking it away from them
++ * would trade this flake for a subtler one.
++ */
++let seedOnce = null;
++function seedAlertFixturesOnce(page) {
++  if (!seedOnce) {
++    seedOnce = seedAlertFixtures(page).catch((error) => {
++      seedOnce = null; // let the next test retry rather than inherit the failure
++      throw error;
++    });
++  }
++  return seedOnce;
++}
++
+ /** Best-effort delete of the given alert_ids (used in afterEach). */
+ async function deleteAlerts(page, ids) {
+   const { v2 } = urls();
+@@ -145,6 +224,47 @@ async function deleteAlerts(page, ids) {
+   }
+ }
+ 
++/**
++ * Delete composites before their children, whatever order the ids arrive in.
++ *
++ * A child that is still referenced is refused with 409, so cleanup that walks a
++ * flat list leaks fixtures whenever the caller's creation order is not exactly
++ * children-then-parents. Composites can nest, so parents are drained in passes
++ * until nothing more will go.
++ */
++async function deleteAlertsCascade(page, ids) {
++  const alive = new Set(ids.filter(Boolean));
++  for (let pass = 0; pass < 6 && alive.size; pass += 1) {
++    const before = alive.size;
++    let transportFailed = false;
++    const rows = await listAlerts(page).catch(() => {
++      transportFailed = true;
++      return [];
++    });
++    const type = new Map(rows.map((r) => [r.alert_id, r.alert_type]));
++    const composites = [...alive].filter((id) => type.get(id) === 'composite');
++    for (const id of composites.length ? composites : [...alive]) {
++      const response = await api(page, 'delete', `${urls().v2}/alerts/${id}?folder=default`)
++        .catch(() => {
++          transportFailed = true;
++          return null;
++        });
++      // 404 counts as gone; a 409 means a parent is still standing, so leave it
++      // for the next pass once that parent has been removed.
++      if (response && (response.status() < 400 || response.status() === 404)) alive.delete(id);
++    }
++    // Stop only when a pass made no progress for a REASON, not because the
++    // network dropped. Treating a transient failure as "nothing left to do"
++    // abandoned every id on the first hiccup and leaked the whole fixture set
++    // — silently, because callers discard the return value.
++    if (alive.size === before) {
++      if (!transportFailed) break;
++      await new Promise((resolve) => setTimeout(resolve, 1500));
++    }
++  }
++  return [...alive];
++}
++
+ /**
+  * Idempotently seed the template + a "dogfood" destination + a 3-group stream.
+  *
+@@ -248,7 +368,9 @@ module.exports = {
+   uniq, urls, api,
+   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
+   compositeAlert, validateComposite, getCompositeReferences,
+-  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
++  createChildAlerts, createCompositeAlert, deleteAlertsCascade,
++  createAlert, listAlerts, findAlertId, getAlert, deleteAlerts,
++  seedAlertFixtures, seedAlertFixturesOnce,
+   createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
+   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
+ };

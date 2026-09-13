@@ -1,0 +1,12 @@
+[
+  {
+    "title": "E1 · toggling warning-counts-as-firing flips the flag and re-runs validation",
+    "action": "append",
+    "verifies": "the warning-counts-as-firing OSwitch flips aria-checked and re-fires the validate endpoint with the new flag"
+  },
+  {
+    "title": "P0 · composite is created end-to-end from the wizard and appears in the list",
+    "action": "append",
+    "verifies": "the create wizard POSTs a valid composite whose badge and child count appear under the Composite list tab"
+  }
+]
