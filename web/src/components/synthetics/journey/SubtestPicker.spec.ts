@@ -520,4 +520,42 @@ describe("SubtestPicker load state", () => {
     expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(false);
     consoleError.mockRestore();
   });
+
+  // A persisted reference is `{ id }` only; the step's own name is the fallback the host passes.
+  it("displays the fallback name for an id-only reference while loading, after load and after a failed load", async () => {
+    const list = deferredList();
+    const w = mountPicker({ modelValue: { id: "login-test" }, fallbackName: "Login" });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Login");
+    expect(w.text()).not.toContain("login-test");
+
+    list.resolve({ data: { checks: CHECKS } });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Login");
+    const values = (select(w).props("options") as { value?: string }[]).map((o) => o.value);
+    expect(values).toEqual(["login-test"]);
+
+    const failed = deferredList();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const w2 = mountPicker({ modelValue: { id: "login-test" }, fallbackName: "Login" });
+    failed.reject(new Error("boom"));
+    await flushPromises();
+    expect(displayLabel(w2)).toBe("Login");
+    expect(w2.text()).not.toContain("login-test");
+    consoleError.mockRestore();
+  });
+
+  it("prefers the reference's own name over the fallback", async () => {
+    deferredList();
+    const w = mountPicker({ modelValue: SAVED, fallbackName: "Stale step name" });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Login");
+  });
+
+  it("falls back to the id only when neither the reference nor the host names it", async () => {
+    deferredList();
+    const w = mountPicker({ modelValue: { id: "login-test" } });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("login-test");
+  });
 });

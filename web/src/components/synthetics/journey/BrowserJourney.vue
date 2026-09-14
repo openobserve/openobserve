@@ -1178,6 +1178,12 @@ async function ensureChildLoaded(row: BrowserStep) {
   }
 }
 
+const variablesToggleLabel = computed(() =>
+  props.variablesPanelOpen
+    ? t("synthetics.variablesPanel.collapsePanel")
+    : t("synthetics.variablesPanel.openPanel"),
+);
+
 // ── Subtest composition ──────────────────────────────────────────────────
 // `=== true` so an unknown flag hides the button — the step editor's stance for its Subtest option.
 const isCompositionEnabled = computed(
@@ -1419,7 +1425,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
       </div>
 
-      <!-- The filter is flex-1 and the action area shrink-0, so a chip's width comes out of the filter and the buttons stay put. -->
       <JourneySuggestions
         v-if="!readonly"
         :suggestions="suggestions"
@@ -1546,11 +1551,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           v-if="variablesPanelOpen !== undefined"
           variant="panel-collapse"
           size="icon-toolbar"
-          :aria-label="
-            variablesPanelOpen
-              ? t('synthetics.variablesPanel.collapsePanel')
-              : t('synthetics.variablesPanel.openPanel')
-          "
+          :aria-label="variablesToggleLabel"
           data-test="synthetics-journey-toggle-variables-btn"
           @click="emit('toggle-variables-panel')"
         >
@@ -1560,14 +1561,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             "
             size="sm"
           />
-          <OTooltip
-            :content="
-              variablesPanelOpen
-                ? t('synthetics.variablesPanel.collapsePanel')
-                : t('synthetics.variablesPanel.openPanel')
-            "
-            side="bottom"
-          />
+          <OTooltip :content="variablesToggleLabel" side="bottom" />
         </OButton>
       </div>
     </div>

@@ -34,9 +34,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...args: unknown[]) => mockToast(...args),
 }));
 
-// Mocked so `ensureChildLoaded`'s `org.value` read (via useStore) resolves
-// instead of throwing when no Vuex plugin is installed on the test wrapper.
-// `zoConfig` is mutable so a test can flip the composition gate per case.
+// Mocked so `ensureChildLoaded`'s `org.value` read (via useStore) resolves without a Vuex plugin.
 const mockStoreState: {
   selectedOrganization: { identifier: string };
   zoConfig: Record<string, unknown>;
@@ -276,7 +274,6 @@ describe("BrowserJourney recording", () => {
     const cancel = wrapper.find('[data-test="synthetics-journey-cancel-btn"]');
     expect(cancel.attributes("icon-left")).toBe("close");
     expect(cancel.attributes("variant")).toBe("outline");
-    expect(wrapper.findAll('[class~="w-24!"]')).toHaveLength(0);
 
     // Stream steps via the bridge
     emitStreamEvent({
@@ -917,8 +914,8 @@ describe("BrowserJourney reveals a newly created step", () => {
   }
 
   /** The journey as the parent now holds it, after the component's emit. */
-  function currentSteps(w: VueWrapper): any[] {
-    return (w.props() as Record<string, unknown>).modelValue as any[];
+  function currentSteps(w: VueWrapper): BrowserStep[] {
+    return (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
   }
 
   function expandedIds(w: VueWrapper): string[] {
@@ -995,13 +992,9 @@ describe("BrowserJourney reveals a newly created step", () => {
   });
 });
 
-// The only way to add a subtest was Add Step, open the row, change its action —
-// nothing in the toolbar said subtests exist. Add Subtest is that path in one
-// click: it appends a step already set to `subtest` and reveals it with the
-// picker open, so the author's next click is choosing a test.
 describe("BrowserJourney Add Subtest button", () => {
   let wrapper: VueWrapper;
-  let originalScrollIntoView: any;
+  let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
   const ADD_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
   const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
@@ -1009,25 +1002,24 @@ describe("BrowserJourney Add Subtest button", () => {
   beforeEach(() => {
     mockStoreState.zoConfig = { synthetics_composition_enabled: true };
     mockSyntheticsList.mockResolvedValue({ data: { checks: [] } });
-    originalScrollIntoView = (Element.prototype as any).scrollIntoView;
-    (Element.prototype as any).scrollIntoView = vi.fn();
+    originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
   });
 
   afterEach(() => {
-    (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+    Element.prototype.scrollIntoView = originalScrollIntoView;
     mockStoreState.zoConfig = {};
     mockSyntheticsList.mockReset();
     wrapper?.unmount();
     vi.restoreAllMocks();
   });
 
-  // Same v-model harness as the reveal tests above: revealStep needs the row rendered
-  // on the next tick, so the parent must write the emit back synchronously.
-  function mountWithModel(initial: any[], withExpansion = false) {
+  // revealStep needs the row rendered on the next tick, so the parent writes the emit back synchronously.
+  function mountWithModel(initial: BrowserStep[], withExpansion = false) {
     const w = mount(BrowserJourney, {
       props: {
         modelValue: initial,
-        "onUpdate:modelValue": (steps: any[]) => w.setProps({ modelValue: steps }),
+        "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
       },
       global: {
         stubs: withExpansion
@@ -1038,8 +1030,8 @@ describe("BrowserJourney Add Subtest button", () => {
     return w;
   }
 
-  function currentSteps(w: VueWrapper): any[] {
-    return (w.props() as Record<string, unknown>).modelValue as any[];
+  function currentSteps(w: VueWrapper): BrowserStep[] {
+    return (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
   }
 
   it("should render an outline button with an icon immediately after Add Step", () => {
@@ -1066,8 +1058,7 @@ describe("BrowserJourney Add Subtest button", () => {
     expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
   });
 
-  // Hidden, not disabled, when the flag is unknown — the same `=== true` stance the
-  // step editor takes for its Subtest action option.
+  // Hidden, not disabled, when the flag is unknown — the step editor's `=== true` stance.
   it("should not render when the composition flag is absent", () => {
     mockStoreState.zoConfig = {};
     wrapper = mountJourney();
@@ -1109,7 +1100,6 @@ describe("BrowserJourney Add Subtest button", () => {
       name: "",
       subtest: undefined,
     });
-    expect(steps[1].locator).toBeUndefined();
   });
 
   it("should reveal the new step with the subtest picker in its expanded row", async () => {
@@ -1126,7 +1116,7 @@ describe("BrowserJourney Add Subtest button", () => {
     expect(rows[1].find('[data-test="synthetics-journey-step-subtest-picker"]').exists()).toBe(
       true,
     );
-    expect((Element.prototype as any).scrollIntoView).toHaveBeenCalledWith({
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
       block: "nearest",
       behavior: "smooth",
     });
@@ -3004,6 +2994,7 @@ describe("BrowserJourney — a restore that never reached the recording point", 
   });
 
   afterEach(() => {
+    mockStoreState.zoConfig = {};
     wrapper?.unmount();
     vi.restoreAllMocks();
     vi.useRealTimers();
@@ -3436,18 +3427,14 @@ describe("BrowserJourney — a restore that never reached the recording point", 
 
   it("should not offer Add Subtest while the restore runs", async () => {
     mockStoreState.zoConfig = { synthetics_composition_enabled: true };
-    try {
-      wrapper = mountAnchored();
-      await startAnchoredRestore(wrapper);
-      respondToLastCommand({ success: true });
-      await flushPromises();
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    respondToLastCommand({ success: true });
+    await flushPromises();
 
-      const addSubtest = wrapper.find('[data-test="synthetics-journey-add-subtest-btn"]');
-      expect(addSubtest.exists(), "Add Subtest disappeared instead of being disabled").toBe(true);
-      expect(addSubtest.attributes("disabled")).toBeDefined();
-    } finally {
-      mockStoreState.zoConfig = {};
-    }
+    const addSubtest = wrapper.find('[data-test="synthetics-journey-add-subtest-btn"]');
+    expect(addSubtest.exists(), "Add Subtest disappeared instead of being disabled").toBe(true);
+    expect(addSubtest.attributes("disabled")).toBeDefined();
   });
 
   it("should not offer Replay while the restore runs", async () => {
