@@ -799,6 +799,12 @@ async fn resolve_gate_context(checks: &[synthetics_checks::DueCheck]) -> Option<
         std::collections::HashSet::new()
     });
 
+    tracing::debug!(
+        claimed = claimed.len(),
+        status_attached = status_attached.len(),
+        "[synthetics scheduler] status page membership for this tick"
+    );
+
     Some(GateContext {
         remaining,
         policies,
