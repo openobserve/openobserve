@@ -13911,8 +13911,6 @@
         "openChild": "Open \"{name}\"",
         "noAccessRemedy": "Ask for read access to its folder, or remove the reference.",
         "noAccessBadge": "no access",
-        "pickGroupEligible": "Can be used here",
-        "pickGroupIneligible": "Can't be used here",
         "pickNested": "Already contains a subtest — nesting is limited to one level",
         "pickUsedBy": "Used by {count} test | Used by {count} tests",
         "pickSteps": "{count} steps",

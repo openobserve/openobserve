@@ -74,7 +74,8 @@ describe("SubtestPicker", () => {
       header?: boolean;
       value?: string;
     }[];
-    expect(options.filter((o) => !o.header).map((o) => o.value)).toEqual(["login-test"]);
+    expect(options.map((o) => o.value)).toEqual(["login-test"]);
+    expect(options.some((o) => o.header)).toBe(false);
   });
 
   it("emits the reference and states the executed-step delta and the run time", async () => {
@@ -186,7 +187,7 @@ describe("SubtestPicker", () => {
   });
 });
 
-// ── Grouped, annotated rows (Phase B) ────────────────────────────────────────
+// ── Flat, annotated rows (Phase B) ───────────────────────────────────────────
 // Everything on a row comes from the list response; nothing costs a request per option.
 describe("SubtestPicker rows", () => {
   const NOW = new Date("2026-09-11T12:00:00Z");
@@ -286,18 +287,15 @@ describe("SubtestPicker rows", () => {
     vi.useRealTimers();
   });
 
-  it("groups eligible and ineligible checks under header rows, in that order", async () => {
+  it("lists every other browser check flat, in list order, with no header rows", async () => {
     const w = await mountWithRows(ROWS);
-    const shape = optionsOf(w).map((o) =>
-      o.header ? { header: true, label: o.label } : { value: o.value },
-    );
+    const shape = optionsOf(w).map((o) => ({ value: o.value, disabled: o.disabled === true }));
     expect(shape).toEqual([
-      { header: true, label: "Can be used here" },
-      { value: "login-test" },
-      { value: "login-staging" },
-      { header: true, label: "Can't be used here" },
-      { value: "checkout-full" },
+      { value: "login-test", disabled: false },
+      { value: "login-staging", disabled: false },
+      { value: "checkout-full", disabled: true },
     ]);
+    expect(optionsOf(w).some((o) => o.header)).toBe(false);
     expect(w.findComponent(OSelect).props("disabled")).toBe(false);
   });
 
@@ -311,28 +309,21 @@ describe("SubtestPicker rows", () => {
     expect(rowOf(w, "login-test").disabled).not.toBe(true);
   });
 
-  it("omits the ineligible header when every check is eligible", async () => {
-    const w = await mountWithRows(ROWS.filter((r) => r.id !== "checkout-full"));
-    const headers = optionsOf(w).filter((o) => o.header);
-    expect(headers.map((h) => h.label)).toEqual(["Can be used here"]);
-    expect(optionsOf(w).some((o) => o.label === "Can't be used here")).toBe(false);
-    w.unmount();
-
-    // The mirror: a header with no rows under it is noise, whichever group is empty.
+  it("keeps ineligible checks listed and disabled even when every check is ineligible", async () => {
+    // Ineligible rows are explained, not hidden: the list must not collapse to the empty state.
     const allNested = ROWS.map((r) =>
       r.type === "browser" && r.id !== "self" ? { ...r, references: 1 } : r,
     );
-    const w2 = await mountWithRows(allNested);
-    const shape = optionsOf(w2).map((o) =>
-      o.header ? { header: true, label: o.label } : { value: o.value, disabled: o.disabled },
-    );
+    const w = await mountWithRows(allNested);
+    const shape = optionsOf(w).map((o) => ({ value: o.value, disabled: o.disabled }));
     expect(shape).toEqual([
-      { header: true, label: "Can't be used here" },
       { value: "login-test", disabled: true },
       { value: "login-staging", disabled: true },
       { value: "checkout-full", disabled: true },
     ]);
-    w2.unmount();
+    expect(optionsOf(w).some((o) => o.header)).toBe(false);
+    expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(false);
+    expect(w.findComponent(OSelect).props("disabled")).toBe(false);
   });
 
   it("annotates a row with folder, step count, used-by (pluralised) and last run", async () => {
@@ -378,9 +369,9 @@ describe("SubtestPicker rows", () => {
     const paused = rowOf(w, "login-staging");
     expect(paused.disabled).not.toBe(true);
     expect(paused.subLabel).toBe("13 steps · Used by 1 test · Paused · Failed 2 days ago");
-    // Offered: it sits in the eligible group, above the ineligible header.
-    const ineligibleHeader = options.findIndex((o) => o.header && o.label === "Can't be used here");
-    expect(options.indexOf(paused)).toBeLessThan(ineligibleHeader);
+    // Offered: it is a plain row in the flat list, not a header.
+    expect(options).toContain(paused);
+    expect(paused.header).not.toBe(true);
     expect(rowOf(w, "login-test").subLabel).not.toContain("Paused");
   });
 
