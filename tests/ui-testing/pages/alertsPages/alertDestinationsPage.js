@@ -219,7 +219,11 @@ export class AlertDestinationsPage {
             await this.page.locator(this.customEmailsSelectTrigger).first().click();
             await popover.waitFor({ state: 'visible', timeout: 10000 });
         }
-        if (searchTerm) {
+        // The org-user list is fetched after the popover opens, so an immediate read returns [] and cannot be told apart from "no users" — gated only for the UNFILTERED read, since with a search term an empty list is the legitimate outcome under test.
+        if (!searchTerm) {
+            await this.page.locator(this.customEmailsSelectOption).first()
+                .waitFor({ state: 'attached', timeout: 15000 }).catch(() => {});
+        } else {
             const search = this.page.locator(this.customEmailsSelectSearch).first();
             if (await search.isVisible().catch(() => false)) {
                 await search.fill(searchTerm);

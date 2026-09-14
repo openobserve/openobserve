@@ -149,6 +149,16 @@ pub struct CorrelationResponse {
     /// Echo of the request's source stream type (logs/traces/metrics) (F27).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_type: Option<String>,
+    /// Whether `service_name` is the name of the stream this service was
+    /// discovered in rather than anything about the service.
+    ///
+    /// Discovery falls back to the stream name when a record carries neither a
+    /// `service` dimension nor any tracked one, so `node_cpu_seconds` is a
+    /// perfectly ordinary entry in the registry. That is fine for a list of
+    /// streams and wrong for anything that acts on it: on-call routing would be
+    /// routing on a table name. Consumers that need a real service check this.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub service_name_from_stream: bool,
 }
 
 impl CorrelationResponse {
@@ -199,6 +209,7 @@ impl CorrelationResponse {
             matched_set_id: None,
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         response.build_all_streams();
         response
@@ -779,6 +790,7 @@ mod tests {
             matched_set_id: None,
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -801,6 +813,7 @@ mod tests {
             matched_set_id: Some("set1".to_string()),
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();

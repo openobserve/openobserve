@@ -15,28 +15,9 @@
 
 use promql_parser::{parser::Expr, util::ExprVisitor};
 
+#[derive(Default)]
 pub struct MetricSelectorVisitor {
     pub(crate) exprs: Vec<Expr>,
-}
-
-impl MetricSelectorVisitor {
-    pub fn new() -> Self {
-        Self { exprs: vec![] }
-    }
-
-    pub fn exprs_to_string(&self) -> String {
-        self.exprs
-            .iter()
-            .map(|e| e.to_string())
-            .collect::<Vec<String>>()
-            .join(",")
-    }
-}
-
-impl Default for MetricSelectorVisitor {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl ExprVisitor for MetricSelectorVisitor {
@@ -44,10 +25,7 @@ impl ExprVisitor for MetricSelectorVisitor {
 
     fn pre_visit(&mut self, expr: &Expr) -> Result<bool, Self::Error> {
         match expr {
-            Expr::VectorSelector(_) => {
-                self.exprs.push(expr.clone());
-            }
-            Expr::MatrixSelector(_) => {
+            Expr::VectorSelector(_) | Expr::MatrixSelector(_) => {
                 self.exprs.push(expr.clone());
             }
             _ => {}
@@ -85,7 +63,13 @@ mod tests {
             "container_fs_reads_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
             "container_fs_writes_bytes_total{container!=\"\",device=~\"(/dev/)?(mmcblk[0-9]p[0-9]+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)\"}[5m]",
         ];
-        assert_eq!(visitor.exprs_to_string(), expected.join(","));
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
 
         let promql = r#"http_requests_total{environment=~"staging|testing|development",method!="GET"} offset 5m"#;
 
@@ -95,13 +79,19 @@ mod tests {
         let expected = [
             "http_requests_total{environment=~\"staging|testing|development\",method!=\"GET\"} offset 5m",
         ];
-        assert_eq!(visitor.exprs_to_string(), expected.join(","));
+        assert_eq!(
+            visitor.exprs,
+            expected
+                .into_iter()
+                .map(|expr| parser::parse(expr).unwrap())
+                .collect::<Vec<_>>()
+        );
     }
 
     #[test]
-    fn test_selector_visitor_empty_exprs_to_string() {
-        let visitor = MetricSelectorVisitor::new();
-        assert_eq!(visitor.exprs_to_string(), "");
+    fn test_selector_visitor_empty() {
+        let visitor = MetricSelectorVisitor::default();
+        assert!(visitor.exprs.is_empty());
     }
 
     #[test]
@@ -109,9 +99,8 @@ mod tests {
         // Scalar arithmetic has no VectorSelector or MatrixSelector
         let promql = "1 + 2";
         let ast = parser::parse(promql).unwrap();
-        let mut visitor = MetricSelectorVisitor::new();
+        let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
         assert!(visitor.exprs.is_empty());
-        assert_eq!(visitor.exprs_to_string(), "");
     }
 }

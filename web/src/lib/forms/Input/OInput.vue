@@ -224,6 +224,13 @@ watch(
   },
 );
 
+/** Focus the underlying input/textarea programmatically. */
+function focus() {
+  inputRef.value?.focus();
+}
+
+defineExpose({ focus });
+
 // ── Styles ─────────────────────────────────────────────────────────────────
 // Height applied to the wrapper (so border is included in the box, matching
 // OSelect); the inner input fills it via h-full. 34px control height per the

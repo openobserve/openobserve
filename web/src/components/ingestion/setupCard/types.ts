@@ -72,6 +72,8 @@ export interface RichCardCode {
   filename?: string;
   /** Show a ".env" download button in the block toolbar. */
   downloadEnv?: boolean;
+  /** data-test for this block, when a card renders more than one. */
+  dataTest?: string;
 }
 
 /**
@@ -162,6 +164,8 @@ export interface RichCardStep {
    */
   action?: RichCardStepAction;
   completeOn: StepCompleteOn;
+  /** Host-owned completion — wins over `completeOn` when set. */
+  done?: boolean;
   /** Marks the step as required (renders a "Required" emphasis on its chip). */
   required?: boolean;
   /** The step that hosts the live status bar + "most likely fix" box. */
@@ -313,7 +317,8 @@ export interface RichCardInput {
 export interface RichCardContent {
   provider: RichCardProvider;
   steps: RichCardStep[];
-  detect: RichCardDetect;
+  /** Omitted by cards with nothing to ingest (e.g. MCP) — no `detectionAnchor` then. */
+  detect?: RichCardDetect;
   /** When set, the card shows a stream-name input (see RichCardStreamInput). */
   streamInput?: RichCardStreamInput;
   extras?: RichCardExtras;

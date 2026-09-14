@@ -69,6 +69,7 @@ import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
 
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
 const DbmSamplesPage = () => import("@/views/DatabaseMonitoring/SamplesPage.vue");
 const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
 const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
@@ -387,6 +388,15 @@ const useRoutes = () => {
           path: "",
           name: "dbmDatabases",
           component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "metrics",
+          name: "dbmMetrics",
+          component: DbmMetricsPage,
           meta: {
             keepAlive: true,
             title: "Databases",

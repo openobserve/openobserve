@@ -58,7 +58,6 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSample } from "@/plugins/workflows/testSample";
-import { buildIncidentSample } from "@/plugins/workflows/incidentSample";
 import WorkflowFunction from "./WorkflowFunction.vue";
 
 // The "Events" sample comes from the CURRENT trigger's kind, so seed a trigger
