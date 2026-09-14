@@ -261,30 +261,31 @@ mod tests {
     }
 
     #[test]
-    fn markers_inside_remote_fragments_are_left_to_the_follower() {
+    fn markers_inside_remote_fragments_are_stripped_before_shipping() {
         let plan = UnionExec::try_new(vec![
             remote(marker(1, filtered(1))),
             remote(marker(1, filtered(1))),
         ])
         .unwrap();
+        assert_eq!(count::<SharedSubplanMarkerExec>(&plan), 0);
         let plan = SharedSubplanRule::new()
             .optimize(plan, &ConfigOptions::new())
             .unwrap();
         assert_eq!(count::<SharedSubplanExec>(&plan), 0);
         assert_eq!(count::<SharedSubplanReaderExec>(&plan), 0);
-        assert_eq!(count::<SharedSubplanMarkerExec>(&plan), 2);
         assert_eq!(count::<RemoteScanExec>(&plan), 2);
+        assert_eq!(count::<FilterExec>(&plan), 2);
     }
 
     #[test]
-    fn marker_inside_a_remote_fragment_does_not_pair_with_one_outside() {
+    fn marker_outside_a_remote_fragment_has_no_partner_inside() {
         let plan = UnionExec::try_new(vec![remote(marker(1, filtered(1))), marker(1, filtered(1))])
             .unwrap();
         let plan = SharedSubplanRule::new()
             .optimize(plan, &ConfigOptions::new())
             .unwrap();
         assert_eq!(count::<SharedSubplanExec>(&plan), 0);
-        assert_eq!(count::<SharedSubplanMarkerExec>(&plan), 1);
+        assert_eq!(count::<SharedSubplanMarkerExec>(&plan), 0);
         assert_eq!(count::<FilterExec>(&plan), 2);
     }
 }

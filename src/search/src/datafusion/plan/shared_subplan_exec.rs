@@ -18,7 +18,11 @@ use std::{collections::HashSet, fmt, sync::Arc};
 use arrow::array::{ArrayData, RecordBatch};
 use arrow_schema::SchemaRef;
 use datafusion::{
-    common::{Result, plan_err, runtime::SpawnedTask},
+    common::{
+        Result, plan_err,
+        runtime::SpawnedTask,
+        tree_node::{Transformed, TransformedResult, TreeNode},
+    },
     error::{DataFusionError, SharedResult},
     execution::{
         SendableRecordBatchStream, TaskContext,
@@ -446,6 +450,18 @@ impl MaterializeBudget {
     fn release(&mut self, bytes: usize) {
         self.reservation.shrink(bytes);
     }
+}
+
+/// Removes every marker from a plan fragment, so a fragment shipped to a follower never carries
+/// one.
+pub fn strip_markers(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+    plan.transform_up(
+        |node| match node.downcast_ref::<SharedSubplanMarkerExec>() {
+            Some(marker) => Ok(Transformed::yes(Arc::clone(marker.input()))),
+            None => Ok(Transformed::no(node)),
+        },
+    )
+    .data()
 }
 
 // The result is served after the full materialization, so the emission type is final.
