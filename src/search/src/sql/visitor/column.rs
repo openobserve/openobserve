@@ -38,7 +38,7 @@ pub struct ColumnVisitor<'a> {
     pub is_wildcard: bool,
     pub is_distinct: bool,
     pub has_agg_function: bool,
-    seen_query: bool,
+    outer_query_visited: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -54,7 +54,7 @@ impl<'a> ColumnVisitor<'a> {
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
-            seen_query: false,
+            outer_query_visited: false,
         }
     }
 }
@@ -155,8 +155,8 @@ impl VisitorMut for ColumnVisitor<'_> {
             self.is_wildcard = true;
         }
         // Only the outermost LIMIT bounds the result, not a CTE, subquery or set-op branch's.
-        let is_outermost = !self.seen_query;
-        self.seen_query = true;
+        let is_outermost = !self.outer_query_visited;
+        self.outer_query_visited = true;
         let mut has_limit = false;
         if is_outermost
             && let Some(limit_clause) = query.limit_clause.as_ref()
