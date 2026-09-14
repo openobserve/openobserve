@@ -123,7 +123,7 @@ fn marker_groups(
     Ok(groups)
 }
 
-// A remote scan re-serializes its fragment, which only the marker survives; the follower drops it.
+// RemoteScanExec::new already stripped its fragment; skipping it here is only a safeguard.
 fn is_remote_boundary(plan: &Arc<dyn ExecutionPlan>) -> bool {
     plan.downcast_ref::<RemoteScanExec>().is_some()
 }
