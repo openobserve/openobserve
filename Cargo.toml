@@ -455,11 +455,11 @@ datafusion = "55.1.0"
 datafusion-proto = "55.1.0"
 datafusion-functions-aggregate-common = "55.1.0"
 datafusion-functions-json = "0.55.1"
-arrow = { version = "59.2", features = ["ipc_compression", "prettyprint"] }
-arrow-flight = "59.2"
-arrow-json = "59.2"
-arrow-schema = { version = "59.2", features = ["serde"] }
-parquet = { version = "59.2", features = ["arrow", "async", "object_store"] }
+arrow = { version = "59.3.0", features = ["ipc_compression", "prettyprint"] }
+arrow-flight = "59.3.0"
+arrow-json = "59.3.0"
+arrow-schema = { version = "59.3.0", features = ["serde"] }
+parquet = { version = "59.3.0", features = ["arrow", "async", "object_store"] }
 object_store = { version = "0.13.2", features = ["aws", "azure", "gcp"] }
 sqlparser = { version = "0.62", features = ["serde", "visitor"] }
 vortex = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244", features = [

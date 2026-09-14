@@ -91,6 +91,9 @@ fn create_session_config(
         .execution
         .listing_table_ignore_subdirectory = false;
 
+    // Keep grouped execution aligned with the accumulator-state streaming cache merger.
+    config.options_mut().execution.enable_migration_aggregate = false;
+
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
     config.options_mut().execution.parquet.pushdown_filters =
@@ -907,6 +910,7 @@ mod tests {
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
             get_config().search.feature_pushdown_filter_enabled
