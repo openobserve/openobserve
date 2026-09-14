@@ -69,6 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :show-global-filter="false"
           :default-columns="false"
           :loading="loadingState"
+          :forbidden="forbidden"
           :enable-column-resize="true"
           :persist-columns="true"
           table-id="streams-log-stream-list"
@@ -450,6 +451,7 @@ export default defineComponent({
     const duplicateStreamList: Ref<any[]> = ref([]);
     const selectedStreamType = ref("logs");
     const loadingState = ref(true);
+    const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
     const streamActiveTab = ref("logs");
@@ -650,6 +652,7 @@ export default defineComponent({
     const getLogStream = (_refresh?: boolean) => {
       if (store.state.selectedOrganization != null) {
         loadingState.value = true;
+        forbidden.value = false;
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
           variant: "loading",
@@ -718,7 +721,8 @@ export default defineComponent({
             dismiss();
           })
           .catch((err) => {
-            if (err.response?.status != 403) {
+            forbidden.value = err?.response?.status === 403;
+            if (!forbidden.value) {
               toast({
                 variant: "error",
                 message: err.response?.data?.message || t("logStream.errorWhileFetchingStreams"),
@@ -1265,6 +1269,7 @@ export default defineComponent({
       streamsEmptyActions,
       onStreamsEmptyStateAction,
       loadingState,
+      forbidden,
       isDeleting,
       searchKeyword,
       deleteAssociatedAlertsPipelines,

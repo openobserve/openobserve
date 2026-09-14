@@ -514,6 +514,8 @@ test.describe('Email destinations and distribution lists', () => {
     const destName = uniq('onemsg');
     const cleared = await sink.clear();
     test.skip(!cleared, 'needs a clearable sink to count messages exactly (use Mailpit)');
+    // The prior serial delivery test also mails ORG_USER; its async delivery can land after clear() and, since only one org recipient exists, cannot be told apart by address — so drain to stable-empty before sending.
+    await sink.waitUntilEmptyStable();
 
     await fillEmailForm(pm, destName, `${ORG_USER},${ORG_USER}`);
     await pm.alertDestinationsPage.clickTest();

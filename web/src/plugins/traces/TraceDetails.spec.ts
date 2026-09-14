@@ -16,6 +16,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
@@ -332,6 +333,17 @@ describe("TraceDetails", () => {
       expect(operationName.text()).toContain(
         tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
       );
+    });
+
+    it("should constrain the operation name so a long one ellipsises", () => {
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
+
+      expect(operationName.classes()).toContain("truncate");
+      expect(operationName.attributes("title")).toBe(
+        tracesMockData.tracesDetails.traceSpans.hits[0].operation_name,
+      );
+      // The ellipsis only fires if the header also lets the title block shrink.
+      expect(wrapper.findComponent(OPageHeader).props("titleOverflow")).toBe("visible");
     });
 
     it("should display trace ID in toolbar", () => {

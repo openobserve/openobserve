@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="token"
           :loading="loading"
+          :forbidden="forbidden"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           pagination="client"
@@ -267,6 +268,7 @@ export default defineComponent({
     ];
     const resultTotal = ref<number>(0);
     const loading = ref(false);
+    const forbidden = ref(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -280,6 +282,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       try {
         const response = await usersService.getPendingInvites();
 
@@ -290,12 +293,16 @@ export default defineComponent({
         resultTotal.value = response.data.data.length;
         dismiss();
       } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
+        const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
-        toast({
-          message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
-          variant: "error",
-        });
+        forbidden.value = e.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
+            variant: "error",
+          });
+        }
       } finally {
         loading.value = false;
       }
@@ -429,6 +436,7 @@ export default defineComponent({
       columns,
       resultTotal,
       loading,
+      forbidden,
       confirmAccept,
       confirmReject,
       selectedInvitation,

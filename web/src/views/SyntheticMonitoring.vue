@@ -106,6 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :mode="monitorTableMode"
           :data="filteredMonitors"
           :loading="loading"
+          :forbidden="forbidden"
           :timezone="store.state.timezone"
           :footer-title="footerTitle"
           :empty-message="emptyMessage"
@@ -561,6 +562,7 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
 const loading = ref(true);
+const forbidden = ref(false);
 
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
@@ -583,6 +585,7 @@ function waitForOrgIdentifier(): Promise<void> {
 async function loadMonitors(folderId?: string) {
   if (!orgIdentifier.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     const targetFolder =
       folderId !== undefined
@@ -595,6 +598,9 @@ async function loadMonitors(folderId?: string) {
     // bundle and a server on opposite sides of that rename still render.
     const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
     monitors.value = rows.map(mapMonitor);
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    throw err;
   } finally {
     loading.value = false;
   }

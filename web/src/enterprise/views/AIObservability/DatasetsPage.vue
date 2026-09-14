@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         @row-click="openDetail"
         :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
@@ -279,6 +280,7 @@ function openDetail(row: LlmDataset) {
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -369,10 +371,15 @@ const columns = computed<OTableColumnDef[]>(() => [
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     datasets.value = await llmDatasetsService.list(orgId.value);
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    }
   } finally {
     loading.value = false;
   }

@@ -23,6 +23,8 @@ export interface Provider {
   providerType?: string;
   provider_type?: string;
   endpoint?: string | null;
+  resolvedEndpoint?: string;
+  resolved_endpoint?: string;
   defaultModel?: string;
   default_model?: string;
   availableModels?: string[];

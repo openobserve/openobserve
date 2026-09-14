@@ -39,17 +39,17 @@ mod stdvar;
 mod sum;
 mod topk;
 
-pub(crate) use avg::avg;
+pub(crate) use avg::Avg;
 pub(crate) use bottomk::bottomk;
-pub(crate) use count::count;
+pub(crate) use count::Count;
 pub(crate) use count_values::count_values;
-pub(crate) use group::group;
-pub(crate) use max::max;
-pub(crate) use min::min;
+pub(crate) use group::Group;
+pub(crate) use max::Max;
+pub(crate) use min::Min;
 pub(crate) use quantile::quantile;
-pub(crate) use stddev::stddev;
-pub(crate) use stdvar::stdvar;
-pub(crate) use sum::sum;
+pub(crate) use stddev::Stddev;
+pub(crate) use stdvar::Stdvar;
+pub(crate) use sum::Sum;
 pub(crate) use topk::topk;
 
 /// Series per parallel partial-aggregation chunk when a single group is large.

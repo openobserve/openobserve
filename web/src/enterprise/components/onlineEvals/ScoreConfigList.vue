@@ -9,6 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('onlineEvals.scoreConfig.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -198,6 +199,7 @@ const props = defineProps<{
   scorers: Scorer[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
 }>();
 
 const emit = defineEmits<{

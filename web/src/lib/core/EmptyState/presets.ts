@@ -55,6 +55,14 @@ export interface EmptyStatePreset {
 }
 
 export const emptyStatePresets = {
+  // --- access denied (a 403 on the data this view lists) -------------------
+  "no-access": {
+    illustration: "lock",
+    variant: "neutral",
+    titleKey: "emptyState.noAccess.title",
+    descriptionKey: "emptyState.noAccess.description",
+    actions: [],
+  },
   // --- no results (a search/filter/time-range returned nothing) ------------
   "no-search-results": {
     illustration: "no-results",

@@ -272,6 +272,55 @@ describe("ExperimentDetailPage", () => {
     expect(scoring.text()).toContain("0 successful · 8 failed · 21 pending · 0 skipped");
   });
 
+  it("shows full score coverage and explains task-failed dimensions", async () => {
+    const experiment = makeExperiment({
+      id: "exp-1",
+      name: "run one",
+      datasetId: "ds-1",
+      scorers: [{ id: "scorer-9", version: 1 }],
+    });
+    get.mockResolvedValue(
+      makeExperimentDetail(experiment, {
+        results: {
+          executions: [],
+          scores: [],
+          taskProgress: { completed: 29, total: 30, skipped: 0 },
+          scoringProgress: { completed: 25, total: 26, skipped: 0 },
+          taskOutcomes: {
+            total: 30,
+            succeeded: 25,
+            failed: 4,
+            pending: 1,
+            skipped: 0,
+          },
+          scoreOutcomes: {
+            completed: 25,
+            total: 30,
+            scored: 25,
+            failed: 0,
+            pending: 1,
+            skipped: 0,
+            unscored: 4,
+          },
+          scoreSummaries: [],
+        },
+      }),
+    );
+
+    const wrapper = mount(ExperimentDetailPage);
+    await flushPromises();
+
+    const tasks = wrapper.get('[data-test="ai-experiment-detail-progress"]');
+    expect(tasks.text()).toContain("Tasks");
+    expect(tasks.text()).toContain("29/30");
+    expect(tasks.text()).toContain("25 succeeded · 4 failed · 1 pending · 0 skipped");
+
+    const scores = wrapper.get('[data-test="ai-experiment-detail-scoring"]');
+    expect(scores.text()).toContain("Scores");
+    expect(scores.text()).toContain("25/30");
+    expect(scores.text()).toContain("25 scored · 0 failed · 1 pending · 0 skipped · 4 unscored");
+  });
+
   it("reads as prose: humanized task type and singular counts", async () => {
     const experiment = makeExperiment({ id: "exp-1", name: "run one", datasetId: "ds-1" });
     experiment.task = {

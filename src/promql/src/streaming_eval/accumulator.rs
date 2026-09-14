@@ -14,9 +14,51 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::promql::value::Sample;
+use promql_parser::parser::token::{self, TokenId};
 
-use super::op::FusedAggOp;
 use crate::common::{kahan_sum_increment, std_deviation2, std_variance2};
+
+/// Aggregations the fused path can fold through dense per-timestamp state.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum FusedAggOp {
+    Avg,
+    Count,
+    Group,
+    Max,
+    Min,
+    Stddev,
+    Stdvar,
+    Sum,
+}
+
+impl FusedAggOp {
+    pub(crate) fn from_token(id: TokenId) -> Option<Self> {
+        match id {
+            token::T_AVG => Some(Self::Avg),
+            token::T_COUNT => Some(Self::Count),
+            token::T_GROUP => Some(Self::Group),
+            token::T_MAX => Some(Self::Max),
+            token::T_MIN => Some(Self::Min),
+            token::T_STDDEV => Some(Self::Stddev),
+            token::T_STDVAR => Some(Self::Stdvar),
+            token::T_SUM => Some(Self::Sum),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn name(self) -> &'static str {
+        match self {
+            Self::Avg => "avg",
+            Self::Count => "count",
+            Self::Group => "group",
+            Self::Max => "max",
+            Self::Min => "min",
+            Self::Stddev => "stddev",
+            Self::Stdvar => "stdvar",
+            Self::Sum => "sum",
+        }
+    }
+}
 
 /// Dense per-timestamp aggregation state for one output group.
 ///
@@ -304,4 +346,18 @@ fn dispersion_sample(
     let count = values.len() as i64;
     let mean = sum / count as f64;
     dispersion(values, mean, count).map(|value| Sample::new(timestamp, value))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fused_agg_op_token_coverage() {
+        assert!(FusedAggOp::from_token(token::T_SUM).is_some());
+        assert!(FusedAggOp::from_token(token::T_AVG).is_some());
+        assert!(FusedAggOp::from_token(token::T_TOPK).is_none());
+        assert!(FusedAggOp::from_token(token::T_QUANTILE).is_none());
+        assert!(FusedAggOp::from_token(token::T_COUNT_VALUES).is_none());
+    }
 }

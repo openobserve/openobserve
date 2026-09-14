@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
             show-index
@@ -855,8 +856,12 @@ export default defineComponent({
     const selectedDashboardIds = computed(() => selectedIds.value);
 
     onMounted(async () => {
-      //get folders list
-      await getFoldersList(store);
+      // Awaited so the landing decision settles after FolderList's async init emission.
+      try {
+        await getFoldersList(store);
+      } catch {
+        // Already reported by the grouped access toast; the empty rail stands in.
+      }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
       // landing below depends on knowing whether any exist.
@@ -913,15 +918,20 @@ export default defineComponent({
         // String() matches JS's own null→"null" key coercion (behavior-neutral).
         loading.value =
           !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        forbidden.value = false;
         try {
           const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
 
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
-          showErrorNotification(
-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
-          );
+          forbidden.value = asCaughtError(error).response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            showErrorNotification(
+              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+            );
+          }
         } finally {
           loading.value = false;
           searchAcrossFolders.value = false;
@@ -1143,6 +1153,8 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // Only the dashboards fetch is authoritative on access; the folder list is not.
+    const forbidden = ref(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -1713,6 +1725,7 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,

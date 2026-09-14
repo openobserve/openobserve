@@ -353,6 +353,11 @@ fn resource_attribute_key(raw_key: String) -> String {
     }
 }
 
+// Clock skew can deliver end < start; saturate instead of wrapping to ~585M years.
+fn span_duration_micros(start_time_nanos: u64, end_time_nanos: u64) -> u64 {
+    end_time_nanos.saturating_sub(start_time_nanos) / 1000
+}
+
 pub async fn otlp_proto(
     org_id: &str,
     body: Bytes,
@@ -757,7 +762,7 @@ pub async fn handle_otlp_request(
                     operation_name: span.name.clone(),
                     start_time,
                     end_time,
-                    duration: (end_time - start_time) / 1000, // microseconds
+                    duration: span_duration_micros(start_time, end_time),
                     reference: span_ref.clone(),
                     service_name: service_name.clone(),
                     attributes: span_att_map.clone(),
@@ -1723,6 +1728,7 @@ mod tests {
     use config::utils::json::json;
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
 
+    use super::span_duration_micros;
     use crate::ingestion::grpc::get_val_for_attr;
 
     #[test]
@@ -2137,8 +2143,7 @@ mod tests {
     fn test_duration_calculation() {
         let start_time = 1_640_995_200_000_000_000u64;
         let end_time = 1_640_995_201_500_000_000u64; // 1.5 seconds later
-        let duration_micros = (end_time - start_time) / 1000;
-        assert_eq!(duration_micros, 1_500_000); // 1.5 seconds in microseconds
+        assert_eq!(span_duration_micros(start_time, end_time), 1_500_000);
     }
 
     // Test attribute key transformation for blocked fields
@@ -2780,21 +2785,17 @@ mod tests {
 
     #[test]
     fn test_span_duration_edge_cases() {
-        // Test same start and end time (zero duration)
         let start_time = 1_640_995_200_000_000_000u64;
-        let end_time = start_time;
-        let duration = (end_time - start_time) / 1000;
-        assert_eq!(duration, 0);
+        assert_eq!(span_duration_micros(start_time, start_time), 0);
+        assert_eq!(span_duration_micros(start_time, start_time + 1), 0);
+        assert_eq!(span_duration_micros(start_time, start_time + 1000), 1);
+    }
 
-        // Test very small duration (1 nanosecond)
-        let end_time_small = start_time + 1;
-        let duration_small = (end_time_small - start_time) / 1000;
-        assert_eq!(duration_small, 0); // Less than 1 microsecond rounds to 0
-
-        // Test 1 microsecond duration
-        let end_time_micro = start_time + 1000;
-        let duration_micro = (end_time_micro - start_time) / 1000;
-        assert_eq!(duration_micro, 1);
+    #[test]
+    fn test_span_duration_end_before_start_saturates_to_zero() {
+        let start_time = 1_640_995_200_000_000_000u64;
+        assert_eq!(span_duration_micros(start_time, start_time - 50_000_000), 0);
+        assert_eq!(span_duration_micros(start_time, 0), 0);
     }
 
     // Test span status extraction with attributes

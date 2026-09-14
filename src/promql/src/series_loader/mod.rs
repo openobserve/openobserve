@@ -13,12 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Loads PromQL series samples, exemplars, and labels from DataFusion.
+//! Materializes a selector's series (samples, exemplars, labels) from DataFusion into a matrix.
 
 mod label_cache;
+pub(crate) mod label_interner;
 mod labels;
-mod load_labels;
-mod series_capacity;
 
 use std::{borrow::Cow, sync::Arc};
 
@@ -31,6 +30,7 @@ use config::{
     utils::{
         hash::{Sum64, gxhash},
         json,
+        time::hour_micros,
     },
 };
 use datafusion::{
@@ -39,25 +39,20 @@ use datafusion::{
         datatypes::{DataType, Float64Type, Int64Type, Schema, UInt64Type},
     },
     error::{DataFusionError, Result},
-    logical_expr::utils::disjunction,
     physical_plan::{
         Partitioning, execute_stream_partitioned, expressions::Column, repartition::RepartitionExec,
     },
-    prelude::{DataFrame, Expr, SessionContext, col, lit},
+    prelude::{DataFrame, SessionContext, col},
 };
 use futures::TryStreamExt;
 use hashbrown::{HashMap, HashSet, hash_map::Entry};
 use promql_parser::parser::VectorSelector;
 
-use self::{
-    labels::load_series_labels,
-    series_capacity::{initial_series_capacity, series_fragment_hint},
-};
-pub(crate) use self::{
-    load_labels::{LabelColumn, LabelInterner},
-    series_capacity::batch_run_len,
-};
-use super::utils::{apply_label_selector, apply_matchers};
+use self::labels::load_series_labels;
+use super::utils::{apply_label_selector, apply_matchers, apply_time_window, batch_run_len};
+
+const MAX_SERIES_FRAGMENT_HINT: usize = 24;
+const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
 
 pub(super) type PartitionedMetrics = Vec<HashMap<u64, RangeValue>>;
 
@@ -88,56 +83,6 @@ fn with_hash_label(labels: Labels, hash: u64, include_hash_label: bool) -> Label
     }));
     with_hash.extend(labels);
     with_hash
-}
-
-// Constants for optimization thresholds
-const OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER: i64 = 5;
-const OPTIMIZATION_MAX_STEPS: i64 = 30;
-
-/// Restricts `df` to the rows the evaluation can observe: per-step lookback
-/// windows when the steps are sparse enough, the contiguous
-/// `[start - lookback, end]` range otherwise.
-pub(crate) fn apply_time_window(
-    df: DataFrame,
-    start: i64,
-    end: i64,
-    step: i64,
-    lookback: i64,
-) -> Result<DataFrame> {
-    // Optimization: When step > lookback, we don't need to load all data in
-    // [start-lookback, end] Instead, we only need to load data windows around
-    // each evaluation point
-    let use_optimization = start != end
-        && step > 0
-        && step >= lookback * OPTIMIZATION_STEP_LOOKBACK_MULTIPLIER
-        && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
-    if use_optimization {
-        let num_steps = ((end - start) / step) + 1;
-        let eval_timestamps: Vec<i64> = (0..num_steps).map(|i| start + (step * i)).collect();
-
-        let mut conditions: Vec<Expr> = Vec::new();
-        for &eval_ts in &eval_timestamps {
-            let window_start = eval_ts - lookback;
-            let window_end = eval_ts;
-
-            conditions.push(
-                col(TIMESTAMP_COL_NAME)
-                    .gt_eq(lit(window_start))
-                    .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(window_end))),
-            );
-        }
-
-        let filters = disjunction(conditions).unwrap();
-        df.filter(filters)
-    } else {
-        // Need to include lookback window before start for the first evaluation point
-        let query_start = start - lookback;
-        df.filter(
-            col(TIMESTAMP_COL_NAME)
-                .gt_eq(lit(query_start))
-                .and(col(TIMESTAMP_COL_NAME).lt_eq(lit(end))),
-        )
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -388,6 +333,47 @@ fn append_batch_samples(
     }
 }
 
+/// Estimate the total sample count of a series from its first contiguous run
+/// of `first_run_len` rows spanning `[run_first_ts, run_last_ts]`.
+///
+/// Two estimates cover the common shapes: `run × fragments` fits a series
+/// whose runs arrive whole, `duration / interval` recovers a first run
+/// truncated by a batch boundary. Overestimating (short-lived series, the
+/// sparse-window optimization path) only wastes capacity, bounded by
+/// `MAX_INITIAL_SERIES_CAPACITY`.
+fn initial_series_capacity(
+    first_run_len: usize,
+    fragment_hint: usize,
+    run_first_ts: i64,
+    run_last_ts: i64,
+    query_duration: i64,
+) -> usize {
+    let run_based = first_run_len.saturating_mul(fragment_hint);
+    // At least two intervals, so a single anomalous gap (adjacent
+    // near-duplicate rows in time-sorted input) cannot dictate the estimate.
+    let interval_based = if first_run_len >= 3 && run_last_ts > run_first_ts {
+        let sample_interval =
+            ((run_last_ts - run_first_ts) / (first_run_len - 1) as i64).max(1) as u64;
+        let samples = (query_duration.max(0) as u64)
+            .div_ceil(sample_interval)
+            .saturating_add(1);
+        usize::try_from(samples).unwrap_or(MAX_INITIAL_SERIES_CAPACITY)
+    } else {
+        0
+    };
+    // The current batch already proves first_run_len samples exist, so the
+    // cap never allocates below that.
+    let cap = MAX_INITIAL_SERIES_CAPACITY.max(first_run_len);
+    run_based.max(interval_based).min(cap)
+}
+
+/// Hash-sorted parquet is written per storage hour, so a series arrives as
+/// roughly one contiguous run per hour fragment of the query span.
+fn series_fragment_hint(query_duration: i64) -> usize {
+    let hourly_fragments = (query_duration.max(0) as u64).div_ceil(hour_micros(1) as u64);
+    hourly_fragments.clamp(1, MAX_SERIES_FRAGMENT_HINT as u64) as usize
+}
+
 /// The hash column as u64 values: zero-copy for UInt64, hashed per row for
 /// Utf8.
 fn batch_hash_values<'a>(batch: &'a RecordBatch, hash_field_type: &DataType) -> Cow<'a, [u64]> {
@@ -530,6 +516,30 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn test_initial_series_capacity_is_bounded() {
+        assert_eq!(initial_series_capacity(160, 4, 0, 0, 0), 640);
+        assert_eq!(
+            initial_series_capacity(100, 4, 0, 99 * 15 * 1_000_000, 11_100 * 1_000_000),
+            741,
+        );
+        assert_eq!(initial_series_capacity(1024, 4, 0, 0, 0), 2048);
+        assert_eq!(initial_series_capacity(4096, 4, 0, 0, 0), 4096);
+        // A 2-row run must not infer an interval from its single gap.
+        assert_eq!(
+            initial_series_capacity(2, 4, 0, 1_000, 11_100 * 1_000_000),
+            8
+        );
+    }
+
+    #[test]
+    fn test_series_fragment_hint_is_bounded() {
+        let hour = hour_micros(1);
+        assert_eq!(series_fragment_hint(3 * hour + 5 * 60 * 1_000_000), 4);
+        assert_eq!(series_fragment_hint(0), 1);
+        assert_eq!(series_fragment_hint(100 * hour), MAX_SERIES_FRAGMENT_HINT);
+    }
 
     #[test]
     fn test_into_loaded_metrics_only_keeps_uint64_hashes_partitioned() {

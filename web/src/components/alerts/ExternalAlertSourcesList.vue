@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="advancedColumns"
           row-key="rowKey"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[10, 20, 50, 100]"
@@ -366,6 +367,7 @@ export default defineComponent({
   data() {
     return {
       loading: false,
+      forbidden: false,
       filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
@@ -536,11 +538,16 @@ export default defineComponent({
     },
     async fetchIntegrations() {
       this.loading = true;
+      this.forbidden = false;
       try {
         const res = await alertSources.list(this.orgIdentifier);
         this.integrations = res.data.integrations;
-      } catch (e) {
-        toast({ variant: "error", message: this.t("alert_sources.error") });
+      } catch (e: any) {
+        this.forbidden = e?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!this.forbidden) {
+          toast({ variant: "error", message: this.t("alert_sources.error") });
+        }
       } finally {
         this.loading = false;
       }

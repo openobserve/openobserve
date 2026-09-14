@@ -73,6 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="otableColumns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
             :enable-column-resize="true"
@@ -149,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-if="!row.is_draft"
                   :data-test="`workflow-list-${row.name}-pause-start-action`"
                   :data-row-action="row.enabled ? 'pause' : 'resume'"
-                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   @click.stop="toggleWorkflow(row)"
@@ -275,6 +276,7 @@ const currentRouteName = computed(() => router.currentRoute.value.name);
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
 const loading = ref(true);
+const forbidden = ref(false);
 const filterQuery = ref("");
 const workflows = ref<any[]>([]);
 const oTableRef: any = ref(null);
@@ -385,6 +387,7 @@ const otableColumns = computed(() => columns.value);
 
 const getWorkflows = async () => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const response = await workflowService.listWorkflows(orgId.value);
     // list handler returns a bare array of Workflow.
@@ -395,8 +398,9 @@ const getWorkflows = async () => {
       trigger: triggerLabel(wf),
       updated_at_display: formatTs(wf.updated_at),
     }));
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    forbidden.value = error?.response?.status === 403;
   } finally {
     loading.value = false;
   }
