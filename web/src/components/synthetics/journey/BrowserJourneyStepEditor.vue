@@ -462,6 +462,7 @@ const hasAdvancedChanges = computed(
       <SubtestPicker
         v-if="props.step.action === 'subtest'"
         :model-value="props.step.subtest"
+        :fallback-name="props.step.name"
         :own-check-id="ownCheckId"
         :own-step-count="ownStepCount"
         :journey-budget-ms="journeyBudgetMs"

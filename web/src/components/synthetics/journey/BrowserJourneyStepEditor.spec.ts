@@ -19,6 +19,7 @@ import { createI18n } from "vue-i18n";
 import type { BrowserStep } from "@/types/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import SubtestPicker from "./SubtestPicker.vue";
 import store from "@/test/unit/helpers/store";
 import en from "@/locales/languages/en-US.json";
 
@@ -639,6 +640,8 @@ describe("BrowserJourneyStepEditor subtest action", () => {
   it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
     const w = render({ action: "subtest", subtest: { id: "login-test" } });
     expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);
+    // A saved reference is `{ id }` only, so the step name is what the picker can display.
+    expect(w.findComponent(SubtestPicker).props("fallbackName")).toBe("Sign in");
     expect(w.find(test("synthetics-journey-step-locator")).exists()).toBe(false);
     expect(w.find(test("synthetics-journey-step-group-advanced")).exists()).toBe(false);
 

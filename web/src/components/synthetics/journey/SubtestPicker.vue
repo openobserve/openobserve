@@ -38,6 +38,8 @@ import { MAX_STEPS } from "@/utils/synthetics/runBudget";
  */
 const props = defineProps<{
   modelValue?: { id: string; name?: string };
+  /** Shown for an `{ id }`-only persisted reference until the list supplies the real row. */
+  fallbackName?: string;
   ownCheckId?: string;
   ownStepCount?: number;
   journeyBudgetMs?: number;
@@ -70,14 +72,14 @@ const listOptions = ref<SelectOption[]>([]);
 const isLoading = ref(true);
 /** True only once the list has loaded and holds no other browser test. */
 const isEmpty = ref(false);
-// OSelect renders the raw value when no option matches, so the saved name is seeded as an
-// option until (and unless) the list supplies the real row for that id.
+// OSelect renders the raw value when no option matches, so the saved name is seeded until the list has it.
 const options = computed<SelectOption[]>(() => {
   const saved = props.modelValue;
-  if (!saved?.name || listOptions.value.some((o) => o.value === saved.id)) {
+  const name = saved?.name ?? props.fallbackName;
+  if (!saved || !name || listOptions.value.some((o) => o.value === saved.id)) {
     return listOptions.value;
   }
-  return [{ label: raw(saved.name), value: saved.id }, ...listOptions.value];
+  return [{ label: raw(name), value: saved.id }, ...listOptions.value];
 });
 const childSteps = ref<number | null>(null);
 const lastRunSeconds = ref<number | null>(null);
@@ -111,9 +113,7 @@ function rowOption(r: ListRow): SelectOption {
 
 onMounted(async () => {
   try {
-    // `undefined` omits `?folder=`, which lists every folder — deliberate: §10
-    // keeps references cross-folder, so the picker is not scoped to the
-    // parent's folder.
+    // undefined omits ?folder= so every folder is listed: references are cross-folder by design.
     const res = await syntheticsService.listByFolderId(org.value, undefined);
     const rows = ((res.data.checks ?? []) as ListRow[]).filter(
       (r) => r.type === "browser" && r.id !== props.ownCheckId,
