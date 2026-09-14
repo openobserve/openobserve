@@ -1614,5 +1614,78 @@ describe("useMetricsExplorerGrid", () => {
       const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
       expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
     });
+
+    it("keeps the recheck available when it is cancelled before answering", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const cancelled = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card); // scrolled out of view before the recheck answered
+      inFlight.length = 0;
+      await cancelled;
+
+      const retry = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // the recheck was not spent
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await retry;
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("does not let a concurrent disk read paint the stale empty answer over the recheck", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      const [key, , cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      getPanelCacheMock.mockResolvedValue({
+        key,
+        value: { results: [NO_SERIES], sparse: false },
+        cacheTimeRange,
+      });
+
+      const reloaded = await setup();
+      const reloadedCard = cardNamed(reloaded, "http_requests_total");
+      inFlight.length = 0;
+
+      // Two requests both waiting on IndexedDB — a double visibility report, or the hide-no-data pre-fetch.
+      const first = reloaded.requestPreview(reloadedCard);
+      const second = reloaded.requestPreview(reloadedCard);
+      await flush();
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("loading");
+      expect(reloaded.emptyHiddenCount.value).toBe(0); // a hidden card unmounts and cancels the recheck
+
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await Promise.all([first, second]);
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(reloaded.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("serves a rechecked empty answer from disk after a reload instead of querying again", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      await landPreview(grid.requestPreview(card), NO_SERIES); // the recheck, still empty
+      const [key, value, cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      expect(value.rechecked).toBe(true);
+
+      // A reload: fresh composable, empty in-memory state, only the disk entry.
+      getPanelCacheMock.mockResolvedValue({ key, value, cacheTimeRange });
+      const reloaded = await setup();
+      inFlight.length = 0;
+      await reloaded.requestPreview(cardNamed(reloaded, "http_requests_total"));
+      await flush();
+
+      expect(inFlight).toHaveLength(0);
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("done");
+    });
   });
 });
