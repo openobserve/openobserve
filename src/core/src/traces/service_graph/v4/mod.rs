@@ -31,6 +31,7 @@ use tokio::sync::{Mutex, RwLock};
 use self::{resolution::ResolutionTable, state::StreamState};
 
 pub const MICROS: i64 = 1_000_000;
+/// Caps catch-up per tick so one far-behind stream cannot hold a scheduler task for hours.
 pub const MAX_WINDOWS_PER_TICK: usize = 120;
 pub const LEARN_INTERVAL_SECS: i64 = 300;
 pub const SERIES_TTL_MICROS: i64 = 24 * 3600 * MICROS;
@@ -40,7 +41,9 @@ pub const GRACE_LEARN_CYCLES: u32 = 2;
 pub const EDGE_HARD_CAP: usize = 50_000;
 pub const NODE_HARD_CAP: usize = 15_000;
 pub const LEARN_SAMPLE: u32 = 64;
+/// An offset further behind than this jumps to the present; there is no history backfill.
 pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * MICROS;
+/// v1 stops once v4 has run and holds data for this long; a design §10 constant, not configurable.
 pub const V1_STOP_AFTER_MICROS: i64 = 7 * 24 * 3600 * MICROS;
 pub const PROCESSED_TIMESTAMP_STREAM: &str = "traces_service_graph_processed_timestamp";
 
@@ -49,8 +52,11 @@ pub(crate) static STREAM_STATES: LazyLock<DashMap<(String, String), StateRef>> =
     LazyLock::new(DashMap::new);
 /// Per-org resolution table; read by every stream of the org, written by the learning pass.
 pub(crate) static ORG_TABLES: LazyLock<DashMap<String, TableRef>> = LazyLock::new(DashMap::new);
-/// Retained (edges, nodes) per stream so the org gauges can be summed without locking states.
+/// Retained (edges, nodes) per stream, kept so a stream's next update can be applied as a delta.
 pub(crate) static RETAINED: LazyLock<DashMap<(String, String), (usize, usize)>> =
+    LazyLock::new(DashMap::new);
+/// Running per-org totals of `RETAINED`, so the org gauges cost O(1) per window.
+pub(crate) static ORG_RETAINED: LazyLock<DashMap<String, (usize, usize)>> =
     LazyLock::new(DashMap::new);
 /// `started_at` is write-once per process; this guard avoids a meta-db read on every window.
 pub(crate) static STARTED_AT_WRITTEN: AtomicBool = AtomicBool::new(false);
@@ -58,6 +64,7 @@ pub(crate) static STARTED_AT_WRITTEN: AtomicBool = AtomicBool::new(false);
 pub type StateRef = Arc<Mutex<StreamState>>;
 pub type TableRef = Arc<RwLock<ResolutionTable>>;
 
+/// The three env-backed knobs plus the reused `ZO_CACHE_DELAY_SECS`; nothing else is configurable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub interval_secs: u64,
@@ -80,6 +87,7 @@ impl Settings {
         (self.flush_secs as i64).max(1) * MICROS
     }
 
+    /// Newest window end allowed: data younger than `cache_delay_secs` may still be in flight.
     pub fn horizon(&self, now: i64) -> i64 {
         now - self.cache_delay_secs * MICROS
     }

@@ -31,6 +31,7 @@ const NULL_STR: &str = "CAST(NULL AS VARCHAR)";
 const NULL_PORT: &str = "CAST(NULL AS BIGINT)";
 const ROOT_PRED: &str = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 
+/// Missing optional columns become typed NULL constants with the same alias; GROUP BY never moves.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Columns {
     pub infer_self_key: bool,

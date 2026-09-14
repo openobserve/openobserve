@@ -23,13 +23,21 @@ use super::{
     sql::{Q2Row, WindowCounts},
 };
 
+/// Emitted `client` label of entry edges; `client_type` keeps it apart from a service named `user`.
 pub const CLIENT_USER: &str = "user";
+/// Emitted `client_type` label value of entry edges.
 pub const CLIENT_TYPE_USER: &str = "user";
+/// Emitted `client_type` label value of consumer edges (Q3, topic → service).
 pub const CLIENT_TYPE_QUEUE: &str = "queue";
+/// Emitted `connection_type` label value of an explicit `peer.service` that is not a known service.
 pub const CONNECTION_EXTERNAL: &str = "external";
+/// Emitted `reason` label value: the only peer key was a bare IP.
 pub const REASON_IP_ONLY: &str = "ip_only";
+/// Emitted `reason` label value: no peer key at all and no signature hit.
 pub const REASON_NO_PEER: &str = "no_peer";
+/// Emitted `reason` label value: the majority won with a runner-up at ≥ 30 %.
 pub const REASON_AMBIGUOUS: &str = "ambiguous";
+/// Emitted `reason` label value: the edge found no slot within the stream's budget.
 pub const REASON_CARDINALITY: &str = "cardinality";
 
 /// Series identity without `trace_stream` (one state per stream already scopes it).

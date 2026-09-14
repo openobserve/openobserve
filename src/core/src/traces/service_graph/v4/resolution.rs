@@ -95,7 +95,7 @@ pub struct ResolutionTable {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Snapshot {
+pub struct Snapshot {
     pairing: Vec<(TypedKey, ServiceCounts)>,
     self_key: Vec<(TypedKey, ServiceCounts)>,
     known_services: HashMap<String, HourBuckets>,
@@ -185,6 +185,12 @@ impl Candidates {
             });
         }
         keys
+    }
+}
+
+impl Snapshot {
+    pub fn to_json(&self) -> Result<Vec<u8>, serde_json::Error> {
+        serde_json::to_vec(self)
     }
 }
 
@@ -306,8 +312,9 @@ impl ResolutionTable {
 
     /// Pairing layer first (①②③④), then self_key (①②③); `Sig` keys exist only in the pairing layer.
     pub fn resolve_candidates(&self, c: &Candidates, now: i64) -> Option<Resolved> {
-        for key in c.keys(true) {
-            if let Some((service, ambiguous)) = self.lookup(Layer::Pairing, &key, now) {
+        let keys = c.keys(true);
+        for key in &keys {
+            if let Some((service, ambiguous)) = self.lookup(Layer::Pairing, key, now) {
                 return Some(Resolved {
                     service,
                     tier: Tier::Pairing,
@@ -315,8 +322,8 @@ impl ResolutionTable {
                 });
             }
         }
-        for key in c.keys(false) {
-            if let Some((service, ambiguous)) = self.lookup(Layer::SelfKey, &key, now) {
+        for key in keys.iter().filter(|k| !matches!(k, TypedKey::Sig { .. })) {
+            if let Some((service, ambiguous)) = self.lookup(Layer::SelfKey, key, now) {
                 return Some(Resolved {
                     service,
                     tier: Tier::SelfKey,
@@ -346,7 +353,12 @@ impl ResolutionTable {
     }
 
     pub fn to_snapshot_json(&self) -> Result<Vec<u8>, serde_json::Error> {
-        let snap = Snapshot {
+        self.snapshot().to_json()
+    }
+
+    /// The owned copy taken under the table lock; encoding it happens outside the lock.
+    pub fn snapshot(&self) -> Snapshot {
+        Snapshot {
             pairing: self
                 .pairing
                 .iter()
@@ -360,8 +372,7 @@ impl ResolutionTable {
             known_services: self.known_services.clone(),
             q1k_up_to: self.q1k_up_to,
             ql_up_to: self.ql_up_to,
-        };
-        serde_json::to_vec(&snap)
+        }
     }
 
     pub fn from_snapshot_json(bytes: &[u8], now: i64) -> Result<Self, serde_json::Error> {

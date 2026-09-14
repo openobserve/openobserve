@@ -27,8 +27,8 @@ use infra::{cluster::get_node_by_uuid, dist_lock};
 use tokio::sync::{Mutex, RwLock};
 
 use super::{
-    LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_TABLES,
-    PROCESSED_TIMESTAMP_STREAM, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN,
+    LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_RETAINED,
+    ORG_TABLES, PROCESSED_TIMESTAMP_STREAM, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN,
     STREAM_STATES, Settings, TableRef, V1_STOP_AFTER_MICROS,
     handoff::{AgentProgress, handoff_boundary, load_progress},
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
@@ -428,15 +428,16 @@ async fn learn_chunks(
                 }
             }
         }
-        let mut t = table.write().await;
         match kind {
             LearnKind::Q1k => {
                 let rows: Vec<Q1kRow> = hits.iter().filter_map(Q1kRow::parse).collect();
+                let mut t = table.write().await;
                 t.learn_q1k(&rows, now);
                 t.q1k_up_to = end;
             }
             LearnKind::Ql => {
                 let rows: Vec<QlRow> = hits.iter().filter_map(QlRow::parse).collect();
+                let mut t = table.write().await;
                 t.learn_ql(&rows, now);
                 t.ql_up_to = end;
             }
@@ -447,22 +448,21 @@ async fn learn_chunks(
 }
 
 async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
-    let bytes = {
+    let snap = {
         let mut t = table.write().await;
         if now - t.last_snapshot_at < SNAPSHOT_INTERVAL_SECS * MICROS {
             return;
         }
         t.last_snapshot_at = now;
-        match t.to_snapshot_json() {
-            Ok(b) => b,
-            Err(e) => {
-                log::warn!("[ServiceGraph] org {org}: snapshot serialize failed: {e}");
-                return;
-            }
-        }
+        t.snapshot()
     };
     let path = snapshot_path(org);
-    match tokio::task::spawn_blocking(move || write_snapshot_file(&path, &bytes)).await {
+    // JSON encoding of up to 200k keys happens off the lock and off the runtime threads
+    let write = move || {
+        let bytes = snap.to_json().map_err(std::io::Error::other)?;
+        write_snapshot_file(&path, &bytes)
+    };
+    match tokio::task::spawn_blocking(write).await {
         Ok(Ok(())) => {}
         Ok(Err(e)) => log::warn!("[ServiceGraph] org {org}: snapshot write failed: {e}"),
         Err(e) => log::warn!("[ServiceGraph] org {org}: snapshot task failed: {e}"),
@@ -771,13 +771,16 @@ async fn note_started() {
 }
 
 fn update_retained(org: &str, stream: &str, state: &StreamState) {
-    RETAINED.insert((org.to_string(), stream.to_string()), state.retained());
-    let (edges, nodes) = RETAINED
-        .iter()
-        .filter(|e| e.key().0 == org)
-        .fold((0usize, 0usize), |acc, e| {
-            (acc.0 + e.value().0, acc.1 + e.value().1)
-        });
+    let new = state.retained();
+    let prev = RETAINED
+        .insert((org.to_string(), stream.to_string()), new)
+        .unwrap_or((0, 0));
+    let (edges, nodes) = {
+        let mut total = ORG_RETAINED.entry(org.to_string()).or_insert((0, 0));
+        total.0 = (total.0 + new.0).saturating_sub(prev.0);
+        total.1 = (total.1 + new.1).saturating_sub(prev.1);
+        *total
+    };
     config::metrics::O2_SERVICE_GRAPH_RETAINED_EDGES
         .with_label_values(&[org])
         .set(edges as i64);

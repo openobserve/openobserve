@@ -113,6 +113,7 @@ pub async fn write_batch(org: &str, chunks: Vec<Vec<u8>>) -> WriteOutcome {
             match send(org, chunk.clone()).await {
                 ReplyClass::Ok => break,
                 ReplyClass::Partial => {
+                    // 207 = whole pipeline batch failed on the ingester; retry cannot help (§7.1)
                     if !partial_warned {
                         partial_warned = true;
                         log::warn!(

@@ -90,6 +90,7 @@ pub async fn get_v4_offset(org_id: &str, stream_name: &str) -> (i64, String) {
     }
 }
 
+/// Value is `<micros>;<node_uuid>`: the claiming node travels with the offset.
 pub async fn set_v4_offset(
     org_id: &str,
     stream_name: &str,
@@ -134,7 +135,7 @@ pub async fn set_agent_signals_handoff_if_absent(boundary: i64) -> Result<(), an
     put_once(AGENT_SIGNALS_HANDOFF_KEY, boundary.to_string()).await
 }
 
-/// A missing key is `Ok(None)`; a read failure is `Err`, so the caller waits instead of restarting.
+/// Value `<done>` or `<from>;<to>` (in flight); missing key → `Ok(None)`, read failure → `Err`.
 pub async fn get_agent_signals_progress(
     org_id: &str,
     stream_name: &str,

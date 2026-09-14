@@ -207,6 +207,7 @@ impl StreamState {
         report
     }
 
+    /// `0 @ t_base` precedes a first emission, or the engine cannot count the first value.
     pub fn emit(&self, window_end: i64) -> Batch {
         let mut samples = Vec::with_capacity(self.series.len() * 2);
         for (key, s) in &self.series {
@@ -396,6 +397,7 @@ impl<'a> AdmitCtx<'a> {
     }
 }
 
+/// Design §4.4: `clamp(10·services, 20000, 50000)` edges, `clamp(3·services, 5000, 15000)` nodes.
 pub fn budgets(services: usize) -> Budgets {
     Budgets {
         edges: (10 * services).clamp(20_000, EDGE_HARD_CAP),
