@@ -72,22 +72,21 @@ async function seedGauge(page, metric, { minutesAgo, points, stepSeconds, firstV
  *   wait until it returns none (the "history is outside the window" premise).
  */
 async function waitForInstantQuery(page, metric, present, timeout = 60_000) {
-  const deadline = Date.now() + timeout;
-  let last = 'never queried';
-  while (Date.now() < deadline) {
+  const seriesCount = async () => {
     const res = await page.request.get(
       `${baseUrl()}/api/${org()}/prometheus/api/v1/query?query=${encodeURIComponent(metric)}`,
       { headers: getAuthHeaders() },
     );
     const body = await res.json().catch(() => ({}));
-    const hits = body?.data?.result?.length ?? 0;
-    last = `${res.status()} with ${hits} series`;
-    if (present ? hits > 0 : hits === 0) return;
-    await page.waitForTimeout(2000);
-  }
-  throw new Error(
-    `${metric} never became ${present ? 'queryable' : 'empty'} within ${timeout}ms (last: ${last})`,
-  );
+    return body?.data?.result?.length ?? 0;
+  };
+  const poll = expect
+    .poll(seriesCount, {
+      timeout,
+      intervals: [1000, 2000, 2000, 5000],
+      message: `${metric} never became ${present ? 'queryable' : 'empty'}`,
+    });
+  await (present ? poll.toBeGreaterThan(0) : poll.toBe(0));
 }
 
 test.describe('Metrics Explorer stale no-data (#14238)', () => {
