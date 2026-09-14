@@ -75,6 +75,11 @@ pub fn is_reserved_internal_stream(stream_name: &str) -> bool {
     RESERVED_INTERNAL_STREAMS.contains(&stream_name)
 }
 
+/// True for a usage stream name that only the enterprise build is allowed to write, in any org.
+pub fn is_enterprise_only_usage_stream(stream_name: &str) -> bool {
+    matches!(stream_name, USAGE_STREAM | DATA_RETENTION_USAGE_STREAM)
+}
+
 /// Returns true if `stream_name` is an internal rollup stream written only by
 /// OpenObserve's own aggregation jobs — the `_o2_` family (`_o2_service_graph`,
 /// `_o2_db_stats`, future `_o2_dep_stats` siblings) plus the pre-prefix-era
@@ -1558,6 +1563,16 @@ mod tests {
         assert!(!is_reserved_self_reporting_stream("usage_production"));
         assert!(!is_reserved_self_reporting_stream("_usage"));
         assert!(!is_reserved_self_reporting_stream(""));
+    }
+
+    #[test]
+    fn test_is_enterprise_only_usage_stream() {
+        assert!(is_enterprise_only_usage_stream(USAGE_STREAM));
+        assert!(is_enterprise_only_usage_stream(DATA_RETENTION_USAGE_STREAM));
+        assert!(!is_enterprise_only_usage_stream(TRIGGERS_STREAM));
+        assert!(!is_enterprise_only_usage_stream(ERROR_STREAM));
+        assert!(!is_enterprise_only_usage_stream(STATS_STREAM));
+        assert!(!is_enterprise_only_usage_stream("my_usage_stream"));
     }
 
     #[test]

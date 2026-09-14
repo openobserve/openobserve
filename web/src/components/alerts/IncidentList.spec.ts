@@ -37,6 +37,19 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+// acknowledgeIncident awaits a confirm dialog that only resolves via user
+// interaction with a rendered provider — unmocked, the call hangs until timeout.
+const mockConfirm = vi.fn().mockResolvedValue(true);
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({
+    currentDialog: { value: null },
+    confirm: mockConfirm,
+    handleConfirm: vi.fn(),
+    handleCancel: vi.fn(),
+    handleUpdateOpen: vi.fn(),
+  }),
+}));
+
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
@@ -562,6 +575,10 @@ describe("IncidentList.vue", () => {
 
       const incident = (wrapper.vm as any).allIncidents[0];
       (wrapper.vm as any).viewIncident(incident);
+      // Settle this test's own navigation here rather than leaving it pending —
+      // an un-awaited push resolves during a later test's flushPromises() and
+      // clobbers whatever route query that test set up.
+      await flushPromises();
 
       expect(pushSpy).toHaveBeenCalledWith(
         expect.objectContaining({

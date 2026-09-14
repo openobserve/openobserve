@@ -71,9 +71,6 @@ describe("ListOrganizations", () => {
         selectedOrganization: {
           identifier: "test-org",
         },
-        // useIsMetaOrg compares selectedOrganization.identifier to zoConfig.meta_org.
-        // "test-org" !== "_meta" → isMetaOrg is false → getOrganizations() uses the
-        // regular list() endpoint (the non-admin path these tests exercise).
         zoConfig: {
           meta_org: "_meta",
         },
@@ -107,13 +104,6 @@ describe("ListOrganizations", () => {
 
     // Mock the organizations service list method
     organizationsService.list.mockResolvedValue(mockOrganizations);
-    // getOrganizations() now reads from the _meta admin endpoint. Delegate it to
-    // whatever `list` is currently mocked to return (incl. per-test mockResolvedValueOnce),
-    // so existing test data setups keep driving the component unchanged.
-    organizationsService.get_admin_org.mockImplementation((...args) =>
-      organizationsService.list(...args),
-    );
-    organizationsService.resurrect_org.mockResolvedValue({});
     organizationsService.delete_org.mockResolvedValue({});
 
     wrapper = mount(ListOrganizations, {
@@ -181,8 +171,8 @@ describe("ListOrganizations", () => {
       const columns = wrapper.vm.columns;
       // The row index is rendered by OTable's `show-index` prop, so there is no
       // "#" column in the definition. Non-cloud columns are:
-      // name, identifier, type, status, actions = 5
-      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type", "status", "actions"]);
+      // name, identifier, type, actions = 4
+      expect(columns.map((c) => c.id)).toEqual(["name", "identifier", "type", "actions"]);
       expect(columns.map((c) => c.id)).not.toContain("plan");
       expect(columns[columns.length - 1].isAction).toBe(true);
     });
@@ -212,12 +202,11 @@ describe("ListOrganizations", () => {
 
       await flushPromises();
       // When isCloud is true a "plan" column is inserted before "actions":
-      // name, identifier, type, status, plan, actions = 6
+      // name, identifier, type, plan, actions = 5
       expect(wrapperWithCloud.vm.columns.map((c) => c.id)).toEqual([
         "name",
         "identifier",
         "type",
-        "status",
         "plan",
         "actions",
       ]);
@@ -228,47 +217,23 @@ describe("ListOrganizations", () => {
   });
 
   describe("Data Loading", () => {
-    it("should load organizations on mount via the regular list endpoint (non-_meta context)", async () => {
+    it("should load organizations on mount via the user-scoped list endpoint", async () => {
       await flushPromises();
-      // selectedOrganization is "test-org" (not _meta) → isMetaOrg is false →
-      // getOrganizations() uses the regular list() endpoint, not the admin one.
-      expect(organizationsService.list).toHaveBeenCalled();
+      expect(organizationsService.list).toHaveBeenCalledWith(0, 1000000, "name", false, "");
       expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+      // The user-scoped list feeds the header switcher.
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", expect.anything());
     });
 
-    it("should use the _meta admin endpoint when the selected org is _meta on cloud", async () => {
-      config.isCloud = "true";
-      organizationsService.list.mockClear();
-      organizationsService.get_admin_org.mockClear();
-      organizationsService.get_admin_org.mockResolvedValue(mockOrganizations);
-      const metaWrapper = mount(ListOrganizations, {
-        global: {
-          plugins: [i18n, router],
-          provide: {
-            store: {
-              ...mockStore,
-              state: {
-                ...mockStore.state,
-                // Selecting the _meta org flips isMetaOrg true → admin endpoint on cloud.
-                selectedOrganization: { identifier: "_meta" },
-              },
-            },
-          },
-          stubs: { OTable: true },
-        },
-      });
-      await flushPromises();
-      expect(organizationsService.get_admin_org).toHaveBeenCalledWith("_meta");
-      expect(organizationsService.list).not.toHaveBeenCalled();
-      metaWrapper.unmount();
-      config.isCloud = "false";
-    });
-
-    it("should fall back to the regular list for _meta off-cloud", async () => {
-      config.isCloud = "false";
+    it.each([
+      ["cloud", "true"],
+      ["off-cloud", "false"],
+    ])("should stay user-scoped in the _meta context on %s", async (_label, isCloud) => {
+      config.isCloud = isCloud;
       organizationsService.list.mockClear();
       organizationsService.get_admin_org.mockClear();
       organizationsService.list.mockResolvedValue(mockOrganizations);
+      mockStore.dispatch.mockClear();
       const metaWrapper = mount(ListOrganizations, {
         global: {
           plugins: [i18n, router],
@@ -285,9 +250,14 @@ describe("ListOrganizations", () => {
         },
       });
       await flushPromises();
-      expect(organizationsService.list).toHaveBeenCalled();
+      // IAM lists only the user's own orgs: the all-orgs admin endpoint belongs
+      // to Settings → Organization Management, never here.
+      expect(organizationsService.list).toHaveBeenCalledWith(0, 1000000, "name", false, "");
       expect(organizationsService.get_admin_org).not.toHaveBeenCalled();
+      // Always the user-scoped list, so it always feeds the header switcher.
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizations", expect.anything());
       metaWrapper.unmount();
+      config.isCloud = "false";
     });
 
     it("should transform organization data correctly", async () => {
@@ -298,9 +268,6 @@ describe("ListOrganizations", () => {
 
     it("should load organizations into the local list", async () => {
       await flushPromises();
-      // getOrganizations() populates the component's own list and deliberately does
-      // NOT dispatch setOrganizations (the navbar switcher keeps its own filtered
-      // list of non-deleting orgs).
       expect(wrapper.vm.organizations).toHaveLength(mockOrganizations.data.data.length);
       expect(wrapper.vm.organizations[0].identifier).toBe(
         mockOrganizations.data.data[0].identifier,

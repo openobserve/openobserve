@@ -136,11 +136,13 @@ describe("ONavbar", () => {
 
       // Alerts brings Destinations/Templates with it, so it is a group tile
       // rather than a bare link; Dashboards is absent so Reports stays a link.
+      // On-Call rides in the same group with its own three entries — Pages,
+      // Teams and Routing — since a storeless mount has every gate open.
       expect(wrapper.find('[data-test="menu-link-alertList-item"]').exists()).toBe(false);
       const reliability = wrapper.find('[data-test="nav-group-reliability"]');
       expect(reliability.exists()).toBe(true);
       expect(reliability.attributes("data-children")).toBe(
-        "alertList,alertDestinations,alertTemplates,alertLibrary",
+        "alertList,alertDestinations,alertTemplates,alertLibrary,onCallResponses,onCallTeams,onCallRouting",
       );
       expect(wrapper.find('[data-test="menu-link-reports-item"]').exists()).toBe(true);
     });

@@ -16,7 +16,10 @@
       @submit="saveOrgSettings"
       v-slot="{ isSubmitting }"
     >
-      <div data-test="add-role-rolename-input-btn" class="trace-id-field-name o2-input mb-2 w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="trace-id-field-name o2-input mb-2 w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-trace-id-input"
           name="traceIdFieldName"
@@ -27,7 +30,10 @@
         />
       </div>
 
-      <div data-test="add-role-rolename-input-btn" class="span-id-field-name o2-input w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-span-id-input"
           name="spanIdFieldName"
@@ -41,7 +47,7 @@
       <div
         v-if="config.isCloud !== 'true'"
         data-test="add-toggle-ingestion"
-        class="span-id-field-name o2-input w-100"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
       >
         <OFormSwitch
           data-test="add-toggle-ingestion-btn"

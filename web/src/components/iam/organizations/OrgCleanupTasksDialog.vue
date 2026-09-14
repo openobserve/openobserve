@@ -246,6 +246,7 @@ import { cleanupTasksQuery } from "@/services/organizations.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useQuery } from "@tanstack/vue-query";
 import { defineComponent, ref, computed, watch } from "vue";
+import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -278,6 +279,7 @@ export default defineComponent({
   emits: ["update:open"],
   setup(props) {
     const { t } = useI18nTyped();
+    const store = useStore();
     const tasks = ref<CleanupTask[]>([]);
 
     const sortedTasks = computed(() =>
@@ -396,10 +398,12 @@ export default defineComponent({
     // once every step is done and is torn down with the component — no manual
     // timer to start, clear and leak.
     const orgId = useOrgId();
+    // The cleanup endpoint is served by the meta org, which is configurable.
+    const metaOrg = computed(() => store.state.zoConfig?.meta_org || "_meta");
     // `Object.assign`, not a spread: `queryOptions()` brands its key with the
     // result type and a fresh object literal drops that brand.
     const cleanupTasks = useQuery(() =>
-      Object.assign(cleanupTasksQuery(orgId.value, props.orgId), {
+      Object.assign(cleanupTasksQuery(orgId.value, props.orgId, metaOrg.value), {
         enabled: props.open && !!props.orgId && !!orgId.value,
         refetchInterval: props.open && !isComplete.value ? 5000 : false,
       }),

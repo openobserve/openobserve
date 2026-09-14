@@ -20,6 +20,8 @@ use std::{
 
 use axum::http;
 use chrono::Utc;
+#[cfg(not(feature = "enterprise"))]
+use config::meta::self_reporting::usage::is_enterprise_only_usage_stream;
 #[cfg(feature = "cloud")]
 use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
@@ -131,6 +133,15 @@ pub async fn ingest(
     if need_usage_report && is_reserved_internal_stream(&stream_name) {
         return Err(Error::IngestionError(format!(
             "stream '{stream_name}' is reserved and cannot be ingested into"
+        )));
+    }
+
+    // The OSS build never writes these, so any write is external; blocking it keeps
+    // hand-written rows out of metering if the deployment later goes enterprise.
+    #[cfg(not(feature = "enterprise"))]
+    if is_enterprise_only_usage_stream(&stream_name) {
+        return Err(Error::IngestionError(format!(
+            "stream '{stream_name}' is reserved for enterprise usage reporting"
         )));
     }
 

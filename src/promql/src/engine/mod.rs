@@ -29,7 +29,7 @@ use promql_parser::parser::{
     UnaryExpr, value::ValueType,
 };
 
-use crate::{binaries, exec::PromqlContext, promql::label_usage::labels_dropped_at_root};
+use crate::{ast::label_usage::labels_dropped_at_root, binary, exec::PromqlContext};
 
 pub struct Engine {
     trace_id: String,
@@ -65,16 +65,6 @@ impl Engine {
         }
     }
 
-    /// Create a new engine with evaluation context for range queries
-    /// This is now an alias for `new()` since eval_ctx is always required
-    pub fn new_with_context(
-        trace_id: &str,
-        ctx: Arc<PromqlContext>,
-        eval_ctx: EvalContext,
-    ) -> Self {
-        Self::new(trace_id, ctx, eval_ctx)
-    }
-
     pub async fn exec(&mut self, prom_expr: &PromExpr) -> Result<(Value, Option<String>)> {
         self.extract_columns_from_prom_expr(prom_expr)?;
         if self.disable_label_selector {
@@ -100,24 +90,14 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Matrix(m) => {
-                        let out = m
-                            .into_iter()
-                            .map(|mut range| RangeValue {
-                                labels: std::mem::take(&mut range.labels).without_metric_name(),
-                                samples: range
-                                    .samples
-                                    .into_iter()
-                                    .map(|s| Sample {
-                                        timestamp: s.timestamp,
-                                        value: -s.value,
-                                    })
-                                    .collect(),
-                                exemplars: range.exemplars,
-                                time_window: range.time_window,
-                            })
-                            .collect();
-                        Value::Matrix(out)
+                    Value::Matrix(mut matrix) => {
+                        for range in &mut matrix {
+                            range.labels = std::mem::take(&mut range.labels).without_metric_name();
+                            for sample in &mut range.samples {
+                                sample.value = -sample.value;
+                            }
+                        }
+                        Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
                     _ => {
@@ -138,30 +118,25 @@ impl Engine {
                 let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
-                        let value = binaries::scalar_binary_operations(
-                            token,
-                            left,
-                            right,
-                            return_bool,
-                            op,
-                        )?;
+                        let value =
+                            binary::scalar_binary_operations(token, left, right, return_bool, op)?;
                         Value::Float(value)
                     }
                     (Value::Matrix(left), Value::Matrix(right)) => {
-                        binaries::vector_bin_op(expr, left, right)?
+                        binary::vector_bin_op(expr, left, right)?
                     }
                     (Value::Matrix(left), Value::Float(right)) => {
-                        binaries::vector_scalar_bin_op(expr, left, right, false).await?
+                        binary::vector_scalar_bin_op(expr, left, right, false)?
                     }
                     (Value::Float(left), Value::Matrix(right)) => {
-                        binaries::vector_scalar_bin_op(expr, right, left, true).await?
+                        binary::vector_scalar_bin_op(expr, right, left, true)?
                     }
                     // a set operator keeps the other side when one side has no series at all
                     (Value::None, Value::Matrix(right)) if expr.op.is_set_operator() => {
-                        binaries::vector_bin_op(expr, vec![], right)?
+                        binary::vector_bin_op(expr, vec![], right)?
                     }
                     (Value::Matrix(left), Value::None) if expr.op.is_set_operator() => {
-                        binaries::vector_bin_op(expr, left, vec![])?
+                        binary::vector_bin_op(expr, left, vec![])?
                     }
                     (Value::None, Value::None) => Value::None,
                     _ => {
@@ -178,15 +153,13 @@ impl Engine {
                 let val = self.exec_expr(&expr.expr).await?;
                 let range = expr.range;
                 let matrix = match val {
-                    Value::Matrix(vs) => {
+                    Value::Matrix(mut vs) => {
                         // For matrix type, update the time_window range
-                        vs.into_iter()
-                            .map(|mut rv| {
-                                // Update time_window with new range
-                                rv.time_window = Some(TimeWindow::new(range));
-                                rv
-                            })
-                            .collect()
+                        for rv in &mut vs {
+                            // Update time_window with new range
+                            rv.time_window = Some(TimeWindow::new(range));
+                        }
+                        vs
                     }
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -589,6 +562,47 @@ pub(crate) mod tests {
             assert_eq!(val, -42.0);
         } else {
             panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unary_matrix_preserves_timestamps_and_special_values() {
+        let ctx = EvalContext::new(1_000_000, 3_000_000, 1_000_000, "test".into());
+        for (input, expected) in [
+            ("0", -0.0_f64),
+            ("7", -7.0),
+            ("Inf", f64::NEG_INFINITY),
+            ("NaN", f64::NAN),
+        ] {
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    SimpleMockProvider,
+                    vec![],
+                )),
+                ctx.clone(),
+            );
+            let query = format!(
+                r#"-label_replace(label_replace(vector({input}), "job", "api", "", ""), "__name__", "m", "", "")"#
+            );
+            let expr = promql_parser::parser::parse(&query).unwrap();
+            let Value::Matrix(matrix) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels.len(), 1);
+            assert_eq!(matrix[0].labels[0].name, "job");
+            assert_eq!(matrix[0].labels[0].value, "api");
+            assert_eq!(matrix[0].samples.len(), 3);
+            for (sample, timestamp) in matrix[0].samples.iter().zip(ctx.timestamps()) {
+                assert_eq!(sample.timestamp, timestamp);
+                if expected.is_nan() {
+                    assert!(sample.value.is_nan());
+                } else {
+                    assert_eq!(sample.value.to_bits(), expected.to_bits());
+                }
+            }
         }
     }
 

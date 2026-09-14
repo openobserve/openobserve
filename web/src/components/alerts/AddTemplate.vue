@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="false">
+    <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="isMobile">
       <template v-slot:before>
         <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg flex h-full flex-col">
           <div class="overflow-auto p-3">
@@ -315,6 +315,7 @@ import {
   type AddTemplateForm,
 } from "./AddTemplate.schema";
 import ContentTemplateForm from "./template-content/ContentTemplateForm.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   emptyContentSpec,
   linkUrlBadScheme,
@@ -342,6 +343,7 @@ const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 const { t } = useI18nTyped();
 const splitterModel: Ref<number> = ref(55);
+const { isMobile } = useBreakpoint();
 const router = useRouter();
 const isUpdatingTemplate = ref(false);
 

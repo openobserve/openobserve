@@ -81,6 +81,30 @@ pub fn get_request_columns_limit_error(stream_name: &str, num_fields: usize) -> 
     )
 }
 
+/// The `ZO_COLS_PER_RECORD_LIMIT` rule, with the ingest-error counter the rejection is counted by.
+pub fn check_request_columns_limit(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    num_fields: usize,
+) -> Result<(), anyhow::Error> {
+    if num_fields <= get_config().limit.req_cols_per_record_limit {
+        return Ok(());
+    }
+    metrics::INGEST_ERRORS
+        .with_label_values(&[
+            org_id,
+            stream_type.as_str(),
+            stream_name,
+            SCHEMA_CONFORMANCE_FAILED,
+        ])
+        .inc();
+    Err(get_request_columns_limit_error(
+        &format!("{org_id}/{stream_type}/{stream_name}"),
+        num_fields,
+    ))
+}
+
 #[derive(Debug)]
 pub enum StreamSettingsError {
     StreamDeleting(String),
@@ -419,7 +443,6 @@ pub async fn check_for_schema(
         let schema = infra::schema::get_cache(org_id, stream_name, stream_type).await?;
         stream_schema_map.insert(stream_name.to_string(), schema);
     }
-    let cfg = get_config();
     let schema = stream_schema_map.get(stream_name).unwrap();
 
     // get infer schema
@@ -437,20 +460,12 @@ pub async fn check_for_schema(
         ));
     }
 
-    if inferred_schema.fields.len() > cfg.limit.req_cols_per_record_limit {
-        metrics::INGEST_ERRORS
-            .with_label_values(&[
-                org_id,
-                stream_type.as_str(),
-                stream_name,
-                SCHEMA_CONFORMANCE_FAILED,
-            ])
-            .inc();
-        return Err(get_request_columns_limit_error(
-            &format!("{org_id}/{stream_type}/{stream_name}"),
-            inferred_schema.fields.len(),
-        ));
-    }
+    check_request_columns_limit(
+        org_id,
+        stream_type,
+        stream_name,
+        inferred_schema.fields.len(),
+    )?;
 
     let mut need_insert_new_latest = false;
     let is_new = schema.schema().fields().is_empty();
@@ -594,6 +609,8 @@ pub async fn handle_diff_schema(
     if let Some(updated_schema) = read_cache.get(&cache_key)
         && let (false, _) = get_schema_changes(updated_schema, inferred_schema)
     {
+        // the caller still holds the schema it started from, empty for a just-created stream
+        stream_schema_map.insert(stream_name.to_string(), updated_schema.clone());
         return Ok(None);
     }
     drop(read_cache);
@@ -1199,6 +1216,42 @@ mod tests {
         .await
         .unwrap();
         assert!(!result.is_schema_changed);
+    }
+
+    /// The loser of a create race must adopt the winner's schema, not keep its empty one.
+    #[tokio::test]
+    async fn test_check_for_schema_adopts_schema_another_writer_created() {
+        let org_name = "nexus";
+        let stream_name = "race_created_by_peer";
+        let record: json::Value =
+            json::from_str(r#"{"city": "Athens", "_timestamp": 1234234234234}"#).unwrap();
+
+        let peer_schema = Schema::new(vec![
+            Field::new("city", DataType::Utf8, false),
+            Field::new("_timestamp", DataType::Int64, false),
+        ]);
+        STREAM_SCHEMAS_LATEST.write().await.insert(
+            format!("{org_name}/{}/{stream_name}", StreamType::Logs),
+            SchemaCache::new(peer_schema),
+        );
+
+        let mut map: HashMap<String, SchemaCache> = HashMap::new();
+        map.insert(stream_name.to_string(), SchemaCache::new(Schema::empty()));
+        check_for_schema(
+            org_name,
+            stream_name,
+            StreamType::Logs,
+            &mut map,
+            vec![record.as_object().unwrap()],
+            1234234234234,
+            false,
+        )
+        .await
+        .unwrap();
+
+        let adopted = map.get(stream_name).unwrap().schema();
+        assert_eq!(adopted.fields().len(), 2);
+        assert!(adopted.field_with_name("city").is_ok());
     }
 
     #[tokio::test]

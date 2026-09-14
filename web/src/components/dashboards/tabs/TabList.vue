@@ -102,7 +102,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             name="edit"
             size="sm"
             :aria-label="t('common.edit')"
-            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-60 hover:!opacity-100"
+            class="text-text-secondary absolute top-1/2 right-0.5 -translate-y-1/2 cursor-pointer opacity-0 transition-opacity duration-150 group-hover/otab:opacity-60 hover:!opacity-100 max-md:opacity-60"
             :data-test="`dashboard-tab-${tab.tabId}-rename-btn`"
             @click.stop="startRename(tab)"
             @mousedown.stop

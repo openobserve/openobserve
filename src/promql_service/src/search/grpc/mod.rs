@@ -32,12 +32,12 @@ use hashbrown::HashSet;
 use infra::errors::Result;
 use promql::{
     DEFAULT_LOOKBACK, TableProvider,
-    exec::PromqlContext,
-    micros,
-    promql::{
+    ast::{
         name_visitor,
         selector_window::{SelectorWindow, selector_window},
     },
+    exec::PromqlContext,
+    micros,
 };
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;

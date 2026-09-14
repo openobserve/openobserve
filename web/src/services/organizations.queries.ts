@@ -47,13 +47,14 @@ export const orgSummaryQuery = (org: string) =>
     refetchOnWindowFocus: true,
   });
 
-export const cleanupTasksQuery = (org: string, targetOrg: string) =>
+// `metaOrg` is the org that serves the endpoint, not the one being cleaned up — it is deployment-configurable, so the caller reads it from config.
+export const cleanupTasksQuery = (org: string, targetOrg: string, metaOrg = "_meta") =>
   queryOptions({
     queryKey: organizationKeys.cleanupTasks(org, targetOrg),
     // A failed poll must not surface an error; the next tick retries.
     queryFn: (): Promise<any[]> =>
       organizations
-        .get_cleanup_tasks(targetOrg)
+        .get_cleanup_tasks(metaOrg, targetOrg)
         .then((res: any) => res.data ?? [])
         .catch(() => []),
     staleTime: 0,

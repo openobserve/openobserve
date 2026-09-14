@@ -427,34 +427,33 @@ pub async fn handle_mcp_get(
 
 /// Handler for OAuth 2.0 Authorization Server Metadata (Enterprise)
 /// RFC 8414: https://datatracker.ietf.org/doc/html/rfc8414
-/// This endpoint provides discovery information for OAuth clients
-/// Must be publicly accessible (no auth) per OAuth spec
+/// Public (no auth) — describes the Dex authorization server, 404 when Dex is off.
 #[cfg(feature = "enterprise")]
 #[utoipa::path(
-    post,
+    get,
     path = "/.well-known/oauth-authorization-server",
     context_path = "",
     tag = "MCP",
     operation_id = "OAuthServerMetadata",
     responses(
         (status = 200, description = "Success", content_type = "application/json"),
+        (status = 404, description = "Not Found - OAuth discovery requires Dex to be enabled", content_type = "application/json"),
     ),
     extensions(
         ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn oauth_authorization_server_metadata() -> Response {
-    use std::sync::LazyLock as Lazy;
+    if !oauth_discovery_available().await {
+        return oauth_discovery_unavailable();
+    }
 
-    static METADATA: Lazy<OAuthServerMetadata> = Lazy::new(|| {
-        let dex_config = o2_dex::config::get_config();
-        let base_url = dex_config.dex_url.as_str();
-        OAuthServerMetadata::build(base_url)
-    });
+    let dex_config = o2_dex::config::get_config();
+    let metadata = OAuthServerMetadata::build(&dex_config.dex_url);
     Response::builder()
         .status(StatusCode::OK)
         .header(header::CONTENT_TYPE, "application/json")
-        .body(Body::from(serde_json::to_string(&*METADATA).unwrap()))
+        .body(Body::from(serde_json::to_string(&metadata).unwrap()))
         .unwrap()
 }
 
@@ -463,7 +462,7 @@ pub async fn oauth_authorization_server_metadata() -> Response {
 /// This endpoint provides discovery information for OAuth clients
 #[cfg(not(feature = "enterprise"))]
 #[utoipa::path(
-    post,
+    get,
     path = "/.well-known/oauth-authorization-server",
     context_path = "",
     tag = "MCP",
@@ -482,6 +481,27 @@ pub async fn oauth_authorization_server_metadata() -> Response {
         .body(Body::from(
             serde_json::to_string(&serde_json::json!({
                 "error": "OAuth discovery is only available in enterprise edition"
+            }))
+            .unwrap(),
+        ))
+        .unwrap()
+}
+
+/// Mirrors the UI's `sso_enabled`, so discovery never advertises OAuth the UI hides.
+#[cfg(feature = "enterprise")]
+async fn oauth_discovery_available() -> bool {
+    o2_dex::config::get_config().dex_enabled
+        && !o2_enterprise::enterprise::license::block_feature_for_report_failure().await
+}
+
+#[cfg(feature = "enterprise")]
+fn oauth_discovery_unavailable() -> Response {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(
+            serde_json::to_string(&serde_json::json!({
+                "error": "OAuth discovery requires Dex to be enabled and licensed features unblocked"
             }))
             .unwrap(),
         ))
@@ -525,25 +545,12 @@ fn parse_mcp_resource_org(resource_path: &str) -> Option<&str> {
     extensions(("x-o2-mcp" = json!({"enabled": false})))
 )]
 pub async fn oauth_protected_resource_metadata(Path(resource_path): Path<String>) -> Response {
-    let dex_config = o2_dex::config::get_config();
-    // Without Dex there is no authorization server to point clients at, and
-    // RFC 9728 requires `authorization_servers` to name at least one. Advertising
-    // a disabled Dex would send clients into a flow that cannot complete, so
-    // report that no OAuth-protected resource metadata exists — matching the
-    // 401 challenge, which is likewise suppressed when Dex is off.
-    if !dex_config.dex_enabled {
-        return Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .header(header::CONTENT_TYPE, "application/json")
-            .body(Body::from(
-                serde_json::to_string(&serde_json::json!({
-                    "error": "OAuth discovery requires Dex to be enabled"
-                }))
-                .unwrap(),
-            ))
-            .unwrap();
+    // RFC 9728 requires `authorization_servers` to name a live server, so this must go silent too.
+    if !oauth_discovery_available().await {
+        return oauth_discovery_unavailable();
     }
 
+    let dex_config = o2_dex::config::get_config();
     let cfg = config::get_config();
     let o2_base = format!("{}{}", cfg.common.web_url, cfg.common.base_uri);
     let o2_base = o2_base.trim_end_matches('/');
@@ -824,5 +831,20 @@ mod tests {
         let response = oauth_protected_resource_metadata(Path("api/default/mcp".to_string())).await;
         // Enterprise: 200; OSS build: 404. Either is a valid, non-panicking response.
         assert!(response.status() == StatusCode::OK || response.status() == StatusCode::NOT_FOUND);
+    }
+
+    /// The 401 challenge and RFC 9728 doc both go silent with Dex off; RFC 8414 must too.
+    #[tokio::test]
+    async fn oauth_discovery_endpoints_agree_on_availability() {
+        let protected_resource =
+            oauth_protected_resource_metadata(Path("api/default/mcp".to_string()))
+                .await
+                .status();
+        let authorization_server = oauth_authorization_server_metadata().await.status();
+
+        assert_eq!(
+            protected_resource, authorization_server,
+            "RFC 8414 and RFC 9728 discovery must both be served or both be absent"
+        );
     }
 }

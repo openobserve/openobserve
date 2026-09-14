@@ -42,7 +42,9 @@ impl Engine {
                 self.extract_columns_from_modifier(modifier, op);
                 Ok(())
             }
-            PromExpr::Unary(UnaryExpr { expr }) => self.extract_columns_from_prom_expr(expr),
+            PromExpr::Unary(UnaryExpr { expr }) | PromExpr::Paren(ParenExpr { expr }) => {
+                self.extract_columns_from_prom_expr(expr)
+            }
             PromExpr::Binary(BinaryExpr {
                 op,
                 lhs,
@@ -59,17 +61,15 @@ impl Engine {
                 {
                     self.extract_columns_from_modifier(matching, op);
                     // group_left or group_right -> no column selection
-                    match card {
-                        VectorMatchCardinality::ManyToOne(_)
-                        | VectorMatchCardinality::OneToMany(_) => {
-                            self.label_selector.clear();
-                        }
-                        _ => {}
+                    if matches!(
+                        card,
+                        VectorMatchCardinality::ManyToOne(_) | VectorMatchCardinality::OneToMany(_)
+                    ) {
+                        self.label_selector.clear();
                     }
                 }
                 Ok(())
             }
-            PromExpr::Paren(ParenExpr { expr }) => self.extract_columns_from_prom_expr(expr),
             PromExpr::Subquery(expr) => self.extract_columns_from_prom_expr(&expr.expr),
             PromExpr::Call(Call { func, args }) => {
                 // `label_replace` / `label_join` create new labels that don't
@@ -81,11 +81,9 @@ impl Engine {
                 if matches!(func.name, "label_replace" | "label_join") {
                     self.disable_label_selector = true;
                 }
-                _ = args
-                    .args
-                    .iter()
-                    .map(|expr| self.extract_columns_from_prom_expr(expr))
-                    .collect::<Vec<_>>();
+                for expr in &args.args {
+                    let _ = self.extract_columns_from_prom_expr(expr);
+                }
                 Ok(())
             }
             PromExpr::Extension(expr) => Err(DataFusionError::NotImplemented(format!(
@@ -112,10 +110,8 @@ impl Engine {
                 // topk and bottomk query all columns when with modifiers
                 token::T_TOPK | token::T_BOTTOMK => self.label_selector.clear(),
                 _ => {
-                    if let (label_selector, LabelModifier::Include(labels)) =
-                        (&mut self.label_selector, label_modifier)
-                    {
-                        label_selector.extend(labels.labels.iter().cloned());
+                    if let LabelModifier::Include(labels) = label_modifier {
+                        self.label_selector.extend(labels.labels.iter().cloned());
                     }
                 }
             }
@@ -450,10 +446,24 @@ mod tests {
             variadic: false,
             return_type: ValueType::Scalar,
         };
-        let expr = PromExpr::Call(Call { func, args });
+        let mut expr = PromExpr::Call(Call { func, args });
 
         let result = engine.extract_columns_from_prom_expr(&expr);
         assert!(result.is_ok());
+        let PromExpr::Call(call) = &mut expr else {
+            unreachable!();
+        };
+        call.args.args.insert(
+            0,
+            Box::new(PromExpr::Extension(Extension {
+                expr: Arc::new(TestExtension),
+            })),
+        );
+        call.args.args.push(Box::new(
+            promql_parser::parser::parse("sum by (job) (m)").unwrap(),
+        ));
+        assert!(engine.extract_columns_from_prom_expr(&expr).is_ok());
+        assert!(engine.label_selector.contains("job"));
     }
 
     #[test]

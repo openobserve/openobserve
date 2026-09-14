@@ -49,7 +49,20 @@ export interface ShortcutGroup {
   pageKey: I18nKey;
   /** Manager scope shared by this group's registerable shortcuts (omit = global). */
   scope?: string;
+  /** Hide this page in the cheatsheet unless the edition/config exposes the feature. */
+  visible?: (caps: ShortcutCapabilities) => boolean;
   shortcuts: ShortcutEntry[];
+}
+
+/** Runtime edition + org scope + `/config` flags that gate feature-specific pages. */
+export interface ShortcutCapabilities {
+  isEnterprise: boolean;
+  isCloud: boolean;
+  isMetaOrg: boolean;
+  onlineEvalsEnabled: boolean;
+  incidentsEnabled: boolean;
+  modelPricingEnabled: boolean;
+  rbacEnabled: boolean;
 }
 
 export interface ShortcutModule {
@@ -64,6 +77,18 @@ export interface ShortcutModule {
   /** pageKeys (ShortcutGroup.pageKey) grouped under this module, in display order */
   pages: I18nKey[];
 }
+
+// Gates mirror each feature's own route guard, so the cheatsheet never lists a page OSS cannot reach.
+const enterprise = (c: ShortcutCapabilities) => c.isEnterprise;
+const cloud = (c: ShortcutCapabilities) => c.isCloud;
+const enterpriseOrCloud = (c: ShortcutCapabilities) => c.isEnterprise || c.isCloud;
+const incidents = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.incidentsEnabled;
+const onlineEvals = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.onlineEvalsEnabled;
+const modelPricing = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.modelPricingEnabled;
+const rbac = (c: ShortcutCapabilities) => enterpriseOrCloud(c) && c.rbacEnabled;
+// Cluster-scoped admin surfaces only render inside the _meta org.
+const metaAdmin = (c: ShortcutCapabilities) => c.isEnterprise && c.isMetaOrg;
+const cloudMetaAdmin = (c: ShortcutCapabilities) => c.isCloud && c.isMetaOrg;
 
 /**
  * Groups the flat SHORTCUT_REGISTRY into modules for the cheatsheet. Each module
@@ -102,6 +127,10 @@ export const SHORTCUT_MODULES: ShortcutModule[] = [
       "shortcuts.pages.alertTemplates",
       "shortcuts.pages.alertIncidents",
     ],
+  },
+  {
+    titleKey: "shortcuts.modules.oncall",
+    pages: ["shortcuts.pages.oncall", "shortcuts.pages.oncallDetail"],
   },
   { titleKey: "shortcuts.modules.streams", pages: ["shortcuts.pages.streams"] },
   {
@@ -455,6 +484,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertSources",
     scope: "alert-sources",
+    visible: incidents,
     shortcuts: [
       { id: "alertSourcesAdd", key: "n", descriptionKey: "shortcuts.actions.alertSourcesAdd" },
       {
@@ -595,6 +625,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamRoles",
     scope: "iam-roles",
+    visible: rbac,
     shortcuts: [
       { id: "iamRolesAdd", key: "n", descriptionKey: "shortcuts.actions.iamRolesAdd" },
       { id: "iamRolesRefresh", key: "r", descriptionKey: "shortcuts.actions.iamRolesRefresh" },
@@ -612,6 +643,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamGroups",
     scope: "iam-groups",
+    visible: rbac,
     shortcuts: [
       { id: "iamGroupsAdd", key: "n", descriptionKey: "shortcuts.actions.iamGroupsAdd" },
       { id: "iamGroupsRefresh", key: "r", descriptionKey: "shortcuts.actions.iamGroupsRefresh" },
@@ -708,6 +740,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.runningQueries",
     scope: "running-queries",
+    visible: metaAdmin,
     shortcuts: [
       {
         id: "runningQueriesRefresh",
@@ -726,6 +759,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.alertIncidents",
     scope: "alert-incidents",
+    visible: incidents,
     shortcuts: [
       {
         id: "alertIncidentsRefresh",
@@ -735,10 +769,39 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     ],
   },
 
+  // ── On-Call: the list screens ───────────────────────────────────────────
+  // One scope for Pages / My on-call / Teams / Routing. A page registers only
+  // the ids it actually handles, so sharing the scope costs nothing and lets
+  // `r` mean "refresh this list" everywhere in the module.
+  {
+    pageKey: "shortcuts.pages.oncall",
+    scope: "oncall",
+    shortcuts: [
+      { id: "oncallRefresh", key: "r", descriptionKey: "shortcuts.actions.oncallRefresh" },
+      { id: "oncallSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
+      { id: "oncallNewTeam", key: "n", descriptionKey: "shortcuts.actions.oncallNewTeam" },
+    ],
+  },
+
+  // ── On-Call: one page ───────────────────────────────────────────────────
+  // Its own scope: `r` on a record would mean something different from `r` on
+  // a list, and `shift+r` must not be shadowed by the list's refresh.
+  {
+    pageKey: "shortcuts.pages.oncallDetail",
+    scope: "oncall-detail",
+    shortcuts: [
+      { id: "oncallAck", key: "a", descriptionKey: "shortcuts.actions.oncallAck" },
+      { id: "oncallEscalate", key: "e", descriptionKey: "shortcuts.actions.oncallEscalate" },
+      { id: "oncallSnooze", key: "s", descriptionKey: "shortcuts.actions.oncallSnooze" },
+      { id: "oncallResolve", key: "shift+r", descriptionKey: "shortcuts.actions.oncallResolve" },
+    ],
+  },
+
   // ── Pipeline Destinations ───────────────────────────────────────────────
   {
     pageKey: "shortcuts.pages.pipelineDestinations",
     scope: "pipeline-destinations",
+    visible: enterprise,
     shortcuts: [
       {
         id: "pipelineDestinationsRefresh",
@@ -765,6 +828,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.iamInvitations",
     scope: "iam-invitations",
+    visible: cloud,
     shortcuts: [
       {
         id: "iamInvitationsRefresh",
@@ -791,6 +855,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.regexPatterns",
     scope: "regex-patterns",
+    visible: enterprise,
     shortcuts: [
       {
         id: "regexPatternsRefresh",
@@ -804,6 +869,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.cipherKeys",
     scope: "cipher-keys",
+    visible: enterprise,
     shortcuts: [
       { id: "cipherKeysRefresh", key: "r", descriptionKey: "shortcuts.actions.cipherKeysRefresh" },
     ],
@@ -813,6 +879,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.nodes",
     scope: "nodes",
+    visible: metaAdmin,
     shortcuts: [{ id: "nodesRefresh", key: "r", descriptionKey: "shortcuts.actions.nodesRefresh" }],
   },
 
@@ -820,6 +887,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.modelPricing",
     scope: "model-pricing",
+    visible: modelPricing,
     shortcuts: [
       {
         id: "modelPricingRefresh",
@@ -833,6 +901,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.searchSchedulers",
     scope: "search-schedulers",
+    visible: enterprise,
     shortcuts: [
       {
         id: "searchSchedulersRefresh",
@@ -868,6 +937,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalTemplates",
     scope: "eval-templates",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "evalTemplatesRefresh",
@@ -881,6 +951,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.scorers",
     scope: "scorers",
+    visible: onlineEvals,
     shortcuts: [
       { id: "scorersRefresh", key: "r", descriptionKey: "shortcuts.actions.scorersRefresh" },
     ],
@@ -890,6 +961,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.evalJobs",
     scope: "eval-jobs",
+    visible: onlineEvals,
     shortcuts: [
       { id: "evalJobsRefresh", key: "r", descriptionKey: "shortcuts.actions.evalJobsRefresh" },
     ],
@@ -899,6 +971,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.scoreConfigs",
     scope: "score-configs",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "scoreConfigsRefresh",
@@ -912,6 +985,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.actions",
     scope: "actions",
+    visible: enterpriseOrCloud,
     shortcuts: [
       { id: "actionsRefresh", key: "r", descriptionKey: "shortcuts.actions.actionsRefresh" },
     ],
@@ -921,6 +995,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.llmProviders",
     scope: "llm-providers",
+    visible: onlineEvals,
     shortcuts: [
       {
         id: "llmProvidersRefresh",
@@ -934,6 +1009,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.aiToolsets",
     scope: "ai-toolsets",
+    visible: enterprise,
     shortcuts: [
       { id: "aiToolsetsRefresh", key: "r", descriptionKey: "shortcuts.actions.aiToolsetsRefresh" },
     ],
@@ -943,6 +1019,7 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
   {
     pageKey: "shortcuts.pages.orgManagement",
     scope: "organization-management",
+    visible: cloudMetaAdmin,
     shortcuts: [
       {
         id: "orgManagementRefresh",
