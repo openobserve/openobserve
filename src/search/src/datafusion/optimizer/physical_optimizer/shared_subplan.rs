@@ -35,18 +35,11 @@ use crate::datafusion::{
 
 /// Replaces the markers of one shared subplan by a single producer and one reader per other copy.
 #[derive(Debug, Default)]
-pub struct SharedSubplanRule {
-    memory_limit: Option<usize>,
-}
+pub struct SharedSubplanRule;
 
 impl SharedSubplanRule {
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Overrides the pool-derived materialization budget, meant for tests.
-    pub fn with_memory_limit(memory_limit: Option<usize>) -> Self {
-        Self { memory_limit }
+        Self
     }
 }
 
@@ -83,7 +76,7 @@ impl PhysicalOptimizerRule for SharedSubplanRule {
                     let producer = Arc::new(SharedSubplanExec::new(
                         id,
                         groups[&id].len(),
-                        self.memory_limit,
+                        None,
                         Arc::clone(marker.input()),
                     ));
                     producers.insert(id, Arc::clone(&producer));

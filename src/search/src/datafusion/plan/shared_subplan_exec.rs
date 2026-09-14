@@ -621,9 +621,9 @@ mod tests {
     use arrow_schema::{DataType, Field, Schema};
     use datafusion::{
         common::tree_node::{TreeNode, TreeNodeRecursion},
-        datasource::MemTable,
+        datasource::{MemTable, memory::MemorySourceConfig},
         execution::{SessionStateBuilder, runtime_env::RuntimeEnvBuilder},
-        physical_plan::{collect, displayable},
+        physical_plan::{collect, common::collect as collect_stream, displayable},
         prelude::{SessionConfig, SessionContext},
     };
 
@@ -659,7 +659,7 @@ mod tests {
         Arc::new(MemTable::try_new(schema, partitions).unwrap())
     }
 
-    fn sharing_context(memory_limit: Option<usize>) -> SessionContext {
+    fn sharing_context() -> SessionContext {
         let runtime = RuntimeEnvBuilder::new()
             .with_memory_limit(1 << 30, 1.0)
             .build()
@@ -670,9 +670,7 @@ mod tests {
             .with_default_features()
             .with_analyzer_rule(Arc::new(MarkSharedSubplanRule::new()))
             .with_optimizer_rule(Arc::new(StripDivergedSharedSubplanRule::new()))
-            .with_physical_optimizer_rule(Arc::new(SharedSubplanRule::with_memory_limit(
-                memory_limit,
-            )))
+            .with_physical_optimizer_rule(Arc::new(SharedSubplanRule::new()))
             .with_query_planner(Arc::new(OpenobserveQueryPlanner::new()))
             .build();
         let ctx = SessionContext::new_with_state(state);
@@ -688,15 +686,7 @@ mod tests {
     }
 
     async fn shared_results(sql: &str) -> (String, String, usize) {
-        let (results, plan, materializations, _) = shared_results_with(sql, None).await;
-        (results, plan, materializations)
-    }
-
-    async fn shared_results_with(
-        sql: &str,
-        memory_limit: Option<usize>,
-    ) -> (String, String, usize, usize) {
-        let ctx = sharing_context(memory_limit);
+        let ctx = sharing_context();
         let plan = ctx
             .sql(sql)
             .await
@@ -706,20 +696,13 @@ mod tests {
             .unwrap();
         let text = displayable(plan.as_ref()).indent(true).to_string();
         let batches = collect(Arc::clone(&plan), ctx.task_ctx()).await.unwrap();
-        let (mut materializations, mut spills) = (0, 0);
+        let mut materializations = 0;
         plan.apply(|node| {
             if let Some(shared) = node.downcast_ref::<SharedSubplanExec>() {
-                let metric = |name: &str| {
-                    shared
-                        .metrics()
-                        .and_then(|m| m.sum_by_name(name))
-                        .map(|m| m.as_usize())
-                        .unwrap_or_default()
-                };
-                materializations += metric("materializations");
-                spills += shared
+                materializations += shared
                     .metrics()
-                    .and_then(|m| m.spill_count())
+                    .and_then(|m| m.sum_by_name("materializations"))
+                    .map(|m| m.as_usize())
                     .unwrap_or_default();
             }
             Ok(TreeNodeRecursion::Continue)
@@ -729,20 +712,38 @@ mod tests {
             pretty_format_batches(&batches).unwrap().to_string(),
             text,
             materializations,
-            spills,
         )
     }
 
     #[tokio::test]
     async fn over_budget_materialization_spills_to_disk() {
-        let sql = "WITH c AS (SELECT name, count(*) AS cnt, sum(v) AS sv FROM t GROUP BY name) \
-                   SELECT c1.name, c1.cnt, c2.sv, c3.cnt FROM c c1 JOIN c c2 ON c1.name = c2.name \
-                   JOIN c c3 ON c1.name = c3.name WHERE c2.cnt > 1 ORDER BY c1.name";
-        let (results, plan, materializations, spills) = shared_results_with(sql, Some(1)).await;
-        assert_eq!(plan.matches("SharedSubplanExec").count(), 1, "{plan}");
-        assert_eq!(materializations, 1);
-        assert!(spills > 0);
-        assert_eq!(results, plain_results(sql).await);
+        let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int64Array::from(vec![1, 2, 3]))],
+        )
+        .unwrap();
+        let input = MemorySourceConfig::try_new_exec(&[vec![batch.clone()]], schema, None).unwrap();
+        let producer = SharedSubplanExec::new(1, 2, Some(1), input);
+        let reader = producer.reader();
+        let ctx = Arc::new(TaskContext::default());
+        let expected = pretty_format_batches(&[batch]).unwrap().to_string();
+        for plan in [&producer as &dyn ExecutionPlan, &reader] {
+            let stream = plan.execute(0, Arc::clone(&ctx)).unwrap();
+            let batches = collect_stream(stream).await.unwrap();
+            assert_eq!(
+                pretty_format_batches(&batches).unwrap().to_string(),
+                expected
+            );
+        }
+        let metrics = producer.metrics().unwrap();
+        assert_eq!(metrics.spill_count(), Some(1));
+        assert_eq!(
+            metrics
+                .sum_by_name("materializations")
+                .map(|m| m.as_usize()),
+            Some(1)
+        );
     }
 
     #[tokio::test]
