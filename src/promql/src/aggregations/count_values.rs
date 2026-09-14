@@ -13,20 +13,26 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 
 use config::meta::promql::value::{Label, Labels, LabelsExt, RangeValue, Sample};
 
-use super::{Accumulate, AggFunc};
+use super::{Accumulate, AggFunc, Count, count::CountAccumulate};
 
 #[derive(Clone)]
 pub(crate) struct CountValues {
     label: Option<String>,
 }
 
-pub(crate) struct CountValuesAccumulate {
-    label: Option<String>,
-    counts: Vec<HashMap<String, usize>>,
+pub(crate) enum CountValuesAccumulate {
+    Values {
+        label: String,
+        counts: BTreeMap<usize, HashMap<String, usize>>,
+    },
+    Count(CountAccumulate),
 }
 
 impl CountValues {
@@ -43,9 +49,12 @@ impl AggFunc for CountValues {
     }
 
     fn build(&self, slots: usize) -> Self::Accumulator {
-        CountValuesAccumulate {
-            label: self.label.clone(),
-            counts: vec![HashMap::new(); slots],
+        match &self.label {
+            Some(label) => CountValuesAccumulate::Values {
+                label: label.clone(),
+                counts: BTreeMap::new(),
+            },
+            None => CountValuesAccumulate::Count(Count.build(slots)),
         }
     }
 }
@@ -54,36 +63,54 @@ impl Accumulate for CountValuesAccumulate {
     fn push_series(
         &mut self,
         values: impl Iterator<Item = (usize, f64)>,
-        _labels: impl FnOnce() -> Labels,
+        labels: impl FnOnce() -> Labels,
     ) {
-        for (slot, value) in values {
-            let value = if self.label.is_none() {
-                String::new()
-            } else if value == f64::INFINITY {
-                "+Inf".into()
-            } else if value == f64::NEG_INFINITY {
-                "-Inf".into()
-            } else {
-                value.to_string()
-            };
-            *self.counts[slot].entry(value).or_default() += 1;
-        }
-    }
-
-    fn merge(&mut self, other: Self) {
-        for (counts, other) in self.counts.iter_mut().zip(other.counts) {
-            for (value, count) in other {
-                *counts.entry(value).or_default() += count;
+        match self {
+            Self::Count(count) => count.push_series(values, labels),
+            Self::Values { counts, .. } => {
+                for (slot, value) in values {
+                    let value = if value == f64::INFINITY {
+                        "+Inf".into()
+                    } else if value == f64::NEG_INFINITY {
+                        "-Inf".into()
+                    } else {
+                        value.to_string()
+                    };
+                    *counts.entry(slot).or_default().entry(value).or_default() += 1;
+                }
             }
         }
     }
 
-    fn evaluate(self, mut group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
-        if let Some(name) = &self.label {
-            group_labels.retain(|label| &label.name != name);
+    fn merge(&mut self, other: Self) {
+        match (self, other) {
+            (Self::Count(count), Self::Count(other)) => count.merge(other),
+            (Self::Values { counts, .. }, Self::Values { counts: other, .. }) => {
+                for (slot, other) in other {
+                    let counts = counts.entry(slot).or_default();
+                    for (value, count) in other {
+                        *counts.entry(value).or_default() += count;
+                    }
+                }
+            }
+            _ => unreachable!("cannot merge different count_values modes"),
         }
+    }
+
+    fn evaluate(self, mut group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let (label, counts) = match self {
+            Self::Count(count) => {
+                return count
+                    .evaluate(group_labels, timestamps)
+                    .into_iter()
+                    .filter(|series| !series.samples.is_empty())
+                    .collect();
+            }
+            Self::Values { label, counts } => (label, counts),
+        };
+        group_labels.retain(|existing| existing.name != label);
         let mut samples: HashMap<String, Vec<Sample>> = HashMap::new();
-        for (slot, counts) in self.counts.into_iter().enumerate() {
+        for (slot, counts) in counts {
             for (value, count) in counts {
                 samples
                     .entry(value)
@@ -95,9 +122,7 @@ impl Accumulate for CountValuesAccumulate {
             .into_iter()
             .map(|(value, samples)| {
                 let mut labels = group_labels.clone();
-                if let Some(label) = &self.label {
-                    labels.push(Arc::new(Label::new(label, &value)));
-                }
+                labels.push(Arc::new(Label::new(&label, &value)));
                 labels.sort();
                 RangeValue::new(labels, samples)
             })
@@ -115,6 +140,76 @@ mod tests {
         aggregations::AggOp,
         streaming_eval::tests::{by, without},
     };
+
+    #[test]
+    fn test_count_values_sparse_slots_stay_sparse_and_ordered_after_merge() {
+        let func = CountValues::new(Some("v".into()));
+        let mut acc = func.build(30_000);
+        let mut partial = func.build(30_000);
+        acc.push_series([(29_999, 7.0), (0, 7.0)].into_iter(), || {
+            panic!("labels must stay lazy")
+        });
+        partial.push_series([(29_999, 7.0)].into_iter(), || {
+            panic!("labels must stay lazy")
+        });
+        acc.merge(partial);
+        let CountValuesAccumulate::Values { counts, .. } = &acc else {
+            panic!("expected value counts")
+        };
+        assert_eq!(counts.len(), 2);
+        let timestamps: Vec<_> = (0..30_000).collect();
+        let output = acc.evaluate(vec![], &timestamps);
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0].labels, vec![Arc::new(Label::new("v", "7"))]);
+        assert_eq!(
+            output[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect::<Vec<_>>(),
+            vec![(0, 1.0), (29_999, 2.0)]
+        );
+    }
+
+    #[test]
+    fn test_count_values_excluded_destination_counts_and_omits_empty_groups() {
+        let func = CountValues::new(None);
+        let labels = vec![Arc::new(Label::new("job", "api"))];
+        assert!(
+            func.build(3)
+                .evaluate(labels.clone(), &[10, 20, 30])
+                .is_empty()
+        );
+        let mut acc = func.build(3);
+        let mut partial = func.build(3);
+        acc.push_series([(2, f64::NAN), (0, f64::INFINITY)].into_iter(), || {
+            panic!("labels must stay lazy")
+        });
+        partial.push_series([(2, f64::NEG_INFINITY)].into_iter(), || {
+            panic!("labels must stay lazy")
+        });
+        acc.merge(partial);
+        let output = acc.evaluate(labels.clone(), &[10, 20, 30]);
+        assert_eq!(output.len(), 1);
+        assert_eq!(output[0].labels, labels);
+        assert_eq!(
+            output[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect::<Vec<_>>(),
+            vec![(10, 1.0), (30, 2.0)]
+        );
+
+        let ctx = EvalContext::new(10, 30, 10, "test".into());
+        let empty = Value::Matrix(vec![RangeValue::new(labels, [])]);
+        assert!(matches!(
+            AggOp::CountValues(Some("v".into()))
+                .eval_aggregate(&without(&["v"]), empty, &ctx)
+                .unwrap(),
+            Value::None
+        ));
+    }
 
     #[test]
     fn test_count_values_sparse_special_values_and_merges() {

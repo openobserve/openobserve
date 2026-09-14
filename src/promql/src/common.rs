@@ -74,7 +74,7 @@ pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> 
     let upper = data[index + 1];
 
     let fraction = quantile * (n - 1) as f64 - index as f64;
-    let quantile_value = lower + (upper - lower) * fraction;
+    let quantile_value = lower * (1.0 - fraction) + upper * fraction;
 
     Some(quantile_value)
 }
@@ -182,6 +182,20 @@ mod tests {
         assert_eq!(quantile_in_place(&mut [], -1.0), Some(f64::NEG_INFINITY));
         assert_eq!(quantile_in_place(&mut [], 2.0), Some(f64::INFINITY));
         assert!(quantile_in_place(&mut [], f64::NAN).unwrap().is_nan());
+    }
+
+    #[test]
+    fn test_quantile_interpolation_with_extreme_finite_values() {
+        for (mut values, q, expected) in [
+            ([-f64::MAX, f64::MAX], 0.0, -f64::MAX),
+            ([-f64::MAX, f64::MAX], 0.5, 0.0),
+            ([-f64::MAX, f64::MAX], 1.0, f64::MAX),
+            ([f64::MAX, f64::MAX], 0.5, f64::MAX),
+            ([-f64::MAX, -f64::MAX], 0.5, -f64::MAX),
+        ] {
+            assert_eq!(quantile(&values, q), Some(expected));
+            assert_eq!(quantile_in_place(&mut values, q), Some(expected));
+        }
     }
 
     #[test]
