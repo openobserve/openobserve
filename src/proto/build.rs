@@ -61,6 +61,7 @@ fn main() -> Result<()> {
         .type_attribute("MetricsQueryRequest", "#[derive(serde::Serialize)]")
         .type_attribute("MetricsQueryResponse", "#[derive(serde::Serialize)]")
         .type_attribute("ScanStats", "#[derive(serde::Serialize)]")
+        .type_attribute("SearchEventContext", "#[derive(serde::Serialize)]")
         .type_attribute(
             "PhysicalPlanNode.plan",
             "#[allow(clippy::large_enum_variant)]",

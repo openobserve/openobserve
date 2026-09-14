@@ -101,6 +101,26 @@ pub struct SimpleFileList {
     #[prost(string, repeated, tag = "1")]
     pub files: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
+#[derive(serde::Serialize)]
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct SearchEventContext {
+    #[prost(string, optional, tag = "1")]
+    pub alert_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "2")]
+    pub derived_stream_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "3")]
+    pub report_key: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "4")]
+    pub dashboard_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "5")]
+    pub dashboard_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "6")]
+    pub dashboard_folder_id: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "7")]
+    pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
+    #[prost(string, optional, tag = "8")]
+    pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
+}
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FileContentResponse {
     #[prost(message, repeated, tag = "1")]
@@ -506,6 +526,8 @@ pub struct MetricsQueryRequest {
     pub clusters: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     #[prost(bool, tag = "13")]
     pub is_super_cluster: bool,
+    #[prost(message, optional, tag = "14")]
+    pub search_event_context: ::core::option::Option<SearchEventContext>,
 }
 #[derive(serde::Serialize)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
@@ -1088,25 +1110,6 @@ pub struct SamplingConfig {
     /// Number of time buckets for stratified sampling (e.g., 24 for hourly over a day)
     #[prost(int32, optional, tag = "4")]
     pub num_time_strata: ::core::option::Option<i32>,
-}
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct SearchEventContext {
-    #[prost(string, optional, tag = "1")]
-    pub alert_key: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "2")]
-    pub derived_stream_key: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "3")]
-    pub report_key: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "4")]
-    pub dashboard_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "5")]
-    pub dashboard_name: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "6")]
-    pub dashboard_folder_id: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "7")]
-    pub dashboard_folder_name: ::core::option::Option<::prost::alloc::string::String>,
-    #[prost(string, optional, tag = "8")]
-    pub alert_name: ::core::option::Option<::prost::alloc::string::String>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct QueryStatus {
