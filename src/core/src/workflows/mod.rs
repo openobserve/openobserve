@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
     folder::DEFAULT_FOLDER,
@@ -441,9 +441,9 @@ pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
     folder_slug: Option<&str>,
-    name_substring: Option<&str>,
+    search_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = db::workflows::list_workflows(org_id, folder_slug, name_substring)
+    let ret = db::workflows::list_workflows(org_id, folder_slug, search_substring)
         .await?
         .into_iter()
         .filter(|pipeline| is_permitted(&pipeline.id, org_id, permitted.as_ref()))
@@ -459,28 +459,37 @@ pub async fn move_workflows(
 ) -> Result<(), anyhow::Error> {
     // The row stores the folder's primary key but tuples name folders by slug,
     // so resolve the source slug before the move overwrites it.
-    let mut previous = Vec::with_capacity(workflow_ids.len());
-    let mut missing = Vec::new();
-    for id in workflow_ids {
-        match db::workflows::get_workflow(org_id, id).await? {
-            Some(w) => {
-                let src_slug = infra::table::folders::get_name_by_pk(&w.folder_id)
-                    .await
-                    .ok()
-                    .flatten();
-                previous.push((w.id.clone(), src_slug));
-            }
-            // Without this the update simply matches no rows and the caller is
-            // told the move succeeded.
-            None => missing.push(id.clone()),
-        }
-    }
+    let folder_pks = infra::table::workflows::folder_pks_by_ids(org_id, workflow_ids).await?;
+
+    // Without this the update simply matches no rows and the caller is told the
+    // move succeeded.
+    let found: HashSet<&str> = folder_pks.iter().map(|(id, _)| id.as_str()).collect();
+    let missing: Vec<&str> = workflow_ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !found.contains(id))
+        .collect();
     if !missing.is_empty() {
         return Err(anyhow::anyhow!(
             "workflows not found: {}",
             missing.join(", ")
         ));
     }
+
+    let mut slugs: HashMap<&str, Option<String>> = HashMap::new();
+    for (_, pk) in &folder_pks {
+        if !slugs.contains_key(pk.as_str()) {
+            let slug = infra::table::folders::get_name_by_pk(pk)
+                .await
+                .ok()
+                .flatten();
+            slugs.insert(pk.as_str(), slug);
+        }
+    }
+    let previous: Vec<(String, Option<String>)> = folder_pks
+        .iter()
+        .map(|(id, pk)| (id.clone(), slugs.get(pk.as_str()).cloned().flatten()))
+        .collect();
 
     db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
 
@@ -1212,6 +1221,7 @@ mod tests {
         Workflow {
             id: "w1".to_string(),
             org_id: "org1".to_string(),
+            folder_id: "folder1".to_string(),
             name: "w".to_string(),
             description: String::new(),
             enabled: true,

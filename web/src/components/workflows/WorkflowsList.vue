@@ -130,7 +130,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="workflow-list-search-scope-current"
                           :title="t('workflow.searchThisFolderTooltip')"
-                          >{{ t("workflow.searchThisFolder") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("workflow.searchThisFolder")
+                          }}</span></OToggleGroupItem
                         >
                         <OToggleGroupItem
                           value="all"
@@ -138,7 +140,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="workflow-list-search-across-folders-toggle"
                           :title="t('workflow.searchAllFoldersTooltip')"
-                          >{{ t("workflow.searchAllFolders") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("workflow.searchAllFolders")
+                          }}</span></OToggleGroupItem
                         >
                       </OToggleGroup>
                     </template>
@@ -154,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="workflow-list-refresh"
-                @click="getWorkflows"
+                @click="() => getWorkflows()"
               >
                 <OTooltip side="bottom" :content="t('workflow.refresh')" />
               </OButton>
@@ -351,7 +355,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
@@ -389,13 +393,9 @@ const onMoveUpdated = () => {
 };
 
 const onFolderChange = (folderId: string) => {
-  if (folderId === activeFolderId.value) return;
   router.push({
     query: { ...route.query, org_identifier: orgId.value, folder: folderId },
   });
-  // Pass the folder explicitly: router.push resolves asynchronously, so
-  // reading it back off the route here would still yield the previous folder.
-  getWorkflows(folderId);
 };
 const store = useStore();
 
@@ -412,6 +412,17 @@ const filterQuery = ref("");
 const crossFolderActive = computed(
   () => searchAcrossFolders.value && filterQuery.value.trim() !== "",
 );
+
+// Driven off the URL, so it covers browser back/forward as well as rail clicks.
+// A cross-folder search would otherwise keep showing org-wide results under the
+// newly selected folder.
+watch(activeFolderId, (folderId) => {
+  if (searchAcrossFolders.value) {
+    searchAcrossFolders.value = false;
+    filterQuery.value = "";
+  }
+  getWorkflows(folderId);
+});
 
 const onFolderScopeChange = (v: string) => {
   const across = v === "all";
@@ -449,8 +460,7 @@ const filteredWorkflows = computed(() => {
   const tab = activeTab.value;
   return workflows.value.filter((w) => {
     if (tab !== "all" && triggerKind(w) !== tab) return false;
-    // In cross-folder mode the backend already applied the name filter; applying
-    // it again here would drop rows that matched on name but not description.
+    // In cross-folder mode the backend already applied the same filter.
     if (!q || crossFolderActive.value) return true;
     return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
   });
@@ -486,7 +496,7 @@ const formatTs = (ts?: number): string => {
   return new Date(ms).toLocaleString();
 };
 
-const columns = computed(() => [
+const columns = computed<OTableColumnDef<any>[]>(() => [
   {
     id: "#",
     header: raw("#"),

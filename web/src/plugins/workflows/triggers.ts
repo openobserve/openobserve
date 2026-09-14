@@ -28,7 +28,8 @@
 //   2. Give it a `buildSample()` (inline, or a builder like testSample.ts /
 //      incidentSample.ts) describing the payload it emits.
 //   3. Add its i18n strings under `workflow.triggerKind.<camelKind>` in
-//      en-US.json: { label, node, desc, intro }.
+//      en-US.json: { label, node, desc, intro, tab }. `tab` is the short list
+//      tab label; without it the tab falls back to the full `label`.
 // Nothing else needs touching — no picker/title/label/mapping edits.
 // ─────────────────────────────────────────────────────────────────────────────
 

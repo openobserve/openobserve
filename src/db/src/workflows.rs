@@ -146,18 +146,18 @@ pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String
 }
 
 /// Lists an org's workflows in one folder, or across the org when `folder_slug`
-/// is `None`, optionally restricted to names containing `name_substring`.
+/// is `None`, optionally restricted to rows matching `search_substring`.
 pub async fn list_workflows(
     org_id: &str,
     folder_slug: Option<&str>,
-    name_substring: Option<&str>,
+    search_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
     match folder_slug {
         Some(slug) => {
             let pk = resolve_folder_pk(org_id, slug).await?;
-            infra::table::workflows::list_by_org_folder(org_id, Some(&pk), name_substring).await
+            infra::table::workflows::list_by_org_folder(org_id, Some(&pk), search_substring).await
         }
-        None => infra::table::workflows::list_by_org_folder(org_id, None, name_substring).await,
+        None => infra::table::workflows::list_by_org_folder(org_id, None, search_substring).await,
     }
 }
 

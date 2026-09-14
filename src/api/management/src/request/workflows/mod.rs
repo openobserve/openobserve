@@ -167,6 +167,8 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder"),
+        ("draft" = Option<bool>, Query, description = "Save to the drafts table, skipping graph validation"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
@@ -264,7 +266,7 @@ pub async fn save_workflow(
         ("org_id" = String, Path, description = "Organization id"),
         ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
         ("all_folders" = Option<bool>, Query, description = "List across every folder the caller may see. Overrides `folder`."),
-        ("name_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name must contain."),
+        ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -317,10 +319,11 @@ pub async fn list_workflows(
 
     // Matched in the database rather than in the browser, so a cross-folder
     // search does not depend on every workflow having been fetched first.
-    let name_substring = query.get("name_substring").map(|s| s.as_str());
+    let search_substring = query.get("search_substring").map(|s| s.as_str());
 
     let workflows =
-        match workflows::list_workflows(&org_id, permitted.clone(), folder, name_substring).await {
+        match workflows::list_workflows(&org_id, permitted.clone(), folder, search_substring).await
+        {
             Ok(workflows) => workflows,
             Err(e) => return MetaHttpResponse::internal_error(e),
         };
@@ -401,7 +404,6 @@ pub struct MoveWorkflowsRequestBody {
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("folder" = Option<String>, Query, description = "Source folder ID (for RBAC)"),
     ),
     request_body(content = MoveWorkflowsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
     responses(
