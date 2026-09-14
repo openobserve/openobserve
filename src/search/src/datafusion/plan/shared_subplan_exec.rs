@@ -53,52 +53,6 @@ pub struct SharedSubplanMarkerExec {
     properties: Arc<PlanProperties>,
 }
 
-/// Executes the shared subplan once and serves the first consumer.
-#[derive(Debug)]
-pub struct SharedSubplanExec {
-    state: Arc<SharedSubplanState>,
-    input: Arc<dyn ExecutionPlan>,
-    properties: Arc<PlanProperties>,
-    metrics: ExecutionPlanMetricsSet,
-}
-
-/// Replays the shared result for one more consumer; it has no child so the plan stays a tree.
-#[derive(Debug)]
-pub struct SharedSubplanReaderExec {
-    state: Arc<SharedSubplanState>,
-    schema: SchemaRef,
-    properties: Arc<PlanProperties>,
-}
-
-/// Runtime state shared by the producer and every reader of one subplan.
-pub struct SharedSubplanState {
-    id: u64,
-    consumers: usize,
-    memory_limit: Option<usize>,
-    input: RwLock<Arc<dyn ExecutionPlan>>,
-    materialized: Mutex<Option<MaterializeFut>>,
-    metrics: ExecutionPlanMetricsSet,
-    materializations: Count,
-}
-
-struct MaterializedSubplan {
-    partitions: Vec<PartitionData>,
-    spill_manager: Arc<SpillManager>,
-    // Released together with the in-memory batches.
-    _budget: Arc<Mutex<MaterializeBudget>>,
-}
-
-enum PartitionData {
-    Memory(Vec<RecordBatch>),
-    Spilled(RefCountedTempFile),
-}
-
-// Shared by all partition collectors; a partition that stops fitting moves to disk.
-struct MaterializeBudget {
-    reservation: MemoryReservation,
-    limit: Option<usize>,
-}
-
 impl SharedSubplanMarkerExec {
     pub fn new(id: u64, input: Arc<dyn ExecutionPlan>) -> Self {
         let properties = Arc::clone(input.properties());
@@ -171,6 +125,15 @@ impl ExecutionPlan for SharedSubplanMarkerExec {
     fn cardinality_effect(&self) -> CardinalityEffect {
         CardinalityEffect::Equal
     }
+}
+
+/// Executes the shared subplan once and serves the first consumer.
+#[derive(Debug)]
+pub struct SharedSubplanExec {
+    state: Arc<SharedSubplanState>,
+    input: Arc<dyn ExecutionPlan>,
+    properties: Arc<PlanProperties>,
+    metrics: ExecutionPlanMetricsSet,
 }
 
 impl SharedSubplanExec {
@@ -300,6 +263,14 @@ impl ExecutionPlan for SharedSubplanExec {
     }
 }
 
+/// Replays the shared result for one more consumer; it has no child so the plan stays a tree.
+#[derive(Debug)]
+pub struct SharedSubplanReaderExec {
+    state: Arc<SharedSubplanState>,
+    schema: SchemaRef,
+    properties: Arc<PlanProperties>,
+}
+
 impl DisplayAs for SharedSubplanReaderExec {
     fn fmt_as(&self, _t: DisplayFormatType, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "SharedSubplanReaderExec: id={}", self.state.id)
@@ -352,14 +323,15 @@ impl ExecutionPlan for SharedSubplanReaderExec {
     }
 }
 
-impl fmt::Debug for SharedSubplanState {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "SharedSubplanState(id={}, consumers={})",
-            self.id, self.consumers
-        )
-    }
+/// Runtime state shared by the producer and every reader of one subplan.
+pub struct SharedSubplanState {
+    id: u64,
+    consumers: usize,
+    memory_limit: Option<usize>,
+    input: RwLock<Arc<dyn ExecutionPlan>>,
+    materialized: Mutex<Option<MaterializeFut>>,
+    metrics: ExecutionPlanMetricsSet,
+    materializations: Count,
 }
 
 impl SharedSubplanState {
@@ -404,6 +376,23 @@ impl SharedSubplanState {
     }
 }
 
+impl fmt::Debug for SharedSubplanState {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SharedSubplanState(id={}, consumers={})",
+            self.id, self.consumers
+        )
+    }
+}
+
+struct MaterializedSubplan {
+    partitions: Vec<PartitionData>,
+    spill_manager: Arc<SpillManager>,
+    // Released together with the in-memory batches.
+    _budget: Arc<Mutex<MaterializeBudget>>,
+}
+
 impl MaterializedSubplan {
     fn stream(&self, partition: usize) -> Result<SendableRecordBatchStream> {
         let schema = Arc::clone(self.spill_manager.schema());
@@ -421,6 +410,17 @@ impl MaterializedSubplan {
             ))),
         }
     }
+}
+
+enum PartitionData {
+    Memory(Vec<RecordBatch>),
+    Spilled(RefCountedTempFile),
+}
+
+// Shared by all partition collectors; a partition that stops fitting moves to disk.
+struct MaterializeBudget {
+    reservation: MemoryReservation,
+    limit: Option<usize>,
 }
 
 impl MaterializeBudget {
