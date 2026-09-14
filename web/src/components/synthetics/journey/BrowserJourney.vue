@@ -1178,6 +1178,12 @@ async function ensureChildLoaded(row: BrowserStep) {
   }
 }
 
+// ── Subtest composition ──────────────────────────────────────────────────
+// `=== true` so an unknown flag hides the button — the step editor's stance for its Subtest option.
+const isCompositionEnabled = computed(
+  () => store.state.zoConfig?.synthetics_composition_enabled === true,
+);
+
 // ── Executed step cap ────────────────────────────────────────────────────
 // Undefined `ownStepCount` (a child could not be loaded) shows no notice; the server backstop applies.
 const overCap = computed(() => props.ownStepCount !== undefined && props.ownStepCount > MAX_STEPS);
@@ -1258,13 +1264,19 @@ function handleUpdateExpanded(ids: string[]) {
   expandedStepIds.value = ids;
 }
 function addStep() {
-  const step: BrowserStep = {
+  appendStep({
     id: getUUIDv7(true),
     action: "click",
     name: "",
     // See handleInsertBelow — a new step is version 2.
     locator: { candidates: [] },
-  };
+  });
+}
+// No locator, matching what the editor writes when an action becomes subtest.
+function addSubtestStep() {
+  appendStep({ id: getUUIDv7(true), action: "subtest", name: "", subtest: undefined });
+}
+function appendStep(step: BrowserStep) {
   emit("update:modelValue", [...props.modelValue, step]);
   revealStep(step.id);
 }
@@ -1383,8 +1395,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
-    <!-- Toolbar — ps-4 mirrors the expand column (w-4) so the select-all checkbox
-         aligns with the row checkboxes in the OTable below. -->
     <div class="ms-6.5 mb-3 flex items-center gap-4 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
@@ -1433,6 +1443,17 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           icon-left="add"
         >
           {{ t("synthetics.journey.addStep") }}
+        </OButton>
+        <OButton
+          v-if="!isRecording && !isReplayLocked && isCompositionEnabled"
+          variant="outline"
+          size="sm"
+          :disabled="readonly || isRecording || isRestoring"
+          data-test="synthetics-journey-add-subtest-btn"
+          @click="addSubtestStep"
+          icon-left="account-tree"
+        >
+          {{ t("synthetics.journey.addSubtest") }}
         </OButton>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->

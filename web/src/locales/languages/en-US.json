@@ -14027,6 +14027,7 @@
       "advancedTimeoutHeading": "While it acts — give up after",
       "advancedFailureHeading": "If it fails",
       "addStep": "Add Step",
+      "addSubtest": "Add Subtest",
       "addStepManually": "Add a step manually",
       "bulkDeleteStepsBody": "Delete {count} step? This cannot be undone. | Delete {count} steps? This cannot be undone.",
       "bulkDeleteStepsTitle": "Delete steps",

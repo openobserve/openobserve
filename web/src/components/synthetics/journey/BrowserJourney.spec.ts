@@ -36,17 +36,26 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 // Mocked so `ensureChildLoaded`'s `org.value` read (via useStore) resolves
 // instead of throwing when no Vuex plugin is installed on the test wrapper.
+// `zoConfig` is mutable so a test can flip the composition gate per case.
+const mockStoreState: {
+  selectedOrganization: { identifier: string };
+  zoConfig: Record<string, unknown>;
+} = { selectedOrganization: { identifier: "default" }, zoConfig: {} };
 vi.mock("vuex", async () => {
   const actual = await vi.importActual<typeof import("vuex")>("vuex");
   return {
     ...actual,
-    useStore: () => ({ state: { selectedOrganization: { identifier: "default" } } }),
+    useStore: () => ({ state: mockStoreState }),
   };
 });
 
 const mockSyntheticsGet = vi.fn();
+const mockSyntheticsList = vi.fn();
 vi.mock("@/services/synthetics", () => ({
-  default: { get: (...args: unknown[]) => mockSyntheticsGet(...args) },
+  default: {
+    get: (...args: unknown[]) => mockSyntheticsGet(...args),
+    listByFolderId: (...args: unknown[]) => mockSyntheticsList(...args),
+  },
 }));
 
 import BrowserJourney from "./BrowserJourney.vue";
@@ -983,6 +992,155 @@ describe("BrowserJourney reveals a newly created step", () => {
     const steps = currentSteps(wrapper);
     expect(expandedIds(wrapper)).toContain("s1");
     expect(expandedIds(wrapper)).toContain(steps[1].id);
+  });
+});
+
+// The only way to add a subtest was Add Step, open the row, change its action —
+// nothing in the toolbar said subtests exist. Add Subtest is that path in one
+// click: it appends a step already set to `subtest` and reveals it with the
+// picker open, so the author's next click is choosing a test.
+describe("BrowserJourney Add Subtest button", () => {
+  let wrapper: VueWrapper;
+  let originalScrollIntoView: any;
+
+  const ADD_SUBTEST = '[data-test="synthetics-journey-add-subtest-btn"]';
+  const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
+
+  beforeEach(() => {
+    mockStoreState.zoConfig = { synthetics_composition_enabled: true };
+    mockSyntheticsList.mockResolvedValue({ data: { checks: [] } });
+    originalScrollIntoView = (Element.prototype as any).scrollIntoView;
+    (Element.prototype as any).scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => {
+    (Element.prototype as any).scrollIntoView = originalScrollIntoView;
+    mockStoreState.zoConfig = {};
+    mockSyntheticsList.mockReset();
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  // Same v-model harness as the reveal tests above: revealStep needs the row rendered
+  // on the next tick, so the parent must write the emit back synchronously.
+  function mountWithModel(initial: any[], withExpansion = false) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: initial,
+        "onUpdate:modelValue": (steps: any[]) => w.setProps({ modelValue: steps }),
+      },
+      global: {
+        stubs: withExpansion
+          ? { ...STUBS, JourneySteps: JourneyStepsStubWithExpansion }
+          : { ...STUBS },
+      },
+    }) as VueWrapper;
+    return w;
+  }
+
+  function currentSteps(w: VueWrapper): any[] {
+    return (w.props() as Record<string, unknown>).modelValue as any[];
+  }
+
+  it("should render an outline button with an icon immediately after Add Step", () => {
+    wrapper = mountJourney();
+
+    const btn = wrapper.find(ADD_SUBTEST);
+    expect(btn.exists()).toBe(true);
+    expect(btn.attributes("variant")).toBe("outline");
+    expect(btn.attributes("size")).toBe("sm");
+    expect(btn.attributes("icon-left")).toBe("account-tree");
+    expect(btn.text()).toBe("synthetics.journey.addSubtest");
+
+    const buttons = wrapper.findAll("button").map((b) => b.attributes("data-test"));
+    expect(buttons.indexOf("synthetics-journey-add-subtest-btn")).toBe(
+      buttons.indexOf("synthetics-journey-add-step-btn") + 1,
+    );
+  });
+
+  it("should not render when composition is disabled", () => {
+    mockStoreState.zoConfig = { synthetics_composition_enabled: false };
+    wrapper = mountJourney();
+
+    expect(wrapper.find(ADD_STEP).exists()).toBe(true);
+    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
+  });
+
+  // Hidden, not disabled, when the flag is unknown — the same `=== true` stance the
+  // step editor takes for its Subtest action option.
+  it("should not render when the composition flag is absent", () => {
+    mockStoreState.zoConfig = {};
+    wrapper = mountJourney();
+
+    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
+  });
+
+  it("should be disabled while readonly, like Add Step", () => {
+    wrapper = mountJourney({ readonly: true });
+
+    expect(wrapper.find(ADD_STEP).attributes("disabled")).toBeDefined();
+    expect(wrapper.find(ADD_SUBTEST).attributes("disabled")).toBeDefined();
+  });
+
+  it("should leave the toolbar with Add Step while a replay locks the journey", () => {
+    wrapper = mountJourney({ replayPhase: "running" });
+
+    expect(wrapper.find(ADD_STEP).exists()).toBe(false);
+    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
+  });
+
+  it("should leave the toolbar with Add Step while a replay is stopping", () => {
+    wrapper = mountJourney({ replayPhase: "stopping" });
+
+    expect(wrapper.find(ADD_STEP).exists()).toBe(false);
+    expect(wrapper.find(ADD_SUBTEST).exists()).toBe(false);
+  });
+
+  it("should append a step whose action is already subtest", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.find(ADD_SUBTEST).trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(2);
+    expect(steps[1]).toEqual({
+      id: expect.any(String),
+      action: "subtest",
+      name: "",
+      subtest: undefined,
+    });
+    expect(steps[1].locator).toBeUndefined();
+  });
+
+  it("should reveal the new step with the subtest picker in its expanded row", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }], true);
+    await wrapper.find(ADD_SUBTEST).trigger("click");
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(wrapper.findComponent(JourneyStepsStubWithExpansion).props("expandedIds")).toContain(
+      steps[1].id,
+    );
+    const rows = wrapper.findAll(".step-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[1].find('[data-test="synthetics-journey-step-subtest-picker"]').exists()).toBe(
+      true,
+    );
+    expect((Element.prototype as any).scrollIntoView).toHaveBeenCalledWith({
+      block: "nearest",
+      behavior: "smooth",
+    });
+  });
+
+  it("should count the new reference in the executed badge like an editor-chosen subtest", async () => {
+    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
+    await wrapper.setProps({ ownStepCount: 1 });
+    expect(wrapper.find('[data-test="synthetics-journey-executed-badge"]').exists()).toBe(false);
+
+    await wrapper.find(ADD_SUBTEST).trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="synthetics-journey-executed-badge"]').exists()).toBe(true);
   });
 });
 
@@ -3274,6 +3432,22 @@ describe("BrowserJourney — a restore that never reached the recording point", 
     const addStep = wrapper.find('[data-test="synthetics-journey-add-step-btn"]');
     expect(addStep.exists(), "Add Step disappeared instead of being disabled").toBe(true);
     expect(addStep.attributes("disabled")).toBeDefined();
+  });
+
+  it("should not offer Add Subtest while the restore runs", async () => {
+    mockStoreState.zoConfig = { synthetics_composition_enabled: true };
+    try {
+      wrapper = mountAnchored();
+      await startAnchoredRestore(wrapper);
+      respondToLastCommand({ success: true });
+      await flushPromises();
+
+      const addSubtest = wrapper.find('[data-test="synthetics-journey-add-subtest-btn"]');
+      expect(addSubtest.exists(), "Add Subtest disappeared instead of being disabled").toBe(true);
+      expect(addSubtest.attributes("disabled")).toBeDefined();
+    } finally {
+      mockStoreState.zoConfig = {};
+    }
   });
 
   it("should not offer Replay while the restore runs", async () => {
