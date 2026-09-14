@@ -912,6 +912,8 @@ export default defineComponent({
               browser_steps_limit: Number(responseData[i].browser_steps_limit ?? 0),
               protocol_steps_used: Number(responseData[i].protocol_steps_used ?? 0),
               protocol_steps_limit: Number(responseData[i].protocol_steps_limit ?? 0),
+              status_steps_used: Number(responseData[i].status_steps_used ?? 0),
+              status_steps_limit: Number(responseData[i].status_steps_limit ?? 0),
               created_at: timestampToTimezoneDate(responseData[i].created_at, "UTC", "yyyy-MM-dd"),
               trial_expires_at: timestampToTimezoneDate(
                 responseData[i].trial_expires_at,

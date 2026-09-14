@@ -22,7 +22,7 @@
 //!
 //! ## Pools
 //!
-//! [`TrialQuotaPool::AiCredits`] and the two synthetics step pools are
+//! [`TrialQuotaPool::AiCredits`] and the three synthetics step pools are
 //! independent: every counter, limit, DB read and HA message is keyed
 //! `(org, pool)`, so spending one grant cannot drain the other, and
 //! [`TrialQuotaFeature::pool`] is the only feature-to-pool mapping. No
@@ -107,8 +107,9 @@ struct FlushRecord {
     cost: i64,
 }
 
-/// A lifetime free grant, and the unit of isolation between features. Every counter, limit and DB
-/// read is keyed per `(org, pool)` via [`scope`]: an org that spends its AI credits must not
+/// A free grant per org, and the unit of isolation between features. Every pool is lifetime except
+/// [`TrialQuotaPool::SyntheticsStatusProtocol`], which resets each month. Every counter, limit and
+/// DB read is keyed per `(org, pool)` via [`scope`]: an org that spends its AI credits must not
 /// thereby lose its synthetics budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TrialQuotaPool {

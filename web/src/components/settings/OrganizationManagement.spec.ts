@@ -470,6 +470,8 @@ describe("OrganizationManagement.vue", () => {
         browser_steps_limit: 0,
         protocol_steps_used: 0,
         protocol_steps_limit: 0,
+        status_steps_used: 0,
+        status_steps_limit: 0,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
@@ -478,6 +480,42 @@ describe("OrganizationManagement.vue", () => {
         status: "active",
         deleted_at: null,
         grace_period_days: null,
+      });
+    });
+
+    it("should carry every synthetics pool from the response into the row", async () => {
+      mockGetAdminOrg.mockResolvedValue({
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "1",
+              created_at: 1701388800000000,
+              trial_expires_at: 1701388800000000,
+              browser_steps_used: 400,
+              browser_steps_limit: 10000,
+              protocol_steps_used: 900,
+              protocol_steps_limit: 20000,
+              status_steps_used: 12000,
+              status_steps_limit: 43200,
+            },
+          ],
+        },
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.getData();
+
+      // A dropped field opens the limit dialog at 0, and saving that wipes the grant.
+      expect(wrapper.vm.tabledata[0]).toMatchObject({
+        browser_steps_used: 400,
+        browser_steps_limit: 10000,
+        protocol_steps_used: 900,
+        protocol_steps_limit: 20000,
+        status_steps_used: 12000,
+        status_steps_limit: 43200,
       });
     });
 

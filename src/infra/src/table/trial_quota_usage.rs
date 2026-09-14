@@ -986,7 +986,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn status_upsert_ignores_an_older_month() {
+    async fn status_upsert_adds_a_late_older_month_to_the_current_month() {
         let db = db().await;
         apply_status(&db, ORG, 90, 202610).await;
         apply_status(&db, ORG, 5, 202609).await;
@@ -995,7 +995,7 @@ mod tests {
         assert_eq!(
             (row.usage_count, row.period),
             (95, 202610),
-            "a late replay must not rewind the period it settled into",
+            "a late replay counts against the current month and never rewinds the period",
         );
     }
 
