@@ -26,7 +26,8 @@ use hashbrown::{HashMap, hash_map::Entry};
 use super::{evaluate_partitions, range_expr::RangeExpr};
 use crate::{
     aggregations::{
-        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, Rank, Stddev, Stdvar, Sum,
+        Accumulate, AggFunc, AggOp, Avg, Count, CountValues, Group, Max, Min, Quantile, Rank,
+        Stddev, Stdvar, Sum,
     },
     series_stream::SeriesStream,
 };
@@ -53,6 +54,8 @@ where
         AggOp::Avg => aggregate_with(sources, Avg, eval).await,
         AggOp::Bottomk(k) => aggregate_with(sources, Rank::new(k, true), eval).await,
         AggOp::Count => aggregate_with(sources, Count, eval).await,
+        AggOp::CountValues(label) => aggregate_with(sources, CountValues::new(label), eval).await,
+        AggOp::Quantile(q) => aggregate_with(sources, Quantile::new(q), eval).await,
         AggOp::Group => aggregate_with(sources, Group, eval).await,
         AggOp::Max => aggregate_with(sources, Max, eval).await,
         AggOp::Min => aggregate_with(sources, Min, eval).await,
@@ -69,7 +72,7 @@ async fn aggregate_with<A, F, S>(
     eval: Arc<RangeExpr>,
 ) -> Result<(Value, usize)>
 where
-    A: AggFunc + Copy + Send + 'static,
+    A: AggFunc + Clone + Send + 'static,
     A::Accumulator: 'static,
     F: Future<Output = Result<S>> + Send + 'static,
     S: SeriesStream + 'static,
@@ -82,8 +85,9 @@ where
         func.name(),
         sources.len(),
     );
+    let partition_func = func.clone();
     let (folds, series_count) = evaluate_partitions(sources, &eval, move |source, eval| {
-        aggregate_partial(source, func, eval)
+        aggregate_partial(source, partition_func.clone(), eval)
     })
     .await?;
     let value = aggregate_final(folds, &eval.timestamps);
@@ -283,6 +287,9 @@ mod tests {
             AggOp::Bottomk(1),
             AggOp::Bottomk(2),
             AggOp::Count,
+            AggOp::CountValues(Some("value".into())),
+            AggOp::CountValues(Some("path".into())),
+            AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,
             AggOp::Min,
@@ -318,6 +325,8 @@ mod tests {
         op: AggOp,
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
+        let (op, modifier) = op.grouping(modifier);
+        let modifier = &modifier;
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let (sources, range) = group_sources(
             Value::Matrix(matrix),
@@ -363,12 +372,18 @@ mod tests {
             for func_name in range_cases {
                 for modifier in &modifiers {
                     let expected =
-                        run_generic(modifier, matrix.clone(), func_name, op, &eval_ctx).unwrap();
-
-                    let actual =
-                        run_materialized(modifier, matrix.clone(), func_name, op, &eval_ctx)
-                            .await
+                        run_generic(modifier, matrix.clone(), func_name, op.clone(), &eval_ctx)
                             .unwrap();
+
+                    let actual = run_materialized(
+                        modifier,
+                        matrix.clone(),
+                        func_name,
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap();
 
                     assert_eq!(
                         canonical_matrix(expected),
@@ -405,12 +420,24 @@ mod tests {
 
         for op in all_ops() {
             for modifier in [None, by(&["path"])] {
-                let expected =
-                    run_generic(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx).unwrap();
+                let expected = run_generic(
+                    &modifier,
+                    matrix.clone(),
+                    "sum_over_time",
+                    op.clone(),
+                    &eval_ctx,
+                )
+                .unwrap();
                 let first = canonical_matrix(
-                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
-                        .await
-                        .unwrap(),
+                    run_materialized(
+                        &modifier,
+                        matrix.clone(),
+                        "sum_over_time",
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap(),
                 );
                 assert_eq!(
                     canonical_matrix(expected),
@@ -418,9 +445,15 @@ mod tests {
                     "chunked fused {op:?}(sum_over_time) diverged from generic (modifier: {modifier:?})",
                 );
                 let second = canonical_matrix(
-                    run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
-                        .await
-                        .unwrap(),
+                    run_materialized(
+                        &modifier,
+                        matrix.clone(),
+                        "sum_over_time",
+                        op.clone(),
+                        &eval_ctx,
+                    )
+                    .await
+                    .unwrap(),
                 );
                 assert_eq!(
                     first, second,
@@ -455,10 +488,10 @@ mod tests {
 
         for op in [AggOp::Sum, AggOp::Avg] {
             let expected = canonical_matrix(
-                run_generic(&None, matrix.clone(), "rate", op, &eval_ctx).unwrap(),
+                run_generic(&None, matrix.clone(), "rate", op.clone(), &eval_ctx).unwrap(),
             );
             let actual = canonical_matrix(
-                run_materialized(&None, matrix.clone(), "rate", op, &eval_ctx)
+                run_materialized(&None, matrix.clone(), "rate", op.clone(), &eval_ctx)
                     .await
                     .unwrap(),
             );
@@ -630,6 +663,8 @@ mod tests {
         op: AggOp,
         modifier: &Option<LabelModifier>,
     ) -> Value {
+        let (op, modifier) = op.grouping(modifier);
+        let modifier = &modifier;
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let range = Duration::from_secs(60);
         let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
@@ -657,15 +692,22 @@ mod tests {
         let mut ops = all_ops();
         ops.extend([AggOp::Topk(0), AggOp::Topk(10), AggOp::Bottomk(10)]);
         for func_name in ["rate", "last_over_time", "sum_over_time", "delta"] {
-            for &op in &ops {
+            for op in &ops {
                 for modifier in &modifiers {
                     let expected = canonical_matrix(
-                        run_generic(modifier, rank_matrix(), func_name, op, &eval_ctx()).unwrap(),
+                        run_generic(modifier, rank_matrix(), func_name, op.clone(), &eval_ctx())
+                            .unwrap(),
                     );
                     for partitions in [1, 2, 3] {
                         let actual = canonical_matrix(
-                            run_partitioned(rank_matrix(), partitions, func_name, op, modifier)
-                                .await,
+                            run_partitioned(
+                                rank_matrix(),
+                                partitions,
+                                func_name,
+                                op.clone(),
+                                modifier,
+                            )
+                            .await,
                         );
                         let context = format!(
                             "{op:?}({func_name}) over {partitions} partitions (modifier: {modifier:?})"
@@ -677,6 +719,80 @@ mod tests {
                             assert_matrix_close(expected.clone(), actual, &context);
                         }
                     }
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_count_values_and_quantile_special_values_partition_parity() {
+        let matrix = [-0.0, 0.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY]
+            .into_iter()
+            .enumerate()
+            .map(|(i, value)| {
+                make_series("m", &i.to_string(), "/one", &[(50, value), (170, value)])
+            })
+            .collect::<Vec<_>>();
+        let ops = [
+            AggOp::CountValues(Some("instance".into())),
+            AggOp::Quantile(0.0),
+            AggOp::Quantile(0.5),
+            AggOp::Quantile(1.0),
+            AggOp::Quantile(-1.0),
+            AggOp::Quantile(2.0),
+            AggOp::Quantile(f64::NAN),
+        ];
+        for op in ops {
+            for modifier in [None, by(&["instance"]), without(&["instance"])] {
+                let expected = canonical_matrix(
+                    run_generic(
+                        &modifier,
+                        matrix.clone(),
+                        "last_over_time",
+                        op.clone(),
+                        &eval_ctx(),
+                    )
+                    .unwrap(),
+                );
+                let materialized = canonical_matrix(
+                    run_materialized(
+                        &modifier,
+                        matrix.clone(),
+                        "last_over_time",
+                        op.clone(),
+                        &eval_ctx(),
+                    )
+                    .await
+                    .unwrap(),
+                );
+                assert_matrix_close(
+                    expected.clone(),
+                    materialized,
+                    "materialized special values",
+                );
+                for partitions in [1, 2, 5] {
+                    let actual = canonical_matrix(
+                        run_partitioned(
+                            matrix.clone(),
+                            partitions,
+                            "last_over_time",
+                            op.clone(),
+                            &modifier,
+                        )
+                        .await,
+                    );
+                    assert_matrix_close(expected.clone(), actual, "partitioned special values");
+                    assert!(matches!(
+                        run_partitioned(
+                            vec![],
+                            partitions,
+                            "last_over_time",
+                            op.clone(),
+                            &modifier
+                        )
+                        .await,
+                        Value::None
+                    ));
                 }
             }
         }
@@ -696,7 +812,7 @@ mod tests {
             .map(|series| series.labels[0].value.clone())
             .unwrap();
         for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
-            let value = run_partitioned(tied.clone(), 2, "rate", op, &None).await;
+            let value = run_partitioned(tied.clone(), 2, "rate", op.clone(), &None).await;
             let Value::Matrix(matrix) = value else {
                 panic!("expected a matrix");
             };
@@ -705,7 +821,7 @@ mod tests {
             assert_eq!(matrix[0].samples.len(), 3, "{op:?}");
             assert_eq!(
                 canonical_matrix(
-                    run_generic(&None, tied.clone(), "rate", op, &eval_ctx()).unwrap()
+                    run_generic(&None, tied.clone(), "rate", op.clone(), &eval_ctx()).unwrap()
                 ),
                 canonical_matrix(Value::Matrix(matrix)),
                 "{op:?}"
@@ -725,7 +841,7 @@ mod tests {
     #[tokio::test]
     async fn test_fused_outputs_carry_no_window() {
         for op in all_ops() {
-            let value = run_partitioned(rank_matrix(), 1, "rate", op, &None).await;
+            let value = run_partitioned(rank_matrix(), 1, "rate", op.clone(), &None).await;
             let Value::Matrix(matrix) = value else {
                 panic!("{op:?}: expected a matrix");
             };

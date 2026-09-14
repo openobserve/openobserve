@@ -13,44 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
 use crate::{
     aggregations::{Accumulate, AggFunc, group_series},
     common::quantile_in_place,
 };
 
-/// Note: quantile aggregates all series into a single result (no label grouping)
-pub fn quantile(qtile: f64, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) started",
-        eval_ctx.trace_id,
-    );
-
-    // Handle invalid quantile parameter by returning special values
-    if !(0.0..=1.0).contains(&qtile) {
-        let value = quantile_in_place(&mut [], qtile).unwrap();
-        return crate::functions::vector(Value::Float(value), eval_ctx);
-    }
-
-    let result = super::eval_aggregate(&None, data, Quantile { qtile }, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] quantile_range({qtile}) execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
-
+#[derive(Clone, Copy)]
 pub struct Quantile {
     qtile: f64,
 }
 
-#[cfg(test)]
+pub struct QuantileAccumulate {
+    qtile: f64,
+    values: Vec<Vec<f64>>,
+}
+
 impl Quantile {
-    pub(super) fn new(qtile: f64) -> Self {
+    pub(crate) fn new(qtile: f64) -> Self {
         Self { qtile }
     }
 }
@@ -69,16 +50,10 @@ impl AggFunc for Quantile {
         }
     }
 
-    // Buffers every sample; merging partials would re-copy them at each
-    // reduction level.
+    // Repeated merging would copy every buffered sample at each reduction level.
     fn mergeable(&self) -> bool {
         false
     }
-}
-
-pub struct QuantileAccumulate {
-    qtile: f64,
-    values: Vec<Vec<f64>>,
 }
 
 impl QuantileAccumulate {
@@ -105,7 +80,7 @@ impl Accumulate for QuantileAccumulate {
     }
 
     fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
-        let samples = self
+        let samples: Vec<_> = self
             .values
             .into_iter()
             .enumerate()
@@ -117,7 +92,11 @@ impl Accumulate for QuantileAccumulate {
                     .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
             })
             .collect();
-        group_series(group_labels, samples)
+        if samples.is_empty() {
+            Vec::new()
+        } else {
+            group_series(group_labels, samples)
+        }
     }
 }
 
@@ -126,62 +105,74 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_quantile_value_none_input() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(0.5, Value::None, &eval_ctx).unwrap();
-        assert!(matches!(result, Value::None));
-    }
+    fn test_quantile_parameters_groups_sparse_slots_and_merges() {
+        use std::sync::Arc;
 
-    #[test]
-    fn test_quantile_invalid_input_returns_err() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(0.5, Value::Float(1.0), &eval_ctx);
-        assert!(result.is_err());
-    }
+        use config::meta::promql::value::{EvalContext, Label, Value};
 
-    #[test]
-    fn test_quantile_out_of_range_positive_returns_infinity() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(1.5, Value::None, &eval_ctx).unwrap();
-        match result {
-            Value::Matrix(m) => {
-                assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_infinite());
-                assert!(m[0].samples[0].value > 0.0);
+        use crate::{
+            aggregations::AggOp,
+            streaming_eval::tests::{by, without},
+        };
+
+        let ctx = EvalContext::new(10, 30, 10, "test".into());
+        for q in [0.0, 0.5, 1.0, -1.0, 2.0, f64::NAN] {
+            for empty in [
+                Value::None,
+                Value::Matrix(vec![]),
+                Value::Matrix(vec![RangeValue::new(vec![], [])]),
+            ] {
+                assert!(matches!(
+                    AggOp::Quantile(q)
+                        .eval_aggregate(&None, empty, &ctx)
+                        .unwrap(),
+                    Value::None
+                ));
             }
-            _ => panic!("Expected Matrix"),
+            let func = Quantile::new(q);
+            let mut acc = func.build(3);
+            for value in [1.0, 3.0] {
+                let mut partial = func.build(3);
+                partial.push_series([(0, value), (2, value)].into_iter(), || {
+                    panic!("labels must stay lazy")
+                });
+                acc.merge(partial);
+            }
+            let output = acc.evaluate(vec![], &[10, 20, 30]);
+            let expected = if q < 0.0 {
+                f64::NEG_INFINITY
+            } else if q > 1.0 {
+                f64::INFINITY
+            } else {
+                1.0 + 2.0 * q
+            };
+            assert_eq!(output[0].samples.len(), 2);
+            for sample in &output[0].samples {
+                assert!(sample.value == expected || (sample.value.is_nan() && expected.is_nan()));
+            }
         }
-    }
-
-    #[test]
-    fn test_quantile_out_of_range_negative_returns_neg_infinity() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(-0.1, Value::None, &eval_ctx).unwrap();
-        match result {
-            Value::Matrix(m) => {
-                assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_infinite());
-                assert!(m[0].samples[0].value < 0.0);
-            }
-            _ => panic!("Expected Matrix"),
-        }
-    }
-
-    #[test]
-    fn test_quantile_nan_returns_nan_samples() {
-        let timestamp = 1640995200;
-        let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = quantile(f64::NAN, Value::None, &eval_ctx).unwrap();
-        match result {
-            Value::Matrix(m) => {
-                assert_eq!(m.len(), 1);
-                assert!(m[0].samples[0].value.is_nan());
-            }
-            _ => panic!("Expected Matrix"),
+        let matrix = Value::Matrix(
+            [("a", 1.0), ("a", 3.0), ("b", 8.0)]
+                .into_iter()
+                .map(|(job, value)| {
+                    RangeValue::new(
+                        vec![Arc::new(Label::new("job", job))],
+                        [Sample::new(10, value)],
+                    )
+                })
+                .collect(),
+        );
+        for modifier in [by(&["job"]), without(&["instance"])] {
+            let Value::Matrix(mut output) = AggOp::Quantile(0.5)
+                .eval_aggregate(&modifier, matrix.clone(), &ctx)
+                .unwrap()
+            else {
+                panic!("expected matrix")
+            };
+            output.sort_by(|a, b| a.labels[0].value.cmp(&b.labels[0].value));
+            assert_eq!(output.len(), 2);
+            assert_eq!(output[0].samples[0].value, 2.0);
+            assert_eq!(output[1].samples[0].value, 8.0);
         }
     }
 

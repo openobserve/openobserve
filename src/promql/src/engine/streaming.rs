@@ -66,7 +66,7 @@ impl Engine {
             return Ok(None);
         };
         let streamed = self
-            .stream_fused_agg(&scan, modifier, func.clone(), op, range)
+            .stream_fused_agg(&scan, modifier, func.clone(), op.clone(), range)
             .await?;
         if let Some(value) = streamed {
             if self.result_type.is_none() {
@@ -155,7 +155,7 @@ impl Engine {
     ) -> Result<Option<Value>> {
         self.stream_scan_guarded(scan, |ctx, schema| async move {
             let Some(label_cols) =
-                LabelColumns::for_op(op, modifier, schema, &scan.label_selector, func.name())
+                LabelColumns::for_op(&op, modifier, schema, &scan.label_selector, func.name())
             else {
                 return Ok(None);
             };
@@ -678,7 +678,7 @@ mod tests {
 
     /// The generic ranking path: the range function or the instant selector, then the plain
     /// fold through `AggOp::eval_aggregate`.
-    async fn generic_topk(provider: StreamingProvider, query: &str) -> Value {
+    async fn generic_aggregation(provider: StreamingProvider, query: &str) -> Value {
         use promql_parser::parser::{AggregateExpr, Expr};
 
         let Expr::Aggregate(AggregateExpr {
@@ -712,8 +712,19 @@ mod tests {
     /// match the generic path both when it streams and when it falls back on the same context.
     /// Both test series carry the same values, so `k=1` is decided by the tie-break alone.
     #[tokio::test]
-    async fn test_topk_matches_generic_streaming_and_materialized() {
+    async fn test_parameterized_aggregations_match_generic_streaming_and_materialized() {
         for query in [
+            "quantile(0.5, rate(m[1m]))",
+            "quantile by(instance) (0.5, m)",
+            "quantile without(instance) (0.5, rate(m[1m]))",
+            "quantile(1 + 1, m)",
+            "quantile(-1, m)",
+            "quantile(0/0, m)",
+            r#"count_values("value", rate(m[1m]))"#,
+            r#"count_values by(instance) ("instance", m)"#,
+            r#"count_values without(instance) ("instance", m)"#,
+            r#"count_values without(nope) ("instance", rate(m[1m]))"#,
+            r#"count_values("value", m offset 30s)"#,
             "topk(1, rate(m[1m]))",
             "bottomk(1, rate(m[1m]))",
             "topk(1, increase(m{instance=\"a\"}[1m] offset 30s))",
@@ -726,7 +737,7 @@ mod tests {
             "bottomk by(nope) (1, m)",
             "topk(5, m)",
         ] {
-            let expected = generic_topk(provider(false, false), query).await;
+            let expected = generic_aggregation(provider(false, false), query).await;
             let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
             assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
             let materialized = eval_query(provider(false, false), 30, query).await.unwrap();
@@ -764,7 +775,12 @@ mod tests {
     /// k streams like a literal one.
     #[tokio::test]
     async fn test_topk_takes_the_streaming_path() {
-        for query in ["topk(1, m)", "topk(2 - 1, m)"] {
+        for query in [
+            "topk(1, m)",
+            "topk(2 - 1, m)",
+            "quantile(0.5, m)",
+            r#"count_values("value", m)"#,
+        ] {
             let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
             assert_eq!(result_type.as_deref(), Some("matrix"), "{query}");
             let Value::Matrix(matrix) = value else {
@@ -793,7 +809,7 @@ mod tests {
     #[tokio::test]
     async fn test_topk_bails_to_the_generic_path() {
         let query = "topk without(instance) (1, m)";
-        let expected = generic_topk(provider(false, false), query).await;
+        let expected = generic_aggregation(provider(false, false), query).await;
         let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
         assert_eq!(result_type.as_deref(), Some("vector"), "{query}");
         assert_same_matrix(expected, value, query);

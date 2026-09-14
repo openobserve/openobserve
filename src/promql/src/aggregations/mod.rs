@@ -42,11 +42,11 @@ mod sum;
 
 pub(crate) use avg::Avg;
 pub(crate) use count::Count;
-pub(crate) use count_values::count_values;
+pub(crate) use count_values::CountValues;
 pub(crate) use group::Group;
 pub(crate) use max::Max;
 pub(crate) use min::Min;
-pub(crate) use quantile::quantile;
+pub(crate) use quantile::Quantile;
 pub(crate) use rank::Rank;
 pub(crate) use stddev::Stddev;
 pub(crate) use stdvar::Stdvar;
@@ -174,20 +174,18 @@ pub trait Accumulate: Send + Sync + Sized {
     fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue>;
 }
 
-/// The aggregation operators that fold through the shared accumulators, with their parameter.
-///
-/// This is the single table from a parser token to an operator: the generic path dispatches
-/// through [`AggOp::eval_aggregate`] and the streaming path through `streaming_eval::aggregate`,
-/// each matching once into the monomorphized fold for the chosen [`AggFunc`]. Operators that
-/// are not listed here (`quantile`, `count_values`) are evaluated by their own functions.
-#[derive(Clone, Copy, Debug)]
+/// Aggregation operators and their evaluated parameters, shared by every execution path.
+#[derive(Clone, Debug)]
 pub(crate) enum AggOp {
     Avg,
     Bottomk(usize),
     Count,
+    // Without the destination label, values share one count but still omit empty groups.
+    CountValues(Option<String>),
     Group,
     Max,
     Min,
+    Quantile(f64),
     Stddev,
     Stdvar,
     Sum,
@@ -198,29 +196,65 @@ impl AggOp {
     /// The operator of a token with its evaluated parameter; the error of an unsupported
     /// operator or of a k that is not a number.
     pub(crate) fn new(op: &token::TokenType, param: Option<Value>) -> Result<Self> {
-        let k = |name: &str| match param {
-            Some(Value::Float(value)) => Ok(value as usize),
+        let number = |name: &str| match &param {
+            Some(Value::Float(value)) => Ok(*value),
             _ => Err(DataFusionError::Plan(format!(
                 "[{name}] param must be a number"
             ))),
         };
         Ok(match op.id() {
             token::T_AVG => Self::Avg,
-            token::T_BOTTOMK => Self::Bottomk(k("bottomk")?),
+            token::T_BOTTOMK => Self::Bottomk(number("bottomk")? as usize),
             token::T_COUNT => Self::Count,
+            token::T_COUNT_VALUES => {
+                let Some(Value::String(label_name)) = param else {
+                    return Err(DataFusionError::Plan(
+                        "[count_values] param must be a string".into(),
+                    ));
+                };
+                if !Label::is_valid_label_name(label_name.as_str()) {
+                    return Err(DataFusionError::Plan(format!(
+                        "[count_values] invalid label name: {label_name}"
+                    )));
+                }
+                Self::CountValues(Some(label_name))
+            }
+            token::T_QUANTILE => Self::Quantile(number("quantile")?),
             token::T_GROUP => Self::Group,
             token::T_MAX => Self::Max,
             token::T_MIN => Self::Min,
             token::T_STDDEV => Self::Stddev,
             token::T_STDVAR => Self::Stdvar,
             token::T_SUM => Self::Sum,
-            token::T_TOPK => Self::Topk(k("topk")?),
+            token::T_TOPK => Self::Topk(number("topk")? as usize),
             _ => {
                 return Err(DataFusionError::NotImplemented(format!(
                     "Unsupported Aggregate: {op:?}"
                 )));
             }
         })
+    }
+
+    // The destination is replaced before grouping, so its previous value must never split groups.
+    pub(crate) fn grouping(
+        &self,
+        modifier: &Option<LabelModifier>,
+    ) -> (Self, Option<LabelModifier>) {
+        let Self::CountValues(Some(label)) = self else {
+            return (self.clone(), modifier.clone());
+        };
+        let mut modifier = modifier.clone();
+        match &mut modifier {
+            Some(LabelModifier::Include(labels)) => labels.labels.retain(|name| name != label),
+            Some(LabelModifier::Exclude(labels)) => {
+                if labels.labels.contains(label) || label == NAME_LABEL {
+                    return (Self::CountValues(None), modifier);
+                }
+                labels.labels.push(label.clone());
+            }
+            None => {}
+        }
+        (self.clone(), modifier)
     }
 
     /// Whether the output keeps the input series' own labels, so a source must carry every
@@ -236,10 +270,16 @@ impl AggOp {
         data: Value,
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
-        match self {
+        let (op, modifier) = self.grouping(modifier);
+        let modifier = &modifier;
+        match op {
             Self::Avg => eval_aggregate(modifier, data, Avg, eval_ctx),
             Self::Bottomk(k) => eval_aggregate(modifier, data, Rank::new(k, true), eval_ctx),
             Self::Count => eval_aggregate(modifier, data, Count, eval_ctx),
+            Self::CountValues(label) => {
+                eval_aggregate(modifier, data, CountValues::new(label), eval_ctx)
+            }
+            Self::Quantile(q) => eval_aggregate(modifier, data, Quantile::new(q), eval_ctx),
             Self::Group => eval_aggregate(modifier, data, Group, eval_ctx),
             Self::Max => eval_aggregate(modifier, data, Max, eval_ctx),
             Self::Min => eval_aggregate(modifier, data, Min, eval_ctx),
@@ -716,6 +756,7 @@ mod tests {
         for (id, message) in [
             (token::T_TOPK, "[topk] param must be a number"),
             (token::T_BOTTOMK, "[bottomk] param must be a number"),
+            (token::T_QUANTILE, "[quantile] param must be a number"),
         ] {
             for param in [None, Some(Value::None), Some(Value::String("k".into()))] {
                 let result = AggOp::new(&op(id), param);
@@ -725,8 +766,8 @@ mod tests {
                 );
             }
         }
-        for id in [token::T_QUANTILE, token::T_COUNT_VALUES, token::T_ADD] {
-            let unsupported = op(id);
+        {
+            let unsupported = op(token::T_ADD);
             assert!(matches!(
                 AggOp::new(&unsupported, Some(Value::Float(0.5))),
                 Err(DataFusionError::NotImplemented(m)) if m == format!("Unsupported Aggregate: {unsupported:?}")
@@ -742,6 +783,8 @@ mod tests {
         for op in [
             AggOp::Avg,
             AggOp::Count,
+            AggOp::CountValues(Some("v".into())),
+            AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,
             AggOp::Min,

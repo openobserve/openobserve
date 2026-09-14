@@ -263,6 +263,8 @@ mod tests {
             AggOp::Bottomk(1),
             AggOp::Bottomk(2),
             AggOp::Count,
+            AggOp::CountValues(Some("value".into())),
+            AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,
             AggOp::Min,
@@ -294,9 +296,9 @@ mod tests {
                     .unwrap()
                     .unwrap();
                     let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
-                    let expected = aggregate(sources, op, eval).await.unwrap().0;
+                    let expected = aggregate(sources, op.clone(), eval).await.unwrap().0;
 
-                    let actual = run_streaming(&ctx, modifier, func_name, op, range)
+                    let actual = run_streaming(&ctx, modifier, func_name, op.clone(), range)
                         .await
                         .expect("streaming path must not fall back on the sorted table");
 

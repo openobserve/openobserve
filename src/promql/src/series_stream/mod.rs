@@ -238,9 +238,11 @@ mod tests {
         op: AggOp,
         range: Duration,
     ) -> Option<Value> {
+        let (op, modifier) = op.grouping(modifier);
+        let modifier = &modifier;
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
         let label_cols =
-            LabelColumns::for_op(op, modifier, &arrow_schema(), &HashSet::new(), func_name)?;
+            LabelColumns::for_op(&op, modifier, &arrow_schema(), &HashSet::new(), func_name)?;
         let sources = sorted_table_sources(ctx, label_cols, range).await?;
         let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
         Some(aggregate(sources, op, eval).await.unwrap().0)

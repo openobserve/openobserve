@@ -77,7 +77,7 @@ impl LabelColumns {
     /// column when the output keeps the series' own labels; `None` when the modifier cannot be
     /// keyed by columns.
     pub(crate) fn for_op(
-        op: AggOp,
+        op: &AggOp,
         modifier: &Option<LabelModifier>,
         schema: &Schema,
         label_selector: &HashSet<String>,

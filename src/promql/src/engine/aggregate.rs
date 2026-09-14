@@ -25,10 +25,7 @@ use promql_parser::parser::{
 };
 
 use super::Engine;
-use crate::{
-    aggregations::{self, AggOp},
-    functions, series_stream, streaming_eval,
-};
+use crate::{aggregations::AggOp, functions, series_stream, streaming_eval};
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
 /// `last_over_time` over the lookback window.
@@ -55,34 +52,13 @@ impl Engine {
             None => None,
         };
         let eval_ctx = self.eval_ctx.clone();
-        match op.id() {
-            token::T_QUANTILE => {
-                let Some(Value::Float(value)) = param else {
-                    return Err(DataFusionError::Plan(
-                        "[quantile] param must be a number".to_string(),
-                    ));
-                };
-                let input = self.exec_expr(expr).await?;
-                aggregations::quantile(value, input, &eval_ctx)
-            }
-            token::T_COUNT_VALUES => {
-                let Some(Value::String(label_name)) = param else {
-                    return Err(DataFusionError::Plan(
-                        "[count_values] param must be a string".to_string(),
-                    ));
-                };
-                let input = self.exec_expr(expr).await?;
-                aggregations::count_values(&label_name, modifier, input, &eval_ctx)
-            }
-            _ => {
-                let agg_op = AggOp::new(op, param)?;
-                if let Some(value) = self.fused_agg(agg_op, expr, modifier).await? {
-                    return Ok(value);
-                }
-                let input = self.exec_expr(expr).await?;
-                agg_op.eval_aggregate(modifier, input, &eval_ctx)
-            }
+        let agg_op = AggOp::new(op, param)?;
+        let (fused_op, fused_modifier) = agg_op.grouping(modifier);
+        if let Some(value) = self.fused_agg(fused_op, expr, &fused_modifier).await? {
+            return Ok(value);
         }
+        let input = self.exec_expr(expr).await?;
+        agg_op.eval_aggregate(modifier, input, &eval_ctx)
     }
 
     /// The fused fold over an already-materialized matrix, bounded by the query timeout.
@@ -127,7 +103,13 @@ impl Engine {
         if let Some((selector, range)) = shape.selector {
             let range = range.unwrap_or_else(|| self.ctx.lookback());
             if let Some(value) = self
-                .try_streaming_fused_agg(selector, range, modifier, shape.func.clone(), agg_op)
+                .try_streaming_fused_agg(
+                    selector,
+                    range,
+                    modifier,
+                    shape.func.clone(),
+                    agg_op.clone(),
+                )
                 .await?
             {
                 return Ok(Some(value));
@@ -231,13 +213,53 @@ mod tests {
             )),
             create_test_eval_ctx(),
         );
-        for query in ["topk(2 - 1, vector(5))", "bottomk(1 + 0, vector(5))"] {
+        for query in [
+            "topk(2 - 1, vector(5))",
+            "bottomk(1 + 0, vector(5))",
+            "quantile(1 / 2, vector(5))",
+        ] {
             let expr = parse(query).unwrap();
             let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
                 panic!("expected matrix for {query}");
             };
             assert_eq!(series.len(), 1, "{query}");
             assert_eq!(series[0].samples[0].value, 5.0, "{query}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_count_values_dispatch_validates_evaluated_parameter() {
+        use crate::{engine::tests::*, exec::PromqlContext};
+
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        let mut expr = parse(r#"count_values("v", vector(5))"#).unwrap();
+        let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+            panic!("expected matrix")
+        };
+        assert_eq!(series[0].labels[0].name, "v");
+        assert_eq!(series[0].labels[0].value, "5");
+        assert_eq!(series[0].samples[0].value, 1.0);
+        for param in [
+            Some(Box::new(parse("1 + 1").unwrap())),
+            None,
+            Some(Box::new(parse(r#""bad-name""#).unwrap())),
+        ] {
+            let PromExpr::Aggregate(aggregate) = &mut expr else {
+                unreachable!()
+            };
+            aggregate.param = param;
+            assert!(matches!(
+                engine.exec_expr(&expr).await,
+                Err(DataFusionError::Plan(_))
+            ));
         }
     }
 
