@@ -119,23 +119,21 @@ def resolve_org(client: OpenObserveClient, wanted: str) -> str:
     return wanted
 
 
-def oncall_enabled(client: OpenObserveClient) -> bool:
-    """Whether this build exposes the on-call routes at all.
+def oncall_enabled(client: OpenObserveClient, org: str) -> bool:
+    """Whether this build serves the on-call routes.
 
-    Read from the server's own `/config`, the same flag the web app gates its
-    navigation on, rather than probing a route: a 404 from an OSS build and a
-    404 from a typo are indistinguishable.
+    Probes `GET {org}/oncall/teams` rather than reading a flag off `/config`.
+    An earlier version read `config.oncall_enabled`, which is what the issue
+    report quoted — but a current enterprise build does not publish that key at
+    all, so the gate skipped all 104 tests against a server that was serving
+    on-call perfectly well. A 200 (or a 403, which is still the route answering)
+    means the feature is there; a 404 means this build does not carry it.
     """
     try:
-        resp = client.get("config", prefix="")
+        resp = client.get("oncall/teams", org=org)
     except requests.RequestException:
         return False
-    if resp.status_code != 200:
-        return False
-    try:
-        return resp.json().get("oncall_enabled") is True
-    except ValueError:
-        return False
+    return resp.status_code in (200, 403)
 
 
 def shift_rule(name: str, members: list[str], *, priority: int = 0,
@@ -461,9 +459,21 @@ class OnCallClient:
     # ---- pages (responses) --------------------------------------------------
 
     def list_responses(self, **params: Any) -> list[dict[str, Any]]:
-        resp = self.oc("GET", "responses", params=params or None)
+        """List pages, optionally filtered server-side.
+
+        Booleans are lowercased on the way out: `requests` renders Python `True`
+        as `"True"`, and the query deserializer answers
+        `400 provided string was not \u0060true\u0060 or \u0060false\u0060`. Left as a bool this
+        returned 400 on every poll, and the old `return []` on non-200 made that
+        read as "no pages yet" — so every wait burned its full timeout and
+        reported a product failure that never happened.
+        """
+        clean = {k: ("true" if v is True else "false" if v is False else v)
+                 for k, v in params.items() if v is not None}
+        resp = self.oc("GET", "responses", params=clean or None)
         if resp.status_code != 200:
-            return []
+            raise AssertionError(
+                f"listing pages failed: {resp.status_code} {resp.text[:200]}")
         body = resp.json()
         return body if isinstance(body, list) else body.get("list", [])
 

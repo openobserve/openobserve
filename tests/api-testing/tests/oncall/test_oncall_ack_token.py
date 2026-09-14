@@ -99,18 +99,20 @@ MALFORMED_TOKENS = [
 
 @pytest.fixture(scope="module", autouse=True)
 def require_oncall(create_session, base_url, org_id):
-    """Skip the module unless the build actually serves the ack route.
+    """Skip the module unless the build actually serves the on-call routes.
 
-    `/config` reports `oncall_enabled` from the enterprise config. On an OSS
-    build, or with O2_ONCALL_ENABLED off, the route is never registered and
-    `/api/v2/…/oncall/ack` falls through to the authenticated catch-all — every
-    assertion below would then be measuring the auth middleware instead.
+    Probes `oncall/teams` rather than reading `config.oncall_enabled`: that key
+    is what the issue report quoted, but a current enterprise build does not
+    publish it, and gating on it skipped every test against a server that was
+    serving on-call correctly. A 404 means the routes are not registered, in
+    which case `/oncall/ack` falls through to the authenticated catch-all and
+    every assertion below would be measuring the auth middleware instead.
     """
-    resp = create_session.get(f"{base_url}api/{org_id}/config")
-    if resp.status_code != 200:
-        pytest.skip(f"/config unavailable ({resp.status_code}), cannot confirm on-call is enabled")
-    if not resp.json().get("oncall_enabled"):
-        pytest.skip("on-call is disabled on this build (config.oncall_enabled is false)")
+    resp = create_session.get(f"{base_url}api/{org_id}/oncall/teams")
+    if resp.status_code == 404:
+        pytest.skip("this build does not serve the on-call routes")
+    if resp.status_code not in (200, 403):
+        pytest.skip(f"cannot confirm on-call is served (oncall/teams -> {resp.status_code})")
 
 
 @pytest.fixture

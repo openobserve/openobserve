@@ -34,8 +34,8 @@ def oncall_org(client: OpenObserveClient) -> str:
 
 
 @pytest.fixture(scope="session")
-def oncall_available(client: OpenObserveClient) -> bool:
-    return oncall_enabled(client)
+def oncall_available(client: OpenObserveClient, oncall_org: str) -> bool:
+    return oncall_enabled(client, oncall_org)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -47,13 +47,13 @@ def _require_oncall(oncall_available: bool) -> None:
     teams and wait on pages that can never arrive before ever reaching the skip.
     """
     if not oncall_available:
-        pytest.skip("on-call is not enabled on this build (config.oncall_enabled)")
+        pytest.skip("this build does not serve the on-call routes")
 
 
 @pytest.fixture(scope="module")
 def oncall(client: OpenObserveClient, oncall_org: str) -> Generator[OnCallClient, None, None]:
     oc = OnCallClient(client, oncall_org)
-    if oncall_enabled(client):
+    if oncall_enabled(client, oncall_org):
         oc.seed_destinations()
     try:
         yield oc
