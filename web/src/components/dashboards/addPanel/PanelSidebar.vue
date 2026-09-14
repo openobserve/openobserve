@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="bg-surface-panel relative flex h-full min-h-0 flex-col"
-    :class="isOpen ? 'w-75' : 'w-12.5'"
+    :class="isOpen ? 'w-75 max-md:w-full' : 'w-12.5'"
     data-test="panel-sidebar-root"
   >
     <div

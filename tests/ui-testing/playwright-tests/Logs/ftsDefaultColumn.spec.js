@@ -20,7 +20,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData, waitForStreamListed } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const TC008_SECOND_STREAM = 'e2e_automate_fts2_tc008';
@@ -38,6 +38,9 @@ test.describe("FTS Default Column Selection testcases", () => {
       await ingestTestData(page, TC008_SECOND_STREAM);
       expect(await waitForStreamData(page, TC008_SECOND_STREAM, 1, 30000),
         `stream ${TC008_SECOND_STREAM} never became queryable within 30s of ingestion`).toBe(true);
+      // Queryable is not the same as LISTED: the stream popover is built from /streams, which enumerates a new stream later than _search can query it.
+      expect(await waitForStreamListed(page, TC008_SECOND_STREAM, 'logs'),
+        `stream ${TC008_SECOND_STREAM} never appeared in the streams list after ingestion`).toBe(true);
     } finally {
       await context.close();
     }
@@ -58,6 +61,10 @@ test.describe("FTS Default Column Selection testcases", () => {
     // contention the UI search could fire before the just-ingested rows were queryable,
     // leaving the results table empty and timing out waitForSearchResults.
     await waitForStreamData(page, "e2e_automate", 1, 30000);
+
+    // Re-checked in THIS session rather than only the beforeAll context, because the streams list is cached per session and must be confirmed before the goto below, which is where the page caches the list the popover filters.
+    expect(await waitForStreamListed(page, TC008_SECOND_STREAM, 'logs'),
+      `stream ${TC008_SECOND_STREAM} is not listed for this session — the stream popover cannot offer it`).toBe(true);
 
     // Navigate to logs page and select stream
     await page.goto(
