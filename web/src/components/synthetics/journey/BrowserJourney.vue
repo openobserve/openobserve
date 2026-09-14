@@ -1407,9 +1407,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
       </div>
 
-      <!-- Advisory notices used to be two permanently-expanded cards below this
-           toolbar. The filter is `flex-1` and the action area is a fixed width,
-           so the chip's width comes out of the filter and the buttons stay put. -->
+      <!-- The filter is flex-1 and the action area shrink-0, so a chip's width comes out of the filter and the buttons stay put. -->
       <JourneySuggestions
         v-if="!readonly"
         :suggestions="suggestions"
@@ -1422,8 +1420,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         class="flex-1"
         data-test="synthetics-journey-filter-input"
       />
-      <!-- Fixed-width action area — buttons right-aligned, widest set (Add Step + Record + Replay/Stop) fits in 320px -->
-      <div class="flex w-110 items-center justify-end gap-2">
+      <div class="flex shrink-0 items-center justify-end gap-2">
         <OButton
           v-if="!isRecording && !isReplayLocked"
           variant="outline"
@@ -1494,6 +1491,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           size="sm"
           data-test="synthetics-journey-cancel-btn"
           @click="cancelRecording"
+          icon-left="close"
         >
           {{ t("synthetics.journey.cancel") }}
         </OButton>
@@ -1505,7 +1503,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-stop-btn"
           @click="stopRecording"
           icon-left="stop"
-          class="w-24!"
         >
           {{ t("synthetics.journey.stop") }}
         </OButton>
@@ -1517,7 +1514,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           data-test="synthetics-journey-record-btn"
           @click="onRecordButtonClick"
           icon-left="smart-display"
-          class="w-24!"
         >
           {{ t("synthetics.journey.record") }}
         </OButton>
@@ -1525,13 +1521,16 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         <!-- Variables panel toggle — only when the host provides that panel -->
         <OButton
           v-if="variablesPanelOpen !== undefined"
-          variant="outline"
-          size="sm"
-          class="shrink-0"
+          variant="panel-collapse"
+          size="icon-toolbar"
+          :aria-label="
+            variablesPanelOpen
+              ? t('synthetics.variablesPanel.collapsePanel')
+              : t('synthetics.variablesPanel.openPanel')
+          "
           data-test="synthetics-journey-toggle-variables-btn"
           @click="emit('toggle-variables-panel')"
         >
-          {{ t("synthetics.variablesPanel.title") }}
           <OIcon
             :name="
               variablesPanelOpen ? 'keyboard-double-arrow-right' : 'keyboard-double-arrow-left'
