@@ -832,9 +832,11 @@ mod tests {
             browser_steps_limit: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
             status_steps_used: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
             status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
@@ -898,9 +900,11 @@ mod tests {
             browser_steps_limit: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
             status_steps_used: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
             status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
@@ -929,9 +933,11 @@ mod tests {
             browser_steps_limit: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
             status_steps_used: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
             status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
@@ -1015,9 +1021,11 @@ mod tests {
             browser_steps_limit: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
             status_steps_used: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
             status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
@@ -1056,9 +1064,11 @@ mod tests {
             browser_steps_limit: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
             status_steps_used: 0,
             #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
             status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
