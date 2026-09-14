@@ -282,8 +282,7 @@ describe("AlertConfigSummary — anomaly detection configs", () => {
     expect(value(wrapper, "query-mode")).toBe(translated("alerts.anomaly.filters"));
     expect(value(wrapper, "detection-function")).toBe("avg(took)");
     expect(value(wrapper, "filters")).toBe("service = 'checkout'");
-    // 97 indexes TRAINING scores — shown as the percentile, never restated
-    // as a live anomaly rate (that arithmetic was measured false).
+    // 97 indexes TRAINING scores — shown as the percentile, never restated as a live anomaly rate.
     expect(value(wrapper, "sensitivity")).toBe(
       translated("alerts.anomaly.summaryThresholdPercentile", { percentile: 97 }),
     );

@@ -64,8 +64,15 @@
         <span class="text-text-secondary text-2xs font-normal">{{ panel.hint }}</span>
       </PanelBar>
       <div class="h-62.5 w-full">
+        <div
+          v-if="!kindColumnsReady"
+          class="flex h-full items-center justify-center"
+          :data-test="`alerts-anomalydetectionchart-${panel.key}-loading`"
+        >
+          <OSpinner size="md" />
+        </div>
         <PanelSchemaRenderer
-          v-if="panel.schema"
+          v-else-if="panel.schema"
           :height="5"
           :width="5"
           :panelSchema="panel.schema"
@@ -94,6 +101,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
@@ -156,14 +164,13 @@ const rangeOptions = computed(() => [
 
 const interval = computed(() => props.alert?.histogram_interval);
 
-// deviation_percent means a different thing per record kind, and the kind
-// flags are only serialized when true — so a stream that never saw a kind has
-// no column for it, and referencing it would fail the query. The schema says
-// which split the stream can express; without it (fetch failure included)
-// the single-series legacy query still renders.
+// Kind flags serialize only when true, so the stream schema is what says which per-kind split a query may reference.
 const kindColumns = ref<AnomalyKindColumns>({ ...NO_KIND_COLUMNS });
+// Charts wait for the schema probe, or the first render burns a query round-trip on the legacy shape.
+const kindColumnsReady = ref(false);
 
 async function loadKindColumns() {
+  kindColumnsReady.value = false;
   try {
     const res = await streamService.schema(
       store.state.selectedOrganization.identifier,
@@ -179,6 +186,8 @@ async function loadKindColumns() {
     };
   } catch {
     kindColumns.value = { ...NO_KIND_COLUMNS };
+  } finally {
+    kindColumnsReady.value = true;
   }
 }
 
@@ -348,7 +357,13 @@ const onRangeChange = (value: unknown) => {
   setTimeRange();
 };
 
-watch(() => props.anomalyId, setTimeRange);
+watch(
+  () => props.anomalyId,
+  () => {
+    setTimeRange();
+    loadKindColumns();
+  },
+);
 onMounted(() => {
   setTimeRange();
   loadKindColumns();

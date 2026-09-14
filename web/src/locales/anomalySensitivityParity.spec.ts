@@ -60,8 +60,7 @@ const ADDED = [
   "alerts.anomaly.sensitivityAggressive",
   "alerts.anomaly.percentile",
   "alerts.anomaly.sensitivityRange",
-  // Phase B (course-correction): mode-aware copy — the honest percentile hint
-  // plus the budget-mode control's strings, and the per-kind deviation labels.
+  // Mode-aware copy: the honest percentile hint, the budget-mode strings, the per-kind deviation labels.
   "alerts.anomaly.sensitivityHintPercentile",
   "alerts.anomaly.sensitivityBudgetTooltip",
   "alerts.anomaly.budgetHintPerDay",
@@ -78,12 +77,7 @@ const ADDED = [
   "alerts.anomaly.seriesExpected",
 ];
 
-// Orphaned with the slider and its mark lines, then with the Load data button
-// when the chart moved to the right-hand Preview card and became automatic.
-// The last four fell to Phase B: the per-day hint arithmetic was measured
-// fiction (§1.1 of the course-correction design), the "{rate}% anomaly rate"
-// summary restated it, and the single Deviation series folded score-% and
-// value-% into one number.
+// Keys orphaned by retired UI; a locale still carrying one is dead copy nothing else would flag.
 const REMOVED = [
   "alerts.anomaly.anomalyScoreRange",
   "alerts.anomaly.maxThresholdMarkLine",
@@ -404,9 +398,7 @@ describe("anomaly sensitivity locale parity", () => {
     }
   });
 
-  // §1.1: the stored percentile indexes TRAINING scores, and live distributions
-  // measurably diverge (63.9% under the bar on the worst deployed config). Any
-  // count, rate, or share of live buckets derived from it is fiction.
+  // The stored percentile indexes TRAINING scores; any live count, rate, or flag share derived from it is fiction.
   it("en-US percentile-mode copy promises no alert rate or flag share", () => {
     for (const key of [
       "alerts.anomaly.sensitivityTooltip",

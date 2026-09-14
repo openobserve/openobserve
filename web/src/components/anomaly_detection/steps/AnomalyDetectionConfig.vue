@@ -510,8 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OIcon>
           </div>
           <div class="flex flex-1 flex-col gap-1">
-            <!-- Budget mode (config carries alert_budget_per_day): the budget
-                 IS the contract, so the control is the delivered-alert cap. -->
+            <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
             <div v-if="budgetMode" class="flex items-start gap-3">
               <OToggleGroup
                 :model-value="budgetTier"
@@ -536,8 +535,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   min="1"
                   :model-modifiers="{ number: true }"
                   :aria-label="t('alerts.anomaly.budgetLabel')"
-                  class="alert-v3-input"
-                  style="width: 5.4375rem"
+                  class="alert-v3-input max-w-21.75 min-w-21.75"
                   data-test="anomaly-budget-count"
                 >
                   <template #error />
@@ -547,8 +545,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :options="budgetPeriods"
                   label-key="label"
                   value-key="value"
-                  class="alert-v3-select"
-                  style="min-width: 6.25rem"
+                  class="alert-v3-select min-w-25"
                   data-test="anomaly-budget-period"
                 />
               </div>
@@ -729,8 +726,7 @@ export default defineComponent({
       { value: 97, label: t("alerts.anomaly.sensitivityBalanced") },
       { value: 95, label: t("alerts.anomaly.sensitivityAggressive") },
     ]);
-    // Budget-mode tiers per the course-correction design: 1/week is the burden
-    // gate's median target, 4/day is the org-wide on-call ceiling.
+    // 1/week is the burden gate's median target, 4/day the org-wide on-call ceiling.
     const budgetTiers = computed(() => [
       {
         value: "1_week",
@@ -803,8 +799,7 @@ export default defineComponent({
         : t("alerts.anomaly.sensitivityTooltip"),
     );
 
-    // The active budget preset, or "" for a custom budget — a plain toggle
-    // because its one value fans out into two form fields.
+    // A plain toggle, not a form field: one preset value fans out into two form fields.
     const budgetTier = computed(() => {
       const match = budgetTiers.value.find(
         (tier) => tier.count === Number(budgetCount.value) && tier.period === budgetPeriod.value,
@@ -819,9 +814,7 @@ export default defineComponent({
       form.setFieldValue("budget_period", tier.period as "day" | "week");
     };
 
-    // Suppressed on bad input: the error message is the feedback there, never
-    // a hint quoting it. No computed alert rate in percentile mode — the bar
-    // is a training-score quantile, not a promise about live buckets.
+    // Suppressed on bad input (the error is the feedback); never a rate computed from the percentile.
     const sensitivityHint = computed(() => {
       if (budgetMode.value) {
         const count = Number(budgetCount.value);
@@ -866,10 +859,7 @@ export default defineComponent({
         cfg.training_window_days = toModelNumber(v.training_window_days);
         cfg.retrain_interval_days = toModelNumber(v.retrain_interval_days);
         if (v.sensitivity_mode === "budget") {
-          // threshold is controller-derived state in budget mode — never
-          // overwrite it from a control that does not render. An invalid
-          // count writes nothing: flipping the stored budget to undefined
-          // would silently switch the config back to percentile mode.
+          // threshold is controller-derived here; an invalid count writes nothing, or the config would flip back to percentile mode.
           const count = Number(v.budget_count);
           if (Number.isFinite(count) && count > 0) {
             cfg.alert_budget_per_day = v.budget_period === "week" ? count / 7 : count;

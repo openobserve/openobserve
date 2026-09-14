@@ -179,6 +179,35 @@ describe("AnomalyDetectionChart", () => {
     expect(schemaAt(wrapper, 0).queries[0].query).not.toContain("expected_value");
   });
 
+  it("holds the first query behind the schema probe, showing loading meanwhile", async () => {
+    wrapper = mount(AnomalyDetectionChart, {
+      props: { alert: ANOMALY, anomalyId: "cfg1" },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(0);
+    expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-loading"]').exists()).toBe(
+      true,
+    );
+    await flushPromises();
+    expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(3);
+    expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-loading"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("re-probes the schema when the anomaly id changes", async () => {
+    wrapper = await mountChart();
+    expect(schemaAt(wrapper, 0).queries[0].query).not.toContain("expected_value");
+
+    anomaliesSchema.fields = [{ name: "expected_value" }];
+    await wrapper.setProps({ anomalyId: "cfg2" });
+    await flushPromises();
+
+    const query = schemaAt(wrapper, 0).queries[0].query;
+    expect(query).toContain("max(expected_value) AS expected_value");
+    expect(query).toContain("WHERE anomaly_id = 'cfg2'");
+  });
+
   it("buckets at the config's detection resolution", async () => {
     wrapper = await mountChart({ ...ANOMALY, histogram_interval: "1h" });
     expect(schemaAt(wrapper, 0).queries[0].query).toContain("histogram(_timestamp, '1h')");

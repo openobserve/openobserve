@@ -581,9 +581,7 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("hint names the training-score percentile and promises no alert rate", async () => {
-      // The retired hint computed "about N per day" from the percentile — an
-      // arithmetic §1.1 of the course-correction design measured as fiction
-      // (63.9% of live buckets over the bar on the worst deployed config).
+      // The percentile indexes training scores, so any "about N per day" arithmetic is measured fiction.
       wrapper = mountConfig({
         threshold: 97,
         histogram_interval_value: 5,
@@ -766,14 +764,7 @@ describe("AnomalyDetectionConfig", () => {
     });
   });
 
-  // =========================================================================
-  // Budget mode (course-correction Phase B). The wire contract this UI
-  // assumes: config field `alert_budget_per_day` (number, per-day, may be
-  // fractional); absent/null/invalid = percentile mode, bit-for-bit today's
-  // behaviour. While a budget is set the API treats `threshold` as derived
-  // state and rejects writes to it, so the percentile control must not render
-  // and the write-back must not touch it.
-  // =========================================================================
+  // Wire contract: `alert_budget_per_day` absent/invalid = percentile mode; while set, `threshold` is API-derived and must never render or be written.
   describe("sensitivity — budget mode", () => {
     it("a config with no budget renders the percentile controls only", async () => {
       wrapper = mountConfig();

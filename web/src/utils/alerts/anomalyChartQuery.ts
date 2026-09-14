@@ -35,11 +35,7 @@ export const ANOMALY_DEVIATION_ALIAS = "deviation_value";
 export const ANOMALY_DROP_ALIAS = "drop_value";
 export const ANOMALY_EXPECTED_ALIAS = "expected_value";
 
-/** Which of the optional per-kind record fields exist in the `_anomalies`
- *  stream's schema. Referencing a column the stream has never seen fails the
- *  whole query ("No field named …"), so each one is opt-in; and a column that
- *  is absent also PROVES no record of that kind exists, so omitting its
- *  predicate is exact, not approximate. */
+/** Opt-in per-kind columns: referencing one the stream never saw fails the whole query, and its absence proves no such record exists. */
 export interface AnomalyKindColumns {
   isAbsence: boolean;
   isPartialDrop: boolean;
@@ -119,25 +115,18 @@ export function buildAnomalyScoreQuery(anomalyId?: string, interval?: string): s
   );
 }
 
-/** Bars, not a line: the writer stores zero for every non-anomalous bucket, so
- *  a line through the flat baseline would imply a trend that is not there.
- *
- *  `deviation_percent` means a different thing per record kind — score-space %
- *  over the bar for scored points, value-space % below the slot median for
- *  partial drops, and a constant 100.0 sentinel for absence — so one
- *  max() across kinds compares numbers from different spaces. Split: scored
- *  rows keep the deviation series, drops get their own, absence (a sentinel,
- *  not a measurement) is excluded. `IS NOT TRUE` keeps legacy rows, which
- *  predate both flags and are all score-space, in the scored series. */
+/** Bars, not a line: the writer zero-fills non-anomalous buckets, and a line through that baseline would imply a trend. */
 export function buildAnomalyDeviationQuery(
   anomalyId?: string,
   interval?: string,
   kinds: AnomalyKindColumns = NO_KIND_COLUMNS,
 ): string | null {
+  // deviation_percent lives in a different space per kind, so kinds never share one max(); absence is a sentinel, excluded.
   const scoredOnly = [
     ...(kinds.isAbsence ? ["is_absence IS NOT TRUE"] : []),
     ...(kinds.isPartialDrop ? ["is_partial_drop IS NOT TRUE"] : []),
   ];
+  // IS NOT TRUE keeps flag-less legacy rows (all score-space) in the scored series.
   const scored = scoredOnly.length
     ? `max(CASE WHEN ${scoredOnly.join(" AND ")} THEN deviation_percent END) ` +
       `AS ${ANOMALY_DEVIATION_ALIAS}`

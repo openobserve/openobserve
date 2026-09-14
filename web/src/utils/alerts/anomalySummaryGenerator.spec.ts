@@ -50,9 +50,7 @@ const config = (overrides: Record<string, unknown> = {}) => ({
 
 describe("generateAnomalySummary — sensitivity line", () => {
   it("states the training-score percentile, never a live anomaly rate", () => {
-    // "{rate}% anomaly rate" restated the per-day fiction §1.1 of the
-    // course-correction design measured false; the percentile indexes
-    // TRAINING scores and promises nothing about live buckets.
+    // The percentile indexes TRAINING scores and promises nothing about live buckets.
     const summary = generateAnomalySummary(config(), [], t);
     expect(summary).toContain("score bar at p97");
     expect(summary).not.toContain("anomaly rate");
@@ -68,9 +66,14 @@ describe("generateAnomalySummary — sensitivity line", () => {
     expect(summary).not.toContain("score bar");
   });
 
-  it("a sub-daily budget reads as alerts per week", () => {
+  it("a sub-daily budget reads as alerts per week, singular at one", () => {
     const summary = generateAnomalySummary(config({ alert_budget_per_day: 1 / 7 }), [], t);
-    expect(summary).toContain("at most 1 alerts/week");
+    expect(summary).toContain("at most 1 alert/week");
+  });
+
+  it("a fractional budget keeps the plural", () => {
+    const summary = generateAnomalySummary(config({ alert_budget_per_day: 0.05 }), [], t);
+    expect(summary).toContain("at most 0.35 alerts/week");
   });
 
   // The percentile input can be emptied, and the write-back passes "" through

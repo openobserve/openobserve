@@ -73,10 +73,7 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     training_window_days: z.coerce.number().min(1, t("alerts.validation.minimumOneDay")),
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
-    // Mode-conditional rules for the three sensitivity fields live in the
-    // superRefine: threshold only judges percentile mode (a budget-mode config
-    // carries a controller-derived percentile that may be fractional), and the
-    // budget pair only judges budget mode.
+    // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
     sensitivity_mode: z.enum(["percentile", "budget"]),
     threshold: z.coerce.number(),
     budget_count: z.coerce.number(),
@@ -159,8 +156,7 @@ export const createAnomalyDetectionConfigSchema = (
     }
   });
 
-/** The stored per-day budget when the config is in budget mode, else null.
- *  Absent/null/invalid = percentile mode — the only wire contract assumed. */
+/** The stored per-day budget, or null; absent/invalid = percentile mode — the only wire contract assumed. */
 export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined): number | null => {
   const budget = Number(cfg?.alert_budget_per_day);
   return Number.isFinite(budget) && budget > 0 ? budget : null;
@@ -171,8 +167,7 @@ export const budgetFieldsFromPerDay = (
   perDay: number | null,
 ): { budget_count: number; budget_period: "day" | "week" } => {
   if (perDay === null) return { budget_count: 1, budget_period: "day" };
-  // Round only the DISPLAY decimals float noise introduces (1/7*7 = 0.9999…),
-  // never the stored magnitude.
+  // Rounds only the DISPLAY decimals float noise introduces (1/7*7 = 0.9999…), never the magnitude.
   const round = (n: number) => Math.round(n * 1e6) / 1e6;
   return perDay < 1
     ? { budget_count: round(perDay * 7), budget_period: "week" }
