@@ -51,6 +51,13 @@ export class MetricsExplorerPage {
         // Card data-tests are name-suffixed (`…-card-select-cpu_usage`), so the
         // "any card" locator matches on the stable prefix.
         this.anyCardSelect = '[data-test^="metrics-explorer-card-select-"]';
+        // The same suffixing is why these are prefixes rather than whole selectors:
+        // the metric name is only known at call time. Kept here so every selector
+        // string still lives in one place.
+        this.cardPrefix = 'metrics-explorer-card-';
+        this.cardNoDataPrefix = 'metrics-explorer-card-nodata-';
+        // ECharts mounts more than one canvas per instance (zrender adds layers).
+        this.cardChartCanvas = 'canvas';
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -412,27 +419,20 @@ export class MetricsExplorerPage {
     /* ------------------------------------------------- a card, by metric name */
 
     cardRoot(metric) {
-        return this.page.locator(`[data-test="metrics-explorer-card-${metric}"]`);
+        return this.page.locator(`[data-test="${this.cardPrefix}${metric}"]`);
     }
 
     /** The inline "No data" tile — MetricCard's `isEmpty` branch. */
     cardNoData(metric) {
-        return this.page.locator(`[data-test="metrics-explorer-card-nodata-${metric}"]`);
+        return this.page.locator(`[data-test="${this.cardNoDataPrefix}${metric}"]`);
     }
 
     /**
      * A DRAWN chart, not merely a mounted card: the preview renders through
      * PanelSchemaRenderer, which paints into a canvas only once it has series.
-     * ECharts mounts more than one canvas per instance (zrender adds its own
-     * layers), so take the first rather than tripping strict mode.
      */
     cardChart(metric) {
-        return this.cardRoot(metric).locator('canvas').first();
-    }
-
-    /** The card's own ⟳ — the grid toolbar's Refresh is a different control. */
-    cardRefreshButton(metric) {
-        return this.page.locator(`[data-test="metrics-explorer-card-refresh-${metric}"]`);
+        return this.cardRoot(metric).locator(this.cardChartCanvas).first();
     }
 
     async expectCardNoData(metric, timeout = 60000) {
@@ -448,12 +448,6 @@ export class MetricsExplorerPage {
             timeout,
         });
         await expect(this.cardNoData(metric)).toBeHidden();
-    }
-
-    /** Hover first: the action row is collapsed at rest — see openFirstCardInVisualize. */
-    async refreshCard(metric) {
-        await this.cardRoot(metric).hover();
-        await this.cardRefreshButton(metric).click();
     }
 
     /* ----------------------------------------------------------------- share */
