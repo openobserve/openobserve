@@ -303,7 +303,7 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(15);
+      expect(columns).toHaveLength(17);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
@@ -315,10 +315,12 @@ describe("OrganizationManagement.vue", () => {
       expect(columns[8].id).toBe("browser_steps_total");
       expect(columns[9].id).toBe("protocol_steps_used");
       expect(columns[10].id).toBe("protocol_steps_total");
-      expect(columns[11].id).toBe("created_on");
-      expect(columns[12].id).toBe("trial_expiry");
-      expect(columns[13].id).toBe("contract_end_date");
-      expect(columns[14].id).toBe("actions");
+      expect(columns[11].id).toBe("status_steps_used");
+      expect(columns[12].id).toBe("status_steps_total");
+      expect(columns[13].id).toBe("created_on");
+      expect(columns[14].id).toBe("trial_expiry");
+      expect(columns[15].id).toBe("contract_end_date");
+      expect(columns[16].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
