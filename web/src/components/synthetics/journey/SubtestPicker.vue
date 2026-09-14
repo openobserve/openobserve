@@ -20,6 +20,7 @@ import { useStore } from "vuex";
 import { formatDistanceToNowStrict } from "date-fns";
 import { raw, useI18nTyped } from "@/types/i18n";
 import syntheticsService from "@/services/synthetics";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
@@ -65,9 +66,19 @@ interface ListRow {
   last_check_at?: number | null;
 }
 
-const options = ref<SelectOption[]>([]);
+const listOptions = ref<SelectOption[]>([]);
+const isLoading = ref(true);
 /** True only once the list has loaded and holds no other browser test. */
 const isEmpty = ref(false);
+// OSelect renders the raw value when no option matches, so the saved name is seeded as an
+// option until (and unless) the list supplies the real row for that id.
+const options = computed<SelectOption[]>(() => {
+  const saved = props.modelValue;
+  if (!saved?.name || listOptions.value.some((o) => o.value === saved.id)) {
+    return listOptions.value;
+  }
+  return [{ label: raw(saved.name), value: saved.id }, ...listOptions.value];
+});
 const childSteps = ref<number | null>(null);
 const lastRunSeconds = ref<number | null>(null);
 
@@ -99,20 +110,27 @@ function rowOption(r: ListRow): SelectOption {
 }
 
 onMounted(async () => {
-  // `undefined` omits `?folder=`, which lists every folder — deliberate: §10
-  // keeps references cross-folder, so the picker is not scoped to the
-  // parent's folder.
-  const res = await syntheticsService.listByFolderId(org.value, undefined);
-  const rows = ((res.data.checks ?? []) as ListRow[]).filter(
-    (r) => r.type === "browser" && r.id !== props.ownCheckId,
-  );
-  // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
-  options.value = rows.map((r) =>
-    (r.references ?? 0) > 0
-      ? { ...rowOption(r), disabled: true, subLabel: t("synthetics.journey.subtest.pickNested") }
-      : rowOption(r),
-  );
-  isEmpty.value = rows.length === 0;
+  try {
+    // `undefined` omits `?folder=`, which lists every folder — deliberate: §10
+    // keeps references cross-folder, so the picker is not scoped to the
+    // parent's folder.
+    const res = await syntheticsService.listByFolderId(org.value, undefined);
+    const rows = ((res.data.checks ?? []) as ListRow[]).filter(
+      (r) => r.type === "browser" && r.id !== props.ownCheckId,
+    );
+    // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
+    listOptions.value = rows.map((r) =>
+      (r.references ?? 0) > 0
+        ? { ...rowOption(r), disabled: true, subLabel: t("synthetics.journey.subtest.pickNested") }
+        : rowOption(r),
+    );
+    isEmpty.value = rows.length === 0;
+  } catch (err) {
+    console.error("[synthetics] failed to load browser tests for the subtest picker", err);
+    toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
+  } finally {
+    isLoading.value = false;
+  }
 });
 
 async function onPick(id: string) {
@@ -151,6 +169,7 @@ const isSlow = computed(
       :model-value="modelValue?.id"
       :label="t('synthetics.journey.subtest.pickLabel')"
       :options="options"
+      :loading="isLoading"
       :disabled="isEmpty"
       class="w-full"
       data-test="synthetics-subtest-select"
