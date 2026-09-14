@@ -32,7 +32,7 @@ use crate::{
     aggregations::AggOp,
     functions, micros,
     series_stream::plan::{
-        StreamingSelector, execute_partitioned, group_label_columns, series_label_columns,
+        LabelColumns, StreamingSelector, execute_partitioned, series_label_columns,
     },
     streaming_eval,
 };
@@ -154,7 +154,9 @@ impl Engine {
         range: Duration,
     ) -> Result<Option<Value>> {
         self.stream_scan_guarded(scan, |ctx, schema| async move {
-            let Some(label_cols) = group_label_columns(modifier, schema, func.name()) else {
+            let Some(label_cols) =
+                LabelColumns::for_op(op, modifier, schema, &scan.label_selector, func.name())
+            else {
                 return Ok(None);
             };
             let Some(sources) = execute_partitioned(
@@ -194,7 +196,7 @@ impl Engine {
                 ctx,
                 schema,
                 &scan.streaming_selector(),
-                label_cols,
+                LabelColumns::grouped(label_cols),
                 micros(range),
                 &self.eval_ctx,
             )
@@ -559,7 +561,7 @@ mod tests {
             for ((ts_e, v_e), (ts_a, v_a)) in expected.1.iter().zip(&actual.1) {
                 assert_eq!(ts_e, ts_a, "{context}: timestamp");
                 assert!(
-                    (v_e - v_a).abs() <= 1e-9,
+                    v_e.to_bits() == v_a.to_bits() || (v_e - v_a).abs() <= 1e-9,
                     "{context}: {v_e} vs {v_a} at {ts_e}"
                 );
             }
@@ -640,28 +642,176 @@ mod tests {
         }
     }
 
+    /// The generic path evaluates an empty selector to `None`, not to an empty matrix.
+    fn matrix_or_none(matrix: Vec<RangeValue>) -> Value {
+        if matrix.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(matrix)
+        }
+    }
+
     /// The generic range path: `eval_matrix_selector` then `eval_range`.
     async fn generic_range_func(provider: StreamingProvider, query: &str) -> Value {
-        let mut engine = engine(provider, 30);
         let promql_parser::parser::Expr::Call(call) = promql_parser::parser::parse(query).unwrap()
         else {
             panic!("{query} is not a call");
         };
+        generic_range_func_on(&mut engine(provider, 30), &call).await
+    }
+
+    async fn generic_range_func_on(
+        engine: &mut Engine,
+        call: &promql_parser::parser::Call,
+    ) -> Value {
         let promql_parser::parser::Expr::MatrixSelector(promql_parser::parser::MatrixSelector {
             vs,
             range,
         }) = call.args.args[0].as_ref()
         else {
-            panic!("{query} is not over a matrix selector");
+            panic!("{call:?} is not over a matrix selector");
         };
         let matrix = engine.eval_matrix_selector(vs, *range, None).await.unwrap();
-        let input = if matrix.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(matrix)
-        };
         let func = functions::fusable_range_func(call.func.name).unwrap();
-        functions::eval_range(input, func, &engine.eval_ctx).unwrap()
+        functions::eval_range(matrix_or_none(matrix), func, &engine.eval_ctx).unwrap()
+    }
+
+    /// The generic ranking path: the range function or the instant selector, then the plain
+    /// fold through `AggOp::eval_aggregate`.
+    async fn generic_topk(provider: StreamingProvider, query: &str) -> Value {
+        use promql_parser::parser::{AggregateExpr, Expr};
+
+        let Expr::Aggregate(AggregateExpr {
+            op,
+            expr,
+            param,
+            modifier,
+        }) = promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("{query} is not an aggregation");
+        };
+        let mut engine = engine(provider, 30);
+        let input = match expr.as_ref() {
+            Expr::Call(call) => generic_range_func_on(&mut engine, call).await,
+            Expr::VectorSelector(vs) => {
+                matrix_or_none(engine.eval_vector_selector(vs, None).await.unwrap())
+            }
+            _ => panic!("{query} is not over a range function or a selector"),
+        };
+        let param = match param.as_deref() {
+            Some(param) => Some(engine.exec_expr(param).await.unwrap()),
+            None => None,
+        };
+        let agg_op = AggOp::new(&op, param).unwrap();
+        agg_op
+            .eval_aggregate(&modifier, input, &engine.eval_ctx)
+            .unwrap()
+    }
+
+    /// `topk`/`bottomk` over a range function or a bare selector, with and without `by()`, must
+    /// match the generic path both when it streams and when it falls back on the same context.
+    /// Both test series carry the same values, so `k=1` is decided by the tie-break alone.
+    #[tokio::test]
+    async fn test_topk_matches_generic_streaming_and_materialized() {
+        for query in [
+            "topk(1, rate(m[1m]))",
+            "bottomk(1, rate(m[1m]))",
+            "topk(1, increase(m{instance=\"a\"}[1m] offset 30s))",
+            "topk by(instance) (1, rate(m[1m]))",
+            "bottomk by(instance) (1, last_over_time(m[40s]))",
+            "topk(5, rate(m[1m]))",
+            "topk(1, m)",
+            "bottomk(1, m offset 30s)",
+            "topk by(instance) (1, m)",
+            "bottomk by(nope) (1, m)",
+            "topk(5, m)",
+        ] {
+            let expected = generic_topk(provider(false, false), query).await;
+            let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
+            assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
+            let materialized = eval_query(provider(false, false), 30, query).await.unwrap();
+            assert_same_matrix(expected, materialized, &format!("materialized {query}"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_keeps_every_series_when_k_exceeds_them() {
+        for query in ["topk(5, rate(m[1m]))", "bottomk(5, m)"] {
+            let value = eval_query(provider(true, false), 30, query).await.unwrap();
+            let series = canonical(value);
+            assert_eq!(series.len(), 2, "{query}");
+            assert!(
+                series.iter().all(|(_, samples)| samples.len() == 3),
+                "{query}: every step ranks"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_topk_with_k_zero_is_none() {
+        for query in ["topk(0, rate(m[1m]))", "bottomk(0, m)"] {
+            let value = eval_query(provider(true, false), 30, query).await.unwrap();
+            assert!(
+                matches!(value, Value::None),
+                "{query}: {}",
+                value.get_type()
+            );
+        }
+    }
+
+    /// The bare selector under `topk` streams as `last_over_time` and reports a matrix, where
+    /// the generic instant path reports a vector; the winners carry no window, and a computed
+    /// k streams like a literal one.
+    #[tokio::test]
+    async fn test_topk_takes_the_streaming_path() {
+        for query in ["topk(1, m)", "topk(2 - 1, m)"] {
+            let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
+            assert_eq!(result_type.as_deref(), Some("matrix"), "{query}");
+            let Value::Matrix(matrix) = value else {
+                panic!("{query}: expected a matrix");
+            };
+            assert!(
+                matrix.iter().all(|series| series.time_window.is_none()),
+                "{query}"
+            );
+        }
+        for query in ["topk(1, rate(m[1m]))", "bottomk(2, m)"] {
+            let err = eval_query(provider(true, true), 30, query)
+                .await
+                .unwrap_err();
+            assert!(
+                matches!(
+                    infra::errors::Error::from(err),
+                    infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))
+                ),
+                "{query}"
+            );
+        }
+    }
+
+    /// `without()` stays on the generic path, which reports the instant selector as a vector.
+    #[tokio::test]
+    async fn test_topk_bails_to_the_generic_path() {
+        let query = "topk without(instance) (1, m)";
+        let expected = generic_topk(provider(false, false), query).await;
+        let (value, result_type) = exec_query(provider(true, false), 30, query).await.unwrap();
+        assert_eq!(result_type.as_deref(), Some("vector"), "{query}");
+        assert_same_matrix(expected, value, query);
+    }
+
+    #[tokio::test]
+    async fn test_topk_evaluates_on_the_streaming_context_without_sorted_table() {
+        for query in ["topk(1, rate(m[1m]))", "topk(1, m)"] {
+            let provider = provider(false, false);
+            let calls = provider.calls.clone();
+            let value = eval_query(provider, 30, query).await.unwrap();
+            assert_eq!(canonical(value).len(), 1, "{query}: one series");
+            assert_eq!(
+                calls.load(Ordering::SeqCst),
+                1,
+                "{query}: the fallback must reuse the context the streaming attempt created"
+            );
+        }
     }
 
     /// A bare range function streams each series whole and must match the generic path, both
