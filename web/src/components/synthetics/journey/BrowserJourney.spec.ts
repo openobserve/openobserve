@@ -263,6 +263,11 @@ describe("BrowserJourney recording", () => {
     expect(postMessageSpy).toHaveBeenCalled();
     // Stop button should be visible now that isRecording is true
     expect(wrapper.find('[data-test="synthetics-journey-stop-btn"]').exists()).toBe(true);
+    // Cancel is a labelled toolbar button, so it carries a leading icon like its siblings.
+    const cancel = wrapper.find('[data-test="synthetics-journey-cancel-btn"]');
+    expect(cancel.attributes("icon-left")).toBe("close");
+    expect(cancel.attributes("variant")).toBe("outline");
+    expect(wrapper.findAll('[class~="w-24!"]')).toHaveLength(0);
 
     // Stream steps via the bridge
     emitStreamEvent({
@@ -2298,9 +2303,6 @@ describe("BrowserJourney suggestions", () => {
 });
 
 // ── Variables panel toggle ────────────────────────────────────────────────
-// The toggle used to be a bare chevron square, which read as decoration next to
-// the labelled Add Step / Record / Replay buttons. It now carries the panel's
-// own name, so the label is part of the contract — not just the chevron.
 describe("BrowserJourney variables panel toggle", () => {
   let wrapper: VueWrapper;
 
@@ -2312,11 +2314,17 @@ describe("BrowserJourney variables panel toggle", () => {
     props: ["name"],
     template: '<i :data-icon-name="name" />',
   };
+  const OTooltipWithContentStub = {
+    props: ["content"],
+    template: '<div :data-tooltip="content" />',
+  };
 
   function mountToolbar(props: Record<string, unknown> = {}) {
     return mount(BrowserJourney, {
       props: { modelValue: [], ...props },
-      global: { stubs: { ...STUBS, OIcon: OIconWithNameStub } },
+      global: {
+        stubs: { ...STUBS, OIcon: OIconWithNameStub, OTooltip: OTooltipWithContentStub },
+      },
     }) as VueWrapper;
   }
 
@@ -2328,11 +2336,37 @@ describe("BrowserJourney variables panel toggle", () => {
     vi.restoreAllMocks();
   });
 
-  // vue-i18n is mocked to return the key, so the key IS the rendered text here.
-  it("should label the toggle with the variables panel's name", () => {
+  it("should render the toggle as the icon-only panel-collapse button", () => {
     wrapper = mountToolbar({ variablesPanelOpen: false });
 
-    expect(wrapper.find(TOGGLE).text()).toContain("synthetics.variablesPanel.title");
+    const toggle = wrapper.find(TOGGLE);
+    expect(toggle.attributes("variant")).toBe("panel-collapse");
+    expect(toggle.attributes("size")).toBe("icon-toolbar");
+    expect(toggle.text()).toBe("");
+  });
+
+  // vue-i18n is mocked to return the key, so the key IS the rendered tooltip here.
+  it("should offer the collapse tooltip while the panel is open", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: true });
+
+    expect(wrapper.find(`${TOGGLE} [data-tooltip]`).attributes("data-tooltip")).toBe(
+      "synthetics.variablesPanel.collapsePanel",
+    );
+  });
+
+  it("should offer the open tooltip while the panel is closed", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.find(`${TOGGLE} [data-tooltip]`).attributes("data-tooltip")).toBe(
+      "synthetics.variablesPanel.openPanel",
+    );
+  });
+
+  it("should size the action area to its content instead of a fixed width", () => {
+    wrapper = mountToolbar({ variablesPanelOpen: false });
+
+    expect(wrapper.findAll(".w-110")).toHaveLength(0);
+    expect(wrapper.findAll('[class~="w-24!"]')).toHaveLength(0);
   });
 
   // The host owns the panel; without that prop there is meant to be no panel to
