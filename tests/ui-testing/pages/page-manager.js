@@ -35,6 +35,10 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { OnCallTeamsPage } from "./oncallPages/oncallTeamsPage.js";
+import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
+import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
+import { OnCallRoutingPage } from "./oncallPages/oncallRoutingPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -170,6 +174,12 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+
+    // ===== ON-CALL PAGE OBJECTS (enterprise) =====
+    this.oncallTeamsPage = new OnCallTeamsPage(page);
+    this.oncallTeamDetailPage = new OnCallTeamDetailPage(page);
+    this.oncallPagesListPage = new OnCallPagesListPage(page);
+    this.oncallRoutingPage = new OnCallRoutingPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);
