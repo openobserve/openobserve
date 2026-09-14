@@ -83,6 +83,11 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
     await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
 
+    // metrics-14238-stale-nodata.spec.js seeds one METRICS stream per run, named with a
+    // timestamp so parallel runs cannot collide — which also means nothing ever reuses
+    // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
+    await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
+
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
