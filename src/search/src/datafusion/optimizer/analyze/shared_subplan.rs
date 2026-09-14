@@ -86,7 +86,7 @@ fn shared_candidates(plan: &LogicalPlan) -> Result<HashMap<u64, LogicalPlan>> {
     let mut seen: HashMap<u64, (LogicalPlan, usize)> = HashMap::new();
     // Subqueries count too: decorrelation turns them into joins over the same copy.
     plan.apply_with_subqueries(|node| {
-        if matches!(node, LogicalPlan::SubqueryAlias(_)) && is_expensive(node)? {
+        if matches!(node, LogicalPlan::SubqueryAlias(_)) && is_shareable(node)? {
             let hash = plan_hash(node);
             match seen.get_mut(&hash) {
                 Some((first, count)) if first == node => *count += 1,
@@ -146,6 +146,18 @@ fn prune_columns(plan: LogicalPlan, used: &HashSet<String>) -> Result<LogicalPla
         return Ok(plan);
     }
     LogicalPlanBuilder::from(plan).project(keep)?.build()
+}
+
+fn is_shareable(plan: &LogicalPlan) -> Result<bool> {
+    Ok(is_expensive(plan)? && !depends_on_context(plan)?)
+}
+
+// Outer references belong to one enclosing query and volatile calls must run once per copy.
+fn depends_on_context(plan: &LogicalPlan) -> Result<bool> {
+    plan.exists(|node| {
+        Ok(node.contains_outer_reference()
+            || node.expressions().iter().any(|expr| expr.is_volatile()))
+    })
 }
 
 // Sharing pays off only when the subplan breaks the pipeline; a plain scan is cheaper inlined.
@@ -243,6 +255,24 @@ mod tests {
     #[test]
     fn plain_filter_cte_is_left_inlined() {
         let plan = analyze(self_join(cte(false), ("c1", "c2")));
+        assert!(!plan.contains("SharedSubplan"), "{plan}");
+    }
+
+    #[test]
+    fn volatile_subplan_is_left_inlined() {
+        let cte = LogicalPlanBuilder::from(scan())
+            .filter(col("v").gt(datafusion::functions::expr_fn::random()))
+            .unwrap()
+            .aggregate(
+                vec![col("name")],
+                vec![datafusion::functions_aggregate::expr_fn::sum(col("v")).alias("sv")],
+            )
+            .unwrap()
+            .alias("c")
+            .unwrap()
+            .build()
+            .unwrap();
+        let plan = analyze(self_join(cte, ("c1", "c2")));
         assert!(!plan.contains("SharedSubplan"), "{plan}");
     }
 

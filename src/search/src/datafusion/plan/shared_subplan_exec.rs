@@ -817,6 +817,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn correlated_derived_subqueries_are_not_shared() {
+        let sql = "SELECT o.name, \
+                   (SELECT s.total FROM (SELECT t.name, sum(t.v) AS total FROM t WHERE t.name = o.name GROUP BY t.name) s) AS x, \
+                   (SELECT s.total + 1 FROM (SELECT t.name, sum(t.v) AS total FROM t WHERE t.name = o.name GROUP BY t.name) s) AS y \
+                   FROM t o ORDER BY o.name, o.v";
+        let (results, plan, _) = shared_results(sql).await;
+        assert!(!plan.contains("SharedSubplan"), "{plan}");
+        assert_eq!(results, plain_results(sql).await);
+    }
+
+    #[tokio::test]
+    async fn volatile_derived_subqueries_are_not_shared() {
+        let sql = "SELECT r FROM (SELECT random() AS r FROM t LIMIT 1) s \
+                   UNION ALL SELECT r FROM (SELECT random() AS r FROM t LIMIT 1) s";
+        let (results, plan, _) = shared_results(sql).await;
+        assert!(!plan.contains("SharedSubplan"), "{plan}");
+        assert_eq!(results.lines().count(), 6, "{results}");
+    }
+
+    #[tokio::test]
     async fn plain_cte_is_not_shared() {
         let sql = "WITH c AS (SELECT name, v FROM t WHERE v > 1) \
                    SELECT c1.name, c2.v FROM c c1 JOIN c c2 ON c1.name = c2.name ORDER BY c1.name, c2.v";
