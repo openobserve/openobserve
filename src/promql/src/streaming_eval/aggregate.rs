@@ -798,6 +798,74 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn test_quantile_signed_zero_partition_parity_and_count_values_labels() {
+        for values in [[0.0, -0.0, 0.0], [0.0, 0.0, -0.0], [-0.0, 0.0, 0.0]] {
+            let matrix = values
+                .into_iter()
+                .enumerate()
+                .map(|(i, value)| {
+                    make_series("m", &i.to_string(), "/one", &[(50, value), (170, value)])
+                })
+                .collect::<Vec<_>>();
+            for q in [0.0, 0.5, 1.0] {
+                let expected = run_generic(
+                    &None,
+                    matrix.clone(),
+                    "last_over_time",
+                    AggOp::Quantile(q),
+                    &eval_ctx(),
+                )
+                .unwrap();
+                let count_values = |value| {
+                    AggOp::CountValues(Some("v".into()))
+                        .eval_aggregate(&None, value, &eval_ctx())
+                        .unwrap()
+                };
+                let expected_counts = count_values(expected.clone());
+                let materialized = run_materialized(
+                    &None,
+                    matrix.clone(),
+                    "last_over_time",
+                    AggOp::Quantile(q),
+                    &eval_ctx(),
+                )
+                .await
+                .unwrap();
+                assert_eq!(
+                    canonical_matrix(expected.clone()),
+                    canonical_matrix(materialized)
+                );
+                for partitions in [1, 2, 3, 5] {
+                    let actual = run_partitioned(
+                        matrix.clone(),
+                        partitions,
+                        "last_over_time",
+                        AggOp::Quantile(q),
+                        &None,
+                    )
+                    .await;
+                    assert_eq!(
+                        canonical_matrix(expected.clone()),
+                        canonical_matrix(actual.clone()),
+                        "q={q}, partitions={partitions}, input={values:?}"
+                    );
+                    assert_eq!(
+                        canonical_matrix(expected_counts.clone()),
+                        canonical_matrix(count_values(actual))
+                    );
+                }
+                if q == 1.0 {
+                    let Value::Matrix(series) = expected_counts else {
+                        panic!("expected count_values output")
+                    };
+                    assert_eq!(series.len(), 1);
+                    assert_eq!(series[0].labels[0].value, "0");
+                }
+            }
+        }
+    }
+
     /// `a`, `b` and `z` carry the same values everywhere, so `topk(1)` and `bottomk(1)` among
     /// them fall entirely to the label signature.
     #[tokio::test]

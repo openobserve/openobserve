@@ -60,7 +60,8 @@ pub(crate) fn quantile_in_place(data: &mut [f64], quantile: f64) -> Option<f64> 
         return None;
     }
 
-    data.sort_by(sort_float);
+    // Break equal-value ties deterministically because partition merging can reorder signed zeros.
+    data.sort_by(|a, b| sort_float(a, b).then_with(|| a.total_cmp(b)));
 
     let n = data.len();
     let index = (quantile * (n - 1) as f64) as usize;
@@ -181,6 +182,28 @@ mod tests {
         assert_eq!(quantile_in_place(&mut [], -1.0), Some(f64::NEG_INFINITY));
         assert_eq!(quantile_in_place(&mut [], 2.0), Some(f64::INFINITY));
         assert!(quantile_in_place(&mut [], f64::NAN).unwrap().is_nan());
+    }
+
+    #[test]
+    fn test_quantile_orders_signed_zero_deterministically_and_keeps_nan_first() {
+        for mut values in [[0.0, -0.0, 0.0], [0.0, 0.0, -0.0], [-0.0, 0.0, 0.0]] {
+            assert_eq!(
+                quantile_in_place(&mut values, 1.0).unwrap().to_bits(),
+                0.0_f64.to_bits()
+            );
+            assert_eq!(
+                values.map(f64::to_bits),
+                [(-0.0_f64).to_bits(), 0.0_f64.to_bits(), 0.0_f64.to_bits()]
+            );
+        }
+        let mut values = [0.0, f64::NAN, f64::NEG_INFINITY, -0.0, -f64::NAN];
+        assert_eq!(
+            quantile_in_place(&mut values, 1.0).unwrap().to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert!(values[0].is_nan() && values[1].is_nan());
+        assert_eq!(values[2], f64::NEG_INFINITY);
+        assert_eq!(values[3].to_bits(), (-0.0_f64).to_bits());
     }
 
     #[test]
