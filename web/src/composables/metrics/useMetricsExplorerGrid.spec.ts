@@ -1688,4 +1688,42 @@ describe("useMetricsExplorerGrid", () => {
       expect(reloaded.previews.value["http_requests_total"].status).toBe("done");
     });
   });
+
+  describe("a refresh cancelled by a card remount still lands", () => {
+    it("re-queries on the remount instead of reusing the pre-refresh preview", async () => {
+      // Hiding a sibling as no-data reflows the grid, which remounts this card mid-refresh and cancels its query.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const refresh = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card);
+      inFlight.length = 0;
+      await refresh;
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBe(true);
+
+      const remount = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await remount;
+
+      const preview = grid.previews.value["http_requests_total"];
+      expect(preview.pendingRefresh).toBeUndefined();
+      expect(preview.results.some((r: any) => r.result.length)).toBe(true);
+    });
+
+    it("still reuses a settled preview when no refresh was cancelled", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(0);
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBeUndefined();
+    });
+  });
 });
