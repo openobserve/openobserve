@@ -27,9 +27,11 @@ Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
 it, all inside a **full-height flex column** so the header stays put and only the
 body scrolls.
 
-- **Primary page action** (New / Add / Create) and page-level secondary actions
-  (Import, an overflow `ODropdown`) go in the header's **`#actions`** slot as O2
-  buttons — never in the table toolbar.
+- **Primary page action** (New / Add / Create) goes in the header's
+  **`#actions`** slot; page-level secondary actions (Import, Export, an overflow
+  `ODropdown`) go in **`#actions-overflow`** — inline on desktop, behind one ⋮ on
+  phones (add `overflow-first` so they keep their place before the CTA). Never in the
+  table toolbar. See [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
 - **The create CTA is label-only — no `icon-left="add"`.** Secondary header
   actions keep their semantic icons (Import → `upload-file`), and in-section
   adders inside the body keep their `+`; it is only the header's create button
@@ -141,21 +143,29 @@ for every list — don't ship a listing page without them.
   data-test="channels-table"
   @row-click="edit"
 >
-  <!-- filters + search on the LEFT of the toolbar (fills the row) -->
+  <!-- filters + search on the LEFT of the toolbar (fills the row); max-md:contents +
+       mobile-dropdown keep the phone toolbar on one row -->
   <template #toolbar>
-    <div class="flex items-center gap-2 w-full">
-      <OToggleGroup :model-value="typeFilter" @update:model-value="filterByType">
+    <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+      <OToggleGroup
+        mobile-dropdown
+        :model-value="typeFilter"
+        data-test="channels-type-filter"
+        @update:model-value="filterByType"
+      >
         <OToggleGroupItem value="all" size="sm">{{ t("channels.all") }}</OToggleGroupItem>
         <OToggleGroupItem value="prebuilt" size="sm">{{ t("channels.prebuilt") }}</OToggleGroupItem>
         <OToggleGroupItem value="custom" size="sm">{{ t("channels.custom") }}</OToggleGroupItem>
       </OToggleGroup>
-      <OSearchInput
-        v-model="search"
-        class="flex-1"
-        :placeholder="t('channels.search')"
-        clearable
-        data-test="channels-search"
-      />
+      <div class="min-w-0 flex-1 max-md:min-w-40">
+        <OSearchInput
+          v-model="search"
+          class="w-full"
+          :placeholder="t('channels.search')"
+          clearable
+          data-test="channels-search"
+        />
+      </div>
     </div>
   </template>
 
@@ -352,7 +362,9 @@ visible data.
   blank table.
 - **Primary action** (New) is in the header `#actions`; **row actions**
   (edit/delete/…) are in the `isAction` column as O2 buttons; **destructive
-  delete** goes through `ConfirmDialog` + `useConfirmDialog`.
+  delete** goes through `ConfirmDialog` + `useConfirmDialog`. On phones the inline
+  row buttons are `max-md:hidden` and one `md:hidden` kebab mirrors them — see
+  [responsive § Tables and row actions](responsive.md#tables-and-row-actions).
 - **Keyboard shortcuts** (register + bind — see
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
@@ -403,7 +415,12 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 - [ ] **`:forbidden`** bound to a ref the page sets from a 403 on *its own* list
       request (cleared at the start of every load path), so a denied user sees
       "You don't have access" rather than a create CTA that will 403.
-- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`.
+- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`; inline
+      buttons `max-md:hidden` + a `md:hidden` kebab mirroring them (`-menu` data-tests).
+- [ ] **Responsive** — toolbar recipe (`max-md:contents`, `mobile-dropdown`, search
+      floor), footer count `max-md:hidden`, secondary header actions in
+      `#actions-overflow`; checked at 375 / 768 / 1280 with 1280 identical to main
+      (see [responsive.md](responsive.md)).
 - [ ] `n` / `/` / `r` keyboard shortcuts registered and bound.
 - [ ] **Registered in navigation** and gated for the right env/role — see
       [navigation-menus.md](navigation-menus.md).

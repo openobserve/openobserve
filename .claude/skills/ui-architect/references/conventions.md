@@ -148,8 +148,10 @@ conditional.
 
 ### Comments stay short
 
-**One or two lines.** A comment carries the *why* behind a non-obvious choice —
-not a re-telling of the code, and not the history of the PR that added it.
+**One line, or none** (CLAUDE.md, enforced in review). A comment carries the *why*
+behind a non-obvious constraint — not a re-telling of the code, not layout narration
+("< md the toolbar wraps", "matches the header height"), and not the history of the
+PR that added it. If the point needs a second line, it does not belong in a comment.
 
 ```vue
 <!-- good -->

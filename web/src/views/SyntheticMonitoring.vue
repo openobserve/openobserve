@@ -79,9 +79,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabs>
     </template>
     <!-- CONTENT AREA: sidebar + main -->
-    <div class="flex flex-1 overflow-hidden">
+    <div class="flex flex-1 overflow-hidden max-md:flex-col">
       <!-- LEFT SIDEBAR: folder navigation (locations are org-level, no folders) -->
-      <div v-if="activeSection === 'checks'" class="w-rail shrink-0 overflow-y-auto">
+      <div
+        v-if="activeSection === 'checks'"
+        class="w-rail max-md:border-border-default shrink-0 overflow-y-auto max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <FolderList
           type="synthetics"
           data-test="synthetic-monitoring-folder-list"
@@ -100,7 +103,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       />
 
       <!-- RIGHT MAIN: filter bar + table -->
-      <div v-if="activeSection === 'checks'" class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <div
+        v-if="activeSection === 'checks'"
+        class="flex min-w-0 flex-1 flex-col overflow-hidden max-md:min-h-0"
+      >
         <!-- ── CHECKS TABLE ── -->
         <MonitorTable
           :mode="monitorTableMode"
@@ -160,22 +166,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Toolbar content rendered inside OTable's toolbar bar -->
           <template #toolbar>
-            <div class="flex min-w-0 flex-1 items-center gap-2">
+            <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
+            <div
+              class="flex min-w-0 flex-1 items-center gap-2 max-lg:@container/synthetics-toolbar max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+            >
               <!-- Type tabs -->
-              <OToggleGroup :model-value="activeTab" @update:model-value="onTabChange">
+              <OToggleGroup
+                mobile-dropdown
+                :model-value="activeTab"
+                data-test="synthetic-monitoring-type-tabs"
+                @update:model-value="onTabChange"
+              >
                 <OToggleGroupItem
                   v-for="tab in typeTabs"
                   :key="tab.key"
                   :value="tab.key"
                   size="sm"
                   :icon-left="tab.icon"
+                  :title="lgUp ? undefined : tab.label"
                 >
-                  {{ tab.label }}
+                  <span class="@max-[38rem]/synthetics-toolbar:hidden">{{ tab.label }}</span>
                 </OToggleGroupItem>
               </OToggleGroup>
 
               <!-- Search -->
-              <div class="min-w-0 flex-1">
+              <!-- flex-1 is basis-0, so the min-w floor is what wraps the input instead of shrinking it to nothing. -->
+              <div class="min-w-0 flex-1 md:max-lg:min-w-60">
                 <OInput
                   v-model="search"
                   :placeholder="
@@ -202,16 +218,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         size="xs"
                         icon-left="folder-outline"
                         data-test="synthetic-monitoring-search-this-folder-btn"
+                        :title="isMobile ? t('synthetics.search.thisFolder') : undefined"
                       >
-                        {{ t("synthetics.search.thisFolder") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.thisFolder") }}</span>
                       </OToggleGroupItem>
                       <OToggleGroupItem
                         value="all"
                         size="xs"
                         icon-left="search"
                         data-test="synthetic-monitoring-search-all-folders-btn"
+                        :title="isMobile ? t('synthetics.search.allFolders') : undefined"
                       >
-                        {{ t("synthetics.search.allFolders") }}
+                        <span class="max-md:hidden">{{ t("synthetics.search.allFolders") }}</span>
                       </OToggleGroupItem>
                     </OToggleGroup>
                   </template>
@@ -469,12 +487,14 @@ import {
 import { getFoldersListByType } from "@/utils/commons";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
 const { t } = useI18nTyped();
 const { confirm } = useConfirmDialog();
+const { isMobile, lgUp } = useBreakpoint();
 
 // ── API types ──────────────────────────────────────────────────────────
 type SyntheticsSection = "checks" | "private" | "status-pages";

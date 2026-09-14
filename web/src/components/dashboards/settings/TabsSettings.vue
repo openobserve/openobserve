@@ -98,6 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click.stop="editItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-edit-btn"
               icon-left="edit"
+              class="max-md:hidden"
             >
             </OButton>
             <OButton
@@ -107,9 +108,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('dashboard.delete')"
               @click.stop="deleteItem(row.tabId)"
               data-test="dashboard-tab-settings-tab-delete-btn"
+              class="max-md:hidden"
             >
               <template #icon-left><OIcon name="delete" size="sm" /></template>
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="dashboard-tab-settings-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                :disabled="row.tabId === editTabId"
+                class="md:hidden"
+                data-test="dashboard-tab-settings-tab-edit-btn-menu"
+                @select="editItem(row.tabId)"
+              >
+                <span>{{ t("dashboard.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="currentDashboardData.data.tabs.length !== 1"
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                data-test="dashboard-tab-settings-tab-delete-btn-menu"
+                @select="deleteItem(row.tabId)"
+              >
+                <span>{{ t("dashboard.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -145,6 +179,8 @@ import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commo
 import { useRoute } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -161,6 +197,8 @@ export default defineComponent({
     AddTab,
     TabsDeletePopUp,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OTable,
   },

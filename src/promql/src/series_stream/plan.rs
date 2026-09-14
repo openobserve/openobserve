@@ -44,6 +44,7 @@ use promql_parser::{label::Matchers, parser::LabelModifier};
 
 use super::hash_sorted::HashSortedSeriesStream;
 use crate::{
+    aggregations::AggOp,
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
 };
@@ -55,13 +56,52 @@ pub(crate) struct StreamingSelector<'a> {
     pub offset: i64,
 }
 
+/// The label columns a stream reads: `group` keys the series it yields, `series` is what its
+/// labels carry. The same set for a scalar aggregation; a ranking keys by the `by()` columns
+/// but carries every label column.
+pub(crate) struct LabelColumns {
+    pub group: Vec<String>,
+    pub series: Vec<String>,
+}
+
+impl LabelColumns {
+    /// Series keyed and labelled by the same columns.
+    pub(crate) fn grouped(cols: Vec<String>) -> Self {
+        Self {
+            group: cols.clone(),
+            series: cols,
+        }
+    }
+
+    /// The columns an aggregation reads: keyed by the `by()` columns, carrying every label
+    /// column when the output keeps the series' own labels; `None` when the modifier cannot be
+    /// keyed by columns.
+    pub(crate) fn for_op(
+        op: AggOp,
+        modifier: &Option<LabelModifier>,
+        schema: &Schema,
+        label_selector: &HashSet<String>,
+        func_name: &str,
+    ) -> Option<Self> {
+        let group = group_label_columns(modifier, schema, func_name)?;
+        Some(if op.needs_series_labels() {
+            Self {
+                group,
+                series: series_label_columns(schema, label_selector, func_name),
+            }
+        } else {
+            Self::grouped(group)
+        })
+    }
+}
+
 /// One hash-sorted stream per partition over the selector's hash-sorted table, projected to the
-/// sample columns plus `label_cols`; `None` when the layout cannot stream in order.
+/// sample columns plus the label columns; `None` when the layout cannot stream in order.
 pub(crate) async fn execute_partitioned(
     ctx: &SessionContext,
     schema: &Schema,
     selector: &StreamingSelector<'_>,
-    label_cols: Vec<String>,
+    label_cols: LabelColumns,
     lookback: i64,
     eval_ctx: &EvalContext,
 ) -> Result<
@@ -86,7 +126,11 @@ pub(crate) async fn execute_partitioned(
     )?;
     let df = apply_matchers(df, selector.matchers)?;
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(label_cols.iter().map(String::as_str));
+    for name in label_cols.group.iter().chain(&label_cols.series) {
+        if !columns.contains(&name.as_str()) {
+            columns.push(name);
+        }
+    }
     let partitions = ctx.state().config().target_partitions();
     let Some(partition_inputs) =
         build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?
@@ -112,7 +156,7 @@ async fn build_partition_inputs(
     trace_id: &str,
 ) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
     let mut partition_inputs = Vec::with_capacity(partitions);
-    for (partition, (lo, hi)) in hash_partitions(partitions).into_iter().enumerate() {
+    for (partition, (lo, hi)) in hash_partitions(partitions).enumerate() {
         let partition_df = df
             .clone()
             .filter(
@@ -144,16 +188,14 @@ async fn build_partition_inputs(
 }
 
 /// Uniform partition of the u64 hash space into `count` inclusive ranges.
-fn hash_partitions(count: usize) -> Vec<(u64, u64)> {
+fn hash_partitions(count: usize) -> impl Iterator<Item = (u64, u64)> {
     let count = count.max(1) as u128;
     let span = (u64::MAX as u128) + 1;
-    (0..count)
-        .map(|partition| {
-            let lo = (span * partition / count) as u64;
-            let hi = (span * (partition + 1) / count - 1) as u64;
-            (lo, hi)
-        })
-        .collect()
+    (0..count).map(move |partition| {
+        let lo = (span * partition / count) as u64;
+        let hi = (span * (partition + 1) / count - 1) as u64;
+        (lo, hi)
+    })
 }
 
 /// The merge node's own child partitions, so the row-level merge itself is never executed.
@@ -219,7 +261,7 @@ pub(crate) fn group_label_columns(
                 && name != VALUE_LABEL
                 && name != EXEMPLARS_LABEL
                 // range functions strip the metric name before aggregation
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
                 && schema.field_with_name(name).is_ok()
         })
         .cloned()
@@ -248,7 +290,7 @@ pub(crate) fn series_label_columns(
                 && (label_selector.is_empty()
                     || label_selector.contains(name)
                     || name == BUCKET_LABEL)
-                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+                && (name != NAME_LABEL || func_name == KEEP_METRIC_NAME_FUNC)
         })
         .collect();
     cols.sort();
@@ -265,7 +307,7 @@ mod tests {
     use promql_parser::label::Labels as ModifierLabels;
 
     use super::{super::tests::*, *};
-    use crate::streaming_eval::{FusedAggOp, tests::by};
+    use crate::{aggregations::AggOp, streaming_eval::tests::by};
 
     #[test]
     fn test_group_label_columns_resolution() {
@@ -335,7 +377,7 @@ mod tests {
     #[test]
     fn test_hash_shards_cover_the_full_space_contiguously() {
         for count in [1, 3, 7, 16] {
-            let partitions = hash_partitions(count);
+            let partitions: Vec<_> = hash_partitions(count).collect();
             assert_eq!(partitions.len(), count);
             assert_eq!(partitions[0].0, 0);
             assert_eq!(partitions[count - 1].1, u64::MAX);
@@ -351,14 +393,7 @@ mod tests {
         let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
         ctx.register_table("m", Arc::new(table)).unwrap();
 
-        let result = run_streaming(
-            &ctx,
-            &None,
-            "rate",
-            FusedAggOp::Sum,
-            Duration::from_secs(60),
-        )
-        .await;
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
     }
 
@@ -371,14 +406,7 @@ mod tests {
         ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
             .unwrap();
 
-        let result = run_streaming(
-            &ctx,
-            &None,
-            "rate",
-            FusedAggOp::Sum,
-            Duration::from_secs(60),
-        )
-        .await;
+        let result = run_streaming(&ctx, &None, "rate", AggOp::Sum, Duration::from_secs(60)).await;
         assert!(result.is_none());
     }
 }

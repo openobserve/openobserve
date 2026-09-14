@@ -12,7 +12,12 @@
 ## Rust code organization
 
 Item order inside a file/module, top to bottom (clippy's default grouping):
-`mod`/`pub mod` declarations → `use` imports → macros → `const`/`static` → types (`struct`/`enum`/`trait`/`type`) → `impl` blocks → functions.
+`mod`/`pub mod` declarations → `use` imports → macros → `const`/`static` → types (`struct`/`enum`/`trait`/`type`), each immediately followed by its own `impl` blocks (inherent impl first, then trait impls) → functions.
+
+- A type and its `impl` blocks stay together. Do not collect all types at the top and all
+  `impl` blocks below them; a reader must see a struct's methods right under its fields.
+  Types that only serve another type (private helper structs/enums) go after the type that
+  uses them, again followed by their own impls. No lint enforces adjacency, review does.
 
 - Function length, cognitive complexity, and nesting depth are capped by the
   thresholds in clippy.toml (set just above the worst existing code). They only

@@ -43,6 +43,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StepAction } from "@/types/synthetics";
 import { ACTION_ICONS, stepActionLabelKey } from "@/constants/synthetics";
@@ -564,7 +566,7 @@ function handleUpdateExpanded(ids: string[]) {
                preview rides the same span for the same reason, and focus is bound
                alongside hover so the destination is not mouse-only. -->
           <span
-            class="inline-flex"
+            class="inline-flex max-md:hidden"
             @mouseenter="onRecordBeforeEnter(row)"
             @mouseleave="onRecordBeforeLeave"
             @focusin="onRecordBeforeFocus(row)"
@@ -589,6 +591,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
+          class="max-md:hidden"
           :aria-label="t('synthetics.journey.insertStepBelow')"
           data-test="synthetics-journey-step-insert-btn"
           :disabled="isLocked"
@@ -601,6 +604,7 @@ function handleUpdateExpanded(ids: string[]) {
           v-if="!readonly"
           variant="ghost"
           size="xs"
+          class="max-md:hidden"
           :aria-label="t('synthetics.journey.duplicateStep')"
           data-test="synthetics-journey-step-duplicate-btn"
           data-row-action="duplicate"
@@ -618,11 +622,61 @@ function handleUpdateExpanded(ids: string[]) {
           data-test="synthetics-journey-step-delete-btn"
           data-row-action="delete"
           :disabled="isLocked"
-          class="hover:text-status-error-text"
+          class="hover:text-status-error-text max-md:hidden"
           @click="emit('delete', row)"
         >
           <OIcon name="delete" size="sm" aria-hidden="true" />
         </OButton>
+
+        <ODropdown v-if="!readonly" side="bottom" align="end">
+          <template #trigger>
+            <OButton
+              icon-left="more-vert"
+              variant="ghost"
+              size="icon-xs-sq"
+              class="md:hidden"
+              data-test="synthetics-journey-step-row-more-actions"
+              @click.stop
+            />
+          </template>
+          <ODropdownItem
+            icon-left="smart-display"
+            class="md:hidden"
+            :disabled="recordBeforeDisabled(row)"
+            data-test="synthetics-journey-step-record-before-btn-menu"
+            @select="emit('record-before', row)"
+          >
+            <span>{{ t("synthetics.journey.recordBeforeStep") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="add"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-insert-btn-menu"
+            @select="emit('insert-below', row)"
+          >
+            <span>{{ t("synthetics.journey.insertStepBelow") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="content-copy"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-duplicate-btn-menu"
+            @select="emit('duplicate', row)"
+          >
+            <span>{{ t("synthetics.journey.duplicateStep") }}</span>
+          </ODropdownItem>
+          <ODropdownItem
+            icon-left="delete"
+            variant="destructive"
+            class="md:hidden"
+            :disabled="isLocked"
+            data-test="synthetics-journey-step-delete-btn-menu"
+            @select="emit('delete', row)"
+          >
+            <span>{{ t("synthetics.journey.deleteStepAria") }}</span>
+          </ODropdownItem>
+        </ODropdown>
       </div>
     </template>
 

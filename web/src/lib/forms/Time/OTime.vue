@@ -396,6 +396,7 @@ const fieldClasses = computed(() => [
         align="start"
         :class="[
           'rounded-default bg-datepicker-popup-bg border-datepicker-popup-border z-60 overflow-hidden border shadow-md outline-none',
+          'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
           withSeconds ? 'w-64' : 'w-56',
         ]"
         data-test="otime-popup"
