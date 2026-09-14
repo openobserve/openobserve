@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `alert_budget_per_day`: delivered-alerts/day budget. NULL means percentile mode,
-//! so every existing config keeps its exact pre-budget behaviour after the upgrade.
+//! `alert_budget_per_day`: NULL means percentile mode, so existing configs are unchanged.
 
 use sea_orm_migration::prelude::*;
 

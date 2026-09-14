@@ -97,6 +97,7 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
     "retries",
     "last_failed_at",
     "last_alert_fired_at",
+    "last_recovery_notified_at",
 ];
 
 /// Reject an `oncall_team` that names no on-call team in this organization.
@@ -178,6 +179,14 @@ fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
     config::meta::alerts::alert::normalize_runbook_url(url)
         .map(|_| ())
         .map_err(MetaHttpResponse::bad_request)
+}
+
+/// Removes the runtime/training keys from an anomaly config's export payload, in place.
+#[cfg(feature = "enterprise")]
+fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
+    for &key in ANOMALY_EXPORT_STRIPPED_KEYS {
+        obj.remove(key);
+    }
 }
 
 /// CreateAlert
@@ -1674,14 +1683,6 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
             }
         }
         Err(e) => e.into(),
-    }
-}
-
-/// Removes the runtime/training keys from an anomaly config's export payload, in place.
-#[cfg(feature = "enterprise")]
-fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
-    for &key in ANOMALY_EXPORT_STRIPPED_KEYS {
-        obj.remove(key);
     }
 }
 
@@ -3889,6 +3890,8 @@ mod tests {
             "last_error": "boom",
             "retries": 4,
             "last_failed_at": 1_700_000_000_000_000i64,
+            "last_alert_fired_at": 1_700_000_000_000_000i64,
+            "last_recovery_notified_at": 1_700_000_000_000_000i64,
         });
 
         super::strip_anomaly_runtime_state(config.as_object_mut().unwrap());

@@ -484,16 +484,10 @@ mod tests {
         assert_eq!(get_text_type(), "text");
     }
 
-    /// The newest migration each `DB_SCHEMA_VERSION` was raised to cover.
-    ///
-    /// `init_db` returns early when the stored version equals the constant, so a
-    /// migration appended without a bump never runs on an existing deployment —
-    /// only on fresh installs, which is why CI otherwise cannot see the omission.
-    /// One version legitimately covers a batch of migrations landing over several
-    /// commits, so the guard pins the newest name per version rather than counting.
+    /// Newest migration per `DB_SCHEMA_VERSION`: `init_db` skips upgrades on version match.
     const VERSION_COVERAGE: &[(u64, &str)] = &[
         (78, "m20260827_000001_drop_table_action_scripts"),
-        (79, "m20260906_000001_add_anomaly_last_alert_fired_at"),
+        (79, "m20260831_000001_add_exhausted_at_to_oncall_responses"),
         (80, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
     ];
 

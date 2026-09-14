@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `last_alert_fired_at`: the post-fire cooldown anchor. NULL means never fired,
-//! so the first alert after an upgrade is always allowed through.
+//! `last_alert_fired_at`: cooldown anchor; NULL (never fired) lets the first alert through.
 
 use sea_orm_migration::prelude::*;
 

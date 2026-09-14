@@ -73,6 +73,15 @@ mod stats;
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
 use openobserve_core::org_cleanup::StreamDataCleanup;
 
+/// The anomaly claim supervisor's per-tick verdict, pure so the handover rules are testable.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+#[derive(Debug, PartialEq, Eq)]
+enum AnomalyClaimTransition {
+    Start,
+    Stop,
+    Hold,
+}
+
 struct CompactionStreamDataCleanup;
 
 #[async_trait::async_trait]
@@ -1055,24 +1064,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    // The scheduler and startup recovery only run on scheduler nodes.
-    // Skip entirely when anomaly detection is disabled — no training and no detection.
+    // Supervised per tick, not started here: init runs before the job-cluster election resolves.
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_scheduler()
         && !o2_enterprise::enterprise::common::config::get_config()
             .anomaly_detection
             .disabled
-        && anomaly_holds_job_cluster_claim().await
     {
-        // Ensure every enabled anomaly config has a live detection trigger after restart.
-        // Handles: trigger row missing, or stuck in Processing from a previous crash.
-        openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
-
-        if let Err(e) =
-            o2_enterprise::enterprise::anomaly_detection::scheduler::start_scheduler().await
-        {
-            log::error!("Failed to start anomaly detection scheduler: {e}");
-        }
+        tokio::task::spawn(anomaly_claim_supervisor());
     }
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
@@ -1323,19 +1322,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Whether this cluster may train and detect anomalies.
-///
-/// Anomaly training was gated only by `is_scheduler()`, so in a super cluster every
-/// scheduler-role region trained the same replicated config and wrote its own
-/// region-local model, score sidecar and `hybrid_bar.zst`. Those artifacts never
-/// replicate, so the regions then judged the same series against different bars — the
-/// single-owner invariant `anomaly_detection::threshold` documents but nothing enforced.
-///
-/// Follows the election, never holds one: registering here would defeat the arbitration
-/// `scheduler::run` performs, since `init` runs before it and would always read back its
-/// own name. Fails CLOSED, unlike the alert-group reaper's fail-open sweep — a read
-/// failure that opens the gate is the duplicate training this exists to prevent, and an
-/// unclaimed key means the election below has simply not resolved yet.
+/// Follows the `scheduler::run` election, never holds one; a failed read fails CLOSED.
 #[cfg(feature = "enterprise")]
 async fn anomaly_holds_job_cluster_claim() -> bool {
     use o2_enterprise::enterprise::super_cluster::kv;
@@ -1347,13 +1334,13 @@ async fn anomaly_holds_job_cluster_claim() -> bool {
     let claim = match kv::scheduler::get_job_cluster().await {
         Ok(name) => name,
         Err(e) => {
-            log::error!("[ANOMALY] could not read the job cluster, not starting: {e}");
+            log::error!("[ANOMALY] could not read the job cluster, not running here: {e}");
             return false;
         }
     };
     let local = config::get_cluster_name();
     if claim.is_empty() {
-        log::info!("[ANOMALY] no cluster holds the job-cluster claim yet — not starting");
+        log::debug!("[ANOMALY] no cluster holds the job-cluster claim yet — not running here");
         return false;
     }
     if claim == local {
@@ -1363,7 +1350,7 @@ async fn anomaly_holds_job_cluster_claim() -> bool {
     let live = match kv::cluster::list_by_role_group(None).await {
         Ok(clusters) => clusters.into_iter().map(|c| c.name).collect::<Vec<_>>(),
         Err(e) => {
-            log::error!("[ANOMALY] could not list clusters, not starting: {e}");
+            log::error!("[ANOMALY] could not list clusters, not running here: {e}");
             return false;
         }
     };
@@ -1371,9 +1358,46 @@ async fn anomaly_holds_job_cluster_claim() -> bool {
     // mean no region ever trains again.
     let held_elsewhere = kv::scheduler::claim_is_held_elsewhere(&claim, &local, &live);
     if held_elsewhere {
-        log::info!("[ANOMALY] job cluster is {claim} — anomaly detection not starting here");
+        log::debug!("[ANOMALY] job cluster is {claim} — anomaly detection not running here");
     }
     !held_elsewhere
+}
+
+/// Re-checks the claim every tick so ownership arrives or leaves without a restart.
+#[cfg(feature = "enterprise")]
+async fn anomaly_claim_supervisor() {
+    use o2_enterprise::enterprise::anomaly_detection::scheduler;
+
+    let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
+    loop {
+        ticker.tick().await;
+        let holds_claim = anomaly_holds_job_cluster_claim().await;
+        match anomaly_claim_transition(holds_claim, scheduler::is_running().await) {
+            AnomalyClaimTransition::Start => {
+                // Idempotent: re-creates missing detection triggers on every ownership gain.
+                openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
+                if let Err(e) = scheduler::start_scheduler().await {
+                    log::error!("Failed to start anomaly detection scheduler: {e}");
+                }
+            }
+            AnomalyClaimTransition::Stop => {
+                if let Err(e) = scheduler::stop_scheduler().await {
+                    log::error!("Failed to stop anomaly detection scheduler: {e}");
+                }
+            }
+            AnomalyClaimTransition::Hold => {}
+        }
+    }
+}
+
+/// Fail-closed handover rule: run exactly while the claim is provably held here.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn anomaly_claim_transition(holds_claim: bool, running: bool) -> AnomalyClaimTransition {
+    match (holds_claim, running) {
+        (true, false) => AnomalyClaimTransition::Start,
+        (false, true) => AnomalyClaimTransition::Stop,
+        _ => AnomalyClaimTransition::Hold,
+    }
 }
 
 /// Additional jobs that init processes should be deferred until the gRPC service
@@ -1414,4 +1438,39 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AnomalyClaimTransition, anomaly_claim_transition};
+
+    /// A claim resolving after init grants scheduling on the next tick, with no restart.
+    #[test]
+    fn a_claim_appearing_later_starts_scheduling_without_reinit() {
+        assert_eq!(
+            anomaly_claim_transition(true, false),
+            AnomalyClaimTransition::Start
+        );
+    }
+
+    /// A migrated (or unreadable) claim stands the former owner down within one tick.
+    #[test]
+    fn a_claim_moving_away_stops_scheduling_within_one_tick() {
+        assert_eq!(
+            anomaly_claim_transition(false, true),
+            AnomalyClaimTransition::Stop
+        );
+    }
+
+    #[test]
+    fn steady_states_hold() {
+        assert_eq!(
+            anomaly_claim_transition(true, true),
+            AnomalyClaimTransition::Hold
+        );
+        assert_eq!(
+            anomaly_claim_transition(false, false),
+            AnomalyClaimTransition::Hold
+        );
+    }
 }

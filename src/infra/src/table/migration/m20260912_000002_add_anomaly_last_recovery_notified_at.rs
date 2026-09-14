@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! `last_recovery_notified_at`: the delivered alert a recovery message is still owed for.
-//! NULL means nothing is owed, so no config recovers for an alert predating the upgrade.
+//! `last_recovery_notified_at`: NULL owes no recovery, so pre-upgrade alerts never recover.
 
 use sea_orm_migration::prelude::*;
 

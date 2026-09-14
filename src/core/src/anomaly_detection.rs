@@ -13,6 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+use std::{
+    collections::HashMap,
+    sync::{LazyLock, RwLock},
+    time::{Duration, Instant},
+};
+
 use anyhow::Result;
 use chrono::Utc;
 use config::{
@@ -49,6 +56,15 @@ const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 /// `value_column` existed keep resolving exactly as they did.
 #[cfg(feature = "enterprise")]
 const LEGACY_VALUE_COLUMNS: [&str; 5] = ["value", "count", "_count", "metric", "result"];
+
+/// Bounds staleness after an edit on nodes the update-path invalidation cannot reach.
+#[cfg(feature = "enterprise")]
+const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
+
+/// Keyed `(org_id, anomaly_id)` so per-tick detection stops PK-reading the meta primary.
+#[cfg(feature = "enterprise")]
+static VALUE_COLUMN_CACHE: LazyLock<RwLock<HashMap<(String, String), (Option<String>, Instant)>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Lowercased operators the enterprise query builder can express, mirroring its
 /// `build_single_filter` arms and the UI's `ANOMALY_FILTER_OPERATORS`. All three must move
@@ -257,7 +273,38 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
             serde_json::Value::String(status_label(s as i32).to_string()),
         );
     }
+    add_effective_shingle_size(&mut val);
     val
+}
+
+/// Report the width the model is actually trained at alongside the requested one: the stored
+/// column is only the request, and the span derivation routinely overrides it (a sub-hourly
+/// config stores the default 4 and trains at 1), so reading it alone misleads.
+fn add_effective_shingle_size(val: &mut serde_json::Value) {
+    let Some(obj) = val.as_object_mut() else {
+        return;
+    };
+    let (Some(configured), Some(interval), Some(window_days), Some(tree_size)) = (
+        obj.get("rcf_shingle_size").and_then(|v| v.as_i64()),
+        obj.get("histogram_interval").and_then(|v| v.as_str()),
+        obj.get("training_window_days").and_then(|v| v.as_i64()),
+        obj.get("rcf_tree_size").and_then(|v| v.as_i64()),
+    ) else {
+        return;
+    };
+    if let Some(effective) =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            configured as i32,
+            interval,
+            window_days as i32,
+            tree_size as i32,
+        )
+    {
+        obj.insert(
+            "effective_rcf_shingle_size".to_string(),
+            serde_json::Value::from(effective),
+        );
+    }
 }
 
 /// Merge the run state the scheduler recorded on the trigger into a config row.
@@ -655,6 +702,7 @@ pub async fn update_config(
         req.percentile,
         req.alert_budget_per_day,
         existing.alert_budget_per_day,
+        existing.threshold,
     )
     .map_err(validation_error)?;
 
@@ -732,8 +780,6 @@ pub async fn update_config(
         active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
-        // An unparseable interval fails every bucket-adjacency check, so detection scores nothing.
-        parse_interval(&histogram_interval)?;
         retryable_change |= previous.histogram_interval != histogram_interval;
         active_model.histogram_interval = Set(histogram_interval);
     }
@@ -747,7 +793,7 @@ pub async fn update_config(
         active_model.detection_window_seconds = Set(detection_window_seconds);
     }
     if let Some(percentile) = req.percentile {
-        let clamped = percentile.clamp(50.0, 99.9) as i32;
+        let clamped = clamped_threshold(percentile);
         active_model.threshold = Set(clamped);
         if clamped != previous_threshold {
             new_threshold = Some(clamped);
@@ -814,6 +860,8 @@ pub async fn update_config(
     #[cfg(feature = "enterprise")]
     o2_enterprise::enterprise::anomaly_detection::cache::invalidate_config(&updated.anomaly_id)
         .await;
+    #[cfg(feature = "enterprise")]
+    invalidate_value_column_cache(org_id, anomaly_id);
 
     // If the threshold (percentile) changed on a trained config, recompute the model's baked
     // cutoff in place from its persisted training-score distribution — no retrain needed. This
@@ -1375,17 +1423,21 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                 // The scheduler's builder, so the two dispatchers cannot disagree on kind.
                 let ctx = o2_enterprise::enterprise::anomaly_detection::types::build_alert_context(
                     &result.scored_points,
-                    org_id,
-                    &config.name,
-                    anomaly_id,
-                    result.anomaly_count,
-                    &config.stream_name,
-                    window_start,
-                    window_end,
+                    &o2_enterprise::enterprise::anomaly_detection::types::AlertContextIdent {
+                        org_id,
+                        config_name: &config.name,
+                        anomaly_id,
+                        anomaly_count: result.anomaly_count,
+                        stream_name: &config.stream_name,
+                        window_start_us: window_start,
+                        window_end_us: window_end,
+                    },
                 );
 
+                let mut outcomes = Vec::with_capacity(destinations.len());
                 for dest_id in destinations {
-                    if let Err(e) = send_anomaly_alert(dest_id.clone(), ctx.clone()).await {
+                    let sent = send_anomaly_alert(dest_id.clone(), ctx.clone()).await;
+                    if let Err(e) = &sent {
                         log::warn!(
                             "[anomaly_detection {}] failed to send alert to '{}': {}",
                             anomaly_id,
@@ -1393,6 +1445,24 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
                             e
                         );
                     }
+                    outcomes.push(sent);
+                }
+                let delivered = any_alert_delivered(outcomes);
+
+                // Anchored on the alerting point's data time; an all-failed send arms nothing.
+                if delivered
+                    && let Some(fired_at_us) = leading_edge_anchor_us(
+                        result
+                            .scored_points
+                            .iter()
+                            .map(|p| (p.is_anomaly, p.timestamp)),
+                    )
+                {
+                    o2_enterprise::enterprise::anomaly_detection::scheduler::record_manual_alert_delivery(
+                        anomaly_id,
+                        fired_at_us,
+                    )
+                    .await;
                 }
             }
         }
@@ -1578,16 +1648,22 @@ fn validated_budget_create(percentile: Option<f64>, budget: Option<f64>) -> Resu
     Ok(())
 }
 
-/// Update-time rule: while a budget is in force the stored percentile is derived state, so a
-/// user-supplied percentile is rejected unless the same request clears the budget.
+/// Shared with the update path so the replay gate compares exactly what an echo re-stores.
+fn clamped_threshold(percentile: f64) -> i32 {
+    percentile.clamp(50.0, 99.9) as i32
+}
+
+/// While a budget is in force the percentile is derived, so only a CHANGE to it is rejected.
 fn validated_budget_update(
     percentile: Option<f64>,
     budget: Option<Option<f64>>,
     existing_budget: Option<f64>,
+    existing_threshold: i32,
 ) -> Result<()> {
+    let percentile_changed = percentile.is_some_and(|p| clamped_threshold(p) != existing_threshold);
     if let Some(Some(b)) = budget {
         validate_budget_value(b)?;
-        if percentile.is_some() {
+        if percentile_changed {
             anyhow::bail!("supply either percentile or alert_budget_per_day, not both");
         }
     }
@@ -1595,7 +1671,7 @@ fn validated_budget_update(
         None => existing_budget,
         Some(b) => b,
     };
-    if percentile.is_some() && budget_after.is_some() {
+    if percentile_changed && budget_after.is_some() {
         anyhow::bail!(
             "percentile is derived while alert_budget_per_day is set; clear the budget \
              (alert_budget_per_day: null) to set a percentile"
@@ -1627,6 +1703,21 @@ fn ensure_trainable(config: &infra::table::entity::anomaly_detection_config::Mod
 /// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
 fn dispatch_allowed(anomaly_count: i32, alert_enabled: bool) -> bool {
     anomaly_count > 0 && alert_enabled
+}
+
+/// Whether any destination actually received the alert: only `Ok(true)` counts, so a
+/// skipped destination (not found, non-HTTP) or a failed send can never arm the cooldown.
+fn any_alert_delivered(outcomes: impl IntoIterator<Item = anyhow::Result<bool>>) -> bool {
+    outcomes.into_iter().any(|o| matches!(o, Ok(true)))
+}
+
+/// Manual-run cooldown anchor, `min` not `first` since callers need not pass sorted points.
+fn leading_edge_anchor_us(points: impl IntoIterator<Item = (bool, i64)>) -> Option<i64> {
+    points
+        .into_iter()
+        .filter(|(is_anomaly, _)| *is_anomaly)
+        .map(|(_, timestamp)| timestamp)
+        .min()
 }
 
 /// Create-time training gate: the config's own `enabled`, not just the global kill-switch.
@@ -1683,9 +1774,7 @@ fn merged_interval_pair(
     )
 }
 
-/// Validates the merged pair only when it differs from the persisted one, byte-wise or in
-/// parsed seconds: the full-body PUT resends unchanged intervals, and rejecting those would
-/// strand the rows already broken on disk, including those whose stored value cannot parse.
+/// Skips unchanged pairs: the full-body PUT resends them, and rejecting would strand rows.
 fn validated_intervals(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
@@ -2221,13 +2310,19 @@ pub async fn execute_anomaly_query(
     Ok(data_points)
 }
 
-/// The config-declared value column, or `None` to keep the legacy name fallback.
-///
-/// A lookup failure must not abort a run that the legacy names would have served, so this
-/// degrades to `None` rather than propagating.
+/// The config-declared value column; degrades to `None` (legacy fallback) on lookup failure.
 #[cfg(feature = "enterprise")]
 async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> {
-    let db = get_orm_client_rw().await;
+    let key = (org_id.to_string(), anomaly_id.to_string());
+    if let Ok(cache) = VALUE_COLUMN_CACHE.read()
+        && let Some((column, cached_at)) = cache.get(&key)
+        && cached_at.elapsed() < VALUE_COLUMN_TTL
+    {
+        return column.clone();
+    }
+
+    let db = get_orm_client_ro().await;
+    // A failed read is not cached, so the legacy fallback lasts one run, not a full TTL.
     let model = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .inspect_err(|e| {
@@ -2237,7 +2332,19 @@ async fn resolve_value_column(org_id: &str, anomaly_id: &str) -> Option<String> 
         })
         .ok()??;
 
-    declared_value_column(&model.query_mode, &model.detection_function)
+    let column = declared_value_column(&model.query_mode, &model.detection_function);
+    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+        cache.insert(key, (column.clone(), Instant::now()));
+    }
+    column
+}
+
+/// Update-path hook; only bounds staleness on the serving node, the TTL covers the rest.
+#[cfg(feature = "enterprise")]
+fn invalidate_value_column_cache(org_id: &str, anomaly_id: &str) {
+    if let Ok(mut cache) = VALUE_COLUMN_CACHE.write() {
+        cache.remove(&(org_id.to_string(), anomaly_id.to_string()));
+    }
 }
 
 /// The value column a config declares, or `None` when it declares none.
@@ -2410,11 +2517,7 @@ fn extract_timestamp_from_hit(hit: &serde_json::Value) -> Result<i64> {
     anyhow::bail!("No timestamp field found in search result")
 }
 
-/// Extract value from a search hit.
-///
-/// A declared `value_column` is authoritative and never falls back to the legacy names:
-/// silently scoring a different column than the config names is the data-loss bug this
-/// parameter exists to end, so a declared column absent from the row is an error.
+/// A declared `value_column` is authoritative: a missing one errors, never legacy-falls-back.
 #[cfg(feature = "enterprise")]
 fn extract_value_from_hit(hit: &serde_json::Value, value_column: Option<&str>) -> Result<f64> {
     if let Some(column) = value_column.map(str::trim).filter(|c| !c.is_empty()) {
@@ -2608,8 +2711,7 @@ fn value_anomaly_body(
     body
 }
 
-/// The webhook JSON body. Numeric fields are null where the kind has no honest value
-/// for them, and `deviation_basis` names which space `max_deviation_percent` lives in.
+/// The webhook JSON body; `deviation_kind` names which space `max_deviation_percent` is in.
 #[cfg(feature = "enterprise")]
 fn anomaly_alert_payload(
     ctx: &o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
@@ -2635,9 +2737,10 @@ fn anomaly_alert_payload(
         "org_id": ctx.org_id,
         "stream_name": ctx.stream_name,
         "anomaly_count": ctx.anomaly_count,
-        "max_deviation_percent": ctx.max_deviation_percent,
+        // Both predate the nullable kinds and were always numeric; strict parsers break on null.
+        "max_deviation_percent": ctx.max_deviation_percent.unwrap_or(0.0),
         "deviation_kind": deviation_kind,
-        "worst_actual_value": ctx.worst_actual_value,
+        "worst_actual_value": ctx.worst_actual_value.unwrap_or(0.0),
         "expected_value": ctx.worst_expected,
         "score": ctx.score,
         "threshold": ctx.threshold,
@@ -2654,12 +2757,13 @@ fn anomaly_alert_payload(
 /// Called by the enterprise scheduler when anomalies are detected and alert_enabled=true.
 /// Looks up the destination by name and POSTs a JSON payload to its webhook URL.
 /// Non-HTTP destinations (email, SNS) are skipped with a warning — a known, parked gap
-/// that recovery messages inherit.
+/// that recovery messages inherit. Returns `Ok(true)` only when the webhook was actually
+/// sent; a skip returns `Ok(false)` so the caller never arms a cooldown on nothing.
 #[cfg(feature = "enterprise")]
 pub async fn send_anomaly_alert(
     destination_id: String,
     ctx: o2_enterprise::enterprise::anomaly_detection::types::AnomalyAlertContext,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<bool> {
     let anomaly_id = ctx.anomaly_id.clone();
     let dest = match destinations::get(&ctx.org_id, &destination_id).await {
         Ok(d) => d,
@@ -2670,7 +2774,7 @@ pub async fn send_anomaly_alert(
                 destination_id,
                 e
             );
-            return Ok(());
+            return Ok(false);
         }
     };
 
@@ -2685,7 +2789,7 @@ pub async fn send_anomaly_alert(
                 anomaly_id,
                 destination_id
             );
-            return Ok(());
+            return Ok(false);
         }
     };
 
@@ -2733,7 +2837,7 @@ pub async fn send_anomaly_alert(
         status
     );
 
-    Ok(())
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -3091,6 +3195,30 @@ mod tests {
         let val = serde_json::json!("just a string");
         let result = model_to_api_json(val.clone());
         assert_eq!(result, val);
+    }
+
+    /// The API returned the stored `rcf_shingle_size` while the model trained at another
+    /// width, and only the log carried the truth. A 5m config stored at the default 4
+    /// trains at 1, so the response must carry that width beside the request.
+    #[test]
+    fn the_api_reports_the_width_the_model_trains_at() {
+        let val = serde_json::json!({
+            "rcf_shingle_size": 4i64,
+            "histogram_interval": "5m",
+            "training_window_days": 7i64,
+            "rcf_tree_size": 256i64,
+        });
+        let result = model_to_api_json(val);
+        assert_eq!(result["effective_rcf_shingle_size"], 1);
+        // The operator's request stays visible, so a 4 that became a 1 is legible as such.
+        assert_eq!(result["rcf_shingle_size"], 4);
+    }
+
+    /// A row without the shingle inputs must pass through rather than gain a fabricated width.
+    #[test]
+    fn a_row_without_the_shingle_inputs_gains_no_effective_width() {
+        let result = model_to_api_json(serde_json::json!({"name": "test"}));
+        assert!(result.get("effective_rcf_shingle_size").is_none());
     }
 
     // ── extract_timestamp_from_hit ──────────────────────────────────────────
@@ -3985,6 +4113,44 @@ mod tests {
             assert!(!dispatch_allowed(0, false));
         }
 
+        /// The manual `/detect` path delivered real webhooks while leaving
+        /// `last_alert_fired_at` NULL, so the cooldown never saw those alerts. The anchor it
+        /// records must be the leading edge, matching the scheduled path.
+        #[test]
+        fn the_manual_anchor_is_the_earliest_anomalous_point() {
+            let points = [(false, 10), (true, 30), (true, 20), (false, 5)];
+            assert_eq!(leading_edge_anchor_us(points), Some(20));
+        }
+
+        /// A run that scored nothing anomalous has no anchor to arm the cooldown with.
+        #[test]
+        fn a_run_without_anomalies_yields_no_manual_anchor() {
+            assert_eq!(leading_edge_anchor_us([(false, 10), (false, 20)]), None);
+            assert_eq!(leading_edge_anchor_us([]), None);
+        }
+
+        /// `send_anomaly_alert` returns Ok on its skip paths (destination missing,
+        /// non-HTTP); counting those as deliveries armed the cooldown with nothing sent.
+        #[test]
+        fn a_skipped_destination_does_not_count_as_delivered() {
+            assert!(!any_alert_delivered([Ok(false)]));
+            assert!(!any_alert_delivered([
+                Ok(false),
+                Err(anyhow::anyhow!("boom"))
+            ]));
+            assert!(!any_alert_delivered([]));
+        }
+
+        /// A single real delivery arms the cooldown even when other destinations skip.
+        #[test]
+        fn a_real_delivery_still_arms_the_cooldown() {
+            assert!(any_alert_delivered([Ok(false), Ok(true)]));
+            assert!(any_alert_delivered([
+                Err(anyhow::anyhow!("boom")),
+                Ok(true)
+            ]));
+        }
+
         /// `Status::Disabled` (4) is dead: nothing writes it, and the guard keys off
         /// `enabled`, so a row carrying it is still trainable. Documents current reality.
         #[test]
@@ -4876,15 +5042,36 @@ mod tests {
 
             let absent = ctx(AnomalyAlertKind::Absence);
             let p = anomaly_alert_payload(&absent, "m", LINK);
-            assert!(
-                p["max_deviation_percent"].is_null(),
-                "the absence sentinel 100.0 must not survive into the wire payload"
+            assert_eq!(
+                p["max_deviation_percent"], 0.0,
+                "neither the absence sentinel 100.0 nor a null may reach the wire payload"
             );
             assert!(p["deviation_kind"].is_null());
 
             let p = anomaly_alert_payload(&ctx(AnomalyAlertKind::Recovery), "m", LINK);
             assert_eq!(p["alert_type"], "anomaly_detection_recovery");
             assert_eq!(p["kind"], "recovery");
+        }
+
+        /// Pre-recovery webhooks always carried numbers here; strict parsers break on null.
+        #[test]
+        fn the_payload_keeps_legacy_numeric_fields_numeric_for_every_kind() {
+            for kind in [
+                AnomalyAlertKind::Value,
+                AnomalyAlertKind::PartialDrop,
+                AnomalyAlertKind::Absence,
+                AnomalyAlertKind::Recovery,
+            ] {
+                let p = anomaly_alert_payload(&ctx(kind), "m", LINK);
+                assert_eq!(p["max_deviation_percent"], 0.0, "{kind:?}");
+                assert_eq!(p["worst_actual_value"], 0.0, "{kind:?}");
+            }
+            let mut c = ctx(AnomalyAlertKind::Value);
+            c.max_deviation_percent = Some(52.4);
+            c.worst_actual_value = Some(612.0);
+            let p = anomaly_alert_payload(&c, "m", LINK);
+            assert_eq!(p["max_deviation_percent"], 52.4);
+            assert_eq!(p["worst_actual_value"], 612.0);
         }
     }
 
@@ -4909,31 +5096,40 @@ mod tests {
                     err.to_string().contains("finite value greater than 0"),
                     "{bad}: {err}"
                 );
-                assert!(validated_budget_update(None, Some(Some(bad)), None).is_err());
+                assert!(validated_budget_update(None, Some(Some(bad)), None, 95).is_err());
             }
             assert!(validated_budget_create(None, Some(1.0 / 7.0)).is_ok());
         }
 
-        /// While a budget is stored, `threshold` is derived state (B.3): a percentile
-        /// edit must be refused, not silently overwritten by the controller later.
+        /// While a budget is stored `threshold` is derived state (B.3), so a CHANGE is refused.
         #[test]
-        fn update_refuses_a_percentile_while_a_budget_is_in_force() {
-            let err = validated_budget_update(Some(95.0), None, Some(1.0)).unwrap_err();
+        fn update_refuses_a_changed_percentile_while_a_budget_is_in_force() {
+            let err = validated_budget_update(Some(95.0), None, Some(1.0), 90).unwrap_err();
             assert!(err.to_string().contains("derived"), "{err}");
             // Same request setting both is the create-time rule.
-            let err = validated_budget_update(Some(95.0), Some(Some(1.0)), None).unwrap_err();
+            let err = validated_budget_update(Some(95.0), Some(Some(1.0)), None, 90).unwrap_err();
             assert!(err.to_string().contains("not both"), "{err}");
+        }
+
+        /// A full-body RMW echoes the derived percentile; an unchanged echo must pass.
+        #[test]
+        fn update_accepts_an_unchanged_percentile_echo_while_a_budget_is_in_force() {
+            assert!(validated_budget_update(Some(95.0), None, Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(Some(95.0), Some(Some(1.0)), Some(1.0), 95).is_ok());
+            // Unchanged is judged post-clamp, the form the row stores.
+            assert!(validated_budget_update(Some(95.4), None, Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(Some(120.0), None, Some(1.0), 99).is_ok());
         }
 
         /// The atomic switch back: clearing the budget and supplying a percentile in ONE
         /// request must be allowed, or percentile mode is unreachable without two calls.
         #[test]
         fn update_allows_clear_budget_and_set_percentile_together() {
-            assert!(validated_budget_update(Some(95.0), Some(None), Some(1.0)).is_ok());
+            assert!(validated_budget_update(Some(95.0), Some(None), Some(1.0), 90).is_ok());
             // And plain edits in each mode stay legal.
-            assert!(validated_budget_update(Some(95.0), None, None).is_ok());
-            assert!(validated_budget_update(None, Some(Some(2.0)), Some(1.0)).is_ok());
-            assert!(validated_budget_update(None, None, Some(1.0)).is_ok());
+            assert!(validated_budget_update(Some(95.0), None, None, 90).is_ok());
+            assert!(validated_budget_update(None, Some(Some(2.0)), Some(1.0), 95).is_ok());
+            assert!(validated_budget_update(None, None, Some(1.0), 95).is_ok());
         }
 
         /// The double-option contract: absent leaves, null clears, a value sets.
