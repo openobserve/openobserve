@@ -70,7 +70,7 @@ impl OptimizerRule for StripDivergedSharedSubplanRule {
     }
 }
 
-pub fn shared_node(plan: &LogicalPlan) -> Option<&SharedSubplanNode> {
+fn shared_node(plan: &LogicalPlan) -> Option<&SharedSubplanNode> {
     let LogicalPlan::Extension(extension) = plan else {
         return None;
     };

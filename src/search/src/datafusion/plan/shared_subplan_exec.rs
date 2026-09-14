@@ -70,6 +70,7 @@ pub struct SharedSubplanReaderExec {
     properties: Arc<PlanProperties>,
 }
 
+/// Runtime state shared by the producer and every reader of one subplan.
 pub struct SharedSubplanState {
     id: u64,
     consumers: usize,
@@ -452,8 +453,7 @@ impl MaterializeBudget {
     }
 }
 
-/// Removes every marker from a plan fragment, so a fragment shipped to a follower never carries
-/// one.
+/// Removes every marker from a fragment about to be shipped to a follower.
 pub fn strip_shared_subplan_markers(
     plan: Arc<dyn ExecutionPlan>,
 ) -> Result<Arc<dyn ExecutionPlan>> {

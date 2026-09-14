@@ -44,7 +44,7 @@ impl SharedSubplanRule {
         Self::default()
     }
 
-    // Overrides the pool-derived materialization budget, meant for tests.
+    /// Overrides the pool-derived materialization budget, meant for tests.
     pub fn with_memory_limit(memory_limit: Option<usize>) -> Self {
         Self { memory_limit }
     }
