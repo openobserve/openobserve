@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="token"
           :loading="loading"
+          :forbidden="forbidden"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
           pagination="client"
@@ -41,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-invitations-list"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('invitation.search')"
@@ -95,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="primary"
                 size="sm"
+                class="max-md:hidden"
                 @click="acceptInvitation(row)"
                 :data-test="`accept-invitation-${row.token}`"
               >
@@ -103,15 +105,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="secondary"
                 size="sm"
+                class="max-md:hidden"
                 @click="rejectInvitation(row)"
                 :data-test="`reject-invitation-${row.token}`"
               >
                 {{ t("invitation.reject") }}
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="invitation-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  class="md:hidden"
+                  :data-test="`accept-invitation-${row.token}-menu`"
+                  @select="acceptInvitation(row)"
+                >
+                  <span>{{ t("invitation.accept") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  class="md:hidden"
+                  :data-test="`reject-invitation-${row.token}-menu`"
+                  @select="rejectInvitation(row)"
+                >
+                  <span>{{ t("invitation.reject") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #bottom>
-            <span class="text-xs font-normal">
+            <span class="text-xs font-normal max-md:hidden">
               {{ resultTotal }} {{ t("invitation.pendingInvitations") }}
             </span>
           </template>
@@ -150,6 +179,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
@@ -188,6 +219,8 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OTimeCell,
@@ -267,6 +300,7 @@ export default defineComponent({
     ];
     const resultTotal = ref<number>(0);
     const loading = ref(false);
+    const forbidden = ref(false);
 
     onMounted(() => {
       fetchPendingInvitations();
@@ -280,6 +314,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       try {
         const response = await usersService.getPendingInvites();
 
@@ -290,12 +325,16 @@ export default defineComponent({
         resultTotal.value = response.data.data.length;
         dismiss();
       } catch (error) {
-        const e = error as { response?: { data?: { message?: string } } };
+        const e = error as { response?: { status?: number; data?: { message?: string } } };
         dismiss();
-        toast({
-          message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
-          variant: "error",
-        });
+        forbidden.value = e.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            message: raw(e.response?.data?.message || t("iam.invitationList.failedLoadPending")),
+            variant: "error",
+          });
+        }
       } finally {
         loading.value = false;
       }
@@ -429,6 +468,7 @@ export default defineComponent({
       columns,
       resultTotal,
       loading,
+      forbidden,
       confirmAccept,
       confirmReject,
       selectedInvitation,

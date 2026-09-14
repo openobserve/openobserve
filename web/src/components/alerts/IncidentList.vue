@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         :frame="false"
         :loading="loading"
+        :forbidden="forbidden"
         row-key="id"
         pagination="client"
         :page-size="pageSize"
@@ -51,8 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
             <OToggleGroup
+              mobile-dropdown
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
               data-test="incident-status-filter-group"
@@ -76,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -141,7 +143,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          <div
+            v-if="getSortedDimensions(row.group_values).length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -176,6 +181,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OTag>
           </div>
+          <span v-else class="text-text-muted text-xs italic">
+            {{ t("alerts.incidents.noDimensionsAvailable") }}
+          </span>
         </template>
         <template #cell-alert_count="{ row }">
           <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
@@ -195,15 +203,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
+              class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip
+              ><OIcon name="check-circle" size="sm" aria-hidden="true" /><OTooltip
                 :content="t('alerts.incidents.acknowledge')"
             /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
               ><OIcon name="task-alt" size="sm" /><OTooltip
@@ -213,11 +224,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
               ><OIcon name="restart-alt" size="sm" /><OTooltip
                 :content="t('alerts.incidents.reopen')"
             /></OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="incident-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.status === 'open'"
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="incident-ack-btn-menu"
+                @select="acknowledgeIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.acknowledge") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status !== 'resolved'"
+                icon-left="task-alt"
+                class="md:hidden"
+                data-test="incident-resolve-btn-menu"
+                @select="resolveIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.resolve") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status === 'resolved'"
+                icon-left="restart-alt"
+                class="md:hidden"
+                data-test="incident-reopen-btn-menu"
+                @select="reopenIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.reopen") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
 
@@ -237,7 +289,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Bottom -->
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal">
+            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ visibleIncidents.length }}
               {{
                 visibleIncidents.length === 1
@@ -275,9 +327,12 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "IncidentList",
@@ -295,16 +350,20 @@ export default defineComponent({
     OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
+    const { confirm } = useConfirmDialog();
 
     const qTableRef: any = ref(null);
     // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
     const loading = ref(true);
+    const forbidden = ref(false);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -566,6 +625,7 @@ export default defineComponent({
 
     const loadIncidents = async () => {
       loading.value = true;
+      forbidden.value = false;
       try {
         const org = store.state.selectedOrganization.identifier;
         const limit = 1000;
@@ -581,10 +641,14 @@ export default defineComponent({
         allIncidents.value = items;
         store.dispatch("incidents/setCachedData", items);
       } catch (error: any) {
-        toast({
-          variant: "error",
-          message: t("alerts.incidents.errorLoading"),
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            variant: "error",
+            message: t("alerts.incidents.errorLoading"),
+          });
+        }
         console.error("Failed to load incidents:", error);
       } finally {
         loading.value = false;
@@ -653,7 +717,15 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = (incident: Incident) => {
+    const acknowledgeIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "acknowledged");
     };
 
@@ -844,6 +916,7 @@ export default defineComponent({
       raw,
       t,
       loading,
+      forbidden,
       allIncidents,
       visibleIncidents,
       severityStats,

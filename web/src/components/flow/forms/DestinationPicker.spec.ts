@@ -342,7 +342,7 @@ describe("DestinationPicker", () => {
     await flushPromises();
     const opts = (wrapper.vm as any).destinationOptions;
     expect(opts.map((o: any) => o.value)).toEqual(["splunk-hec", "webhook", "legacy"]);
-    expect(opts[0].subLabel).toBe("Unsupported Type — Workflows Support Custom Destinations Only");
+    expect(opts[0].subLabel).toBe("Unsupported type — workflows support custom destinations only");
   });
 
   it("still resolves the retained non-custom destination on submit", async () => {

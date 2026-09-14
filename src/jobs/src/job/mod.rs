@@ -41,6 +41,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+mod leader;
 #[cfg(feature = "enterprise")]
 mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
@@ -53,6 +54,8 @@ mod llm_review_reconciliation;
 mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+mod oncall_maintenance;
 #[cfg(feature = "enterprise")]
 mod org_storage;
 #[cfg(feature = "enterprise")]
@@ -546,6 +549,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
     tokio::task::spawn(infra::coordinator::synthetics::watch());
+    // Every node watches: API nodes serve the screens an admin reloads after editing a rotation.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        tokio::task::spawn(infra::coordinator::oncall::watch(|tag, expires_at| {
+            // An ack token is single-use, and single-use on one node only is not single-use.
+            o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
+        }));
+    }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -1230,6 +1241,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // Nothing else notices a lost escalation timer: the thing that would have is the timer.
+    #[cfg(feature = "enterprise")]
+    oncall_maintenance::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]

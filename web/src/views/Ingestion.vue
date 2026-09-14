@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <div class="w-50 flex-none">
+      <div class="w-50 flex-none max-md:w-auto max-md:min-w-36 max-md:flex-1">
         <OSearchInput
           v-model="globalSearchQuery"
           :placeholder="t('common.search')"
@@ -36,12 +36,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OSelect
-        v-if="!isRUMPage && tokenOptions.length > 0"
+        v-if="!isMobile && !isRUMPage && tokenOptions.length > 0"
         v-model="selectedTokenName"
         :options="tokenOptions"
         label-key="label"
         value-key="value"
-        class="max-w-xs"
+        class="max-w-xs max-md:order-last max-md:max-w-full max-md:min-w-0! max-md:basis-full"
         style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />
@@ -50,9 +50,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="primary"
         size="sm"
         icon-left="key"
+        :title="isMobile ? t('ingestion.manageTokensBtnLabel') : undefined"
         @click="navigateToIngestionTokens"
       >
-        {{ t("ingestion.manageTokensBtnLabel") }}
+        <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>
       </OButton>
       <OButton
         v-if="
@@ -83,6 +84,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
+        <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
+          <OSelect
+            v-model="selectedTokenName"
+            :options="tokenOptions"
+            label-key="label"
+            value-key="value"
+            @update:model-value="onTokenSelected"
+          />
+        </div>
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"
@@ -226,6 +236,7 @@ import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
@@ -245,6 +256,7 @@ export default defineComponent({
     OBanner,
   },
   setup() {
+    const { isMobile } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
@@ -626,6 +638,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       t,
       store,
       router,

@@ -149,6 +149,20 @@ describe("SearchResult Component", () => {
       wrapper.vm.scrollContainerRef = null;
       expect(() => wrapper.vm.scrollTableToTop(0)).not.toThrow();
     });
+
+    // Regression: the skeleton clamped the shared scroller mid-list, so a fresh patterns result mounted half-way down instead of at the top
+    it("should scroll the shared container to the top when a patterns extraction starts", async () => {
+      const scrollToSpy = vi.fn();
+      wrapper.vm.scrollContainerRef = { scrollTo: scrollToSpy };
+      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: false };
+      await flushPromises();
+      scrollToSpy.mockClear();
+
+      wrapper.vm.patternsState = { ...wrapper.vm.patternsState, loading: true };
+      await flushPromises();
+
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 0 });
+    });
   });
 
   describe("Chart and Histogram Functionality", () => {

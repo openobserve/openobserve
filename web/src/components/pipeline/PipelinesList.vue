@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
+          :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
           :page-size="20"
@@ -72,8 +73,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="onTabChange"
                 data-test="pipeline-list-tabs"
@@ -91,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -160,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                 size="icon-sm"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
               >
                 <OTooltip
@@ -168,11 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
                 />
               </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('pipeline.view')"
+                class="max-md:hidden"
                 icon-left="visibility"
               >
                 <OTooltip max-width="none" side="left">
@@ -184,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
               >
@@ -221,6 +227,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                   />
                 </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
+                  class="md:hidden"
+                  @select="togglePipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                  </template>
+                  {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="edit" />
+                  </template>
+                  {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   :data-test="`pipeline-list-${row.name}-export-action`"
                   shortcut-id="pipelinesRowExport"
@@ -314,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="me-4 flex items-center text-xs font-normal">
+              <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -970,8 +997,10 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
+const forbidden = ref(false);
 const getPipelines = async () => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const response = await pipelineService.getPipelines(
       store.state.selectedOrganization.identifier,
@@ -1028,8 +1057,9 @@ const getPipelines = async () => {
         ...pipeline,
       };
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    forbidden.value = error?.response?.status === 403;
   } finally {
     loading.value = false;
   }

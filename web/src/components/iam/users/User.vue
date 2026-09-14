@@ -44,6 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedUserIds"
           v-model:global-filter="filterQuery"
           :show-global-filter="false"
@@ -84,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('user.search')"
@@ -166,6 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.delete')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`delete-basic-user-${row.email}`"
               data-row-action="delete"
               @click="confirmDeleteAction(row)"
@@ -177,6 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.revoke_invite')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`revoke-invite-${row.email}`"
               data-row-action="delete"
               @click="confirmRevokeAction(row)"
@@ -188,15 +191,65 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :title="t('user.update')"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :data-test="`edit-basic-user-${row.email}`"
               data-row-action="edit"
               @click="addRoutePush(row)"
             >
               <OIcon name="edit" size="sm" />
             </OButton>
+            <ODropdown
+              v-if="
+                (row.enableDelete && row.status != 'pending') ||
+                (row.status == 'pending' && row.token) ||
+                (row.enableEdit && row.status != 'pending')
+              "
+              side="bottom"
+              align="end"
+            >
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="user-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.enableDelete && row.status != 'pending'"
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`delete-basic-user-${row.email}-menu`"
+                @select="confirmDeleteAction(row)"
+              >
+                <span>{{ t("user.delete") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status == 'pending' && row.token"
+                icon-left="cancel"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`revoke-invite-${row.email}-menu`"
+                @select="confirmRevokeAction(row)"
+              >
+                <span>{{ t("user.revoke_invite") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.enableEdit && row.status != 'pending'"
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`edit-basic-user-${row.email}-menu`"
+                @select="addRoutePush(row)"
+              >
+                <span>{{ t("user.update") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ rows.length }}
               {{
                 isEnterpriseOrCloud
@@ -282,6 +335,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onActivated, onBeforeMount, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -324,6 +379,8 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
     OStatStrip,
@@ -749,6 +806,7 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getOrgMembers = () => {
       const dismiss = toast({
         variant: "loading",
@@ -757,6 +815,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       return new Promise((resolve, reject) => {
         usersService
           .orgUsers(store.state.selectedOrganization.identifier)
@@ -871,13 +930,17 @@ export default defineComponent({
           .catch((err: any) => {
             console.error("Failed to fetch org members:", err);
             dismiss();
-            toast({
-              variant: "error",
-              message: t("iam.user.failedToLoadUsers", {
-                error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
-              }),
-              timeout: 5000,
-            });
+            forbidden.value = err?.response?.status === 403;
+            // The grouped access toast already reports a 403; a second red toast adds nothing.
+            if (!forbidden.value) {
+              toast({
+                variant: "error",
+                message: t("iam.user.failedToLoadUsers", {
+                  error: err?.response?.data?.message || err?.message || t("iam.user.unknownError"),
+                }),
+                timeout: 5000,
+              });
+            }
             reject(false);
           })
           .finally(() => {
@@ -1406,6 +1469,7 @@ export default defineComponent({
       usersState,
       columns,
       loading,
+      forbidden,
       orgData,
       confirmDelete,
       deleteUser,

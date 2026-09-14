@@ -974,12 +974,14 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// seeding list cannot drift from the detection lists. A fifth engine added
 /// there is seeded automatically rather than silently de-optimizing the page.
 ///
-/// The union collapses to FIVE fields, because the two marker arrays are
-/// deliberately different shapes:
+/// The union collapses to SEVEN fields — the scope columns, then the marker
+/// columns of the two deliberately different-shaped arrays:
 ///
 /// | Field | Justified by |
 /// |---|---|
 /// | `o2_dbm_kind` | the canonical operand of every DBM read |
+/// | `o2_dbm_engine` | scope predicate: every Metrics-tab panel and every engine-scoped service read emits `o2_dbm_engine = '<engine>'` |
+/// | `o2_dbm_instance` | scope predicate: the instance filter of the Metrics/Activity pages — measured 2.1 GB scanned to return 83 rows without it |
 /// | `o2_pg_event` | `DEADLOCK_MARKERS` — Postgres deadlocks (filelog) |
 /// | `o2_my_event` | `DEADLOCK_MARKERS` — MySQL deadlocks (filelog) |
 /// | `o2_maria_event` | `DEADLOCK_MARKERS` — MariaDB deadlocks (filelog) |
@@ -991,9 +993,17 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// four columns. `o2_recipe` is shared between the two arrays and must appear
 /// once, which is why this dedupes rather than concatenating.
 ///
+/// The scope columns are plain AND-equality operands, not OR members, so they
+/// prune independently: `is_expr_valid_for_index` recurses `And` per branch and
+/// keeps whichever operands are indexed. Their selectivity caveat is the same
+/// as the kind column's — on a single-engine, single-instance deployment each
+/// value covers most rows and the 35% skip-threshold guard stands the index
+/// down per file; the win is on fleets, where one instance is a sliver of the
+/// stream.
+///
 /// Every extra indexed column costs tantivy work at parquet-write time and
 /// bytes in the index file, so the set is kept closed: an addition here needs a
-/// real OR operand in a real read query behind it.
+/// real predicate in a real read query behind it.
 ///
 /// # Seeding a column the stream does not have is SAFE
 ///
@@ -1017,8 +1027,10 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// `o2_maria_event` entry that indexes nothing, costs nothing, and becomes
 /// live the day that recipe first ships.
 pub fn server_stream_index_fields() -> Vec<&'static str> {
-    let mut fields = Vec::with_capacity(1 + DEADLOCK_MARKERS.len() + BLOCKING_MARKERS.len());
+    let mut fields = Vec::with_capacity(3 + DEADLOCK_MARKERS.len() + BLOCKING_MARKERS.len());
     fields.push(SERVER_STREAM_INDEX_FIELD);
+    fields.push(O2_DBM_ENGINE);
+    fields.push(O2_DBM_INSTANCE);
     for (col, _) in DEADLOCK_MARKERS.iter().chain(BLOCKING_MARKERS.iter()) {
         if !fields.contains(col) {
             fields.push(col);

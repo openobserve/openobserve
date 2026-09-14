@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The affordance appears on hover rather than standing permanently, so
            a strip of five does not read as five buttons. -->
       <span
-        class="text-text-link text-2xs font-semibold opacity-0 transition-opacity group-hover:opacity-100"
+        class="text-text-link text-2xs font-semibold opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
         :class="activeId === insight.id ? 'opacity-100' : ''"
       >
         {{ affordanceOf(insight) }}

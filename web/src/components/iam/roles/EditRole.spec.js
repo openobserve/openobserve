@@ -29,13 +29,31 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
 
+// Mocked so these specs stay independent of the real DBM catalogs' contents.
+vi.mock("@/components/iam/roles/dbmViewerPreset", () => ({
+  DBM_VIEWER_STREAMS: ["postgresql_backends", "mysql_threads", "dbm_absent_stream"],
+  DBM_VIEWER_STREAM_ROW_PERMS: ["AllowGet"],
+  DBM_VIEWER_TYPE_NODE_PERMS: ["AllowList"],
+  DBM_MODULE_RESOURCE: "db_monitoring",
+}));
+
+// Mutable so a spec can shrink the org's metric streams (the zero-match case).
+const metricStreamsOverride = { list: null };
+
 // Mock composable useStreams
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: vi.fn(async (type) => {
       const map = {
         logs: { list: [{ name: "app" }, { name: "sys" }] },
-        metrics: { list: [{ name: "cpu" }, { name: "mem" }] },
+        metrics: {
+          list: metricStreamsOverride.list ?? [
+            { name: "cpu" },
+            { name: "mem" },
+            { name: "postgresql_backends" },
+            { name: "mysql_threads" },
+          ],
+        },
         traces: { list: [{ name: "svc-a" }] },
         index: { list: [{ name: "users" }] },
         enrichment_tables: { list: [{ name: "geo" }] },
@@ -181,6 +199,14 @@ vi.mock("@/services/iam", () => ({
         top_level: true,
         visible: true,
         order: 16,
+      },
+      {
+        key: "db_monitoring",
+        display_name: "Database Monitoring",
+        has_entities: false,
+        top_level: true,
+        visible: true,
+        order: 17,
       },
     ],
   })),
@@ -973,6 +999,191 @@ describe("EditRole - read-only preset", () => {
   });
 
   it("does not seed permissions without the readonly preset", async () => {
+    router.currentRoute.value.query = {};
+    const wrapper = await mountEditRole();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+describe("EditRole - dbm viewer preset", () => {
+  const mountWithDbmPreset = async () => {
+    router.currentRoute.value.query = { preset: "dbm" };
+    const wrapper = await mountEditRole();
+    await flushPromises();
+    router.currentRoute.value.query = {};
+    return wrapper;
+  };
+
+  afterEach(() => {
+    metricStreamsOverride.list = null;
+  });
+
+  it("stages AllowGet on the curated DBM metric streams present in the org", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "metrics:postgresql_backends", permission: "AllowGet" },
+        { object: "metrics:mysql_threads", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  // A leaf stream row hides its AllowList checkbox, so seeding it would stage a grant the user cannot see or untick.
+  it("does not stage a permission the table hides on a stream row", async () => {
+    const wrapper = await mountWithDbmPreset();
+    const rows = wrapper.vm.heavyResourceEntities["metrics"] ?? [];
+    const seeded = rows.find((r) => r.name === "postgresql_backends");
+    expect(seeded.permission.AllowList.show).toBe(false);
+    expect(
+      Object.values(wrapper.vm.addedPermissions).some(
+        (p) => p.permission === "AllowList" && p.object.startsWith("metrics:postgresql_"),
+      ),
+    ).toBe(false);
+  });
+
+  // GET /{org}/streams checks `metrics:_all_<org>`, and FGA's LIST relation does
+  // not accept ALLOW_GET — without this grant the Metrics tab cannot load its
+  // stream list at all.
+  it("stages AllowList on the metrics stream-type node", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([{ object: "metrics:_all_default", permission: "AllowList" }]),
+    );
+  });
+
+  // ALLOW_GET on `metrics:_all_<org>` reads as a wildcard over every metric stream in the org, which would make the curated per-stream grants decorative.
+  it("never stages AllowGet on the metrics stream-type node", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+  });
+
+  // db_monitoring is a module-level toggle with no entities of its own — it
+  // authorizes every /{org}/db_monitoring/* endpoint (the DB-load and
+  // health-ratio panels riding _o2_dbm_server), a separate grant object from
+  // the raw metrics:<name> streams above.
+  it("stages AllowList and AllowGet on the db_monitoring module resource", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(Object.values(wrapper.vm.addedPermissions)).toEqual(
+      expect.arrayContaining([
+        { object: "db_monitoring:_all_default", permission: "AllowList" },
+        { object: "db_monitoring:_all_default", permission: "AllowGet" },
+      ]),
+    );
+  });
+
+  it("ticks the metrics type-node checkboxes so the grant is reviewable", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    const streamResource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "stream",
+    );
+    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
+    expect(metricsNode.type).toBe("Type");
+    expect(metricsNode.permission.AllowList.show).toBe(true);
+    expect(metricsNode.permission.AllowList.value).toBe(true);
+    expect(metricsNode.permission.AllowGet.value).toBe(false);
+  });
+
+  it("does not grant a wildcard beyond metrics and db_monitoring", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("stream:_all_default");
+    expect(objects).not.toContain("logs:_all_default");
+    expect(objects).not.toContain("traces:_all_default");
+  });
+
+  it("stages exactly the curated streams plus the metrics and db_monitoring grants", async () => {
+    const wrapper = await mountWithDbmPreset();
+
+    expect(
+      [...new Set(Object.values(wrapper.vm.addedPermissions).map((p) => p.object))].sort(),
+    ).toEqual([
+      "db_monitoring:_all_default",
+      "metrics:_all_default",
+      "metrics:mysql_threads",
+      "metrics:postgresql_backends",
+    ]);
+  });
+
+  it("sets the permissions filter to 'selected' so the seeded rows are easy to review", async () => {
+    const wrapper = await mountWithDbmPreset();
+    expect(wrapper.vm.filter.permissions).toBe("selected");
+  });
+
+  it("writes the seeded permissions into the save payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountWithDbmPreset();
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.remove).toEqual([]);
+    expect(payload.add).toEqual(
+      expect.arrayContaining([
+        { object: "db_monitoring:_all_default", permission: "AllowList" },
+        { object: "db_monitoring:_all_default", permission: "AllowGet" },
+        { object: "metrics:_all_default", permission: "AllowList" },
+        { object: "metrics:postgresql_backends", permission: "AllowGet" },
+        { object: "metrics:mysql_threads", permission: "AllowGet" },
+      ]),
+    );
+    expect(payload.add).not.toContainEqual({
+      object: "metrics:_all_default",
+      permission: "AllowGet",
+    });
+    expect(payload.add).toHaveLength(5);
+  });
+
+  it("reports how many curated streams matched this org", async () => {
+    mockToast.mockClear();
+    await mountWithDbmPreset();
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "info",
+        message: expect.stringContaining("2 of 3"),
+      }),
+    );
+  });
+
+  it("reports the zero-match case instead of implying success", async () => {
+    metricStreamsOverride.list = [{ name: "cpu" }];
+    mockToast.mockClear();
+
+    const wrapper = await mountWithDbmPreset();
+    const objects = Object.values(wrapper.vm.addedPermissions).map((p) => p.object);
+    expect(objects).not.toContain("metrics:_all_default");
+    expect(objects).toContain("db_monitoring:_all_default");
+
+    expect(mockToast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        variant: "warning",
+        message: expect.stringContaining("None"),
+      }),
+    );
+  });
+
+  it("does not seed when the role already has permissions", async () => {
+    const { getAllRolePermissions } = await import("@/services/iam");
+    vi.mocked(getAllRolePermissions).mockResolvedValueOnce({
+      data: [{ object: "stream:_all_default", permission: "AllowGet" }],
+    });
+
+    const wrapper = await mountWithDbmPreset();
+    expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+
+  it("does not seed permissions without the dbm preset", async () => {
     router.currentRoute.value.query = {};
     const wrapper = await mountEditRole();
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
