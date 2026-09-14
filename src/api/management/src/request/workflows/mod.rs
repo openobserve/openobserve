@@ -167,7 +167,7 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder"),
+        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder. Ignored when `draft=true`."),
         ("draft" = Option<bool>, Query, description = "Save to the drafts table, skipping graph validation"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
@@ -300,9 +300,9 @@ pub async fn list_workflows(
     };
     // Get List of allowed objects ends
 
-    // `all_folders=true` lists across every folder. It is a separate parameter
-    // rather than a `folder=all` sentinel so `folder` stays empty, which is what
-    // makes the route's authorization fall back to the org-wide folder check.
+    // `all_folders=true` lists across every folder. A `folder=all` sentinel
+    // would instead be authorized against a folder that does not exist; rows
+    // still pass the per-item permission filter below either way.
     let across_folders = query
         .get("all_folders")
         .is_some_and(|v| v.eq_ignore_ascii_case("true"));
@@ -382,7 +382,7 @@ pub async fn list_workflows(
     MetaHttpResponse::json(ret)
 }
 
-/// DeleteWorkflows
+/// MoveWorkflows
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct MoveWorkflowsRequestBody {
@@ -431,8 +431,8 @@ pub async fn move_workflows(
     // authorized here: PUT on every workflow being moved, plus write access to
     // the destination folder. Without both, a list+delete role could relocate
     // workflows between folders it cannot write.
-    for id in &body.workflow_ids {
-        if !check_permissions(
+    let checks = body.workflow_ids.iter().map(|id| {
+        check_permissions(
             id,
             &org_id,
             &user_email.user_id,
@@ -443,10 +443,9 @@ pub async fn move_workflows(
             true,
             false,
         )
-        .await
-        {
-            return MetaHttpResponse::forbidden("Forbidden");
-        }
+    });
+    if !futures::future::join_all(checks).await.iter().all(|ok| *ok) {
+        return MetaHttpResponse::forbidden("Forbidden");
     }
 
     if !check_folder_write_permissions(

@@ -51,6 +51,8 @@ impl MigrationTrait for Migration {
 
         backfill_default_folders(manager).await?;
 
+        // SQLite cannot add a foreign key to an existing table and is dev-only
+        // here, so it keeps a nullable, unconstrained column.
         if backend == sea_orm::DbBackend::Postgres {
             manager
                 .get_connection()
@@ -58,16 +60,19 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        // SQLite cannot add a foreign key to an existing table, and is dev-only
-        // here, so the constraint is Postgres-only.
         if backend == sea_orm::DbBackend::Postgres && !fk_exists(manager).await? {
-            manager
-                .get_connection()
-                .execute_unprepared(&format!(
-                    "ALTER TABLE workflows ADD CONSTRAINT {FK_NAME} \
-                     FOREIGN KEY (folder_id) REFERENCES folders(id)"
-                ))
-                .await?;
+            let conn = manager.get_connection();
+            // NOT VALID first: a validated FK holds ACCESS EXCLUSIVE for the
+            // whole scan, which on a large table can outlast the dist_lock.
+            conn.execute_unprepared(&format!(
+                "ALTER TABLE workflows ADD CONSTRAINT {FK_NAME} \
+                 FOREIGN KEY (folder_id) REFERENCES folders(id) NOT VALID"
+            ))
+            .await?;
+            conn.execute_unprepared(&format!(
+                "ALTER TABLE workflows VALIDATE CONSTRAINT {FK_NAME}"
+            ))
+            .await?;
         }
 
         manager

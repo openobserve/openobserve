@@ -345,7 +345,7 @@ pub async fn save_workflow(
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
-    let slug = folder_slug.unwrap_or(DEFAULT_FOLDER);
+    let slug = normalize_folder_slug(folder_slug);
     workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
 
     db::workflows::save_workflow_record(workflow.clone()).await?;
@@ -361,6 +361,15 @@ pub async fn save_workflow(
     .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
+}
+
+/// `resolve_folder_pk` treats a blank slug as the default folder, so the
+/// ownership tuple must normalize identically or the two name different folders.
+fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
+    folder_slug
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(DEFAULT_FOLDER)
 }
 
 pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
@@ -397,10 +406,7 @@ pub async fn promote_draft(
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
-    let slug = folder_slug
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or(DEFAULT_FOLDER);
+    let slug = normalize_folder_slug(folder_slug);
     workflow.folder_id = db::workflows::resolve_folder_pk(org_id, slug).await?;
 
     let id = workflow.id.clone();
@@ -437,6 +443,8 @@ pub async fn enable_disable_workflow(
     Ok(())
 }
 
+/// `folder_slug` of `None` lists across every folder in the org rather than
+/// falling back to the default one.
 pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
@@ -495,8 +503,9 @@ pub async fn move_workflows(
 
     // Ownership follows the row. Removing the tuple requires naming the OLD
     // parent: without it the stale parent survives and the source folder's
-    // grants keep reaching a workflow that has left it.
-    for (id, src_slug) in previous {
+    // grants keep reaching a workflow that has left it. Ordered per workflow,
+    // concurrent across them.
+    futures::future::join_all(previous.into_iter().map(|(id, src_slug)| async move {
         if let Some(src) = src_slug {
             remove_ownership(
                 org_id,
@@ -519,7 +528,8 @@ pub async fn move_workflows(
             },
         )
         .await;
-    }
+    }))
+    .await;
     Ok(())
 }
 

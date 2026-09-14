@@ -94,6 +94,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
                 <OToggleGroup
                   :model-value="activeTab"
+                  mobile-dropdown
                   data-test="workflow-list-tabs"
                   @update:model-value="(v) => (activeTab = (v as string) || 'all')"
                 >
@@ -176,6 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
+            <template #cell-folder_name="{ row }">
+              {{ row.folder_name || t("common.defaultLabel") }}
+            </template>
+
             <template #cell-updated_at="{ row }">
               <span>{{ row.updated_at_display }}</span>
             </template>
@@ -230,6 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
                 </OButton>
                 <OButton
+                  v-if="!row.is_draft"
                   :data-test="`workflow-list-${row.name}-move`"
                   variant="ghost"
                   size="icon-sm"
@@ -282,8 +288,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-workflows"
-                :filtered="!!filterQuery"
-                @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : openCreateEditor())"
+                :filtered="!!filterQuery || activeTab !== 'all'"
+                @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreateEditor())"
               />
             </template>
 
@@ -423,6 +429,12 @@ watch(activeFolderId, (folderId) => {
   }
   getWorkflows(folderId);
 });
+
+// The type tab filters the table too, so it has to clear with the query.
+const clearFilters = () => {
+  filterQuery.value = "";
+  activeTab.value = "all";
+};
 
 const onFolderScopeChange = (v: string) => {
   const across = v === "all";
