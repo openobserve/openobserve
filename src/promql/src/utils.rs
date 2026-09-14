@@ -76,9 +76,10 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let Some(field) = matcher_residual_field(schema, mat) else {
             continue;
         };
-        let field_type = field.data_type().clone();
+        let field_type = field.data_type();
+        let column = col(mat.name.as_str());
         let literal = |value: String| -> Expr {
-            match &field_type {
+            match field_type {
                 // Explicitly type equality matcher literals to the label column;
                 // an untyped literal would become Utf8View == Utf8 at execution.
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
@@ -87,17 +88,17 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             }
         };
         let predicate = match &mat.op {
-            MatchOp::Equal => col(mat.name.clone()).eq(literal(mat.value.clone())),
-            MatchOp::NotEqual => col(mat.name.clone()).not_eq(literal(mat.value.clone())),
+            MatchOp::Equal => column.eq(literal(mat.value.clone())),
+            MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
                 // DataFusion 54 can lower a regex on Utf8View to a mixed-type
                 // equality/LIKE expression. Cast only regex matchers until that
                 // optimizer bug is fixed; equality matchers stay zero-copy views.
-                let value = if field_type == DataType::Utf8View {
-                    cast(col(mat.name.clone()), DataType::Utf8)
+                let value = if field_type == &DataType::Utf8View {
+                    cast(column, DataType::Utf8)
                 } else {
-                    col(mat.name.clone())
+                    column
                 };
                 let predicate = regexp_like().call(vec![value, lit(regex)]);
                 if matches!(mat.op, MatchOp::NotRe(_)) {
@@ -131,30 +132,18 @@ pub fn apply_label_selector(
         let schema_fields = schema
             .fields()
             .iter()
-            .map(|f| f.name())
+            .map(|f| f.name().as_str())
             .collect::<HashSet<_>>();
-        let mut def_labels = vec![
-            HASH_LABEL.to_string(),
-            VALUE_LABEL.to_string(),
-            BUCKET_LABEL.to_string(),
-            TIMESTAMP_COL_NAME.to_string(),
-        ];
-        for label in label_selector.iter() {
-            if def_labels.contains(label) {
-                def_labels.retain(|x| x != label);
-            }
-        }
+        let def_labels = [HASH_LABEL, VALUE_LABEL, BUCKET_LABEL, TIMESTAMP_COL_NAME]
+            .into_iter()
+            .filter(|label| !label_selector.contains(*label));
         // include only found columns and required _timestamp, hash, value, le cols
         let selected_cols: Vec<_> = label_selector
             .iter()
-            .chain(def_labels.iter())
-            .filter_map(|label| {
-                if schema_fields.contains(label) {
-                    Some(col(label))
-                } else {
-                    None
-                }
-            })
+            .map(String::as_str)
+            .chain(def_labels)
+            .filter(|label| schema_fields.contains(label))
+            .map(col)
             .collect();
         df = match df.select(selected_cols) {
             Ok(df) => df,
@@ -186,10 +175,9 @@ pub(crate) fn apply_time_window(
         && (((end - start) / step) + 1) < OPTIMIZATION_MAX_STEPS;
     if use_optimization {
         let num_steps = ((end - start) / step) + 1;
-        let eval_timestamps: Vec<i64> = (0..num_steps).map(|i| start + (step * i)).collect();
-
         let mut conditions: Vec<Expr> = Vec::new();
-        for &eval_ts in &eval_timestamps {
+        for i in 0..num_steps {
+            let eval_ts = start + (step * i);
             let window_start = eval_ts - lookback;
             let window_end = eval_ts;
 

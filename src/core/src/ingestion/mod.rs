@@ -285,9 +285,17 @@ pub async fn write_file(
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
 ) -> Result<RequestStats> {
-    let mut req_stats = RequestStats::default();
-    let entries = buf
-        .into_iter()
+    let entries = schema_records_to_entries(org_id, stream_name, buf);
+    write_entries(writer, stream_name, entries, fsync).await
+}
+
+/// One WAL entry per non-empty partition of `buf`.
+pub fn schema_records_to_entries(
+    org_id: &str,
+    stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+) -> Vec<ingester::Entry> {
+    buf.into_iter()
         .filter_map(|(hour_key, entry)| {
             if entry.records.is_empty() {
                 None
@@ -304,10 +312,26 @@ pub async fn write_file(
                 })
             }
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+/// An entry carrying a `batch` counts its rows from the batch, not from `data`.
+pub async fn write_entries(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+) -> Result<RequestStats> {
+    let mut req_stats = RequestStats::default();
     let (entries_records, entries_size) = entries
         .iter()
-        .map(|entry| (entry.data.len(), entry.data_size))
+        .map(|entry| {
+            let rows = entry
+                .batch
+                .as_ref()
+                .map_or(entry.data.len(), |batch| batch.num_rows());
+            (rows, entry.data_size)
+        })
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });

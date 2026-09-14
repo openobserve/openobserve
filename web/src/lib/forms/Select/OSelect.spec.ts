@@ -17,7 +17,7 @@ describe("OSelect", () => {
   });
 
   it.each([
-    ["sm", "h-6"],
+    ["sm", "h-[2.125rem]"],
     ["md", "h-[2.125rem]"],
   ] as const)("sizes the trigger for %s", (size, expected) => {
     wrapper = mount(OSelect, { props: { size } });
@@ -168,6 +168,54 @@ describe("OSelect", () => {
     expect(wrapper.emitted("create")).toBeFalsy();
   });
 
+  describe("opening a large single-select scrolls to the current value", () => {
+    // Regression for a virtualised 48-option time-of-day picker always opening
+    // scrolled to its first entry: single-select now seeds highlightedIndex
+    // with the selected option and scrolls the virtualizer to it on open.
+    const MANY_OPTIONS = Array.from({ length: 48 }, (_, i) => ({
+      label: `Option ${i}`,
+      value: i,
+    }));
+
+    it("does not throw when the selected value is deep in the list", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: 24, options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      // Popover opened successfully (search input mounted) and nothing threw
+      // while resolving/scrolling to the selected index.
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+
+    it("does not throw when the current value has no matching option", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: "not-an-option", options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+
+    it("still resets the multi-select highlight on open instead of scrolling to a single value", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: { modelValue: [24], multiple: true, options: MANY_OPTIONS },
+      });
+      await wrapper.find("button").trigger("click");
+      await flushPromises();
+
+      const input = document.body.querySelector('input[placeholder="Search..."]');
+      expect(input).not.toBeNull();
+    });
+  });
+
   describe("trigger keyboard focus behavior", () => {
     // The listbox-mode trigger must expose role="combobox" so the global
     // shortcut manager's isInputFocused() guard treats a focused select as a
@@ -215,6 +263,36 @@ describe("OSelect", () => {
         },
       });
       await wrapper.find("button").trigger("keydown", { key: "s", ctrlKey: true });
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+    });
+
+    // A caller driving the trigger programmatically (an empty state's "add"
+    // action landing the cursor in the field) wants more than a focus ring —
+    // it wants the picker actually open, the same as a click would.
+    it("opens the dropdown when focus() is called programmatically", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+    });
+
+    it("does not open a disabled select", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          disabled: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
       await flushPromises();
       expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
     });

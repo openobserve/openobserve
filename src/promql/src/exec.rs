@@ -104,7 +104,7 @@ impl PromqlContext {
                         .into_iter()
                         .filter_map(|range_val| {
                             range_val.samples.first().map(|sample| InstantValue {
-                                labels: range_val.labels.clone(),
+                                labels: range_val.labels,
                                 sample: *sample,
                             })
                         })
@@ -126,21 +126,11 @@ impl PromqlContext {
             match value {
                 Value::Float(scalar_val) => {
                     // Generate samples for each time point
-                    let timestamps = eval_ctx.timestamps();
-                    let samples: Vec<Sample> = timestamps
-                        .into_iter()
-                        .map(|ts| Sample::new(ts, scalar_val))
-                        .collect();
-
                     // Create a matrix with a single series containing all time points
-                    let range_value = RangeValue {
-                        labels: Labels::default(),
-                        samples,
-                        exemplars: None,
-                        time_window: None,
-                    };
-
-                    (Value::Matrix(vec![range_value]), Some("matrix".to_string()))
+                    (
+                        crate::functions::vector(Value::Float(scalar_val), &eval_ctx)?,
+                        Some("matrix".to_string()),
+                    )
                 }
                 Value::None => (Value::None, Some("matrix".to_string())),
                 other @ Value::Matrix(_) => (other, Some("matrix".to_string())),
@@ -174,7 +164,6 @@ impl PromqlContext {
         // pick all selectors from stmt
         let mut visitor = MetricSelectorVisitor::default();
         promql_parser::util::walk_expr(&mut visitor, &stmt.expr).unwrap();
-        let _selectors = visitor.exprs_to_string();
 
         let ctx = Arc::new(self.clone());
 
@@ -197,10 +186,10 @@ impl PromqlContext {
                     drop(permit);
                     ret
                 });
-            tasks.push((time, task));
+            tasks.push(task);
         }
 
-        for (_time, ret) in tasks {
+        for ret in tasks {
             let (result, _result_type_exec) = match ret.await {
                 Ok(Ok((value, result_type))) => (value, result_type),
                 Ok(Err(e)) => {
@@ -226,22 +215,16 @@ impl PromqlContext {
 
         // merge data
         let mut merged_data = HashMap::new();
-        let mut merged_metrics = HashMap::new();
         for value in instant_vectors {
-            merged_data
+            let (labels, exemplars) = merged_data
                 .entry(signature(&value.labels))
-                .or_insert_with(Vec::new)
-                .extend(value.exemplars.unwrap_or_default());
-            merged_metrics.insert(signature(&value.labels), value.labels);
+                .or_insert_with(|| (Labels::default(), Vec::new()));
+            *labels = value.labels;
+            exemplars.extend(value.exemplars.unwrap_or_default());
         }
         let merged_data = merged_data
-            .into_iter()
-            .map(|(sig, exemplars)| {
-                RangeValue::new_with_exemplars(
-                    merged_metrics.get(&sig).unwrap().to_owned(),
-                    exemplars,
-                )
-            })
+            .into_values()
+            .map(|(labels, exemplars)| RangeValue::new_with_exemplars(labels, exemplars))
             .collect::<Vec<_>>();
 
         // sort data

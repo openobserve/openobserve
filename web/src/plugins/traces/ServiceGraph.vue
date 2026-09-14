@@ -1,7 +1,7 @@
 ﻿<template>
   <OCard class="flex h-full flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="flex items-center gap-2 p-1.5 pb-0">
+    <div class="flex items-center gap-2 p-1.5 pb-0 max-lg:flex-wrap max-lg:gap-y-1">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
       <div
@@ -27,7 +27,7 @@
       <div v-if="!hideSearchInput" data-test="service-graph-search-input">
         <OSearchInput
           v-model="searchFilter"
-          class="w-56!"
+          class="w-56! max-lg:w-40!"
           :placeholder="t('traces.serviceGraph.searchPlaceholder')"
           :debounce="300"
           @update:model-value="applyFilters"
@@ -39,21 +39,29 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem]"
+        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem] max-lg:max-w-full max-lg:flex-wrap max-lg:gap-y-1.5"
       >
-        <div data-test="sg-legend" class="flex min-w-0 flex-row items-center gap-3">
-          <!-- Border Color -->
-          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap">
+        <div
+          data-test="sg-legend"
+          class="flex min-w-0 flex-row items-center gap-3 max-lg:flex-wrap max-lg:gap-y-1"
+          :title="
+            isMobile
+              ? `${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`
+              : undefined
+          "
+        >
+          <div class="text-text-label! mb-0! text-xs font-bold whitespace-nowrap max-md:hidden">
             {{ t("traces.serviceGraph.borderColor") }}
             <span class="font-normal opacity-55"
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
             >
           </div>
-          <div class="flex! flex-row gap-2">
+          <div class="flex! flex-row gap-2 max-lg:flex-wrap max-lg:gap-y-1">
             <div
               v-for="level in healthLevels"
               :key="level.key"
               class="flex flex-none flex-row items-center gap-1.5"
+              :title="isMobile ? `${level.label} ${level.range}` : undefined"
               :data-test="`sg-legend-${level.key}`"
             >
               <span
@@ -69,12 +77,12 @@
                 <div class="text-text-secondary! text-left text-xs font-semibold">
                   {{ level.label }}
                 </div>
-                <div class="text-3xs text-left opacity-55">{{ level.range }}</div>
+                <div class="text-3xs text-left opacity-55 max-md:hidden">{{ level.range }}</div>
               </div>
             </div>
           </div>
         </div>
-        <OSeparator vertical class="mx-1 self-stretch" />
+        <OSeparator vertical class="mx-1 self-stretch max-md:hidden" />
         <!-- Inventory chip: total entity count. Click to expand the per-kind
              distribution (read-only; the show/hide toggles live in "Show types"). -->
         <ODropdown side="bottom" align="start">
@@ -365,6 +373,7 @@ import {
 import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import serviceGraphService from "@/services/service_graph";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import ServiceGraphSidePanel from "./ServiceGraphNodeSidePanel.vue";
@@ -502,6 +511,7 @@ export default defineComponent({
     const store = useStore();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const { getStreams } = useStreams(t);
     const { searchObj } = useTraces();
 
@@ -1892,6 +1902,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       raw,
       t,
       loading,
