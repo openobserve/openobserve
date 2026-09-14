@@ -454,7 +454,9 @@ impl MaterializeBudget {
 
 /// Removes every marker from a plan fragment, so a fragment shipped to a follower never carries
 /// one.
-pub fn strip_markers(plan: Arc<dyn ExecutionPlan>) -> Result<Arc<dyn ExecutionPlan>> {
+pub fn strip_shared_subplan_markers(
+    plan: Arc<dyn ExecutionPlan>,
+) -> Result<Arc<dyn ExecutionPlan>> {
     plan.transform_up(
         |node| match node.downcast_ref::<SharedSubplanMarkerExec>() {
             Some(marker) => Ok(Transformed::yes(Arc::clone(marker.input()))),
