@@ -58,7 +58,7 @@ const AGG_PARALLEL_CHUNK: usize = 32768;
 /// Trait for PromQL aggregation operators.
 ///
 /// One implementation per operator (`sum`, `avg`, `min`, `max`, `count`, `group`, `stddev`,
-/// `stdvar`, `quantile`, `topk`/`bottomk`) shared by both evaluation paths: the generic path
+/// `stdvar`, `topk`/`bottomk`) shared by both evaluation paths: the generic path
 /// folds a materialized matrix through it in [`eval_aggregate`], and the streaming path folds
 /// each hash partition of a series stream through it in `streaming_eval::aggregate`. The
 /// operator carries only its parameter (k, φ), if any; all per-group state lives in the
@@ -127,8 +127,12 @@ pub trait AggFunc: Sync {
 ///
 /// ```ignore
 /// let mut acc = Sum.build(timestamps.len());
+/// let grid = EvalGrid::new(&eval_ctx, timestamps.len());
 /// for series in matrix {
-///     acc.push_series(series.values(), || series.labels.clone());
+///     let values = series.samples.iter().filter_map(|sample| {
+///         grid.slot(sample.timestamp).map(|slot| (slot, sample.value))
+///     });
+///     acc.push_series(values, || series.labels.clone());
 /// }
 /// let series: Vec<RangeValue> = acc.evaluate(group_labels, &timestamps);
 /// ```

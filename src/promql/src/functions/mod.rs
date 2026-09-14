@@ -417,10 +417,11 @@ where
             }
             let time_window = metric.time_window.as_ref().unwrap();
             let range = time_window.range;
-            let result_samples: Vec<Sample> =
+            let mut result_samples = Vec::with_capacity(timestamps.len());
+            result_samples.extend(
                 SeriesRange::new(&metric.samples, &func, range, eval_ctx, &timestamps)
-                    .map(|(slot, value)| Sample::new(timestamps[slot], value))
-                    .collect();
+                    .map(|(slot, value)| Sample::new(timestamps[slot], value)),
+            );
 
             if !result_samples.is_empty() {
                 Some(RangeValue {

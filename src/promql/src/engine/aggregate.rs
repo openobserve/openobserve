@@ -85,35 +85,6 @@ impl Engine {
         }
     }
 
-    /// The aggregation folded with its range function when the shape allows it; `None` leaves
-    /// it to the generic fold.
-    async fn fused_agg(
-        &mut self,
-        agg_op: AggOp,
-        expr: &PromExpr,
-        modifier: &Option<LabelModifier>,
-    ) -> Result<Option<Value>> {
-        let Some(shape) = fused_agg_shape(expr) else {
-            return Ok(None);
-        };
-        if let Some((selector, range)) = shape.selector {
-            let range = range.unwrap_or_else(|| self.ctx.lookback());
-            if let Some(value) = self
-                .try_streaming_fused_agg(selector, range, modifier, shape.func.clone(), agg_op)
-                .await?
-            {
-                return Ok(Some(value));
-            }
-        }
-        let Some(range_arg) = shape.range_arg else {
-            return Ok(None);
-        };
-        let range_input = self.exec_expr(range_arg).await?;
-        self.materialized_fused_agg(modifier, range_input, shape.func, agg_op)
-            .await
-            .map(Some)
-    }
-
     /// The fused fold over an already-materialized matrix, bounded by the query timeout.
     pub(super) async fn materialized_fused_agg(
         &self,
@@ -142,6 +113,33 @@ impl Engine {
                     ))
                 })??;
         Ok(value)
+    }
+
+    async fn fused_agg(
+        &mut self,
+        agg_op: AggOp,
+        expr: &PromExpr,
+        modifier: &Option<LabelModifier>,
+    ) -> Result<Option<Value>> {
+        let Some(shape) = fused_agg_shape(expr) else {
+            return Ok(None);
+        };
+        if let Some((selector, range)) = shape.selector {
+            let range = range.unwrap_or_else(|| self.ctx.lookback());
+            if let Some(value) = self
+                .try_streaming_fused_agg(selector, range, modifier, shape.func.clone(), agg_op)
+                .await?
+            {
+                return Ok(Some(value));
+            }
+        }
+        let Some(range_arg) = shape.range_arg else {
+            return Ok(None);
+        };
+        let range_input = self.exec_expr(range_arg).await?;
+        self.materialized_fused_agg(modifier, range_input, shape.func, agg_op)
+            .await
+            .map(Some)
     }
 }
 

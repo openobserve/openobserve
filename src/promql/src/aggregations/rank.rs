@@ -30,6 +30,26 @@ pub(crate) struct Rank {
     is_bottom: bool,
 }
 
+/// One bounded heap per slot: memory is `slots × k` whatever the series count.
+pub(crate) struct RankAccumulator {
+    k: usize,
+    is_bottom: bool,
+    heaps: Vec<BinaryHeap<Ranked>>,
+}
+
+/// One series' labels and their signature, read from the source once, on first use.
+struct SeriesIdentity<L> {
+    labels: Option<L>,
+    memo: Option<(Arc<Labels>, u64)>,
+}
+
+struct Ranked {
+    value: f64,
+    signature: u64,
+    labels: Arc<Labels>,
+    is_bottom: bool,
+}
+
 impl Rank {
     pub(crate) fn new(k: usize, is_bottom: bool) -> Self {
         Self { k, is_bottom }
@@ -52,16 +72,7 @@ impl AggFunc for Rank {
     }
 }
 
-/// One bounded heap per slot: memory is `slots × k` whatever the series count.
-pub(crate) struct RankAccumulator {
-    k: usize,
-    is_bottom: bool,
-    heaps: Vec<BinaryHeap<Ranked>>,
-}
-
 impl RankAccumulator {
-    /// Whether an arrival beats the worst of a full heap; an empty heap with room admits all,
-    /// and the signature is asked for only when the values tie.
     fn admits(&self, slot: usize, value: f64, signature: impl FnOnce() -> u64) -> bool {
         let heap = &self.heaps[slot];
         if heap.len() < self.k {
@@ -128,7 +139,7 @@ impl Accumulate for RankAccumulator {
         // one series is one shared label set, and slots come in order, so its samples ascend
         let mut winners: HashMap<*const Labels, (Arc<Labels>, Vec<Sample>)> = HashMap::new();
         for (slot, heap) in self.heaps.into_iter().enumerate() {
-            for entry in heap.into_sorted_vec() {
+            for entry in heap {
                 winners
                     .entry(Arc::as_ptr(&entry.labels))
                     .or_insert_with(|| (entry.labels, Vec::new()))
@@ -148,12 +159,6 @@ impl Accumulate for RankAccumulator {
     }
 }
 
-/// One series' labels and their signature, read from the source once, on first use.
-struct SeriesIdentity<L> {
-    labels: Option<L>,
-    memo: Option<(Arc<Labels>, u64)>,
-}
-
 impl<L: FnOnce() -> Labels> SeriesIdentity<L> {
     fn new(labels: L) -> Self {
         Self {
@@ -169,16 +174,6 @@ impl<L: FnOnce() -> Labels> SeriesIdentity<L> {
             (Arc::new(labels), signature)
         })
     }
-}
-
-/// A series' value at one evaluation slot; the heap keeps the k best and its top is the worst
-/// of them, so a better arrival pops it. Ties go to the lower label signature, which is stable
-/// across runs where the load order of the series is not.
-struct Ranked {
-    value: f64,
-    signature: u64,
-    labels: Arc<Labels>,
-    is_bottom: bool,
 }
 
 impl Ranked {
@@ -207,16 +202,18 @@ impl Ord for Ranked {
     }
 }
 
-/// Less is better; greater = worse keeps NaN below every number, as `sort_float` orders them.
+// Less is better; NaN loses to every numeric value in either direction.
 fn rank_cmp(is_bottom: bool, left: (f64, u64), right: (f64, u64)) -> Ordering {
     rank_values(is_bottom, left.0, right.0).then_with(|| left.1.cmp(&right.1))
 }
 
 fn rank_values(is_bottom: bool, left: f64, right: f64) -> Ordering {
-    if is_bottom {
-        sort_float(&left, &right)
-    } else {
-        sort_float(&right, &left)
+    match (left.is_nan(), right.is_nan()) {
+        (true, true) => Ordering::Equal,
+        (true, false) => Ordering::Greater,
+        (false, true) => Ordering::Less,
+        (false, false) if is_bottom => sort_float(&left, &right),
+        (false, false) => sort_float(&right, &left),
     }
 }
 
@@ -252,6 +249,28 @@ mod tests {
             .collect();
         rows.sort_by(|a, b| a.0.cmp(&b.0));
         rows
+    }
+
+    #[test]
+    fn test_rank_nan_loses_to_numbers_in_either_arrival_order() {
+        for is_bottom in [false, true] {
+            for numeric in [f64::NEG_INFINITY, -1.0, 0.0, f64::INFINITY] {
+                for values in [[f64::NAN, numeric], [numeric, f64::NAN]] {
+                    let mut acc = Rank::new(1, is_bottom).build(1);
+                    for (index, value) in values.into_iter().enumerate() {
+                        acc.push_series(std::iter::once((0, value)), || {
+                            vec![Arc::new(Label::new("s", &index.to_string()))]
+                        });
+                    }
+                    let result = acc.evaluate(vec![], &[10]);
+                    assert_eq!(result.len(), 1);
+                    assert_eq!(result[0].samples[0].value, numeric);
+                }
+            }
+            let mut acc = Rank::new(1, is_bottom).build(1);
+            acc.push_series(std::iter::once((0, f64::NAN)), Vec::new);
+            assert!(acc.evaluate(vec![], &[10])[0].samples[0].value.is_nan());
+        }
     }
 
     #[test]
@@ -325,8 +344,6 @@ mod tests {
         );
     }
 
-    /// The bounded heaps pick exactly what a full per-slot sort by (value, signature) picks,
-    /// with NaN ranking below every number and ties going to the lower label signature.
     #[test]
     fn test_rank_bounded_heap_matches_full_ranking() {
         let ts: Vec<i64> = (0..4).map(|i| 1_000 + i * 10).collect();
@@ -381,13 +398,12 @@ mod tests {
                     assert_eq!(x.1.to_bits(), y.1.to_bits());
                 }
             }
-            // the NaN never wins a top slot and always wins a bottom slot it competes in
             let a_slots: Vec<i64> = actual
                 .iter()
                 .find(|(n, _)| n == "a")
                 .map(|(_, t)| t.iter().map(|x| x.0).collect())
                 .unwrap_or_default();
-            assert_eq!(a_slots.contains(&1_020), is_bottom);
+            assert!(!a_slots.contains(&1_020));
         }
     }
 
@@ -424,8 +440,6 @@ mod tests {
         }
     }
 
-    /// Two series with the same labels are two winners, as the generic ranking keyed by series
-    /// index produced.
     #[test]
     fn test_rank_keeps_duplicate_label_sets_apart() {
         let eval_ctx = EvalContext::new(1_000, 1_010, 10, "test".to_string());
@@ -446,8 +460,6 @@ mod tests {
         );
     }
 
-    /// Every chunking of the series, merged in order, ranks exactly like the sequential fold;
-    /// a series is pushed whole, so the chunks split series, not values.
     #[test]
     fn test_rank_merges_like_the_sequential_fold() {
         let series: Vec<(Labels, Vec<(usize, f64)>)> = [
