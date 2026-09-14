@@ -106,25 +106,12 @@ onMounted(async () => {
   const rows = ((res.data.checks ?? []) as ListRow[]).filter(
     (r) => r.type === "browser" && r.id !== props.ownCheckId,
   );
-  // Nesting is one level deep, so a check that already holds a reference cannot be picked.
-  const eligible = rows.filter((r) => !((r.references ?? 0) > 0));
-  const ineligible = rows.filter((r) => (r.references ?? 0) > 0);
-  const next: SelectOption[] = [];
-  if (eligible.length > 0) {
-    next.push({ header: true, label: t("synthetics.journey.subtest.pickGroupEligible") });
-    next.push(...eligible.map(rowOption));
-  }
-  if (ineligible.length > 0) {
-    next.push({ header: true, label: t("synthetics.journey.subtest.pickGroupIneligible") });
-    next.push(
-      ...ineligible.map((r) => ({
-        ...rowOption(r),
-        disabled: true,
-        subLabel: t("synthetics.journey.subtest.pickNested"),
-      })),
-    );
-  }
-  options.value = next;
+  // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
+  options.value = rows.map((r) =>
+    (r.references ?? 0) > 0
+      ? { ...rowOption(r), disabled: true, subLabel: t("synthetics.journey.subtest.pickNested") }
+      : rowOption(r),
+  );
   isEmpty.value = rows.length === 0;
 });
 
