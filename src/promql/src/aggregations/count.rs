@@ -15,7 +15,7 @@
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc, SeriesKey, group_series};
+use crate::aggregations::{Accumulate, AggFunc, group_series};
 
 #[derive(Clone, Copy)]
 pub struct Count;
@@ -38,9 +38,21 @@ pub struct CountAccumulate {
     counts: Vec<u64>,
 }
 
-impl Accumulate for CountAccumulate {
-    fn push(&mut self, slot: usize, _value: f64, _series: &SeriesKey<'_>) {
+impl CountAccumulate {
+    fn push(&mut self, slot: usize, _value: f64) {
         self.counts[slot] += 1;
+    }
+}
+
+impl Accumulate for CountAccumulate {
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {

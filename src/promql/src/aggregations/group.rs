@@ -15,7 +15,7 @@
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc, SeriesKey, group_series};
+use crate::aggregations::{Accumulate, AggFunc, group_series};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
 #[derive(Clone, Copy)]
@@ -39,9 +39,21 @@ pub struct GroupAccumulate {
     present: Vec<bool>,
 }
 
-impl Accumulate for GroupAccumulate {
-    fn push(&mut self, slot: usize, _value: f64, _series: &SeriesKey<'_>) {
+impl GroupAccumulate {
+    fn push(&mut self, slot: usize, _value: f64) {
         self.present[slot] = true;
+    }
+}
+
+impl Accumulate for GroupAccumulate {
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {

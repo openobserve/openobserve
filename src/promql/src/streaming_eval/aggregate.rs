@@ -26,7 +26,7 @@ use hashbrown::{HashMap, hash_map::Entry};
 use super::{evaluate_partitions, range_expr::RangeExpr};
 use crate::{
     aggregations::{
-        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, SeriesKey, Stddev, Stdvar, Sum,
+        Accumulate, AggFunc, AggOp, Avg, Count, Group, Max, Min, Rank, Stddev, Stdvar, Sum,
     },
     series_stream::SeriesStream,
 };
@@ -51,6 +51,7 @@ where
 {
     match op {
         AggOp::Avg => aggregate_with(sources, Avg, eval).await,
+        AggOp::Bottomk(k) => aggregate_with(sources, Rank::new(k, true), eval).await,
         AggOp::Count => aggregate_with(sources, Count, eval).await,
         AggOp::Group => aggregate_with(sources, Group, eval).await,
         AggOp::Max => aggregate_with(sources, Max, eval).await,
@@ -58,6 +59,7 @@ where
         AggOp::Stddev => aggregate_with(sources, Stddev, eval).await,
         AggOp::Stdvar => aggregate_with(sources, Stdvar, eval).await,
         AggOp::Sum => aggregate_with(sources, Sum, eval).await,
+        AggOp::Topk(k) => aggregate_with(sources, Rank::new(k, false), eval).await,
     }
 }
 
@@ -106,18 +108,19 @@ async fn aggregate_partial<A: AggFunc, S: SeriesStream>(
 ) -> Result<(GroupAccs<A::Accumulator>, usize)> {
     let mut groups = GroupAccs::new();
     let mut series_count = 0;
+    let mut samples = Vec::new();
     while let Some(sig) = source.advance().await? {
-        let GroupEntry { labels, acc } = match groups.entry(sig) {
+        let entry = match groups.entry(sig) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(GroupEntry {
                 labels: source.labels(),
                 acc: func.build(eval.timestamps.len()),
             }),
         };
-        let samples = source.consume().await?;
-        // the stream exposes only the group projection of a series' labels
-        let series = SeriesKey { labels };
-        eval.evaluate(samples, |slot, value| acc.push(slot, value, &series));
+        source.consume(&mut samples).await?;
+        entry
+            .acc
+            .push_series(eval.values(&samples), || source.labels());
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -167,7 +170,7 @@ mod tests {
         time::Duration,
     };
 
-    use config::meta::promql::value::{EvalContext, Label, Labels, Sample, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Label, Labels, Sample, TimeWindow, signature};
     use datafusion::error::DataFusionError;
     use promql_parser::parser::LabelModifier;
 
@@ -176,12 +179,9 @@ mod tests {
         *,
     };
     use crate::{
-        aggregations,
         functions::{self, RangeFunc},
         series_stream::matrix::{MATRIX_PARTITION_CHUNK, group_sources},
     };
-
-    type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
 
     /// Errors on its first series.
     struct FailingStream;
@@ -193,8 +193,8 @@ mod tests {
         fn labels(&mut self) -> Labels {
             Labels::default()
         }
-        async fn consume(&mut self) -> Result<&[Sample]> {
-            Ok(&[])
+        async fn consume(&mut self, _samples: &mut Vec<Sample>) -> Result<()> {
+            Ok(())
         }
     }
 
@@ -211,8 +211,9 @@ mod tests {
         fn labels(&mut self) -> Labels {
             Labels::default()
         }
-        async fn consume(&mut self) -> Result<&[Sample]> {
-            Ok(&self.samples)
+        async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
+            samples.clone_from(&self.samples);
+            Ok(())
         }
     }
 
@@ -275,9 +276,39 @@ mod tests {
         ]
     }
 
+    /// Every operator the fused fold covers.
+    fn all_ops() -> Vec<AggOp> {
+        vec![
+            AggOp::Avg,
+            AggOp::Bottomk(1),
+            AggOp::Bottomk(2),
+            AggOp::Count,
+            AggOp::Group,
+            AggOp::Max,
+            AggOp::Min,
+            AggOp::Stddev,
+            AggOp::Stdvar,
+            AggOp::Sum,
+            AggOp::Topk(1),
+            AggOp::Topk(3),
+        ]
+    }
+
     /// The generic evaluator over the same table the fused path resolves names through.
     fn range_eval(name: &str, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
         functions::eval_range(data, functions::fusable_range_func(name).unwrap(), eval_ctx)
+    }
+
+    /// The generic path: the range function over the whole matrix, then the aggregation.
+    fn run_generic(
+        modifier: &Option<LabelModifier>,
+        matrix: Vec<RangeValue>,
+        func_name: &str,
+        op: AggOp,
+        eval_ctx: &EvalContext,
+    ) -> Result<Value> {
+        let input = range_eval(func_name, Value::Matrix(matrix), eval_ctx)?;
+        op.eval_aggregate(modifier, input, eval_ctx)
     }
 
     async fn run_materialized(
@@ -288,40 +319,19 @@ mod tests {
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        let (sources, range) = group_sources(Value::Matrix(matrix), modifier, func_name)?
-            .expect("the test matrix is not empty");
+        let (sources, range) = group_sources(
+            Value::Matrix(matrix),
+            modifier,
+            func_name,
+            op.needs_series_labels(),
+        )?
+        .expect("the test matrix is not empty");
         let eval = Arc::new(RangeExpr::new(func, range, eval_ctx));
         aggregate(sources, op, eval).await.map(|(value, _)| value)
     }
 
     #[tokio::test]
     async fn test_fused_range_agg_matches_generic_for_all_pairs() {
-        let agg_cases: [(AggOp, GenericAgg); 8] = [
-            (AggOp::Avg, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
-            }),
-            (AggOp::Count, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
-            }),
-            (AggOp::Group, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
-            }),
-            (AggOp::Max, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
-            }),
-            (AggOp::Min, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
-            }),
-            (AggOp::Stddev, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
-            }),
-            (AggOp::Stdvar, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
-            }),
-            (AggOp::Sum, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
-            }),
-        ];
         let range_cases = [
             "avg_over_time",
             "changes",
@@ -349,12 +359,11 @@ mod tests {
 
         let eval_ctx = eval_ctx();
         let matrix = test_matrix();
-        for (op, generic_agg) in agg_cases {
+        for op in all_ops() {
             for func_name in range_cases {
                 for modifier in &modifiers {
-                    let generic_input =
-                        range_eval(func_name, Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
-                    let expected = generic_agg(modifier, generic_input, &eval_ctx).unwrap();
+                    let expected =
+                        run_generic(modifier, matrix.clone(), func_name, op, &eval_ctx).unwrap();
 
                     let actual =
                         run_materialized(modifier, matrix.clone(), func_name, op, &eval_ctx)
@@ -394,37 +403,10 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let agg_cases: [(AggOp, GenericAgg); 8] = [
-            (AggOp::Avg, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
-            }),
-            (AggOp::Count, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Count, eval_ctx)
-            }),
-            (AggOp::Group, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Group, eval_ctx)
-            }),
-            (AggOp::Max, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Max, eval_ctx)
-            }),
-            (AggOp::Min, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Min, eval_ctx)
-            }),
-            (AggOp::Stddev, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Stddev, eval_ctx)
-            }),
-            (AggOp::Stdvar, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Stdvar, eval_ctx)
-            }),
-            (AggOp::Sum, |modifier, input, eval_ctx| {
-                aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
-            }),
-        ];
-        for (op, generic_agg) in agg_cases {
+        for op in all_ops() {
             for modifier in [None, by(&["path"])] {
-                let generic_input =
-                    range_eval("sum_over_time", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
-                let expected = generic_agg(&modifier, generic_input, &eval_ctx).unwrap();
+                let expected =
+                    run_generic(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx).unwrap();
                 let first = canonical_matrix(
                     run_materialized(&modifier, matrix.clone(), "sum_over_time", op, &eval_ctx)
                         .await
@@ -471,23 +453,10 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        for (op, generic_agg) in [
-            (
-                AggOp::Sum,
-                (|modifier, input, eval_ctx| {
-                    aggregations::eval_aggregate(modifier, input, aggregations::Sum, eval_ctx)
-                }) as GenericAgg,
-            ),
-            (
-                AggOp::Avg,
-                (|modifier, input, eval_ctx| {
-                    aggregations::eval_aggregate(modifier, input, aggregations::Avg, eval_ctx)
-                }) as GenericAgg,
-            ),
-        ] {
-            let generic_input =
-                range_eval("rate", Value::Matrix(matrix.clone()), &eval_ctx).unwrap();
-            let expected = canonical_matrix(generic_agg(&None, generic_input, &eval_ctx).unwrap());
+        for op in [AggOp::Sum, AggOp::Avg] {
+            let expected = canonical_matrix(
+                run_generic(&None, matrix.clone(), "rate", op, &eval_ctx).unwrap(),
+            );
             let actual = canonical_matrix(
                 run_materialized(&None, matrix.clone(), "rate", op, &eval_ctx)
                     .await
@@ -552,5 +521,220 @@ mod tests {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
         panic!("the endless source was not aborted");
+    }
+
+    /// One partition of series keyed by their `by()` signature, carrying the labels the
+    /// projection asks for: the full set, or the group's.
+    struct VecStream {
+        series: std::vec::IntoIter<RangeValue>,
+        current: Option<RangeValue>,
+        modifier: Option<LabelModifier>,
+        series_labels: bool,
+    }
+
+    impl SeriesStream for VecStream {
+        async fn advance(&mut self) -> Result<Option<u64>> {
+            self.current = self.series.next();
+            Ok(self.current.as_ref().map(|series| {
+                signature(&crate::aggregations::projected_labels(
+                    &self.modifier,
+                    &series.labels,
+                ))
+            }))
+        }
+
+        fn labels(&mut self) -> Labels {
+            let series = self.current.as_ref().expect("a series is current");
+            if self.series_labels {
+                return series.labels.clone();
+            }
+            crate::aggregations::projected_labels(&self.modifier, &series.labels)
+        }
+
+        async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
+            let series = self.current.as_mut().expect("a series is current");
+            *samples = std::mem::take(&mut series.samples);
+            Ok(())
+        }
+    }
+
+    /// Ties across series, a NaN, a counter reset, and a series alone in its group.
+    fn rank_matrix() -> Vec<RangeValue> {
+        let series = |instance, values: [f64; 6]| {
+            make_series(
+                "requests_total",
+                instance,
+                if ["a", "b", "c"].contains(&instance) {
+                    "/one"
+                } else if instance == "z" {
+                    "/zzz"
+                } else {
+                    "/two"
+                },
+                &[10, 50, 70, 110, 130, 170]
+                    .into_iter()
+                    .zip(values)
+                    .collect::<Vec<_>>(),
+            )
+        };
+        vec![
+            series("a", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+            series("b", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+            series("c", [0.5, 9.0, 9.5, 1.0, 1.5, 2.0]),
+            series("d", [2.0, 2.0, f64::NAN, 2.0, 2.0, 2.0]),
+            series("e", [3.0, 1.0, 4.0, 1.0, 5.0, 9.0]),
+            series("f", [-1.0, -2.0, -3.0, -4.0, -5.0, -6.0]),
+            series("z", [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]),
+        ]
+    }
+
+    /// The matrix split into `partitions` round-robin, so groups straddle partitions.
+    fn partitioned_sources(
+        matrix: Vec<RangeValue>,
+        partitions: usize,
+        modifier: &Option<LabelModifier>,
+        series_labels: bool,
+    ) -> Vec<std::future::Ready<Result<VecStream>>> {
+        let mut parts: Vec<Vec<RangeValue>> = (0..partitions).map(|_| Vec::new()).collect();
+        for (index, series) in matrix.into_iter().enumerate() {
+            parts[index % partitions].push(series);
+        }
+        parts
+            .into_iter()
+            .map(|part| {
+                std::future::ready(Ok(VecStream {
+                    series: part.into_iter(),
+                    current: None,
+                    modifier: modifier.clone(),
+                    series_labels,
+                }))
+            })
+            .collect()
+    }
+
+    /// Series without the metric name, as the range function output the generic path folds.
+    fn streamed_input(matrix: Vec<RangeValue>, func_name: &str) -> Vec<RangeValue> {
+        let mut matrix = matrix;
+        if func_name != functions::KEEP_METRIC_NAME_FUNC {
+            for series in &mut matrix {
+                series.labels.retain(|label| label.name != "__name__");
+            }
+        }
+        matrix
+    }
+
+    async fn run_partitioned(
+        matrix: Vec<RangeValue>,
+        partitions: usize,
+        func_name: &str,
+        op: AggOp,
+        modifier: &Option<LabelModifier>,
+    ) -> Value {
+        let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
+        let range = Duration::from_secs(60);
+        let eval = Arc::new(RangeExpr::new(func, range, &eval_ctx()));
+        let sources = partitioned_sources(
+            streamed_input(matrix.clone(), func_name),
+            partitions,
+            modifier,
+            op.needs_series_labels(),
+        );
+        let (value, count) = aggregate(sources, op, eval).await.unwrap();
+        assert_eq!(count, matrix.len());
+        value
+    }
+
+    /// Every operator over partitions that split its groups matches the generic path, so the
+    /// partial merges of every accumulator agree with the sequential fold.
+    #[tokio::test]
+    async fn test_fused_partitions_match_generic_for_all_ops() {
+        let modifiers = [
+            None,
+            by(&["path"]),
+            by(&["instance", "path"]),
+            by(&["nope"]),
+        ];
+        let mut ops = all_ops();
+        ops.extend([AggOp::Topk(0), AggOp::Topk(10), AggOp::Bottomk(10)]);
+        for func_name in ["rate", "last_over_time", "sum_over_time", "delta"] {
+            for &op in &ops {
+                for modifier in &modifiers {
+                    let expected = canonical_matrix(
+                        run_generic(modifier, rank_matrix(), func_name, op, &eval_ctx()).unwrap(),
+                    );
+                    for partitions in [1, 2, 3] {
+                        let actual = canonical_matrix(
+                            run_partitioned(rank_matrix(), partitions, func_name, op, modifier)
+                                .await,
+                        );
+                        let context = format!(
+                            "{op:?}({func_name}) over {partitions} partitions (modifier: {modifier:?})"
+                        );
+                        // a value buffer merged in partition order may drift in the last bits
+                        if op.needs_series_labels() {
+                            assert_eq!(expected, actual, "{context}");
+                        } else {
+                            assert_matrix_close(expected.clone(), actual, &context);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// `a`, `b` and `z` carry the same values everywhere, so `topk(1)` and `bottomk(1)` among
+    /// them fall entirely to the label signature.
+    #[tokio::test]
+    async fn test_fused_rank_ties_go_to_the_lower_signature() {
+        let tied: Vec<RangeValue> = streamed_input(rank_matrix(), "rate")
+            .into_iter()
+            .filter(|series| ["a", "b", "z"].contains(&series.labels[0].value.as_str()))
+            .collect();
+        let lowest = tied
+            .iter()
+            .min_by_key(|series| signature(&series.labels))
+            .map(|series| series.labels[0].value.clone())
+            .unwrap();
+        for op in [AggOp::Topk(1), AggOp::Bottomk(1)] {
+            let value = run_partitioned(tied.clone(), 2, "rate", op, &None).await;
+            let Value::Matrix(matrix) = value else {
+                panic!("expected a matrix");
+            };
+            assert_eq!(matrix.len(), 1, "{op:?}");
+            assert_eq!(matrix[0].labels[0].value, lowest, "{op:?}");
+            assert_eq!(matrix[0].samples.len(), 3, "{op:?}");
+            assert_eq!(
+                canonical_matrix(
+                    run_generic(&None, tied.clone(), "rate", op, &eval_ctx()).unwrap()
+                ),
+                canonical_matrix(Value::Matrix(matrix)),
+                "{op:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fused_rank_k_zero_and_no_series_are_none() {
+        let value = run_partitioned(rank_matrix(), 2, "rate", AggOp::Topk(0), &None).await;
+        assert!(matches!(value, Value::None));
+        let value = run_partitioned(vec![], 2, "rate", AggOp::Bottomk(3), &None).await;
+        assert!(matches!(value, Value::None));
+    }
+
+    /// No aggregation output carries a window, like the generic path.
+    #[tokio::test]
+    async fn test_fused_outputs_carry_no_window() {
+        for op in all_ops() {
+            let value = run_partitioned(rank_matrix(), 1, "rate", op, &None).await;
+            let Value::Matrix(matrix) = value else {
+                panic!("{op:?}: expected a matrix");
+            };
+            assert!(
+                matrix
+                    .iter()
+                    .all(|series| series.time_window.is_none() && series.exemplars.is_none()),
+                "{op:?}"
+            );
+        }
     }
 }

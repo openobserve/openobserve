@@ -15,7 +15,7 @@
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use super::{Accumulate, SeriesKey, group_series};
+use super::{Accumulate, group_series};
 use crate::common::{std_deviation, std_variance};
 
 pub struct DispersionAccumulator<const STDDEV: bool> {
@@ -28,11 +28,21 @@ impl<const STDDEV: bool> DispersionAccumulator<STDDEV> {
             values: vec![Vec::new(); slots],
         }
     }
+
+    fn push(&mut self, slot: usize, value: f64) {
+        self.values[slot].push(value);
+    }
 }
 
 impl<const STDDEV: bool> Accumulate for DispersionAccumulator<STDDEV> {
-    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
-        self.values[slot].push(value);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {
@@ -62,8 +72,6 @@ mod tests {
     #[test]
     fn test_dispersion_merge_preserves_slots_and_special_values() {
         fn check<const STDDEV: bool>() {
-            let labels = Labels::default();
-            let key = SeriesKey { labels: &labels };
             let mut left = DispersionAccumulator::<STDDEV>::new(6);
             let mut right = DispersionAccumulator::<STDDEV>::new(6);
             for (slot, a, b) in [
@@ -73,8 +81,8 @@ mod tests {
                 (3, f64::NAN, 1.0),
                 (4, f64::MAX, f64::MAX),
             ] {
-                left.push(slot, a, &key);
-                right.push(slot, b, &key);
+                left.push(slot, a);
+                right.push(slot, b);
             }
             left.merge(right);
             let mut series = left.evaluate(Labels::default(), &[1, 2, 3, 4, 5, 6]);
