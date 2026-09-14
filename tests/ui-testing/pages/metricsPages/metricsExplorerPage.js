@@ -390,6 +390,53 @@ export class MetricsExplorerPage {
             .toBeGreaterThan(0);
     }
 
+    /* ------------------------------------------------- a card, by metric name */
+
+    cardRoot(metric) {
+        return this.page.locator(`[data-test="metrics-explorer-card-${metric}"]`);
+    }
+
+    /** The inline "No data" tile — MetricCard's `isEmpty` branch. */
+    cardNoData(metric) {
+        return this.page.locator(`[data-test="metrics-explorer-card-nodata-${metric}"]`);
+    }
+
+    /**
+     * A DRAWN chart, not merely a mounted card: the preview renders through
+     * PanelSchemaRenderer, which paints into a canvas only once it has series.
+     * ECharts mounts more than one canvas per instance (zrender adds its own
+     * layers), so take the first rather than tripping strict mode.
+     */
+    cardChart(metric) {
+        return this.cardRoot(metric).locator('canvas').first();
+    }
+
+    /** The card's own ⟳ — the grid toolbar's Refresh is a different control. */
+    cardRefreshButton(metric) {
+        return this.page.locator(`[data-test="metrics-explorer-card-refresh-${metric}"]`);
+    }
+
+    async expectCardNoData(metric, timeout = 60000) {
+        await expect(
+            this.cardNoData(metric),
+            `${metric} should render the No-data tile`,
+        ).toBeVisible({ timeout });
+    }
+
+    /** Charted means BOTH: a canvas arrived and the No-data tile went away. */
+    async expectCardCharted(metric, timeout = 60000) {
+        await expect(this.cardChart(metric), `${metric} should render a chart`).toBeVisible({
+            timeout,
+        });
+        await expect(this.cardNoData(metric)).toBeHidden();
+    }
+
+    /** Hover first: the action row is collapsed at rest — see openFirstCardInVisualize. */
+    async refreshCard(metric) {
+        await this.cardRoot(metric).hover();
+        await this.cardRefreshButton(metric).click();
+    }
+
     /* ----------------------------------------------------------------- share */
 
     getShareButton() {
