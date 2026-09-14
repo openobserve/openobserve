@@ -23,9 +23,9 @@ use arrow::{
 use arrow_schema::{DataType, Field, Schema};
 use config::{cluster::LOCAL_NODE, meta::cluster::NodeInfo};
 use datafusion::{
-    common::{DataFusionError, Result, internal_err},
+    common::{DataFusionError, Result, internal_err, tree_node::TreeNodeRecursion},
     execution::TaskContext,
-    physical_expr::EquivalenceProperties,
+    physical_expr::{EquivalenceProperties, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, Distribution, ExecutionPlan, ExecutionPlanProperties,
         Partitioning, PlanProperties, SendableRecordBatchStream, execute_stream,
@@ -99,6 +99,13 @@ impl DisplayAs for DistributeAnalyzeExec {
 }
 
 impl ExecutionPlan for DistributeAnalyzeExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "DistributeAnalyzeExec"
     }

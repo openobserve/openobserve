@@ -83,6 +83,7 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
@@ -593,7 +594,7 @@ fn metrics_query_schema_with_utf8_view(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -623,10 +624,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -653,23 +651,6 @@ impl TableBuilder {
         files: Vec<FileKey>,
         schema: Arc<Schema>,
     ) -> Result<Vec<Arc<dyn TableProvider>>> {
-        let cfg = get_config();
-        let target_partitions = if session.target_partitions == 0 {
-            cfg.limit.cpu_num
-        } else {
-            session.target_partitions
-        };
-        let target_partitions = max(cfg.limit.datafusion_min_partition_num, target_partitions);
-
-        #[cfg(feature = "enterprise")]
-        let (target_partitions, _) = get_cpu_and_mem_limit(
-            &session.id,
-            session.work_group.clone(),
-            target_partitions,
-            cfg.memory_cache.datafusion_max_size,
-        )
-        .await?;
-
         // Group files by format
         let mut parquet_files = Vec::new();
         let mut vortex_files = Vec::new();
@@ -698,7 +679,6 @@ impl TableBuilder {
                     parquet_files,
                     schema.clone(),
                     FileFormat::Parquet,
-                    target_partitions,
                 )
                 .await?;
             tables.push(table);
@@ -711,7 +691,6 @@ impl TableBuilder {
                     vortex_files,
                     schema.clone(),
                     FileFormat::Vortex,
-                    target_partitions,
                 )
                 .await?;
             tables.push(table);
@@ -726,7 +705,6 @@ impl TableBuilder {
         files: Vec<FileKey>,
         schema: Arc<Schema>,
         format: FileFormat,
-        target_partitions: usize,
     ) -> Result<Arc<dyn TableProvider>> {
         // Configure listing options with the appropriate file format
         let file_format: Arc<dyn DataFusionFileFormat> = match format {
@@ -744,9 +722,7 @@ impl TableBuilder {
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
@@ -924,7 +900,10 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());

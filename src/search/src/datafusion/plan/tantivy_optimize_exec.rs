@@ -27,10 +27,10 @@ use config::{
 };
 use datafusion::{
     arrow::{array::RecordBatch, datatypes::SchemaRef},
-    common::{Result, internal_err},
+    common::{Result, internal_err, tree_node::TreeNodeRecursion},
     error::DataFusionError,
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -107,6 +107,13 @@ impl DisplayAs for TantivyOptimizeExec {
 }
 
 impl ExecutionPlan for TantivyOptimizeExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "TantivyOptimizeExec"
     }
@@ -645,7 +652,10 @@ mod tests {
     use arrow::array::{BooleanArray, Float64Array, Int64Array, StringArray, UInt64Array};
     use arrow_schema::{DataType, Field, Schema, TimeUnit};
     use config::meta::stream::{FileMeta, StreamType};
-    use datafusion::sql::TableReference;
+    use datafusion::{
+        common::TableReference,
+        physical_plan::{ChildrenPropertiesMode, ReplaceChildrenOptions},
+    };
 
     use super::*;
 
@@ -1284,7 +1294,10 @@ mod tests {
             index_optimize_mode,
         ));
 
-        let result = exec.with_new_children(vec![]);
+        let result = exec.replace_children(
+            vec![],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        );
         assert!(result.is_ok());
         let new_exec = result.unwrap();
         assert_eq!(new_exec.name(), "TantivyOptimizeExec");
@@ -1327,7 +1340,8 @@ mod tests {
             index_optimize_mode,
         );
 
-        let stats = exec.partition_statistics(None);
+        let stats = datafusion::physical_plan::StatisticsContext::new()
+            .compute(&exec, &datafusion::physical_plan::StatisticsArgs::new());
         assert!(stats.is_ok());
         let stats = stats.unwrap();
         assert!(matches!(

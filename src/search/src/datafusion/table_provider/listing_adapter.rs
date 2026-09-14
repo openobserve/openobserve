@@ -76,7 +76,7 @@ impl ListingTableAdapter {
         })
     }
 
-    pub fn with_cache(mut self, cache: Option<Arc<dyn FileStatisticsCache>>) -> Self {
+    pub fn with_cache(mut self, cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.listing_table = self.listing_table.with_cache(cache);
         self
     }
@@ -141,7 +141,7 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let target_partitions = self.listing_table.options().target_partitions;
+        let target_partitions = state.config().target_partitions();
         let parquet_exec = match hash_interval(filters) {
             Some(hash_range) if self.sort_order.is_sorted() => handler_metrics_scan(
                 &self.trace_id,
@@ -282,13 +282,8 @@ mod tests {
     };
     use parquet::arrow::ArrowWriter;
     use vortex::{
-        VortexSessionDefault,
-        array::ArrayRef,
-        arrow::{FromArrowArray, FromArrowType},
-        dtype::DType,
-        file::VortexWriteOptions,
-        io::session::RuntimeSessionExt,
-        session::VortexSession,
+        VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+        io::session::RuntimeSessionExt, session::VortexSession,
     };
     use vortex_datafusion::VortexFormat;
 
@@ -336,8 +331,6 @@ mod tests {
             .await
             .unwrap();
         let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
-            .with_target_partitions(2)
-            .with_collect_stat(true)
             .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
@@ -415,9 +408,14 @@ mod tests {
             FileFormat::Vortex => {
                 let session = VortexSession::default().with_tokio();
                 let mut buf = Vec::new();
-                let mut writer = VortexWriteOptions::new(session)
-                    .writer(&mut buf, DType::from_arrow(schema.as_ref()));
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                let mut writer = VortexWriteOptions::new(session.clone()).writer(
+                    &mut buf,
+                    session.arrow().from_arrow_schema(schema.as_ref()).unwrap(),
+                );
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch, schema.as_ref())
+                    .unwrap();
                 writer.push(array).await.unwrap();
                 writer.finish().await.unwrap();
                 std::fs::write(dir.join(name), buf).unwrap();
@@ -474,8 +472,6 @@ mod tests {
             }
         };
         let listing_options = ListingOptions::new(datafusion_file_format)
-            .with_target_partitions(2)
-            .with_collect_stat(true)
             .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
@@ -575,14 +571,29 @@ mod tests {
 
         let session = VortexSession::default().with_tokio();
         let mut buf = Vec::new();
-        let mut writer = VortexWriteOptions::new(session.clone())
-            .writer(&mut buf, DType::from_arrow(file_schema.as_ref()));
+        let mut writer = VortexWriteOptions::new(session.clone()).writer(
+            &mut buf,
+            session
+                .arrow()
+                .from_arrow_schema(file_schema.as_ref())
+                .unwrap(),
+        );
         writer
-            .push(ArrayRef::from_arrow(batch1, false).unwrap())
+            .push(
+                session
+                    .arrow()
+                    .from_arrow_record_batch(batch1, file_schema.as_ref())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         writer
-            .push(ArrayRef::from_arrow(batch2, false).unwrap())
+            .push(
+                session
+                    .arrow()
+                    .from_arrow_record_batch(batch2, file_schema.as_ref())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         writer.finish().await.unwrap();
@@ -601,9 +612,7 @@ mod tests {
             .unwrap();
         let format: Arc<dyn DataFusionFileFormat> =
             Arc::new(VortexFormat::new(VortexSession::default().with_tokio()));
-        let listing_options = ListingOptions::new(format)
-            .with_target_partitions(2)
-            .with_collect_stat(true);
+        let listing_options = ListingOptions::new(format);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
             .with_listing_options(listing_options)
