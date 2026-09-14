@@ -263,7 +263,7 @@ mod tests {
             AggOp::Bottomk(1),
             AggOp::Bottomk(2),
             AggOp::Count,
-            AggOp::CountValues(Some("value".into())),
+            AggOp::CountValues("value".into()),
             AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,

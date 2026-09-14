@@ -80,7 +80,7 @@ impl Accumulate for QuantileAccumulate {
     }
 
     fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
-        let samples: Vec<_> = self
+        let samples = self
             .values
             .into_iter()
             .enumerate()
@@ -92,11 +92,7 @@ impl Accumulate for QuantileAccumulate {
                     .map(|quantile_val| Sample::new(timestamps[slot], quantile_val))
             })
             .collect();
-        if samples.is_empty() {
-            Vec::new()
-        } else {
-            group_series(group_labels, samples)
-        }
+        group_series(group_labels, samples)
     }
 }
 

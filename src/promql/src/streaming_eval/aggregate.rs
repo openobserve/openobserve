@@ -287,8 +287,8 @@ mod tests {
             AggOp::Bottomk(1),
             AggOp::Bottomk(2),
             AggOp::Count,
-            AggOp::CountValues(Some("value".into())),
-            AggOp::CountValues(Some("path".into())),
+            AggOp::CountValues("value".into()),
+            AggOp::CountValues("path".into()),
             AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,
@@ -734,7 +734,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
         let ops = [
-            AggOp::CountValues(Some("instance".into())),
+            AggOp::CountValues("instance".into()),
             AggOp::Quantile(0.0),
             AggOp::Quantile(0.5),
             AggOp::Quantile(1.0),
@@ -818,7 +818,7 @@ mod tests {
                 )
                 .unwrap();
                 let count_values = |value| {
-                    AggOp::CountValues(Some("v".into()))
+                    AggOp::CountValues("v".into())
                         .eval_aggregate(&None, value, &eval_ctx())
                         .unwrap()
                 };

@@ -180,8 +180,7 @@ pub(crate) enum AggOp {
     Avg,
     Bottomk(usize),
     Count,
-    // Without the destination label, values share one count but still omit empty groups.
-    CountValues(Option<String>),
+    CountValues(String),
     Group,
     Max,
     Min,
@@ -217,7 +216,7 @@ impl AggOp {
                         "[count_values] invalid label name: {label_name}"
                     )));
                 }
-                Self::CountValues(Some(label_name))
+                Self::CountValues(label_name)
             }
             token::T_QUANTILE => Self::Quantile(number("quantile")?),
             token::T_GROUP => Self::Group,
@@ -240,7 +239,7 @@ impl AggOp {
         &self,
         modifier: &Option<LabelModifier>,
     ) -> (Self, Option<LabelModifier>) {
-        let Self::CountValues(Some(label)) = self else {
+        let Self::CountValues(label) = self else {
             return (self.clone(), modifier.clone());
         };
         let mut modifier = modifier.clone();
@@ -248,7 +247,7 @@ impl AggOp {
             Some(LabelModifier::Include(labels)) => labels.labels.retain(|name| name != label),
             Some(LabelModifier::Exclude(labels)) => {
                 if labels.labels.contains(label) || label == NAME_LABEL {
-                    return (Self::CountValues(None), modifier);
+                    return (Self::Count, modifier);
                 }
                 labels.labels.push(label.clone());
             }
@@ -324,7 +323,7 @@ impl EvalGrid {
     }
 }
 
-/// One series under the group labels, kept when empty because the generic path emits every group.
+/// One series under the group labels; both paths drop it when no slot produced a value.
 pub(crate) fn group_series(group_labels: Labels, samples: Vec<Sample>) -> Vec<RangeValue> {
     vec![RangeValue {
         labels: group_labels,
@@ -486,6 +485,7 @@ where
 
             acc.evaluate(labels, &timestamps)
         })
+        .filter(|series| !series.samples.is_empty())
         .collect();
 
     log::info!(
@@ -503,7 +503,6 @@ where
         start4.elapsed()
     );
 
-    // a scalar aggregation emits every group; one that selects series may emit nothing
     if results.is_empty() {
         return Ok(Value::None);
     }
@@ -783,7 +782,7 @@ mod tests {
         for op in [
             AggOp::Avg,
             AggOp::Count,
-            AggOp::CountValues(Some("v".into())),
+            AggOp::CountValues("v".into()),
             AggOp::Quantile(0.5),
             AggOp::Group,
             AggOp::Max,
@@ -846,7 +845,7 @@ mod tests {
     }
 
     #[test]
-    fn test_eval_aggregate_keeps_off_grid_group_and_sorts_by_slot() {
+    fn test_eval_aggregate_drops_off_grid_group_and_sorts_by_slot() {
         let matrix = vec![
             RangeValue::new(
                 vec![Arc::new(Label::new("job", "a"))],
@@ -865,13 +864,13 @@ mod tests {
         let param = Some(LabelModifier::Include(promql_parser::label::Labels {
             labels: vec!["job".to_string()],
         }));
-        let Value::Matrix(mut result) =
+        let Value::Matrix(result) =
             eval_aggregate(&param, Value::Matrix(matrix), Sum, &eval_ctx).unwrap()
         else {
             panic!("expected matrix");
         };
-        result.sort_by(|x, y| x.labels[0].value.cmp(&y.labels[0].value));
-        assert_eq!(result.len(), 2);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].labels[0].value, "a");
         assert_eq!(
             result[0]
                 .samples
@@ -880,7 +879,6 @@ mod tests {
                 .collect::<Vec<_>>(),
             [(1000, 1.0), (3000, 3.0)]
         );
-        assert!(result[1].samples.is_empty());
     }
 
     /// Runs `eval_aggregate` over a single group large enough to take the
