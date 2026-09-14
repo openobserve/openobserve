@@ -44,6 +44,7 @@ import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
 import { MetricsPage } from "./metricsPages/metricsPage.js";
+import { MetricsExplorerPage } from "./metricsPages/metricsExplorerPage.js";
 import { MetricsQueryEditorPage } from "./metricsPages/metricsQueryEditorPage.js";
 import { MetricsBuilderPage } from "./metricsPages/metricsBuilderPage.js";
 import { TracesPage } from "./tracesPages/tracesPage.js";
@@ -168,6 +169,7 @@ class PageManager {
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
     this.metricsPage = new MetricsPage(page);
+    this.metricsExplorerPage = new MetricsExplorerPage(page);
     this.metricsQueryEditorPage = new MetricsQueryEditorPage(page);
     this.metricsBuilderPage = new MetricsBuilderPage(page);
     this.tracesPage = new TracesPage(page);
