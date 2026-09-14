@@ -100,9 +100,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import organizations from "@/services/organizations";
-import { queryClient } from "@/composables/query/queryClient";
-import { organizationKeys } from "@/services/organizations.querykeys";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -120,6 +120,8 @@ import {
 const { t } = useI18nTyped();
 
 const store = useStore();
+const orgId = useOrgId();
+const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
 
 // Schema-driven validation replaces the hand-rolled validate()/error refs.
 const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
@@ -163,15 +165,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    await organizations.post_organization_settings(
-      store.state.selectedOrganization.identifier,
-      payload,
-    );
-
-    // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
-    await queryClient.invalidateQueries({
-      queryKey: organizationKeys.settings(store.state.selectedOrganization.identifier),
-    });
+    await updateOrgSettings.mutateAsync(payload);
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,

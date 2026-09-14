@@ -430,7 +430,8 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { downloadFile } from "@/utils/dom";
 import type { I18nKey } from "@/types/i18n";
 import {
@@ -679,7 +680,7 @@ async function loadQualityAgents() {
   if (!orgId.value || !startUs || !endUs) return;
   qualityAgentsLoading.value = true;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const response = await queryClient.fetchQuery(genAiAgentsQuery(orgId.value, startUs, endUs));
     qualityAgents.value = response.agents;
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&

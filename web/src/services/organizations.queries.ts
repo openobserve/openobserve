@@ -17,27 +17,14 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import organizations from "./organizations";
 import { organizationKeys } from "./organizations.querykeys";
 import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
-const ALL_ORGS = 100000;
-
+// Memory only: settings pages post this object back whole, so a disk copy could overwrite newer server values.
 export const orgSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.settings(org),
     queryFn: async () => (await organizations.get_organization_settings(org)).data,
     staleTime: CONFIG_STALE_TIME,
     gcTime: LONG_GC_TIME,
-    persister: localStoragePersister,
-  });
-
-export const orgListQuery = (org: string) =>
-  queryOptions({
-    queryKey: organizationKeys.list(org),
-    queryFn: async (): Promise<any[]> =>
-      (await organizations.os_list(0, ALL_ORGS, "id", false, "", org)).data?.data ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
-    persister: localStoragePersister,
   });
 
 export const orgSummaryQuery = (org: string) =>
@@ -96,4 +83,13 @@ export const resetPasscodeMutation = (org: string) =>
   mutationOptions({
     mutationFn: () => organizations.update_organization_passcode(org),
     meta: { invalidates: [organizationKeys.passcode(org)], silentError: true },
+  });
+
+/** Four call sites write this, and MainLayout re-reads the scope on every org switch. */
+export const updateOrgSettingsMutation = (org: string) =>
+  mutationOptions({
+    // Not the selected org: domain management writes the meta org.
+    mutationFn: (payload: any) => organizations.post_organization_settings(org, payload),
+    // Every call site renders its own success and failure toasts.
+    meta: { invalidates: [organizationKeys.settings(org)], silentError: true },
   });

@@ -13,8 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import zo_config from "./config";
+import settings from "./settings";
 import { configKeys } from "./config.querykeys";
 import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
 
@@ -43,4 +44,14 @@ export const configFullQuery = (org: string) =>
     queryFn: async () => (await zo_config.get_config_full(org)).data,
     staleTime: SESSION_STALE_TIME,
     gcTime: SESSION_STALE_TIME,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** The branding text lives in the session-tier full config, so without this drop the next org switch restores the old text. */
+export const updateCustomLogoTextMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (value: string) => settings.updateCustomText(org, "custom_logo_text", value),
+    // The form reads `res.status` itself and renders both outcomes.
+    meta: { invalidates: [configKeys.full(org)], silentError: true },
   });

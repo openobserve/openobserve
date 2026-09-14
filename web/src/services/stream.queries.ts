@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import stream from "./stream";
 import type { StreamPageParams } from "./stream";
 import { streamKeys } from "./stream.querykeys";
@@ -47,4 +47,36 @@ export const streamPageQuery = (org: string, type: string, params: StreamPagePar
       return { list: res.data.list ?? [], total: res.data.total ?? 0 };
     },
     refetchOnWindowFocus: true,
+  });
+
+/** Resolves to the payload, not the axios envelope, so the cache never holds an XHR object; `useStreams` keeps its own copy on purpose. */
+export const streamSchemaQuery = (org: string, streamName: string, type: string) =>
+  queryOptions({
+    queryKey: streamKeys.schema(org, type, streamName),
+    queryFn: async (): Promise<any> => (await stream.schema(org, streamName, type)).data,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** `streamKeys.all` is the scope: a stream write can touch the persisted name lists, the paged list and every cached schema. */
+export const createStreamMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { name: string; type: string; payload: any }) =>
+      stream.createStream(org, vars.name, vars.type, vars.payload),
+    // The dialog renders the failure against its own fields.
+    meta: { invalidates: [streamKeys.all(org)], silentError: true },
+  });
+
+export const updateStreamSettingsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { name: string; type: string; settings: any }) =>
+      stream.updateSettings(org, vars.name, vars.type, vars.settings),
+    meta: { invalidates: [streamKeys.all(org)], silentError: true },
+  });
+
+export const deleteStreamFieldsMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { name: string; type: string; fields: [] }) =>
+      stream.deleteFields(org, vars.name, vars.type, vars.fields),
+    meta: { invalidates: [streamKeys.all(org)], silentError: true },
   });

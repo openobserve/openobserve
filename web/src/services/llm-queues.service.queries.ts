@@ -13,13 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import llmQueuesService from "./llm-queues.service";
 import type { LlmQueue } from "./llm-queues.service";
 import { llmQueueKeys } from "./llm-queues.service.querykeys";
+import { llmDatasetKeys } from "./llm-datasets.service.querykeys";
 
 export const llmQueuesQuery = (org: string) =>
   queryOptions({
     queryKey: llmQueueKeys.list(org),
     queryFn: (): Promise<LlmQueue[]> => llmQueuesService.list(org),
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** A submitted review moves the queue's reviewed/pending split, which the list shows. */
+export const submitQueueReviewMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { queueId: string; itemId: string; payload: any }) =>
+      llmQueuesService.submitReview(org, vars.queueId, vars.itemId, vars.payload),
+    // The workbench advances to the next item and toasts that itself.
+    meta: { invalidates: [llmQueueKeys.all(org)], silentError: true },
+  });
+
+/** Distilling writes into a dataset, so it drops that scope rather than the queue's. */
+export const pushQueueItemToDatasetMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { queueId: string; itemId: string; payload: any }) =>
+      llmQueuesService.pushToDataset(org, vars.queueId, vars.itemId, vars.payload),
+    meta: { invalidates: [llmDatasetKeys.all(org)], silentError: true },
   });

@@ -42,11 +42,11 @@ import {
 } from "@/composables/fieldValueDB";
 import { GLOBAL_SCOPE } from "./keys";
 
-/**
- * Bump when a cached response shape changes so stale payloads are discarded
- * rather than rendered.
- */
-export const PERSIST_BUSTER = "1";
+/** Bump when a cached response shape changes so stale payloads are discarded rather than rendered. */
+export const LS_BUSTER = "2";
+
+/** Deliberately behind `LS_BUSTER`: a bump here re-runs every dashboard panel's search on next read. */
+export const IDB_BUSTER = "1";
 
 export const LS_PREFIX = "o2q";
 export const IDB_PREFIX = "o2q-heavy";
@@ -103,7 +103,7 @@ export const localPersister = experimental_createQueryPersister<string>({
   storage: safeLocalStorage,
   maxAge: DAY_MS,
   prefix: LS_PREFIX,
-  buster: PERSIST_BUSTER,
+  buster: LS_BUSTER,
 });
 
 /**
@@ -115,7 +115,7 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
   storage: isIdbAvailable() ? idbStorage : undefined,
   maxAge: DAY_MS,
   prefix: IDB_PREFIX,
-  buster: PERSIST_BUSTER,
+  buster: IDB_BUSTER,
   serialize: (persistedQuery) => persistedQuery,
   deserialize: (value) => value as never,
 });
@@ -129,6 +129,20 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
  */
 export const localStoragePersister = localPersister.persisterFn as QueryPersister<any, any, any>;
 export const indexedDbPersister = idbPersister.persisterFn as QueryPersister<any, any, any>;
+
+/** A write just made these stale: drop the persisted copies under `queryKey` — localStorage only, since the IndexedDB variant reads the whole store. */
+export const dropPersistedCopies = async (
+  queryKey: readonly unknown[],
+  exact = false,
+): Promise<void> => {
+  // Without a key the library removes EVERY entry, which would take every org's data.
+  if (!Array.isArray(queryKey) || queryKey.length === 0) return;
+  try {
+    await localPersister.removeQueries({ queryKey, exact });
+  } catch {
+    /* a storage failure must never fail the write that triggered it */
+  }
+};
 
 /**
  * Storage-key prefix for one org. Every query key starts `["org", orgId]`, and

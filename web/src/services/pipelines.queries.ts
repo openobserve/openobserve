@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange, stableFilters } from "@/composables/query/queryClient";
 import pipelines from "./pipelines";
 import { pipelineKeys } from "./pipelines.querykeys";
@@ -38,8 +38,15 @@ export const pipelineHistoryQuery = (org: string, params: Record<string, string>
   });
 };
 
-export const pipelineDetailQuery = (org: string, name: string) =>
-  queryOptions({
-    queryKey: pipelineKeys.detail(org, name),
-    queryFn: async () => (await pipelines.getPipeline({ name, org_identifier: org })).data,
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** Create and update drop the same scope, so the editor declares neither. */
+export const savePipelineMutation = (org: string, isUpdate: () => boolean) =>
+  mutationOptions({
+    mutationFn: (data: any) =>
+      isUpdate()
+        ? pipelines.updatePipeline({ org_identifier: org, data })
+        : pipelines.createPipeline({ org_identifier: org, data }),
+    // The editor renders the failure itself and keeps the canvas open on error.
+    meta: { invalidates: [pipelineKeys.all(org)], silentError: true },
   });

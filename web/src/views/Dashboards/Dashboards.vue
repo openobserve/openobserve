@@ -1379,7 +1379,8 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard(t).load(org);
+            // Forced: a plain load would answer from the cache and keep the pin for up to staleTime.
+            if (org) useHomeDashboard(t).load(org, true);
           }
         } catch (err) {
           showErrorNotification(
@@ -1711,7 +1712,7 @@ export default defineComponent({
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard(t).load(org);
+          if (org) await useHomeDashboard(t).load(org, true);
         }
       } catch (error) {
         dismiss();

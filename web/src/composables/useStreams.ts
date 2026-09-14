@@ -16,6 +16,7 @@
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { dropPersistedCopies } from "@/composables/query/persisters";
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
@@ -72,9 +73,21 @@ const useStreams = (t: TranslateFn) => {
           // `force` must reach the server: drop the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
-            await queryClient.invalidateQueries({
-              queryKey: streamKeys.all(store.state.selectedOrganization.identifier),
-            });
+            const org = store.state.selectedOrganization.identifier;
+            if (streamName === "all") {
+              await dropPersistedCopies(streamKeys.all(org));
+              await queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
+            } else {
+              // One type, exactly: a Metrics Explorer mount must not throw away the logs and traces lists too.
+              await dropPersistedCopies(streamKeys.nameList(org, streamName), true);
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: streamKeys.nameList(org, streamName),
+                  exact: true,
+                }),
+                queryClient.invalidateQueries({ queryKey: streamKeys.pagesAll(org) }),
+              ]);
+            }
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -464,6 +477,12 @@ const useStreams = (t: TranslateFn) => {
   // Don't add delete log here, it will create issue
   // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
+    const org = store.state.selectedOrganization.identifier;
+    // Ahead of the early return: the disk copy and the page entries hold the deleted row whether Vuex does or not.
+    void dropPersistedCopies(streamKeys.nameList(org, streamType), true).then(() =>
+      queryClient.invalidateQueries({ queryKey: streamKeys.all(org) }),
+    );
+
     const indexMapping = store.state.streams.streamsIndexMapping[streamType];
 
     // Bail out safely when the mapping/cache for this type isn't populated.
@@ -495,11 +514,6 @@ const useStreams = (t: TranslateFn) => {
         updateStreamsInStore(streamType, streamList);
       }
     }
-    // Whole streams prefix, not just this type's name list: the paginated
-    // Log Streams pages cache the deleted row too.
-    void queryClient.invalidateQueries({
-      queryKey: streamKeys.all(store.state.selectedOrganization.identifier),
-    });
   };
 
   const addStream = async (stream: any) => {

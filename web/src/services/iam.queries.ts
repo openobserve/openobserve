@@ -18,7 +18,6 @@ import {
   getGroups,
   getRoles,
   getResources,
-  getAllRolePermissions,
   createGroup,
   updateGroup,
   deleteGroup,
@@ -53,13 +52,6 @@ export const resourcesQuery = (org: string) =>
     staleTime: CONFIG_STALE_TIME,
     gcTime: LONG_GC_TIME,
     persister: localStoragePersister,
-  });
-
-export const rolePermissionsQuery = (org: string, roleName: string) =>
-  queryOptions({
-    queryKey: iamKeys.rolePermissions(org, roleName),
-    queryFn: async () =>
-      (await getAllRolePermissions({ role_name: roleName, org_identifier: org })).data,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

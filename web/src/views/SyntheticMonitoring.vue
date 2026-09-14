@@ -1368,8 +1368,13 @@ async function toggleEnabled(m: any) {
   });
   try {
     await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folderId);
-    const found = monitors.value.find((mon) => String(mon.id) === id);
-    if (found) found.enabled = newEnabled;
+    // `monitors` is a computed over the cached rows, so patching a mapped copy would be thrown away on the next re-evaluation.
+    queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) =>
+      // `undefined` leaves an entry without this monitor untouched instead of re-stamping it as fresh.
+      Array.isArray(old) && old.some((mon: any) => String(mon.id) === id)
+        ? old.map((mon: any) => (String(mon.id) === id ? { ...mon, enabled: newEnabled } : mon))
+        : old,
+    );
     dismiss();
     toast({
       variant: "success",
@@ -1553,12 +1558,13 @@ async function deleteMonitor(m: any) {
   });
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
-    // Drop it from the cached entry rather than waiting for the invalidation's
-    // refetch to repaint.
-    queryClient.setQueryData<any[]>(
-      syntheticsKeys.monitors(orgIdentifier.value, readFolder.value),
-      (old) => (old ?? []).filter((mon: any) => String(mon.id) !== String(m.id)),
-    );
+    // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
+    queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
+      if (!Array.isArray(old)) return undefined;
+      const next = old.filter((mon: any) => String(mon.id) !== String(m.id));
+      // `undefined` leaves a folder without this monitor untouched instead of re-stamping it as fresh.
+      return next.length === old.length ? undefined : next;
+    });
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {

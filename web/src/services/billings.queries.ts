@@ -17,13 +17,6 @@ import { queryOptions } from "@tanstack/vue-query";
 import billings from "./billings";
 import { billingKeys } from "./billings.querykeys";
 
-export const subscriptionQuery = (org: string) =>
-  queryOptions({
-    queryKey: billingKeys.subscription(org),
-    queryFn: async () => (await billings.list_subscription(org)).data,
-    refetchOnWindowFocus: true,
-  });
-
 export const invoiceHistoryQuery = (org: string) =>
   queryOptions({
     queryKey: billingKeys.invoices(org),
@@ -35,12 +28,5 @@ export const aiUsageQuery = (org: string) =>
   queryOptions({
     queryKey: billingKeys.aiUsage(org),
     queryFn: async () => (await billings.get_ai_usage(org)).data,
-    refetchOnWindowFocus: true,
-  });
-
-export const billingGroupMembersQuery = (org: string) =>
-  queryOptions({
-    queryKey: billingKeys.groupMembers(org),
-    queryFn: async () => (await billings.list_billing_group_members(org)).data,
     refetchOnWindowFocus: true,
   });

@@ -104,6 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { groupsQuery } from "@/services/iam.queries";
 import { rolesQuery } from "@/services/iam.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { saveServiceAccountMutation } from "@/services/service_accounts.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { defineComponent, computed, ref, watch } from "vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -165,6 +167,10 @@ export default defineComponent({
     const beingUpdated = computed(() => !!props.modelValue?.email || props.isUpdated);
 
     const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+
+    const saveServiceAccount = useMutation(() =>
+      saveServiceAccountMutation(orgId.value, () => beingUpdated.value),
+    );
 
     // The stored identifier is `<name>.<org_id>@sa.internal` — shown in the
     // name field's help text so the user knows what they are creating.
@@ -231,6 +237,7 @@ export default defineComponent({
       t,
       store,
       beingUpdated,
+      saveServiceAccount,
       identifierSuffix,
       addServiceAccountSchema,
       addServiceAccountDefaults,
@@ -312,7 +319,7 @@ export default defineComponent({
         const { email: userEmail, ...rest } = this.modelValue ?? {};
         const payload: any = { ...rest, organization, first_name: value.first_name };
         try {
-          const res = await service_accounts.update(payload, organization, userEmail);
+          const res = await this.saveServiceAccount.mutateAsync({ payload, email: userEmail });
           this.$emit("updated", res.data, { ...payload, email: userEmail }, "updated");
           this.$emit("update:open", false);
         } catch (err: any) {
@@ -334,10 +341,9 @@ export default defineComponent({
         // still receives a regular email payload.
         const email = buildServiceAccountEmail(value.name, organization);
         try {
-          const res = await service_accounts.create(
-            { email, first_name: value.first_name },
-            organization,
-          );
+          const res = await this.saveServiceAccount.mutateAsync({
+            payload: { email, first_name: value.first_name },
+          });
 
           // Fan out access grants AFTER the account exists — but do NOT await
           // them here: the show-once token must never be held hostage by a

@@ -219,7 +219,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { resetPasscodeMutation } from "@/services/organizations.queries";
-import { createRumTokenMutation } from "@/services/api_keys.queries";
+import { createRumTokenMutation, updateRumTokenMutation } from "@/services/api_keys.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { ingestionTokensQuery } from "@/services/organizations.queries";
@@ -240,7 +240,6 @@ import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
-import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -518,6 +517,8 @@ export default defineComponent({
 
     const orgIdForWrites = useOrgId();
     const createRumToken = useMutation(() => createRumTokenMutation(orgIdForWrites.value));
+    // `getRUMToken` below is a bare fetchQuery, so only the mutation's invalidation stops it re-serving the old token.
+    const updateRumToken = useMutation(() => updateRumTokenMutation(orgIdForWrites.value));
     const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
 
     const generateRUMToken = () => {
@@ -558,19 +559,17 @@ export default defineComponent({
       return request;
     };
 
+    // Returned so the dialog handler (and the spec) can await the write.
     const updateRUMToken = () => {
-      apiKeysService
-        .updateRUMToken(
-          store.state.selectedOrganization.identifier,
-          store.state.organizationData.rumToken.id,
-        )
-        .then(() => {
-          getRUMToken();
+      const done = updateRumToken
+        .mutateAsync(store.state.organizationData.rumToken.id)
+        .then(async () => {
           toast({
             variant: "success",
             message: t("toastMessages.views.rumTokenUpdatedSuccessfully"),
             timeout: 5000,
           });
+          getRUMToken();
         })
         .catch((e) => {
           if (e.response.status != 403) {
@@ -588,6 +587,8 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
+
+      return done;
     };
 
     // Global search functionality across all ingestion tabs

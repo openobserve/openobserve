@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import modelPricing from "./model_pricing";
 import { modelPricingKeys } from "./model_pricing.querykeys";
 import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
@@ -26,4 +26,16 @@ export const modelPricingQuery = (org: string) =>
     staleTime: CONFIG_STALE_TIME,
     gcTime: LONG_GC_TIME,
     persister: localStoragePersister,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** The list is a five-minute persisted read, so the editor would otherwise route back to a pre-write copy. */
+export const saveModelPricingMutation = (org: string) =>
+  mutationOptions({
+    // The id travels in the vars: the editor only knows it per submitted model.
+    mutationFn: (vars: { id?: string; data: any }) =>
+      vars.id ? modelPricing.update(org, vars.id, vars.data) : modelPricing.create(org, vars.data),
+    // The editor composes its own toast, including the pattern-conflict warning.
+    meta: { invalidates: [modelPricingKeys.all(org)], silentError: true },
   });

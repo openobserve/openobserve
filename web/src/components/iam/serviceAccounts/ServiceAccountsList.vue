@@ -1114,7 +1114,7 @@ export default defineComponent({
             variant: "success",
           });
 
-          getServiceAccountsUsers();
+          getServiceAccountsUsers(true);
         })
         .catch((err) => {
           if (err.response?.status != 403) {

@@ -34,5 +34,4 @@ export const reportKeys = {
       filters.folder ?? "__all__",
       stableFilters({ isCache: filters.isCache, nameQuery: filters.nameQuery }),
     ),
-  detail: (org: string, id: string) => orgKey(org, "reports", "detail", id),
 };

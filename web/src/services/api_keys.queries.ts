@@ -32,3 +32,10 @@ export const createRumTokenMutation = (org: string) =>
     mutationFn: () => apiKeys.createRUMToken(org),
     meta: { invalidates: [apiKeyKeys.all(org)], silentError: true },
   });
+
+/** Rotating returns a new token, so the cached one must not answer afterwards. */
+export const updateRumTokenMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (id: string) => apiKeys.updateRUMToken(org, id),
+    meta: { invalidates: [apiKeyKeys.all(org)], silentError: true },
+  });

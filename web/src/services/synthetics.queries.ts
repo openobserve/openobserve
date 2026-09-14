@@ -28,12 +28,6 @@ export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
     refetchOnWindowFocus: true,
   });
 
-export const monitorDetailQuery = (org: string, id: string, folderId?: string) =>
-  queryOptions({
-    queryKey: syntheticsKeys.detail(org, id, folderId),
-    queryFn: async () => (await syntheticsService.get(org, id, folderId)).data,
-  });
-
 export const agentTokensQuery = (org: string) =>
   queryOptions({
     queryKey: syntheticsKeys.agentTokens(org),

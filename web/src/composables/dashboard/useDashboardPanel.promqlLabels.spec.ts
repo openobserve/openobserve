@@ -40,6 +40,7 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { flushPromises } from "@vue/test-utils";
+import { queryClient } from "@/composables/query/queryClient";
 
 vi.mock("@/services/metrics", () => ({ default: { get_promql_series: vi.fn() } }));
 vi.mock("@/services/stream", async (importOriginal) => {
@@ -143,6 +144,8 @@ describe("fetchPromQLLabels — names come from the schema", () => {
     await flushPromises();
     expect(p.dashboardPanelData.meta.promql.loadingLabels).toBe(false);
 
+    // The schema is a cached read now; a fresh entry would answer the second call without the service.
+    queryClient.clear();
     vi.mocked(streamService.schema).mockRejectedValue(new Error("500"));
     await p.fetchPromQLLabels("cpu_utilization_percent");
     await flushPromises();

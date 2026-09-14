@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import service_accounts from "./service_accounts";
 import { serviceAccountKeys } from "./service_accounts.querykeys";
 
@@ -22,4 +22,17 @@ export const serviceAccountsQuery = (org: string) =>
     queryKey: serviceAccountKeys.list(org),
     queryFn: async (): Promise<any[]> => (await service_accounts.list(org)).data?.data ?? [],
     refetchOnWindowFocus: true,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** Refetching after a create is safe: the list returns `token` already redacted, in the same form the caller appends locally. */
+export const saveServiceAccountMutation = (org: string, isUpdate: () => boolean) =>
+  mutationOptions({
+    mutationFn: (vars: { payload: any; email?: string }) =>
+      isUpdate()
+        ? service_accounts.update(vars.payload, org, vars.email ?? "")
+        : service_accounts.create(vars.payload, org),
+    // The dialog renders the failure itself and keeps itself open on error.
+    meta: { invalidates: [serviceAccountKeys.all(org)], silentError: true },
   });

@@ -497,9 +497,8 @@ import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
 import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
-import organizations from "@/services/organizations";
-import { queryClient } from "@/composables/query/queryClient";
-import { organizationKeys } from "@/services/organizations.querykeys";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
 import searchService from "@/services/search";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import ORadio from "@/lib/forms/Radio/ORadio.vue";
@@ -538,6 +537,11 @@ const pendingRemoveEmail = ref<{
 } | null>(null);
 const store = useStore();
 const router = useRouter();
+
+// Domain settings live on the meta org, not the selected one.
+const updateMetaOrgSettings = useMutation(() =>
+  updateOrgSettingsMutation(store.state.zoConfig.meta_org),
+);
 
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
@@ -857,15 +861,7 @@ const saveClaimParserFunction = async () => {
       claim_parser_function: claimParserFunction.value || "",
     };
 
-    await organizations.post_organization_settings(
-      store.state.zoConfig.meta_org,
-      orgSettingsPayload,
-    );
-
-    // Writes the meta org, so that is the scope MainLayout would serve back stale on an org switch.
-    await queryClient.invalidateQueries({
-      queryKey: organizationKeys.settings(store.state.zoConfig.meta_org),
-    });
+    await updateMetaOrgSettings.mutateAsync(orgSettingsPayload);
 
     // Update store with new settings
     const updatedSettings: any = {

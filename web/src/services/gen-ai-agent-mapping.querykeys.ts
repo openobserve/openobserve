@@ -13,15 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
-import cipherKeys from "./cipher_keys";
-import { cipherKeyKeys } from "./cipher_keys.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { orgKey } from "@/composables/query/keys";
 
-export const cipherKeysQuery = (org: string) =>
-  queryOptions({
-    queryKey: cipherKeyKeys.list(org),
-    queryFn: async (): Promise<any[]> => (await cipherKeys.list(org)).data?.keys ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
-  });
+/** Keys only, so another domain can drop this scope without importing this domain's transport (no import cycle). */
+export const genAiAgentKeys = {
+  all: (org: string) => orgKey(org, "genAiAgents"),
+  /** Callers pass an already-quantized range: a relative window re-anchors to `now` on every mount and would never hit. */
+  agents: (org: string, start: number, end: number) =>
+    orgKey(org, "genAiAgents", "list", `${start}-${end}`),
+};

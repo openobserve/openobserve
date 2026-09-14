@@ -50,6 +50,20 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// The composable is setup-only in the app but called bare here, so `useMutation`
+// has no injection context. Stub it to run the declared mutationFn directly —
+// the write still reaches the mocked service, which is what the tests assert on.
+vi.mock("@tanstack/vue-query", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useMutation: (options: any) => ({
+      mutateAsync: (vars: any) =>
+        (typeof options === "function" ? options() : options).mutationFn(vars),
+    }),
+  };
+});
+
 const {
   mockGetSystemTemplates,
   mockGetByName,

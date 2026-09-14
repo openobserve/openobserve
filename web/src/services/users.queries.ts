@@ -41,10 +41,3 @@ export const allUserRolesQuery = (org: string) =>
     queryFn: async () => (await users.getAllUserRoles(org)).data ?? null,
     refetchOnWindowFocus: true,
   });
-
-export const pendingInvitesQuery = (org: string) =>
-  queryOptions({
-    queryKey: userKeys.invitations(org),
-    queryFn: async () => (await users.getPendingInvites()).data,
-    refetchOnWindowFocus: true,
-  });

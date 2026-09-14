@@ -15,7 +15,7 @@
 
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
 import {
-  localPersister,
+  dropPersistedCopies,
   purgeAllPersisted,
   purgePersistedExceptOrg,
   purgePersistedOrg,
@@ -84,13 +84,16 @@ export const queryClient = new QueryClient({
    * makes the migration to this incremental.
    */
   mutationCache: new MutationCache({
-    onSuccess: (_data, _vars, _onMutateResult, mutation) => {
+    onSuccess: async (_data, _vars, _onMutateResult, mutation) => {
       const meta = mutation.meta;
       if (!meta) return;
       for (const key of meta.removes ?? []) {
+        await dropPersistedCopies(key);
         queryClient.removeQueries({ queryKey: key, type: "inactive" });
       }
       for (const key of meta.invalidates ?? []) {
+        // Disk first: the refetch this triggers writes a fresh copy that must never be deleted after it lands.
+        await dropPersistedCopies(key);
         void queryClient.invalidateQueries({ queryKey: key });
       }
       if (meta.successMessage) {
@@ -155,17 +158,6 @@ export const purgeOrgQueries = (org: string, nextOrg?: string): void => {
   // disk until the 24 h max age.
   if (nextOrg) void purgePersistedExceptOrg(nextOrg);
   clearFieldValueReadCache();
-};
-
-/**
- * Write-through for a mutation that updates a localStorage-persisted query
- * outside a fetch. `setQueryData` alone leaves the on-disk copy stale, and a
- * reload inside the freshness window restores that copy as FRESH — the
- * mutation visibly reverts (a favorited dashboard losing its star on F5).
- */
-export const setPersistedQueryData = (queryKey: readonly unknown[], data: unknown): void => {
-  queryClient.setQueryData(queryKey, data);
-  void localPersister.persistQueryByKey?.(queryKey as any, queryClient);
 };
 
 /** Called on logout: nothing from the previous session may survive. */

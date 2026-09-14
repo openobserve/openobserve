@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import reports from "./reports";
 import type { ReportListFilters } from "./reports";
 import { reportKeys } from "./reports.querykeys";
@@ -34,8 +34,18 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
     refetchOnWindowFocus: true,
   });
 
-export const reportDetailQuery = (org: string, id: string) =>
-  queryOptions({
-    queryKey: reportKeys.detail(org, id),
-    queryFn: async () => (await reports.getReportById(org, id)).data,
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** Three save shapes, one scope: `reportKeys.all` also covers the cross-folder search entry a Vuex prune never reached. */
+export const saveReportMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { payload: any; reportId?: string; folderId?: string; isEdit: boolean }) => {
+      if (vars.isEdit && vars.reportId) {
+        return reports.updateReportById(org, vars.reportId, vars.payload);
+      }
+      if (vars.isEdit) return reports.updateReport(org, vars.payload);
+      return reports.createReportV2(org, vars.payload, vars.folderId);
+    },
+    // The form composes create-vs-update wording for both outcomes itself.
+    meta: { invalidates: [reportKeys.all(org)], silentError: true },
   });

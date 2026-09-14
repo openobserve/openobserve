@@ -441,7 +441,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -973,8 +974,10 @@ async function loadServicesCatalog() {
   if (hasInferColumns.value === null) {
     try {
       const org = searchObj.organizationIdentifier;
-      const schemaResponse = await streamService.schema(org, streamName, "traces");
-      const schemaFields = schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      const schemaPayload = await queryClient.fetchQuery(
+        streamSchemaQuery(org, streamName, "traces"),
+      );
+      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
       hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
     } catch {
       // If schema check fails, default to false (use service_name only)

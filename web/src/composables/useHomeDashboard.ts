@@ -15,7 +15,7 @@
 
 import { settingQuery } from "@/services/settings.queries";
 import { settingKeys } from "@/services/settings.querykeys";
-import { queryClient, setPersistedQueryData } from "@/composables/query/queryClient";
+import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
@@ -60,8 +60,7 @@ export function useHomeDashboard(t: TranslateFn) {
       // setting revalidates, so the home button never flickers back to empty.
       await fetchInto(settingQuery(org, SETTING_KEY), { apply, loading: isLoading });
     } catch {
-      // Missing setting / 404 → no home dashboard for this org.
-      homeDashboard.value = null;
+      // A 404 already arrives as `null` from the query; anything else is transient and must not drop the pin.
     } finally {
       isLoading.value = false;
     }
@@ -78,7 +77,7 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = d; // optimistic
     try {
       await settings.setOrgSetting(org, SETTING_KEY, d, SETTING_CATEGORY);
-      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), d);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), d);
     } catch (e: any) {
       homeDashboard.value = prev; // revert
       toast({
@@ -94,14 +93,18 @@ export function useHomeDashboard(t: TranslateFn) {
     homeDashboard.value = null; // optimistic
     try {
       await settings.deleteOrgSetting(org, SETTING_KEY);
-      setPersistedQueryData(settingKeys.one(org, SETTING_KEY), null);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
     } catch (e: any) {
       // A 404 means the setting is already gone — this is the desired end state,
       // not a failure. The backend now clears home_dashboard itself when the
       // pinned dashboard is deleted, so the client's delete can race and find it
       // already absent. Treat "already cleared" as success: keep the optimistic
       // null, don't revert, don't toast. Only real errors revert.
-      if (e?.response?.status === 404) return;
+      if (e?.response?.status === 404) {
+        // The cached copy still holds the old pin; without this the next load inside staleTime would revive it.
+        queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), null);
+        return;
+      }
       homeDashboard.value = prev; // revert
       toast({
         variant: "error",
@@ -120,9 +123,12 @@ export function useHomeDashboard(t: TranslateFn) {
       const updated = { ...homeDashboard.value, label: raw(label) };
       homeDashboard.value = updated;
       if (org) {
-        settings.setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY).catch(() => {
-          /* label persist is best-effort; ref already shows the fresh label */
-        });
+        settings
+          .setOrgSetting(org, SETTING_KEY, updated, SETTING_CATEGORY)
+          .then(() => queryClient.setQueryData(settingKeys.one(org, SETTING_KEY), updated))
+          .catch(() => {
+            /* label persist is best-effort; ref already shows the fresh label */
+          });
       }
     }
   };

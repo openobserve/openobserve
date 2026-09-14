@@ -727,7 +727,7 @@ export default defineComponent({
         toast({ variant: "success", message: this.t("alert_sources.rotatedSuccess") });
         this.revealedIds = this.revealedIds.filter((id) => id !== this.rotateTarget?.id);
         this.rotateTarget = undefined;
-        await this.fetchAll();
+        await this.fetchAll(true);
       } catch (e) {
         toast({ variant: "error", message: this.t("alert_sources.error") });
       }

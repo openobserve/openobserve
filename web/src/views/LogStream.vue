@@ -1028,11 +1028,12 @@ export default defineComponent({
       // cache-first, so a page still holding the deleted row would paint it
       // again — and inside staleTime nothing would refetch to correct it.
       queryClient.setQueriesData(
-        { queryKey: streamKeys.all(store.state.selectedOrganization.identifier) },
+        { queryKey: streamKeys.pagesAll(store.state.selectedOrganization.identifier) },
         (page: any) => {
-          if (!page?.list) return page;
+          // `undefined` leaves an untouched entry alone; returning it would re-stamp it as fresh.
+          if (!page?.list) return undefined;
           const list = page.list.filter((s: any) => !removedKeys.has(`${s.name}-${s.stream_type}`));
-          if (list.length === page.list.length) return page;
+          if (list.length === page.list.length) return undefined;
           return {
             ...page,
             list,

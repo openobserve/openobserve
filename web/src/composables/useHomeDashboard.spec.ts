@@ -31,6 +31,8 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 import settings from "@/services/settings";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { queryClient } from "@/composables/query/queryClient";
+import { settingKeys } from "@/services/settings.querykeys";
 
 const D = { dashboardId: "abc", folderId: "default", label: "Payments" };
 
@@ -54,6 +56,25 @@ describe("useHomeDashboard", () => {
     const { load, homeDashboard } = useHomeDashboard(gt);
     await load("org1");
     expect(homeDashboard.value).toBeNull();
+  });
+
+  it("a forced load that fails for any reason but 404 keeps the pin", async () => {
+    const { load, homeDashboard } = useHomeDashboard(gt);
+    homeDashboard.value = D;
+    (settings.getSetting as any).mockRejectedValue({ response: { status: 500 } });
+    await load("org1", true);
+    expect(homeDashboard.value).toEqual(D);
+  });
+
+  it("an unpin the server already applied (404) also clears the cached pin", async () => {
+    queryClient.setQueryData(settingKeys.one("org1", "home_dashboard"), D);
+    (settings.deleteOrgSetting as any).mockRejectedValue({ response: { status: 404 } });
+    const { clearHomeDashboard, homeDashboard } = useHomeDashboard(gt);
+    homeDashboard.value = D;
+    await clearHomeDashboard("org1");
+    expect(homeDashboard.value).toBeNull();
+    expect(queryClient.getQueryData(settingKeys.one("org1", "home_dashboard"))).toBeNull();
+    expect(toast).not.toHaveBeenCalled();
   });
 
   it("setHomeDashboard optimistically sets the ref and writes the org setting", async () => {

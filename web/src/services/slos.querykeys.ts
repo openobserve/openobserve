@@ -25,5 +25,4 @@ import { orgKey } from "@/composables/query/keys";
 export const sloKeys = {
   all: (org: string) => orgKey(org, "slos"),
   list: (org: string, folder?: string) => orgKey(org, "slos", "list", folder ?? "all"),
-  detail: (org: string, id: string) => orgKey(org, "slos", "detail", id),
 };

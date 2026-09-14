@@ -24,10 +24,10 @@ import { orgKey } from "@/composables/query/keys";
  */
 export const syntheticsKeys = {
   all: (org: string) => orgKey(org, "synthetics"),
+  /** Every folder's monitor list — the scope a local row patch may touch; agent tokens live beside it. */
+  monitorsAll: (org: string) => orgKey(org, "synthetics", "monitors"),
   monitors: (org: string, folderId?: string) =>
     orgKey(org, "synthetics", "monitors", folderId ?? "all"),
-  detail: (org: string, id: string, folderId?: string) =>
-    orgKey(org, "synthetics", "detail", id, folderId ?? ""),
   agentTokensAll: (org: string) => orgKey(org, "synthetics", "agentTokens"),
   agentTokens: (org: string) => orgKey(org, "synthetics", "agentTokens"),
 };

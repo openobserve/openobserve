@@ -885,6 +885,7 @@ export default defineComponent({
       const shouldRefresh = store.state.incidents?.shouldRefresh || false;
 
       if (allIncidents.value.length === 0 || shouldRefresh) {
+        // Not forced: the drawer's writes drop the cached list, so the observer refetches on its own and forcing here would repeat it.
         await loadIncidents();
         if (shouldRefresh) {
           store.dispatch("incidents/setShouldRefresh", false);

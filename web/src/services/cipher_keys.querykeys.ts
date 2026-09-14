@@ -25,5 +25,4 @@ import { orgKey } from "@/composables/query/keys";
 export const cipherKeyKeys = {
   all: (org: string) => orgKey(org, "settings", "cipherKeys"),
   list: (org: string) => orgKey(org, "settings", "cipherKeys"),
-  detail: (org: string, name: string) => orgKey(org, "settings", "cipherKeys", "detail", name),
 };

@@ -13,11 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange } from "@/composables/query/queryClient";
 import alerts from "./alerts";
 import type { AlertHistoryQuery } from "./alerts";
 import { alertKeys } from "./alerts.querykeys";
+import { anomalyKeys } from "./anomaly_detection.querykeys";
 
 export const alertsListQuery = (
   org: string,
@@ -93,3 +94,51 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
     refetchOnWindowFocus: true,
   });
 };
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** Create or update, chosen by the caller; the scope is `alertKeys.all` because the folder a row lands in is rarely the one on screen. */
+export const saveAlertMutation = (org: string, isUpdate: () => boolean) =>
+  mutationOptions({
+    mutationFn: (vars: { payload: any; folderId?: string }) =>
+      isUpdate()
+        ? alerts.update_by_alert_id(org, vars.payload, vars.folderId)
+        : alerts.create_by_alert_id(org, vars.payload, vars.folderId),
+    // Callers compose their own per-row or per-batch outcome messages.
+    meta: { invalidates: [alertKeys.all(org)], silentError: true },
+  });
+
+/** An anomaly clone also lands in the anomaly configs Overview reads from its own scope. */
+export const cloneAnomalyAlertMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: {
+      alertId: string;
+      data: { name?: string; folder_id?: string; stream_type?: string; stream_name?: string };
+      folderId?: string;
+    }) => alerts.clone_by_id(org, vars.alertId, vars.data, vars.folderId),
+    meta: { invalidates: [alertKeys.all(org), anomalyKeys.all(org)], silentError: true },
+  });
+
+/** Only the anomaly scope drops: the caller patches the list row, since refetching a folder for one cell would lose the scroll. */
+export const retrainAnomalyMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (alertId: string) => alerts.retrain_by_id(org, alertId),
+    meta: { invalidates: [anomalyKeys.all(org)], silentError: true },
+  });
+
+/** Drops nothing: the caller patches the row, since refetching the whole folder for one cell would take the scroll with it. */
+export const toggleAlertStateMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
+      alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
+    // No `silentError`: the list's toggle chain renders no failure of its own, so the central toast is the report.
+    meta: {},
+  });
+
+/** Same write for an anomaly row, which Overview also renders from its own scope. */
+export const toggleAnomalyAlertStateMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { alertId: string; enabled: boolean; folderId?: string }) =>
+      alerts.toggle_state_by_alert_id(org, vars.alertId, vars.enabled, vars.folderId),
+    meta: { invalidates: [anomalyKeys.all(org)] },
+  });

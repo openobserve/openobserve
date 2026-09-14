@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions, useQuery } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions, useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import dashboards from "./dashboards";
 import { dashboardKeys } from "./dashboards.querykeys";
@@ -39,3 +39,14 @@ export const useDashboards = (folderId: () => string | null | undefined) => {
     }),
   );
 };
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** A dashboard imported from an integration tile is new to every folder list. */
+export const createDashboardMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { json: any; folderId: string }) =>
+      dashboards.create(org, vars.json, vars.folderId),
+    // The tile composes its own per-integration success and failure toasts.
+    meta: { invalidates: [dashboardKeys.all(org)], silentError: true },
+  });

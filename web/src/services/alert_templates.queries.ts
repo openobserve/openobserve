@@ -39,3 +39,16 @@ export const saveTemplateMutation = (org: string, isUpdate: () => boolean) =>
     // The form composes its own success/error toasts.
     meta: { invalidates: [templateKeys.all(org)], silentError: true },
   });
+
+export const deleteTemplateMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (name: string) => template.delete({ org_identifier: org, template_name: name }),
+    // The list renders its own toasts and prunes its rows in place.
+    meta: { invalidates: [templateKeys.all(org)], silentError: true },
+  });
+
+export const bulkDeleteTemplatesMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (names: string[]) => template.bulkDelete(org, { ids: names }),
+    meta: { invalidates: [templateKeys.all(org)], silentError: true },
+  });

@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { queryOptions } from "@tanstack/vue-query";
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import incidents from "./incidents";
 import { incidentKeys } from "./incidents.querykeys";
 
@@ -22,4 +22,22 @@ export const incidentsQuery = (org: string, status: string, limit: number, offse
     queryKey: incidentKeys.list(org, status, limit, offset),
     queryFn: async () => (await incidents.list(org, status, limit, offset)).data,
     refetchOnWindowFocus: true,
+  });
+
+// ── Writes ──────────────────────────────────────────────────────────────────
+
+/** Dropping the scope is what repaints the list: its `shouldRefresh` store flag only lands on a remount, which the drawer's back button often skips. */
+export const updateIncidentStatusMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id: string; status: "open" | "acknowledged" | "resolved" }) =>
+      incidents.updateStatus(org, vars.id, vars.status),
+    // The drawer reads the response to update its own header and toasts itself.
+    meta: { invalidates: [incidentKeys.all(org)], silentError: true },
+  });
+
+export const updateIncidentMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (vars: { id: string; updates: { title?: string; severity?: string } }) =>
+      incidents.updateIncident(org, vars.id, vars.updates),
+    meta: { invalidates: [incidentKeys.all(org)], silentError: true },
   });

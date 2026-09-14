@@ -1497,7 +1497,11 @@ import incidentsService, {
 } from "@/services/incidents";
 import oncallService from "@/services/oncall";
 import type { OnCallResponse } from "@/ts/interfaces/oncall";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
@@ -1557,6 +1561,12 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { confirm } = useConfirmDialog();
+
+    const incidentOrgId = useOrgId();
+    const updateIncidentStatus = useMutation(() =>
+      updateIncidentStatusMutation(incidentOrgId.value),
+    );
+    const updateIncident = useMutation(() => updateIncidentMutation(incidentOrgId.value));
 
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
@@ -2149,8 +2159,7 @@ export default defineComponent({
         const streamName = firstAlert.stream_name || "default";
 
         // Step 1: Get stream schema (like logs page does)
-        const schemaResponse = await streamService.schema(org, streamName, streamType);
-        const schema = schemaResponse.data;
+        const schema = await queryClient.fetchQuery(streamSchemaQuery(org, streamName, streamType));
 
         // Step 2: Extract schema fields (like logs page does)
         // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
@@ -2689,11 +2698,10 @@ export default defineComponent({
       updating.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
         incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
@@ -2763,8 +2771,9 @@ export default defineComponent({
 
       try {
         const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: nextTitle,
+        const response = await updateIncident.mutateAsync({
+          id: incidentDetails.value.id,
+          updates: { title: nextTitle },
         });
 
         // Update local state with the actual title from the API response
@@ -2895,11 +2904,10 @@ export default defineComponent({
       updating.value = true;
       try {
         const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
 
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
@@ -2947,8 +2955,9 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         const incidentId = incidentDetails.value.id;
-        const response = await incidentsService.updateIncident(org, incidentId, {
-          severity: newSeverity,
+        const response = await updateIncident.mutateAsync({
+          id: incidentId,
+          updates: { severity: newSeverity },
         });
 
         const data = response.data;

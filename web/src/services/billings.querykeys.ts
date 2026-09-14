@@ -24,8 +24,6 @@ import { orgKey } from "@/composables/query/keys";
  */
 export const billingKeys = {
   all: (org: string) => orgKey(org, "billing"),
-  subscription: (org: string) => orgKey(org, "billing", "subscription"),
   invoices: (org: string) => orgKey(org, "billing", "invoices"),
   aiUsage: (org: string) => orgKey(org, "billing", "aiUsage"),
-  groupMembers: (org: string) => orgKey(org, "billing", "groupMembers"),
 };

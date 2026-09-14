@@ -35,7 +35,7 @@
           :experiments="experiments"
           :datasets="datasets"
           @new="openCreate"
-          @refresh="refresh"
+          @refresh="refresh(true)"
           @select="openExperiment"
           @baseline-changed="onBaselineChanged"
           sync-url
@@ -56,7 +56,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { aiExperimentCreateRoute, aiExperimentDetailRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIExperimentsPage" });
@@ -78,12 +81,16 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
   });
 }
 
-async function refresh() {
+// `force` reaches the server: the mount may serve the cached list, but Refresh and post-write reloads must not.
+async function refresh(force = false) {
   if (!orgId.value) return;
   loading.value = true;
   try {
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+    }
     [experiments.value, datasets.value] = await Promise.all([
-      llmExperimentsService.list(orgId.value, { includeSummary: true }),
+      queryClient.fetchQuery(experimentsListQuery(orgId.value)),
       llmDatasetsService.list(orgId.value),
     ]);
   } catch (error: any) {

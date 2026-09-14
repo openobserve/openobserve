@@ -72,3 +72,20 @@ export const deleteEvalEntityMutation = (org: string) =>
     },
     meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
   });
+
+/** Drops the whole online-evals scope: scorers and jobs name their provider, so a rename or delete reaches them too. */
+export const saveProviderMutation = (org: string, isUpdate: () => boolean, id: () => string) =>
+  mutationOptions({
+    mutationFn: (payload: any) =>
+      isUpdate()
+        ? onlineEvalsService.providers.update(org, id(), payload)
+        : onlineEvalsService.providers.create(org, payload),
+    // The form renders the server's validation message against its own fields.
+    meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
+  });
+
+export const deleteProviderMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (id: string) => onlineEvalsService.providers.delete(org, id),
+    meta: { invalidates: [onlineEvalKeys.all(org)], silentError: true },
+  });

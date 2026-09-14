@@ -24,12 +24,6 @@ export const slosQuery = (org: string, folder?: string) =>
     refetchOnWindowFocus: true,
   });
 
-export const sloDetailQuery = (org: string, id: string) =>
-  queryOptions({
-    queryKey: sloKeys.detail(org, id),
-    queryFn: async () => (await slos.get(org, id)).data,
-  });
-
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export const moveSlosMutation = (org: string) =>
@@ -49,5 +43,14 @@ export const setSloEnabledMutation = (org: string) =>
 export const deleteSloMutation = (org: string) =>
   mutationOptions({
     mutationFn: (id: string) => slos.delete(org, id),
+    meta: { invalidates: [sloKeys.all(org)], silentError: true },
+  });
+
+/** Create or update, chosen by the caller — both drop the same scope. */
+export const saveSloMutation = (org: string, isUpdate: () => boolean, id: () => string) =>
+  mutationOptions({
+    mutationFn: (payload: object) =>
+      isUpdate() ? slos.update(org, id(), payload) : slos.create(org, payload),
+    // The form renders the backend's budget rejection verbatim against its own banner.
     meta: { invalidates: [sloKeys.all(org)], silentError: true },
   });

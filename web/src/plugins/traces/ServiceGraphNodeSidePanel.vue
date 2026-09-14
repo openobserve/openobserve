@@ -625,7 +625,8 @@ import {
   K8S_METRIC_GROUP_DEFINITIONS,
 } from "@/utils/metrics/metricGrouping";
 import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import OAgentBadges from "@/components/shared/OAgentBadges.vue";
 import { normalizeSeverity } from "@/utils/sourceEventSeverity";
 import DeployedCode from "@/components/icons/DeployedCode.vue";
@@ -1606,10 +1607,12 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization?.identifier;
         if (!org) return;
-        const res = await genAiAgentMappingService.listAgents(
-          org,
-          Math.trunc(props.timeRange.startTime * 1000),
-          Math.trunc(props.timeRange.endTime * 1000),
+        const res = await queryClient.fetchQuery(
+          genAiAgentsQuery(
+            org,
+            Math.trunc(props.timeRange.startTime * 1000),
+            Math.trunc(props.timeRange.endTime * 1000),
+          ),
         );
         const match = res.agents.find(
           (a) => a.source_stream === props.streamFilter && a.name === behaviorAgentName.value,

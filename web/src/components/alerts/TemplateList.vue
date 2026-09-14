@@ -336,16 +336,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { templatesQuery } from "@/services/alert_templates.queries";
+import {
+  bulkDeleteTemplatesMutation,
+  deleteTemplateMutation,
+  templatesQuery,
+} from "@/services/alert_templates.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { templateKeys } from "@/services/alert_templates.querykeys";
 import { useOrgId } from "@/composables/query/useOrgId";
-import { useQuery } from "@tanstack/vue-query";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
@@ -530,10 +533,7 @@ watch(templatesList.error, (err: any) => {
     message: t("toastMessages.alerts.errorWhilePullingTemplates"),
   });
 });
-// A delete is one row leaving a list the server has already confirmed. Splice it
-// out and prune the shared dependency graph rather than refetching: a refetch
-// blanks the table behind its spinner and a "please wait" toast, which reads as a
-// page reload, and drops the user's scroll and page position with it.
+// Splice the confirmed rows out at once; the mutation's background refetch only spins the refresh button.
 const dropTemplates = (names: string[]) => {
   if (!names.length) return;
   const gone = new Set(names);
@@ -628,15 +628,19 @@ const cloneTemplate = (template: any) => {
     },
   });
 };
+// Mutations rather than direct service calls: their scope reaches every cache the list feeds, on disk too.
+const deleteTemplateWrite = useMutation(() =>
+  deleteTemplateMutation(store.state.selectedOrganization.identifier),
+);
+const bulkDeleteTemplatesWrite = useMutation(() =>
+  bulkDeleteTemplatesMutation(store.state.selectedOrganization.identifier),
+);
 const deleteTemplate = () => {
   const name = confirmDelete.value?.data?.name;
   if (!name) return;
   deletingTemplates.value.add(name);
-  templateService
-    .delete({
-      org_identifier: store.state.selectedOrganization.identifier,
-      template_name: name,
-    })
+  deleteTemplateWrite
+    .mutateAsync(name)
     .then(() => {
       toast({
         variant: "success",
@@ -761,10 +765,8 @@ const bulkDeleteTemplates = () => {
   bulkDeleteLoading.value = true;
   const templateNames = selectedTemplates.value.map((template: any) => template.name);
 
-  templateService
-    .bulkDelete(store.state.selectedOrganization.identifier, {
-      ids: templateNames,
-    })
+  bulkDeleteTemplatesWrite
+    .mutateAsync(templateNames)
     .then((res) => {
       const { successful, unsuccessful } = res.data;
 

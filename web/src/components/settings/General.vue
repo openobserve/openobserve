@@ -583,10 +583,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
-import { configFullQuery } from "@/services/config.queries";
+import { configFullQuery, updateCustomLogoTextMutation } from "@/services/config.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { queryClient } from "@/composables/query/queryClient";
-import { orgSummaryQuery } from "@/services/organizations.queries";
-import { organizationKeys } from "@/services/organizations.querykeys";
+import { orgSummaryQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
 import {
   computed,
   defineComponent,
@@ -669,6 +669,16 @@ export default defineComponent({
     }));
 
     const loadingState = ref(false);
+
+    // Branding is instance-wide, so with no org selected it is written against the default-type org.
+    const brandingOrg = () =>
+      store.state.selectedOrganization?.identifier ||
+      store.state.organizations?.find((o: any) => o.type == "default")?.identifier ||
+      "default";
+    const updateCustomLogoText = useMutation(() => updateCustomLogoTextMutation(brandingOrg()));
+    const updateOrgSettings = useMutation(() =>
+      updateOrgSettingsMutation(store.state?.selectedOrganization?.identifier),
+    );
     const customText = ref("");
     const editingText = ref(false);
     const showAnnouncementBanners = ref(false);
@@ -954,27 +964,24 @@ export default defineComponent({
           ? null
           : Number(maxSeriesRaw);
 
+      // Only the fields this form owns: the backend applies what is present, and Vuex may hold values another admin changed since.
+      const owned = {
+        scrape_interval: Number(value.scrape_interval),
+        max_series_per_query: maxSeriesNum,
+        light_mode_theme_color: customLightColor.value,
+        dark_mode_theme_color: customDarkColor.value,
+      };
+
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: Number(value.scrape_interval),
-          max_series_per_query: maxSeriesNum,
-          light_mode_theme_color: customLightColor.value,
-          dark_mode_theme_color: customDarkColor.value,
+          ...owned,
         });
 
         //update settings in backend
-        await organizations.post_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-          store.state?.organizationData?.organizationSettings,
-        );
-
-        // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
-        await queryClient.invalidateQueries({
-          queryKey: organizationKeys.settings(store.state?.selectedOrganization?.identifier),
-        });
+        await updateOrgSettings.mutateAsync(owned);
 
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";
@@ -1276,13 +1283,6 @@ export default defineComponent({
 
     const updateCustomText = () => {
       loadingState.value = true;
-      let orgIdentifier = "default";
-      for (let item of store.state.organizations) {
-        if (item.type == "default") {
-          orgIdentifier = item.identifier;
-        }
-      }
-
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
         toast({
@@ -1293,12 +1293,9 @@ export default defineComponent({
         return;
       }
 
-      settingsService
-        .updateCustomText(
-          store.state.selectedOrganization?.identifier || orgIdentifier,
-          "custom_logo_text",
-          customText.value,
-        )
+      // Returned so a caller can await the write.
+      return updateCustomLogoText
+        .mutateAsync(customText.value)
         .then(async (res: any) => {
           if (res.status == 200) {
             toast({

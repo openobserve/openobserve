@@ -26,6 +26,11 @@ import type { StreamPageParams } from "./stream";
 export const streamKeys = {
   all: (org: string) => orgKey(org, "streams"),
   nameList: (org: string, type: string) => orgKey(org, "streams", "nameList", type),
+  /** Every paginated Log Streams page, any type — the scope a delete or forced read drops. */
+  pagesAll: (org: string) => orgKey(org, "streams", "page"),
   page: (org: string, type: string, params: StreamPageParams) =>
     orgKey(org, "streams", "page", type || "all", params),
+  /** One entry per stream, not per caller — the list queries deliberately fetch with `schema: false`. */
+  schema: (org: string, type: string, streamName: string) =>
+    orgKey(org, "streams", "schema", type || "all", streamName),
 };

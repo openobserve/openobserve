@@ -359,7 +359,8 @@ import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import KpiCardsSkeleton from "./KpiCardsSkeleton.vue";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type { EvalJob, Provider, Scorer, ScoreConfig } from "@/services/online-evals.service";
 import { dataTypeOf, entityId } from "../utils/evalEntity";
 import { useScorerRuns, type RunRow, type ScorerRunsWindow } from "../composables/useScorerRuns";
@@ -522,7 +523,7 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
 async function loadAgents() {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const response = await queryClient.fetchQuery(genAiAgentsQuery(orgId.value, startUs, endUs));
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&

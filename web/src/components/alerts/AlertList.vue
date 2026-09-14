@@ -814,7 +814,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
-        @refresh:templates="getTemplates"
+        @refresh:templates="refreshTemplates"
       />
     </template>
     <template v-else>
@@ -929,7 +929,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { alertDetailQuery } from "@/services/alerts.queries";
 import { alertsListQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
+import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
+import { dropPersistedCopies } from "@/composables/query/persisters";
+import {
+  cloneAnomalyAlertMutation,
+  retrainAnomalyMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
+} from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import {
   defineComponent,
@@ -2428,9 +2438,20 @@ export default defineComponent({
         );
     };
 
-    const getTemplates = () => {
-      queryClient
-        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+    const getTemplates = (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
+      // The mount read stays cache-first; only the form's refresh button forces a server read.
+      const ready = force
+        ? dropPersistedCopies(options.queryKey, true).then(() =>
+            queryClient.invalidateQueries({
+              queryKey: options.queryKey,
+              exact: true,
+              refetchType: "none",
+            }),
+          )
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
         .then((list: any) => {
           templates.value = list;
         })
@@ -2441,6 +2462,8 @@ export default defineComponent({
           }),
         );
     };
+    // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
+    const refreshTemplates = () => getTemplates(true);
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
     // Restored the same way as pageSize above, so returning from add/edit/detail lands back on the page the user was viewing instead of resetting to page 1.
@@ -2507,17 +2530,16 @@ export default defineComponent({
           timeout: 0,
         });
         try {
-          await alertsService.clone_by_id(
-            store.state.selectedOrganization.identifier,
-            toBeClonedID.value,
-            {
+          await cloneAnomalyAlert.mutateAsync({
+            alertId: toBeClonedID.value,
+            data: {
               name: toBeCloneAlertName.value,
               folder_id: (folderIdToBeCloned.value as string) || "default",
               stream_type: toBeClonestreamType.value,
               stream_name: toBeClonestreamName.value,
             },
-            folderIdToBeCloned.value,
-          );
+            folderId: folderIdToBeCloned.value,
+          });
           dismiss();
           toast({
             variant: "success",
@@ -2706,6 +2728,46 @@ export default defineComponent({
         page: "Add Alert",
       });
     };
+    const alertWriteOrgId = useOrgId();
+    const toggleAlertStateWrite = useMutation(() =>
+      toggleAlertStateMutation(alertWriteOrgId.value),
+    );
+    const toggleAnomalyState = useMutation(() =>
+      toggleAnomalyAlertStateMutation(alertWriteOrgId.value),
+    );
+    const cloneAnomalyAlert = useMutation(() => cloneAnomalyAlertMutation(alertWriteOrgId.value));
+    const retrainAnomalyAlert = useMutation(() => retrainAnomalyMutation(alertWriteOrgId.value));
+
+    // Only the entries that hold alert rows: the same scope also holds templates, destinations, sources and history, which a patch would re-stamp as fresh.
+    const ALERT_ROW_KEYS = ["list", "search", "dependencies"];
+    const alertRowEntries = (org: string) => ({
+      queryKey: alertKeys.all(org),
+      predicate: (q: any) => ALERT_ROW_KEYS.includes(q.queryKey[3]),
+    });
+    // Table rows are mapped copies, so a local field flip must also reach the cached raw rows every folder revisit re-renders from.
+    const patchCachedAlert = (alertId: any, patch: Record<string, any>) => {
+      if (!alertId) return;
+      const id = String(alertId);
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        let hit = false;
+        const next = cached.map((r: any) => {
+          if (String(r?.alert_id ?? r?.anomaly_id ?? r?.id) !== id) return r;
+          hit = true;
+          return { ...r, ...patch };
+        });
+        // `undefined` leaves an entry without this alert untouched instead of re-stamping it as fresh.
+        return hit ? next : undefined;
+      });
+      // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.detail(org, id),
+        exact: true,
+        refetchType: "none",
+      });
+    };
+
     // A delete is one row leaving a list the server has already confirmed. Splice
     // it out — of the rows, the filtered view, the selection AND the per-folder
     // cache a folder revisit is served from — instead of refetching every alert in
@@ -2716,6 +2778,10 @@ export default defineComponent({
       if (!gone.size) return;
 
       const keep = (row: any) => !gone.has(String(row?.alert_id));
+      // Read before the splice below removes the rows this has to inspect.
+      const droppedAnomaly = allAlerts.value.some(
+        (row: any) => !keep(row) && row?.type === "anomaly",
+      );
       allAlerts.value = allAlerts.value.filter(keep);
       filteredResults.value = filteredResults.value.filter(keep);
       // Anything that failed to delete stays selected, so a bulk retry is one click.
@@ -2741,12 +2807,17 @@ export default defineComponent({
       // splice the rows out of every one of them too, and drop each deleted
       // alert's detail entry outright.
       const org = store.state.selectedOrganization.identifier;
-      queryClient.setQueriesData({ queryKey: alertKeys.all(org) }, (cached: any) =>
-        Array.isArray(cached) ? cached.filter(keep) : cached,
-      );
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        const next = cached.filter(keep);
+        return next.length === cached.length ? undefined : next;
+      });
       gone.forEach((id: string) =>
-        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id) }),
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
       );
+
+      // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
+      if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
 
       // The alert is gone from every destination and template that referenced it.
       invalidateDependencyGraphCache();
@@ -2855,24 +2926,30 @@ export default defineComponent({
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
 
-      alertsService
-        .toggle_state_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-          !row?.enabled,
-          activeFolderId.value,
-        )
+      // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
+      const toggle = row.type === "anomaly" ? toggleAnomalyState : toggleAlertStateWrite;
+
+      toggle
+        .mutateAsync({
+          alertId: row.alert_id,
+          enabled: !row?.enabled,
+          folderId: activeFolderId.value,
+        })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
           filteredResults.value.forEach((alert: any) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
+          patchCachedAlert(row.alert_id, { enabled: isEnabled });
           toast({
             variant: "success",
             message: isEnabled
               ? t("toastMessages.alerts.alertResumedSuccessfully")
               : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
+        })
+        .catch(() => {
+          /* the mutation handler already toasts the failure; this only keeps the rejection handled */
         })
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
@@ -3005,11 +3082,10 @@ export default defineComponent({
 
     const retrainAnomaly = async (row: any) => {
       try {
-        await alertsService.retrain_by_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-        );
+        await retrainAnomalyAlert.mutateAsync(row.alert_id);
         row.status = "training";
+        // Patched, not invalidated: refetching the whole folder for one cell would take the scroll with it.
+        patchCachedAlert(row.alert_id, { status: "training" });
         toast({
           variant: "success",
           message: t("toastMessages.alerts.retrainingTriggered"),
@@ -3676,6 +3752,7 @@ export default defineComponent({
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,
+      refreshTemplates,
       exportAlert,
       showExportDialog,
       alertsToExport,

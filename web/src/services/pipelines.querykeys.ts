@@ -25,7 +25,6 @@ import { orgKey } from "@/composables/query/keys";
 export const pipelineKeys = {
   all: (org: string) => orgKey(org, "pipelines"),
   list: (org: string) => orgKey(org, "pipelines", "list"),
-  detail: (org: string, name: string) => orgKey(org, "pipelines", "detail", name),
   history: (org: string, params: Record<string, unknown>) =>
     orgKey(org, "pipelines", "history", params),
 };

@@ -584,7 +584,8 @@ import useSqlSuggestions from "@/composables/useSuggestions";
 import { computed, defineComponent, ref, watch, type PropType } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   ANOMALY_FILTER_OPERATORS,
   operatorNeedsValue,
@@ -879,12 +880,9 @@ export default defineComponent({
       }
       loadingFields.value = true;
       try {
-        const res = await streamService.schema(
-          store.state.selectedOrganization.identifier,
-          streamName,
-          streamType,
+        const schema = await queryClient.fetchQuery(
+          streamSchemaQuery(store.state.selectedOrganization.identifier, streamName, streamType),
         );
-        const schema = res.data;
         const fieldsArray =
           schema.uds_schema && schema.uds_schema.length > 0
             ? schema.uds_schema

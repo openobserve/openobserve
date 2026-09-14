@@ -251,8 +251,9 @@ import usePipelines from "@/composables/usePipelines";
 
 import config from "@/aws-exports";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { queryClient } from "@/composables/query/queryClient";
-import { pipelineKeys } from "@/services/pipelines.querykeys";
+import { savePipelineMutation } from "@/services/pipelines.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 
 const PipelineFlow = defineAsyncComponent(() => import("@/plugins/pipelines/PipelineFlow.vue"));
 
@@ -299,6 +300,7 @@ const pipeline = ref<Pipeline>({
 
 const router = useRouter();
 const store = useStore();
+const orgId = useOrgId();
 const { isDark } = useTheme();
 
 const confirmDialogMeta: any = ref({
@@ -381,6 +383,10 @@ const {
   closeStepPicker,
   onDragStart,
 } = useDragAndDrop(t);
+
+const savePipelineWrite = useMutation(() =>
+  savePipelineMutation(orgId.value, () => pipelineObj.isEditPipeline),
+);
 
 // Items for the shared step picker: the downstream-addable node types
 // (Transform + Destination; sources aren't "added after" a node).
@@ -906,22 +912,10 @@ const onSubmitPipeline = async () => {
     timeout: 0,
   });
 
-  const saveOperation = pipelineObj.isEditPipeline
-    ? pipelineService.updatePipeline({
-        data: pipelineObj.currentSelectedPipeline,
-        org_identifier: store.state.selectedOrganization.identifier,
-      })
-    : pipelineService.createPipeline({
-        data: pipelineObj.currentSelectedPipeline,
-        org_identifier: store.state.selectedOrganization.identifier,
-      });
+  const saveOperation = savePipelineWrite.mutateAsync(pipelineObj.currentSelectedPipeline);
 
   saveOperation
     .then(() => {
-      // Drop the scope the list renders from, or the router.push below lands on pre-save rows.
-      void queryClient.invalidateQueries({
-        queryKey: pipelineKeys.all(store.state.selectedOrganization.identifier),
-      });
       if (pipelineObj.isEditPipeline && showJsonEditorDialog.value == false) {
         pipelineObj.isEditPipeline = false;
 

@@ -307,6 +307,8 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
+import { cloneExperimentMutation } from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
@@ -606,6 +608,9 @@ function canSetBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline || experiment.status === "completed";
 }
 
+// The clone is a new row the list this returns to would otherwise miss.
+const cloneExperimentWrite = useMutation(() => cloneExperimentMutation(props.orgId));
+
 // Cloning opens the create form seeded from the source rather than starting a
 // run outright: a clone costs a full execution, and the reason for making one is
 // almost always to change something first.
@@ -616,7 +621,7 @@ async function cloneExperiment(experiment: LlmExperiment) {
   }
   cloningId.value = experiment.id;
   try {
-    const clone = await llmExperimentsService.clone(props.orgId, experiment.id);
+    const clone = await cloneExperimentWrite.mutateAsync({ experimentId: experiment.id });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(props.orgId, clone.id));
   } catch (error: any) {

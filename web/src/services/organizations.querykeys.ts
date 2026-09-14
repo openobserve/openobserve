@@ -24,7 +24,6 @@ import { orgKey } from "@/composables/query/keys";
  */
 export const organizationKeys = {
   settings: (org: string) => orgKey(org, "organizations", "settings"),
-  list: (org: string) => orgKey(org, "organizations", "list"),
   summary: (org: string) => orgKey(org, "organizations", "summary"),
   cleanupTasksAll: (org: string) => orgKey(org, "organizations", "cleanupTasks"),
   cleanupTasks: (org: string, targetOrg: string) =>

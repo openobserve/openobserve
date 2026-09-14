@@ -29,6 +29,4 @@ export const iamKeys = {
   roles: (org: string) => orgKey(org, "iam", "roles"),
   resourcesAll: (org: string) => orgKey(org, "iam", "resources"),
   resources: (org: string) => orgKey(org, "iam", "resources"),
-  rolePermissions: (org: string, roleName: string) =>
-    orgKey(org, "iam", "roles", "permissions", roleName),
 };

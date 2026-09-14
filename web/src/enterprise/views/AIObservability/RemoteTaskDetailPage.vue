@@ -394,10 +394,14 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { discardRemoteTaskDraftMutation } from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import RemoteTaskSigningPanel from "@/enterprise/components/AIObservability/RemoteTaskSigningPanel.vue";
 import RemoteTaskTestRunPanel from "@/enterprise/components/AIObservability/RemoteTaskTestRunPanel.vue";
 import RemoteTaskDetailSection from "@/enterprise/components/AIObservability/RemoteTaskDetailSection.vue";
-import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
+import { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentDetailRoute } from "./experimentRoutes";
 import {
   DEFAULT_REQUEST_TEMPLATE,
@@ -537,7 +541,9 @@ function openExperiment(row: { id: string }) {
 async function loadUsedBy(name: string) {
   loadingUsedBy.value = true;
   try {
-    const experiments: LlmExperiment[] = await llmExperimentsService.list(orgId.value);
+    const experiments: LlmExperiment[] = await queryClient.fetchQuery(
+      experimentsListQuery(orgId.value),
+    );
     usedBy.value = experiments
       .filter(
         (experiment) =>
@@ -644,6 +650,9 @@ async function refresh() {
   }
 }
 
+// `refresh` only re-reads this page; the tasks list still shows the draft badge.
+const discardDraftWrite = useMutation(() => discardRemoteTaskDraftMutation(orgId.value));
+
 async function discardDraft() {
   const ok = await confirm({
     title: t("aiObservability.remoteTasks.detail.discardDraftTitle"),
@@ -653,7 +662,7 @@ async function discardDraft() {
   });
   if (!ok) return;
   try {
-    await remoteTasksService.discardDraft(orgId.value, entityId.value);
+    await discardDraftWrite.mutateAsync(entityId.value);
     toast({
       variant: "success",
       message: t("aiObservability.remoteTasks.detail.discardDraftSuccess"),

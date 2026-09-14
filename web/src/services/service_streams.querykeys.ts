@@ -15,18 +15,13 @@
 
 import { orgKey } from "@/composables/query/keys";
 
-/**
- * Keys only, dependency-free apart from `orgKey`, so a write in another domain
- * can drop this scope without importing this domain's transport — and so two
- * domains invalidating each other cannot form an import cycle.
- *
- * `all` is the invalidation scope; the rest are entries beneath it.
- */
-export const userKeys = {
-  usersAll: (org: string) => orgKey(org, "iam", "users"),
-  users: (org: string) => orgKey(org, "iam", "users"),
-  /** The roles a user can be assigned in this org. */
-  assignableRoles: (org: string) => orgKey(org, "iam", "users", "assignableRoles"),
-  /** email → role list for every user in the org, in one request. */
-  allUserRoles: (org: string) => orgKey(org, "iam", "users", "allRoles"),
+/** Keys only, so another domain can drop this scope without importing this domain's transport (no import cycle). */
+export const serviceStreamKeys = {
+  all: (org: string) => orgKey(org, "serviceStreams"),
+  semanticGroups: (org: string) => orgKey(org, "serviceStreams", "semanticGroups"),
+  identityConfig: (org: string) => orgKey(org, "serviceStreams", "identityConfig"),
 };
+
+/** Org-scoped keys cannot be swept for every org at once, so the all-org clear has to be a predicate. */
+export const isServiceStreamKey = (queryKey: readonly unknown[], entry: string): boolean =>
+  queryKey[0] === "org" && queryKey[2] === "serviceStreams" && queryKey[3] === entry;

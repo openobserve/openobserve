@@ -197,6 +197,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import { deleteProviderMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   defaultModelOf,
   providerTypeOf,
@@ -226,6 +228,9 @@ const confirmDeleteOpen = ref(false);
 const pendingDeleteRow = ref<Provider | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
+
+// `loadProviders` only refreshes this page; the Online Evals surfaces read `providersQuery`, which the mutation drops.
+const deleteProvider = useMutation(() => deleteProviderMutation(orgId.value));
 
 const columns = computed(() => [
   {
@@ -382,7 +387,7 @@ async function performDelete() {
   const row = pendingDeleteRow.value;
   if (!row) return;
   try {
-    await onlineEvalsService.providers.delete(orgId.value, row.id);
+    await deleteProvider.mutateAsync(row.id);
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),

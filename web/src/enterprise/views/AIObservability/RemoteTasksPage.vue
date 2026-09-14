@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             icon-left="refresh"
             :loading="loading"
             data-test="ai-remote-tasks-refresh-btn"
-            @click="refresh"
+            @click="refresh(true)"
           >
             <OTooltip side="bottom" :content="t('common.refresh')" />
           </OButton>
@@ -237,7 +237,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
-import llmExperimentsService from "@/services/llm-experiments.service";
+import { remoteTasksListQuery, experimentsListQuery } from "@/services/llm-experiments.queries";
+import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   canEditRemoteTask,
   remoteTaskState,
@@ -423,7 +425,7 @@ function onEmptyAction(id?: string) {
  *  better than one that fails because a second, unrelated request did. */
 async function loadReferenceCounts() {
   try {
-    const experiments = await llmExperimentsService.list(orgId.value);
+    const experiments = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
     const counts: Record<string, number> = {};
     for (const experiment of experiments) {
       if (experiment.task?.type !== "remote") continue;
@@ -437,12 +439,16 @@ async function loadReferenceCounts() {
   }
 }
 
-async function refresh() {
+// `force` reaches the server: the mount may serve the cached list, but Refresh and the post-delete reload must not.
+async function refresh(force = false) {
   if (!orgId.value) return;
   loading.value = true;
   forbidden.value = false;
   try {
-    tasks.value = await remoteTasksService.list(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: remoteTaskKeys.all(orgId.value) });
+    }
+    tasks.value = await queryClient.fetchQuery(remoteTasksListQuery(orgId.value));
   } catch (error: any) {
     forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -469,7 +475,7 @@ async function removeTask(row: RemoteTask) {
   try {
     await remoteTasksService.delete(orgId.value, row.entityId);
     toast({ variant: "success", message: t("aiObservability.remoteTasks.delete.success") });
-    await refresh();
+    await refresh(true);
   } catch (error: any) {
     toast({
       variant: "error",

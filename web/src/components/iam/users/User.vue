@@ -907,9 +907,9 @@ export default defineComponent({
       return new Promise((resolve, reject) => {
         (force
           ? queryClient
+              // Not `exact`: the roles list hangs off this key as a child, and a role change is exactly what a forced reload is for.
               .invalidateQueries({
                 queryKey: orgUsersQuery(org).queryKey,
-                exact: true,
                 refetchType: "none",
               })
               .then(() => queryClient.fetchQuery(orgUsersQuery(org)))
@@ -1442,6 +1442,8 @@ export default defineComponent({
               variant: "success",
               message: t("iam.user.orgMemberUpdatedSuccess"),
             });
+            // The role lives in the cached members list; a forced reload is what repaints it.
+            getOrgMembers(true);
           }
           dismiss();
         })

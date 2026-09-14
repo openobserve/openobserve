@@ -15,7 +15,7 @@
 
 import { settingQuery } from "@/services/settings.queries";
 import { settingKeys } from "@/services/settings.querykeys";
-import { queryClient, setPersistedQueryData } from "@/composables/query/queryClient";
+import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
@@ -45,11 +45,7 @@ export function useFavoriteDashboards() {
   const isFavorite = (dashboardId: string) =>
     favorites.value.some((f) => f.dashboardId === dashboardId);
 
-  /**
-   * Cached read — this runs on nearly every Dashboards mount, and the result
-   * survives a reload so the favourites rail paints immediately. `force` is for
-   * the rare caller that must see the server's copy.
-   */
+  /** Cached read — this runs on nearly every Dashboards mount; `force` is for the rare caller that must see the server's copy. */
   const load = async (org: string, userId: string, force = false) => {
     if (!org || !userId) return;
     const apply = (val: unknown) => {
@@ -91,7 +87,7 @@ export function useFavoriteDashboards() {
       : [...prev, d]; // optimistic
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      setPersistedQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch (e: any) {
       favorites.value = prev; // revert
       toast({
@@ -116,7 +112,7 @@ export function useFavoriteDashboards() {
     favorites.value = next;
     try {
       await settings.setUserSetting(org, userId, SETTING_KEY, favorites.value, SETTING_CATEGORY);
-      setPersistedQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
+      queryClient.setQueryData(settingKeys.one(org, SETTING_KEY, userId), favorites.value);
     } catch {
       // The cached copy is now behind the screen; drop it so the next load
       // reconciles from the server.

@@ -229,8 +229,8 @@ import useTheme from "@/composables/useTheme";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
 import useBreakpoint from "@/composables/useBreakpoint";
 import BillingService from "@/services/billings";
-import organizations from "@/services/organizations";
-import { organizationKeys } from "@/services/organizations.querykeys";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { useRouter } from "vue-router";
 import { getImageURL } from "@/utils/zincutils";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -253,6 +253,10 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const { lgUp } = useBreakpoint();
     const store = useStore();
+    // A store read, not useOrgId(): two functions below bind a local `orgId` that a same-named ref would shadow.
+    const updateOrgSettings = useMutation(() =>
+      updateOrgSettingsMutation(store.state.selectedOrganization.identifier),
+    );
     const { isDark } = useTheme();
     const router = useRouter();
     const dataLoading = ref(false);
@@ -307,18 +311,14 @@ export default defineComponent({
     const enableUsageReporting = async () => {
       if (enablingUsage.value) return;
       enablingUsage.value = true;
-      const orgId = store.state.selectedOrganization.identifier;
       const currentSettings = store.state?.organizationData?.organizationSettings ?? {};
-      // Build the merged object once so the POST and the store update can
-      // never drift apart.
+      // Merged for the store only: the POST carries just the opt-in, since the backend applies what is present.
       const updatedSettings = {
         ...currentSettings,
         usage_stream_enabled: true,
       };
       try {
-        await organizations.post_organization_settings(orgId, updatedSettings);
-        // MainLayout re-reads this scope on every org switch and would serve the pre-save payload back.
-        await queryClient.invalidateQueries({ queryKey: organizationKeys.settings(orgId) });
+        await updateOrgSettings.mutateAsync({ usage_stream_enabled: true });
         store.dispatch("setOrganizationSettings", updatedSettings);
         toast({
           variant: "success",
