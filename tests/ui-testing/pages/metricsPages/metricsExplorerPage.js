@@ -51,6 +51,13 @@ export class MetricsExplorerPage {
         // Card data-tests are name-suffixed (`…-card-select-cpu_usage`), so the
         // "any card" locator matches on the stable prefix.
         this.anyCardSelect = '[data-test^="metrics-explorer-card-select-"]';
+        // The same suffixing is why these are prefixes rather than whole selectors:
+        // the metric name is only known at call time. Kept here so every selector
+        // string still lives in one place.
+        this.cardPrefix = 'metrics-explorer-card-';
+        this.cardNoDataPrefix = 'metrics-explorer-card-nodata-';
+        // ECharts mounts more than one canvas per instance (zrender adds layers).
+        this.cardChartCanvas = 'canvas';
 
         // ===== EMPTY STATES =====
         this.noMetricsState = '[data-test="metrics-explorer-no-metrics"]';
@@ -407,6 +414,40 @@ export class MetricsExplorerPage {
                 intervals: [500, 1000, 2000],
             })
             .toBeGreaterThan(0);
+    }
+
+    /* ------------------------------------------------- a card, by metric name */
+
+    cardRoot(metric) {
+        return this.page.locator(`[data-test="${this.cardPrefix}${metric}"]`);
+    }
+
+    /** The inline "No data" tile — MetricCard's `isEmpty` branch. */
+    cardNoData(metric) {
+        return this.page.locator(`[data-test="${this.cardNoDataPrefix}${metric}"]`);
+    }
+
+    /**
+     * A DRAWN chart, not merely a mounted card: the preview renders through
+     * PanelSchemaRenderer, which paints into a canvas only once it has series.
+     */
+    cardChart(metric) {
+        return this.cardRoot(metric).locator(this.cardChartCanvas).first();
+    }
+
+    async expectCardNoData(metric, timeout = 60000) {
+        await expect(
+            this.cardNoData(metric),
+            `${metric} should render the No-data tile`,
+        ).toBeVisible({ timeout });
+    }
+
+    /** Charted means BOTH: a canvas arrived and the No-data tile went away. */
+    async expectCardCharted(metric, timeout = 60000) {
+        await expect(this.cardChart(metric), `${metric} should render a chart`).toBeVisible({
+            timeout,
+        });
+        await expect(this.cardNoData(metric)).toBeHidden();
     }
 
     /* ----------------------------------------------------------------- share */
