@@ -84,7 +84,7 @@ const SERVICE: &str = "service";
 const PARENT_SPAN_ID: &str = "reference.parent_span_id";
 const PARENT_TRACE_ID: &str = "reference.parent_trace_id";
 const REF_TYPE: &str = "reference.ref_type";
-const RESERVED_SPAN_FIELDS: [&str; 27] = [
+const RESERVED_SPAN_FIELDS: [&str; 33] = [
     "trace_id",
     "span_id",
     "flags",
@@ -98,6 +98,12 @@ const RESERVED_SPAN_FIELDS: [&str; 27] = [
     inferred::INFER_SERVICE_NAME,
     inferred::INFER_SERVICE_TYPE,
     inferred::INFER_SERVICE_SYSTEM,
+    inferred::INFER_PEER_KEY,
+    inferred::INFER_PEER_PORT,
+    inferred::INFER_PEER_IP,
+    inferred::INFER_SELF_KEY,
+    inferred::INFER_SELF_PORT,
+    inferred::INFER_SELF_IP,
     // DBM identity columns written by crate::db_monitoring::enrich (design D1
     // condition 1): a user span attribute named e.g. `o2.db.fingerprint` gets
     // the attr_ prefix instead of spoofing aggregates.
@@ -291,35 +297,115 @@ fn strip_client_supplied_derived_fields(record_val: &mut Map<String, json::Value
     for field in crate::db_monitoring::ALL_DB_FIELDS {
         record_val.remove(field);
     }
-    record_val.remove(inferred::INFER_SERVICE_NAME);
-    record_val.remove(inferred::INFER_SERVICE_TYPE);
-    record_val.remove(inferred::INFER_SERVICE_SYSTEM);
+    for field in inferred::ALL_INFER_FIELDS {
+        record_val.remove(field);
+    }
 }
 
-/// Save DBM identity columns that the stream's UDS field list does NOT include,
-/// so they can be re-inserted after `refactor_map` strips unlisted fields —
-/// they are aggregation keys, not user attributes (design D1 condition 2; same
-/// guarantee [`restore_canonical_agent_fields`] provides for gen_ai identity).
-/// Columns the UDS list DOES include are left to `refactor_map` itself.
-fn save_db_fields_for_uds(
+/// Save the derived identity columns a UDS list omits; they are keys, not user attrs (D1 cond. 2).
+fn save_derived_fields_for_uds(
     record_val: &Map<String, json::Value>,
     fields: &HashSet<String>,
 ) -> Vec<(&'static str, json::Value)> {
     crate::db_monitoring::ALL_DB_FIELDS
         .iter()
+        .chain(inferred::ALL_INFER_FIELDS.iter())
         .filter(|f| !fields.contains(**f))
         .filter_map(|f| record_val.get(*f).map(|v| (*f, v.clone())))
         .collect()
 }
 
-/// Re-insert the fields captured by [`save_db_fields_for_uds`].
-fn restore_db_fields(
+fn restore_derived_fields(
     record_val: &mut Map<String, json::Value>,
     saved: Vec<(&'static str, json::Value)>,
 ) {
     for (field, value) in saved {
         record_val.insert(field.to_string(), value);
     }
+}
+
+/// Service-graph join keys of one span, as columns; an absent value yields no column at all.
+fn derive_service_graph_fields<F>(span_kind: i32, get_attr: F) -> Vec<(&'static str, json::Value)>
+where
+    F: Fn(&str) -> Option<String>,
+{
+    let mut fields: Vec<(&'static str, json::Value)> = Vec::new();
+    if let Some(peer) = inferred::derive_peer_keys(span_kind, &get_attr) {
+        if let Some(key) = peer.key {
+            fields.push((inferred::INFER_PEER_KEY, key.into()));
+        }
+        if let Some(port) = peer.port {
+            fields.push((inferred::INFER_PEER_PORT, port.into()));
+        }
+        if let Some(ip) = peer.ip {
+            fields.push((inferred::INFER_PEER_IP, ip.into()));
+        }
+    }
+    if let Some(own) = inferred::derive_self_keys(span_kind, &get_attr) {
+        if let Some(key) = own.key {
+            fields.push((inferred::INFER_SELF_KEY, key.into()));
+        }
+        if let Some(port) = own.port {
+            fields.push((inferred::INFER_SELF_PORT, port.into()));
+        }
+        if let Some(ip) = own.ip {
+            fields.push((inferred::INFER_SELF_IP, ip.into()));
+        }
+    }
+    fields
+}
+
+/// Span attributes win over resource attributes; both spellings are tried in each map.
+fn span_graph_attr(
+    key: &str,
+    span_att_map: &HashMap<String, json::Value>,
+    service_att_map: &HashMap<String, json::Value>,
+) -> Option<String> {
+    let flat = key.replace('.', "_");
+    span_att_map
+        .get(key)
+        .or_else(|| span_att_map.get(&flat))
+        .or_else(|| service_att_map.get(key))
+        .or_else(|| service_att_map.get(&flat))
+        .or_else(|| service_att_map.get(&format!("{SERVICE}_{key}")))
+        .or_else(|| service_att_map.get(&format!("{SERVICE}_{flat}")))
+        .and_then(attr_string)
+}
+
+/// Same precedence as [`span_graph_attr`], on the already-flattened JSON record.
+fn record_graph_attr(key: &str, record_val: &Map<String, json::Value>) -> Option<String> {
+    let flat = key.replace('.', "_");
+    record_val
+        .get(key)
+        .or_else(|| record_val.get(&flat))
+        .or_else(|| record_val.get(&format!("{SERVICE}_{key}")))
+        .or_else(|| record_val.get(&format!("{SERVICE}_{flat}")))
+        .and_then(attr_string)
+}
+
+/// Attribute value as a lookup string; JSON-path clients send ports as numbers.
+fn attr_string(value: &json::Value) -> Option<String> {
+    match value {
+        json::Value::String(v) => Some(v.clone()),
+        json::Value::Number(v) => Some(v.to_string()),
+        _ => None,
+    }
+}
+
+/// Parse `span_kind`, rewriting a known kind to the numeric string the OTLP path writes.
+fn normalize_span_kind(record_val: &mut Map<String, json::Value>) -> i32 {
+    let span_kind = match record_val.get("span_kind") {
+        Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
+        Some(v) => v
+            .as_i64()
+            .and_then(|kind| i32::try_from(kind).ok())
+            .unwrap_or(0),
+        None => 0,
+    };
+    if (1..=5).contains(&span_kind) {
+        record_val.insert("span_kind".to_string(), span_kind.to_string().into());
+    }
+    span_kind
 }
 
 fn normalized_trace_key(key: &str) -> String {
@@ -732,6 +818,14 @@ pub async fn handle_otlp_request(
                     }
                 }
 
+                // the self side needs resource attributes too: `k8s.pod.ip` is one
+                let graph_fields = derive_service_graph_fields(span.kind, |key| {
+                    span_graph_attr(key, &span_att_map, &service_att_map)
+                });
+                for (field, value) in graph_fields {
+                    span_att_map.insert(field.to_string(), value);
+                }
+
                 // Database Monitoring: canonical dual-semconv identity + stable
                 // query fingerprint for db CLIENT/PRODUCER spans (o2_db_*,
                 // design §3.1). enrich itself gates on span kind and db-attr
@@ -909,11 +1003,10 @@ pub async fn handle_otlp_request(
                             if let Some(Some(fields)) =
                                 user_defined_schema_map.get(&stream_params.stream_name.to_string())
                             {
-                                // Save DBM identity columns across the UDS
-                                // refactor (design D1 condition 2).
-                                let saved_db_fields = save_db_fields_for_uds(&record_val, fields);
+                                // identity columns are keys, not user attrs (D1 cond. 2)
+                                let saved_fields = save_derived_fields_for_uds(&record_val, fields);
                                 record_val = crate::ingestion::refactor_map(record_val, fields);
-                                restore_db_fields(&mut record_val, saved_db_fields);
+                                restore_derived_fields(&mut record_val, saved_fields);
                             }
                             restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
                             set_o2_ingest_ts(&mut record_val);
@@ -1118,12 +1211,10 @@ fn finalize_and_buffer_trace_span(
         agent_observations,
     );
     if let Some(Some(fields)) = user_defined_schema_map.get(traces_stream_name) {
-        // Save DBM identity columns across the UDS refactor — they are
-        // aggregation keys, not user attributes (design D1 condition 2; same
-        // guarantee restore_canonical_agent_fields provides below).
-        let saved_db_fields = save_db_fields_for_uds(&record_val, fields);
+        // derived identity columns are aggregation and graph keys, not user attributes (D1 cond. 2)
+        let saved_fields = save_derived_fields_for_uds(&record_val, fields);
         record_val = crate::ingestion::refactor_map(record_val, fields);
-        restore_db_fields(&mut record_val, saved_db_fields);
+        restore_derived_fields(&mut record_val, saved_fields);
     }
     restore_canonical_agent_fields(&mut record_val, canonical_agent_fields);
     set_o2_ingest_ts(&mut record_val);
@@ -1265,11 +1356,7 @@ pub async fn ingest_json(
         // the raw attributes still on the record (design D1 condition 1).
         strip_client_supplied_derived_fields(&mut record_val);
 
-        let span_kind = match record_val.get("span_kind") {
-            Some(json::Value::String(s)) => inferred::span_kind_to_i32(s),
-            Some(v) => v.as_i64().unwrap_or(0) as i32,
-            None => 0,
-        };
+        let span_kind = normalize_span_kind(&mut record_val);
 
         // Derive inferred service fields (data from sources that did not run
         // the OTLP-side derivation, e.g. older versions or pipeline re-ingest —
@@ -1291,6 +1378,13 @@ pub async fn ingest_json(
             if let Some(system) = inferred_svc.system {
                 record_val.insert(inferred::INFER_SERVICE_SYSTEM.to_string(), system.into());
             }
+        }
+
+        // resource attributes are already `service_`-prefixed and flattened on this path
+        let graph_fields =
+            derive_service_graph_fields(span_kind, |key| record_graph_attr(key, &record_val));
+        for (field, value) in graph_fields {
+            record_val.insert(field.to_string(), value);
         }
 
         // Database Monitoring identity (design §3.1) — same re-derivation
@@ -2095,7 +2189,7 @@ mod tests {
     #[test]
     fn test_reserved_span_fields() {
         let reserved_span_fields = &super::RESERVED_SPAN_FIELDS;
-        assert_eq!(reserved_span_fields.len(), 27);
+        assert_eq!(reserved_span_fields.len(), 33);
         // All eleven DBM identity columns are reserved (design D1 condition 1).
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             assert!(
@@ -2103,14 +2197,18 @@ mod tests {
                 "missing DBM reserved field {field}"
             );
         }
+        // Same for every column the inferred module derives (design §3).
+        for field in super::inferred::ALL_INFER_FIELDS {
+            assert!(
+                reserved_span_fields.contains(&field),
+                "missing inferred reserved field {field}"
+            );
+        }
         assert!(reserved_span_fields.contains(&"_timestamp"));
         assert!(reserved_span_fields.contains(&"duration"));
         assert!(reserved_span_fields.contains(&"start_time"));
         assert!(reserved_span_fields.contains(&"end_time"));
         assert!(reserved_span_fields.contains(&"service_name"));
-        assert!(reserved_span_fields.contains(&"infer_service_name"));
-        assert!(reserved_span_fields.contains(&"infer_service_type"));
-        assert!(reserved_span_fields.contains(&"infer_service_system"));
         assert!(reserved_span_fields.contains(&"trace_id"));
         assert!(reserved_span_fields.contains(&"span_id"));
         assert!(reserved_span_fields.contains(&"events"));
@@ -2576,6 +2674,12 @@ mod tests {
         record_val.insert("infer_service_name".to_string(), json::json!("evil-svc"));
         record_val.insert("infer_service_type".to_string(), json::json!("database"));
         record_val.insert("infer_service_system".to_string(), json::json!("spoofql"));
+        record_val.insert("infer_peer_key".to_string(), json::json!("evil-peer"));
+        record_val.insert("infer_peer_port".to_string(), json::json!(1));
+        record_val.insert("infer_peer_ip".to_string(), json::json!("10.0.0.1"));
+        record_val.insert("infer_self_key".to_string(), json::json!("evil-self"));
+        record_val.insert("infer_self_port".to_string(), json::json!(2));
+        record_val.insert("infer_self_ip".to_string(), json::json!("10.0.0.2"));
 
         super::strip_client_supplied_derived_fields(&mut record_val);
 
@@ -2585,9 +2689,12 @@ mod tests {
                 "client-supplied {field} must not survive the JSON path"
             );
         }
-        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_NAME));
-        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_TYPE));
-        assert!(!record_val.contains_key(super::inferred::INFER_SERVICE_SYSTEM));
+        for field in super::inferred::ALL_INFER_FIELDS {
+            assert!(
+                !record_val.contains_key(field),
+                "client-supplied {field} must not survive the JSON path"
+            );
+        }
         // Ordinary keys are untouched — re-derivation has its raw inputs.
         assert_eq!(
             record_val.get("db_system").and_then(|v| v.as_str()),
@@ -2685,13 +2792,13 @@ mod tests {
         record_val.insert("o2_db_system".to_string(), json::json!("postgresql"));
         let fields: HashSet<String> = HashSet::from(["o2_db_fingerprint".to_string()]);
 
-        let saved = super::save_db_fields_for_uds(&record_val, &fields);
+        let saved = super::save_derived_fields_for_uds(&record_val, &fields);
         // Listed field is not saved (refactor_map will keep it); unlisted is.
         assert!(saved.iter().all(|(name, _)| *name != "o2_db_fingerprint"));
         assert!(saved.iter().any(|(name, _)| *name == "o2_db_system"));
 
         record_val.remove("o2_db_system"); // simulate refactor_map stripping it
-        super::restore_db_fields(&mut record_val, saved);
+        super::restore_derived_fields(&mut record_val, saved);
         assert_eq!(
             record_val.get("o2_db_system").and_then(|v| v.as_str()),
             Some("postgresql")
@@ -2927,5 +3034,234 @@ mod tests {
             json!("response"),
         );
         assert!(super::detect_llm_stream(|k| map.contains_key(k)));
+    }
+
+    #[test]
+    fn test_span_attribute_key_blocks_infer_field_spoofing() {
+        // a user span attribute must not be able to write a derived column (design §3)
+        let service_att_map = std::collections::HashMap::new();
+        for field in super::inferred::ALL_INFER_FIELDS {
+            let dotted = field.replace('_', ".");
+            assert_eq!(
+                super::span_attribute_key(dotted.clone(), &service_att_map),
+                format!("attr_{dotted}"),
+                "dotted form of {field} must be attr_-prefixed"
+            );
+            assert_eq!(
+                super::span_attribute_key(field.to_string(), &service_att_map),
+                format!("attr_{field}"),
+                "literal {field} must be attr_-prefixed"
+            );
+        }
+    }
+
+    #[test]
+    fn test_finalize_keeps_infer_fields_under_uds() {
+        // a UDS list that omits the graph keys must not strip them (design §3)
+        use std::collections::{HashMap, HashSet};
+
+        use config::{meta::gen_ai::GenAiAgentMappingConfig, utils::json};
+
+        let value = json::json!({
+            "trace_id": "5b8efff798038103d269b633813fc60c",
+            "span_id": "eee19b7ec3c1b174",
+            "service_name": "svc",
+            "duration": 5,
+            "_timestamp": 1722172800000000i64,
+            "infer_service_name": "orders",
+            "infer_peer_key": "orders-db.prod",
+            "infer_peer_port": 5432,
+            "infer_peer_ip": "10.0.0.8",
+            "junk_attr": "should be stripped by UDS"
+        });
+        let mut uds: HashMap<String, Option<HashSet<String>>> = HashMap::new();
+        uds.insert(
+            "default".to_string(),
+            Some(HashSet::from([
+                "trace_id".to_string(),
+                "span_id".to_string(),
+                "service_name".to_string(),
+                "duration".to_string(),
+                config::TIMESTAMP_COL_NAME.to_string(),
+            ])),
+        );
+        let mut partial = super::ExportTracePartialSuccess::default();
+        let mut out: HashMap<String, super::O2IngestJsonData> = HashMap::new();
+        let mut observations: super::AgentObservationBuffer = Default::default();
+
+        let ok = super::finalize_and_buffer_trace_span(
+            value,
+            "org1",
+            &uds,
+            "default",
+            &GenAiAgentMappingConfig::default(),
+            &mut partial,
+            &mut out,
+            &mut observations,
+        );
+        assert!(ok);
+        let (ts_data, _) = out.get("default").unwrap();
+        let record = &ts_data[0].1;
+        assert!(!record.contains_key("junk_attr"));
+        assert_eq!(
+            record.get("infer_service_name").and_then(|v| v.as_str()),
+            Some("orders")
+        );
+        assert_eq!(
+            record.get("infer_peer_key").and_then(|v| v.as_str()),
+            Some("orders-db.prod")
+        );
+        assert_eq!(
+            record.get("infer_peer_port").and_then(|v| v.as_i64()),
+            Some(5432)
+        );
+        assert_eq!(
+            record.get("infer_peer_ip").and_then(|v| v.as_str()),
+            Some("10.0.0.8")
+        );
+    }
+
+    #[test]
+    fn test_uds_save_restore_covers_infer_fields_only_when_unlisted() {
+        use std::collections::HashSet;
+
+        use config::utils::json;
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert("infer_peer_key".to_string(), json::json!("orders-db.prod"));
+        record_val.insert("infer_self_key".to_string(), json::json!("cart.svc"));
+        let fields: HashSet<String> = HashSet::from(["infer_peer_key".to_string()]);
+
+        let saved = super::save_derived_fields_for_uds(&record_val, &fields);
+        assert!(saved.iter().all(|(name, _)| *name != "infer_peer_key"));
+        assert!(saved.iter().any(|(name, _)| *name == "infer_self_key"));
+
+        record_val.remove("infer_self_key"); // simulate refactor_map stripping it
+        super::restore_derived_fields(&mut record_val, saved);
+        assert_eq!(
+            record_val.get("infer_self_key").and_then(|v| v.as_str()),
+            Some("cart.svc")
+        );
+        assert_eq!(
+            record_val.get("infer_peer_key").and_then(|v| v.as_str()),
+            Some("orders-db.prod")
+        );
+    }
+
+    #[test]
+    fn test_normalize_span_kind_on_json_path() {
+        // the rollup matches span_kind IN ('2','5'), so a known kind is stored numerically
+        use config::utils::json;
+
+        for (input, expected_value, expected_kind) in [
+            (json::json!("SPAN_KIND_SERVER"), json::json!("2"), 2),
+            (json::json!(2), json::json!("2"), 2),
+            (json::json!("2"), json::json!("2"), 2),
+            (json::json!("SPAN_KIND_CONSUMER"), json::json!("5"), 5),
+            (json::json!("garbage"), json::json!("garbage"), 0),
+            // 2^32 + 2 must not narrow into SPAN_KIND_SERVER and overwrite the client's value
+            (json::json!(4294967298i64), json::json!(4294967298i64), 0),
+            (json::json!(-1), json::json!(-1), -1),
+            (json::json!("0"), json::json!("0"), 0),
+            (json::json!(9), json::json!(9), 9),
+        ] {
+            let mut record_val: json::Map<String, json::Value> = json::Map::new();
+            record_val.insert("span_kind".to_string(), input.clone());
+            let kind = super::normalize_span_kind(&mut record_val);
+            assert_eq!(kind, expected_kind, "kind for {input}");
+            assert_eq!(record_val.get("span_kind"), Some(&expected_value));
+        }
+
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        assert_eq!(super::normalize_span_kind(&mut record_val), 0);
+        assert!(!record_val.contains_key("span_kind"));
+    }
+
+    #[test]
+    fn test_graph_attr_span_attribute_wins_over_resource() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        // the span carries the flattened spelling, the resource the dotted one
+        for resource_key in ["server.address", "service_server.address"] {
+            let span_att_map: HashMap<String, json::Value> =
+                HashMap::from([("server_address".to_string(), json::json!("orders.svc"))]);
+            let service_att_map: HashMap<String, json::Value> =
+                HashMap::from([(resource_key.to_string(), json::json!("gateway.svc"))]);
+            let derived: HashMap<&str, json::Value> =
+                super::derive_service_graph_fields(3, |key| {
+                    super::span_graph_attr(key, &span_att_map, &service_att_map)
+                })
+                .into_iter()
+                .collect();
+            assert_eq!(
+                derived.get("infer_peer_key"),
+                Some(&json::json!("orders.svc")),
+                "resource key {resource_key}"
+            );
+        }
+
+        // the same span, flattened, must derive the same key on the JSON path
+        let mut record_val: json::Map<String, json::Value> = json::Map::new();
+        record_val.insert("server_address".to_string(), json::json!("orders.svc"));
+        record_val.insert(
+            "service_server_address".to_string(),
+            json::json!("gateway.svc"),
+        );
+        let derived: HashMap<&str, json::Value> =
+            super::derive_service_graph_fields(3, |key| super::record_graph_attr(key, &record_val))
+                .into_iter()
+                .collect();
+        assert_eq!(
+            derived.get("infer_peer_key"),
+            Some(&json::json!("orders.svc"))
+        );
+    }
+
+    #[test]
+    fn test_derive_service_graph_fields_by_span_kind() {
+        use std::collections::HashMap;
+
+        use config::utils::json;
+
+        let attrs: HashMap<String, json::Value> = HashMap::from([
+            ("server.address".to_string(), json::json!("orders-db.prod")),
+            ("server.port".to_string(), json::json!(5432)),
+            ("net.peer.ip".to_string(), json::json!("10.0.0.8")),
+            ("service_k8s.pod.ip".to_string(), json::json!("10.42.0.7")),
+        ]);
+        let lookup = |key: &str| {
+            attrs
+                .get(key)
+                .or_else(|| attrs.get(&format!("service_{key}")))
+                .and_then(super::attr_string)
+        };
+
+        let client: HashMap<&str, json::Value> = super::derive_service_graph_fields(3, lookup)
+            .into_iter()
+            .collect();
+        assert_eq!(
+            client.get("infer_peer_key"),
+            Some(&json::json!("orders-db.prod"))
+        );
+        assert_eq!(client.get("infer_peer_port"), Some(&json::json!(5432)));
+        assert_eq!(client.get("infer_peer_ip"), Some(&json::json!("10.0.0.8")));
+        assert!(!client.contains_key("infer_self_key"));
+
+        let server: HashMap<&str, json::Value> = super::derive_service_graph_fields(2, lookup)
+            .into_iter()
+            .collect();
+        assert_eq!(
+            server.get("infer_self_key"),
+            Some(&json::json!("orders-db.prod"))
+        );
+        assert_eq!(server.get("infer_self_port"), Some(&json::json!(5432)));
+        assert_eq!(server.get("infer_self_ip"), Some(&json::json!("10.42.0.7")));
+        assert!(!server.contains_key("infer_peer_key"));
+
+        for kind in [0, 1] {
+            assert!(super::derive_service_graph_fields(kind, lookup).is_empty());
+        }
     }
 }

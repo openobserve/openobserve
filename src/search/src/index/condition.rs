@@ -13,26 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{
-    fmt::{self, Debug, Formatter},
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use config::{
     INDEX_FIELD_NAME_FOR_ALL, get_config,
-    meta::inverted_index::UNKNOWN_NAME,
     tantivy::{query::contains_query::ContainsQuery, tokenizer::o2_collect_search_tokens},
 };
 use datafusion::{
-    arrow::datatypes::{DataType, SchemaRef},
+    arrow::datatypes::DataType,
     config::ConfigOptions,
     logical_expr::Operator,
-    physical_expr::{ScalarFunctionExpr, conjunction},
+    physical_expr::ScalarFunctionExpr,
     physical_plan::{
         PhysicalExpr,
-        expressions::{
-            BinaryExpr, CastExpr, Column, InListExpr, IsNotNullExpr, LikeExpr, Literal, NotExpr,
-        },
+        expressions::{BinaryExpr, Column, InListExpr, Literal, NotExpr},
     },
     scalar::ScalarValue,
 };
@@ -46,167 +40,16 @@ use tantivy::{
     schema::{Field, IndexRecordOption, Schema},
 };
 
-use super::datafusion::udf::fuzzy_match_udf;
+use super::physical::{
+    conjunction, create_like_expr_with_not_null, create_str_match_expr, disjunction,
+    get_physical_column_name, get_physical_value, get_scalar_value, is_alphanumeric,
+    is_physical_column, is_physical_value,
+};
 use crate::datafusion::udf::{
     MATCH_FIELD_IGNORE_CASE_UDF_NAME, MATCH_FIELD_UDF_NAME, STR_MATCH_UDF_IGNORE_CASE_NAME,
-    STR_MATCH_UDF_NAME,
+    STR_MATCH_UDF_NAME, fuzzy_match_udf,
     match_all_udf::{FUZZY_MATCH_ALL_UDF_NAME, MATCH_ALL_UDF_NAME},
-    str_match_udf,
 };
-
-// note the condition in IndexCondition is connection by AND operator
-#[derive(Default, Clone, Hash, Eq, PartialEq)]
-pub struct IndexCondition {
-    pub conditions: Vec<Condition>,
-}
-
-impl IndexCondition {
-    pub fn new() -> Self {
-        IndexCondition {
-            conditions: Vec::new(),
-        }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.conditions.is_empty()
-    }
-
-    pub fn add_condition(&mut self, condition: Condition) {
-        self.conditions.push(condition);
-    }
-}
-
-impl Debug for IndexCondition {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_query())
-    }
-}
-
-impl IndexCondition {
-    // this only use for display the query
-    pub fn to_query(&self) -> String {
-        self.conditions
-            .iter()
-            .map(|condition| condition.to_query())
-            .collect::<Vec<_>>()
-            .join(" AND ")
-    }
-
-    // get the tantivy query for the index condition
-    // Returns (query, has_skipped):
-    //   has_skipped = true means some conditions were skipped because the field
-    //   does not exist in this tantivy index (e.g., a newly added index field
-    //   that has no historical data). The caller must keep the DataFusion filter
-    //   so that the skipped predicates are still evaluated.
-    pub fn to_tantivy_query(
-        &self,
-        trace_id: &str,
-        schema: Schema,
-        default_field: Option<Field>,
-    ) -> anyhow::Result<(Box<dyn Query>, bool)> {
-        let mut has_skipped = false;
-        let mut queries: Vec<(Occur, Box<dyn Query>)> = Vec::with_capacity(self.conditions.len());
-        for condition in &self.conditions {
-            match condition.to_tantivy_query(&schema, default_field) {
-                Ok(query) => {
-                    queries.push((Occur::Must, query));
-                }
-                Err(e) => {
-                    log::info!(
-                        "[trace_id {trace_id}] to_tantivy_query: skipping condition due to error: {e}"
-                    );
-                    has_skipped = true;
-                }
-            }
-        }
-        if queries.is_empty() {
-            Err(anyhow::anyhow!(
-                "All AND conditions are failed to generate tantivy query"
-            ))
-        } else if queries.len() == 1 {
-            Ok((queries.pop().unwrap().1, has_skipped))
-        } else {
-            Ok((Box::new(BooleanQuery::from(queries)), has_skipped))
-        }
-    }
-
-    // get the fields use for search in datafusion(for add filter back logical)
-    pub fn get_schema_fields(&self, fst_fields: &[String]) -> HashSet<String> {
-        self.conditions
-            .iter()
-            .fold(HashSet::new(), |mut acc, condition| {
-                acc.extend(condition.get_schema_fields(fst_fields));
-                acc
-            })
-    }
-
-    pub fn get_schema_projection(&self, schema: SchemaRef, fst_fields: &[String]) -> Vec<usize> {
-        let fields = self.get_schema_fields(fst_fields);
-        let mut projection = Vec::with_capacity(fields.len());
-        for field in fields.iter() {
-            if let Ok(index) = schema.index_of(field) {
-                projection.push(index);
-            }
-        }
-        projection
-    }
-
-    pub fn need_all_term_fields(&self) -> Vec<String> {
-        self.conditions
-            .iter()
-            .flat_map(|condition| condition.need_all_term_fields())
-            .collect::<HashSet<_>>()
-            .into_iter()
-            .collect()
-    }
-
-    pub fn to_physical_expr(
-        &self,
-        schema: &arrow_schema::Schema,
-        fst_fields: &[String],
-    ) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
-        Ok(conjunction(
-            self.conditions
-                .iter()
-                .map(|condition| condition.to_physical_expr(schema, fst_fields))
-                .collect::<Result<Vec<_>, _>>()?,
-        ))
-    }
-
-    pub fn can_remove_filter(&self) -> bool {
-        self.conditions
-            .iter()
-            .all(|condition| condition.can_remove_filter())
-    }
-
-    // use for simple distinct optimization
-    pub fn get_str_match_condition(&self) -> Option<(String, bool)> {
-        match &self.conditions[0] {
-            Condition::StrMatch(_, value, case_sensitive) => {
-                Some((value.to_string(), *case_sensitive))
-            }
-            Condition::All() => None, // for the condition that query without filter
-            _ => unreachable!("get_str_match_condition only support one str_match condition"),
-        }
-    }
-
-    // use for check if the index condition is only
-    // for the condition that query without filter
-    pub fn is_condition_all(&self) -> bool {
-        self.conditions.len() == 1 && matches!(self.conditions[0], Condition::All())
-    }
-
-    // use for the simple histogram RANK fast path: the single `field = value` term
-    pub fn single_equal_term(&self) -> Option<(String, String)> {
-        if self.conditions.len() == 1
-            && let Condition::Equal(field, value) = &self.conditions[0]
-        {
-            Some((field.clone(), value.clone()))
-        } else {
-            None
-        }
-    }
-}
 
 // single condition
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -226,8 +69,9 @@ pub enum Condition {
     // term, distance
     FuzzyMatchAll(String, u8),
     All(),
-    Or(Box<Condition>, Box<Condition>),
-    And(Box<Condition>, Box<Condition>),
+    // n-ary so a long OR/AND chain does not recurse one level per term
+    Or(Vec<Condition>),
+    And(Vec<Condition>),
     Not(Box<Condition>),
 }
 
@@ -260,12 +104,35 @@ impl Condition {
                 format!("{INDEX_FIELD_NAME_FOR_ALL}:fuzzy({value}, {distance})")
             }
             Condition::All() => "ALL".to_string(),
-            Condition::Or(left, right) => format!("({} OR {})", left.to_query(), right.to_query()),
-            Condition::And(left, right) => {
-                format!("({} AND {})", left.to_query(), right.to_query())
-            }
+            Condition::Or(items) => format!("({})", Self::join_query(items, " OR ")),
+            Condition::And(items) => format!("({})", Self::join_query(items, " AND ")),
             Condition::Not(condition) => format!("NOT({})", condition.to_query()),
         }
+    }
+
+    fn join_query(items: &[Condition], sep: &str) -> String {
+        items
+            .iter()
+            .map(|c| c.to_query())
+            .collect::<Vec<_>>()
+            .join(sep)
+    }
+
+    // walks the same-operator chain iteratively so depth stays O(1) for `a OR b OR c ...`
+    fn flatten_physical_chain(root: &BinaryExpr) -> Vec<Condition> {
+        let op = *root.op();
+        let mut items = Vec::new();
+        let mut stack = vec![root.right(), root.left()];
+        while let Some(expr) = stack.pop() {
+            match expr.downcast_ref::<BinaryExpr>() {
+                Some(bin) if *bin.op() == op => {
+                    stack.push(bin.right());
+                    stack.push(bin.left());
+                }
+                _ => items.push(Condition::from_physical_expr(expr)),
+            }
+        }
+        items
     }
 
     pub fn from_physical_expr(expr: &Arc<dyn PhysicalExpr>) -> Self {
@@ -294,14 +161,8 @@ impl Condition {
                         Condition::NotEqual(field, value)
                     }
                 }
-                Operator::And => Condition::And(
-                    Box::new(Condition::from_physical_expr(expr.left())),
-                    Box::new(Condition::from_physical_expr(expr.right())),
-                ),
-                Operator::Or => Condition::Or(
-                    Box::new(Condition::from_physical_expr(expr.left())),
-                    Box::new(Condition::from_physical_expr(expr.right())),
-                ),
+                Operator::And => Condition::And(Self::flatten_physical_chain(expr)),
+                Operator::Or => Condition::Or(Self::flatten_physical_chain(expr)),
                 _ => unreachable!(),
             }
         } else if let Some(expr) = expr.downcast_ref::<InListExpr>() {
@@ -452,15 +313,19 @@ impl Condition {
                 Box::new(FuzzyTermQuery::new(term, *distance, false))
             }
             Condition::All() => Box::new(AllQuery {}),
-            Condition::Or(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_field)?;
-                let right_query = right.to_tantivy_query(schema, default_field)?;
-                Box::new(BooleanQuery::union(vec![left_query, right_query]))
+            Condition::Or(items) => {
+                let queries = items
+                    .iter()
+                    .map(|c| c.to_tantivy_query(schema, default_field))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                Box::new(BooleanQuery::union(queries))
             }
-            Condition::And(left, right) => {
-                let left_query = left.to_tantivy_query(schema, default_field)?;
-                let right_query = right.to_tantivy_query(schema, default_field)?;
-                Box::new(BooleanQuery::intersection(vec![left_query, right_query]))
+            Condition::And(items) => {
+                let queries = items
+                    .iter()
+                    .map(|c| c.to_tantivy_query(schema, default_field))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                Box::new(BooleanQuery::intersection(queries))
             }
             Condition::Not(condition) => {
                 let query = condition.to_tantivy_query(schema, default_field)?;
@@ -488,9 +353,8 @@ impl Condition {
             Condition::FuzzyMatchAll(..) => {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
-            Condition::Or(left, right) | Condition::And(left, right) => {
-                fields.extend(left.need_all_term_fields());
-                fields.extend(right.need_all_term_fields());
+            Condition::Or(items) | Condition::And(items) => {
+                fields.extend(items.iter().flat_map(|c| c.need_all_term_fields()));
             }
             Condition::Not(condition) => {
                 fields.extend(condition.need_all_term_fields());
@@ -518,9 +382,8 @@ impl Condition {
                 fields.insert(INDEX_FIELD_NAME_FOR_ALL.to_string());
             }
             Condition::All() => {}
-            Condition::Or(left, right) | Condition::And(left, right) => {
-                fields.extend(left.get_tantivy_fields());
-                fields.extend(right.get_tantivy_fields());
+            Condition::Or(items) | Condition::And(items) => {
+                fields.extend(items.iter().flat_map(|c| c.get_tantivy_fields()));
             }
             Condition::Not(condition) => {
                 fields.extend(condition.get_tantivy_fields());
@@ -544,9 +407,8 @@ impl Condition {
                 fields.extend(fst_fields.iter().cloned());
             }
             Condition::All() => {}
-            Condition::Or(left, right) | Condition::And(left, right) => {
-                fields.extend(left.get_schema_fields(fst_fields));
-                fields.extend(right.get_schema_fields(fst_fields));
+            Condition::Or(items) | Condition::And(items) => {
+                fields.extend(items.iter().flat_map(|c| c.get_schema_fields(fst_fields)));
             }
             Condition::Not(condition) => {
                 fields.extend(condition.get_schema_fields(fst_fields));
@@ -670,15 +532,19 @@ impl Condition {
                 Ok(disjunction(expr_list))
             }
             Condition::All() => Ok(Arc::new(Literal::new(ScalarValue::Boolean(Some(true))))),
-            Condition::Or(left, right) => {
-                let left = left.to_physical_expr(schema, fst_fields)?;
-                let right = right.to_physical_expr(schema, fst_fields)?;
-                Ok(Arc::new(BinaryExpr::new(left, Operator::Or, right)))
+            Condition::Or(items) => {
+                let exprs = items
+                    .iter()
+                    .map(|c| c.to_physical_expr(schema, fst_fields))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(disjunction(exprs))
             }
-            Condition::And(left, right) => {
-                let left = left.to_physical_expr(schema, fst_fields)?;
-                let right = right.to_physical_expr(schema, fst_fields)?;
-                Ok(Arc::new(BinaryExpr::new(left, Operator::And, right)))
+            Condition::And(items) => {
+                let exprs = items
+                    .iter()
+                    .map(|c| c.to_physical_expr(schema, fst_fields))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(conjunction(exprs))
             }
             Condition::Not(condition) => {
                 let expr = condition.to_physical_expr(schema, fst_fields)?;
@@ -697,157 +563,17 @@ impl Condition {
             Condition::MatchAll(v) => is_alphanumeric(v),
             Condition::FuzzyMatchAll(..) => false,
             Condition::All() => true,
-            Condition::Or(left, right) => left.can_remove_filter() && right.can_remove_filter(),
-            Condition::And(left, right) => left.can_remove_filter() && right.can_remove_filter(),
+            Condition::Or(items) | Condition::And(items) => {
+                items.iter().all(|c| c.can_remove_filter())
+            }
             Condition::Not(condition) => condition.can_remove_filter(),
         }
     }
 }
 
-// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
-fn is_physical_column(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    if expr.downcast_ref::<Column>().is_some() {
-        true
-    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
-        is_physical_column(expr.expr())
-    } else {
-        false
-    }
-}
-
-// TODO: duplication with datafusion/optimizer/physical_optimizer/utils.rs
-fn get_physical_column_name(expr: &Arc<dyn PhysicalExpr>) -> &str {
-    if let Some(expr) = expr.downcast_ref::<Column>() {
-        expr.name()
-    } else if let Some(expr) = expr.downcast_ref::<CastExpr>() {
-        get_physical_column_name(expr.expr())
-    } else {
-        UNKNOWN_NAME
-    }
-}
-
-fn is_physical_value(expr: &Arc<dyn PhysicalExpr>) -> bool {
-    expr.downcast_ref::<Literal>().is_some()
-}
-
-fn get_physical_value(expr: &Arc<dyn PhysicalExpr>) -> String {
-    if let Some(literal) = expr.downcast_ref::<Literal>() {
-        match literal.value() {
-            ScalarValue::Boolean(Some(b)) => b.to_string(),
-            ScalarValue::Int64(Some(i)) => i.to_string(),
-            ScalarValue::UInt64(Some(i)) => i.to_string(),
-            ScalarValue::Float64(Some(f)) => f.to_string(),
-            ScalarValue::Utf8(Some(s)) => s.clone(),
-            ScalarValue::LargeUtf8(Some(s)) => s.clone(),
-            ScalarValue::Utf8View(Some(s)) => s.clone(),
-            ScalarValue::Binary(Some(b)) => String::from_utf8_lossy(b).to_string(),
-            _ => unimplemented!("get_physical_value not support {:?}", literal),
-        }
-    } else {
-        unreachable!()
-    }
-}
-
-// combine all exprs with OR operator
-fn disjunction(exprs: Vec<Arc<dyn PhysicalExpr>>) -> Arc<dyn PhysicalExpr> {
-    if exprs.len() == 1 {
-        exprs[0].clone()
-    } else {
-        // conjuction all expr in exprs
-        let mut expr = exprs[0].clone();
-        for e in exprs.into_iter().skip(1) {
-            expr = Arc::new(BinaryExpr::new(expr, Operator::Or, e));
-        }
-        expr
-    }
-}
-
-fn get_scalar_value(value: &str, data_type: &DataType) -> Result<Arc<Literal>, anyhow::Error> {
-    Ok(match data_type {
-        DataType::Boolean => Arc::new(Literal::new(ScalarValue::Boolean(Some(value.parse()?)))),
-        DataType::Int64 => Arc::new(Literal::new(ScalarValue::Int64(Some(value.parse()?)))),
-        DataType::UInt64 => Arc::new(Literal::new(ScalarValue::UInt64(Some(value.parse()?)))),
-        DataType::Float64 => Arc::new(Literal::new(ScalarValue::Float64(Some(value.parse()?)))),
-        DataType::Utf8 => Arc::new(Literal::new(ScalarValue::Utf8(Some(value.to_string())))),
-        DataType::LargeUtf8 => Arc::new(Literal::new(ScalarValue::LargeUtf8(Some(
-            value.to_string(),
-        )))),
-        DataType::Utf8View => {
-            Arc::new(Literal::new(ScalarValue::Utf8View(Some(value.to_string()))))
-        }
-        DataType::Binary => Arc::new(Literal::new(ScalarValue::Binary(Some(
-            value.as_bytes().to_vec(),
-        )))),
-        _ => unimplemented!(),
-    })
-}
-
-fn create_like_expr_with_not_null(
-    field: &str,
-    term: Arc<dyn PhysicalExpr>,
-    schema: &arrow_schema::Schema,
-) -> Arc<dyn PhysicalExpr> {
-    let column = Arc::new(Column::new(field, schema.index_of(field).unwrap()));
-    Arc::new(BinaryExpr::new(
-        Arc::new(IsNotNullExpr::new(column.clone())),
-        Operator::And,
-        Arc::new(LikeExpr::new(false, true, column, term.clone())),
-    ))
-}
-
-fn create_str_match_expr(
-    schema: &arrow_schema::Schema,
-    name: &str,
-    value: &str,
-    case_sensitive: bool,
-) -> Result<Arc<dyn PhysicalExpr>, anyhow::Error> {
-    let index = schema.index_of(name).unwrap();
-    let field = schema.field(index);
-    let col = Arc::new(Column::new(name, index));
-
-    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
-    let left: Arc<dyn PhysicalExpr> = if *field.data_type() == DataType::Utf8View {
-        Arc::new(CastExpr::new(col, DataType::Utf8, None))
-    } else {
-        col
-    };
-
-    // if the field is Utf8View, we need to cast it to Utf8 for str_match udf
-    let data_type = if *field.data_type() == DataType::Utf8View {
-        DataType::Utf8
-    } else {
-        field.data_type().clone()
-    };
-
-    let right = get_scalar_value(value, &data_type)?;
-    let udf = if case_sensitive {
-        Arc::new(str_match_udf::STR_MATCH_UDF.clone())
-    } else {
-        Arc::new(str_match_udf::STR_MATCH_IGNORE_CASE_UDF.clone())
-    };
-
-    let udf_expr = Arc::new(ScalarFunctionExpr::try_new(
-        udf.clone(),
-        vec![left, right],
-        schema,
-        Arc::new(ConfigOptions::default()),
-    )?);
-    Ok(udf_expr)
-}
-
-fn is_alphanumeric(s: &str) -> bool {
-    s.chars().all(|c| c.is_ascii_alphanumeric())
-}
-
-fn _is_blank_or_alphanumeric(s: &str) -> bool {
-    s.chars()
-        .all(|c| c.is_ascii_whitespace() || c.is_ascii_alphanumeric())
-}
-
 #[cfg(test)]
 mod tests {
-
-    use super::*;
+    use super::{super::IndexCondition, *};
 
     #[test]
     fn test_condition_get_tantivy_fields_equal() {
@@ -914,7 +640,7 @@ mod tests {
     fn test_condition_get_tantivy_fields_or_simple() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         let fields = condition.get_tantivy_fields();
 
         assert_eq!(fields.len(), 2);
@@ -926,7 +652,7 @@ mod tests {
     fn test_condition_get_tantivy_fields_and_simple() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::In("field2".to_string(), vec!["value1".to_string()], false);
-        let condition = Condition::And(Box::new(left), Box::new(right));
+        let condition = Condition::And(vec![left, right]);
         let fields = condition.get_tantivy_fields();
 
         assert_eq!(fields.len(), 2);
@@ -938,7 +664,7 @@ mod tests {
     fn test_condition_get_tantivy_fields_or_with_overlap() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field1".to_string(), "value2".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         let fields = condition.get_tantivy_fields();
 
         // Should only have one field since both conditions use the same field
@@ -950,7 +676,7 @@ mod tests {
     fn test_condition_get_tantivy_fields_and_with_overlap() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Regex("field1".to_string(), "pattern.*".to_string());
-        let condition = Condition::And(Box::new(left), Box::new(right));
+        let condition = Condition::And(vec![left, right]);
         let fields = condition.get_tantivy_fields();
 
         // Should only have one field since both conditions use the same field
@@ -962,15 +688,15 @@ mod tests {
     fn test_condition_get_tantivy_fields_nested_complex() {
         // Create a complex nested condition: (field1 = value1 OR field2 = value2) AND (field3 =
         // value3 OR match_all(term))
-        let left_or = Condition::Or(
-            Box::new(Condition::Equal("field1".to_string(), "value1".to_string())),
-            Box::new(Condition::Equal("field2".to_string(), "value2".to_string())),
-        );
-        let right_or = Condition::Or(
-            Box::new(Condition::Equal("field3".to_string(), "value3".to_string())),
-            Box::new(Condition::MatchAll("search_term".to_string())),
-        );
-        let condition = Condition::And(Box::new(left_or), Box::new(right_or));
+        let left_or = Condition::Or(vec![
+            Condition::Equal("field1".to_string(), "value1".to_string()),
+            Condition::Equal("field2".to_string(), "value2".to_string()),
+        ]);
+        let right_or = Condition::Or(vec![
+            Condition::Equal("field3".to_string(), "value3".to_string()),
+            Condition::MatchAll("search_term".to_string()),
+        ]);
+        let condition = Condition::And(vec![left_or, right_or]);
         let fields = condition.get_tantivy_fields();
 
         assert_eq!(fields.len(), 4);
@@ -992,11 +718,11 @@ mod tests {
 
         // Create nested structure: ((equal OR in) AND (regex OR match_all)) OR (fuzzy_match_all AND
         // all)
-        let left_or = Condition::Or(Box::new(equal_cond), Box::new(in_cond));
-        let right_or = Condition::Or(Box::new(regex_cond), Box::new(match_all_cond));
-        let left_and = Condition::And(Box::new(left_or), Box::new(right_or));
-        let right_and = Condition::And(Box::new(fuzzy_match_cond), Box::new(all_cond));
-        let condition = Condition::Or(Box::new(left_and), Box::new(right_and));
+        let left_or = Condition::Or(vec![equal_cond, in_cond]);
+        let right_or = Condition::Or(vec![regex_cond, match_all_cond]);
+        let left_and = Condition::And(vec![left_or, right_or]);
+        let right_and = Condition::And(vec![fuzzy_match_cond, all_cond]);
+        let condition = Condition::Or(vec![left_and, right_and]);
 
         let fields = condition.get_tantivy_fields();
 
@@ -1042,101 +768,6 @@ mod tests {
 
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
-    }
-
-    #[test]
-    fn test_is_alphanumeric() {
-        assert!(is_alphanumeric("123"));
-        assert!(is_alphanumeric("123abc"));
-        assert!(!is_alphanumeric("123 abc"));
-        assert!(!is_alphanumeric("123 abc 123"));
-    }
-
-    #[test]
-    fn test_is_blank_or_alphanumeric() {
-        assert!(_is_blank_or_alphanumeric("123"));
-        assert!(_is_blank_or_alphanumeric("123abc"));
-        assert!(_is_blank_or_alphanumeric("123 abc"));
-        assert!(_is_blank_or_alphanumeric("123 abc 123"));
-    }
-
-    #[test]
-    fn test_index_condition_new() {
-        let condition = IndexCondition::new();
-        assert!(condition.conditions.is_empty());
-    }
-
-    #[test]
-    fn test_index_condition_add_condition() {
-        let mut index_condition = IndexCondition::new();
-        let condition = Condition::Equal("field1".to_string(), "value1".to_string());
-
-        index_condition.add_condition(condition.clone());
-
-        assert_eq!(index_condition.conditions.len(), 1);
-        assert!(matches!(
-            index_condition.conditions[0],
-            Condition::Equal(ref field, ref value) if field == "field1" && value == "value1"
-        ));
-    }
-
-    #[test]
-    fn test_index_condition_to_query() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        index_condition.add_condition(Condition::Equal("field2".to_string(), "value2".to_string()));
-
-        let query_string = index_condition.to_query();
-        assert_eq!(query_string, "field1=value1 AND field2=value2");
-    }
-
-    #[test]
-    fn test_index_condition_to_query_empty() {
-        let index_condition = IndexCondition::new();
-        let query_string = index_condition.to_query();
-        assert_eq!(query_string, "");
-    }
-
-    #[test]
-    fn test_index_condition_is_empty() {
-        let mut index_condition = IndexCondition::new();
-        assert!(index_condition.is_empty());
-
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        assert!(!index_condition.is_empty());
-    }
-
-    #[test]
-    fn test_index_condition_get_str_match_condition() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::StrMatch(
-            "field1".to_string(),
-            "value1".to_string(),
-            true,
-        ));
-
-        let result = index_condition.get_str_match_condition();
-        assert_eq!(result, Some(("value1".to_string(), true)));
-    }
-
-    #[test]
-    fn test_index_condition_get_str_match_condition_all() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::All());
-
-        let result = index_condition.get_str_match_condition();
-        assert_eq!(result, None);
-    }
-
-    #[test]
-    fn test_index_condition_is_condition_all() {
-        let mut index_condition = IndexCondition::new();
-        index_condition.add_condition(Condition::All());
-
-        assert!(index_condition.is_condition_all());
-
-        index_condition.add_condition(Condition::Equal("field1".to_string(), "value1".to_string()));
-        assert!(!index_condition.is_condition_all());
     }
 
     #[test]
@@ -1207,7 +838,7 @@ mod tests {
     fn test_condition_to_query_or() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         assert_eq!(condition.to_query(), "(field1=value1 OR field2=value2)");
     }
 
@@ -1215,7 +846,7 @@ mod tests {
     fn test_condition_to_query_and() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
-        let condition = Condition::And(Box::new(left), Box::new(right));
+        let condition = Condition::And(vec![left, right]);
         assert_eq!(condition.to_query(), "(field1=value1 AND field2=value2)");
     }
 
@@ -1275,7 +906,7 @@ mod tests {
     fn test_condition_need_all_term_fields_or() {
         let left = Condition::StrMatch("field1".to_string(), "value".to_string(), true);
         let right = Condition::NotEqual("field2".to_string(), "value".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         let fields = condition.need_all_term_fields();
         assert_eq!(fields.len(), 1);
         assert!(fields.contains("field1"));
@@ -1333,46 +964,13 @@ mod tests {
     fn test_condition_can_remove_filter_or() {
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Equal("field2".to_string(), "value2".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         assert!(condition.can_remove_filter());
 
         let left = Condition::Equal("field1".to_string(), "value1".to_string());
         let right = Condition::Regex("field2".to_string(), "pattern.*".to_string());
-        let condition = Condition::Or(Box::new(left), Box::new(right));
+        let condition = Condition::Or(vec![left, right]);
         assert!(!condition.can_remove_filter());
-    }
-
-    #[test]
-    fn test_disjunction_single() {
-        use datafusion::{physical_expr::expressions::Literal, scalar::ScalarValue};
-
-        let expr = Arc::new(Literal::new(ScalarValue::Boolean(Some(true))));
-        let result = disjunction(vec![expr.clone()]);
-        assert_eq!(result.as_ref() as *const _, expr.as_ref() as *const _);
-    }
-
-    #[test]
-    fn test_get_scalar_value_boolean() {
-        let result = get_scalar_value("true", &DataType::Boolean);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_get_scalar_value_int64() {
-        let result = get_scalar_value("123", &DataType::Int64);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_get_scalar_value_utf8() {
-        let result = get_scalar_value("test", &DataType::Utf8);
-        assert!(result.is_ok());
-    }
-
-    #[test]
-    fn test_get_scalar_value_error() {
-        let result = get_scalar_value("not_a_number", &DataType::Int64);
-        assert!(result.is_err());
     }
 
     /// Build a minimal tantivy schema containing only the given text field names.
@@ -1464,5 +1062,81 @@ mod tests {
             result.is_err(),
             "should return error when the only field is missing"
         );
+    }
+
+    fn deep_or_chain(terms: usize) -> Arc<dyn PhysicalExpr> {
+        use datafusion::physical_expr::expressions::{Column, Literal};
+        let leaf = |i: usize| -> Arc<dyn PhysicalExpr> {
+            Arc::new(BinaryExpr::new(
+                Arc::new(Column::new("field1", 0)),
+                Operator::Eq,
+                Arc::new(Literal::new(ScalarValue::Utf8(Some(format!("v{i}"))))),
+            ))
+        };
+        (1..terms).fold(leaf(0), |acc, i| {
+            Arc::new(BinaryExpr::new(acc, Operator::Or, leaf(i)))
+        })
+    }
+
+    #[test]
+    fn test_from_physical_expr_flattens_or_chain() {
+        let condition = Condition::from_physical_expr(&deep_or_chain(4));
+        let Condition::Or(items) = &condition else {
+            panic!("expected Or, got {condition:?}");
+        };
+        assert_eq!(items.len(), 4);
+        assert_eq!(items[0], Condition::Equal("field1".into(), "v0".into()));
+        assert_eq!(items[3], Condition::Equal("field1".into(), "v3".into()));
+        assert_eq!(
+            condition.to_query(),
+            "(field1=v0 OR field1=v1 OR field1=v2 OR field1=v3)"
+        );
+    }
+
+    #[test]
+    fn test_from_physical_expr_keeps_mixed_operator_nesting() {
+        use datafusion::physical_expr::expressions::{Column, Literal};
+        let eq = |v: &str| -> Arc<dyn PhysicalExpr> {
+            Arc::new(BinaryExpr::new(
+                Arc::new(Column::new("field1", 0)),
+                Operator::Eq,
+                Arc::new(Literal::new(ScalarValue::Utf8(Some(v.to_string())))),
+            ))
+        };
+        // (a OR b) AND c
+        let expr: Arc<dyn PhysicalExpr> = Arc::new(BinaryExpr::new(
+            Arc::new(BinaryExpr::new(eq("a"), Operator::Or, eq("b"))),
+            Operator::And,
+            eq("c"),
+        ));
+        let condition = Condition::from_physical_expr(&expr);
+        assert_eq!(
+            condition,
+            Condition::And(vec![
+                Condition::Or(vec![
+                    Condition::Equal("field1".into(), "a".into()),
+                    Condition::Equal("field1".into(), "b".into()),
+                ]),
+                Condition::Equal("field1".into(), "c".into()),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_deep_or_chain_does_not_recurse_per_term() {
+        let expr = deep_or_chain(5_000);
+        let condition = Condition::from_physical_expr(&expr);
+        assert!(condition.can_remove_filter());
+        assert_eq!(condition.get_tantivy_fields().len(), 1);
+        let mut builder = tantivy::schema::SchemaBuilder::new();
+        builder.add_text_field("field1", tantivy::schema::STRING);
+        let schema = builder.build();
+        assert!(condition.to_tantivy_query(&schema, None).is_ok());
+        let arrow_schema = arrow_schema::Schema::new(vec![arrow_schema::Field::new(
+            "field1",
+            arrow_schema::DataType::Utf8,
+            true,
+        )]);
+        assert!(condition.to_physical_expr(&arrow_schema, &[]).is_ok());
     }
 }

@@ -16,7 +16,7 @@
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
 use crate::{
-    aggregations::{Accumulate, AggFunc, SeriesKey, group_series},
+    aggregations::{Accumulate, AggFunc, group_series},
     common::kahan_sum_increment,
 };
 
@@ -67,10 +67,22 @@ pub struct SumAccumulate {
     present: Vec<bool>,
 }
 
-impl Accumulate for SumAccumulate {
-    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+impl SumAccumulate {
+    fn push(&mut self, slot: usize, value: f64) {
         self.sums[slot].push(value);
         self.present[slot] = true;
+    }
+}
+
+impl Accumulate for SumAccumulate {
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {

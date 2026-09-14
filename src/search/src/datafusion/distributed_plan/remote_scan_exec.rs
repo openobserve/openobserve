@@ -42,11 +42,14 @@ use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 
 use super::node::RemoteScanNode;
-use crate::datafusion::distributed_plan::{
-    codec::get_physical_extension_codec,
-    common::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
-    decoder_stream::FlightDecoderStream,
-    utils::make_flight_client,
+use crate::datafusion::{
+    distributed_plan::{
+        codec::get_physical_extension_codec,
+        common::{EmptyStream, QueryContext, get_empty_stream, process_partial_err},
+        decoder_stream::FlightDecoderStream,
+        utils::make_flight_client,
+    },
+    plan::shared_subplan_exec::strip_shared_subplan_markers,
 };
 
 /// Execution plan for empty relation with produce_one_row=false
@@ -70,6 +73,8 @@ impl RemoteScanExec {
         input: Arc<dyn ExecutionPlan>,
         mut remote_scan_node: RemoteScanNode,
     ) -> Result<Self> {
+        // Sharing happens on the leader only, a follower must never see a marker.
+        let input = strip_shared_subplan_markers(input)?;
         let output_partitions = remote_scan_node.nodes.len();
         let cache = Self::compute_properties(Arc::clone(&input.schema()), output_partitions);
 

@@ -38,6 +38,7 @@ pub struct ColumnVisitor<'a> {
     pub is_wildcard: bool,
     pub is_distinct: bool,
     pub has_agg_function: bool,
+    outer_query_visited: bool,
 }
 
 impl<'a> ColumnVisitor<'a> {
@@ -53,6 +54,7 @@ impl<'a> ColumnVisitor<'a> {
             is_wildcard: false,
             is_distinct: false,
             has_agg_function: false,
+            outer_query_visited: false,
         }
     }
 }
@@ -152,15 +154,18 @@ impl VisitorMut for ColumnVisitor<'_> {
         {
             self.is_wildcard = true;
         }
+        // Only the outermost LIMIT bounds the result, not a CTE, subquery or set-op branch's.
+        let is_outermost = !self.outer_query_visited;
+        self.outer_query_visited = true;
         let mut has_limit = false;
-        if let Some(limit_clause) = query.limit_clause.as_ref()
+        if is_outermost
+            && let Some(limit_clause) = query.limit_clause.as_ref()
             && let sqlparser::ast::LimitClause::LimitOffset { limit, offset, .. } = limit_clause
         {
             if let Some(limit) = limit.as_ref()
                 && let Expr::Value(ValueWithSpan { value, span: _ }) = limit
                 && let Value::Number(n, _) = value
                 && let Ok(num) = n.to_string().parse::<i64>()
-                && self.limit.is_none()
             {
                 has_limit = true;
                 self.limit = Some(num);
@@ -169,7 +174,6 @@ impl VisitorMut for ColumnVisitor<'_> {
                 && let Expr::Value(ValueWithSpan { value, span: _ }) = &offset.value
                 && let Value::Number(n, _) = value
                 && let Ok(num) = n.to_string().parse::<i64>()
-                && self.offset.is_none()
             {
                 self.offset = Some(num);
             }
@@ -461,5 +465,41 @@ mod tests {
 
         assert_eq!(visitor.limit, Some(5));
         assert_eq!(visitor.offset, Some(0));
+    }
+
+    fn visit_limit(sql: &str) -> (Option<i64>, Option<i64>) {
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+        (visitor.limit, visitor.offset)
+    }
+
+    #[test]
+    fn test_column_visitor_reads_only_outermost_limit() {
+        let cases = [
+            (
+                "WITH a AS (SELECT name FROM users LIMIT 10) SELECT * FROM a",
+                (None, None),
+            ),
+            (
+                "SELECT name FROM users WHERE age IN (SELECT age FROM users LIMIT 3 OFFSET 1)",
+                (None, None),
+            ),
+            (
+                "(SELECT name FROM users LIMIT 5) UNION ALL (SELECT name FROM users LIMIT 7)",
+                (None, None),
+            ),
+            (
+                "SELECT name FROM users UNION ALL SELECT name FROM users LIMIT 20",
+                (Some(20), Some(0)),
+            ),
+        ];
+        for (sql, expected) in cases {
+            assert_eq!(visit_limit(sql), expected, "{sql}");
+        }
     }
 }
