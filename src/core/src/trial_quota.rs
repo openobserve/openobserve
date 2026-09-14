@@ -1279,7 +1279,7 @@ pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<Stri
 
 /// The month the monthly pool is spending right now, UTC.
 fn current_month() -> i32 {
-    infra::table::trial_quota_usage::month_of(config::utils::time::now_micros())
+    config::utils::time::month_of(config::utils::time::now_micros())
 }
 
 /// Each requested org's synthetics spend and grant, for the `_meta` org listing — SPEC §11 #5.

@@ -397,15 +397,6 @@ pub async fn apply_synthetics_deltas_in<C: ConnectionTrait>(
     Ok(())
 }
 
-/// The `YYYYMM` of a microsecond timestamp, UTC. One encoding, or `period` compares against itself.
-pub fn month_of(micros: i64) -> i32 {
-    let at = chrono::DateTime::from_timestamp_micros(micros).unwrap_or_default();
-    at.format("%Y%m")
-        .to_string()
-        .parse()
-        .unwrap_or(LIFETIME_PERIOD)
-}
-
 /// The reset rides the increment, so no pass adds to a month and a later one zeroes it.
 ///
 /// A row from an older month starts the new month at this window's draw. A row from a NEWER month
@@ -1040,11 +1031,5 @@ mod tests {
         apply_status(&db, ORG, 0, 202609).await;
 
         assert!(has_no_row(&db, ORG, STATUS).await);
-    }
-
-    #[test]
-    fn month_of_reads_the_utc_month() {
-        assert_eq!(month_of(1_788_800_853_300_917), 202609);
-        assert_eq!(month_of(0), 197001);
     }
 }
