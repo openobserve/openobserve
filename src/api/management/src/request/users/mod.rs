@@ -572,7 +572,7 @@ pub async fn authentication(
         .collect::<Vec<_>>()
         .join("&");
 
-    // Until decoding the token or body, we can not know the the user_email
+    // Until decoding the token or body, we can not know the user_email
     #[cfg(feature = "enterprise")]
     let mut audit_message = AuditMessage {
         user_email: "".to_string(),
