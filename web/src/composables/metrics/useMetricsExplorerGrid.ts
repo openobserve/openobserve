@@ -139,6 +139,8 @@ export interface CardPreview {
   lastTriggeredAt: number | null;
   /** Cached data whose window is a different LENGTH from the selected one. */
   cachedDataDiffersFromTimeRange: boolean;
+  /** A refresh of this preview was cancelled before it answered, so the next request must still reach the backend. */
+  pendingRefresh?: boolean;
   /**
    * The window this preview's data was FETCHED for (µs), when it came from the
    * persisted cache — `null` on the live path, where the fetched window IS the
@@ -1451,10 +1453,17 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // existing settled preview is always valid for the current query+window.
     // `skipCache` (refresh / time-range change / override) still forces a real
     // re-query, and an `error`/`loading` preview falls through to retry.
+    const settled = previews.value[card.name];
+    const pendingRefresh = !!settled?.pendingRefresh;
     let forcedRecheck = false;
 
-    const settled = previews.value[card.name];
-    if (!opts?.skipCache && settled && settled.status !== "loading" && settled.status !== "error") {
+    if (
+      !opts?.skipCache &&
+      !pendingRefresh &&
+      settled &&
+      settled.status !== "loading" &&
+      settled.status !== "error"
+    ) {
       // EXCEPT a settled-EMPTY preview, once: a metric queried moments after its
       // first write can race ingestion and come back with no samples even
       // though the write succeeded — the exact "No Data" report this guards
@@ -1483,7 +1492,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // the recheck must reach the backend, not just get past the guards above —
     // `queue.run`'s own `cache: true, refresh: false` default would otherwise
     // hand back the very cached empty answer this recheck exists to get past.
-    const queryOpts = forcedRecheck ? { ...opts, skipCache: true } : opts;
+    const queryOpts = forcedRecheck || pendingRefresh ? { ...opts, skipCache: true } : opts;
     // The MISS path of the await above: a restore that painted checks the epoch
     // itself, but a cache miss fell through to the loading write below — and if
     // the map was cleared while IndexedDB was answering, that write resurrects
@@ -1644,8 +1653,12 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
         if (epoch !== previewsEpoch) return;
         // A recheck that never answered has not been spent, or the stale empty answer it restores sticks for good.
         if (forcedRecheck) markRechecked(card.name, false);
-        if (existing) previews.value[card.name] = existing;
-        else delete previews.value[card.name];
+        // A card remounted by a grid reflow (a sibling hidden as no-data) cancels its own refresh; the remount must re-ask, not reuse this.
+        if (existing) {
+          previews.value[card.name] = queryOpts?.skipCache
+            ? { ...existing, pendingRefresh: true }
+            : existing;
+        } else delete previews.value[card.name];
         return;
       }
 
