@@ -517,9 +517,11 @@ pub async fn search_http2_stream(
         }
     }
 
-    // Hack for limit in query
-    if sql.limit != 0 {
-        req.query.size = sql.limit;
+    // 0 means size 0 with no positive SQL LIMIT, so use the default; negative stays unlimited.
+    match sql.limit {
+        0 => req.query.size = cfg.limit.query_default_limit,
+        n if n > 0 => req.query.size = n,
+        _ => {}
     }
 
     let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
