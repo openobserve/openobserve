@@ -67,7 +67,8 @@
     "actual_folder": "RegressionSet/Metrics",
     "browser": "chrome",
     "run_files": [
-      "metrics-regression.spec.js"
+      "metrics-regression.spec.js",
+      "metrics-14238-stale-nodata.spec.js"
     ],
     "disabled": []
   },

@@ -387,7 +387,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-explorer-scroll"
         >
           <div
-            v-if="grid.loading.value"
+            v-if="showLoading"
             class="flex h-3/5 flex-col items-center justify-center gap-2.5 opacity-80"
           >
             <OSpinner size="lg" />
@@ -675,13 +675,17 @@ export default defineComponent({
     // prefix of the full sorted set, so colours stay stable as pages are added.
     const visibleCards = computed(() => grid.pagedCards.value);
 
+    const refreshing = ref(false);
+    // Swapping the grid for the spinner during a refresh's stream reload unmounts every card, emptying `onScreen` before the re-query runs.
+    const showLoading = computed(() => grid.loading.value && !refreshing.value);
+
     // Whether the body is rendering the virtualized grid vs a state placeholder
     // (loading / error / empty). The grid must stay top-aligned for the
     // virtualizer; every placeholder is centered in the scroll area instead.
     // `visibleCards.length > 0` implies not-loading, not-errored, and — in
     // Workspace — that favorites matched, so it's exactly the grid's own branch.
     const gridVisible = computed(
-      () => !grid.loading.value && !grid.loadError.value && visibleCards.value.length > 0,
+      () => !showLoading.value && !grid.loadError.value && visibleCards.value.length > 0,
     );
 
     // Just the count. It used to append "· N no-data hidden", but the checkbox
@@ -1489,8 +1493,8 @@ export default defineComponent({
       // accurate — but a filter change can also drop a card from the result set
       // without unmounting it in the same tick. Intersecting with what is
       // actually rendered keeps a refresh from re-querying metrics nobody can see.
-      const rendered = new Set(visibleCards.value.map((c) => c.name));
-      const live = [...onScreen.values()].filter((c) => rendered.has(c.name));
+      // The rendered objects, not the ones `onScreen` captured: a refresh's stream reload rebuilds every card.
+      const live = visibleCards.value.filter((c) => onScreen.has(c.name));
       return Promise.all(live.map((card) => grid.requestPreview(card, opts)));
     };
 
@@ -1499,8 +1503,6 @@ export default defineComponent({
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
-
-    const refreshing = ref(false);
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -1783,6 +1785,7 @@ export default defineComponent({
       onDataScope,
       visibleCards,
       gridVisible,
+      showLoading,
       resultCountLabel,
       rails,
       selectRail,
