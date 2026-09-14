@@ -1322,8 +1322,7 @@ export function useMetricsExplorerGrid(t: TranslateFn) {
     // stay "No Data" across every future page load, not just every revisit.
     // Reported live: reloading Explore repainted a stale empty answer from here
     // even after the in-memory guard's recheck had already been added.
-    const cachedEmpty =
-      !cached.value.sparse && !(cached.value.results ?? []).some(hasSamples);
+    const cachedEmpty = !cached.value.sparse && !(cached.value.results ?? []).some(hasSamples);
     if (cachedEmpty && !emptyRecheckedCards.value.has(card.name)) {
       const next = new Set(emptyRecheckedCards.value);
       next.add(card.name);
