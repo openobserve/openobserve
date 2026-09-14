@@ -65,9 +65,9 @@ impl HashSortedSeriesStream {
         let mut cursors = Vec::with_capacity(streams.len());
         for stream in streams {
             let cursor = ChainCursor::start(stream).await?;
-            // every batch shares the plan's schema, so the head proves the series columns
+            // Every batch shares the plan's schema, so validate the head once for labels().
             if let Some(batch) = &cursor.batch {
-                Self::label_columns(&cols.series, batch)?;
+                Self::validate_label_columns(&cols.series, batch)?;
             }
             cursors.push(cursor);
         }
@@ -97,17 +97,23 @@ impl HashSortedSeriesStream {
         (Arc::clone(batch), cursor.row)
     }
 
+    fn validate_label_columns(names: &[String], batch: &RecordBatch) -> Result<()> {
+        names
+            .iter()
+            .try_for_each(|name| Self::label_column(name, batch).map(|_| ()))
+    }
+
     fn label_columns<'a>(names: &[String], batch: &'a RecordBatch) -> Result<Vec<LabelColumn<'a>>> {
         names
             .iter()
-            .map(|name| {
-                LabelColumn::try_from_array(batch[name.as_str()].as_ref()).ok_or_else(|| {
-                    DataFusionError::Execution(format!(
-                        "label column {name} is not Utf8 or Utf8View"
-                    ))
-                })
-            })
+            .map(|name| Self::label_column(name, batch))
             .collect()
+    }
+
+    fn label_column<'a>(name: &str, batch: &'a RecordBatch) -> Result<LabelColumn<'a>> {
+        LabelColumn::try_from_array(batch[name].as_ref()).ok_or_else(|| {
+            DataFusionError::Execution(format!("label column {name} is not Utf8 or Utf8View"))
+        })
     }
 }
 
