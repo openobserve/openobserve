@@ -13916,6 +13916,7 @@
         "pickSteps": "{count} steps",
         "pickLastRun": "{status} {ago}",
         "pickEmpty": "No other browser tests in this organization yet.",
+        "pickLoadFailed": "Couldn't load the list of browser tests. Try again.",
         "undefinedVariable": "\"{name}\" uses {variable}, which this test doesn't define.",
         "undefinedVariableAction": "Add it under Variables",
         "failedAt": "{number} — {child} › {step}",

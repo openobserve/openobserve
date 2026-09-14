@@ -29,6 +29,12 @@ vi.mock("@/services/synthetics", () => ({
   },
 }));
 
+// The real toast is a no-op in jsdom, so the failure path has to be observed through a mock.
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: unknown[]) => mockToast(...args),
+}));
+
 import syntheticsService from "@/services/synthetics";
 
 const i18n = createI18n({
@@ -415,5 +421,103 @@ describe("SubtestPicker rows", () => {
     expect(lastRun).toContain("20s");
     expect(lastRun).toContain("120s allowance");
     expect(lastRun).not.toContain("300s");
+  });
+});
+
+// ── Load state and the saved name ────────────────────────────────────────────
+describe("SubtestPicker load state", () => {
+  const SAVED = { id: "login-test", name: "Login" };
+
+  const select = (w: ReturnType<typeof mountPicker>) => w.findComponent(OSelect);
+  const displayLabel = (w: ReturnType<typeof mountPicker>) =>
+    w
+      .find('[data-test="synthetics-subtest-select-trigger"]')
+      .attributes("data-test-selected-label");
+
+  function deferredList() {
+    let resolve!: (value: unknown) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockReturnValue(promise);
+    return { resolve, reject };
+  }
+
+  beforeEach(() => {
+    mockToast.mockReset();
+  });
+
+  it("shows the select's loading indicator until the list resolves", async () => {
+    const list = deferredList();
+    const w = mountPicker();
+    await flushPromises();
+    expect(select(w).props("loading")).toBe(true);
+
+    list.resolve({ data: { checks: CHECKS } });
+    await flushPromises();
+    expect(select(w).props("loading")).toBe(false);
+  });
+
+  it("displays the saved name from first paint, never the id", async () => {
+    const list = deferredList();
+    const w = mountPicker({ modelValue: SAVED });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Login");
+    expect(w.text()).not.toContain("login-test");
+
+    list.resolve({ data: { checks: CHECKS } });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Login");
+    // The seeded name row is replaced by the real row, not listed twice.
+    const values = (select(w).props("options") as { value?: string }[]).map((o) => o.value);
+    expect(values.filter((v) => v === "login-test")).toHaveLength(1);
+    expect(values).toEqual(["login-test"]);
+  });
+
+  it("keeps the saved name when the list no longer holds the referenced test", async () => {
+    const list = deferredList();
+    const w = mountPicker({ modelValue: { id: "gone", name: "Retired" } });
+    list.resolve({ data: { checks: CHECKS } });
+    await flushPromises();
+    expect(displayLabel(w)).toBe("Retired");
+    expect(w.text()).not.toContain("gone");
+  });
+
+  it("withholds the empty state while loading", async () => {
+    const list = deferredList();
+    const w = mountPicker();
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(false);
+    expect(select(w).props("disabled")).toBe(false);
+
+    list.resolve({ data: { checks: [] } });
+    await flushPromises();
+    expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(true);
+  });
+
+  it("ends loading, reports a failed list request and keeps the saved name", async () => {
+    const list = deferredList();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const w = mountPicker({ modelValue: SAVED });
+    await flushPromises();
+    expect(select(w).props("loading")).toBe(true);
+
+    list.reject(new Error("boom"));
+    await flushPromises();
+    expect(select(w).props("loading")).toBe(false);
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
+      message: "Couldn't load the list of browser tests. Try again.",
+    });
+    expect(consoleError).toHaveBeenCalledWith(
+      "[synthetics] failed to load browser tests for the subtest picker",
+      expect.any(Error),
+    );
+    expect(displayLabel(w)).toBe("Login");
+    expect(w.text()).not.toContain("login-test");
+    expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(false);
+    consoleError.mockRestore();
   });
 });
