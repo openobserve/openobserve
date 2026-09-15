@@ -74,13 +74,19 @@ describe("useAutoNavigationPreferences", () => {
     localStorage.setItem(KEY, "{x");
     p.loadAutoNavigationPreferences();
     expect(p.autoNavigationPreferences.value.size).toBe(0);
-    expect(err).toHaveBeenCalledWith("Error loading auto navigation preferences:", expect.anything());
+    expect(err).toHaveBeenCalledWith(
+      "Error loading auto navigation preferences:",
+      expect.anything(),
+    );
 
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new Error("quota");
     });
     p.isAutoNavigationEnabled.value = false;
-    expect(err).toHaveBeenCalledWith("Error saving auto navigation preferences:", expect.anything());
+    expect(err).toHaveBeenCalledWith(
+      "Error saving auto navigation preferences:",
+      expect.anything(),
+    );
     expect(p.isAutoNavigationEnabled.value).toBe(false);
   });
 });

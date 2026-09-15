@@ -102,15 +102,15 @@ describe("getToolCallDisplayData", () => {
   });
 
   it("lets request_body.function win over context.vrl", () => {
-    expect(
-      getToolCallDisplayData({ vrl: "old", request_body: { function: "new" } })!.vrl,
-    ).toBe("new");
+    expect(getToolCallDisplayData({ vrl: "old", request_body: { function: "new" } })!.vrl).toBe(
+      "new",
+    );
   });
 
   it("reads the flat shapes", () => {
-    expect(getToolCallDisplayData({ sql: "S", stream_name: "n", type: "logs", command: "ls" })).toEqual(
-      { query: "S", stream: "n", type: "logs", command: "ls" },
-    );
+    expect(
+      getToolCallDisplayData({ sql: "S", stream_name: "n", type: "logs", command: "ls" }),
+    ).toEqual({ query: "S", stream: "n", type: "logs", command: "ls" });
   });
 });
 
@@ -210,18 +210,12 @@ describe("formatToolCallMessage", () => {
   });
 
   it("truncates a long failure message", () => {
-    const out = formatToolCallMessage(
-      block({ success: false, resultMessage: "e".repeat(61) }),
-      t,
-    );
+    const out = formatToolCallMessage(block({ success: false, resultMessage: "e".repeat(61) }), t);
     expect(out.text).toBe("e".repeat(60) + "...");
   });
 
   it("appends a results count from the summary", () => {
-    const out = formatToolCallMessage(
-      block({ tool: "Whatever", summary: { count: 2 } as any }),
-      t,
-    );
+    const out = formatToolCallMessage(block({ tool: "Whatever", summary: { count: 2 } as any }), t);
     expect(out.text).toBe("Whatever ");
     expect(out.highlight).toBe("aiAssistant.aiChat.toolResultsCount[2]");
   });

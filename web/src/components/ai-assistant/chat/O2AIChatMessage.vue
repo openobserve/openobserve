@@ -84,10 +84,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
           <span>{{ currentAnalyzingMessage }}</span>
         </div>
         <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
-        <template
-          v-for="(block, blockIndex) in message.contentBlocks"
-          :key="'cb-' + blockIndex"
-        >
+        <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
           <!-- Tool call block - expandable -->
           <O2AIChatToolCallBlock
             v-if="block.type === 'tool_call'"
@@ -112,19 +109,13 @@ const isLogEntryExpanded = (blockIndex: number) =>
                 {{ block.preview }}
               </span>
               <OIcon
-                :name="
-                  isLogEntryExpanded(blockIndex) ? 'expand-less' : 'expand-more'
-                "
+                :name="isLogEntryExpanded(blockIndex) ? 'expand-less' : 'expand-more'"
                 size="sm"
                 class="expand-icon opacity-60 transition-transform duration-200"
               />
             </div>
             <!-- Expandable details -->
-            <div
-              v-if="isLogEntryExpanded(blockIndex)"
-              class="log-entry-details mt-2.5"
-              @click.stop
-            >
+            <div v-if="isLogEntryExpanded(blockIndex)" class="log-entry-details mt-2.5" @click.stop>
               <div
                 class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
               >
@@ -218,9 +209,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
                     v-html="textBlock.highlightedContent"
                   ></code>
                 </span>
-                <div
-                  class="code-block-footer flex w-full items-center justify-between px-2 py-1"
-                >
+                <div class="code-block-footer flex w-full items-center justify-between px-2 py-1">
                   <OButton
                     variant="ghost"
                     size="xs"
@@ -286,10 +275,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
                 </OButton>
               </div>
               <span class="generated-code-block">
-                <code
-                  :class="['hljs', block.language]"
-                  v-html="block.highlightedContent"
-                ></code>
+                <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
               </span>
             </div>
             <div
@@ -301,9 +287,7 @@ const isLogEntryExpanded = (blockIndex: number) =>
         </template>
         <!-- Feedback buttons for assistant messages -->
         <div
-          v-if="
-            message.role === 'assistant' && message.content && message.content.trim() !== ''
-          "
+          v-if="message.role === 'assistant' && message.content && message.content.trim() !== ''"
           class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
           :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
         >

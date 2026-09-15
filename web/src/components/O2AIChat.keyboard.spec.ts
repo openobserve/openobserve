@@ -59,7 +59,11 @@ vi.mock("@/composables/useAiChat", () => ({
 vi.mock("@/aws-exports", () => ({ default: { isEnterprise: "true", isCloud: "false" } }));
 
 vi.mock("vue-router", () => ({
-  useRouter: vi.fn(() => ({ push: vi.fn(), replace: vi.fn(), currentRoute: { value: { path: "/" } } })),
+  useRouter: vi.fn(() => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    currentRoute: { value: { path: "/" } },
+  })),
   useRoute: vi.fn(() => ({ fullPath: "/", path: "/", name: "home", query: {}, params: {} })),
 }));
 

@@ -75,7 +75,9 @@ describe("generateNavigationFromToolResult", () => {
   });
 
   it("returns null when a search has sql but no derivable stream, never falling through", () => {
-    const args = searchArgs({ request_body: { query: { sql: "SELECT 1", start_time: 1, end_time: 2 } } });
+    const args = searchArgs({
+      request_body: { query: { sql: "SELECT 1", start_time: 1, end_time: 2 } },
+    });
     expect(generateNavigationFromToolResult("createAlert", args, { alert_id: "a1" }, t)).toBeNull();
   });
 
@@ -180,9 +182,9 @@ describe("navigationPageName", () => {
     expect(
       navigationPageName({ label: raw(""), resource_type: "alert", target: { name: "N" } } as any),
     ).toBe("N");
-    expect(
-      navigationPageName({ label: raw(""), resource_type: "alert", target: {} } as any),
-    ).toBe("Alert");
+    expect(navigationPageName({ label: raw(""), resource_type: "alert", target: {} } as any)).toBe(
+      "Alert",
+    );
   });
 });
 

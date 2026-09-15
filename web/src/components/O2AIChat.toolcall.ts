@@ -143,7 +143,10 @@ export function formatToolCallMessage(block: ToolCallBlock, t: TranslateFn) {
   }
   if (block.tool === "GetIncident" && block.context?.incident_id) {
     const incidentId = block.context.incident_id;
-    return splitAroundHighlight(t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }), incidentId);
+    return splitAroundHighlight(
+      t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
+      incidentId,
+    );
   }
   if (block.tool === "GetAlert" && block.context?.alert_id) {
     const alertId = block.context.alert_id;

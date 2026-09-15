@@ -315,7 +315,7 @@ export function useChatStream(options: UseChatStreamOptions) {
     });
 
     // A detached stream must not write a ref the original would have left untouched.
-    const setIfChanged = <T,>(target: Ref<T>, value: T) => {
+    const setIfChanged = <T>(target: Ref<T>, value: T) => {
       if (target.value !== value) target.value = value;
     };
 
@@ -578,20 +578,15 @@ export function useChatStream(options: UseChatStreamOptions) {
   const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
     try {
       const orgId = store.state.selectedOrganization.identifier;
-      const res = await fetch(
-        `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ approved }),
-        },
-      );
+      const res = await fetch(`${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ approved }),
+      });
 
       if (!res.ok) {
-        console.error(
-          `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
-        );
+        console.error(`Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`);
         appendErrorBlock(
           approved
             ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
@@ -673,10 +668,7 @@ export function useChatStream(options: UseChatStreamOptions) {
 
     const pageName = navigationPageName(action);
 
-    const target = buildNavigationRoute(
-      action,
-      store.state.selectedOrganization.identifier,
-    );
+    const target = buildNavigationRoute(action, store.state.selectedOrganization.identifier);
     if (target) {
       await router.push({ path: target.path, query: target.query });
     }
