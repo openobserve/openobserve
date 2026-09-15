@@ -29,6 +29,7 @@ use datafusion::{
     execution::cache::{
         Cache, CacheEntryInfo, CacheValue, TableScopedPath, cache_manager::CachedFileMetadata,
     },
+    physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr, expressions::Column},
 };
 use object_store::path::Path;
 
@@ -71,7 +72,27 @@ impl FileStatisticsCache {
         (std::mem::size_of::<String>() + key.len()) * 2
             + std::mem::size_of::<(CachedFileMetadata, usize)>()
             + value.size()
+            + Self::estimate_ordering_size(value.ordering.as_ref())
             + 64
+    }
+
+    // CacheValue::size skips the ordering; the schema fingerprint is shared per table, so skip it.
+    fn estimate_ordering_size(ordering: Option<&LexOrdering>) -> usize {
+        ordering.map_or(0, |ordering| {
+            ordering
+                .iter()
+                .map(|sort_expr| {
+                    let name_len = sort_expr
+                        .expr
+                        .downcast_ref::<Column>()
+                        .map_or(0, |column| column.name().len());
+                    std::mem::size_of::<PhysicalSortExpr>()
+                        + std::mem::size_of::<Arc<dyn PhysicalExpr>>()
+                        + std::mem::size_of::<Column>()
+                        + name_len
+                })
+                .sum()
+        })
     }
 
     fn evict(&self, max_bytes: usize) {
@@ -368,6 +389,33 @@ mod tests {
         assert_eq!(cache.put(&key, value.clone()), Some(value.clone()));
         assert_eq!(cache.remove(&key), Some(value));
         assert_eq!(cache.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_ordering_is_charged_to_memory_size() {
+        use datafusion::{
+            execution::cache::SchemaFingerprint,
+            physical_expr::{LexOrdering, PhysicalSortExpr, expressions::Column},
+        };
+
+        let schema = Schema::new(vec![Field::new("value", DataType::Int64, false)]);
+        let meta = object_meta("ordered", 128);
+        let entry = |ordering| {
+            CachedFileMetadata::new(
+                meta.clone(),
+                Arc::new(SchemaFingerprint::from_schema(&schema)),
+                Arc::new(Statistics::new_unknown(&schema)),
+                ordering,
+            )
+        };
+        let unordered = FileStatisticsCache::estimate_entry_size("k", &entry(None));
+        let ordered = FileStatisticsCache::estimate_entry_size(
+            "k",
+            &entry(LexOrdering::new(vec![PhysicalSortExpr::new_default(
+                Arc::new(Column::new("value", 0)),
+            )])),
+        );
+        assert!(ordered > unordered);
     }
 
     #[test]
