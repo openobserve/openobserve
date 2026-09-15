@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Select a field or use a variable like $fieldVariable. If stream uses a variable, field list will be empty - type field name manually.",
     "filterInfoTooltip": "In filters, you can use the value of another variable to filter the current variable's value. This can be done by using the other variable's name. For example:",
     "defaultSelectAll": "Default - Select All",
-    "escapeSingleQuotesTooltip": "If enabled, single quotes will be escaped in the query. For example, a value like `O'Reilly` will be replaced as `O''Reilly`.",
+    "escapeSingleQuotesTooltip": "Single quotes are always escaped in the query. For example, a value like `O'Reilly` is replaced with `O''Reilly`.",
     "byDefaultSelect": "By Default Select:",
     "firstValue": "First value",
     "allValues": "All values",
@@ -9613,7 +9613,14 @@
       "agent": "Agent",
       "noAgentsTitle": "No Agents In This Range",
       "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view.",
-      "viewByStream": "View by Stream"
+      "viewByStream": "View by Stream",
+      "search": {
+        "placeholder": "Search by user or message",
+        "title": "Match sessions whose user ID or conversation text contains the text",
+        "noResultsTitle": "No sessions match your search",
+        "noResultsDescription": "Try a different term, or a wider time range.",
+        "clear": "Clear search"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

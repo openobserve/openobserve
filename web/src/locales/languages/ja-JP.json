@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "フィールドを選択するか、$FieldVariable のような変数を使用してください。ストリームが変数を使用する場合、フィールドリストは空になります。フィールド名を手動で入力してください。",
     "filterInfoTooltip": "フィルターでは、別の変数の値を使用して現在の変数の値をフィルターできます。これは、他の変数の名前を使用して行うことができます。例えば:",
     "defaultSelectAll": "デフォルト-すべて選択",
-    "escapeSingleQuotesTooltip": "有効にすると、クエリ内で一重引用符がエスケープされます。たとえば、`O'Reilly` のような値は `O \"Reilly` に置き換えられます。",
+    "escapeSingleQuotesTooltip": "シングルクォートはクエリ内で常にエスケープされます。たとえば、`O'Reilly` のような値は `O''Reilly` に置き換えられます。",
     "byDefaultSelect": "デフォルトでは以下を選択:",
     "firstValue": "1 番目の値",
     "allValues": "すべての値",
@@ -9613,7 +9613,14 @@
       "agent": "エージェント",
       "noAgentsTitle": "この範囲内にエージェントはありません",
       "noAgentsDescription": "選択した時間枠ではGenAIエージェントは検出されませんでした。範囲を広げるか、ストリームビューに切り替えてください。",
-      "viewByStream": "ストリームで表示"
+      "viewByStream": "ストリームで表示",
+      "search": {
+        "placeholder": "ユーザーまたはメッセージで検索",
+        "title": "ユーザー ID または会話テキストにこのテキストを含むセッションを照合します",
+        "noResultsTitle": "検索に一致するセッションはありません",
+        "noResultsDescription": "別の語句、別のフィールド、またはより広い時間範囲をお試しください。",
+        "clear": "検索をクリア"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

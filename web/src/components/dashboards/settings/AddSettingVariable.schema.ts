@@ -68,7 +68,8 @@ export const makeAddSettingVariableSchema = (t: (_key: string) => string) =>
       hideOnDashboard: z.boolean().optional().default(false),
       selectAllValueForMultiSelect: z.string().optional().default("first"),
       customMultiSelectValue: z.array(z.string()).optional().default([]),
-      escapeSingleQuotes: z.boolean().optional().default(false),
+      // Escaping is unconditional now; kept only so old saved dashboards still parse.
+      escapeSingleQuotes: z.boolean().optional().default(true),
     })
     .superRefine((val, ctx) => {
       if (
