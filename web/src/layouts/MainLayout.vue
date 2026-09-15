@@ -228,7 +228,7 @@ import {
   getImageURL,
   invalidateLoginData,
   shouldPaywallRoute,
-  emptyDataAllowedPaths,
+  isEmptyDataExempt,
 } from "../utils/zincutils";
 
 import {
@@ -954,18 +954,7 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out of IAM
-          // screens just because no streams exist yet. General Settings is exempt
-          // because it hosts the Danger Zone: switching to an empty org must still
-          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
-          // General only, not the rest of the Settings tree.
-          const currentPath = router.currentRoute.value.path || "";
-          if (
-            currentPath.indexOf("/iam") !== -1 ||
-            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
-          ) {
-            return;
-          }
+          if (isEmptyDataExempt(router.currentRoute.value)) return;
           toast({
             variant: "warning",
             message: t("toastMessages.layouts.ingestionNotStarted"),
