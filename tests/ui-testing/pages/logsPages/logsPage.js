@@ -190,7 +190,6 @@ export class LogsPage {
         this.searchResultTitle = '[data-test="logs-search-result-title"]';
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
-        this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
@@ -8442,19 +8441,42 @@ export class LogsPage {
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
      */
+    // The VRL/function editor toggle lives inside the utilities ("More")
+    // dropdown, not on the toolbar. This used to target
+    // `logs-search-bar-vrl-toggle-btn`, which exists nowhere in web/src, so
+    // every call threw — and because both callers swallowed it, the editor
+    // silently never opened. Delegates to toggleQueryModeEditor, which opens
+    // the dropdown, retries through reka-ui's focus-outside races and waits for
+    // the editor to actually appear.
+    // Idempotent: opens the VRL/function editor only if it is not already
+    // showing. Restoring a saved view that carried a function re-opens the
+    // editor on its own (SearchBar.vue keys showTransformEditor off the saved
+    // state), so a blind toggle there CLOSES it instead.
+    async ensureVrlEditorOpen() {
+        const editor = this.page.locator(this.fnEditor).first();
+        if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info('VRL editor already open');
+            return;
+        }
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
+    }
+
     async clickVrlToggleButton() {
-        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
-        await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
-        await vrlToggle.click();
-        testLogger.info('Clicked VRL toggle button');
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
     }
 
     /**
      * Get the VRL editor locator
      * @returns {import('@playwright/test').Locator} VRL editor locator
      */
+    // Scoped to the function-editor container on purpose. The old selector
+    // listed a bare `.monaco-editor` alternative, which also matches the SQL
+    // query editor — so with the VRL editor closed this returned the SQL box
+    // and "VRL editor is visible" assertions passed against the wrong element.
     getVrlEditor() {
-        return this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+        return this.page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
     }
 
     /**

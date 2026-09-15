@@ -822,6 +822,10 @@ test.describe("Logs Regression Bug Fixes", () => {
   // https://github.com/openobserve/openobserve/issues/9690
   // ==========================================================================
   test("should load VRL function correctly when opening saved view @bug-9690 @P1 @savedViews @vrl @regression", async ({ page }) => {
+    // 6 min: this creates a function, saves a view, reloads and re-selects it.
+    // It previously fit the default only because the VRL toggle silently
+    // no-opped and most of the work never happened.
+    test.setTimeout(360_000);
     testLogger.info('Test: Verify VRL function loads correctly in saved views (Bug #9690)');
 
     const uniqueSuffix = Date.now();
@@ -836,15 +840,11 @@ test.describe("Logs Regression Bug Fixes", () => {
       await pm.logsPage.selectStream('e2e_automate');
       await page.waitForTimeout(1000);
 
-      // WARNING: this step is currently a silent no-op — the selector behind
-      // clickVrlToggleButton is dead (see the #9550 note at the end of this
-      // file), so the VRL editor never opens and the assertion below passes
-      // against the SQL editor instead. This test is green without exercising
-      // VRL at all; it needs the same page-object fix.
+      // Not wrapped in a catch: if the editor cannot be opened this test has
+      // nothing to assert, and swallowing that is what made it pass for months
+      // without exercising VRL at all.
       testLogger.info('Step 1: Enabling VRL function toggle');
-      await pm.logsPage.clickVrlToggleButton().catch(() => {
-        testLogger.warn('VRL toggle click failed, trying alternative');
-      });
+      await pm.logsPage.clickVrlToggleButton();
       await page.waitForTimeout(1000);
 
       // Step 2: Enter VRL function in the editor
@@ -909,9 +909,10 @@ test.describe("Logs Regression Bug Fixes", () => {
       // Step 8: Verify VRL function is loaded
       testLogger.info('Step 8: Verifying VRL function loaded');
 
-      // Toggle VRL editor to make it visible (it's collapsed by default after loading saved view)
-      await pm.logsPage.clickVrlToggle();
-      await page.waitForTimeout(1000);
+      // Restoring a saved view that carried a function re-opens the editor by
+      // itself, so this must be idempotent — the old blind toggle closed it and
+      // then waited for it to be visible.
+      await pm.logsPage.ensureVrlEditorOpen();
 
       // Check if VRL editor has content
       const vrlEditorContent = await pm.logsPage.getVrlEditorContent();
@@ -2112,22 +2113,23 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #9550: VRL-generated fields should not offer include/exclude (=)
   // https://github.com/openobserve/openobserve/issues/9550
   // ==========================================================================
-  // Skipped because the VRL editor is never actually opened, NOT because of a
-  // product issue — the reason inherited from the pre-refactor copy of this
-  // test was wrong. Verified against o2latestmain: `clickVrlToggleButton` uses
-  // `[data-test="logs-search-bar-vrl-toggle-btn"]`, which exists nowhere in
-  // web/src, so the call throws and the `.catch` below swallows it. The page
-  // then holds exactly ONE Monaco editor (the SQL one), and
-  // `getVrlEditor()` falls through to its `.monaco-editor` selector, so the
-  // VRL source below is typed into the SQL editor and no computed field is
-  // ever produced.
+  // Still skipped, but for a different reason than recorded before — the VRL
+  // editor now opens correctly (that was the dead-selector bug, fixed in
+  // logsPage.clickVrlToggleButton). What remains is that this test's selectors
+  // were never right: the field list uses
+  //   logs-field-list-item-<field>                         (the row)
+  //   log-search-index-list-filter-<field>-field-btn       (the "=" icon #9550 is about)
+  //   log-search-index-list-interesting-<field>-field-btn
+  // whereas getComputedFieldButton/getIncludeExcludeIcon/getEqualsIcon guess at
+  // `[data-test*="computed_field"]` and a `[class*="equal"]` sibling, none of
+  // which exist. Verified against o2latestmain: after applying a VRL transform,
+  // `computed_field` appears nowhere in the field list — the only DOM mention is
+  // the text inside the query editor.
   //
-  // To re-enable: the editor is gated on `searchObj.meta.showTransformEditor`,
-  // toggled by `logs-search-bar-show-query-toggle-btn` (already used elsewhere
-  // in logsPage.js) or `logs-search-bar-function-editor-pinned-btn` when
-  // pinned, and renders as `logs-vrl-function-editor` — fix
-  // `logsPage.clickVrlToggleButton`/`getVrlEditor` to those, then drop the
-  // `.catch` so a failure to open is a failure rather than a silent pass.
+  // To re-enable: confirm a VRL transform's derived field actually surfaces
+  // (the issue title says "when added to the table", so the table column may be
+  // the real subject rather than the field list), then rewrite against the
+  // selectors above instead of the invented ones.
   test.skip("should not display include/exclude icon for VRL-generated fields", {
     tag: ['@bug-9550', '@P2', '@regression', '@logsRegression', '@logsRegressionVrl']
   }, async ({ page }) => {
@@ -2140,10 +2142,7 @@ test.describe("Logs Regression Bug Fixes", () => {
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    await pm.logsPage.clickVrlToggleButton().catch(() => {
-      testLogger.warn('VRL toggle may already be enabled or not visible');
-    });
-    await page.waitForTimeout(1000);
+    await pm.logsPage.clickVrlToggleButton();
 
     const vrlEditor = pm.logsPage.getVrlEditor().first();
     await expect(vrlEditor, 'Bug #9550: VRL editor must be visible').toBeVisible({ timeout: 5000 });
