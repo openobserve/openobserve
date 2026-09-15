@@ -155,10 +155,10 @@ export default defineComponent({
           query: { org_identifier: store.state.selectedOrganization?.identifier },
         });
       };
-      // Nodes and License are enterprise-only meta-org pages.
+      // Nodes, License and Password policy are enterprise-only meta-org pages.
       const notMeta =
         store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
-      if ((name === "nodes" || name === "license") && notMeta) {
+      if ((name === "nodes" || name === "license" || name === "passwordPolicy") && notMeta) {
         toGeneral();
         return;
       }
@@ -172,11 +172,6 @@ export default defineComponent({
       if (name === "syntheticsLocations" && syntheticsBlocked) {
         toGeneral();
         return;
-      }
-      // Password policy is instance-wide, so the API only accepts the meta org. Not
-      // enterprise-gated — native auth ships in OSS.
-      if (name === "passwordPolicy" && store.state.zoConfig.meta_org && !isMetaOrg.value) {
-        toGeneral();
       }
     };
 
@@ -266,9 +261,7 @@ export default defineComponent({
           description: t("settings.passwordPolicyDesc"),
           icon: "lock",
           to: { name: "passwordPolicy", query: { org_identifier: org } },
-          // Meta-org only, but NOT enterprise-gated like its neighbours here: native
-          // email/password auth is an OSS feature and the API is in the OSS route block.
-          visible: meta,
+          visible: isEnt && meta,
           dataTest: "password-policy-tab",
           group: "Access & Security",
         },
