@@ -16,7 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import serviceStreamsApi, { type FieldAlias, type ServiceIdentityConfig } from "./service_streams";
 import { serviceStreamKeys } from "./service_streams.querykeys";
-import { CONFIG_STALE_TIME, SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 /** `retry: false` because both callers treat a miss as "no config" and carry on, so retries would only hold the traces field list behind backoffs. */
 export const semanticGroupsQuery = (org: string) =>
@@ -24,9 +24,7 @@ export const semanticGroupsQuery = (org: string) =>
     queryKey: serviceStreamKeys.semanticGroups(org),
     queryFn: async (): Promise<FieldAlias[]> =>
       (await serviceStreamsApi.getSemanticGroups(org)).data,
-    staleTime: CONFIG_STALE_TIME,
-    // Read through `getQueryData` by callers that never load, so it must outlive the default 5 min GC as the old map did.
-    gcTime: SESSION_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     retry: false,
   });
 
@@ -35,7 +33,6 @@ export const identityConfigQuery = (org: string) =>
     queryKey: serviceStreamKeys.identityConfig(org),
     queryFn: async (): Promise<ServiceIdentityConfig> =>
       (await serviceStreamsApi.getIdentityConfig(org)).data,
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: SESSION_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     retry: false,
   });

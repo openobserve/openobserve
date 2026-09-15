@@ -48,7 +48,7 @@ import {
   cacheRemoveByPrefix,
   cacheRemoveWhere,
 } from "@/composables/query/idbStorage";
-import { LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { PANEL_GC_TIME } from "@/composables/query/cachePolicy";
 import { panelKeys } from "./panel.querykeys";
 
 /**
@@ -116,7 +116,7 @@ export interface PanelCacheEntry {
  * than leaving it to the client default that never applies here.
  */
 const panelEntryOptions = {
-  gcTime: LONG_GC_TIME,
+  gcTime: PANEL_GC_TIME,
   staleTime: Infinity,
   persister: idbPersister.persisterFn,
 } as const;

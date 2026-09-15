@@ -23,5 +23,4 @@ export const licenseQuery = () =>
     queryKey: licenseKeys.get(),
     queryFn: async () => (await licenseServer.get_license()).data,
     staleTime: 0,
-    gcTime: 60_000,
   });

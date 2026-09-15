@@ -16,12 +16,11 @@
 import { queryOptions } from "@tanstack/vue-query";
 import cipherKeys from "./cipher_keys";
 import { cipherKeyKeys } from "./cipher_keys.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const cipherKeysQuery = (org: string) =>
   queryOptions({
     queryKey: cipherKeyKeys.list(org),
     queryFn: async (): Promise<any[]> => (await cipherKeys.list(org)).data?.keys ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
   });

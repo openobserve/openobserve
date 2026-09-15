@@ -16,6 +16,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import syntheticsService from "./synthetics";
 import { syntheticsKeys } from "./synthetics.querykeys";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
   queryOptions({
@@ -25,12 +26,15 @@ export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
       const data = (await syntheticsService.listByFolderId(org, folderId)).data as any;
       return data?.checks ?? data?.monitors ?? [];
     },
+    staleTime: LIVE_STALE_TIME,
   });
 
+/** An IAM token list, so it takes the IAM tier rather than the monitors' live one. */
 export const agentTokensQuery = (org: string) =>
   queryOptions({
     queryKey: syntheticsKeys.agentTokens(org),
     queryFn: async () => (await syntheticsService.listAgentTokens(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

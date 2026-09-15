@@ -17,11 +17,13 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { quantizeRange, stableFilters } from "@/composables/query/queryClient";
 import pipelines from "./pipelines";
 import { pipelineKeys } from "./pipelines.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const pipelinesQuery = (org: string) =>
   queryOptions({
     queryKey: pipelineKeys.list(org),
     queryFn: async (): Promise<any[]> => (await pipelines.getPipelines(org)).data?.list ?? [],
+    staleTime: NORMAL_STALE_TIME,
   });
 
 export const pipelineHistoryQuery = (org: string, params: Record<string, string>) => {
@@ -33,6 +35,7 @@ export const pipelineHistoryQuery = (org: string, params: Record<string, string>
   return queryOptions({
     queryKey: pipelineKeys.history(org, stableFilters(q)),
     queryFn: async () => (await pipelines.getPipelineHistory(org, q)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 };
 

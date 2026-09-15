@@ -16,12 +16,14 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import { annotationService } from "./dashboard_annotations";
 import { annotationKeys } from "./dashboard_annotations.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const dashboardAnnotationsQuery = (org: string, dashboardId: string, params: unknown) =>
   queryOptions({
     queryKey: annotationKeys.list(org, dashboardId, params),
     queryFn: async () =>
       (await annotationService.get_timed_annotations(org, dashboardId, params as any)).data ?? null,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

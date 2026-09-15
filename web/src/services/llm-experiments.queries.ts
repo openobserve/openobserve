@@ -17,8 +17,9 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "./llm-experiments.service";
 import remoteTasksService, { type RemoteTask } from "./remote-tasks.service";
 import { experimentKeys, remoteTaskKeys } from "./llm-experiments.querykeys";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
-/** Shared by six surfaces; left on default freshness because run status changes as experiments complete. */
+/** Shared by six surfaces, all reading one entry. */
 export const experimentsListQuery = (org: string, datasetId?: string) =>
   queryOptions({
     queryKey: experimentKeys.list(org, datasetId),
@@ -28,12 +29,14 @@ export const experimentsListQuery = (org: string, datasetId?: string) =>
         includeSummary: true,
         ...(datasetId ? { datasetId } : {}),
       }),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 export const remoteTasksListQuery = (org: string) =>
   queryOptions({
     queryKey: remoteTaskKeys.list(org),
     queryFn: (): Promise<RemoteTask[]> => remoteTasksService.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

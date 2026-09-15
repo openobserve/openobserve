@@ -16,11 +16,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import slos from "./slos";
 import { sloKeys } from "./slos.querykeys";
+import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const slosQuery = (org: string, folder?: string) =>
   queryOptions({
     queryKey: sloKeys.list(org, folder),
     queryFn: async (): Promise<any[]> => (await slos.list(org, folder)).data?.list ?? [],
+    staleTime: LIVE_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

@@ -16,21 +16,22 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import organizations from "./organizations";
 import { organizationKeys } from "./organizations.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 // Memory only: settings pages post this object back whole, so a disk copy could overwrite newer server values.
 export const orgSettingsQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.settings(org),
     queryFn: async () => (await organizations.get_organization_settings(org)).data,
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
   });
 
+/** Entity counts that move as the user creates things, so shorter than the settings tier. */
 export const orgSummaryQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.summary(org),
     queryFn: async () => (await organizations.get_organization_summary(org)).data,
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // `metaOrg` is the org that serves the endpoint, not the one being cleaned up — it is deployment-configurable, so the caller reads it from config.
@@ -43,20 +44,22 @@ export const cleanupTasksQuery = (org: string, targetOrg: string, metaOrg = "_me
         .get_cleanup_tasks(metaOrg, targetOrg)
         .then((res: any) => res.data ?? [])
         .catch(() => []),
+    // A live progress poll: a reopened dialog must ask the server, not show the last snapshot.
     staleTime: 0,
-    gcTime: 60_000,
   });
 
 export const ingestionTokensQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.ingestionTokens(org),
     queryFn: async () => (await organizations.list_org_ingestion_tokens(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 export const orgPasscodeQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.passcode(org),
     queryFn: async () => (await organizations.get_organization_passcode(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

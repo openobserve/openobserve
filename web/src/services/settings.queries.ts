@@ -16,7 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import settings from "./settings";
 import { settingKeys } from "./settings.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 // Memory only: favourites and the home pin are rewritten whole, so a disk copy would drop what another device saved.
 export const settingQuery = (org: string, key: string, userId?: string) =>
@@ -32,6 +32,5 @@ export const settingQuery = (org: string, key: string, userId?: string) =>
         throw e;
       }
     },
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
   });

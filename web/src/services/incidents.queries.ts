@@ -16,11 +16,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import incidents from "./incidents";
 import { incidentKeys } from "./incidents.querykeys";
+import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const incidentsQuery = (org: string, status: string, limit: number, offset: number) =>
   queryOptions({
     queryKey: incidentKeys.list(org, status, limit, offset),
     queryFn: async () => (await incidents.list(org, status, limit, offset)).data,
+    staleTime: LIVE_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

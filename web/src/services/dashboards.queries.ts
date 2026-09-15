@@ -17,12 +17,14 @@ import { mutationOptions, queryOptions, useQuery } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query/useOrgId";
 import dashboards from "./dashboards";
 import { dashboardKeys } from "./dashboards.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const dashboardsByFolderQuery = (org: string, folderId: string) =>
   queryOptions({
     queryKey: dashboardKeys.byFolder(org, folderId),
     queryFn: async (): Promise<any[]> =>
       (await dashboards.list(0, 1000, "name", false, "", org, folderId, "")).data?.dashboards ?? [],
+    staleTime: NORMAL_STALE_TIME,
   });
 
 /**

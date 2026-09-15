@@ -16,9 +16,11 @@
 import { queryOptions } from "@tanstack/vue-query";
 import alertSources from "./alert_sources";
 import { alertSourceKeys } from "./alert_sources.querykeys";
+import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const alertSourcesQuery = (org: string) =>
   queryOptions({
     queryKey: alertSourceKeys.list(org),
     queryFn: async (): Promise<any[]> => (await alertSources.list(org)).data?.integrations ?? [],
+    staleTime: LIVE_STALE_TIME,
   });

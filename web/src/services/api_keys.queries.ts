@@ -16,12 +16,14 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import apiKeys from "./api_keys";
 import { apiKeyKeys } from "./api_keys.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 /** A credential list — memory only, never persisted. */
 export const rumTokensQuery = (org: string) =>
   queryOptions({
     queryKey: apiKeyKeys.rumTokens(org),
     queryFn: async () => (await apiKeys.listRUMTokens(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

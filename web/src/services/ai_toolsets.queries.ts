@@ -16,7 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import aiToolsets from "./ai_toolsets";
 import { aiToolsetKeys } from "./ai_toolsets.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 export const aiToolsetsQuery = (org: string) =>
@@ -24,7 +24,6 @@ export const aiToolsetsQuery = (org: string) =>
     queryKey: aiToolsetKeys.list(org),
     queryFn: async (): Promise<any[]> =>
       (await aiToolsets.list(org, { limit: 100000 })).data?.toolsets ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
     persister: localStoragePersister,
   });

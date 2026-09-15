@@ -18,11 +18,13 @@ import llmQueuesService from "./llm-queues.service";
 import type { LlmQueue } from "./llm-queues.service";
 import { llmQueueKeys } from "./llm-queues.service.querykeys";
 import { llmDatasetKeys } from "./llm-datasets.service.querykeys";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const llmQueuesQuery = (org: string) =>
   queryOptions({
     queryKey: llmQueueKeys.list(org),
     queryFn: (): Promise<LlmQueue[]> => llmQueuesService.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

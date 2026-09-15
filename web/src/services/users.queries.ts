@@ -16,12 +16,13 @@
 import { queryOptions } from "@tanstack/vue-query";
 import users from "./users";
 import { userKeys } from "./users.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const orgUsersQuery = (org: string) =>
   queryOptions({
     queryKey: userKeys.users(org),
     queryFn: async (): Promise<any[]> => (await users.orgUsers(org)).data?.data ?? [],
+    staleTime: NORMAL_STALE_TIME,
   });
 
 /** Org configuration — the same option list for every user form and the list page. */
@@ -29,8 +30,7 @@ export const assignableRolesQuery = (org: string) =>
   queryOptions({
     queryKey: userKeys.assignableRoles(org),
     queryFn: async () => (await users.getRoles(org)).data,
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 /** Read by both the users list and the roles list — one entry, not one each. */
@@ -38,4 +38,5 @@ export const allUserRolesQuery = (org: string) =>
   queryOptions({
     queryKey: userKeys.allUserRoles(org),
     queryFn: async () => (await users.getAllUserRoles(org)).data ?? null,
+    staleTime: NORMAL_STALE_TIME,
   });

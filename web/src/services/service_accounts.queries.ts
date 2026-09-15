@@ -16,11 +16,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import service_accounts from "./service_accounts";
 import { serviceAccountKeys } from "./service_accounts.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const serviceAccountsQuery = (org: string) =>
   queryOptions({
     queryKey: serviceAccountKeys.list(org),
     queryFn: async (): Promise<any[]> => (await service_accounts.list(org)).data?.data ?? [],
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

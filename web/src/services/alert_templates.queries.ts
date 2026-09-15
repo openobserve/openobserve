@@ -16,15 +16,15 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import template from "./alert_templates";
 import { templateKeys } from "./alert_templates.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 export const templatesQuery = (org: string) =>
   queryOptions({
     queryKey: templateKeys.list(org),
     queryFn: async (): Promise<any[]> => (await template.list({ org_identifier: org })).data ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    // A catalogue read by every alert form, not alert state — so the normal tier, not the live one.
+    staleTime: NORMAL_STALE_TIME,
     persister: localStoragePersister,
   });
 

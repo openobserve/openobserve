@@ -16,15 +16,15 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import onlineEvalsService from "./online-evals.service";
 import { onlineEvalKeys } from "./online-evals.service.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
+/** One entry serves both Settings › LLM Providers and Online Evals, so it takes the shorter of the two tiers. */
 export const providersQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.providers(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.providers.list(org),
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     persister: localStoragePersister,
   });
 
@@ -32,18 +32,21 @@ export const scoreConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.scoreConfigs(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.scoreConfigs.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 export const scorersQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.scorers(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.scorers.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 export const evalJobsQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.jobs(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.jobs.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

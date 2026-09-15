@@ -20,7 +20,7 @@ import {
   purgePersistedExceptOrg,
   purgePersistedOrg,
 } from "./persisters";
-import { DEFAULT_STALE_TIME } from "./cachePolicy";
+import { GC_TIME, LIVE_STALE_TIME } from "./cachePolicy";
 // Type-only: erased at build time. This module must not pull UI or i18n into its
 // runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
 // evaluates that module before a spec's `vi.mock` can replace it.
@@ -110,9 +110,9 @@ export const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      // The common freshness window. A declaration only states staleTime when
-      // it is genuinely different — see cachePolicy.ts.
-      staleTime: DEFAULT_STALE_TIME,
+      // Every declaration names its tier; this is the safety net for one that forgets — see cachePolicy.ts.
+      staleTime: LIVE_STALE_TIME,
+      gcTime: GC_TIME,
       retry: (failureCount: number, err: any) => {
         const status = err?.response?.status;
         // 4xx are the caller's fault; 501 is a disabled feature — both permanent.

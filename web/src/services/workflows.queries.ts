@@ -16,6 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import workflows from "./workflows";
 import { workflowKeys } from "./workflows.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const workflowsQuery = (org: string) =>
   queryOptions({
@@ -25,4 +26,5 @@ export const workflowsQuery = (org: string) =>
       const data = (await workflows.listWorkflows(org)).data;
       return Array.isArray(data) ? data : ((data as any)?.list ?? []);
     },
+    staleTime: NORMAL_STALE_TIME,
   });

@@ -29,7 +29,7 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import jstransform from "./jstransform";
 import { functionKeys } from "./jstransform.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 // The endpoint paginates but every consumer wants the whole list.
@@ -41,21 +41,17 @@ export const functionsQuery = (org: string) =>
     queryKey: functionKeys.list(org),
     queryFn: async (): Promise<any[]> =>
       (await jstransform.list(1, ALL_FUNCTIONS, "name", false, "", org)).data.list ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
     persister: localStoragePersister,
   });
 
-/**
- * URL-import job statuses for enrichment tables. Volatile (jobs progress), so
- * it takes the default freshness window rather than the config tier — a warm
- * revisit is free, a pending job's status is at most one window behind.
- */
+/** URL-import job progress for enrichment tables, so the live tier rather than the functions tier. */
 export const enrichmentTableStatusesQuery = (org: string) =>
   queryOptions({
     queryKey: functionKeys.enrichmentStatuses(org),
     queryFn: async (): Promise<Record<string, unknown>> =>
       (await jstransform.get_all_enrichment_table_statuses(org)).data ?? {},
+    staleTime: LIVE_STALE_TIME,
   });
 
 /** Create or update, chosen by the caller — both invalidate the same scope. */

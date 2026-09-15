@@ -17,11 +17,13 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import llmDatasetsService from "./llm-datasets.service";
 import type { LlmDataset } from "./llm-datasets.service";
 import { llmDatasetKeys } from "./llm-datasets.service.querykeys";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const llmDatasetsQuery = (org: string) =>
   queryOptions({
     queryKey: llmDatasetKeys.list(org),
     queryFn: (): Promise<LlmDataset[]> => llmDatasetsService.list(org),
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

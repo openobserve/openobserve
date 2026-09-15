@@ -17,7 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import stream from "./stream";
 import type { StreamPageParams } from "./stream";
 import { streamKeys } from "./stream.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 export const streamNameListQuery = (org: string, type: string) =>
@@ -25,8 +25,7 @@ export const streamNameListQuery = (org: string, type: string) =>
     queryKey: streamKeys.nameList(org, type),
     // `schema: false` deliberately — schemas are fetched per stream on demand.
     queryFn: async (): Promise<any[]> => (await stream.nameList(org, type, false)).data.list ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: MEDIUM_STALE_TIME,
     persister: localStoragePersister,
   });
 
@@ -46,6 +45,7 @@ export const streamPageQuery = (org: string, type: string, params: StreamPagePar
       );
       return { list: res.data.list ?? [], total: res.data.total ?? 0 };
     },
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 /** Resolves to the payload, not the axios envelope, so the cache never holds an XHR object; `useStreams` keeps its own copy on purpose. */
@@ -53,6 +53,7 @@ export const streamSchemaQuery = (org: string, streamName: string, type: string)
   queryOptions({
     queryKey: streamKeys.schema(org, type, streamName),
     queryFn: async (): Promise<any> => (await stream.schema(org, streamName, type)).data,
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

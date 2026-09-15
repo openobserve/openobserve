@@ -16,11 +16,13 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import savedViews from "./saved_views";
 import { savedViewKeys } from "./saved_views.querykeys";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const savedViewsQuery = (org: string) =>
   queryOptions({
     queryKey: savedViewKeys.list(org),
     queryFn: async (): Promise<any[]> => (await savedViews.get(org)).data?.views ?? [],
+    staleTime: MEDIUM_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

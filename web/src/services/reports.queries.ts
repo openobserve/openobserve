@@ -17,6 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import reports from "./reports";
 import type { ReportListFilters } from "./reports";
 import { reportKeys } from "./reports.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const reportsQuery = (org: string, filters: ReportListFilters) =>
   queryOptions({
@@ -31,6 +32,7 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
           filters.nameQuery || undefined,
         )
       ).data ?? [],
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

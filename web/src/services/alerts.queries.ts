@@ -19,6 +19,7 @@ import alerts from "./alerts";
 import type { AlertHistoryQuery } from "./alerts";
 import { alertKeys } from "./alerts.querykeys";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
+import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const alertsListQuery = (
   org: string,
@@ -42,6 +43,7 @@ export const alertsListQuery = (
           alertType ?? "",
         )
       ).data?.list ?? [],
+    staleTime: LIVE_STALE_TIME,
   });
 
 /**
@@ -68,12 +70,14 @@ export const alertDependenciesQuery = (org: string) =>
       );
       return res.data?.list ?? res.data ?? [];
     },
+    staleTime: LIVE_STALE_TIME,
   });
 
 export const alertDetailQuery = (org: string, id: string) =>
   queryOptions({
     queryKey: alertKeys.detail(org, id),
     queryFn: async () => (await alerts.get_by_alert_id(org, id)).data,
+    staleTime: LIVE_STALE_TIME,
   });
 
 export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
@@ -90,6 +94,7 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
   return queryOptions({
     queryKey: alertKeys.history(org, q),
     queryFn: async () => (await alerts.getHistory(org, q)).data ?? {},
+    staleTime: LIVE_STALE_TIME,
   });
 };
 

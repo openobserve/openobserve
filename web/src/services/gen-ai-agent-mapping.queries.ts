@@ -18,7 +18,7 @@ import genAiAgentMappingService, {
   type GenAiAgentListResponse,
 } from "./gen-ai-agent-mapping.service";
 import { genAiAgentKeys } from "./gen-ai-agent-mapping.querykeys";
-import { CONFIG_STALE_TIME } from "@/composables/query/cachePolicy";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 import { quantizeRange } from "@/composables/query/queryClient";
 
 /** Keyed on a quantized window: callers derive their range from `Date.now()`, so raw anchors would fork the entry on every visit and never hit. */
@@ -28,7 +28,7 @@ export const genAiAgentsQuery = (org: string, startTime: number, endTime: number
     queryKey: genAiAgentKeys.agents(org, start, end),
     queryFn: (): Promise<GenAiAgentListResponse> =>
       genAiAgentMappingService.listAgents(org, startTime, endTime),
-    staleTime: CONFIG_STALE_TIME,
+    staleTime: MEDIUM_STALE_TIME,
   });
 };
 

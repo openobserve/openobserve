@@ -28,27 +28,28 @@ import {
   bulkDeleteRoles,
 } from "./iam";
 import { iamKeys } from "./iam.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 export const groupsQuery = (org: string) =>
   queryOptions({
     queryKey: iamKeys.groups(org),
     queryFn: async () => (await getGroups(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 export const rolesQuery = (org: string) =>
   queryOptions({
     queryKey: iamKeys.roles(org),
     queryFn: async () => (await getRoles(org)).data,
+    staleTime: NORMAL_STALE_TIME,
   });
 
 export const resourcesQuery = (org: string) =>
   queryOptions({
     queryKey: iamKeys.resources(org),
     queryFn: async () => (await getResources(org)).data,
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
     persister: localStoragePersister,
   });
 

@@ -17,7 +17,7 @@ import { queryOptions } from "@tanstack/vue-query";
 import common from "./common";
 import type { Folder } from "./common";
 import { folderKeys, nodeKeys } from "./common.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 import { localStoragePersister } from "@/composables/query/persisters";
 
 const DEFAULT_FOLDER: Folder = { name: "default", folderId: "default", description: "default" };
@@ -37,8 +37,7 @@ export const foldersQuery = (org: string, type: string) =>
     queryKey: folderKeys.list(org, type),
     queryFn: async (): Promise<Folder[]> =>
       normalizeFolders((await common.list_Folders(org, type)).data.list ?? []),
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
     persister: localStoragePersister,
   });
 
@@ -47,6 +46,5 @@ export const nodesQuery = (org: string) =>
     queryKey: nodeKeys.list(org),
     queryFn: async () => (await common.list_nodes(org)).data,
     // Not persisted: stale cluster state is more confusing than a second of loading.
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    staleTime: NORMAL_STALE_TIME,
   });

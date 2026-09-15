@@ -17,7 +17,7 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import destination from "./alert_destination";
 import { destinationKeys } from "./alert_destination.querykeys";
 import type { DestinationModule } from "./alert_destination.querykeys";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 
 /**
  * Read by the alert form, pipelines and IAM. Memory-only: destination payloads
@@ -38,8 +38,8 @@ export const destinationsQuery = (org: string, module?: DestinationModule) =>
           module,
         })
       ).data ?? [],
-    staleTime: CONFIG_STALE_TIME,
-    gcTime: LONG_GC_TIME,
+    // A catalogue read by every alert form and by pipelines, not alert state — so the normal tier, not the live one.
+    staleTime: NORMAL_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

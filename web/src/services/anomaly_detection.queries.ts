@@ -16,17 +16,20 @@
 import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import anomaly_detection from "./anomaly_detection";
 import { anomalyKeys } from "./anomaly_detection.querykeys";
+import { LIVE_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const anomalyConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: anomalyKeys.list(org),
     queryFn: async (): Promise<any[]> => (await anomaly_detection.list(org)).data ?? [],
+    staleTime: LIVE_STALE_TIME,
   });
 
 export const anomalyHistoryQuery = (org: string, limit: number) =>
   queryOptions({
     queryKey: anomalyKeys.history(org, limit),
     queryFn: async () => (await anomaly_detection.getAllHistory(org, limit)).data,
+    staleTime: LIVE_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

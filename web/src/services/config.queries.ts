@@ -29,7 +29,6 @@ export const configQuery = () =>
     queryKey: configKeys.get(),
     queryFn: async () => (await zo_config.get_config()).data,
     staleTime: SESSION_STALE_TIME,
-    gcTime: SESSION_STALE_TIME,
   });
 
 /**
@@ -43,7 +42,6 @@ export const configFullQuery = (org: string) =>
     queryKey: configKeys.full(org),
     queryFn: async () => (await zo_config.get_config_full(org)).data,
     staleTime: SESSION_STALE_TIME,
-    gcTime: SESSION_STALE_TIME,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

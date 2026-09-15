@@ -103,7 +103,8 @@ Check that failed: "Mount does not force — Zero requests on the return visit"
 Actual:            /api/default/datasets and /api/default/annotation_queues re-fetch on EVERY
                    visit, seconds apart.
 Query Devtools:    ["org","default","llm","datasets","list"] and ["org","default","llm",
-                   "queues","list"] exist with staleTime 30000 — but dataUpdateCount stays 0.
+                   "queues","list"] exist with staleTime 30000 (300000 — 5 min — since
+                   2026-09-15) — but dataUpdateCount stays 0.
                    The declared queries are never populated; the pages still fetch through the
                    raw service. Same "declared but unread" pattern as §24 item 8, except the
                    plan lists these two surfaces as fixed.
@@ -123,7 +124,8 @@ UI path:           Home → switch O2 Assistant / Overview / Usage tabs repeated
 Check that failed: "Each tab loads once — it used to re-request on every tab switch"
 Actual:            Every return to Overview fires /api/v2/default/alerts/incidents?limit=4&
                    offset=0&status=open — TWICE (two identical concurrent requests), well inside
-                   the 30 s window. The pair fires again on each subsequent tab switch.
+                   the 30 s window (1 min since 2026-09-15). The pair fires again on each
+                   subsequent tab switch.
 Other overview reads (alert/anomaly/service summaries) correctly load once — only the
 incidents card misbehaves (not cached, and duplicated within a single mount).
 
@@ -226,7 +228,8 @@ Two faults combine:
    after the server call. `setQueryData` does not invoke the persister, which only writes at
    the end of a query-function run — so `localStorage` keeps the pre-write value.
 2. **The stale copy is never revalidated.** The entries were 22 and 70 minutes old — far past
-   `CONFIG_STALE_TIME` (5 min) — yet no request was issued.
+   `CONFIG_STALE_TIME` (5 min at the time; `settingQuery` is 1 h `NORMAL_STALE_TIME` since
+   2026-09-15, so only the 70-minute entry would count as stale today) — yet no request was issued.
 
 Measured (org `default`, a non-admin UI user; e-mail redacted):
 
@@ -471,7 +474,8 @@ did that next normal fetch hit the network?     false
 **Why it is not currently user-visible:** the *passed* `staleTime` still wins for each
 `fetchQuery` call, so imperative callers (`fetchInto`) keep behaving correctly — verified
 on Cipher Keys, where a Refresh click left the warm revisit at **0 requests** and the
-declared `staleTime: 300000` still in effect for the read decision.
+declared `staleTime: 300000` (3 600 000 since 2026-09-15 — the list moved to the 1 h tier; the
+mechanism is unchanged) still in effect for the read decision.
 
 **Why it still matters:** the stored `0` is what `useQuery` observers, `isStale()`,
 `refetchOnMount` and `refetchOnWindowFocus` consult. Any component that later mounts a
@@ -516,7 +520,8 @@ followed by a normal `fetchQuery`, or use `refetchQueries`, rather than passing
 
 ### 12. Enrichment table status is re-requested on every visit
 
-> **FIXED.** New `enrichmentTableStatusesQuery` (default 30 s tier, focus revalidate);
+> **FIXED.** New `enrichmentTableStatusesQuery` (default 30 s tier, focus revalidate — since
+> 2026-09-15 the 1 min live tier, and focus revalidation is off for every query);
 > the list page reads through it and the Refresh path forces. Verified live: first visit
 > fetches status + stream list, an immediate revisit fires zero enrichment requests.
 
@@ -524,7 +529,7 @@ followed by a normal `fetchQuery`, or use `refetchQueries`, rather than passing
 | --- | --- |
 | **Module** | Pipelines → Enrichment Tables (§10.2) |
 | **UI path** | Left sidebar → **Pipelines** → **Enrichment Tables** |
-| **What to check** | Network tab: navigate away and straight back within 30 s |
+| **What to check** | Network tab: navigate away and straight back within 30 s (the status window is 1 min since 2026-09-15) |
 | **What to expect** | A warm revisit issues no request |
 | **The issue** | `GET /api/default/enrichment_tables/status` fires on **every** visit. The paired stream list *is* cached correctly |
 
@@ -858,7 +863,7 @@ Module:            Reliability -> External Alert Sources (§6.7)
 UI path:           Left sidebar -> hover Reliability -> External Alert Sources
                    (needs O2_INCIDENTS_ENABLED=true; URL /web/alert-sources)
 What to check:     Network tab on mount, on Refresh, and on a warm revisit
-What to expect:    a warm revisit inside 30 s issues 0 requests
+What to expect:    a warm revisit inside 30 s (1 min since 2026-09-15) issues 0 requests
 What you get:      0 list reads, but still one /senders request per row
 ```
 
@@ -950,8 +955,8 @@ instead of calling the service directly — the same pattern `fetchIntegrations`
 this page, which also makes `force` reach both halves instead of only the list.
 
 Result: a warm revisit costs **0** instead of 23, with no behaviour change — the status column
-would be at most 30 s stale, exactly as the name and destination columns on that page already
-are.
+would be at most 30 s stale (1 min since 2026-09-15), exactly as the name and destination columns
+on that page already are.
 
 **Better long-term fix:** fold `last_received_at` into the list response server-side and delete
 the fan-out. The status column only computes `getAlertSourceStatus(s.last_received_at, now)`,
@@ -962,8 +967,8 @@ removes the N+1 rather than caching around it.
 defines only `all` and `list` — there is no `senders` key and no comment anywhere explaining
 the exclusion. Deliberate opt-outs in this branch are documented; `destinationsQuery` carries
 a docblock stating exactly why it stays memory-only. This has none. The page is also
-internally inconsistent: names and destinations are served from a 30 s cache while the status
-column refetches every time.
+internally inconsistent: names and destinations are served from a 30 s cache (1 min since
+2026-09-15) while the status column refetches every time.
 
 **Everything else on this page passed** — C1-C8 all green (including C6 create and C7
 delete-then-return, which the plan had wrongly marked out of scope), sort/paging/search all
@@ -993,8 +998,8 @@ GET /api/default/slos                  <- fired by the reactive key while readFo
 GET /api/default/slos?folder=default   <- fired again once load() sets the folder
 ```
 
-Reproduced on three separate paths: cold page load, a stale (>30 s) revisit, and the
-navigation back to the list after a create. Every mount pays it.
+Reproduced on three separate paths: cold page load, a stale (>30 s; the SLO window is 1 min since
+2026-09-15) revisit, and the navigation back to the list after a create. Every mount pays it.
 
 **Cause.** `readFolder` is initialised to `undefined`, and the query key is reactive:
 
@@ -1317,7 +1322,7 @@ editor -> list round trip (what Save does)   0 requests, still 24, new pipeline 
 **Cause.** `PipelineEditor.vue` had **no contact with the query cache at all** — no
 `queryClient`, no `pipelineKeys`, no `invalidate`. It called the service then `router.push`ed
 back to the list. The list's route watcher runs `getPipelines()` with `force = false`, which
-refetches nothing, so the 30 s-fresh cached list repainted without the new row.
+refetches nothing, so the 30 s-fresh (1 h since 2026-09-15) cached list repainted without the new row.
 
 `ImportPipeline.vue` had the same gap with worse wiring: it emits `update:pipelines` after each
 import, but **nothing anywhere listens to that event** — Import is its own route, so the list is
@@ -1361,8 +1366,8 @@ What you got:      the deleted row stayed on screen, and survived the round trip
 
 **Severity: High.** This is the exact check the plan flags as *"most likely regression"*, and it
 fails: the server deletes the destination, the UI keeps showing it, and navigating away and back
-does not correct it. Destinations sit in the **5-minute** `CONFIG_STALE_TIME` tier, so the stale
-row persists for a long time.
+does not correct it. Destinations sat in the **5-minute** `CONFIG_STALE_TIME` tier (1 h
+`NORMAL_STALE_TIME` since 2026-09-15), so the stale row persists for a long time.
 
 **Measured before the fix:**
 
@@ -1480,7 +1485,8 @@ Module:            Settings -> General / Organization (§15.1)
 UI path:           Settings -> General -> change Scrape Interval -> Save -> switch org -> switch back
 What to check:     The saved value is still there
 What to expect:    It is (main always re-read from the server)
-What you get:      The setting REVERTS to its pre-save value for up to 5 minutes.
+What you get:      The setting REVERTS to its pre-save value for up to 5 minutes (up to 1 h
+                   since 2026-09-15; the settings read moved to the 1 h tier).
                    The server has the new value; the UI shows the old one.
 ```
 
@@ -1500,7 +1506,7 @@ MainLayout re-read (its own line, verbatim)
 
 **Cause.** This PR turned a direct read into a cached one and did not add an invalidation on the
 write. `MainLayout.getOrganizationSettings()` — which its own comment says runs "on every org
-switch" — now serves from a 5-minute entry:
+switch" — now serves from a 5-minute entry (1 h since 2026-09-15):
 
 ```ts
 // branch: MainLayout.vue:1073
@@ -1510,7 +1516,7 @@ const orgSettings: any = {
 store.dispatch("setOrganizationSettings", { ... });   // stale value lands in Vuex
 ```
 
-`orgSettingsQuery` carries `CONFIG_STALE_TIME` (5 min), so within that window `fetchQuery` returns
+`orgSettingsQuery` carried `CONFIG_STALE_TIME` (5 min; `NORMAL_STALE_TIME`, 1 h, since 2026-09-15), so within that window `fetchQuery` returns
 the **pre-save** payload and dispatches it straight into Vuex, overwriting the value the save just
 put there. The settings pages read Vuex, so the UI reverts.
 
@@ -1558,6 +1564,8 @@ billing "cloud-only, untestable" — wrong. Only the **sidebar link** is gated
 `/web/billings/usage?org_identifier=<org>` loads fine. The enable flow writes
 `post_organization_settings`, not a billing endpoint, so the 404s on billing data are irrelevant
 to it. Measured live: `cacheInvalidated: true`, and after an org round trip `REVERTED: false`.
+(Billing itself is no longer cached since 2026-09-15 — its queries were removed — which does not
+touch this settings write.)
 
 **Verification:** `vue-tsc --noEmit` exit 0 · settings + billings specs **43 files / 1632 tests
 passing** · live before-and-after on three of the four pages. Note the suite passed *before* the
@@ -1711,7 +1719,8 @@ odds of a user meeting it are low.
 
 ```
 server truth: 25 toolsets  (cachetest_ts_whiskey deleted)
-persisted cache: 26, aged to 20.7 min (well past the 5-minute CONFIG_STALE_TIME)
+persisted cache: 26, aged to 20.7 min (well past the then 5-minute CONFIG_STALE_TIME;
+                                       AI Toolsets are 1 h since 2026-09-15)
 
 main   (:8083)   GET /api/default/ai/toolsets fired -> "Showing 1 - 20 of 25", deleted row ABSENT
 branch (:8081)   no toolsets request at all       -> "Showing 1 - 20 of 26", deleted row STILL LISTED
@@ -1806,7 +1815,7 @@ which applies to both pages.
 
 ```
 Module:            Alerts -> Destination Templates (TemplateList.vue)
-UI path:           Alerts -> Destination Templates, leave for >5 min, hard-reload
+UI path:           Alerts -> Destination Templates, leave for >5 min (>1 h since 2026-09-15), hard-reload
 What to check:     The row count and contents against the server
 What to expect:    The server's templates (main re-fetches on every load)
 What you get:      The localStorage snapshot, however old, with NO request fired
@@ -1823,7 +1832,8 @@ staleness cue to suggest anything is out of date.
 1. cold visit /web/alert-templates       -> GET /alerts/templates 200, "Showing 1 - 20 of 43"
                                             persisted as o2q-["org","default","alerts","templates"]
 2. create one template out-of-band (API) -> server now 44, page untouched
-3. backdate the persisted entry to 10 min old   (past CONFIG_STALE_TIME = 5 min)
+3. backdate the persisted entry to 10 min old   (past CONFIG_STALE_TIME = 5 min at the time;
+                                                 templates are 1 h since 2026-09-15)
 4. hard reload
      UI              -> "Showing 1 - 20 of 43"      <- stale
      server          -> 44
@@ -2017,7 +2027,8 @@ stream, the RUM page kept showing its "not instrumented" onboarding screen.
 ```
 server            _rumdata EXISTS (listed by /api/default/streams?type=logs; schema resolves)
 persisted entry   o2q-["org","default","streams","nameList","logs"]
-                    age 29.44 min   (staleTime = CONFIG_STALE_TIME = 5 min -> long stale)
+                    age 29.44 min   (staleTime = CONFIG_STALE_TIME = 5 min -> long stale;
+                                     still 5 min since 2026-09-15, now named MEDIUM_STALE_TIME)
                     58 streams, _rumdata ABSENT
 page load         ZERO /api/default/streams requests issued by the app
 UI                "Instrument a web app" / "Enable Session Replay" — RUM reads as disabled
@@ -2028,8 +2039,9 @@ Overview / Vitals / Errors / API tabs and live data (`Total Sessions 2`, `Sessio
 That isolates the persisted entry as the sole cause.
 
 **Cause — the same shape as #27/#28.** `streamNameListQuery` (`services/stream.queries.ts:23`) is
-declared with `staleTime: CONFIG_STALE_TIME` **and** `persister: localStoragePersister`, but
-`useStreams.ts:103` (and `:128`) reads it imperatively:
+declared with `staleTime: CONFIG_STALE_TIME` (`MEDIUM_STALE_TIME`, the same 5 min, since
+2026-09-15) **and** `persister: localStoragePersister`, but `useStreams.ts:103` (and `:128`) reads
+it imperatively:
 
 ```ts
 queryClient.fetchQuery(
@@ -2129,7 +2141,7 @@ purely by asking whether a `_rumdata` stream exists. Ingest RUM events, and RUM 
 | setting | question it answers | layer | survives reload |
 | --- | --- | --- | --- |
 | `staleTime` (5 min) | is my in-memory data fresh enough to skip fetching? | memory | no |
-| `gcTime` (30 min) | how long do I keep unused data in RAM? | memory | no |
+| `gcTime` (30 min; 3 h since 2026-09-15) | how long do I keep unused data in RAM? | memory | no |
 | `maxAge` (**24 h**) | how old may a **stored** copy be before I refuse it? | **disk** | **yes** |
 
 On a reload the in-memory cache is empty, so `staleTime` correctly says "no data, go fetch" — and then
@@ -2156,7 +2168,7 @@ matches the freshness window, and point `streamNameListQuery` at it:
 ```ts
 export const configWindowPersister = experimental_createQueryPersister<string>({
   storage: safeLocalStorage,
-  maxAge: CONFIG_STALE_TIME,   // 5 min — NOT the 24 h the other tiers use
+  maxAge: MEDIUM_STALE_TIME,   // 5 min — NOT the 24 h the other tiers use (was CONFIG_STALE_TIME; renamed 2026-09-15)
   prefix: LS_PREFIX,
   buster: PERSIST_BUSTER,
 });
@@ -2280,7 +2292,7 @@ four together via `Promise.allSettled` (`useOnlineEvalsData.ts:50-53`) and is ca
 
 ```
 revisit (past staleTime)  -> 3 requests   (the three lists; providers still cached)
-revisit (within 30 s)     -> 0 requests
+revisit (within 30 s)     -> 0 requests   (the window is 5 min since 2026-09-15)
 refresh button x2         -> 4 requests each click  (forced read, correct)
 ```
 
@@ -2326,8 +2338,8 @@ so both still force. The ref's exposed type needed widening to `(reloadConfigs?:
 
 **A second change is required with it — the first version introduced a stale-data risk.** With the forced round
 removed, `providers` stopped being refetched on mount and was instead **restored from its persisted
-entry**. `providersQuery` was declared `staleTime: CONFIG_STALE_TIME` **+ `persister:
-localStoragePersister`**, and it is read observerless through `fetchInto` — the exact **#30** shape, so
+entry**. `providersQuery` was declared `staleTime: CONFIG_STALE_TIME` (5 min; `MEDIUM_STALE_TIME`
+since 2026-09-15) **+ `persister: localStoragePersister`**, and it is read observerless through `fetchInto` — the exact **#30** shape, so
 a restored entry is served past `staleTime` without revalidation.
 
 That would normally be covered by write-invalidation, but nothing invalidates this scope:
@@ -2348,6 +2360,9 @@ gcTime: LONG_GC_TIME,
 // Not persisted: read observerless via `fetchInto`, and no provider write
 // invalidates this scope — a restored entry would outlive `staleTime`.
 ```
+
+*(Snippet as of the fix. Since 2026-09-15 the declaration reads `staleTime: MEDIUM_STALE_TIME` — still
+5 min — with no per-query `gcTime`; `CONFIG_STALE_TIME` and `LONG_GC_TIME` no longer exist.)*
 
 **Verified live on `:8081` — the fix, and the three behaviours it must not break:**
 
@@ -2441,7 +2456,8 @@ residue — nothing reads or writes it now, exactly as with the streams entry in
 10. `result_schema` is fetched 4× on every dashboard open (once per panel + one), uncached —
     outside the plan's scope, but it is the only repeated chatter left on a warm dashboard.
 11. Plan wording: the SQL function catalogue (§4 "once per session") is actually config-tier
-    (5 min) — a refetch after the window was observed. Behavior is fine; the plan overstates it.
+    (5 min; 1 h `NORMAL_STALE_TIME` since 2026-09-15) — a refetch after the window was observed.
+    Behavior is fine; the plan overstates it.
 12. Metrics Explorer (§4A): first revisit re-ran 3/5 card queries (cards whose earlier run
     returned no data / crossed the range quantum); second revisit restored all 5 from cache with
     zero requests. Net PASS, but "repaint immediately rather than re-running every query" is
@@ -2503,7 +2519,7 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 | Anomaly detection lists + history | §6.9 | anomaly alerts | none configured anywhere |
 | Alert-detail History pagination prefetch | §6.5 | an alert with >25 history rows | quantized caching verified; the standalone page's prefetch was verified in the parallel run, but that page has no UI entry |
 | RUM sessions pagination + refresh | §21 | RUM traffic | page loads clean, zero sessions |
-| Billing (usage, invoices, checkout URLs) | §22.4 | a cloud deployment (`isCloud=true`) | routes absent on-prem |
+| Billing (usage, invoices, checkout URLs) | §22.4 | a cloud deployment (`isCloud=true`) | routes absent on-prem — moot since 2026-09-15: billing is no longer cached (queries removed), so there is no cached behaviour left to test |
 | Pipeline editor flows, per-pipeline History UI | §9.1/9.3 | at least one pipeline | `pipelineHistoryQuery` is spec-covered; the page flow was never clicked through |
 | Import flows (dashboard/alert/destination/template/pipeline) | §5.5, §6.3/6.4, §9.1 | file-upload interaction | write-through after import is the same invalidation path as create, which passes everywhere |
 
@@ -2513,7 +2529,7 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 | --- | --- | --- |
 | New-deploy detection prompt | §2.1a | a live redeploy of the backend while the app is open |
 | Field-value residue across users | §2.3 / §24-6 | a second, RBAC-restricted user in the same org (the fix — read-cache cleared on purge — is in; the two-user scenario itself is unverified) |
-| Offline → back online refetch | §23 | DevTools network toggling (not available in the in-app browser) |
+| Offline → back online (no automatic refetch since 2026-09-15 — `refetchOnReconnect` is off for every query) | §23 | DevTools network toggling (not available in the in-app browser) |
 | localStorage quota-full degradation | §23 | an org with enough streams to blow the ~5 MB budget |
 | Multi-tab convergence | §23 | two simultaneous app tabs |
 | Private-browsing storage fallback | §23 | a private window |
@@ -2546,7 +2562,7 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 | §9 pipeline editor flows / history | no pipelines on the org; editor too heavy to script safely |
 | ~~§10.2 Enrichment tables~~ | ~~org has none~~ **now verified in `_meta` — PASS** |
 | §16 Trace DAG cache | pentest: no `/traces/{id}/details` endpoint. o2latestmain: details works, but `/traces/{id}/dag` itself 404s for every trace (driven directly through `traceDagQuery` — the component's own path), and no org holds spans with populated `gen_ai_*` columns, so the DAG tab cannot appear. Verified meanwhile: the 404 is not cached and not retried (one call per fetch). Needs a backend with the /dag endpoint and LLM-instrumented traces |
-| §21 RUM, §22.3a LLM Insights, §22.4 Billing | no RUM/LLM/billing data on either env (RUM page loads clean on o2latestmain, zero sessions). ~~§22.1 Online Evals~~ **tested on o2latestmain — PASS**: cold visit fetches score_configs+scorers+eval_jobs+providers once; scorers/jobs tab revisits fire zero requests |
+| §21 RUM, §22.3a LLM Insights, §22.4 Billing | no RUM/LLM/billing data on either env (RUM page loads clean on o2latestmain, zero sessions). **§22.4 is moot since 2026-09-15 — billing is no longer cached (queries removed).** ~~§22.1 Online Evals~~ **tested on o2latestmain — PASS**: cold visit fetches score_configs+scorers+eval_jobs+providers once; scorers/jobs tab revisits fire zero requests |
 | ~~§11 Synthetics~~, §13 Actions | **Synthetics is no longer blocked** — enabled and fully tested on 2026-09-01, see plan §11; §11.1 agent tokens also tested and passing. Actions remains off on every reachable env: the page renders via direct URL but `getAllActions` correctly returns `[]` without a request while `actions_enabled` is unset — no caching to exercise, and no wasted traffic |
 | ~~§15.2 Nodes~~ | **now verified — PASS** (the page needs the `_meta` org selected, not just the URL param): cold 1 request/7 nodes, revisit 0, `r` forces 1, the node filter survives refresh with its filtered rows, and no `o2q-` key is written (memory-only by design) |
 | §23 offline / quota-full / multi-tab | not reproducible in the in-app browser harness |
@@ -2599,7 +2615,7 @@ test it. Anything not listed here has been tested and passes (or is a filed find
 | `src/services/alerts.ts` | `get_by_alert_id` rejects locally on a falsy id | 0b |
 | `src/composables/shared/router.ts` | `/logout` route registrable again (component added; vue-router silently drops component-less records), base-aware redirect, try/finally | 9a |
 | `src/composables/shared/router.spec.ts` | zincutils mock gains `getPath` | 9a |
-| `fe-caching-manual-test-plan.md` | §5.2 range/variables rows corrected to main semantics; §4 catalogue wording (5-min window); §6.3 security note and §24 items 1/6 marked resolved | #2, #11 |
+| `fe-caching-manual-test-plan.md` | §5.2 range/variables rows corrected to main semantics; §4 catalogue wording (5-min window; 1 h since 2026-09-15); §6.3 security note and §24 items 1/6 marked resolved | #2, #11 |
 
 Not changed, by decision: #2 (main parity kept — the plan text is now corrected instead),
 #3/#4 (no code change needed; correct on the current backend, standard error-retry against
@@ -2638,7 +2654,7 @@ distinguished from one until the endpoint is reachable.
 | --- | --- | --- | --- | --- |
 | B1 | Alerts → Sources (§6.7) | Alerts → **Sources** | `GET /api/v2/{org}/incidents/integrations` | **403 Forbidden** |
 | B2 | IAM → Roles / Groups (§14.2, §14.3) | IAM → **Roles** / **User Groups** | `GET /{org}/roles`, `/groups`, `/users/roles/all` | **500 — "OpenFGA store not initialized yet"** |
-| B3 | Billing (§22.4) | **Billing** → Usage / Invoice History | `/billings/invoices`, `/list_subscription`, `/data_usage/30days` | **404** (cloud-only) |
+| B3 | Billing (§22.4) | **Billing** → Usage / Invoice History | `/billings/invoices`, `/list_subscription`, `/data_usage/30days` | **404** (cloud-only). Moot since 2026-09-15: billing is no longer cached at all (queries removed), so this row no longer needs unblocking |
 | B4 | Actions (§13) | **Actions** | `GET /{org}/actions` | **400 — "Failed to get http client"**; the actions backend is not configured, so the page issues no requests at all |
 
 **Retry policy verified as a side-effect:** 403 and 404 produced **exactly one** request per
@@ -2934,7 +2950,7 @@ correct behaviour for the fix that shipped; the plan's expectation was wrong, no
 | §14.2/§14.3 IAM Roles, Groups | `500 — "OpenFGA store not initialized yet"` |
 | §13 Actions | `400 — "Failed to get http client"` (actions backend not configured) |
 | §11 Synthetics | feature disabled — absent from the sidebar, `/synthetics` redirects to Home |
-| §22.4 Billing | `404` — cloud-only endpoints |
+| §22.4 Billing | `404` — cloud-only endpoints. Moot since 2026-09-15: billing is no longer cached (queries removed) |
 
 ### Storage hygiene
 
@@ -2952,7 +2968,7 @@ correct behaviour for the fix that shipped; the plan's expectation was wrong, no
 | --- | --- |
 | `alerts/deduplication/semantic-groups` called ~45× in one session | Not reproducible on a clean page load (**0** calls). The repeats were driven by my own repeated field-expansions and Run Query clicks. `utils/semanticGroupsCache.ts` has a 5-minute TTL cache with in-flight dedup |
 | Field-value IndexedDB store empty | The time window contained no data. After re-ingesting inside the visible range, entries were written correctly (see below) |
-| Dashboards fetching 3 config reads on a "warm" revisit | Those queries had genuinely aged past their 5-minute window. Re-probed 4× back-to-back: visits 2–4 issued **0** requests |
+| Dashboards fetching 3 config reads on a "warm" revisit | Those queries had genuinely aged past their 5-minute window (the folder / settings reads are 1 h since 2026-09-15). Re-probed 4× back-to-back: visits 2–4 issued **0** requests |
 | Two `o2q-` keys present after logout | Re-written by app bootstrap **after** the purge, not survivors; contain no credentials |
 | `QueryInspector` `metaData=undefined` Vue warning | Appears on a cold load too — pre-existing, unrelated to caching |
 
@@ -3026,7 +3042,7 @@ Legend: **Full** = the section's own checks exercised · **Core** = C1/C2 (+ som
 | §22.1 Online Evals | **Full** | → **Issue 2** |
 | §22.2 / §22.3 AI Datasets, Queues | Core | C1,C2 |
 | §22.3a LLM Insights | **Full** | → **Issue 5** |
-| §22.4 Billing | **Blocked** | 404 cloud-only |
+| §22.4 Billing | **Blocked** | 404 cloud-only — moot since 2026-09-15: billing is no longer cached (queries removed) |
 | §23 Resilience | Core+ | retry policy ✅ · **storage-quota failure degrades cleanly, 0 uncaught errors** ✅ · offline/multi-tab not run |
 
 ### Where it stands
@@ -3034,7 +3050,7 @@ Legend: **Full** = the section's own checks exercised · **Core** = C1/C2 (+ som
 - **Fully exercised:** 34 sections (was 7)
 - **Core contract:** ~20 sections
 - **Not exercised:** 0 — §2.1a's caching behaviour is verified; only its end-to-end prompt needs a real deploy
-- **Blocked by environment/data:** 5 sections — all backend configuration (alert sources 403, OpenFGA 500, Actions 400, Synthetics disabled, Billing cloud-only)
+- **Blocked by environment/data:** 5 sections — all backend configuration (alert sources 403, OpenFGA 500, Actions 400, Synthetics disabled, Billing cloud-only — the billing one is moot since 2026-09-15, billing is no longer cached)
 
 Everything still unexercised is either blocked by this instance (no traces/metrics/RUM data,
 Synthetics off, OpenFGA down, billing cloud-only, `_meta`-scoped pages) or a create/import
@@ -3094,8 +3110,8 @@ open the dropdown        "No options found"    ZERO /streams requests        ❌
 `streamNameListQuery` declares a **query-level `persister`**:
 
 ```ts
-staleTime: CONFIG_STALE_TIME,      // 5 minutes
-gcTime:    LONG_GC_TIME,
+staleTime: CONFIG_STALE_TIME,      // 5 minutes (MEDIUM_STALE_TIME, still 5 min, since 2026-09-15)
+gcTime:    LONG_GC_TIME,           // 30 min then; no per-query gcTime since 2026-09-15 (client-wide 3 h)
 persister: localStoragePersister,  // maxAge: 24 h
 ```
 

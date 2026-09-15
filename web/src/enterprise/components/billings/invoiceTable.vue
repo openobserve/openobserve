@@ -57,8 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { invoiceHistoryQuery } from "@/services/billings.queries";
-import { queryClient } from "@/composables/query/queryClient";
+import BillingService from "@/services/billings";
 import { onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -168,11 +167,10 @@ const getInvoiceHistory = () => {
     timeout: 0,
   });
 
-  queryClient
-    .fetchQuery(invoiceHistoryQuery(store.state.selectedOrganization.identifier))
+  BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
     .then((res: any) => {
       dismiss();
-      const invoiceList = res.invoices;
+      const invoiceList = res.data.invoices;
       if (invoiceList.length > 0) {
         invoiceHistory.value = invoiceList.map((invoice: Invoice, index: number) => {
           return {

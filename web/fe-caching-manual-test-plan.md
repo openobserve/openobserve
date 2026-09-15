@@ -45,13 +45,19 @@ that is a bug — it opts out of the org-switch and logout purges.
 
 | Window | Duration | Applies to |
 | --- | --- | --- |
-| Default | **30 seconds** | Most entity lists and detail reads |
-| Config | **5 minutes** | Streams, folders, functions, destinations, templates, actions, regex patterns, org settings |
-| Session | **forever** | `/config`, built-in regex patterns |
+| Live | **1 minute** *(re-tiered 2026-09-15; was the 30 s "Default" tier)* | Alerts list / detail / history / dependencies, alert sources, incidents, anomaly detection, SLOs, synthetics monitors, enrichment-table statuses |
+| Medium | **5 minutes** *(re-tiered 2026-09-15; was the "Config" tier)* | Streams (name lists, paged list, schema), saved views, service topology, field grouping / identity config, org summary, LLM providers, online evals (score configs, scorers, eval jobs), AI datasets / experiments / remote tasks / queues, GenAI agents |
+| Normal | **1 hour** *(new tier 2026-09-15)* | Dashboards, folders, annotations, home / favourite settings, pipelines and pipeline history, functions, query-function catalogue, workflows, reports, IAM (users, roles, groups, resources, service accounts, ingestion / RUM / agent tokens, passcode), nodes, regex patterns (built-in too), cipher keys, AI toolsets, model pricing, org settings, destinations, templates |
+| Session | **forever** | `/config`, trace DAG *(built-in regex patterns moved to the 1 h tier 2026-09-15)* |
+| Never | **0** | License, cleanup tasks — always re-read |
+| Garbage collection | **3 hours** for every query *(set 2026-09-15; was 5 min, or 30 min for the config tier)*; panel results 30 min | Unused entries in memory |
 | Persisted-to-disk max age | **24 hours** | Anything in `localStorage` / `IndexedDB` |
 
 > When a step says "wait past the window", use the table above to know whether that is
-> 30 s or 5 min for the surface you are on.
+> 1 min, 5 min or 1 h for the surface you are on (until 2026-09-15 the choices were 30 s or
+> 5 min, and older rows below still quote those). For a 1 h window, backdate the entry's
+> `dataUpdatedAt` in the console rather than waiting. Billing is not cached at all since
+> 2026-09-15 — its queries were removed.
 
 ---
 
@@ -158,33 +164,39 @@ freshness from the Network tab.
 
 ### The four freshness tiers
 
+> **Tiers re-set 2026-09-15:** 1 min live / 5 min medium / 1 h normal / ∞ session, and `gcTime`
+> is **3 h** for every query. `DEFAULT_STALE_TIME` (30 s), `CONFIG_STALE_TIME` (5 min) and
+> `LONG_GC_TIME` (30 min) no longer exist. Every declaration names its tier; the client default
+> (1 min) is only a safety net.
+
 | Tier | Duration | Applies to | How to verify |
 | --- | --- | --- | --- |
-| **Default** | **30 s** | Most lists — alerts, SLOs, reports, pipelines, dashboards, IAM | Open a list, watch its Devtools badge flip `fresh` → `stale` after 30 s |
-| **Config** | **5 min** | Streams, folders, functions, destinations, templates, actions, regex patterns, org settings | Same, but the flip takes 5 minutes |
-| **Session** | **forever** | `/config` and built-in regex patterns only | Badge stays `fresh` for the whole session — it must **never** go stale |
+| **Live** | **1 min** *(was the 30 s "Default" tier)* | Alerts, incidents, alert sources, anomaly detection, SLOs, synthetics, enrichment-table statuses | Open a list, watch its Devtools badge flip `fresh` → `stale` after 1 min |
+| **Medium** | **5 min** *(was the "Config" tier)* | Streams, saved views, service topology, field grouping, LLM providers, online evals, AI observability lists | Same, but the flip takes 5 minutes |
+| **Normal** | **1 h** *(new 2026-09-15)* | Dashboards, folders, pipelines, functions, workflows, reports, IAM, settings, nodes, destinations, templates, regex patterns, cipher keys, AI toolsets, model pricing | Same, but the flip takes an hour — backdate `dataUpdatedAt` in the console rather than waiting |
+| **Session** | **forever** | `/config` and the trace DAG only *(built-in regex patterns are 1 h since 2026-09-15)* | Badge stays `fresh` for the whole session — it must **never** go stale |
 | **Persisted max age** | **24 h** | Anything in localStorage / IndexedDB | An entry older than 24 h is discarded on read rather than served |
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **P1** | Fresh window suppresses the request | Open Alerts, note the time. Navigate away and back **within 30 s** | **Zero** requests. Devtools badge reads `fresh` |
-| **P2** | Stale window triggers revalidation | Same, but wait **past 30 s** | Rows paint instantly, then **one** background request. Badge goes `stale` → `fetching` → `fresh` |
-| **P3** | Config tier is longer | Open Streams, come back **after 1 minute** | Still **zero** requests — the 5-minute tier has not expired. This is what distinguishes the tiers |
+| **P1** | Fresh window suppresses the request | Open Alerts, note the time. Navigate away and back **within 1 min** *(re-tiered 2026-09-15; was 30 s)* | **Zero** requests. Devtools badge reads `fresh` |
+| **P2** | Stale window triggers revalidation | Same, but wait **past 1 min** *(re-tiered 2026-09-15; was 30 s)* | Rows paint instantly, then **one** background request. Badge goes `stale` → `fetching` → `fresh` |
+| **P3** | Medium tier is longer | Open Streams, come back **after 2 minutes** *(re-tiered 2026-09-15; was "after 1 minute" against the 30 s default)* | Still **zero** requests — the 5-minute medium tier has not expired, while an Alerts list (1 min) would already have refetched. This is what distinguishes the tiers |
 | **P4** | Session tier never expires | Sit in the app for 10+ minutes, navigating around | `/config` is requested **once, ever**. Never re-requested |
-| **P5** | Built-in patterns never expire | Settings → Regex Patterns → Built-in tab, revisit repeatedly | One request per session, and it survives F5 (persisted) |
+| **P5** | Built-in patterns are long-lived and persisted | Settings → Regex Patterns → Built-in tab, revisit repeatedly | One request, and it survives F5 (persisted). *Re-tiered 2026-09-15 to the 1 h normal tier (was session / never): expect one background refetch after an hour, not never* |
 
 ### Eviction, focus, polling, retry
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **P6** | Unused entries are garbage-collected | Open a list, navigate away, **wait 5+ minutes** without returning, then come back | A **cold read with a skeleton** — the entry was evicted from memory. Config-tier entries are held 30 min instead, so use a default-tier list (Alerts, Reports) for this |
-| **P7** | Refetch on window focus | Open **Alerts**, switch to another application for over 30 s, switch back | **One** background request; rows stay on screen. Applies to the volatile lists — alerts, streams, reports, incidents, SLOs, synthetics, dashboards, pipelines, IAM, workflows |
-| **P8** | No focus refetch on config tier | Same, but on **Settings → Regex Patterns** | **Zero** requests — config-tier reads deliberately do not refetch on focus |
+| **P6** | Unused entries are garbage-collected | Open a list, navigate away, **wait 3+ hours** without returning, then come back *(gcTime re-set 2026-09-15 to 3 h for every query; was 5 min, or 30 min for the config tier)* | A **cold read with a skeleton** — the entry was evicted from memory. Any list will do now; in practice evict the entry from the Devtools panel instead of waiting three hours |
+| **P7** | No refetch on window focus | Open **Alerts**, switch to another application for over 1 min *(re-tiered 2026-09-15; was 30 s)*, switch back | **Zero** requests; rows stay on screen. Focus refetch is off for every query (removed 2026-09-15; before that the volatile lists re-checked on focus) |
+| **P8** | No focus refetch on the normal tier *(the "config tier" until 2026-09-15)* | Same, but on **Settings → Regex Patterns** | **Zero** requests |
 | **P9** | Polling starts and stops | IAM → Organizations → open an org's **cleanup tasks** dialog | A request every **5 s** while open. **Close the dialog → polling stops entirely.** A poll that continues after close is a leak |
 | **P10** | Polling stops on completion | Leave the cleanup dialog open until the task reports complete | Polling stops by itself, without closing the dialog |
 | **P11** | 4xx does not retry | Trigger a 403 — sign in as a user without permission for some list | **One** request, one error. **No retry storm, no repeated toasts.** 400/401/403/404 are never retried |
 | **P12** | 5xx / network errors do retry | Stop the backend, then open a list | Up to **2 retries** before the error surfaces |
-| **P13** | Reconnect refetches | DevTools → Network → **Offline**, navigate, then back to **Online** | Queries refetch automatically on reconnect |
+| **P13** | No refetch on reconnect | DevTools → Network → **Offline**, wait past the list's `staleTime`, then back to **Online** | **Zero** requests; rows stay on screen. Reconnect refetch is off for every query (removed 2026-09-15; it was on before) |
 
 ### Persistence lifecycle
 
@@ -259,12 +271,14 @@ aggressively would stop the "a new version is available" prompt from ever firing
 > | → back to A | A still fresh, **no fetch** | B's deleted · ❌ A's **not** re-written |
 > | → B again | B still fresh, **no fetch** | ❌ nothing |
 >
-> **To prove it:** switch away, **wait > 5 minutes** (the config-tier window these
-> persisted queries use), switch back, open Dashboards. The entries go stale, refetch, and
-> the keys reappear. If they do **not** reappear after a stale refetch, *that* is a bug.
+> **To prove it:** switch away, **wait > 1 h** (the normal-tier window these persisted
+> queries use; re-tiered 2026-09-15 — it was > 5 minutes, the old config tier) or backdate
+> their `dataUpdatedAt` in the console, switch back, open Dashboards. The entries go stale,
+> refetch, and the keys reappear. If they do **not** reappear after a stale refetch, *that* is a bug.
 >
-> Consequence worth knowing for §2.4: any org you bounce away from and back to inside
-> 5 minutes loses its reload-persistence until something refetches. See §24 item 12.
+> Consequence worth knowing for §2.4: any org you bounce away from and back to inside its
+> `staleTime` (up to 1 h for normal-tier lists since 2026-09-15; 5 minutes when this was
+> written) loses its reload-persistence until something refetches. See §24 item 12.
 
 ### 2.3 Logout — nothing may survive
 
@@ -305,8 +319,8 @@ aggressively would stop the "a new version is available" prompt from ever firing
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (page + next-page prefetch + `/summary`)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **5 min** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **5 min** (re-tiered 2026-09-15; was 30 s), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a stream, save | Back on the list, the stream is **already there** — no manual refresh |
@@ -391,7 +405,7 @@ Object.keys(localStorage).filter(k => k.startsWith('o2q-'))
 | Saved views | Logs → **Saved Views** dropdown in the search bar | Open, close, reopen | Second open issues no request |
 | Saved views write-through | — | — | The new view is listed without a manual refresh |
 | Functions in the search bar | Logs → **Functions** dropdown | Open it, then go to Pipelines → Functions and back | The list is shared — one cache entry, not two requests |
-| SQL editor function catalogue | — | — | **One** request to `/query_functions` the first time; **zero** on reopening the editor; **zero** after F5 (it is persisted to localStorage). Payload is large — 356 functions on a typical backend — so not re-fetching it per page load is the real win |
+| SQL editor function catalogue | — | — | **One** request to `/query_functions` the first time; **zero** on reopening the editor; **zero** after F5 (it is persisted to localStorage; 1 h normal tier since 2026-09-15 — was the 5 min config tier, see issues #11). Payload is large — 356 functions on a typical backend — so not re-fetching it per page load is the real win |
 | Missing catalogue is remembered | — | ⚠️ **Skip — not testable on a current backend** | Only applies where `/api/{org}/query_functions` is absent (404). Check with `curl -u <email>:<passcode> <url>/api/<org>/query_functions`; a **200 means this row does not apply** |
 | Action scripts (enterprise only) | Left sidebar → **Logs** — the list loads on **page init**, not on menu open | Land on Logs fresh, then navigate to Streams and back | **One** request to `/api/{org}/actions` on first load; **zero** on return. Switching the search-bar transform selector from **Function** to **Action** fetches nothing — it filters an already-loaded list. Requires Enterprise/Cloud (`isActionsEnabled`) |
 | Field values | — | **See §4.1** — it has its own section, because the cache spans nine surfaces beyond Logs and the reader/writer distinction matters | |
@@ -514,8 +528,8 @@ pulled from the shared store:
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **4 (home_dashboard + folders + favourites + dashboards)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a dashboard, save | Back on the list, the dashboard is **already there** — no manual refresh |
@@ -544,9 +558,9 @@ pulled from the shared store:
 | **Delete a dashboard** | Dashboards → folder → delete a dashboard → confirm → go to Streams → come back to Dashboards | Deleted dashboard is gone **and stays gone**. *This was a shipped bug: it used to come back on the next visit* |
 | Create a dashboard | Dashboards → **New Dashboard** → save | You land on the new dashboard; going back to the list shows it without a manual refresh |
 | Move a dashboard between folders | Move a dashboard to another folder, then open both folders | Source folder no longer lists it; destination folder does |
-| Favourites | Star a dashboard → reload the page **within 5 minutes** | ✅ **Fixed 2026-09-10** (was §24 item 16). The star **survives** the reload: favourites are no longer persisted to disk, so the reload fetches `GET …/settings/favorite_dashboards` once and there is no `o2q-…favorite_dashboards…` key to restore stale. Two-browser version: §30 row 30.8 |
+| Favourites | Star a dashboard → reload the page **within 5 minutes** *(the old `settingQuery` window; 1 h since 2026-09-15 — any interval passes now, nothing is restored from disk)* | ✅ **Fixed 2026-09-10** (was §24 item 16). The star **survives** the reload: favourites are no longer persisted to disk, so the reload fetches `GET …/settings/favorite_dashboards` once and there is no `o2q-…favorite_dashboards…` key to restore stale. Two-browser version: §30 row 30.8 |
 | Home dashboard (org-wide pin) | **Dashboards** → a dashboard's row action (or open it → same action) → **Set as Home**. *Not in Settings — there is no such control there* | Click **Home**: that dashboard renders instead of the overview. Re-pin a different one → Home updates with no reload. Unpin → overview returns |
-| Home dashboard survives reload | Pin a dashboard → press **F5 within 5 minutes** | ✅ **Expected to pass** since 2026-09-10 — same fix as Favourites: the pin is read from the server on reload (`GET …/settings/home_dashboard`), nothing is restored from disk. Delete-the-pinned-dashboard variants: §30 rows 30.13 / 30.17 |
+| Home dashboard survives reload | Pin a dashboard → press **F5 within 5 minutes** *(the old `settingQuery` window; 1 h since 2026-09-15 — any interval passes now)* | ✅ **Expected to pass** since 2026-09-10 — same fix as Favourites: the pin is read from the server on reload (`GET …/settings/home_dashboard`), nothing is restored from disk. Delete-the-pinned-dashboard variants: §30 rows 30.13 / 30.17 |
 
 ### 5.2 Dashboard panels — the IndexedDB result cache
 
@@ -632,8 +646,8 @@ Alerts → dashboard-linked flows · anywhere a "select a dashboard" dropdown is
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 (alerts + destinations + templates)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 min** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 min** (re-tiered 2026-09-15; was 30 s), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a alert, save | Back on the list, the alert is **already there** — no manual refresh |
@@ -691,8 +705,8 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2–3 requests** — destinations + the dependency-graph alert read, plus templates *only if its persisted entry has gone stale*. Browser-verified at 2. **Note: a hard reload does NOT clear localStorage**, so persisted queries survive it and the cold count is often lower than a truly empty cache would give. For a genuine cold read, log out first or clear site data |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a destination, save | Back on the list, the destination is **already there** — no manual refresh |
@@ -745,8 +759,8 @@ Run **C1–C8** (including the `r` shortcut).
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2** — destinations + the dependency-graph alert read (both feed the “Used by” column). **The template list itself is served from localStorage**, so it fires nothing. Browser-verified request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a template, save | Back on the list, the template is **already there** — no manual refresh |
@@ -791,9 +805,9 @@ Run **C1–C8** (including the `r` shortcut).
 | Refresh — **standalone Alert History page** | ✅ **Browser-verified:** exactly **1** request (`from=0&size=20`), and **rows stay on screen** — row count sampled 14× during the fetch never left 20, zero skeleton placeholders. This surface splits the two states correctly: `loading = historyList.isLoading` (skeleton, cold read only) vs `fetching = historyList.isFetching` (button spinner) |
 | Refresh — **alert-detail "Alert History" tab** | ⚠️ **Expect the table to blank to a skeleton — this is normal here, not a cache failure.** Browser-verified: rows drop **25 → 0** with 50 skeleton placeholders for ~300 ms, then repaint. `AlertEvaluationHistory.vue` drives `:loading` from a plain `ref(false)` flipped around *every* fetch, so it cannot tell a cached read from a network one. **Identical on `main`** — the branch did not introduce it. Judge this row by the request count (**1**), not by the skeleton |
 | Return to a page you already visited — **alert-detail tab** | ✅ **Browser-verified: 0 requests AND no skeleton at all.** Page 1 → 2 fires 1 request and blanks; page 2 → back to 1 fires **0** and never blanks (the cached read resolves before Vue paints). This is the cleanest proof the cache is working on this surface |
-| Alert History tab → **Configuration** → back to Alert History | ⏱️ **Depends on how long you take — both answers are correct.** Browser-verified on the alert-detail page: round trip completed while the data is **< 30 s old → 0 requests**; the same round trip after the data is **> 30 s old → 1 request**. This is the **30-second `staleTime`**: `alertHistoryQuery` sets none, so it inherits the global `DEFAULT_STALE_TIME = 30_000`. Reading the Configuration tab normally takes longer than 30 s, which is why it looks like it refetches *every* time. **To test the cache, do the round trip in under 30 s.** |
+| Alert History tab → **Configuration** → back to Alert History | ⏱️ **Depends on how long you take — both answers are correct.** Browser-verified on the alert-detail page: round trip completed while the data is **< 30 s old → 0 requests**; the same round trip after the data is **> 30 s old → 1 request**. This is the `staleTime` — **1 min since 2026-09-15** (`alertHistoryQuery` now declares `LIVE_STALE_TIME`; when this row was recorded it set none and inherited the old 30 s `DEFAULT_STALE_TIME`, so the 30 s boundary above is the old one). Reading the Configuration tab can take longer than that, which is why it looks like it refetches *every* time. **To test the cache, do the round trip in under 1 min.** |
 | C2 warm revisit — **standalone page** (leave via *Back to Alerts*, return via browser Back) | ✅ **Browser-verified 0 requests** when the return lands in the **same minute bucket as the cold load**. ⚠️ The constraint is the *load* time, not the last refresh: remounting the page recomputes the relative window from `Date.now()`, so if ≥ 60 s has passed since the page first loaded, the remount mints the next bucket and you get **2** requests (page 1 + prefetch). Measured both ways: return at load+5 s → **0**; return after the bucket rolled → **2**, with two keys exactly 60 s apart in the URL |
-| Why the refetch is so visible on this tab but not the standalone page | Both surfaces have the same 30 s `staleTime` and both refetch when stale. The standalone page keeps its rows on screen while it revalidates, so you never notice; the alert-detail tab blanks to a skeleton, so the same refetch is obvious. That difference is the pre-existing loading-flag behaviour, not a difference in caching |
+| Why the refetch is so visible on this tab but not the standalone page | Both surfaces have the same `staleTime` (1 min since 2026-09-15; 30 s when recorded) and both refetch when stale. The standalone page keeps its rows on screen while it revalidates, so you never notice; the alert-detail tab blanks to a skeleton, so the same refetch is obvious. That difference is the pre-existing loading-flag behaviour, not a difference in caching |
 | Paginate — **standalone Alerts → Alert History page ONLY** | **Cold load fires 2** (page 1 + prefetch of page 2), then **1** per page change — the page you land on is cached, the request warms the page *ahead*. Same pattern as Streams, see §1.1. **Requires more than one page of data in the selected time range**; with ≤ 20 records in range there is no next page, so **1 request is correct** |
 | Paginate — **alert-detail History tab and the History drawer** | These two do **NOT** prefetch. Expect **1** request per page, always. Do not apply the prefetch expectation here |
 
@@ -860,8 +874,8 @@ size 20):**
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **1** — `GET /api/v2/{org}/alerts/incidents?limit=1000&offset=0`, confirmed via CDP after clearing the entry |
-| C2 | Warm revisit < 30 s | ✅ **0** — measured with the entry verified 5 s old |
-| C3 | Stale revisit > 30 s | ✅ **1**, and the table **never blanked** — sampled 16× during the refetch, rows held at 20, zero skeleton placeholders |
+| C2 | Warm revisit < 30 s *(the window is 1 min since 2026-09-15)* | ✅ **0** — measured with the entry verified 5 s old |
+| C3 | Stale revisit > 30 s *(now > 1 min; re-tiered 2026-09-15)* | ✅ **1**, and the table **never blanked** — sampled 16× during the refetch, rows held at 20, zero skeleton placeholders |
 | C4 | Refresh button | ✅ **1** every time, **rows stay on screen** — 14 samples, no blank, no skeleton |
 | C5 | `r` shortcut | ✅ **1** — real keypress. This page *does* register the shortcut (unlike §6.5) |
 | C6 / C7 | Create / edit / delete | ❌ **Not applicable** — no create or delete affordance; incidents are backend-generated. Status changes are edits (`PATCH …/update`) |
@@ -880,7 +894,8 @@ computed chain; no `pagination="server"`). One cache entry backs every page, fil
 ⚠️ The flip side is a **silent cap at 1000** — see §24. Pre-existing: `main`'s
 `IncidentList.vue:550` already had `const limit = 1000`.
 
-**Cache policy** — `staleTime` **30 s**, `gcTime` 5 min, `refetchOnWindowFocus: true`.
+**Cache policy** — `staleTime` **1 min** (re-tiered 2026-09-15; was 30 s), `gcTime` **3 h** (re-set
+2026-09-15; was 5 min), no focus refetch (removed 2026-09-15).
 Key: `["org","<org>","incidents","list",{"limit":1000,"offset":0}]` — the status filter is
 **not** in the key, which is why switching tabs costs nothing.
 
@@ -894,8 +909,9 @@ split as the standalone Alert History page, and the opposite of the alert-detail
 > ⚠️ **Two measurement traps on this page.** (1) `performance.getEntriesByType('resource')`
 > silently drops entries once its 250-entry buffer overflows on this SPA — it reported **0**
 > incident requests on a cold load that CDP showed as **1**. Use the Network panel, not
-> resource timing. (2) A C2 that returns 1 usually means the entry had already aged past 30 s
-> during earlier steps — click **Refresh** immediately before navigating away.
+> resource timing. (2) A C2 that returns 1 usually means the entry had already aged past the
+> window (1 min since 2026-09-15; 30 s when recorded) during earlier steps — click **Refresh**
+> immediately before navigating away.
 ⚠️ **Ignore the C1–C8 table further down this section** — it is the generic template. The
 table above supersedes it for this page: C6/C7 do not apply, and the C1 count is
 cache-state-dependent.
@@ -910,8 +926,8 @@ Run **C1–C5**. Plus:
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 min** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 min** (re-tiered 2026-09-15; was 30 s), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a incident, save | Back on the list, the incident is **already there** — no manual refresh |
@@ -979,8 +995,8 @@ leaves the **N expensive** ones uncached, so migrating this page removed 1 reque
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ 1 list read (+23 senders — see above) |
-| C2 | Warm revisit < 30 s | ✅ **0 list reads** (+23 senders). Measured with the entry verified 6 s old |
-| C3 | Stale revisit > 30 s | ✅ 1 list read, and the table **never blanked** — 16 samples, rows held at 20, zero skeletons |
+| C2 | Warm revisit < 30 s *(the window is 1 min since 2026-09-15)* | ✅ **0 list reads** (+23 senders). Measured with the entry verified 6 s old |
+| C3 | Stale revisit > 30 s *(now > 1 min; re-tiered 2026-09-15)* | ✅ 1 list read, and the table **never blanked** — 16 samples, rows held at 20, zero skeletons |
 | C4 | Refresh button | ✅ 1 list read, **rows stay on screen**, no skeleton |
 | C5 | `r` shortcut | ✅ Works — real keypress, 1 list read. The shortcut fix holds |
 | C6 | Create → row present without manual refresh | ✅ 1 `POST`, then **1 automatic list refetch**; the new row appears on the list unaided. Toast *"Alert source created"* |
@@ -1000,7 +1016,8 @@ The table also **masks** the token in the URL column (`o2iat_****abcd`) behind e
 *Reveal full URL* / *Copy token* actions. Same standard destinations were held to in issue #10.
 ⚠️ When you test Reveal/Copy yourself, do not paste the result anywhere that gets committed.
 
-**Cache policy** — `staleTime` **30 s** (global default), `refetchOnWindowFocus: true`.
+**Cache policy** — `staleTime` **1 min** (live tier, re-tiered 2026-09-15; was the 30 s global
+default), `gcTime` **3 h** (re-set 2026-09-15), no focus refetch (removed 2026-09-15).
 Key: `["org","<org>","alert-sources","list"]`. Persistence: **memory-only**.
 
 
@@ -1012,8 +1029,8 @@ Key: `["org","<org>","alert-sources","list"]`. Persistence: **memory-only**.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 min** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 min** (re-tiered 2026-09-15; was 30 s), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a source, save | Back on the list, the source is **already there** — no manual refresh |
@@ -1037,7 +1054,7 @@ Key: `["org","<org>","alert-sources","list"]`. Persistence: **memory-only**.
 | --- | --- | --- |
 | **`r` shortcut reaches the server** | Click empty page area, press `r` | One request. *This was one of the ten `r`-shortcut fixes — it used to do nothing* |
 | Refresh button | Click Refresh | One request; rows stay on screen |
-| Warm revisit | Navigate away and back within 30 s | Zero requests |
+| Warm revisit | Navigate away and back within 1 min (re-tiered 2026-09-15; was 30 s) | Zero requests |
 
 ### 6.8 Dependency graph
 
@@ -1116,13 +1133,14 @@ on an empty org. Create one with `POST /api/v2/{org}/alerts` and `alert_type:
 
 | Check | Result |
 | --- | --- |
-| Open the anomaly config list, navigate away and back | ✅ **Cached.** Cold read fires **2** — `GET /{org}/anomaly_detection` + `GET /{org}/anomaly_detection/history?limit=20`. Leaving to another module and returning **within the window fires 0**. A return after the 30 s window fires 1 (the config list), which is correct, not a miss |
+| Open the anomaly config list, navigate away and back | ✅ **Cached.** Cold read fires **2** — `GET /{org}/anomaly_detection` + `GET /{org}/anomaly_detection/history?limit=20`. Leaving to another module and returning **within the window fires 0**. A return after the window (1 min since 2026-09-15; 30 s when recorded) fires 1 (the config list), which is correct, not a miss |
 | Anomaly history — cached per limit | ✅ The limit is **in the key**: `["org","<org>","anomalyDetection","history",20]`. A different limit is a separate entry. ⚠️ **Not exercisable from the UI** — `OverviewTab` hardcodes `limit: 20`, so there is no control that varies it. Verify by reading the key, not by clicking |
 | Anomaly history — refresh forces | ✅ The **Refresh button** (`data-test="refresh-button"`, top-right of Overview) fires **both** reads every time. Verified by clicking it twice back-to-back: **2 requests each time**, no caching in between |
 | *(bonus)* Anomalies tab caches too | ✅ **Reliability → Alerts → Anomalies**, switch to All and straight back: **0 requests**. Its entry is `["org","<org>","alerts","list","default","anomaly_detection"]` — the alert-type is part of the key, so each tab keeps its own entry |
 
-**Cache policy** — both anomaly queries: `staleTime` **30 s**, `gcTime` 5 min,
-`refetchOnWindowFocus: true`. Confirmed at runtime.
+**Cache policy** — both anomaly queries: `staleTime` **1 min** (re-tiered 2026-09-15; was 30 s),
+`gcTime` **3 h** (re-set 2026-09-15; was 5 min), no focus refetch (removed 2026-09-15; it was on
+when this section was recorded).
 
 > ⚠️ **Testing trap:** on an org with no anomaly configs, this section looks like it passes
 > while proving nothing — the config list returns `[]` and history never fires at all. Confirm
@@ -1149,8 +1167,8 @@ GET /api/{org}/slos                  <- fired while readFolder is still undefine
 GET /api/{org}/slos?folder=default   <- the one that actually paints the table
 ```
 
-`main` fetched once. Reproduced on a cold page load, a stale (>30 s) revisit, and the
-navigation back to the list after a create. **Expect 2 until #20 is fixed** — do not file it
+`main` fetched once. Reproduced on a cold page load, a stale (>30 s at the time; the SLO window
+is 1 min since 2026-09-15) revisit, and the navigation back to the list after a create. **Expect 2 until #20 is fixed** — do not file it
 again.
 
 **Browser-verified with 35 SLOs (2 pages at page size 25):**
@@ -1158,8 +1176,8 @@ again.
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | 🔴 **2 requests** — see above. Should be 1 |
-| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 6 s old) |
-| C3 | Stale revisit > 30 s | ✅ Table **never blanked** — 16 samples, rows held, zero skeletons. Request count is 2, same cause as C1 |
+| C2 | Warm revisit < 30 s *(the window is 1 min since 2026-09-15)* | ✅ **0** (measured with the entry verified 6 s old) |
+| C3 | Stale revisit > 30 s *(now > 1 min; re-tiered 2026-09-15)* | ✅ Table **never blanked** — 16 samples, rows held, zero skeletons. Request count is 2, same cause as C1 |
 | C4 | Refresh button (`slos-slolist-refresh`) | ✅ **1** request, rows stay on screen, no skeleton |
 | C5 | `r` shortcut | ✅ **Nothing happens — correct.** Real keypress, 0 requests. This page registers no shortcuts |
 | C6 | Create → back on the list | ✅ 1 `POST`, returns to the list, **new row already present**, total incremented |
@@ -1199,8 +1217,8 @@ the org field is **`orgId`** (camelCase, not `org_id`), and `dashboards[].timera
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **2 requests** — `GET /v2/{org}/folders/reports` + `GET /v2/{org}/reports?folder=default&cache=false`. Matches the expected count |
-| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 8 s old) |
-| C3 | Stale revisit > 30 s | ✅ **1** request, and the table **never blanked** — 14 samples, rows held at 20, zero skeletons |
+| C2 | Warm revisit < 30 s *(the window is 1 h since 2026-09-15)* | ✅ **0** (measured with the entry verified 8 s old) |
+| C3 | Stale revisit > 30 s *(now > 1 h; re-tiered 2026-09-15 — backdate `dataUpdatedAt` to re-run)* | ✅ **1** request, and the table **never blanked** — 14 samples, rows held at 20, zero skeletons |
 | C4 | Refresh button | ✅ **1** request every time, rows stay on screen, no skeleton. Verified twice back-to-back |
 | C5 | `r` shortcut | ✅ **1** request — real keypress. The shortcut works on this page |
 | C6 | Create → back on the list | ✅ 1 `POST`, returns to the list, **new row already present**, total 20 → 21 |
@@ -1212,7 +1230,8 @@ the org field is **`orgId`** (camelCase, not `org_id`), and `dashboards[].timera
 
 > ⚠️ **Two measurement traps on this page — both cost me a false "double-fire" reading.**
 >
-> **1 · Refresh can look like 3 requests.** `reportsQuery` sets `refetchOnWindowFocus: true`, and
+> **1 · Refresh can look like 3 requests.** *(No longer applies since 2026-09-15: focus refetch
+> is off for every query.)* `reportsQuery` set `refetchOnWindowFocus: true`, and
 > this page keeps **two** entries — `cache=false` (Scheduled tab) and `cache=true` (Cached tab).
 > If the click that hits Refresh is also the click that returns focus to the page, the focus
 > refetch fires for **both** entries on top of the refresh itself. Observed:
@@ -1258,8 +1277,8 @@ exists"*. For bulk seeding use **scheduled** pipelines (`source.source_type: "sc
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **1** request — `GET /api/{org}/pipelines`. Rows render immediately, **no tab click needed** (this is the #21 regression check) |
-| C2 | Warm revisit < 30 s | ✅ **0** (measured with the entry verified 8 s old) |
-| C3 | Stale revisit > 30 s | ✅ **1** request, table **never blanked** — 14 samples, rows held at 20, zero skeletons |
+| C2 | Warm revisit < 30 s *(the window is 1 h since 2026-09-15)* | ✅ **0** (measured with the entry verified 8 s old) |
+| C3 | Stale revisit > 30 s *(now > 1 h; re-tiered 2026-09-15 — backdate `dataUpdatedAt` to re-run)* | ✅ **1** request, table **never blanked** — 14 samples, rows held at 20, zero skeletons |
 | C4 | Refresh button | ✅ **1** request, rows stay on screen, no skeleton |
 | C5 | `r` shortcut | ✅ **1** request — real keypress |
 | C6 | Create / edit → back on the list | ✅ **Now passes — but only after fixing issue #22, which this row originally missed.** The editor never invalidated the pipelines scope, so a save returned to **stale rows** until you hit Refresh (measured: server 25, list stuck at 24, **0 requests** on the editor→list round trip). Fixed in `PipelineEditor.vue` **and** `ImportPipeline.vue`; re-measured: **1** request on return, total 25 → 26, the new row present. ⚠️ The canvas itself is not automatable, but the invalidation **is** — create via `POST /api/{org}/pipelines`, then do the editor→list route round trip |
@@ -1296,8 +1315,8 @@ with HTTP 400. Use a resolvable host such as `https://example.com/...`.
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **2 requests** — `alerts/destinations?…&module=pipeline` + `alerts/templates` |
-| C2 | Warm revisit < 5 min | ✅ **0** (measured with the entry 10 s old) |
-| C3 | Stale revisit > 5 min | ✅ **1** request at an entry age of **337 s**, and the table **never blanked** — 20 samples, rows held at 9, zero skeletons |
+| C2 | Warm revisit < 5 min *(the window is 1 h since 2026-09-15)* | ✅ **0** (measured with the entry 10 s old) |
+| C3 | Stale revisit > 5 min *(now > 1 h; re-tiered 2026-09-15 — an entry aged 337 s would now be served with 0 requests)* | ✅ **1** request at an entry age of **337 s**, and the table **never blanked** — 20 samples, rows held at 9, zero skeletons |
 | C4 | Refresh button | ✅ **1** request, rows stay on screen, no skeleton |
 | C5 | `r` shortcut | ✅ **1** request — real keypress |
 | C6 | Create → back on the list | ✅ 1 `POST` + **1 automatic refetch**; new row present, 10 → 11. Works because the editor saves through `saveDestinationMutation`, whose `meta.invalidates` is applied by the global `MutationCache.onSuccess` handler |
@@ -1393,8 +1412,8 @@ boundaries) rather than a raw `Date.now()`, so revisits inside the same bucket c
 | # | Check | Result |
 | --- | --- | --- |
 | C1 | Cold read | ✅ **1** request — `GET /{org}/functions?page_num=1&page_size=100000&…` |
-| C2 | Warm revisit < 5 min | ✅ **0** (entry verified 7 s old) |
-| C3 | Stale revisit > 5 min | ✅ **1** request at an entry age of **328 s**, and the table **never blanked** — 20 samples, rows held at 20, zero skeletons |
+| C2 | Warm revisit < 5 min *(the window is 1 h since 2026-09-15)* | ✅ **0** (entry verified 7 s old) |
+| C3 | Stale revisit > 5 min *(now > 1 h; re-tiered 2026-09-15 — an entry aged 328 s would now be served with 0 requests)* | ✅ **1** request at an entry age of **328 s**, and the table **never blanked** — 20 samples, rows held at 20, zero skeletons |
 | C4 | Refresh button (`functions-list-refresh-btn`) | ✅ **1** request, **rows stay on screen**, no skeleton |
 | C5 | `r` shortcut | ✅ **1** request — real keypress, rows stay |
 | C6 | Create → back on the list | ✅ 1 `POST` + **1 automatic refetch**; total 34 → 35 and the new row is on the list |
@@ -1537,8 +1556,8 @@ was `/status`.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 min** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 min** (re-tiered 2026-09-15; was 30 s), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
 | C6 | Create or edit a monitor, save | Back on the list, the monitor is **already there** — no manual refresh |
@@ -1574,7 +1593,8 @@ not take, not something it broke. Not filed as an issue.
 
 **Methodology note — a stale-cache reading that looked like a bug.** An early C2 run showed 3
 requests and looked like a cache miss. It was not: the cached entries were 57 s old, genuinely
-past the 30 s window, because my own snapshotting between steps outlasted the freshness window.
+past the 30 s window then in force (1 min since 2026-09-15 — 57 s would now still be fresh),
+because my own snapshotting between steps outlasted the freshness window.
 Re-run with the entries force-refreshed to an age of 0.5 s immediately before the round trip,
 the list cost **0** requests. **A C2 measurement whose round trip is not provably inside
 `staleTime` proves nothing** — record the cache *age*, not just the elapsed timer.
@@ -1674,7 +1694,7 @@ Previously the last unrun part of §11. All four rows pass.
 
 | Check | Measured | Verdict |
 | --- | --- | --- |
-| **Refresh button works** | 3 consecutive clicks, each taken while the entry was **provably fresh** (`isStale() === false`, ages 25.9 s / 2.2 s / 2.2 s against a 30 s `staleTime`) — each fired **exactly one** `GET /synthetics/agent-tokens`. This is precisely the "used to do nothing while the entry was fresh" regression, and it is fixed | ✅ |
+| **Refresh button works** | 3 consecutive clicks, each taken while the entry was **provably fresh** (`isStale() === false`, ages 25.9 s / 2.2 s / 2.2 s against the 30 s `staleTime` then in force — 1 h since 2026-09-15) — each fired **exactly one** `GET /synthetics/agent-tokens`. This is precisely the "used to do nothing while the entry was fresh" regression, and it is fixed | ✅ |
 | **`r` shortcut** | Real key event with focus on `body` → **exactly one** `GET /synthetics/agent-tokens`, same as the button | ✅ |
 | **Create / rotate / enable / disable** | All four update the list with **no manual refresh**, each write followed by exactly one invalidation refetch (see table below) | ✅ |
 | **Tokens are never written to disk** | **0 leaks.** Scanned every store for the 3 live token values *and* the bare `o2syn_` prefix: 34 localStorage keys (20 of them `o2q-`) → 0 hits; sessionStorage empty; IndexedDB `PanelCache` (416 entries), `o2Cache` (21), `o2ChatDB` (6) → 0 hits. Corroborated structurally: the agent-tokens entry exists **in memory** (3 rows) but has **no `o2q-` key** — the only persisted synthetics key is the harmless folder list | ✅ |
@@ -1717,8 +1737,8 @@ copy and enable/disable — so neither can be removed from this screen.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | ⚠️ **Nothing happens — correct.** This page registers no keyboard shortcuts |
 | C6 | Create or edit a workflow, save | Back on the list, the workflow is **already there** — no manual refresh |
@@ -1913,8 +1933,8 @@ Run **C1–C8** (`r` shortcut applies).
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **4 (users + 3 role lists)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a user, save | Back on the list, the user is **already there** — no manual refresh |
@@ -2024,8 +2044,8 @@ cache-populated and costs **zero** extra requests.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2 (roles + all-user-roles)** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a role, save | Back on the list, the role is **already there** — no manual refresh |
@@ -2112,8 +2132,8 @@ query layer. Worth fixing some day; out of scope for this PR.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a group, save | Back on the list, the group is **already there** — no manual refresh |
@@ -2163,8 +2183,8 @@ query layer. Worth fixing some day; out of scope for this PR.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **30 s**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **30 s**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 30 s) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 30 s — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a service account, save | Back on the list, the service account is **already there** — no manual refresh |
@@ -2186,7 +2206,7 @@ query layer. Worth fixing some day; out of scope for this PR.
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Mount does not force a refetch** | Open Service Accounts → go to Users → come back within 30 s, watching Network | **Zero** requests on the return visit. *It used to force one on every mount* |
+| **Mount does not force a refetch** | Open Service Accounts → go to Users → come back within 1 h (re-tiered 2026-09-15; was 30 s), watching Network | **Zero** requests on the return visit. *It used to force one on every mount* |
 | Create a service account | | Appears in the list without a manual refresh |
 | **Tokens never persisted** | | Local Storage has **no** `o2q-` entry containing a service-account token |
 | Delete → navigate away → return | | Gone and stays gone |
@@ -2374,7 +2394,7 @@ will report leaks that are not.
 
 | Check | Expected |
 | --- | --- |
-| Open, navigate away, return | Settings paint instantly; no request within 5 minutes |
+| Open, navigate away, return | Settings paint instantly; no request within 1 h (re-tiered 2026-09-15; was 5 minutes) |
 | Change a setting and save | The change is reflected everywhere it is used (theme, query defaults) without a reload |
 | Reload the page | The shell waits for `GET /settings` before painting — org settings are **memory-only** since 2026-09-10 (§30), so nothing is restored from disk and no `o2q-…"organizations"…` key exists |
 
@@ -2399,12 +2419,12 @@ Refresh does not repair it.** The disk row passes cleanly; the rest are blocked 
 | Check | Measured | Verdict |
 | --- | --- | --- |
 | C1 — cold read | On a cold URL load the node fetch **never fires** (3 app requests, none for nodes; query stuck `pending`/`idle`) and the page shows "No nodes available". **Pre-existing, not filed** — the one-shot `if (isMetaOrg.value) { getData(false); }` runs at setup before the org store hydrates, and the guard is byte-identical on `main` (`main:927`) with no retry watcher in either version | ⚠️ pre-existing |
-| C2 — warm revisit | **0 requests** with the entry provably fresh (age 0.5 s, `staleTime` 5 min) — the cache is doing its job. But the table shows **0 rows**, `everBlank: true` → **Issue 26** | ❌ |
+| C2 — warm revisit | **0 requests** with the entry provably fresh (age 0.5 s, `staleTime` 5 min at the time — 1 h since 2026-09-15) — the cache is doing its job. But the table shows **0 rows**, `everBlank: true` → **Issue 26** | ❌ |
 | C3 — past the window | Not meaningfully runnable: the table is empty regardless of freshness | ⛔ |
 | C4 — Refresh button | **1 request** per click (correct), but the rows **do not come back**: `dataUpdateCount` 6 → 7 while the table stays at 0 → **Issue 26** | ❌ |
 | C5 — `r` shortcut | Issues **1** request, same as the button; rows still 0 for the same reason | ❌ |
 | **Filter survives refresh** | ⛔ **Not assessable** — the term (`6ee6`) *is* preserved in the box across Refresh, but with 0 rows on screen there is nothing to filter, so "filtered rows preserved" cannot be judged. Re-run after Issue 26 is fixed | ⛔ |
-| **Not persisted to disk** | ✅ **Confirmed** — **no `o2q-` key mentions nodes** (4 `o2q-` keys present, none for the node list). Matches the declaration in `common.queries.ts`: *"Not persisted: stale cluster state is more confusing than a second of loading."* `staleTime: CONFIG_STALE_TIME`, `gcTime: LONG_GC_TIME`, memory-only | ✅ |
+| **Not persisted to disk** | ✅ **Confirmed** — **no `o2q-` key mentions nodes** (4 `o2q-` keys present, none for the node list). Matches the declaration in `common.queries.ts`: *"Not persisted: stale cluster state is more confusing than a second of loading."* `staleTime: CONFIG_STALE_TIME`, `gcTime: LONG_GC_TIME` as recorded (since 2026-09-15 it declares `NORMAL_STALE_TIME` — 1 h — and inherits the client-wide 3 h `gcTime`), memory-only | ✅ |
 
 **The cache layer is working; the render path is not.** Worth separating, because the request
 counts all look right — 0 on a warm revisit, exactly 1 per Refresh, entry `success` and fresh in
@@ -2437,7 +2457,7 @@ surrounding cycle, which was measured: filter `6ee6` → **1 row**, filter `zzz_
 **0 rows**, clear → **1 row**. That proves the filter genuinely applies and is genuinely restored.
 On a multi-node cluster this row should be re-checked with a term that matches a strict subset.
 
-**C3 was not re-run.** Waiting past the 5-minute `CONFIG_STALE_TIME` for a single background-refetch
+**C3 was not re-run.** Waiting past the then 5-minute `CONFIG_STALE_TIME` (1 h since 2026-09-15) for a single background-refetch
 observation was not worth the wall-clock; C2 (cache-served, 0 requests) and C4 (forced refetch,
 1 request) together already exercise both sides of the freshness boundary.
 
@@ -2474,8 +2494,8 @@ multi-node cluster; it is the one check worth repeating if such an environment e
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a cipher key, save | Back on the list, the cipher key is **already there** — no manual refresh |
@@ -2510,8 +2530,8 @@ multi-node cluster; it is the one check worth repeating if such an environment e
 | # | Expect | Measured | Verdict |
 | --- | --- | --- | --- |
 | C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /cipher_keys` (CDP-verified: the only app request besides `config`, `announcements`, `organizations`) | ✅ |
-| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.6 s, `staleTime` 5 min). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
-| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past `CONFIG_STALE_TIME`: **exactly 1** background request. 45 samples, **min = max = 20**, `firstSample: 20`, `everBlank: false` | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.6 s, `staleTime` 5 min at the time — 1 h since 2026-09-15). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past the then `CONFIG_STALE_TIME`: **exactly 1** background request. 45 samples, **min = max = 20**, `firstSample: 20`, `everBlank: false`. *(Re-tiered 2026-09-15 to 1 h: a 5 min 10 s wait would now give 0 requests — backdate `dataUpdatedAt` to re-run)* | ✅ |
 | C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
 | C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /cipher_keys` (200), rows stay | ✅ |
 | C6 | Already on the list, no manual refresh | Created through the **real dialog**: `POST /cipher_keys → 200` **+ 1** `GET`. Count **26 → 27**, key present **on screen *and* in the query cache** | ✅ |
@@ -2562,8 +2582,8 @@ Run **C1–C8**.
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a pattern, save | Back on the list, the pattern is **already there** — no manual refresh |
@@ -2585,7 +2605,7 @@ Run **C1–C8**.
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Revalidation actually happens** | Create a pattern in another tab or as another user, then return here, wait past 5 min and revisit | The list revalidates. *It used to read a local store copy and never consult the cache, so an invalidated entry was never refreshed* |
+| **Revalidation actually happens** | Create a pattern in another tab or as another user, then return here, wait past 1 h (re-tiered 2026-09-15; was 5 min — or backdate `dataUpdatedAt`) and revisit | The list revalidates. *It used to read a local store copy and never consult the cache, so an invalidated entry was never refreshed* |
 | Delete a pattern → navigate away → return | | Gone and stays gone |
 | **Old sessionStorage cache is gone** | DevTools → Application → **Session Storage** | No `regex_patterns_cache_*` key is ever written |
 | Stale sessionStorage residue is harmless | If an older build left a `regex_patterns_cache_*` key, reload with it present | The page ignores it entirely — nothing reads that key any more |
@@ -2594,13 +2614,14 @@ Run **C1–C8**.
 #### Measured results — 2026-09-01, `feat/fe-caching`, local dev
 
 **No defect found on this page.** 31 patterns already existed, so nothing was seeded. Every row
-below was run, including both 5-minute waits.
+below was run, including both 5-minute waits (the window then; 1 h since 2026-09-15, so those
+waits would now yield 0 requests — backdate the entry to re-run them).
 
 | # | Expect | Measured | Verdict |
 | --- | --- | --- | --- |
 | C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /re_patterns` on a *true* cold read (after clearing the persisted entry). With the persisted entry present it is **0** — see the note below | ✅ |
-| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.5 s, `staleTime` 5 min). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
-| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past `CONFIG_STALE_TIME`: **exactly 1** request. 45 samples, **min = max = 20**, `everBlank: false` | ✅ |
+| C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.5 s, `staleTime` 5 min at the time — 1 h since 2026-09-15). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
+| C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past the then `CONFIG_STALE_TIME`: **exactly 1** request. 45 samples, **min = max = 20**, `everBlank: false`. *(Re-tiered 2026-09-15 to 1 h: that wait would now give 0 requests)* | ✅ |
 | C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
 | C5 | Same as C4 | Real keypress on `body` → **exactly 1** `GET /re_patterns` (200), rows stay | ✅ |
 | C6 | Already on the list, no manual refresh | Created through the **real dialog**: `POST /re_patterns → 200` **+ 1** `GET`. Count **31 → 32**, present **on screen *and* in the query cache** | ✅ |
@@ -2618,7 +2639,7 @@ below was run, including both 5-minute waits.
 
 | Own check | Measured | Verdict |
 | --- | --- | --- |
-| **Revalidation actually happens** | Cache made fresh at **28** patterns, then one created **outside this tab** (`POST → 200`), then waited past 5 min and revisited: the list **revalidated to 29** and `cachetest_rp_external` was **in the cache and on screen**. The old failure mode — reading a local store copy and never consulting the cache — does not occur | ✅ |
+| **Revalidation actually happens** | Cache made fresh at **28** patterns, then one created **outside this tab** (`POST → 200`), then waited past 5 min (the window then; 1 h since 2026-09-15) and revisited: the list **revalidated to 29** and `cachetest_rp_external` was **in the cache and on screen**. The old failure mode — reading a local store copy and never consulting the cache — does not occur | ✅ |
 | Delete a pattern → navigate away → return | Covered by **C7**: gone from screen and cache, **0 / 30 frames** on return, **0 requests** | ✅ |
 | **Old sessionStorage cache is gone** | `sessionStorage` stayed **completely empty** across cold load, revisits, refreshes, sorting, paging, search, create, delete and bulk delete — **no `regex_patterns_cache_*` key is ever written** | ✅ |
 | **Stale sessionStorage residue is harmless** | Planted `regex_patterns_cache_default` holding a fake `ZZZ_STALE_RESIDUE_PATTERN`, then hard-reloaded: the page rendered **28 real rows**, the fake was **absent from both screen and cache**, and the residue was left **byte-untouched** — never read, never cleared | ✅ |
@@ -2644,7 +2665,7 @@ When measuring C1 on a persisted page, clear the `o2q-` key first or the number 
 
 | Check | Expected |
 | --- | --- |
-| Open, navigate away, return, reload the page | Requested **once per session** and persisted — these never change |
+| Open, navigate away, return, reload the page | Requested **once per session** and persisted — these never change. *Re-tiered 2026-09-15 to the 1 h normal tier (was session / ∞): still persisted and still 0 requests on revisit and reload, but expect one background refetch once the entry is an hour old* |
 | Refresh button | Still forces a request |
 
 
@@ -2661,26 +2682,27 @@ via `ImportRegexPattern.vue`. Reach it with Settings → Regex Patterns → **Im
 | --- | --- | --- | --- |
 | C1 | Cold read, **1** request | Opening Import issues **1** `GET /re_patterns/built-in`, returning **147** patterns | ✅ |
 | C2 | Warm revisit, **0** requests | Left the module entirely, came back, reopened Import: **0** requests, all **147** still present, tab renders | ✅ |
-| C4 | **1** request every click | Refresh **still forces a request** even against an `Infinity` staleTime: **exactly 1** | ✅ |
+| C4 | **1** request every click | Refresh **still forces a request** even against an `Infinity` staleTime (1 h since 2026-09-15): **exactly 1** | ✅ |
 | C5 | Same as C4 — 1 request | ⚠️ **0** built-in requests. `r` refreshes the **parent** Regex Patterns list (`GET /re_patterns`) instead — see below | ⚠️ observation |
 | C8 | Term and filtered rows preserved | Term `email` preserved across Refresh, same matches before and after, **1** request | ✅ |
 
 | Own check | Measured | Verdict |
 | --- | --- | --- |
-| **Requested once per session and persisted** | Declared `staleTime: SESSION_STALE_TIME` **and** `gcTime: SESSION_STALE_TIME` (both **Infinity**, verified at runtime) with `persister: localStoragePersister`. Navigate away and back → **0** requests. **Hard reload** → the tab rendered all **147** patterns from `o2q-["org","default","settings","builtInRegexPatterns"]` with **0** requests and `fetchStatus: idle` | ✅ |
-| **Refresh button still forces a request** | **Exactly 1** `GET /re_patterns/built-in` per click, despite the infinite freshness window | ✅ |
+| **Requested once per session and persisted** | Declared `staleTime: SESSION_STALE_TIME` **and** `gcTime: SESSION_STALE_TIME` (both **Infinity**, verified at runtime) with `persister: localStoragePersister` *(as recorded — since 2026-09-15 it declares `NORMAL_STALE_TIME`, 1 h, with the client-wide 3 h `gcTime`; still persisted)*. Navigate away and back → **0** requests. **Hard reload** → the tab rendered all **147** patterns from `o2q-["org","default","settings","builtInRegexPatterns"]` with **0** requests and `fetchStatus: idle` | ✅ |
+| **Refresh button still forces a request** | **Exactly 1** `GET /re_patterns/built-in` per click, despite the infinite freshness window (1 h since 2026-09-15) | ✅ |
 
 **C5 deviates, and it is defensible.** Pressing `r` fires `GET /re_patterns` (the parent list) and
 **no** built-in request. The shortcut belongs to `RegexPatternList.vue`; the built-in list is a
 child of the Import dialog and owns its own Refresh button, which does force a fetch. Given the
-built-in set is declared as never-changing (`Infinity` staleTime, persisted), *not* re-fetching it
+built-in set is declared as near-immutable (`Infinity` staleTime when recorded, 1 h since 2026-09-15; persisted), *not* re-fetching it
 from a generic page shortcut is consistent with the design rather than a miss. Recorded so the row
 is not silently marked green.
 
 ⚠️ **`staleTime` reads as `null` when probed via JSON.** `Infinity` does not survive JSON
 serialisation, so a probe that stringifies query options reports `staleTime: null` and looks like
 "no staleTime configured". Compare with `=== Infinity` in-page instead: both `staleTime` and
-`gcTime` are genuinely `Infinity` here.
+`gcTime` were genuinely `Infinity` here when recorded. (Since 2026-09-15 this query is 1 h / 3 h,
+so the JSON trap no longer bites it — it still applies to `/config` and the trace DAG.)
 
 ### 15.6 AI Toolsets
 
@@ -2695,8 +2717,8 @@ serialisation, so a probe that stringifies query options reports `staleTime: nul
 > | # | Measured | Verdict |
 > | --- | --- | --- |
 > | C1 | 1 request (`GET /ai/toolsets?limit=100000`), 20 rows, `Showing 1 - 20 of 23` | ✅ |
-> | C2 | leave to Logs and back inside 5 min → **0 requests**, rows intact | ✅ |
-> | C3 | cache backdated to 6 min → return fired **1** background request, rows stayed at 20, table **never blanked** | ✅ |
+> | C2 | leave to Logs and back inside 5 min → **0 requests**, rows intact *(window is 1 h since 2026-09-15)* | ✅ |
+> | C3 | cache backdated to 6 min → return fired **1** background request, rows stayed at 20, table **never blanked** *(re-tiered 2026-09-15 to 1 h: backdate past 60 min to re-run)* | ✅ |
 > | C4 | Refresh clicked twice → **1 request each time**, rows stay, no blank | ✅ |
 > | C5 | `r` shortcut (real keypress, focus on `body`) → 1 request, rows stay | ✅ |
 > | C6 | create → `POST` + one `GET`, back on list at 24, new row present with no manual refresh. Edit → `PUT` + one `GET`, edited description visible immediately | ✅ |
@@ -2722,8 +2744,8 @@ serialisation, so a probe that stringifies query options reports `staleTime: nul
 | # | Do this | Expect |
 | --- | --- | --- |
 | C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **1** request(s) |
-| C2 | Go to another module, come **straight** back (within **5 min**) | Rows appear **instantly, no skeleton**, **0 requests** |
-| C3 | Go away, wait past **5 min**, come back | Rows appear instantly, then **1** background request. Table must **never** blank |
+| C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
+| C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
 | C5 | Click empty page area, press **`r`** | Same as C4 — 1 request, rows stay |
 | C6 | Create or edit a toolset, save | Back on the list, the toolset is **already there** — no manual refresh |
@@ -2762,8 +2784,8 @@ serialisation, so a probe that stringifies query options reports `staleTime: nul
 > | # | Measured | Verdict |
 > | --- | --- | --- |
 > | C1 | 1 request (`GET /llm/models`), 88 rows, `observers: 1` | ✅ |
-> | C2 | leave to Logs and back inside 5 min → **0 requests**, rows intact | ✅ |
-> | C3 | cache backdated to 6 min → return fired **1** background request, rows stayed, **never blanked** | ✅ |
+> | C2 | leave to Logs and back inside 5 min → **0 requests**, rows intact *(window is 1 h since 2026-09-15)* | ✅ |
+> | C3 | cache backdated to 6 min → return fired **1** background request, rows stayed, **never blanked** *(re-tiered 2026-09-15 to 1 h: backdate past 60 min to re-run)* | ✅ |
 > | C4 | list-refresh clicked twice → **1 list GET each**, rows stay, no blank | ✅ |
 > | C5 | `r` (real keypress) → 1 list GET, rows stay | ✅ |
 > | C8 | search `claude` → 20 of 20; Refresh → term **and** filtered rows preserved, **1** list GET | ✅ |
@@ -2935,6 +2957,10 @@ that is a correctness bug.
 > caching question — each attempt issues its own request — but means the returned checkout URL itself
 > could not be compared for freshness.
 >
+> **2026-09-15 — billing is no longer cached at all.** `billings.queries.ts` and its query keys were
+> removed; `invoiceTable.vue` and `usage.vue` call `BillingService` directly. The two billing rows
+> below stay valid as negative tests — there is simply no billing query left that *could* leak.
+>
 > **The structural fact that underpins the whole section:** `services/search.queries.ts` exports
 > exactly **one** query — `traceDagQuery`. There is *no* cached query registered for log, trace or
 > metrics search anywhere in the cache layer, so those searches cannot be served from it even in
@@ -3087,7 +3113,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 > | --- | --- | --- |
 > | Tab switching does not re-request | Overview → Usage → Overview → Usage → Overview: the four Overview reads fire **only on the cold load**, then **0** on every return. Usage's `/summary` fires once, then 0 | ✅ |
 > | Refresh keeps content | **Unblocked by seeding firing events (below).** With 3 events on screen: refresh fires 4 requests, and across **100 samples over 6 s** the event count never leaves 3 — no empty state, no skeleton, nothing disappears | ✅ |
-> | Overview reads cached (return < 30 s → no request) | return within ~5 s → **0** requests for alerts-history / anomaly / anomaly-history / topology | ✅ |
+> | Overview reads cached (return < 30 s → no request; the window is 1 min since 2026-09-15) | return within ~5 s → **0** requests for alerts-history / anomaly / anomaly-history / topology | ✅ |
 > | Service graph cached per range; changing back instant | Home: 30 m → 1 request · 15 m → **0** (already cached from the default range) · back to 30 m → **0**. Quantized keys computed directly: the two 30 m selections give an identical key `{start:1788414000000000,end:1788415800000000}`, 15 m gives a different one | ✅ |
 > | Usage tab cached; refresh forces | revisit → **0** `/summary` requests. "Refresh forces" is **N/A** — the Usage tab has **no refresh control** (`refresh-button` exists only on Overview, on both branch and `main`) | ✅ cached · N/A refresh |
 >
@@ -3170,7 +3196,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 | --- | --- | --- |
 | **Tab switching does not re-request** | Home → switch between the Overview tabs a few times | Each tab loads **once**. *It used to re-request on every tab switch* |
 | Refresh keeps content | Once a section has loaded, click Refresh | The section content stays on screen while it revalidates |
-| Overview reads | Home → Overview | The alert, incident, anomaly and service-topology summaries are cached; a return visit within 30 s issues no request |
+| Overview reads | Home → Overview | The alert, incident, anomaly and service-topology summaries are cached; a return visit within 1 min (re-tiered 2026-09-15; was 30 s — the topology read is 5 min) issues no request |
 | Service graph | Home → Service Graph (or Traces → Service Graph) | Cached per time range; changing the range forks the entry, changing back is instant |
 | Usage tab | Home → **Usage** | Cached; refresh forces |
 
@@ -3186,7 +3212,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 >
 > | Check | Measured | Verdict |
 > | --- | --- | --- |
-> | Open, navigate away, return | return inside the window → **0 requests**. The single refetch observed was at **35.6 s**, past `DEFAULT_STALE_TIME` (30 s) — correct, not a miss. Subsequent returns at 44 s / 49 s (i.e. 8 s and 5 s after that fetch) → **0 requests** | ✅ |
+> | Open, navigate away, return | return inside the window → **0 requests**. The single refetch observed was at **35.6 s**, past the then `DEFAULT_STALE_TIME` (30 s) — correct, not a miss *(ingestion tokens are 1 h since 2026-09-15, so a refetch that early would now be a miss)*. Subsequent returns at 44 s / 49 s (i.e. 8 s and 5 s after that fetch) → **0 requests** | ✅ |
 > | Create / toggle an ingestion token | create → `POST /ingestion-tokens` + an automatic `GET`, rows **9 → 10**, new token listed with no manual refresh. Toggle → `PATCH` + automatic `GET`; the button flipped `title="Enable"`/`ghost-success` → `title="Disable"`/`ghost-destructive` in step with the API going `enabled: false → true` | ✅ |
 > | Nothing persisted | passcode (37 chars) and all 9 ingestion tokens searched against **451 blobs** — localStorage · sessionStorage · `IDB:o2Cache/kv` · `IDB:PanelCache/panels` · `IDB:o2ChatDB/chatHistory`. **0 hits** | ✅ |
 > | Reset the passcode | **NOT RUN** — see below | ⏸️ |
@@ -3297,7 +3323,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 > | Check | Measured | Verdict |
 > | --- | --- | --- |
 > | C1 cold read | `score_configs`, `scorers`, `eval_jobs` each fetched **twice** (7 requests); `main` fetches each once. Root cause found and a verified fix exists, **reverted on request** — see **#31** | ⏸️ **#31 open** |
-> | C2 warm revisit | revisit past `staleTime` → 3 requests · revisit within 30 s → **0** | ✅ |
+> | C2 warm revisit | revisit past `staleTime` → 3 requests · revisit within 30 s → **0** *(the window is 5 min since 2026-09-15)* | ✅ |
 > | C4 Refresh button | 4 requests per click (providers + the three), on both clicks — a forced read reaching the server every time | ✅ |
 > | Revisit keeps rows | ⛔ **BLOCKED** — no rows exist to keep | — |
 > | Skeleton only when cold | ⛔ **BLOCKED** — the lists render their empty state, never a populated skeleton | — |
@@ -3318,7 +3344,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Revisit keeps rows** | Open Evaluations → navigate away → wait past 30 s → come back | Rows **stay on screen** and swap in place. *It used to blank the whole page for ~470 ms while it blocked on a stale entry* |
+| **Revisit keeps rows** | Open Evaluations → navigate away → wait past 5 min (re-tiered 2026-09-15; was 30 s) → come back | Rows **stay on screen** and swap in place. *It used to blank the whole page for ~470 ms while it blocked on a stale entry* |
 | **Skeleton only when genuinely cold** | Hard-reload, then open the page | Skeleton on the first visit only |
 | Providers list | Settings → LLM Providers, then a scorer form's provider dropdown | Shared cache — persisted, one request |
 | Scorers / score configs / eval jobs | Each list: run C1–C5 | Standard cache behaviour |
@@ -3340,7 +3366,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 > | Check | Measured | Verdict |
 > | --- | --- | --- |
 > | C1 cold read | **1** `GET /api/default/datasets`, 6 rows, `Showing 1 - 6 of 6` | ✅ |
-> | C2 warm revisit | 3 revisits: the first at the 30 s boundary → 1 request; the next two → **0 requests** | ✅ |
+> | C2 warm revisit | 3 revisits: the first at the 30 s boundary → 1 request; the next two → **0 requests** *(the window is 5 min since 2026-09-15, so that first revisit would now be 0 too)* | ✅ |
 > | C4 Refresh button | **1** request per click, twice; rows never left 6 | ✅ |
 > | C5 `r` shortcut | **N/A — not wired on this page.** `DatasetsPage.vue` registers no `useShortcuts`, unlike e.g. `AiToolsets.vue`. 0 requests is correct behaviour, not a miss | — |
 > | C8 search survives refresh | term `dataset_03` and its 1 filtered row both preserved across a refresh; 1 request | ✅ |
@@ -3368,7 +3394,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Mount does not force** | Open Datasets → navigate away → come back within 30 s | **Zero** requests. *It used to fetch on every single visit* |
+| **Mount does not force** | Open Datasets → navigate away → come back within 5 min (re-tiered 2026-09-15; was 30 s) | **Zero** requests. *It used to fetch on every single visit* |
 | **Refresh forces** | Click the Refresh button | One request; rows stay |
 | Table survives a revisit | Go away and back | Rows are still there — the page no longer starts from empty |
 
@@ -3380,7 +3406,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Mount does not force** | Open Queues → navigate away → come back within 30 s | ✅ **Browser-verified.** Cold read fires **1** `GET /api/{org}/annotation_queues`; revisits fire **0**, then **1** once the 30 s window rolls, then **0** again. The mount no longer forces |
+| **Mount does not force** | Open Queues → navigate away → come back within 5 min (re-tiered 2026-09-15; was 30 s) | ✅ **Browser-verified.** Cold read fires **1** `GET /api/{org}/annotation_queues`; revisits fire **0**, then **1** once the window rolls (30 s when recorded; 5 min since 2026-09-15), then **0** again. The mount no longer forces |
 | **Refresh forces** | Click the Refresh button | ✅ **Browser-verified: exactly 1 request per click** (`ai-queues-refresh-btn`, measured twice back-to-back), rows stay on screen |
 | Table survives a revisit | Go away and back | ✅ Rows persist across the revisit — the page never restarts from empty |
 
@@ -3426,6 +3452,14 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 **UI path:** Left sidebar → **Billing**
 
+> **2026-09-15 — billing is no longer cached.** `billings.queries.ts` and `billings.querykeys.ts`
+> were deleted (`invoiceHistoryQuery`, `aiUsageQuery`, `subscriptionQuery` and
+> `billingGroupMembersQuery` are all gone); `invoiceTable.vue` and `usage.vue` call
+> `BillingService` directly. The rows below record the pre-removal state and their cached-behaviour
+> expectations **no longer apply**: expect one request per visit on every billing surface, and
+> nothing billing-related in the query cache, localStorage or IndexedDB. The "not persisted" and
+> "checkout URL never reused" rows still hold, trivially.
+
 | Check | Expected |
 | --- | --- |
 | Billing → **Usage** | ⚠️ **Not verifiable on a self-hosted build, and not actually a cached surface.** The only billing query this page routes through the cache is `aiUsageQuery`, and `loadAiCreditStatus()` returns early unless `config.isCloud === "true"` — so it never runs here. The two calls the page *does* make (`billings/data_usage/7days`, `billings/list_subscription`) are direct `BillingService` calls that were never migrated, so a revisit re-issues them. Measured: **3 requests cold, 3 again on a revisit inside 30 s** |
@@ -3444,14 +3478,18 @@ Visit each page above, then re-inspect storage. These values must live in memory
 | --- | --- | --- |
 | **Private browsing / storage blocked** | Open the app in a private window, or block site data in browser settings | ✅ **Browser-verified.** With every `localStorage` access throwing `SecurityError`, all five surfaces exercised (Reports, Templates, Alerts, Streams, Dashboards) rendered their rows and the app stayed alive, with **0 console errors**. ⚠️ Simulated by replacing the accessor on a running app, so the *cold-boot* path under blocked storage is untested — a real private window is still worth one manual pass |
 | **localStorage quota full** | An org with a very large number of streams, or manually fill localStorage | ✅ **Browser-verified.** Quota genuinely exhausted (every further write threw `QuotaExceededError`); Reports / Templates / Alerts / Streams each still rendered **20 rows**, persistence **silently stopped** (`o2q-*` key count frozen at 13, no new entries), and **0 console errors** |
-| **Offline → back online** | DevTools → Network → Offline, navigate around, then go back Online | ✅ **Browser-verified both halves.** Offline: navigating away and back repainted **141 rows from cache**, no crash, no console error. Back online: **1 automatic refetch** (`GET /api/v2/{org}/reports?folder=default&cache=false`) with `dataUpdatedAt` advancing and rows never blanking. ⚠️ Reconnect refetch requires an **observer** — see the note below |
+| **Offline → back online** | DevTools → Network → Offline, navigate around, then go back Online | ✅ **Browser-verified both halves.** Offline: navigating away and back repainted **141 rows from cache**, no crash, no console error. Back online (as first tested, with reconnect refetch still on): **1 automatic refetch** (`GET /api/v2/{org}/reports?folder=default&cache=false`) with `dataUpdatedAt` advancing and rows never blanking. **Superseded 2026-09-15:** `refetchOnReconnect` is now `false` for every query, so the expected result is **zero** requests on reconnect and the rows stay as they were — see P13 and the note below |
 | **Server error on a list** | Stop the backend, then open a cached list | ✅ **Browser-verified.** With the list endpoint forced to `500`, the cached rows **held at 141 across 16 samples** (never blanked) and the failure surfaced as an *"Error while pulling alerts."* toast — not a silent empty table. The 500 was retried **3×**, which is the policy working (5xx retries, 4xx does not) |
-| **4xx does not retry-storm** | Trigger a 403 on a list (a user without permission) | ✅ **Browser-verified.** A forced `403` produced **exactly one attempt** per query — `fetchFailureCount: 1`, `errorUpdateCount: 1` — with one error surfaced and an aggregated *"Access Required"* notice. No retry loop. Real-world corroboration: `/billings/invoices` 404s and also costs exactly **1** request per visit (§22.4) |
+| **4xx does not retry-storm** | Trigger a 403 on a list (a user without permission) | ✅ **Browser-verified.** A forced `403` produced **exactly one attempt** per query — `fetchFailureCount: 1`, `errorUpdateCount: 1` — with one error surfaced and an aggregated *"Access Required"* notice. No retry loop. Real-world corroboration: `/billings/invoices` 404s and also costs exactly **1** request per visit (§22.4) *(as recorded — since 2026-09-15 billing is not cached at all, so that call no longer goes through the query client's retry policy)* |
 | **Multiple tabs** | Open the app in two tabs, delete a row in tab A, then switch to tab B and interact | ✅ **Browser-verified.** Deleting a service account in tab A took it **31 → 30**; tab B still read *"of 31"* until it regained focus, then corrected to *"of 30"* within ~1 s, **without blanking**. Exactly the "short window of staleness" the row allows |
-| **Window focus** | Leave a list open, switch to another app for a minute, come back | ✅ **Browser-verified, and it discriminates correctly.** Volatile (**Reports**, `refetchOnWindowFocus: true`, `staleTime` 30 s, aged past it): **1** request on refocus, `dataUpdatedAt` advanced. Config-tier (**Alert Templates**, `refetchOnWindowFocus: false`, `staleTime` 300 s): **0** requests, `dataUpdatedAt` unchanged, rows intact |
+| **Window focus** | Leave a list open, switch to another app for a minute, come back | ✅ **Browser-verified, and it discriminates correctly.** Volatile (**Reports**, `refetchOnWindowFocus: true`, `staleTime` 30 s, aged past it): **1** request on refocus, `dataUpdatedAt` advanced. Config-tier (**Alert Templates**, `refetchOnWindowFocus: false`, `staleTime` 300 s): **0** requests, `dataUpdatedAt` unchanged, rows intact. *(Recorded before 2026-09-15: focus refetch is now off everywhere and both lists are 1 h — Reports re-tiered from 30 s, Templates from 5 min — so the expected result on refocus is 0 requests for both)* |
 | **Console is clean** | Keep the Console open throughout all testing | ✅ **Verified: no `DataCloneError` and no `Maximum recursive updates`** anywhere in this run (the §22.3a panel-cache writes were specifically checked — 12 entries, zero clone errors). A cold load does log one `Uncaught (in promise)` plus seven Vue lifecycle warnings, but the **same eight messages appear byte-for-byte on `main`** at the same URL, so they are pre-existing and not from the query layer |
 
-> **What focus- and reconnect-revalidation actually cover.** Both are observer-driven: TanStack only
+> **What focus- and reconnect-revalidation actually cover.** As of 2026-09-15 **both are off for every
+> query** (`refetchOnWindowFocus: false` and `refetchOnReconnect: false` on the client, no declaration
+> overrides either), so neither switching tabs nor coming back online sends a request; a stale list is
+> re-read on the next visit or by its refresh button. The rest of this note records why they never did
+> much even when reconnect was on. Both are observer-driven: TanStack only
 > revalidates a query that some component is *watching* via `useQuery`. Surfaces that read through
 > imperative `fetchQuery`/`fetchInto` have **no observer**, so neither focus nor reconnect can refresh
 > them — measured on the Alerts list, where **0 of 37** cached queries had an observer. The tree is
@@ -3525,8 +3563,8 @@ worth a decision.
    | `rolePermissionsQuery` | IAM role permissions tab | Request on every open |
    | `pendingInvitesQuery` | IAM pending invites | Request on every visit |
    | `orgListQuery` | Org switcher list | Not cache-backed |
-   | `subscriptionQuery` | Billing subscription | Request on every visit |
-   | `billingGroupMembersQuery` | Billing group members | Request on every visit |
+   | `subscriptionQuery` | Billing subscription | Request on every visit — declaration removed 2026-09-15 with `billings.queries.ts`; billing is no longer cached |
+   | `billingGroupMembersQuery` | Billing group members | Request on every visit — declaration removed 2026-09-15 with `billings.queries.ts`; billing is no longer cached |
    | `deleteDestinationMutation` | Single-destination delete | Dead declaration only — the page calls the service directly and prunes the cache by hand, so **behaviour is correct**; just unreachable code |
 
    Either wire them up or delete them. Until then, the "Detail reads" section of
@@ -3556,7 +3594,8 @@ worth a decision.
    something refetches.
 
    Net effect: the reload-persistence win is silently lost for any org the user bounces
-   away from and back to within 5 minutes — on F5 that org re-fetches everything, which is
+   away from and back to inside its `staleTime` (up to 1 h for normal-tier lists since
+   2026-09-15; 5 minutes when written) — on F5 that org re-fetches everything, which is
    the exact cost persistence was added to avoid. Two candidate fixes: re-persist the
    memory copy on org re-entry, or drop the leaving org's in-memory entries too so
    re-entry is a normal cold read. The first keeps the "switching back is free" property
@@ -3590,7 +3629,8 @@ worth a decision.
    value. On reload the persisted (stale, often empty) list hydrates, carries its old
    `dataUpdatedAt`, counts as fresh inside `CONFIG_STALE_TIME` (5 min), and never
    refetches — **the star vanishes**. Past 5 minutes it self-heals, which makes it look
-   intermittent.
+   intermittent. *(As recorded; `settingQuery` is 1 h `NORMAL_STALE_TIME` since 2026-09-15
+   and `CONFIG_STALE_TIME` no longer exists — moot since the persister was removed.)*
 
    **Reproduced end to end**: starred a dashboard → server returned
    `setting_value: [{label: "smoke_dash_xray_024"}]` → localStorage still `[]` → reload →
@@ -3693,7 +3733,7 @@ above. Use this to confirm nothing was skipped.
 | `enterprise/views/AIObservability/DatasetsPage.vue` | §22.2 |
 | `enterprise/views/AIObservability/QueuesPage.vue` | §22.3 |
 | `plugins/traces/LLMInsightsDashboard.vue` | §22.3a |
-| `enterprise/components/billings/usage.vue`, `invoiceTable.vue` | §22.4 |
+| `enterprise/components/billings/usage.vue`, `invoiceTable.vue` | §22.4 — no longer cache consumers since 2026-09-15 (billing queries removed; both call `BillingService` directly) |
 
 **Not user-testable (no UI of their own):** `composables/query/*` (the layer itself),
 `services/*.queries.ts` / `*.querykeys.ts` (declarations and key factories),
@@ -3880,8 +3920,10 @@ centrally.
 
 1. On page **A**, change something (create / rename / toggle / delete).
 2. Go to page **B**, which shows the same data a different way.
-3. **B must show the change.** Within 30 seconds is the window that matters — that is where
-   the bug lived. After 30 seconds even the broken build looked fine.
+3. **B must show the change.** Inside the list's freshness window is where the bug lived —
+   30 seconds when this was written; since 2026-09-15 it is 1 min for live lists and up to
+   1 h for normal-tier lists, so a broken build now looks wrong for far longer. After the
+   window even the broken build looked fine.
 
 A single-page test proves nothing here. The page you wrote on almost always looked right;
 that is why these went unnoticed.
@@ -3964,7 +4006,7 @@ unused. All four writes now drop the incident list directly.
 | --- | --- | --- | --- |
 | **W18** | Creating an SLO | SLOs → **New** → name it, pick stream type **Logs** + a stream, fill **Good when** (e.g. `level != 'error'`) → **Save** | The list shows it on arrival. Also switch the folder filter to **All folders** — it must appear there too (that cross-folder list is a separate cache entry) |
 | **W19** | Editing an SLO | Open one → **Edit** → change the description → **Save** | The list shows the change |
-| **W20** | An SLO alert is also an ordinary alert | SLOs → open one → **New alert** → pick a burn-rate preset, a destination → **Save**. Then go to Reliability → **Alerts** | The new alert is listed on the **Alerts** page too. It used to be missing there for 30s |
+| **W20** | An SLO alert is also an ordinary alert | SLOs → open one → **New alert** → pick a burn-rate preset, a destination → **Save**. Then go to Reliability → **Alerts** | The new alert is listed on the **Alerts** page too. It used to be missing there for 30s (the alerts-list window then; 1 min since 2026-09-15) |
 
 ---
 
@@ -4249,7 +4291,7 @@ it on every org switch** — the real check is switching org and coming back.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **D1** | Scrape interval survives an org round-trip | Settings → **General** → change **Scrape Interval** → Save. Switch to another org, then back | The **new** value is shown, and the switch back fires a fresh `GET /settings`. Without the invalidation MainLayout serves the pre-save payload — this scope is a 5-minute in-memory read (no longer persisted since 2026-09-10, so no `o2q-…"organizations"…` key), so it does not self-heal quickly |
+| **D1** | Scrape interval survives an org round-trip | Settings → **General** → change **Scrape Interval** → Save. Switch to another org, then back | The **new** value is shown, and the switch back fires a fresh `GET /settings`. Without the invalidation MainLayout serves the pre-save payload — this scope is a 1 h in-memory read (re-tiered 2026-09-15; was 5 minutes; no longer persisted since 2026-09-10, so no `o2q-…"organizations"…` key), so it does not self-heal quickly |
 | **D2** | Organization parameters | Settings → **Organization Parameters** → change **Trace ID Field Name** → Save → switch org and back | The new value is shown |
 | **D3** | Domain management writes the **meta** org | Settings → **Domain Management** → set a **Claim Parser Function** → Save → reload | Saves without error and the value survives the reload. ⚠️ This site drops the **meta org** scope, not the selected org — not reachable if your user cannot administer the meta org |
 | **D4** | Billing usage opt-in *(posts only its own field since 2026-09-10)* | Settings → **Organization** → set a distinctive **Trace ID field** → Save. Then Billing → **Usage** → **Enable usage reporting** on the CTA → reopen Settings → Organization | The CTA is replaced by the usage chart. The `POST /settings` body is exactly `{"usage_stream_enabled":true}` — the backend applies only the fields present — so the Trace ID field you set is **unchanged**. Before the fix the page posted a whole settings object it had read earlier, which could overwrite another page's save. ⚠️ Cloud-only on some builds |
@@ -4300,7 +4342,7 @@ onto the mutation.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **D11** | A new model reaches the list | Settings → **LLM Model Pricing** → **Add** → name, match pattern, one price → Save | The editor routes back and the model **is listed**. This list is a 5-minute persisted read, so a stale cache would hide it until a hard refresh |
+| **D11** | A new model reaches the list | Settings → **LLM Model Pricing** → **Add** → name, match pattern, one price → Save | The editor routes back and the model **is listed**. This list is a 1 h persisted read (re-tiered 2026-09-15; was 5 minutes), so a stale cache would hide it until a hard refresh |
 | **D12** | Editing a model | Edit any model → change a price → Save | The list shows the new price on return |
 
 ---
@@ -4511,7 +4553,7 @@ build for the IAM pages. Watch the Network tab for the list request and the toas
 | **N1** | `useQuery` list pages | Sign in as the no-permission user → open, one at a time: Alerts → **Templates**, **Incidents**; Data → **Functions**, **Pipelines**; **Reports**; **Synthetics**; AI → **Datasets**, **Queues**; Settings → **Model Pricing**, **Regex Patterns**, **Cipher Keys**, **AI Toolsets**; IAM → **Groups**, **Roles**, **Service Accounts**, **Ingestion Tokens** | The table area shows the **lock** illustration with *You don't have access* — not the onboarding empty state, not a spinner, not stale rows. **One** grouped *Access Required* toast naming the resource, **no** second red toast. The list request fires **once** and is not retried (P11) |
 | **N2** | Imperative-loader pages | Same user → **Alerts**; Alerts → **Destinations**, **External Sources**; Pipelines → **Destinations**; Data → **Streams**, **Enrichment Tables**; IAM → **Users**; **Dashboards**; AI → **Remote Tasks**; AI → **Evaluations** (each tab) | Same lock state and the same single grouped toast — these pages used to raise their own error toast on top of it. Dashboards shows an empty rail with no toast of its own |
 | **N3** | The state clears once access is granted | Grant the permission → on the open page click **Refresh** (or navigate away and back) | Rows render and the lock state is gone. The `useQuery` pages recompute the flag from the next successful read; the loaders reset it at the start of every load |
-| **N4** | The refusal is never served from cache | On a page that showed the lock state, grant access and revisit **within 30 s** | It still refetches — a 403 is an error result and errors are not cached, so there is no fresh entry to suppress the request. A lock state that persists until you press Refresh is a bug |
+| **N4** | The refusal is never served from cache | On a page that showed the lock state, grant access and revisit **within 1 min** (the shortest tier since 2026-09-15; was 30 s) | It still refetches — a 403 is an error result and errors are not cached, so there is no fresh entry to suppress the request. A lock state that persists until you press Refresh is a bug |
 
 **Fifteen-minute version:** N1 on Templates and Pipelines, N2 on Alerts and Streams, then N3 on
 whichever you ended on.
@@ -4529,7 +4571,7 @@ real axios path: `addUnauthorizedError` runs and the grouped toast appears.
 | **N1** — `useQuery` pages | ✅ **PASS, both halves.** Templates: lock illustration with **0 rows**, `status: error`, `fetchFailureCount: 1` — one attempt, **no retry**, which is P11 holding for a 403. **Exactly one** toast element in the notification region |
 | **N2** — imperative-loader pages | ✅ **PASS on three loaders** — Alerts (`/api/v2/{org}/alerts`), Alerts → Destinations, IAM → Users. Each: the lock state, **0 rows**, and exactly **one** request with no retry. The notification region held **one** `<li>`, never two — which is the row's real point, since these pages used to raise their own error toast on top of the grouped one |
 | **N3** — the state clears | ✅ **PASS** on the loader path (it was already proven on the `useQuery` path). With the 403 lifted, the same page rendered **20 rows** and the lock was gone |
-| **N4** — the refusal is never served from cache | ✅ **PASS.** Revisited about **7 s** after the refusal, far inside 30 s, and it still refetched — a 403 is an error result, so there is no fresh entry to suppress the read |
+| **N4** — the refusal is never served from cache | ✅ **PASS.** Revisited about **7 s** after the refusal, far inside 30 s (and inside the 1 min window in force since 2026-09-15), and it still refetched — a 403 is an error result, so there is no fresh entry to suppress the read |
 
 The grouped toast's counter incremented **1 → 2 → 3 → 4** as each page was refused, while the region
 kept a single toast throughout. That is the grouping contract demonstrated directly.
@@ -4567,7 +4609,7 @@ and re-persisted. Unit tests cover the create-stream flow end to end
 | 30.2 | Stream delete after a reload | Open Streams, Ctrl+Shift+R **on the Streams page**, delete `w1_new`; open the Logs stream picker; re-create `w1_new` and reopen the picker | Gone from the picker, then listed again after the re-create |
 | 30.3 | Metrics Explorer | Note the `o2q-` stream keys; open Metrics Explorer | Only the metrics name list is replaced; the other stream types' keys remain |
 | 30.4 | Folder create | Alerts rail → new folder `W1`; Ctrl+Shift+R | `W1` in the rail |
-| 30.5 | Folder create, cold | Reload the Alerts list, wait 30 min without opening Add alert, create folder `W2` | `W2` appears without a reload |
+| 30.5 | Folder create, cold | Reload the Alerts list, wait 3 h (the folder entry's `gcTime` since 2026-09-15; was 30 min) without opening Add alert — or evict the folder entry from the Devtools panel — then create folder `W2` | `W2` appears without a reload |
 | 30.6 | AWS folder | Visit Dashboards first (folder list on disk) with no "AWS" folder yet; Ingestion → AWS tile → add a dashboard; Ctrl+Shift+R on Dashboards | "AWS" folder in the rail |
 | 30.7 | Org settings | Settings → Organization → change Trace ID field → Save; Ctrl+Shift+R; Settings → General → Save; reopen Organization | The new Trace ID field is still saved; no `o2q-…"organizations"…` key exists any more |
 | 30.8 | Favourites, two browsers | Favourite `D1` in browser A; favourite `D2` in browser B; reload A, toggle `D3` | `D1`, `D2`, `D3` all favourited; no `o2q-…"settings","setting"…` keys exist any more |
@@ -4578,9 +4620,9 @@ and re-persisted. Unit tests cover the create-stream flow end to end
 | 30.13 | Home pin | Pin dashboard `X`; delete `X` from Dashboards | Home shortcut gone at once and after Ctrl+Shift+R |
 | 30.14 | Refresh templates | Alerts list → the **Add alert** button (the list-hosted form — not the `addAlert` route or a deep link, where the refresh event is not wired) → Advanced; create a template in another tab; click refresh templates | New template listed after one `GET …/templates` |
 | 30.15 | Dependency graph | Delete an alert; within 30 s open Destinations | The "Used by" count excludes the deleted alert |
-| 30.16 | Unpin when the pin is already gone server-side | Browser A: pin dashboard `X`. Browser B: delete `X`. Browser A (Home shortcut still showing): **Unpin** | No error toast — the 404 counts as done; the shortcut disappears at once; leave and come back within 5 min → still gone (the cached pin is nulled too); Ctrl+Shift+R → still gone |
+| 30.16 | Unpin when the pin is already gone server-side | Browser A: pin dashboard `X`. Browser B: delete `X`. Browser A (Home shortcut still showing): **Unpin** | No error toast — the 404 counts as done; the shortcut disappears at once; leave and come back within 1 h (re-tiered 2026-09-15; was 5 min) → still gone (the cached pin is nulled too); Ctrl+Shift+R → still gone |
 | 30.17 | Bulk delete that includes the pinned dashboard | Pin `X`; Dashboards → select `X` and one other row → bulk **Delete** → confirm | Home shortcut gone at once, with one `GET …/settings/home_dashboard` after the deletes; still gone after Ctrl+Shift+R. (30.13 is the single-row delete; this is the other call site) |
-| 30.18 | A transient failure keeps the pin | Pin `X`; leave Dashboards alone for **5–30 min** (stale, not yet evicted); DevTools → Network → **Request blocking** `*/settings/home_dashboard*`; open Dashboards; remove the block | The Home shortcut **stays** and no error toast — the stale copy is shown and the failed revalidation is ignored. Before the fix any error nulled the pin; now only a 404 (pin genuinely gone) clears it |
+| 30.18 | A transient failure keeps the pin | Pin `X`; leave Dashboards alone for **1–3 h** (stale, not yet evicted; re-tiered 2026-09-15 — was 5–30 min — or backdate `dataUpdatedAt` past an hour); DevTools → Network → **Request blocking** `*/settings/home_dashboard*`; open Dashboards; remove the block | The Home shortcut **stays** and no error toast — the stale copy is shown and the failed revalidation is ignored. Before the fix any error nulled the pin; now only a 404 (pin genuinely gone) clears it |
 | 30.19 | Cache version bump | On a browser that ran the previous build: note the `o2q-` keys whose JSON carries `"buster":"1"`; load this build; visit Streams, Functions, Templates and a dashboard with panels | Each `o2q-` list is refetched **once** and rewritten with `"buster":"2"`; the IndexedDB panel entries (`o2Cache`) keep `"buster":"1"` and the panels restore **without** re-running their searches |
 | 30.20 | Template bulk delete with one failure | Templates → select two, one of which the server refuses (a template still used by a destination) → bulk **Delete** | The deletable row vanishes at once; the row that failed **stays selected** so a retry is one click; one warning toast; the list then refetches in the background — refresh-button spinner only, **no** table skeleton |
 | 30.21 | Provider Refresh rewrites the disk copy | Browser A: AI → Evaluations (providers persisted). Browser B: create provider `P2`. Browser A: click the providers **Refresh** | `P2` listed after one `GET …/providers`, and A's `o2q-…"onlineEvals","providers"…` value now contains `P2` — the forced read drops the disk copy before it refetches. *(The cold-memory variant is unit-tested only: the page's mount read always warms the entry first)* |
@@ -4635,7 +4677,7 @@ changed: the reload is automatic now.
 | # | Scenario | Steps | Expected |
 | --- | --- | --- | --- |
 | 31.1 | A failed pause/resume shows exactly one toast *(the toggles used to be silent on failure)* | Alerts → DevTools → Network → **Request blocking** → add `*/alerts/*/enable*` → click **pause** on a normal alert, then on a `cachetest_anomaly*` row → remove the block | One red toast per click carrying the failure message, **no** second toast; the row keeps its previous state and its spinner stops; no *Unhandled promise rejection* in the console. A 403 still goes through the grouped *Access Required* toast only |
-| 31.2 | A pause reaches the editor *(the editor reads the alert's detail entry cache-first)* | Alerts → open alert `A`'s editor once → back → **pause** `A` → within 30 s open `A`'s editor again | The second open fires one `GET …/alerts/{id}` and the editor shows `A` as **paused**; save without changes → still paused. Before the fix the row patch re-stamped the detail entry as fresh, so the editor could show — and re-save — the alert as enabled |
+| 31.2 | A pause reaches the editor *(the editor reads the alert's detail entry cache-first)* | Alerts → open alert `A`'s editor once → back → **pause** `A` → within 1 min (re-tiered 2026-09-15; was 30 s) open `A`'s editor again | The second open fires one `GET …/alerts/{id}` and the editor shows `A` as **paused**; save without changes → still paused. Before the fix the row patch re-stamped the detail entry as fresh, so the editor could show — and re-save — the alert as enabled |
 | 31.3 | External alert source rotate refreshes the copied token *(403-blocked here — §27.13)* | Alerts → **External Sources** → row → **Rotate** → confirm → reveal / copy the token | `…/rotate` followed by one `GET …/alert-sources`; the value shown is the **new** token. Delete and enable were already forced reads; rotate was the one missed |
 
 ### 31.2 IAM
@@ -4653,7 +4695,7 @@ changed: the reload is automatic now.
 | # | Scenario | Steps | Expected |
 | --- | --- | --- | --- |
 | 31.5 | Experiments **Refresh** reaches the server | AI → **Experiments** (one `GET …/experiments`) → create an experiment via the API or another tab → click **Refresh** | Exactly one `GET …/experiments` per click and the new row appears; leave and come straight back → **0** requests |
-| 31.6 | Registration rollback leaves no draft behind *(SSRF-blocked here, like W49)* | Remote Tasks → **New** → auth with a **secret** (bearer token) and an endpoint whose connection test fails → **Publish** | Toast *publish failed*; back on Remote Tasks the rolled-back draft is **absent** without a Refresh. Before the fix the list kept it for up to 30 s |
+| 31.6 | Registration rollback leaves no draft behind *(SSRF-blocked here, like W49)* | Remote Tasks → **New** → auth with a **secret** (bearer token) and an endpoint whose connection test fails → **Publish** | Toast *publish failed*; back on Remote Tasks the rolled-back draft is **absent** without a Refresh. Before the fix the list kept it for up to 30 s (the window then; 5 min since 2026-09-15) |
 | 31.7 | Dataset item **edit** | Datasets → open `cachetest-dataset` → edit an existing item → **Save** → back to Datasets | One `GET …/datasets`; the dataset's version / updated column reflects the edit. (W44 covers the add branch of the same mutation; this is the edit branch) |
 | 31.8 | Signing **End grace**, and the other clone entry points *(blocked here — §27.13)* | (a) a published task → signing panel → after **Activate**, **End grace**. (b) Clone from the Experiments **row action**, from the **detail page**, and via the seeded create form | (a) the Remote Tasks list reflects the grace end. (b) each clone is listed on arrival — three entry points, one mutation |
 | 31.9 | The experiment list is shared by its other readers | Open **Experiments** (one GET) → the **Compare** picker, then the Compare page, then a remote task's detail page; then Remote Tasks → the **New experiment** form | Compare picker / page / task detail: **0** `GET …/experiments`; a dataset's experiments tab fires **1** (it is keyed by dataset). The experiment form's remote-task dropdown fires **0** `GET …/tasks` while the Remote Tasks entry is fresh |
@@ -4664,7 +4706,7 @@ changed: the reload is automatic now.
 
 | # | Scenario | Steps | Expected |
 | --- | --- | --- | --- |
-| 31.10 | Grouping survives an idle gap longer than 5 min | Traces → pick a stream (headings render) → go to Home and stay **> 5 min** → return to Traces. Then Settings → **Correlation Settings** → Detection Rules | Headings render immediately (no flat-list flash) with **at most one** background `semantic-groups` request; identity config likewise with at most one `config/identity`. Before the fix both entries were evicted after 5 min unobserved, and the synchronous reader returned nothing until a full reload |
+| 31.10 | Grouping survives an idle gap longer than 5 min | Traces → pick a stream (headings render) → go to Home and stay **> 5 min** → return to Traces. Then Settings → **Correlation Settings** → Detection Rules | Headings render immediately (no flat-list flash) with **at most one** background `semantic-groups` request; identity config likewise with at most one `config/identity`. Before the fix both entries were evicted after 5 min unobserved, and the synchronous reader returned nothing until a full reload. *(Since 2026-09-15 every query shares the client-wide 3 h `gcTime` and both entries are 5 min medium-tier, so a > 5 min gap still produces exactly the one background refetch)* |
 
 ### 31.5 Functions and pipelines
 
@@ -4711,7 +4753,7 @@ from the live query client. No defect was found — the two corrections are to t
 
 | Row | Result |
 | --- | --- |
-| **31.10** — grouping survives a >5 min idle gap | ✅ **PASS.** Both entries declare `gcTime: SESSION_STALE_TIME`, and both survived the gap unobserved: `semanticGroups` for **436 s** (61 groups intact) and `identityConfig` for **380 s**, each at `obs: 0, fetches: 1` the whole time. The default 5-minute GC would have evicted both. Returning to Traces, the field-group headings (*Key Fields (15) / HTTP (5) / Database (1) / Tracing (2)*) were on screen within **250 ms** with no flat-list flash, and exactly **one** background `GET …/semantic-groups` fired (both entries were past `CONFIG_STALE_TIME`, so one refresh each is expected). `config/identity` fired **0** times |
+| **31.10** — grouping survives a >5 min idle gap | ✅ **PASS.** Both entries declare `gcTime: SESSION_STALE_TIME`, and both survived the gap unobserved: `semanticGroups` for **436 s** (61 groups intact) and `identityConfig` for **380 s**, each at `obs: 0, fetches: 1` the whole time. The default 5-minute GC would have evicted both. Returning to Traces, the field-group headings (*Key Fields (15) / HTTP (5) / Database (1) / Tracing (2)*) were on screen within **250 ms** with no flat-list flash, and exactly **one** background `GET …/semantic-groups` fired (both entries were past `CONFIG_STALE_TIME`, so one refresh each is expected). `config/identity` fired **0** times. *(As recorded 2026-09-14. Since 2026-09-15 neither declares its own `gcTime` — the client-wide 3 h applies — and both are 5 min `MEDIUM_STALE_TIME`; `CONFIG_STALE_TIME` no longer exists)* |
 | **31.11** — overwriting an existing function from a flow node | ✅ **PASS.** Confirm prompt read *"Are you sure you want to update the function …?"*; one `PUT …/functions/{name}` followed by one `GET …/functions`; toast **"Function saved successfully"** (the backend's own message wins over `flow.function.updated`). Both `["org","default","functions",…]` entries flipped to `inv: true` from `meta.invalidates`, and the Functions list on next mount fired exactly one request (`fetches` 2→3) and rendered the new body. See the note above §31.5 — the repro path in this row was wrong and is now corrected |
 | **31.12** — Pipelines refresh button shows the data's age | ✅ **PASS.** The label walked *9s ago → 39s ago → 59s ago → 1m ago → 2m ago* on its own 10-second tick, crossing both tiers. Tooltip read **"Last refreshed: 6:58:13 PM"**, and the staleness title moved from *Data is getting stale* back to *Data is fresh* on refresh. A click fired exactly one `GET …/pipelines` and reset the label; the **`r`** shortcut did the same, landing on *just now* |
 | **30.22** — AWS replace, delete reaches the list even if the import fails *(run 2026-09-14)* | ✅ **PASS.** No 500 ms race is needed — fail the create deterministically instead of blocking it by hand. The `DELETE …/dashboards/{id}?folder={fid}` fired, and **56 ms later** the folder's list entry had already gone `inv: false → true`, with the create not yet attempted. That is the invalidation sitting between the delete and the create, which is the whole point of the row. The create then failed and the toast read **"Failed to replace dashboard: Request failed with status code 404"** at 633 ms (the 500 ms sleep plus the attempt). Returning to Dashboards fired **one** `GET …/dashboards` (`fetches` 1→2) and the folder listed **0** — the deleted copy did not survive the failed import |
@@ -4744,9 +4786,10 @@ rows recorded as environment-blocked are therefore runnable, and all three now p
 | **31.5** — Experiments **Refresh** reaches the server | ✅ **PASS**, all three assertions. An experiment created in a second tab was **not** visible in the first; **one** click fired exactly **one** `GET …/experiments?includeSummary=true` (`fetches` 6→7, 1→2 rows) and the row appeared; two consecutive clicks fired one request each; leaving and coming straight back fired **zero** |
 | **31.9** — the experiment list is shared by its readers | ✅ **PASS**, all four parts. Compare picker and Compare page: **0** list requests, only `…/experiments/compare`. A remote task's detail page: **0**. The experiment form's remote-task dropdown rendered and fired **0** `…/tasks`, reusing the cached Remote Tasks entry (`fetches` stayed 1) |
 
-**A caveat 31.9 needs.** `experimentsListQuery` sets no `staleTime`, so it inherits the 30-second
-default, **and** it sets `refetchOnWindowFocus: true`. The "0 requests" claim therefore holds only
-**within 30 s of the last load and without switching windows**. My first attempt showed one list
+**A caveat 31.9 needs.** `experimentsListQuery` declares the 5 min medium tier since 2026-09-15
+(when this was recorded it set no `staleTime` and inherited the old 30-second default). The
+"0 requests" claim therefore holds only **within the window of the last load** — 5 min now, 30 s at
+the time (until 2026-09-15 it also set `refetchOnWindowFocus: true`, so switching windows broke it too). My first attempt showed one list
 request on the Compare page and looked like a failure; re-run inside the window it was zero. Anyone
 running this row slowly, or alt-tabbing, will see a request and misread it.
 
