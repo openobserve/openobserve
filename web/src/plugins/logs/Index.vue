@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Note: Splitter max-height to be dynamically calculated with JS -->
             <OSplitter
               v-model="searchObj.config.splitterModel"
-              :limits="searchObj.config.splitterLimit"
+              :limits="isMobile ? [0, 0] : searchObj.config.splitterLimit"
               class="logs-splitter-smooth h-full max-h-full w-full overflow-hidden"
               separatorClass="field-list-separator"
               :separatorStyle="{
@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
                   <IndexList
-                    v-if="searchObj.meta.showFields"
+                    v-if="searchObj.meta.showFields && !isMobile"
                     data-test="logs-search-index-list"
                     @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
                   />
@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length == 0 &&
                         searchObj.loading == false
                       "
+                      class="h-full max-lg:overflow-y-auto"
                     >
                       <LogsNoDataState
                         :ai-enabled="isAiEnabled"
@@ -133,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         searchObj.data.stream.streamLists.length > 0 &&
                         searchObj.data.stream.selectedStream.length == 0
                       "
-                      class="h-full"
+                      class="h-full max-lg:overflow-y-auto"
                     >
                       <LogsNoStreamState
                         :org-id="store.state.selectedOrganization.identifier"
@@ -246,6 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         @send-to-ai-chat="sendToAiChat"
                         @run-query="searchData"
                         @jump-to-stream-data="onJumpToStreamData"
+                        @open-mobile-fields="mobileFieldsOpen = true"
                       />
                     </div>
                   </div>
@@ -291,6 +293,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
       </OSplitter>
     </div>
+
+    <ODrawer
+      v-if="isMobile"
+      v-model:open="mobileFieldsOpen"
+      side="left"
+      size="sm"
+      bleed
+      seamless
+      anchor="#thirdLevel"
+      data-test="logs-mobile-fields-drawer"
+    >
+      <div class="flex h-full flex-col overflow-hidden pt-2.5">
+        <IndexList
+          data-test="logs-search-index-list-mobile"
+          @setInterestingFieldInSQLQuery="setInterestingFieldInSQLQuery"
+        />
+      </div>
+    </ODrawer>
   </div>
 </template>
 
@@ -355,6 +375,8 @@ import { contextRegistry } from "@/composables/contextProviders";
 import { createLogsContextProvider } from "@/composables/contextProviders/logsContextProvider";
 import IndexList from "@/plugins/logs/IndexList.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import LogsNoEventsState from "@/plugins/logs/LogsNoEventsState.vue";
 import LogsNoDataState from "@/plugins/logs/LogsNoDataState.vue";
@@ -378,6 +400,7 @@ export default defineComponent({
     VisualizeLogsQuery: defineAsyncComponent(() => import("@/plugins/logs/VisualizeLogsQuery.vue")),
     BuildQueryPage: defineAsyncComponent(() => import("@/plugins/logs/BuildQueryPage.vue")),
     OSplitter,
+    ODrawer,
     OEmptyState,
     LogsNoEventsState,
     LogsNoDataState,
@@ -564,6 +587,31 @@ export default defineComponent({
 
     const expandedLogs = ref([]);
     const splitterModel = ref(90);
+
+    const { isMobile, isTablet } = useBreakpoint();
+    const mobileFieldsOpen = ref(false);
+    watch(
+      isMobile,
+      (mobile, wasMobile) => {
+        if (mobile) {
+          searchObj.config.splitterModel = 0;
+        } else if (wasMobile && searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
+          searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+        }
+      },
+      { immediate: true },
+    );
+    // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+    watch(
+      isTablet,
+      (tablet) => {
+        if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+          searchObj.config.splitterModel = 30;
+        }
+      },
+      { immediate: true },
+    );
+
     const chartRedrawTimeout = ref(null);
     const updateColumnsTimeout = ref(null);
 
@@ -1353,6 +1401,16 @@ export default defineComponent({
     };
 
     const onSelectStream = () => {
+      // < md the stream selector lives in the fields drawer, so it must open before the trigger can focus.
+      if (isMobile.value) {
+        mobileFieldsOpen.value = true;
+        setTimeout(() => {
+          document
+            .querySelector<HTMLElement>('[data-test="log-search-index-list-select-stream"] button')
+            ?.click();
+        }, 300);
+        return;
+      }
       // Focus the stream selector trigger so the user can immediately pick a stream.
       const trigger = document.querySelector<HTMLElement>(
         '[data-test="log-search-index-list-select-stream"] button',
@@ -2263,19 +2321,20 @@ export default defineComponent({
       },
     );
 
-    // Auto-expand splitter to 165px when either editor has >2 lines; collapse to 130px otherwise.
-    // Never overrides a user-set value above 165px.
+    // Auto-expand the splitter when either editor has >2 lines; never overrides a larger user-set value.
     watch(
-      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent],
-      ([queryValue, fnValue]) => {
+      [() => searchObj.data.editorValue, () => searchObj.data.tempFunctionContent, isMobile],
+      ([queryValue, fnValue, mobile]) => {
         const queryLines = (queryValue || "").split("\n").length;
         const fnLines = (fnValue || "").split("\n").length;
         const hasMoreThanTwoLines = queryLines > 2 || fnLines > 2;
+        const baseHeight = mobile ? 165 : 83;
+        const expandedHeight = mobile ? 205 : 130;
 
-        if (hasMoreThanTwoLines && splitterModel.value < 130) {
-          splitterModel.value = 130;
-        } else if (!hasMoreThanTwoLines && splitterModel.value <= 130) {
-          splitterModel.value = 83;
+        if (hasMoreThanTwoLines && splitterModel.value < expandedHeight) {
+          splitterModel.value = expandedHeight;
+        } else if (!hasMoreThanTwoLines && splitterModel.value <= expandedHeight) {
+          splitterModel.value = baseHeight;
         }
       },
       { immediate: true },
@@ -3099,6 +3158,8 @@ export default defineComponent({
       searchObj,
       searchBarRef,
       splitterModel,
+      isMobile,
+      mobileFieldsOpen,
       // loadPageData,
       getQueryData,
       getJobData,

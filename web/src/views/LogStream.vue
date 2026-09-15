@@ -78,9 +78,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
-            <div class="flex w-full items-center justify-between gap-2">
+            <div class="flex w-full items-center justify-between gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="streamActiveTab"
+                data-test="log-stream-type-filter"
                 @update:model-value="(v) => filterLogStreamByTab(v as string)"
               >
                 <OToggleGroupItem value="logs" size="sm">
@@ -107,7 +109,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 data-test="streams-search-stream-input"
                 v-model="filterQuery"
-                class="no-border o2-search-input w-64"
+                class="no-border o2-search-input w-64 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                 :placeholder="t('logStream.search')"
                 :debounce="300"
               />
@@ -178,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="exploreStream({ row })"
               />
               <OButton
@@ -187,6 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="view"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="listSchema({ row })"
               />
               <OButton
@@ -196,8 +200,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click="confirmDeleteAction({ row })"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="log-stream-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="search"
+                  class="md:hidden"
+                  data-test="log-stream-explore-btn-menu"
+                  @select="exploreStream({ row })"
+                >
+                  <span>{{ t("logStream.explore") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="description"
+                  class="md:hidden"
+                  data-test="log-stream-schema-btn-menu"
+                  @select="listSchema({ row })"
+                >
+                  <span>{{ t("logStream.schemaHeader") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="log-stream-delete-btn-menu"
+                  @select="confirmDeleteAction({ row })"
+                >
+                  <span>{{ t("logStream.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
           <template #empty>
@@ -286,7 +328,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #bottom="scope">
             <div class="flex w-full items-center justify-between py-2">
               <div class="flex w-full items-center text-xs font-normal">
-                {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
+                <span class="max-md:hidden">
+                  {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
+                </span>
                 <OButton
                   v-if="selectedIds.length > 0"
                   icon-left="delete"
@@ -403,6 +447,8 @@ import { watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -423,6 +469,8 @@ export default defineComponent({
     OButton,
     OTooltip,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OToggleGroup,
     OToggleGroupItem,

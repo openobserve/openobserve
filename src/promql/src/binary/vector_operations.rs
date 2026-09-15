@@ -15,12 +15,12 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, LazyLock as Lazy},
+    sync::Arc,
 };
 
 use config::meta::promql::{
     NAME_LABEL,
-    value::{Label, LabelsExt, RangeValue, Sample, Value, signature},
+    value::{Label, LabelsExt, RangeValue, Sample, Value},
 };
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{BinaryExpr, VectorMatchCardinality, token};
@@ -29,16 +29,14 @@ use rayon::prelude::*;
 use crate::binary::scalar_binary_operations;
 
 // DROP_METRIC_BIN_OP if the operation is one of these, drop the metric __name__
-pub static DROP_METRIC_BIN_OP: Lazy<HashSet<u8>> = Lazy::new(|| {
-    HashSet::from_iter([
-        token::T_ADD,
-        token::T_SUB,
-        token::T_DIV,
-        token::T_MUL,
-        token::T_POW,
-        token::T_MOD,
-    ])
-});
+pub const DROP_METRIC_BIN_OP: [u8; 6] = [
+    token::T_ADD,
+    token::T_SUB,
+    token::T_DIV,
+    token::T_MUL,
+    token::T_POW,
+    token::T_MOD,
+];
 
 /// Implement the operation between a matrix and a float.
 ///
@@ -53,40 +51,33 @@ pub fn vector_scalar_bin_op(
     let return_bool = expr.return_bool();
     let output: Vec<RangeValue> = left
         .into_par_iter()
-        .flat_map(|mut range| {
+        .filter_map(|mut range| {
             let new_samples: Vec<Sample> = range
                 .samples
                 .into_iter()
-                .flat_map(|sample| {
+                .filter_map(|sample| {
                     let (lhs, rhs) = if swapped_lhs_rhs {
                         (right, sample.value)
                     } else {
                         (sample.value, right)
                     };
-                    match scalar_binary_operations(
+                    let value = scalar_binary_operations(
                         expr.op.id(),
                         lhs,
                         rhs,
                         return_bool,
                         is_comparison_operator,
                     )
-                    .ok()
-                    {
-                        Some(value) => {
-                            let final_value =
-                                if is_comparison_operator && swapped_lhs_rhs && !return_bool {
-                                    sample.value
-                                } else {
-                                    value
-                                };
-
-                            Some(Sample {
-                                timestamp: sample.timestamp,
-                                value: final_value,
-                            })
-                        }
-                        None => None,
-                    }
+                    .ok()?;
+                    let value = if is_comparison_operator && swapped_lhs_rhs && !return_bool {
+                        sample.value
+                    } else {
+                        value
+                    };
+                    Some(Sample {
+                        timestamp: sample.timestamp,
+                        value,
+                    })
                 })
                 .collect();
 
@@ -97,12 +88,9 @@ pub fn vector_scalar_bin_op(
                 if return_bool || DROP_METRIC_BIN_OP.contains(&expr.op.id()) {
                     labels = labels.without_metric_name();
                 }
-                Some(RangeValue {
-                    labels,
-                    samples: new_samples,
-                    exemplars: range.exemplars,
-                    time_window: range.time_window,
-                })
+                range.labels = labels;
+                range.samples = new_samples;
+                Some(range)
             }
         })
         .collect();
@@ -116,37 +104,18 @@ pub fn vector_scalar_bin_op(
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#logical-set-binary-operators
 fn vector_or(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) -> Result<Value> {
-    if expr.modifier.as_ref().unwrap().card != VectorMatchCardinality::ManyToMany {
-        return Err(DataFusionError::NotImplemented(
-            "set operations must only use many-to-many matching".to_string(),
-        ));
-    }
-
+    validate_set_matching(expr)?;
     if left.is_empty() {
         return Ok(Value::Matrix(right));
     }
-
     if right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-
-    let lhs_sig: HashSet<u64> = left
-        .par_iter()
-        .map(|item| signature(&item.labels))
-        .collect();
-
     // Add all right-hand side elements which have not been added from the left-hand
     // side.
-    let right_ranges: Vec<RangeValue> = right
-        .into_par_iter()
-        .filter(|item| {
-            let right_sig = signature(&item.labels);
-            !lhs_sig.contains(&right_sig)
-        })
-        .collect();
-
+    let unmatched = filter_set_series(right, &left, false);
     let mut output = left;
-    output.extend(right_ranges);
+    output.extend(unmatched);
     Ok(Value::Matrix(output))
 }
 
@@ -160,32 +129,13 @@ fn vector_unless(
     left: Vec<RangeValue>,
     right: Vec<RangeValue>,
 ) -> Result<Value> {
-    if expr.modifier.as_ref().unwrap().card != VectorMatchCardinality::ManyToMany {
-        return Err(DataFusionError::NotImplemented(
-            "set operations must only use many-to-many matching".to_string(),
-        ));
-    }
-
+    validate_set_matching(expr)?;
     // If right is empty, we simply return the left
     // if left is empty we will return it anyway.
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(left));
     }
-    // Generate all the signatures from the right hand.
-    let rhs_sig: HashSet<u64> = right
-        .par_iter()
-        .map(|item| signature(&item.labels))
-        .collect();
-
-    // Now filter out all the matching labels from left.
-    let output: Vec<RangeValue> = left
-        .into_par_iter()
-        .filter(|item| {
-            let left_sig = signature(&item.labels);
-            !rhs_sig.contains(&left_sig)
-        })
-        .collect();
-    Ok(Value::Matrix(output))
+    Ok(Value::Matrix(filter_set_series(left, &right, false)))
 }
 
 /// matrix1 and matrix2 results in a matrix consisting of the elements of
@@ -195,36 +145,43 @@ fn vector_unless(
 ///
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#logical-set-binary-operators
 fn vector_and(expr: &BinaryExpr, left: Vec<RangeValue>, right: Vec<RangeValue>) -> Result<Value> {
-    if expr.modifier.as_ref().unwrap().card != VectorMatchCardinality::ManyToMany {
-        return Err(DataFusionError::NotImplemented(
-            "set operations must only use many-to-many matching".to_string(),
-        ));
-    }
-
+    validate_set_matching(expr)?;
     // If either left or right is empty, we return an empty array.
     if left.is_empty() || right.is_empty() {
         return Ok(Value::Matrix(vec![]));
     }
-
-    let rhs_sig: HashSet<u64> = right
-        .par_iter()
-        .map(|item| signature(&item.labels))
-        .collect();
-
-    // Now include all the matching ones from the right
-    let output: Vec<RangeValue> = left
+    let output = filter_set_series(left, &right, true)
         .into_par_iter()
-        .filter(|item| {
-            let left_sig = signature(&item.labels);
-            rhs_sig.contains(&left_sig)
-        })
         .map(|mut range| {
             range.labels = range.labels.without_metric_name();
             range
         })
         .collect();
-
     Ok(Value::Matrix(output))
+}
+
+fn validate_set_matching(expr: &BinaryExpr) -> Result<()> {
+    if expr.modifier.as_ref().unwrap().card != VectorMatchCardinality::ManyToMany {
+        return Err(DataFusionError::NotImplemented(
+            "set operations must only use many-to-many matching".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn filter_set_series(
+    input: Vec<RangeValue>,
+    other: &[RangeValue],
+    keep_matches: bool,
+) -> Vec<RangeValue> {
+    let signatures: HashSet<u64> = other
+        .par_iter()
+        .map(|series| series.labels.signature())
+        .collect();
+    input
+        .into_par_iter()
+        .filter(|series| signatures.contains(&series.labels.signature()) == keep_matches)
+        .collect()
 }
 
 fn vector_arithmetic_operators(
@@ -275,11 +232,11 @@ fn vector_arithmetic_operators(
     // Iterate over left and pick up the corresponding range from rhs
     let output: Vec<RangeValue> = left
         .into_par_iter()
-        .flat_map(|range| {
+        .filter_map(|range| {
             let left_sig = labels_to_compare(&range.labels).signature();
             rhs_sig.get(&left_sig).map(|rhs_range| (range, rhs_range))
         })
-        .flat_map(|(mut lhs_range, rhs_range)| {
+        .filter_map(|(mut lhs_range, rhs_range)| {
             // Build a map of timestamps from rhs for quick lookup
             let rhs_map: HashMap<i64, f64> = rhs_range
                 .samples
@@ -291,7 +248,7 @@ fn vector_arithmetic_operators(
             let new_samples: Vec<Sample> = lhs_range
                 .samples
                 .into_iter()
-                .flat_map(|lhs_sample| {
+                .filter_map(|lhs_sample| {
                     rhs_map.get(&lhs_sample.timestamp).and_then(|&rhs_value| {
                         scalar_binary_operations(
                             operator,
@@ -332,12 +289,9 @@ fn vector_arithmetic_operators(
                         }
                     }
                 }
-                Some(RangeValue {
-                    labels,
-                    samples: new_samples,
-                    exemplars: lhs_range.exemplars,
-                    time_window: lhs_range.time_window,
-                })
+                lhs_range.labels = labels;
+                lhs_range.samples = new_samples;
+                Some(lhs_range)
             }
         })
         .collect();
@@ -383,7 +337,7 @@ pub fn vector_bin_op(
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, Sample};
+    use config::meta::promql::value::{Label, Sample, signature};
 
     use super::*;
 

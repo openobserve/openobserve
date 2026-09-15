@@ -208,6 +208,17 @@ describe("AppRoles - onRoleAdded", () => {
     );
   });
 
+  it("forwards the dbm preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "DBM", startFrom: "dbm" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ preset: "dbm" }),
+      }),
+    );
+  });
+
   it("does not set a preset for the custom start option", async () => {
     const wrapper = await mountAppRoles();
     const spy = vi.spyOn(router, "push");

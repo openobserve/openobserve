@@ -50,6 +50,10 @@ pub enum TriggerModule {
     SloBackfill,
     /// Boolean expression evaluated over durable child-alert rollup states.
     CompositeAlert,
+    /// On-call escalation. One job per open response record, re-armed at the
+    /// next rung's delay. Its own lane so a paging timer is never queued
+    /// behind an alert evaluation backlog.
+    OncallEscalation,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -64,6 +68,7 @@ impl std::fmt::Display for TriggerModule {
             Self::Slo => write!(f, "slo"),
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
+            Self::OncallEscalation => write!(f, "oncall_escalation"),
         }
     }
 }
@@ -247,6 +252,7 @@ mod tests {
         assert_eq!(TriggerModule::Slo as i32, 6);
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
+        assert_eq!(TriggerModule::OncallEscalation as i32, 9);
     }
 
     #[test]
