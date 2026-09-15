@@ -4520,7 +4520,7 @@
     "fieldSelectTooltip": "Seleziona un campo o usa una variabile come $fieldVariable. Se stream utilizza una variabile, l'elenco dei campi sarà vuoto: digita il nome del campo manualmente.",
     "filterInfoTooltip": "Nei filtri, puoi utilizzare il valore di un'altra variabile per filtrare il valore della variabile corrente. Questo può essere fatto usando il nome dell'altra variabile. Ad esempio:",
     "defaultSelectAll": "Predefinito: seleziona tutto",
-    "escapeSingleQuotesTooltip": "Se abilitato, nella query verranno eliminate le virgolette singole. Ad esempio, un valore come `O'Reilly` verrà sostituito come `O\"Reilly`.",
+    "escapeSingleQuotesTooltip": "Gli apici singoli vengono sempre sottoposti a escape nella query. Ad esempio, un valore come `O'Reilly` viene sostituito con `O''Reilly`.",
     "byDefaultSelect": "Per impostazione predefinita, seleziona:",
     "firstValue": "Primo valore",
     "allValues": "Tutti i valori",

@@ -4520,7 +4520,7 @@
     "fieldSelectTooltip": "フィールドを選択するか、$FieldVariable のような変数を使用してください。ストリームが変数を使用する場合、フィールドリストは空になります。フィールド名を手動で入力してください。",
     "filterInfoTooltip": "フィルターでは、別の変数の値を使用して現在の変数の値をフィルターできます。これは、他の変数の名前を使用して行うことができます。例えば:",
     "defaultSelectAll": "デフォルト-すべて選択",
-    "escapeSingleQuotesTooltip": "有効にすると、クエリ内で一重引用符がエスケープされます。たとえば、`O'Reilly` のような値は `O \"Reilly` に置き換えられます。",
+    "escapeSingleQuotesTooltip": "シングルクォートはクエリ内で常にエスケープされます。たとえば、`O'Reilly` のような値は `O''Reilly` に置き換えられます。",
     "byDefaultSelect": "デフォルトでは以下を選択:",
     "firstValue": "1 番目の値",
     "allValues": "すべての値",

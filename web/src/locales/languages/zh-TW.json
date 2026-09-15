@@ -4520,7 +4520,7 @@
     "fieldSelectTooltip": "選擇一個欄位，或使用如 $fieldVariable 的變數。若串流使用變數，欄位清單將為空 — 請手動輸入欄位名稱。",
     "filterInfoTooltip": "在篩選條件中，您可以使用另一個變數的值來篩選目前變數的值。可透過使用另一個變數的名稱來達成。例如：",
     "defaultSelectAll": "預設 - 全選",
-    "escapeSingleQuotesTooltip": "若啟用，查詢中的單引號將被跳脫。例如，`O'Reilly` 這樣的值將被替換為 `O''Reilly`。",
+    "escapeSingleQuotesTooltip": "單引號在查詢中一律會被跳脫。例如，像 `O'Reilly` 這樣的值會被替換為 `O''Reilly`。",
     "byDefaultSelect": "預設選擇：",
     "firstValue": "第一個值",
     "allValues": "所有值",

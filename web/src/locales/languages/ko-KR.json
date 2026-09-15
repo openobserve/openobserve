@@ -4520,7 +4520,7 @@
     "fieldSelectTooltip": "필드를 선택하거나 $FieldVariable과 같은 변수를 사용합니다.스트림에서 변수를 사용하는 경우 필드 목록이 비어 있게 됩니다. 필드 이름을 수동으로 입력하세요.",
     "filterInfoTooltip": "필터에서는 다른 변수의 값을 사용하여 현재 변수 값을 필터링할 수 있습니다.다른 변수의 이름을 사용하여 이 작업을 수행할 수 있습니다.예를 들면 다음과 같습니다.",
     "defaultSelectAll": "기본값 - 모두 선택",
-    "escapeSingleQuotesTooltip": "활성화하면 작은 따옴표가 쿼리에서 이스케이프됩니다.예를 들어 `오라일리`와 같은 값은 `O\"Reilly`로 대체됩니다.",
+    "escapeSingleQuotesTooltip": "쿼리에서는 작은따옴표가 항상 이스케이프 처리됩니다. 예를 들어 `O'Reilly` 값은 `O''Reilly`로 바뀝니다.",
     "byDefaultSelect": "기본적으로 다음을 선택합니다.",
     "firstValue": "첫 번째 가치",
     "allValues": "모든 값",

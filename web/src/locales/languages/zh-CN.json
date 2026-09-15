@@ -4520,7 +4520,7 @@
     "fieldSelectTooltip": "选择一个字段或使用像 $fieldVariable 这样的变量。如果 stream 使用变量，则字段列表将为空——手动键入字段名称。",
     "filterInfoTooltip": "在过滤器中，您可以使用另一个变量的值来筛选当前变量的值。这可以通过使用另一个变量的名称来完成。例如：",
     "defaultSelectAll": "默认-全选",
-    "escapeSingleQuotesTooltip": "如果启用，将在查询中对单引号进行转义。例如，像 `O'Reilly` 这样的值将被替换为 `O \"Reilly`。",
+    "escapeSingleQuotesTooltip": "查询中始终会转义单引号。例如，像 `O'Reilly` 这样的值会被替换为 `O''Reilly`。",
     "byDefaultSelect": "默认情况下选择：",
     "firstValue": "第一个值",
     "allValues": "所有值",
