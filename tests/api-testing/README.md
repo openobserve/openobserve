@@ -56,7 +56,7 @@ tests/api-testing/
 ## Writing a new test — the rules
 
 **Use the new framework.** Don't copy-paste from old `test_*.py` files; they
-are scheduled for rewrite (see [revamp plan](../../tests/ui-testing/MD_Files/api%20tests%20revamp/API_TESTS_REVAMP.md)).
+are scheduled for rewrite.
 
 ```python
 # tests/<area>/test_my_feature.py
@@ -125,5 +125,3 @@ file should pass strict ruff.
 ## Revamp in progress
 
 This suite is being incrementally reworked. See:
-- [`../../tests/ui-testing/MD_Files/api tests revamp/API_TESTS_REVAMP.md`](../../tests/ui-testing/MD_Files/api%20tests%20revamp/API_TESTS_REVAMP.md) — the plan
-- [`../../tests/ui-testing/MD_Files/api tests revamp/oss_rework_progress/`](../../tests/ui-testing/MD_Files/api%20tests%20revamp/oss_rework_progress/) — phase-by-phase progress
