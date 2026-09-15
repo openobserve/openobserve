@@ -3,6 +3,7 @@
  *
  * Bug fixes for Data Sources page functionality:
  * - #11682: On clicking on AI integration the credentials disappear
+ * - #11534: AI Frameworks & Agent datasources
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -72,6 +73,52 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     ).toBeGreaterThan(0);
 
     testLogger.info('PASSED: AI Integration content persists on re-click');
+  });
+
+  // ==========================================================================
+  // Feature #11534: AI Frameworks & Agent datasources
+  // https://github.com/openobserve/openobserve/issues/11534
+  // ==========================================================================
+  // The category list is asserted against the slugs in
+  // components/ingestion/ai/data.ts rather than against tab labels, because the
+  // labels run through i18n and would break this test in a non-English locale
+  // while the slugs are part of the route.
+  test("AI datasources should expose every integration category with browsable docs", {
+    tag: ['@bug-11534', '@P2', '@regression', '@datasourcesRegression']
+  }, async ({ page }) => {
+    testLogger.info('Test: AI datasource categories and docs (Feature #11534)');
+
+    await pm.dataPage.navigateToAIIntegrations(process.env.ZO_BASE_URL, process.env.ORGNAME);
+
+    const CATEGORIES = ['frameworks', 'model-providers', 'gateways', 'no-code', 'analytics', 'tools'];
+    for (const slug of CATEGORIES) {
+      await expect(page.locator(`[data-test="ai-integrations-category-${slug}"]`).first(),
+        `Feature #11534: the "${slug}" AI category tab must be present`
+      ).toBeVisible({ timeout: 15000 });
+    }
+    testLogger.info(`All ${CATEGORIES.length} AI categories present`);
+
+    // Frameworks is the category the issue asked for, so it carries the
+    // does-it-actually-work assertions rather than just existing.
+    await page.locator('[data-test="ai-integrations-category-frameworks"]').first().click();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    const items = page.locator('[data-test^="ai-integrations-item-"]');
+    await expect(items.first(),
+      'Feature #11534: the Frameworks category must list integrations'
+    ).toBeVisible({ timeout: 15000 });
+
+    const itemCount = await items.count();
+    testLogger.info(`Frameworks lists ${itemCount} integrations`);
+    expect(itemCount,
+      'Feature #11534: Frameworks must list more than one agent framework'
+    ).toBeGreaterThan(1);
+
+    await items.first().click();
+    const docs = await pm.dataPage.verifyAIDetailRendered();
+    testLogger.info(`Framework doc pane rendered ${docs.length} chars`);
+
+    testLogger.info('✓ PASSED: AI datasource categories browsable with docs (#11534)');
   });
 
   test.afterEach(async () => {
