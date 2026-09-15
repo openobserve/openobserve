@@ -19,18 +19,19 @@ calls that are **not** going to be automated.
 - A new spec must be added to `run_files` in
   `tests/ui-testing/ci-matrix/ci_matrix_regression.json` or it never runs.
 
-## Done — automated (8 tests, 9 issues)
+## Done — automated (10 tests, 10 issues)
 
 | Issue | Spec | Test |
 |---|---|---|
-| #11392 | `Traces/traces-sharing-filters.spec.js` | shared Traces URL applies params and loads on arrival |
-| #12703 | `Traces/traces-sharing-filters.spec.js` | reset clears the error-only `span_status` filter |
+| #12703 | `Traces/traces-filter-reset.spec.js` | reset clears the error-only `span_status` filter |
 | #2067  | `Pipelines/enrichment-lifecycle.spec.js` | duplicate name refused, original data intact |
 | #2937  | `Pipelines/enrichment-lifecycle.spec.js` | list reflects create/delete with no refresh |
 | #12647 <br> #9498 | `Pipelines/pipeline-preview-bounds.spec.js` | row View preview stays inside the viewport |
 | #11534 | `DataSources/datasources-regression.spec.js` | all 6 AI categories present; Frameworks lists integrations and renders docs |
 | #7030  | `Pipelines/pipeline-export.spec.js` | bulk export appears on selection and the downloaded JSON carries node definitions |
-| #7332  | `Logs/logs-multistream-share-url.spec.js` | multi-stream selection restored from a short link — **CI only, see below** |
+| #7332  | `Logs/logs-multistream-share-url.spec.js` | multi-stream selection restored from a short link — CI only; **verified green in CI** |
+| #11353 | `Logs/logs-histogram-severity.spec.js` | backend nominates `severity` as the breakdown field and groups by `zo_sql_breakdown` |
+| #11441 | `Logs/logs-histogram-severity.spec.js` | a numeric severity leaves the query histogram-eligible and the chart renders |
 
 #9498 and #12647 are the same bug filed twice.
 
@@ -81,6 +82,13 @@ the next sweep finds them (`--grep @bug-NNNN` resolves for all four):
 | #7030  | `Pipelines/pipelines.spec.js:78` covers the empty-name error | bulk export — **added on this branch** |
 | #10270 | `Logs/logspage.spec.js:498` drives the exact repro (`limit` + Search Around) | asserts only that something rendered; the bug is the **count** |
 
+### Further label-flip candidates found while picking the next batch (2)
+
+| Issue | Existing coverage |
+|---|---|
+| #9875 | `web/src/components/alerts/AddAlert.schema.spec.ts:87` — tests `name: "bad name"` (a space) plus `:`/`#`/`%`, which is exactly the PR #11366 fix |
+| #7280 | `web/src/components/reports/ReportList.spec.ts:574` — "should remove the report from lists after successful delete" |
+
 ### Looked covered, is not (1)
 
 `#5745` — `tests/api-testing/tests/alerts/test_v2.py:381` explicitly declines to
@@ -122,7 +130,7 @@ list), never on the shared URL's query string.
 | #11463 | The flame graph is an ECharts **canvas** (`renderItem` → `fillRect`), so no per-span DOM geometry exists to assert. Already covered: `FlameGraphView.spec.ts` — "should include spans with tiny duration using minimum 0.1% width", plus zero-duration and all-tiny cases. **No E2E needed.** |
 | #11615 | Needs a click on a canvas-drawn span. `TraceDetails.spec.ts` already exercises `updateSelectedSpan` but never asserts `activeTab` is unchanged — a two-line unit assertion there is deterministic where a coordinate click is not. |
 
-## Remaining UI queue (20)
+## Remaining UI queue (19)
 
 Ordered roughly by value over setup cost. `ENT` = service-graph / SLO /
 Incidents surface, ships in `ci_matrix*.ent.json`, so it needs a paired
@@ -130,6 +138,7 @@ o2-enterprise PR on the **same branch name**.
 
 | Issue | Area | Note |
 |---|---|---|
+| #11392 | Traces | **attempted and withdrawn.** Shared-URL params. On the CI build the address bar carries `query=` EMPTY even with the filter applied and the index list showing it — four retries, all empty — while the same flow writes the base64 query against o2latestmain. Any address-bar assertion is environment-dependent until that difference is explained. The short-link path (as used for #7332) is the likely route. |
 | #11619 | Alerts | logs/traces must not preselect a condition value |
 | #9875  | Alerts | alert name from a dashboard panel contains a space and fails validation |
 | #10202 | Alerts | test-destination on the update page errors; custom destination cannot test/preview |
@@ -196,6 +205,16 @@ no single assertable outcome. Automating these buys flake, not coverage.
   vulnerable `buildSearch()` output is dead code and cannot be triggered
   through the UI. A lint or unit guard is the only meaningful cover.
 - **Needs SSO/dex infrastructure:** #11229
+
+## Gotcha: reading streamed responses
+
+The logs histogram arrives over `POST /_search_stream?…&is_ui_histogram=true` as
+SSE. Do NOT read it from Playwright's `response` event: Chrome releases the body
+once the app has consumed it, so `response.text()` intermittently fails with
+"No data found for resource" — a test that passes alone and fails in a suite.
+`logs-histogram-severity.spec.js` patches `fetch` via `addInitScript` and
+`tee()`s the stream instead, which is deterministic and leaves the app's
+progressive rendering untouched.
 
 ## Known gaps worth a separate pass
 
