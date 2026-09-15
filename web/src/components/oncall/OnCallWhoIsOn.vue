@@ -36,10 +36,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </OCardSection>
 
     <OCardSection role="body" dense>
+      <!-- The roster comes from a separate call than the record itself, so an
+           empty list is ambiguous mid-fetch — this tells "still loading" apart
+           from "resolved to nobody" before either read that as the same row. -->
+      <div v-if="loading && !positions.length" class="flex flex-col gap-2" data-test="oncall-who-is-on-loading">
+        <OSkeleton type="text" class="h-4 w-1/3" />
+        <OSkeleton type="text" class="h-4 w-2/3" />
+      </div>
+
       <!-- An unstaffed rotation is an emergency while a page is open and a
            plain fact once it is closed, so the colour follows the state. -->
       <p
-        v-if="!positions.length"
+        v-else-if="!positions.length"
         class="text-sm"
         :class="closed ? 'text-text-secondary' : 'text-status-error-text'"
         data-test="oncall-who-is-on-nobody"
@@ -134,6 +142,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
 import { useOnCallClock } from "@/composables/useOnCallClock";
@@ -164,6 +173,8 @@ const props = withDefaults(
     closedAt?: number | null;
     /** Who acked it, once somebody has — the timing itself rides the stat strip above. */
     ackedBy?: string | null;
+    /** Whether `positions` reflects a call still in flight, for the empty-roster skeleton. */
+    loading?: boolean;
   }>(),
   {
     positions: () => [],
@@ -172,6 +183,7 @@ const props = withDefaults(
     handoverTo: null,
     closedAt: null,
     ackedBy: null,
+    loading: false,
   },
 );
 

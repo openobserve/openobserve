@@ -343,6 +343,7 @@
               :handover-to="handoverTo"
               :closed-at="response.closed_at"
               :acked-by="response.acked_by"
+              :loading="onCallPositionsLoading"
             />
 
             <OnCallWhatFired
@@ -788,6 +789,7 @@ const subjectAlert = ref<{
 const escalation = ref<EscalationProgress | null>(null);
 /// Who a page to this team reaches right now, and where the pager goes next.
 const onCallPositions = ref<OnCallPosition[]>([]);
+const onCallPositionsLoading = ref(false);
 const handoverAt = ref<number | null>(null);
 const handoverTo = ref<string | null>(null);
 /// The team's own policy, for the one thing progress cannot say: what the
@@ -1251,24 +1253,29 @@ async function fetchDeliveries() {
 async function fetchTeamContext() {
   const r = response.value;
   if (!r) return;
-  const [slots, policyRes, reach] = await Promise.allSettled([
-    // A closed record is history, and the live rotation is not its history:
-    // hours later the pager has moved on, and the rail named whoever holds it
-    // now as though they had been the one paged. The schedule endpoint answers
-    // as of any instant, so a closed record asks it about its own last moment.
-    oncallService.whoIsOnCall({
-      org_identifier: orgId.value,
-      team_id: r.team_id,
-      at: r.closed_at ?? undefined,
-    }),
-    oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
-    oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
-  ]);
-  onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
-  policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
-  smtpConfigured.value =
-    reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
-  await fetchHandover();
+  onCallPositionsLoading.value = true;
+  try {
+    const [slots, policyRes, reach] = await Promise.allSettled([
+      // A closed record is history, and the live rotation is not its history:
+      // hours later the pager has moved on, and the rail named whoever holds it
+      // now as though they had been the one paged. The schedule endpoint answers
+      // as of any instant, so a closed record asks it about its own last moment.
+      oncallService.whoIsOnCall({
+        org_identifier: orgId.value,
+        team_id: r.team_id,
+        at: r.closed_at ?? undefined,
+      }),
+      oncallService.getPolicy({ org_identifier: orgId.value, team_id: r.team_id }),
+      oncallService.teamReachability({ org_identifier: orgId.value, team_id: r.team_id }),
+    ]);
+    onCallPositions.value = slots.status === "fulfilled" ? (slots.value.data ?? []) : [];
+    policy.value = policyRes.status === "fulfilled" ? (policyRes.value.data ?? null) : null;
+    smtpConfigured.value =
+      reach.status === "fulfilled" ? (reach.value.data?.smtp_configured ?? null) : null;
+    await fetchHandover();
+  } finally {
+    onCallPositionsLoading.value = false;
+  }
 }
 
 /// When the default slot's current span ends, and who inherits it. The
