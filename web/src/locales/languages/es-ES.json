@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Seleccione un campo o utilice una variable como $FieldVariable. Si la secuencia usa una variable, la lista de campos estará vacía; escriba el nombre del campo manualmente.",
     "filterInfoTooltip": "En los filtros, puede usar el valor de otra variable para filtrar el valor de la variable actual. Esto se puede hacer usando el nombre de la otra variable. Por ejemplo:",
     "defaultSelectAll": "Predeterminado: seleccionar todo",
-    "escapeSingleQuotesTooltip": "Si se habilita, se omiten las comillas simples en la consulta. Por ejemplo, un valor como `O'Reilly` se reemplazará por `O\"Reilly`.",
+    "escapeSingleQuotesTooltip": "Las comillas simples siempre se escapan en la consulta. Por ejemplo, un valor como `O'Reilly` se reemplaza por `O''Reilly`.",
     "byDefaultSelect": "Seleccione de forma predeterminada:",
     "firstValue": "Primer valor",
     "allValues": "Todos los valores",
@@ -9613,7 +9613,14 @@
       "agent": "Agente",
       "noAgentsTitle": "No hay agentes en este rango",
       "noAgentsDescription": "No se detectaron agentes GenAI para la ventana de tiempo seleccionada. Pruebe con un rango más amplio o vuelva a la vista de stream.",
-      "viewByStream": "Ver por stream"
+      "viewByStream": "Ver por stream",
+      "search": {
+        "placeholder": "Buscar por usuario o mensaje",
+        "title": "Coincidir con las sesiones cuyo ID de usuario o texto de conversación contenga el texto",
+        "noResultsTitle": "Ninguna sesión coincide con su búsqueda",
+        "noResultsDescription": "Pruebe otro término, otro campo o un rango de tiempo más amplio.",
+        "clear": "Borrar búsqueda"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

@@ -164,7 +164,7 @@ export function usePanelDrilldown({
         let value = obj[key];
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       }
     }
 
@@ -186,7 +186,7 @@ export function usePanelDrilldown({
         }
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       },
     );
   };
@@ -261,7 +261,7 @@ export function usePanelDrilldown({
       : "";
 
     if (breakdownColumn && breakdownValue) {
-      const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
+      const breakdownCondition = `${breakdownColumn} = '${escapeSingleQuotes(String(breakdownValue))}'`;
       whereClause += whereClause ? ` AND ${breakdownCondition}` : ` WHERE ${breakdownCondition}`;
     }
 
@@ -388,8 +388,7 @@ export function usePanelDrilldown({
 
     return replaceVariablePlaceholders(query, variablesByName.keys(), ({ name, format }) => {
       const variable = variablesByName.get(name);
-      const escape = (value: any) =>
-        variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value;
+      const escape = (value: any) => escapeSingleQuotes(String(value));
 
       if (!Array.isArray(variable.value)) {
         return variable.value === null ? "" : `${escape(variable.value)}`;

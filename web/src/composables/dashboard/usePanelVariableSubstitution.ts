@@ -33,7 +33,7 @@ const formatPanelVariableValue = (
   format: VariableFormat | undefined,
   queryType: any,
 ): string => {
-  const escape = (value: any) => (variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value);
+  const escape = (value: any) => escapeSingleQuotes(String(value));
 
   if (!Array.isArray(variable.value)) {
     // If no data found (null value), use SELECT_ALL_VALUE
