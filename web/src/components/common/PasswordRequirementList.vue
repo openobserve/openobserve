@@ -14,30 +14,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  The instance password requirements, ticking as they are met.
-
-  Shared by every form that sets a password so the console cannot state one rule in the reset
-  dialog and a different one in the user form — the rows come from the policy the server enforces,
-  never from a hardcoded list.
--->
 <template>
-  <div v-if="requirements.length > 0">
-    <!-- Progress over the policy's own requirements, not an entropy score: a strength library
-         would routinely disagree with the checklist directly below it. -->
-    <div
+  <div v-if="requirements.length > 0" class="mt-2 flex flex-col gap-2">
+    <!-- Progress over the policy's own requirements, not an entropy score. -->
+    <OProgressBar
       v-if="showStrength"
+      :value="metCount / requirements.length"
+      size="xs"
+      :variant="metCount === requirements.length ? 'success' : 'default'"
       data-test="password-requirements-strength"
-      class="bg-surface-subtle mt-2 h-1 w-full overflow-hidden rounded-full"
-    >
-      <div
-        class="h-full rounded-full transition-all duration-200"
-        :class="metCount === requirements.length ? 'bg-status-positive' : 'bg-accent'"
-        :style="{ width: `${strengthPercent}%` }"
-      />
-    </div>
+    />
 
-    <ul class="mt-2 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
+    <ul class="grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
       <li
         v-for="requirement in requirements"
         :key="requirement.key"
@@ -60,6 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed } from "vue";
 
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { countMetRequirements, type PasswordRequirement } from "@/utils/passwordComplexity";
 
 const props = withDefaults(
@@ -74,10 +63,6 @@ const props = withDefaults(
 );
 
 const metCount = computed(() => countMetRequirements(props.requirements, props.password));
-
-const strengthPercent = computed(() =>
-  props.requirements.length === 0 ? 0 : (metCount.value / props.requirements.length) * 100,
-);
 
 const isMet = (requirement: PasswordRequirement) => requirement.isMet(props.password);
 </script>
