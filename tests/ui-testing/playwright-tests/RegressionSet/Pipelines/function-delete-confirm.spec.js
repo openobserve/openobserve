@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 test.describe("Function delete confirmation", () => {
   test.describe.configure({ mode: 'serial' });
@@ -29,7 +30,7 @@ test.describe("Function delete confirmation", () => {
   test("deleting a function must ask first, and cancelling must keep it", {
     tag: ['@bug-2812', '@P2', '@regression', '@pipelinesRegression', '@pipelinesRegressionFunctions']
   }, async () => {
-    await pm.functionsPage.navigate();
+    await pm.functionsPage.navigate(getOrgIdentifier());
     await pm.functionsPage.searchFunction(functionName);
     await pm.functionsPage.expectFunctionInList(functionName);
 
