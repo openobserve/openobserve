@@ -34,7 +34,8 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 // A function ref, unlike a string ref, still reports null during unmount after this scope has stopped.
-const forwardChatInput = (instance: Element | ComponentPublicInstance | null) => emit("input-ref", instance);
+const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
+  emit("input-ref", instance);
 </script>
 
 <template>
@@ -42,10 +43,7 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
     class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
   >
     <!-- Image preview strip -->
-    <div
-      v-if="pendingImages.length > 0"
-      class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2"
-    >
+    <div v-if="pendingImages.length > 0" class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2">
       <div
         v-for="(img, index) in pendingImages"
         :key="index"
@@ -116,10 +114,7 @@ const forwardChatInput = (instance: Element | ComponentPublicInstance | null) =>
           <OIcon
             :name="autoNavigation ? 'check-circle' : 'radio-button-unchecked'"
             size="sm"
-            :class="[
-              'auto-nav-icon',
-              autoNavigation ? 'text-theme-accent!' : 'text-icon-color',
-            ]"
+            :class="['auto-nav-icon', autoNavigation ? 'text-theme-accent!' : 'text-icon-color']"
           />
           <span
             class="auto-nav-label ms-1 text-xs font-medium"

@@ -106,7 +106,9 @@ describe("O2AIChatMessage", () => {
 
   it("shows the inline loader only for an empty assistant message while loading", () => {
     const empty = { role: "assistant", content: "", blocks: [], contentBlocks: [] };
-    expect(mountMessage(empty, { isLoading: true }).find(".inline-loading").text()).toBe("Thinking");
+    expect(mountMessage(empty, { isLoading: true }).find(".inline-loading").text()).toBe(
+      "Thinking",
+    );
     expect(mountMessage(empty).find(".inline-loading").exists()).toBe(false);
   });
 

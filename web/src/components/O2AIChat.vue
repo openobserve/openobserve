@@ -616,12 +616,7 @@ export default defineComponent({
       handleImageReferenceBackspace,
       openImagePreview,
       closeImagePreview,
-    } = useChatImages(
-      chatInput,
-      inputMessage,
-      () => focusInput(),
-      t,
-    );
+    } = useChatImages(chatInput, inputMessage, () => focusInput(), t);
 
     const contextReferences = ref<ReferenceChip[]>([]);
 

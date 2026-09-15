@@ -29,7 +29,9 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 
 // Positional key shape must match the shell's toggleToolCallExpanded.
-const isExpanded = computed(() => props.expandedKeys.has(`${props.messageIndex}-${props.blockIndex}`));
+const isExpanded = computed(() =>
+  props.expandedKeys.has(`${props.messageIndex}-${props.blockIndex}`),
+);
 
 const formatToolCallMessage = (block: ToolCallBlock) => formatToolCall(block, t);
 
@@ -45,19 +47,13 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
         error: block.success === false && !block.pendingConfirmation,
       },
       {
-        'pending-confirmation':
-          block.pendingConfirmation && block.tool !== 'navigation_action',
+        'pending-confirmation': block.pendingConfirmation && block.tool !== 'navigation_action',
       },
       {
-        'pending-navigation':
-          block.pendingConfirmation && block.tool === 'navigation_action',
+        'pending-navigation': block.pendingConfirmation && block.tool === 'navigation_action',
       },
     ]"
-    @click="
-      hasToolCallDetails(block) &&
-      !block.pendingConfirmation &&
-      emit('toggle')
-    "
+    @click="hasToolCallDetails(block) && !block.pendingConfirmation && emit('toggle')"
   >
     <div class="tool-call-header flex items-center gap-2">
       <OIcon
@@ -100,9 +96,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
       </OIcon>
       <OIcon
         v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
-        :name="
-          isExpanded ? 'expand-less' : 'expand-more'
-        "
+        :name="isExpanded ? 'expand-less' : 'expand-more'"
         size="sm"
         class="expand-icon opacity-60 transition-transform duration-200"
       />
@@ -145,10 +139,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
       </template>
       <!-- Summary details for successful tool calls with summary -->
       <template v-if="block.success !== false && block.summary">
-        <div
-          v-if="block.summary.count !== undefined"
-          class="detail-item flex flex-col gap-1"
-        >
+        <div v-if="block.summary.count !== undefined" class="detail-item flex flex-col gap-1">
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.results")
           }}</span>
@@ -157,10 +148,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             >{{ block.summary.count }} {{ t("aiAssistant.recordsSuffix") }}</span
           >
         </div>
-        <div
-          v-if="block.summary.took !== undefined"
-          class="detail-item flex flex-col gap-1"
-        >
+        <div v-if="block.summary.took !== undefined" class="detail-item flex flex-col gap-1">
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("common.duration")
           }}</span>
@@ -170,10 +158,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
           >
         </div>
         <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
-        <div
-          v-if="block.summary.return_code !== undefined"
-          class="detail-item flex flex-col gap-1"
-        >
+        <div v-if="block.summary.return_code !== undefined" class="detail-item flex flex-col gap-1">
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.exitCode")
           }}</span>
@@ -194,10 +179,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             >{{ block.summary.stdout_lines }} {{ t("aiAssistant.lines") }}</span
           >
         </div>
-        <div
-          v-if="block.summary.stderr_lines"
-          class="detail-item flex flex-col gap-1"
-        >
+        <div v-if="block.summary.stderr_lines" class="detail-item flex flex-col gap-1">
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.stderr")
           }}</span>
@@ -229,9 +211,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="
-              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
-            "
+            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query, t)"
           >
             <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyQuery')" />
@@ -275,9 +255,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
         }}</span>
         <span
           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-          >{{
-            formatTimestamp(getToolCallDisplayData(block.context)?.start_time)
-          }}</span
+          >{{ formatTimestamp(getToolCallDisplayData(block.context)?.start_time) }}</span
         >
       </div>
       <div
@@ -289,9 +267,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
         }}</span>
         <span
           class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
-          >{{
-            formatTimestamp(getToolCallDisplayData(block.context)?.end_time)
-          }}</span
+          >{{ formatTimestamp(getToolCallDisplayData(block.context)?.end_time) }}</span
         >
       </div>
       <div
@@ -342,9 +318,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="
-              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
-            "
+            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)"
           >
             <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyVrl')" />
@@ -367,9 +341,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             variant="ghost"
             size="icon-xs-circle"
             class="copy-btn opacity-60 hover:opacity-100"
-            @click.stop="
-              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
-            "
+            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.command, t)"
           >
             <OIcon name="content-copy" size="sm" />
             <OTooltip :content="t('aiAssistant.copyCommand')" />
@@ -384,17 +356,14 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
       <template v-if="block.response && block.response.hits">
         <div class="detail-item flex flex-col gap-1">
           <div class="detail-header flex items-center justify-between">
-            <span
-              class="detail-label text-2xs font-semibold uppercase opacity-60"
-              >{{ t("aiAssistant.results") }}</span
-            >
+            <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+              t("aiAssistant.results")
+            }}</span>
             <OButton
               variant="ghost"
               size="icon-xs-circle"
               class="copy-btn opacity-60 hover:opacity-100"
-              @click.stop="
-                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
-              "
+              @click.stop="copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)"
             >
               <OIcon name="content-copy" size="sm" />
               <OTooltip :content="t('aiAssistant.copyResults')" />
@@ -424,21 +393,15 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
             >{{ t("aiAssistant.total") }} {{ block.response.total }}</span
           >
           <span v-if="block.response.took !== undefined" class="context-tag"
-            >{{ t("aiAssistant.took") }} {{ block.response.took
-            }}{{ t("aiAssistant.ms") }}</span
+            >{{ t("aiAssistant.took") }} {{ block.response.took }}{{ t("aiAssistant.ms") }}</span
           >
           <span v-if="block.response.hits_truncated" class="context-tag"
-            >{{ t("aiAssistant.showingFirst") }}
-            {{ block.response.hits.length }}</span
+            >{{ t("aiAssistant.showingFirst") }} {{ block.response.hits.length }}</span
           >
         </div>
       </template>
       <!-- Tool response: testFunction input/output -->
-      <template
-        v-else-if="
-          block.response && (block.response.input || block.response.output)
-        "
-      >
+      <template v-else-if="block.response && (block.response.input || block.response.output)">
         <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
           <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
             t("aiAssistant.inputEvents")
@@ -458,9 +421,7 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
               >
                 <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
                 {{
-                  typeof val === "string" && val.length > 120
-                    ? val.substring(0, 120) + "..."
-                    : val
+                  typeof val === "string" && val.length > 120 ? val.substring(0, 120) + "..." : val
                 }}
               </span>
             </div>
@@ -507,28 +468,18 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
       </template>
       <!-- Tool response: list items from normalized { total, items } -->
       <template
-        v-else-if="
-          block.response &&
-          block.response.items &&
-          Array.isArray(block.response.items)
-        "
+        v-else-if="block.response && block.response.items && Array.isArray(block.response.items)"
       >
-        <div
-          v-if="block.response.items.length > 0"
-          class="detail-item flex flex-col gap-1"
-        >
+        <div v-if="block.response.items.length > 0" class="detail-item flex flex-col gap-1">
           <div class="detail-header flex items-center justify-between">
-            <span
-              class="detail-label text-2xs font-semibold uppercase opacity-60"
-              >{{ t("aiAssistant.items") }}</span
-            >
+            <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+              t("aiAssistant.items")
+            }}</span>
             <OButton
               variant="ghost"
               size="icon-xs-circle"
               class="copy-btn opacity-60 hover:opacity-100"
-              @click.stop="
-                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
-              "
+              @click.stop="copyToClipboard(JSON.stringify(block.response.items, null, 2), t)"
             >
               <OIcon name="content-copy" size="sm" />
               <OTooltip :content="t('aiAssistant.copyItems')" />

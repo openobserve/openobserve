@@ -682,7 +682,9 @@ describe("O2AIChat SSE protocol", () => {
       const turn = vm.sendMessage();
       await flushPromises();
 
-      gate.push(sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }));
+      gate.push(
+        sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }),
+      );
       gate.push(
         sse({
           type: "tool_result",
@@ -947,9 +949,7 @@ describe("O2AIChat SSE protocol", () => {
       ]);
       off(events.push as any);
 
-      expect(events).toEqual([
-        { type: "dashboard_created", dashboardId: "d1", folderId: "f1" },
-      ]);
+      expect(events).toEqual([{ type: "dashboard_created", dashboardId: "d1", folderId: "f1" }]);
     });
 
     it("skips the dashboard event when call_args carry no dashboard id", async () => {
@@ -1121,7 +1121,9 @@ describe("O2AIChat SSE protocol", () => {
   describe("error events", () => {
     it("swallows session_owner_unavailable and restores the conversation", async () => {
       mockFetchAiChat
-        .mockResolvedValueOnce(readerResponse([sse({ type: "error", code: "session_owner_unavailable" })]))
+        .mockResolvedValueOnce(
+          readerResponse([sse({ type: "error", code: "session_owner_unavailable" })]),
+        )
         .mockResolvedValueOnce(readerResponse([sse({ type: "message_delta", content: "again" })]));
       vm.inputMessage = "hello";
       await vm.sendMessage();
@@ -1402,10 +1404,7 @@ describe("O2AIChat SSE protocol", () => {
     });
 
     it("treats a fallback-field payload as a delta, with no fence reformatting", async () => {
-      await stream(vm, [
-        sse({ text: "```sql SELECT 1 ```" }),
-        sse({ text: "tail" }),
-      ]);
+      await stream(vm, [sse({ text: "```sql SELECT 1 ```" }), sse({ text: "tail" })]);
 
       expect(blocks(vm)[0].text).toBe("```sql SELECT 1 ```tail");
     });
@@ -1528,10 +1527,7 @@ describe("O2AIChat SSE protocol", () => {
     });
 
     it("skips a data line with no JSON object at all", async () => {
-      await stream(vm, [
-        "data: [DONE]\n\n",
-        sse({ type: "message_delta", content: "after done" }),
-      ]);
+      await stream(vm, ["data: [DONE]\n\n", sse({ type: "message_delta", content: "after done" })]);
 
       expect(blocks(vm)[0].text).toBe("after done");
     });
@@ -1569,7 +1565,9 @@ describe("O2AIChat SSE protocol", () => {
       await flushPromises();
 
       gate.push(sse({ type: "tool_result", tool: "SearchLogs", call_id: "c1", message: "early" }));
-      gate.push(sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }));
+      gate.push(
+        sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }),
+      );
       await flushPromises();
 
       expect(vm.chatMessages).toHaveLength(1);
@@ -1687,7 +1685,9 @@ describe("O2AIChat SSE protocol", () => {
       mockSaveToHistory.mockClear();
 
       // A second turn in the NEW session, so a live-id read would differ.
-      mockFetchAiChat.mockResolvedValueOnce(readerResponse([sse({ type: "message_delta", content: "b" })]));
+      mockFetchAiChat.mockResolvedValueOnce(
+        readerResponse([sse({ type: "message_delta", content: "b" })]),
+      );
       vm.inputMessage = "second question";
       await vm.sendMessage();
       await flushPromises();
@@ -1972,7 +1972,9 @@ describe("O2AIChat SSE protocol", () => {
       const turn = vm.sendMessage();
       await flushPromises();
 
-      gate.push(sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }));
+      gate.push(
+        sse({ type: "tool_call", tool: "SearchLogs", message: "Searching", call_id: "c1" }),
+      );
       await flushPromises();
       expect(vm.activeToolCall).not.toBeNull();
 
@@ -1993,7 +1995,9 @@ describe("O2AIChat SSE protocol", () => {
       const turn = vm.sendMessage();
       await flushPromises();
 
-      gate.push(sse({ type: "tool_call", tool: "DeleteStream", message: "Deleting", call_id: "c1" }));
+      gate.push(
+        sse({ type: "tool_call", tool: "DeleteStream", message: "Deleting", call_id: "c1" }),
+      );
       await flushPromises();
       expect(vm.activeToolCall).not.toBeNull();
 
@@ -2251,9 +2255,7 @@ describe("O2AIChat streaming render throttle", () => {
   });
 
   it("paints a streamed code fence as a highlighted code block", async () => {
-    await stream(vm, [
-      sse({ type: "message_delta", content: "here:\n\n```sql\nSELECT 1\n```\n" }),
-    ]);
+    await stream(vm, [sse({ type: "message_delta", content: "here:\n\n```sql\nSELECT 1\n```\n" })]);
     await wrapper.vm.$nextTick();
 
     const code = wrapper.find(".generated-code-block code");

@@ -32,7 +32,12 @@ const detailed = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
-function mountBlock(block: any, expandedKeys = new Set<string>(), messageIndex = 3, blockIndex = 5) {
+function mountBlock(
+  block: any,
+  expandedKeys = new Set<string>(),
+  messageIndex = 3,
+  blockIndex = 5,
+) {
   return mount(O2AIChatToolCallBlock, {
     global: { plugins: [i18n] },
     props: { block, messageIndex, blockIndex, expandedKeys },
@@ -43,9 +48,21 @@ describe("O2AIChatToolCallBlock", () => {
   beforeEach(() => mockCopy.mockClear());
 
   it("expands only for its own positional key", () => {
-    expect(mountBlock(detailed(), new Set(["3-5"])).find(".tool-call-details").exists()).toBe(true);
-    expect(mountBlock(detailed(), new Set(["5-3"])).find(".tool-call-details").exists()).toBe(false);
-    expect(mountBlock(detailed(), new Set(["3-50"])).find(".tool-call-details").exists()).toBe(false);
+    expect(
+      mountBlock(detailed(), new Set(["3-5"]))
+        .find(".tool-call-details")
+        .exists(),
+    ).toBe(true);
+    expect(
+      mountBlock(detailed(), new Set(["5-3"]))
+        .find(".tool-call-details")
+        .exists(),
+    ).toBe(false);
+    expect(
+      mountBlock(detailed(), new Set(["3-50"]))
+        .find(".tool-call-details")
+        .exists(),
+    ).toBe(false);
   });
 
   it("emits toggle on click only when it has details and is not pending", async () => {
@@ -90,7 +107,9 @@ describe("O2AIChatToolCallBlock", () => {
 
   it("formats microsecond timestamps and copies the query", async () => {
     const w = mountBlock(
-      detailed({ context: { request_body: { query: { sql: "SELECT 2", start_time: 1700000000000000 } } } }),
+      detailed({
+        context: { request_body: { query: { sql: "SELECT 2", start_time: 1700000000000000 } } },
+      }),
       new Set(["3-5"]),
     );
     expect(w.text()).toContain(new Date(1700000000000).toLocaleString());

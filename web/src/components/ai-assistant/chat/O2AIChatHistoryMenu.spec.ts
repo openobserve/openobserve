@@ -25,7 +25,11 @@ vi.mock("@/lib/overlay/Dropdown/ODropdownItem.vue", () => ({
     emits: ["select"],
     setup(_, { slots, emit }) {
       return () =>
-        h("div", { class: "stub-item", onClick: () => emit("select", new Event("select")) }, slots.default?.());
+        h(
+          "div",
+          { class: "stub-item", onClick: () => emit("select", new Event("select")) },
+          slots.default?.(),
+        );
     },
   }),
 }));

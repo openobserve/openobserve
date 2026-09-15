@@ -503,7 +503,14 @@ describe("O2AIChat session, persistence and lifecycle", () => {
 
   describe("feedback", () => {
     const answered = async (v: any, traceId = "trace-abc", text = "q1") =>
-      turn(v, [sse({ type: "message_delta", content: "42 errors" }), sse({ type: "complete", trace_id: traceId })], text);
+      turn(
+        v,
+        [
+          sse({ type: "message_delta", content: "42 errors" }),
+          sse({ type: "complete", trace_id: traceId }),
+        ],
+        text,
+      );
 
     it("submits a thumbs up with the session id, query index and last trace id", async () => {
       await answered(vm);
