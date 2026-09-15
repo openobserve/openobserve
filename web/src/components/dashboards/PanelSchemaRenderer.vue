@@ -136,7 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
-          !loading
+          !loading &&
+          !panelSchema.config?.curated_no_data_eligible
         "
         size="inline"
         icon="bar-chart"

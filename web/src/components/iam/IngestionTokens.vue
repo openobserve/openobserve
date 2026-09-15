@@ -120,6 +120,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OCodeCell :value="toBasicAuth(row.name, row.token)" />
           </template>
 
+          <template #cell-splunk_token="{ row }">
+            <OCodeCell :value="row.splunk_token" :empty-label="t('ingestion.splunkTokenNone')" />
+          </template>
+
           <template #cell-status="{ row }">
             <OTag type="featureStatus" :value="row.enabled ? 'enabled' : 'disabled'" />
           </template>
@@ -129,6 +133,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`ingestion-token-${row.name}-splunk`"
+              :icon-left="row.splunk_token ? 'link-off' : 'link'"
+              :variant="row.splunk_token ? 'ghost-destructive' : 'ghost'"
+              size="icon-sm"
+              :title="
+                row.splunk_token
+                  ? t('ingestion.splunkTokenRevoke')
+                  : t('ingestion.splunkTokenGenerate')
+              "
+              :disabled="loading"
+              @click.stop="setSplunkToken(row.name, !row.splunk_token)"
+            />
             <OButton
               :data-test="`ingestion-token-${row.name}-toggle`"
               :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -173,6 +190,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="mt-4"
           data-test="ingestion-token-description-input"
         />
+        <OFormCheckbox
+          name="splunk_token"
+          :label="t('ingestion.splunkTokenCreateLabel')"
+          class="mt-4"
+          data-test="ingestion-token-splunk-checkbox"
+        />
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("ingestion.splunkTokenCreateHint") }}
+        </div>
       </OForm>
     </ODialog>
 
@@ -197,7 +223,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="text-text-secondary mb-3 text-xs">
         {{ t("ingestion.authHeaderHelp") }}
       </div>
+      <template v-if="revealedToken?.splunk_token">
+        <div class="text-text-label mb-1 text-xs font-medium">
+          {{ t("ingestion.splunkTokenColumn") }}
+        </div>
+        <div
+          class="rounded-default border-border-default bg-surface-subtle mb-3 border border-dashed p-2.5"
+        >
+          <code class="font-mono text-sm break-all">{{ revealedToken.splunk_token }}</code>
+        </div>
+        <div class="text-text-label mb-1 text-xs font-medium">
+          {{ t("ingestion.splunkHecUrlLabel") }}
+        </div>
+        <div
+          class="rounded-default border-border-default bg-surface-subtle mb-1 border border-dashed p-2.5"
+        >
+          <code class="font-mono text-sm break-all">{{ hecUrl }}</code>
+        </div>
+        <div class="text-text-secondary mb-3 text-xs">
+          {{ t("ingestion.splunkHecUrlHelp") }}
+        </div>
+      </template>
       <div class="flex justify-end gap-2">
+        <OButton
+          v-if="revealedToken?.splunk_token"
+          variant="outline"
+          size="sm-action"
+          icon="content-copy"
+          data-test="copy-splunk-token-btn"
+          @click="copyToken(revealedToken?.splunk_token || '')"
+        >
+          {{ t("ingestion.splunkTokenColumn") }}
+        </OButton>
         <OButton
           variant="outline"
           size="sm-action"
@@ -223,6 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { useQuery } from "@tanstack/vue-query";
 import {
   createIngestionTokenMutation,
+  setIngestionSplunkTokenMutation,
   setIngestionTokenEnabledMutation,
 } from "@/services/organizations.queries";
 import { useOrgId } from "@/composables/query/useOrgId";
@@ -239,6 +297,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -255,6 +314,7 @@ import { getBasicAuth } from "@/utils/auth";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 interface Token {
   name: string;
@@ -264,6 +324,7 @@ interface Token {
   enabled: boolean;
   created_by: string;
   created_at: number;
+  splunk_token?: string | null;
 }
 
 export default defineComponent({
@@ -278,6 +339,7 @@ export default defineComponent({
     ODialog,
     OForm,
     OFormInput,
+    OFormCheckbox,
     OTable,
     OTag,
     OCodeCell,
@@ -315,7 +377,12 @@ export default defineComponent({
     const filterQuery = ref("");
     const showCreateForm = ref(false);
     const showRevealedDialog = ref(false);
-    const revealedToken = ref<{ name: string; token: string } | null>(null);
+    const revealedToken = ref<{ name: string; token: string; splunk_token?: string } | null>(null);
+    const { confirm } = useConfirmDialog();
+
+    // Splunk forwarders take a bare host, so the collector is always at the
+    // server root — never under a base URI.
+    const hecUrl = computed(() => `${window.location.origin}/services/collector`);
 
     // Ready-to-paste "Basic base64(name:token)" credential shown in the
     // "New Token Generated" dialog (restored — the merge auto-drop lost it).
@@ -347,6 +414,16 @@ export default defineComponent({
         meta: { align: "left" },
       },
       {
+        id: "splunk_token",
+        header: t("ingestion.splunkTokenColumn"),
+        accessorKey: "splunk_token",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 300,
+        meta: { align: "left" },
+      },
+      {
         id: "status",
         header: t("ingestion.tokenStatus"),
         accessorKey: "enabled",
@@ -371,8 +448,8 @@ export default defineComponent({
         accessorKey: "actions",
         sortable: false,
         isAction: true,
-        size: 80,
-        meta: { align: "center", actionCount: 1 },
+        size: 120,
+        meta: { align: "center", actionCount: 2 },
       },
     ];
 
@@ -409,6 +486,9 @@ export default defineComponent({
     const setIngestionTokenEnabled = useMutation(() =>
       setIngestionTokenEnabledMutation(orgIdForWrites.value),
     );
+    const setIngestionSplunkToken = useMutation(() =>
+      setIngestionSplunkTokenMutation(orgIdForWrites.value),
+    );
 
     const createToken = async (value: CreateTokenForm) => {
       loading.value = true;
@@ -416,10 +496,12 @@ export default defineComponent({
         const res = await createIngestionToken.mutateAsync({
           name: value.name.trim(),
           description: (value.description ?? "").trim(),
+          splunk_token: value.splunk_token ?? false,
         });
         revealedToken.value = {
           name: value.name.trim(),
           token: res.data.data.token,
+          splunk_token: res.data.data.splunk_token ?? undefined,
         };
         showCreateForm.value = false;
         showRevealedDialog.value = true;
@@ -458,6 +540,41 @@ export default defineComponent({
         toast({
           variant: "error",
           message: e.response?.data?.message || t("iam.ingestionTokensPage.tokenUpdateError"),
+          timeout: 5000,
+        });
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const setSplunkToken = async (name: string, generate: boolean) => {
+      if (!generate) {
+        const confirmed = await confirm({
+          title: t("ingestion.splunkTokenRevokeTitle"),
+          message: t("ingestion.splunkTokenRevokeMessage"),
+          confirmLabel: t("ingestion.splunkTokenRevoke"),
+          cancelLabel: t("common.cancel"),
+        });
+        if (!confirmed) return;
+      }
+      loading.value = true;
+      try {
+        await setIngestionSplunkToken.mutateAsync({
+          name,
+          action: generate ? "generate" : "revoke",
+        });
+        await fetchTokens();
+        toast({
+          variant: "success",
+          message: generate
+            ? t("ingestion.splunkTokenGenerated")
+            : t("ingestion.splunkTokenRevoked"),
+          timeout: 3000,
+        });
+      } catch (e: any) {
+        toast({
+          variant: "error",
+          message: e.response?.data?.message || t("ingestion.splunkTokenError"),
           timeout: 5000,
         });
       } finally {
@@ -521,6 +638,8 @@ export default defineComponent({
       createTokenSchema,
       createTokenDefaults,
       toggleEnabled,
+      setSplunkToken,
+      hecUrl,
       copyToken,
       toBasicAuth,
     };
