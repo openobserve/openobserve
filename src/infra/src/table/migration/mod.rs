@@ -490,7 +490,10 @@ mod tests {
     const VERSION_COVERAGE: &[(u64, &str)] = &[
         (78, "m20260827_000001_drop_table_action_scripts"),
         (79, "m20260831_000001_add_exhausted_at_to_oncall_responses"),
-        (80, "m20260911_000001_add_splunk_token_to_org_ingestion_tokens"),
+        (
+            80,
+            "m20260911_000001_add_splunk_token_to_org_ingestion_tokens",
+        ),
         (81, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
     ];
 

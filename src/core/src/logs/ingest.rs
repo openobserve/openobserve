@@ -1299,6 +1299,7 @@ mod tests {
         let all_dropped = RecordStatus {
             successful: 0,
             failed: 1000,
+            policy_dropped: 1000,
             error: "Too old data, only last 5 hours data can be ingested".to_string(),
         };
         assert!(is_wholly_discarded(&all_dropped));
@@ -1311,6 +1312,7 @@ mod tests {
         let partial = RecordStatus {
             successful: 57,
             failed: 6_567,
+            policy_dropped: 6_567,
             error: "Too old data".to_string(),
         };
         assert!(!is_wholly_discarded(&partial));
@@ -1318,6 +1320,7 @@ mod tests {
         assert!(!is_wholly_discarded(&RecordStatus {
             successful: 10,
             failed: 0,
+            policy_dropped: 0,
             error: String::new(),
         }));
     }
