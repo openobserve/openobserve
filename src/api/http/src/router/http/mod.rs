@@ -160,14 +160,7 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
     }
 
     let nodes = order_nodes(nodes);
-    // The collector is mounted at the server root on the ingester, outside the
-    // base_uri nest, so its path must be forwarded unchanged.
-    let full_path = if is_splunk_collector_route(api_path) {
-        api_path.to_string()
-    } else {
-        format!("{}{}", base_uri, path)
-    };
-    Ok((full_path, nodes))
+    Ok((format!("{}{}", base_uri, path), nodes))
 }
 
 /// Orders the candidate nodes so the preferred node (per dispatch strategy) is
@@ -805,7 +798,8 @@ pub fn create_splunk_collector_proxy_routes() -> axum::Router {
     // reachable on a router node too.
     axum::Router::new()
         .route("/services/collector", any(dispatch))
-        .route("/services/collector/{*path}", any(dispatch))
+        .route("/services/collector/event", any(dispatch))
+        .route("/services/collector/health", any(dispatch))
 }
 
 #[cfg(test)]

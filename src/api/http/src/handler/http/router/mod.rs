@@ -1979,10 +1979,14 @@ pub fn other_service_routes() -> Router {
         .nest("/rum", rum_routes)
 }
 
-/// Splunk-compatible HEC collector routes, served at the server root.
+/// Splunk-compatible HEC collector routes.
 ///
-/// These must NOT be nested under `base_uri`: Splunk forwarders are configured
-/// with a bare host and always POST to `/services/collector`.
+/// Registered like every other route, so a `ZO_BASE_URI` deployment serves them
+/// at `{base_uri}/services/collector`. Mounting them at the server root instead
+/// would not help there: base_uri exists because a load balancer forwards only
+/// `{base_uri}/*` to OpenObserve, so a root path never reaches the process.
+/// Splunk forwarders send to a bare host and so require a deployment without
+/// base_uri, which is the default.
 pub fn splunk_collector_routes() -> Router {
     use logs::hec_collector;
 
@@ -2042,11 +2046,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         }
 
         // basic_routes are at root level (not under base_uri)
-        Router::new().merge(basic_routes()).merge(router_routes)
+        Router::new()
+            .merge(basic_routes())
+            // Exactly one shape may claim the collector path: merging a proxy
+            // route and a local route onto it gives axum two fallbacks and
+            // panics at startup.
+            .merge(crate::router::http::create_splunk_collector_proxy_routes())
+            .merge(router_routes)
     } else {
         // Non-router node: use direct service routes
         Router::new()
             .merge(basic_routes())
+            .merge(splunk_collector_routes())
             .nest("/config", config_routes())
             .nest("/api", service_routes())
             .merge(other_service_routes())
@@ -2090,17 +2101,6 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             );
         }
         outer
-    };
-
-    // Registered here, AFTER the base_uri nest, because `basic_routes()` is
-    // merged into `app` and `app` is what gets nested — mounting alongside it
-    // would produce `{base_uri}/services/collector`, which no forwarder calls.
-    // Exactly one of the two shapes may claim the path: merging a proxy route
-    // and a local route onto it gives axum two fallbacks and panics at startup.
-    outer = if config::cluster::LOCAL_NODE.is_router() {
-        outer.merge(crate::router::http::create_splunk_collector_proxy_routes())
-    } else {
-        outer.merge(splunk_collector_routes())
     };
 
     // Must be the LAST `.layer()` call in this function: `Router::layer` only
@@ -2340,27 +2340,29 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn collector_stays_at_root_when_a_base_uri_nest_is_applied() {
-        // D4/§8.3: the collector is merged AFTER the base_uri nest, so it must
-        // answer at /services/collector and NOT at {base_uri}/services/collector.
-        let nested = Router::new().nest("/o2", Router::new().route("/ping", get(|| async { "" })));
-        let app = nested.merge(splunk_collector_routes());
-
-        let req = Request::builder()
-            .uri("/services/collector/health")
-            .body(Body::empty())
-            .unwrap();
-        assert_eq!(
-            app.clone().oneshot(req).await.unwrap().status(),
-            StatusCode::OK
-        );
+    async fn collector_is_served_under_base_uri_like_every_other_route() {
+        // base_uri exists because a load balancer forwards only `{base_uri}/*`
+        // to us, so a root-mounted path would never reach the process anyway.
+        // Nesting the collector with everything else is what keeps the proxy
+        // hop free of a path special case -- the special case is what let an
+        // encoded dot segment escape the mount.
+        let nested = Router::new().nest("/o2", splunk_collector_routes());
 
         let req = Request::builder()
             .uri("/o2/services/collector/health")
             .body(Body::empty())
             .unwrap();
         assert_eq!(
-            app.oneshot(req).await.unwrap().status(),
+            nested.clone().oneshot(req).await.unwrap().status(),
+            StatusCode::OK
+        );
+
+        let req = Request::builder()
+            .uri("/services/collector/health")
+            .body(Body::empty())
+            .unwrap();
+        assert_eq!(
+            nested.oneshot(req).await.unwrap().status(),
             StatusCode::NOT_FOUND
         );
     }
