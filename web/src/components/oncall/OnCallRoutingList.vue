@@ -238,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="catchAllOptions"
                 :placeholder="t('oncall.defaultTeamPlaceholder')"
                 data-test="oncall-routing-catch-all-select"
-                @update:model-value="(v: unknown) => (catchAllDraft = String(v))"
+                @update:model-value="(v: unknown) => (catchAllDraft = v === null ? null : String(v))"
               />
               <span class="flex justify-end gap-2">
                 <OButton variant="outline" size="sm-action" @click="catchAllOpen = false">
@@ -248,7 +248,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="primary"
                   size="sm-action"
                   :loading="savingDefault"
-                  :disabled="catchAllDraft === (defaultTeamId ?? '')"
+                  :disabled="catchAllDraft === (defaultTeamId ?? null)"
                   data-test="oncall-routing-catch-all-save"
                   @click="saveCatchAll"
                 >
@@ -544,7 +544,7 @@ const { t } = useI18nTyped();
 /// the same list is the bug this shape makes impossible.
 const editorFor = ref<string | null>(null);
 const catchAllOpen = ref(false);
-const catchAllDraft = ref("");
+const catchAllDraft = ref<string | null>(null);
 const reviewOpen = ref(false);
 
 /// Most specific first, which is the order the engine consults them in. The
@@ -605,7 +605,7 @@ const unclaimedNames = computed<{ text: string; strong: boolean }[]>(() => {
 });
 
 const catchAllOptions = computed(() => [
-  { label: t("oncall.defaultTeamNone"), value: "" },
+  { label: t("oncall.defaultTeamNone"), value: null },
   ...props.teams.map((team) => ({ label: raw(team.name), value: team.id })),
 ]);
 
@@ -622,10 +622,9 @@ const claimingDimensions = computed(() => {
   return signal ? claimableDimensions(signal) : null;
 });
 
-/// `""` means "none" in the picker; the wire value is null. Re-seeded on open
-/// so a cancelled edit does not come back as the draft next time.
+/// Re-seeded on open so a cancelled edit does not come back as the draft next time.
 watch(catchAllOpen, (open) => {
-  if (open) catchAllDraft.value = props.defaultTeamId ?? "";
+  if (open) catchAllDraft.value = props.defaultTeamId ?? null;
 });
 
 function setEditor(id: string | null) {
@@ -648,7 +647,7 @@ function remove() {
 
 function saveCatchAll() {
   catchAllOpen.value = false;
-  emit("set-default", catchAllDraft.value || null);
+  emit("set-default", catchAllDraft.value);
 }
 
 function displayOf(name: string): string {
