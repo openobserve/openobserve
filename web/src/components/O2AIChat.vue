@@ -401,12 +401,9 @@ import {
 import {
   formatContextKey,
   formatContextValue,
-  formatToolCallMessage as formatToolCall,
-  formatTimestamp as formatToolCallTimestamp,
   getToolCallDisplayData,
   hasToolCallDetails,
   truncateQuery,
-  type ToolCallBlock,
 } from "@/components/O2AIChat.toolcall";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
@@ -2530,10 +2527,6 @@ export default defineComponent({
       return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
     };
 
-    const formatToolCallMessage = (block: ToolCallBlock) => formatToolCall(block, t);
-
-    const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp, t);
-
     const likeCodeBlock = async (messageIndex: number) => {
       const message = chatMessages.value[messageIndex];
       if (!message || message.feedback === "thumbs_up") return;
@@ -2584,9 +2577,6 @@ export default defineComponent({
       return isDark.value
         ? getImageURL("images/common/o2_ai_logo_dark.svg")
         : getImageURL("images/common/o2_ai_logo.svg");
-    });
-    const getGenerateAiIcon = computed(() => {
-      return getImageURL("images/common/ai_icon_dark.svg");
     });
 
     return {
@@ -2651,7 +2641,6 @@ export default defineComponent({
       dislikeCodeBlock,
       currentChatTimestamp,
       o2AiTitleLogo,
-      getGenerateAiIcon,
       saveHistoryLoading,
       historySearchTerm,
       filteredChatHistory,
@@ -2671,8 +2660,6 @@ export default defineComponent({
       isToolCallExpanded,
       hasToolCallDetails,
       getToolCallDisplayData,
-      formatToolCallMessage,
-      formatTimestamp,
       formatContextValue,
       expandedLogEntries,
       toggleLogEntryExpanded,
