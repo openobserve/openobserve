@@ -75,9 +75,11 @@ const useManagementRoutes = () => {
     path: "synthetics_locations",
     name: "syntheticsLocations",
     component: () => import("@/components/settings/SyntheticsLocationsList.vue"),
+    // Locations are set up before the first check can run, so an empty org must reach this.
     meta: {
       keepAlive: true,
       titleKey: "routeTitles.syntheticsLocations",
+      allowOnEmptyData: true,
     },
     beforeEnter(to: any, from: any, next: any) {
       routeGuard(to, from, next);

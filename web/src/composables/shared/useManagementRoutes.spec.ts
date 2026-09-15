@@ -413,7 +413,17 @@ describe("useManagementRoutes", () => {
       expect(synthRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "routeTitles.syntheticsLocations",
+        allowOnEmptyData: true,
       });
+    });
+
+    // Locations are a prerequisite of the first check, so the empty-data gate must not block them.
+    it("should flag the syntheticsLocations route as allowOnEmptyData", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(synthRoute.meta?.allowOnEmptyData).toBe(true);
     });
 
     // Synthetics ships in OSS, so the route registers in every build — the
