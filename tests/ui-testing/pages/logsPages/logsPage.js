@@ -12445,21 +12445,22 @@ export class LogsPage {
         testLogger.info(`VRL function set to: ${code}`);
     }
 
-    // The list is virtualised, so a recycled-row bug only surfaces after a scroll away and back.
-    /** Labels of the first rendered stream options after scrolling the popover to the end and back. */
+    // The fix resets the virtual scroll on close, so the reopen is what proves it.
+    /** Labels of the first stream options after scrolling the popover to the end, closing and reopening it. */
     async getStreamListTopLabelsAfterScroll() {
-        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+
         await trigger.waitFor({ state: 'visible', timeout: 15000 });
         await trigger.click();
-
-        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
         await options.first().waitFor({ state: 'visible', timeout: 15000 });
+        await options.last().scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(500);
 
-        const last = options.last();
-        await last.scrollIntoViewIfNeeded();
-        await this.page.waitForTimeout(500);
-        await options.first().scrollIntoViewIfNeeded();
-        await this.page.waitForTimeout(500);
+        await this.page.keyboard.press('Escape');
+        await options.first().waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
+        await trigger.click();
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
 
         const labels = [];
         const sampled = Math.min(await options.count(), 3);
@@ -12468,6 +12469,21 @@ export class LogsPage {
         }
         await this.page.keyboard.press('Escape');
         return labels;
+    }
+
+    // The bubble mounts lazily on hover, so an empty string means the tooltip never rendered.
+    /** Text of the stream-select tooltip after hovering its trigger. */
+    async getStreamSelectTooltipText() {
+        const trigger = this.page.locator(this.indexDropDownTrigger).first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.hover();
+        const bubble = this.page.locator('[data-test="o-tooltip-content"]:visible').first();
+        const appeared = await bubble
+            .waitFor({ state: 'visible', timeout: 4000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!appeared) return '';
+        return ((await bubble.textContent()) ?? '').trim();
     }
 
     // The buttons are gated on the column being a real schema field, which is the whole of #9550.
