@@ -544,6 +544,7 @@ export default defineComponent({
     // via <OForm :form="form"> — ONE source of truth. The schema takes a context
     // GETTER so a single stable instance follows mode flips (e.g. the 422
     // add-existing → create-new switch) with no remount.
+
     // The instance policy, not a hardcoded rule: a fixed mirror would drift from what the server enforces.
     const {
       complexity: passwordComplexity,

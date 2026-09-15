@@ -352,7 +352,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 ### OSettingRow
 **Import:** `@/lib/core/SettingRow/OSettingRow.vue`
 **Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own).
-**Don't use for:** Form fields with a label above the control — use `OFormField`/`OFormInput` directly.
+**Don't use for:** Form fields with a label above the control — use `OFormInput` directly.
 **Key props:**
 - `label` (`I18nText`, required — the setting's name)
 - `description` (`I18nText` — one line saying what the setting does or what a special value means)
@@ -368,7 +368,7 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
   :description="t('passwordPolicy.minLengthDesc')"
   data-test="settings-password-policy-min-length"
 >
-  <OFormInput name="min_length" type="number" :min="1" class="w-24" />
+  <OFormInput name="min_length" type="number" class="w-24" />
 </OSettingRow>
 ```
 **Family:** Pair with `OFormSection`, which supplies the card.

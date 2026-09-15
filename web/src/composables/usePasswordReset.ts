@@ -71,7 +71,7 @@ export function usePasswordReset() {
 
   /** A write was refused under restrict_writes: explain once, and offer the way out. */
   const promptRestricted = async (nextReason?: string) => {
-    if (restrictedPromptPending) return;
+    if (isOpen.value || restrictedPromptPending) return;
     restrictedPromptPending = true;
     const why = serverReason(nextReason);
     try {
