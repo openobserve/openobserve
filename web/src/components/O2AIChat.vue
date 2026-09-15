@@ -1360,38 +1360,29 @@ import {
   watch,
   computed,
   onUnmounted,
+  type Ref,
 } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, useRoute } from "vue-router";
 import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
-import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import "highlight.js/styles/github-dark.css";
-import { marked } from "marked";
-import { MarkedOptions } from "marked";
-import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
 import useAiChat from "@/composables/useAiChat";
 import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
-import { chartColor } from "@/utils/chartTheme";
-import {
-  ChatMessage,
-  ChatHistoryEntry,
-  ContentBlock,
-  NavigationAction,
-  ImageAttachment,
-  MAX_IMAGE_SIZE_BYTES,
-  ALLOWED_IMAGE_TYPES,
-} from "@/ts/interfaces/chat";
+import { ChatMessage, ContentBlock, NavigationAction } from "@/ts/interfaces/chat";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
 import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
 import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
 import { useChatHistory } from "@/composables/useChatHistory";
+import { useChatImages } from "@/composables/useChatImages";
+import { useChatHistoryList } from "@/composables/useChatHistoryList";
+import { useTypewriter } from "@/composables/useTypewriter";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { useAiDashboardEvents, getDashboardEventType } from "@/composables/useAiDashboardEvents";
+import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import OButton from "@/lib/core/Button/OButton.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -1406,39 +1397,42 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
+import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
+import { extractFrames, extractTailFrames } from "@/components/O2AIChat.framing";
+import {
+  reduce,
+  type ReducerCtx,
+  type StreamEffect,
+  type StreamPhase,
+  type StreamState,
+} from "@/components/O2AIChat.reducer";
+import {
+  buildNavigationRoute,
+  generateNavigationFromToolResult as generateNavigation,
+  navigationPageName,
+} from "@/components/O2AIChat.navigation";
+import {
+  createPreview,
+  formatLogEntryContent,
+  getLanguageDisplay,
+  parseLogEntries,
+  processHtmlBlock,
+  processMessageContent,
+  processTextBlock,
+  renderMarkdown,
+} from "@/components/O2AIChat.content";
+import {
+  formatContextKey,
+  formatContextValue,
+  formatToolCallMessage as formatToolCall,
+  getToolCallDisplayData,
+  hasToolCallDetails,
+  truncateQuery,
+  type ToolCallBlock,
+} from "@/components/O2AIChat.toolcall";
 
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
-
-// Register VRL as a JavaScript alias (type assertion)
-hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
-
-// Configure marked options with custom language support
-const markedOptions = {
-  breaks: true,
-  gfm: true,
-  langPrefix: "hljs language-",
-  headerIds: false,
-  mangle: false,
-  sanitize: false, // Allow HTML in markdown
-  highlight: (code: string, lang: string) => {
-    if (lang === "vrl") {
-      return hljs.highlight(code, { language: "javascript" }).value;
-    }
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value;
-    }
-    return hljs.highlightAuto(code).value;
-  },
-} as MarkedOptions;
-
-marked.setOptions(markedOptions);
-
-// Function to render markdown content
-function renderMarkdown(content: any) {
-  return marked.parse(content);
-}
 
 // --- Shared, cross-instance streaming registry ---
 // O2AIChat is instantiated more than once (the Home page's inline AI tab and
@@ -1551,9 +1545,6 @@ export default defineComponent({
     const chatInput = ref<any>(null); // RichTextInput component instance
     const currentStreamingMessage = ref("");
     const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
-    const showHistory = ref(false);
-    // `model` is stored on persisted entries but missing from the shared interface
-    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
@@ -1602,20 +1593,8 @@ export default defineComponent({
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
-    const historySearchTerm = ref("");
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
-
-    // Edit title state
-    const showEditTitleDialog = ref(false);
-    const editingTitle = ref("");
-
-    // Clear all confirmation state
-    const showClearAllConfirmDialog = ref(false);
-
-    // Delete individual chat confirmation state
-    const showDeleteChatConfirmDialog = ref(false);
-    const chatToDelete = ref<number | null>(null);
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{
@@ -1649,11 +1628,50 @@ export default defineComponent({
       },
     });
 
-    // AI-generated chat title state
-    const aiGeneratedTitle = ref<string | null>(null);
-    const displayedTitle = ref<string>("");
-    const isTypingTitle = ref(false);
-    const titleAnimationId = ref<number>(0); // Used to cancel stale animations
+    const {
+      currentAnalyzingMessage,
+      startAnalyzingRotation,
+      stopAnalyzingRotation,
+      aiGeneratedTitle,
+      displayedTitle,
+      isTypingTitle,
+      animateTitle,
+      resetTitleState,
+      clearTitleInterval,
+      displayedStreamingContent,
+      typewriterAnimationId,
+      resetTypewriterState,
+      animateStreamingText,
+    } = useTypewriter(currentTextSegment, t);
+
+    const {
+      showHistory,
+      chatHistory,
+      historySearchTerm,
+      filteredChatHistory,
+      loadHistory,
+      openHistory,
+      showEditTitleDialog,
+      editingTitle,
+      openEditTitleDialog,
+      saveEditedTitle,
+      showDeleteChatConfirmDialog,
+      chatToDelete,
+      deleteChat,
+      confirmDeleteChat,
+      showClearAllConfirmDialog,
+      clearAllConversations,
+      confirmClearAllConversations,
+    } = useChatHistoryList({
+      loadHistoryFromDb: dbLoadHistory,
+      deleteChatById: dbDeleteChatById,
+      clearAllHistory: dbClearAllHistory,
+      updateChatTitle: dbUpdateChatTitle,
+      currentChatId,
+      displayedTitle,
+      aiGeneratedTitle,
+      addNewChat: () => addNewChat(),
+    });
 
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
@@ -1678,21 +1696,30 @@ export default defineComponent({
     // Home tab keeps rendering after navigating to a page where the sidebar
     // instance takes over. See the comment on their declaration for why.
 
-    // Typewriter animation state for LLM responses
-    const displayedStreamingContent = ref("");
-    const typewriterAnimationId = ref<number | null>(null);
-    const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
-
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
     const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
 
-    // Pending images for current message
-    const pendingImages = ref<ImageAttachment[]>([]);
-    const imageInputRef = ref<HTMLInputElement | null>(null);
-    // Image preview dialog state
-    const showImagePreview = ref(false);
-    const previewImage = ref<ImageAttachment | null>(null);
+    const {
+      pendingImages,
+      imageInputRef,
+      showImagePreview,
+      previewImage,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      clearPendingImages,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      openImagePreview,
+      closeImagePreview,
+    } = useChatImages(
+      chatInput,
+      inputMessage,
+      () => focusInput(),
+      t,
+    );
 
     // Context references for rich text input chips
     const contextReferences = ref<ReferenceChip[]>([]);
@@ -1704,178 +1731,6 @@ export default defineComponent({
     // Set true in onUnmounted so watchers firing during teardown don't re-attach
     // a just-detached stream back to this dying instance (see chatUpdated watch).
     const isUnmounting = ref(false);
-
-    // Analyzing messages for loading indicator
-    const ANALYZING_MESSAGES = [
-      t("aiAssistant.aiChat.analyzingMessages.analyzing"),
-      t("aiAssistant.aiChat.analyzingMessages.thinking"),
-      t("aiAssistant.aiChat.analyzingMessages.processing"),
-      t("aiAssistant.aiChat.analyzingMessages.examiningData"),
-      t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
-      t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
-      t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
-      t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
-      t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
-      t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
-      t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
-      t("aiAssistant.aiChat.analyzingMessages.almostThere"),
-      t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
-      t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
-      t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
-      t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
-      t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
-      t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
-      t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
-      t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
-    ];
-    const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
-    const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
-
-    /**
-     * Start rotating the analyzing message every 5 seconds
-     */
-    const startAnalyzingRotation = () => {
-      currentAnalyzingMessage.value =
-        ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
-      analyzingRotationInterval.value = setInterval(() => {
-        currentAnalyzingMessage.value =
-          ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
-      }, 5000);
-    };
-
-    /**
-     * Stop rotating the analyzing message
-     */
-    const stopAnalyzingRotation = () => {
-      if (analyzingRotationInterval.value) {
-        clearInterval(analyzingRotationInterval.value);
-        analyzingRotationInterval.value = null;
-      }
-    };
-
-    // Interval ID for title animation
-    let titleIntervalId: ReturnType<typeof setInterval> | null = null;
-
-    /**
-     * Animate title with typewriter effect
-     * Characters appear one by one from left to right
-     * Uses setInterval for reliable timing with Vue reactivity
-     */
-    const animateTitle = (title: string) => {
-      // Clear any existing animation
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
-
-      // Increment animation ID to track this animation
-      const currentAnimationId = ++titleAnimationId.value;
-
-      isTypingTitle.value = true;
-      displayedTitle.value = "";
-      let charIndex = 0;
-
-      titleIntervalId = setInterval(() => {
-        // Check if this animation was superseded
-        if (titleAnimationId.value !== currentAnimationId) {
-          if (titleIntervalId) {
-            clearInterval(titleIntervalId);
-            titleIntervalId = null;
-          }
-          return;
-        }
-
-        if (charIndex < title.length) {
-          displayedTitle.value = title.slice(0, charIndex + 1);
-          charIndex++;
-        } else {
-          // Animation complete
-          if (titleIntervalId) {
-            clearInterval(titleIntervalId);
-            titleIntervalId = null;
-          }
-          isTypingTitle.value = false;
-        }
-      }, 30); // 30ms per character
-    };
-
-    /**
-     * Reset title state for new chat
-     */
-    const resetTitleState = () => {
-      // Cancel any ongoing animation
-      titleAnimationId.value++;
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
-      aiGeneratedTitle.value = null;
-      displayedTitle.value = "";
-      isTypingTitle.value = false;
-    };
-
-    /**
-     * Reset typewriter animation state
-     */
-    const resetTypewriterState = () => {
-      displayedStreamingContent.value = "";
-      if (typewriterAnimationId.value) {
-        cancelAnimationFrame(typewriterAnimationId.value);
-        typewriterAnimationId.value = null;
-      }
-    };
-
-    /**
-     * Animate text reveal with typewriter effect
-     * Skips animation for code blocks (reveals them instantly)
-     */
-    const animateStreamingText = () => {
-      const target = currentTextSegment.value;
-      const current = displayedStreamingContent.value;
-
-      if (current.length >= target.length) {
-        // Caught up, stop animation
-        if (typewriterAnimationId.value) {
-          cancelAnimationFrame(typewriterAnimationId.value);
-          typewriterAnimationId.value = null;
-        }
-        return;
-      }
-
-      // Check if we're at the start of a code block - if so, skip to end of code block
-      const remaining = target.slice(current.length);
-      const codeBlockStart = remaining.match(/^```[\w]*/);
-
-      if (codeBlockStart) {
-        // Find the closing ``` and reveal entire code block instantly
-        const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
-        if (codeBlockEnd !== -1) {
-          const endPos = codeBlockEnd + 3;
-          displayedStreamingContent.value = target.slice(0, current.length + endPos);
-        } else {
-          // Code block not complete yet, reveal opening and wait
-          displayedStreamingContent.value = target.slice(
-            0,
-            current.length + codeBlockStart[0].length,
-          );
-        }
-      } else {
-        // Regular text - reveal one character per tick when caught up, but
-        // catch up faster when a backlog has built up (e.g. the backend
-        // delivered a large chunk in one burst). Without this, a fixed
-        // 1-char-per-tick reveal can lag the actual stream by many seconds
-        // on bursty responses, then "snap" to the full text once the stream
-        // ends and the remaining backlog is force-flushed.
-        const backlog = remaining.length;
-        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
-        displayedStreamingContent.value = target.slice(0, current.length + revealCount);
-      }
-
-      // Schedule next frame
-      typewriterAnimationId.value = requestAnimationFrame(() => {
-        setTimeout(animateStreamingText, TYPEWRITER_SPEED);
-      });
-    };
 
     // Query history functionality
     const queryHistory = ref<string[]>([]);
@@ -2059,47 +1914,6 @@ export default defineComponent({
       }
     };
 
-    // Helper to create a better preview of content
-    const createPreview = (content: string, maxLength: number = 40): string => {
-      // Clean up content
-      let preview = content.trim();
-
-      // Try to detect JSON and create a meaningful preview
-      try {
-        const parsed = JSON.parse(content);
-        if (typeof parsed === "object" && parsed !== null) {
-          // For objects, show first few keys
-          const keys = Object.keys(parsed);
-          if (keys.length > 0) {
-            const firstKeys = keys
-              .slice(0, 3)
-              .map((k) => {
-                const val = parsed[k];
-                if (typeof val === "string") {
-                  const truncatedVal = val.length > 8 ? val.substring(0, 8) + "..." : val;
-                  return k + ': "' + truncatedVal + '"';
-                }
-                return k + ": " + String(val).substring(0, 8);
-              })
-              .join(", ");
-            const moreKeys = keys.length > 3 ? ", ..." : "";
-            preview = "{" + firstKeys + moreKeys + "}";
-          }
-        }
-      } catch {
-        // Not JSON, use plain text preview
-        // Replace newlines and multiple spaces with single space
-        preview = preview.replace(/\s+/g, " ");
-      }
-
-      // Truncate if still too long
-      if (preview.length > maxLength) {
-        preview = preview.substring(0, maxLength) + "...";
-      }
-
-      return preview;
-    };
-
     watch(
       () => props.aiChatInputContext,
       (newAiChatInputContext: string) => {
@@ -2175,38 +1989,6 @@ export default defineComponent({
       scrollToBottom();
     };
 
-    /**
-     * Extract streamed assistant text from an SSE event.
-     *
-     * The o2-ai (opencode) backend emits streamed text as
-     *   {"type":"message_delta","content":"<plain string>"}
-     * and non-streamed notices as {"type":"message","content":"..."} — the text
-     * is ALWAYS the plain-string `content` field. We also defensively accept the
-     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
-     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
-     * agent/proxy variant doesn't silently render nothing. Returns the text, or
-     * null when the event carries no assistant text.
-     */
-    const extractStreamText = (data: any): string | null => {
-      if (data == null || typeof data !== "object") return null;
-
-      // Canonical o2-ai chat shape.
-      if (typeof data.content === "string") return data.content;
-
-      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
-      if (typeof data.response === "string") return data.response;
-      if (data.delta && typeof data.delta.content === "string") {
-        return data.delta.content;
-      }
-      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
-      if (firstChoice && typeof firstChoice.delta?.content === "string") {
-        return firstChoice.delta.content;
-      }
-      if (typeof data.text === "string") return data.text;
-
-      return null;
-    };
-
     const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
       const decoder = new TextDecoder();
       let buffer = "";
@@ -2267,37 +2049,122 @@ export default defineComponent({
         }
       };
 
-      // Local finalizeTextBlock: operates on captured msgs, not chatMessages.value
-      const localFinalizeTextBlock = () => {
-        if (textSegment) {
-          const lm = msgs[msgs.length - 1];
-          if (lm && lm.role === "assistant" && lm.contentBlocks) {
-            const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
-            if (lb && lb.type === "text") {
-              lb.text = textSegment;
-            }
+      const postConfirmation = async (approved: boolean) => {
+        try {
+          const orgId = store.state.selectedOrganization.identifier;
+          const res = await fetch(
+            `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ approved }),
+            },
+          );
+          // A silent failure leaves the agent paused with nobody left to answer it.
+          if (!res.ok) {
+            console.error(
+              approved
+                ? `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`
+                : `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+            );
           }
+        } catch (error) {
+          console.error(
+            approved
+              ? "Error auto-confirming navigation:"
+              : "Error auto-denying confirmation for background stream:",
+            error,
+          );
         }
-        if (isActive()) {
-          if (typewriterAnimationId.value) {
-            cancelAnimationFrame(typewriterAnimationId.value);
-            typewriterAnimationId.value = null;
-          }
-          displayedStreamingContent.value = "";
-        }
-        textSegment = "";
-        syncStreamingRefs();
       };
 
-      // Creates the assistant placeholder in msgs if needed, so a completed step renders expandable immediately instead of waiting for stream completion.
-      const pushCompletedToolCall = (block: ContentBlock) => {
-        let lastMessage = msgs[msgs.length - 1];
-        if (!lastMessage || lastMessage.role !== "assistant") {
-          lastMessage = { role: "assistant", content: raw(""), contentBlocks: [] };
-          msgs.push(lastMessage);
+      const seedState = (): StreamState => ({
+        messages: msgs,
+        activeToolCall: activeToolCall.value,
+        textSegment,
+        streamingMsg,
+        title: ctxTitle,
+        lastTraceId: lastTraceId.value,
+        ownerUnavailable: streamOwnerUnavailable.value,
+        pendingConfirmation: pendingConfirmation.value,
+        messageComplete,
+        halted: false,
+      });
+
+      // A detached stream must not write a ref the original would have left untouched.
+      const setIfChanged = <T,>(target: Ref<T>, value: T) => {
+        if (target.value !== value) target.value = value;
+      };
+
+      const commitState = (state: StreamState) => {
+        textSegment = state.textSegment;
+        streamingMsg = state.streamingMsg;
+        ctxTitle = state.title;
+        messageComplete = state.messageComplete;
+        setIfChanged(activeToolCall, state.activeToolCall);
+        setIfChanged(lastTraceId, state.lastTraceId);
+        setIfChanged(streamOwnerUnavailable, state.ownerUnavailable);
+        setIfChanged(pendingConfirmation, state.pendingConfirmation);
+      };
+
+      const buildCtx = (phase: StreamPhase): ReducerCtx => ({
+        isActive: isActive(),
+        autoNavigationEnabled: isAutoNavigationEnabled.value,
+        phase,
+        t,
+        generateNavigation: generateNavigationFromToolResult,
+      });
+
+      const runEffects = async (effects: StreamEffect[]) => {
+        for (const effect of effects) {
+          switch (effect.kind) {
+            case "scroll":
+              if (!effect.whenActive || isActive()) await scrollToBottom();
+              break;
+            case "save":
+              await saveCtx();
+              break;
+            case "throttledSave":
+              await throttledSaveCtx(effect.force);
+              break;
+            case "navigate":
+              await handleNavigationAction(effect.action);
+              break;
+            case "confirmPost":
+              await postConfirmation(effect.approved);
+              break;
+            case "dashboardEvent":
+              emitDashboardEvent(effect.payload);
+              break;
+            case "animateTitle":
+              aiGeneratedTitle.value = effect.title;
+              animateTitle(effect.title);
+              break;
+            case "syncSegments":
+              syncStreamingRefs();
+              break;
+            case "animateText":
+              if (!typewriterAnimationId.value) animateStreamingText();
+              break;
+            case "finalizeText":
+              if (typewriterAnimationId.value) {
+                cancelAnimationFrame(typewriterAnimationId.value);
+                typewriterAnimationId.value = null;
+              }
+              displayedStreamingContent.value = "";
+              syncStreamingRefs();
+              break;
+          }
         }
-        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-        lastMessage.contentBlocks.push(block);
+      };
+
+      const applyEvent = async (data: any, phase: StreamPhase) => {
+        const state = seedState();
+        const effects = reduce(state, data, buildCtx(phase));
+        commitState(state);
+        await runEffects(effects);
+        return state.halted;
       };
       // --- End stream context ---
 
@@ -2309,881 +2176,29 @@ export default defineComponent({
           // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
 
-          // Process each line that starts with 'data: '
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || ""; // Keep last potentially incomplete line
+          const { events, rest } = extractFrames(buffer);
+          buffer = rest;
 
-          for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
-              try {
-                // Extract everything after 'data: ' and before any line break
-                const jsonStr = line.substring(line.indexOf("{"));
+          for (const jsonStr of events) {
+            try {
+              const data = JSON.parse(jsonStr);
 
-                // Skip empty or invalid JSON strings
-                if (!jsonStr || !jsonStr.trim()) continue;
-
-                // Try to parse the JSON, handling potential errors
-                try {
-                  const data = JSON.parse(jsonStr);
-
-                  // Handle title events - AI-generated chat title from first message
-                  if (data && data.type === "title") {
-                    ctxTitle = data.title;
-                    if (isActive()) {
-                      aiGeneratedTitle.value = data.title;
-                      animateTitle(data.title);
-                    }
-                    continue;
-                  }
-
-                  // Handle confirmation_required events - add inline confirmation block in chat
-                  if (data && data.type === "confirmation_required") {
-                    localFinalizeTextBlock();
-
-                    // When detached, auto-deny confirmations to unblock the stream
-                    if (!isActive()) {
-                      try {
-                        const orgId = store.state.selectedOrganization.identifier;
-                        const res = await fetch(
-                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ approved: false }),
-                          },
-                        );
-                        // Detached stream, so there is nothing to show the user —
-                        // but a silent failure leaves the agent paused.
-                        if (!res.ok) {
-                          console.error(
-                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
-                          );
-                        }
-                      } catch (error) {
-                        console.error(
-                          "Error auto-denying confirmation for background stream:",
-                          error,
-                        );
-                      }
-                      continue;
-                    }
-
-                    // Check if this is a navigation action and auto navigation is enabled
-                    if (data.tool === "navigation_action" && isAutoNavigationEnabled.value) {
-                      // Auto-approve navigation without showing confirmation
-                      try {
-                        const orgId = store.state.selectedOrganization.identifier;
-                        const res = await fetch(
-                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            credentials: "include",
-                            body: JSON.stringify({ approved: true }),
-                          },
-                        );
-                        if (!res.ok) {
-                          console.error(
-                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
-                          );
-                        }
-                      } catch (error) {
-                        console.error("Error auto-confirming navigation:", error);
-                      }
-                      continue;
-                    }
-
-                    // data.message is always set by the backend:
-                    // - Navigation: validated label (e.g. "View in Logs")
-                    // - Other tools: "Confirm execution of {tool}?"
-                    const confirmBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: data.tool,
-                      message: activeToolCall.value?.message || data.message,
-                      context: activeToolCall.value?.context || {},
-                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
-                      pendingConfirmation: true,
-                      confirmationMessage: data.message,
-                      confirmationArgs: data.args || {},
-                    };
-                    activeToolCall.value = null;
-
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(confirmBlock);
-                    } else {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(""),
-                        contentBlocks: [confirmBlock],
-                      });
-                    }
-                    pendingConfirmation.value = {
-                      tool: data.tool,
-                      args: data.args || {},
-                      message:
-                        data.message ||
-                        t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
-                    };
-                    await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle tool_call events - show spinner indicator, don't add to chat yet
-                  if (data && data.type === "tool_call") {
-                    // If there's already an active tool call, complete it first
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      pushCompletedToolCall(completedToolBlock);
-                    }
-
-                    // Show active indicator (blue spinner box) - don't add to chat yet
-                    if (isActive()) {
-                      activeToolCall.value = {
-                        tool: data.tool,
-                        message: data.message,
-                        context: data.context || {},
-                        call_id: data.call_id || undefined,
-                      };
-                    }
-
-                    localFinalizeTextBlock();
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle error events - display error message to user
-                  if (data && data.type === "error") {
-                    // Owning replica is gone — flag and stop; sendMessage
-                    // restores the conversation once the stream ends.
-                    if (data.code === "session_owner_unavailable") {
-                      streamOwnerUnavailable.value = true;
-                      continue;
-                    }
-                    // Complete any active tool call first
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      pushCompletedToolCall(completedToolBlock);
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Format error message with suggestion if available
-                    // Handle case where error/message might be an object instead of string
-                    const rawError =
-                      data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
-                    const errorText =
-                      typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
-
-                    // Check if this is an authorization/access error
-                    const authErr = isAuthError(errorText, data.error_type);
-                    // Widened to `string`: the branded `I18nText` from t() does not survive
-                    // the `+=` below, and `data.suggestion` is server prose appended as a
-                    // separate paragraph, not a spliced sentence fragment.
-                    let errorMessage: string = authErr
-                      ? t(UNAUTHORIZED_MESSAGE_KEY)
-                      : t("common.errorPrefix", { message: errorText });
-                    if (data.suggestion && !authErr) {
-                      errorMessage += `\n\n${data.suggestion}`;
-                    }
-
-                    // Get or create assistant message for error (reuse lastMessage)
-                    lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(errorMessage),
-                        contentBlocks: [{ type: "text", text: errorMessage }],
-                      });
-                    } else {
-                      // Append error to existing message
-                      if (lastMessage.content) {
-                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
-                      } else {
-                        lastMessage.content = raw(errorMessage);
-                      }
-                      if (!lastMessage.contentBlocks) {
-                        lastMessage.contentBlocks = [];
-                      }
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: errorMessage,
-                      });
-                    }
-
-                    // Reset streaming state
-                    textSegment = "";
-                    syncStreamingRefs();
-
-                    // Save error message to history
-                    await saveCtx();
-                    if (isActive()) await scrollToBottom();
-
-                    // Stop processing further as error occurred
-                    return;
-                  }
-
-                  // Handle complete events - complete any active tool call
-                  if (data && data.type === "complete") {
-                    // Capture trace_id for feedback correlation
-                    if (data.trace_id && isActive()) {
-                      lastTraceId.value = data.trace_id;
-                    }
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      pushCompletedToolCall(completedToolBlock);
-                      if (isActive()) activeToolCall.value = null;
-                    }
-                    continue;
-                  }
-
-                  // Handle tool_result events - enrich tool call with result data
-                  if (data && data.type === "tool_result") {
-                    const resultData = {
-                      success: data.success !== false,
-                      resultMessage: data.message || "",
-                      summary: data.summary || undefined,
-                      errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                      details: data.details || undefined,
-                      response: data.response || undefined,
-                    };
-
-                    // Generate navigation from tool result if applicable
-                    let navigationAction: NavigationAction | null = null;
-                    if (data.success !== false && data.call_args) {
-                      navigationAction = generateNavigationFromToolResult(
-                        data.tool,
-                        data.call_args,
-                        data,
-                      );
-                    }
-
-                    // Emit dashboard event only when stream is active (foreground)
-                    if (data.success !== false && isActive()) {
-                      const resolvedToolName =
-                        data.tool && data.tool !== "tools_call" ? data.tool : "";
-                      const callArgs = data.call_args || {};
-                      const dashboardEventType = getDashboardEventType(resolvedToolName);
-                      if (dashboardEventType) {
-                        const dashboardId =
-                          callArgs.dashboard_id ||
-                          callArgs.args?.dashboard_id ||
-                          callArgs.request_body?.dashboard_id;
-                        if (dashboardId) {
-                          const folderId =
-                            callArgs.folder ||
-                            callArgs.args?.folder ||
-                            callArgs.request_body?.folder;
-                          emitDashboardEvent({
-                            type: dashboardEventType,
-                            dashboardId,
-                            folderId,
-                          });
-                        } else {
-                          console.warn(
-                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
-                            callArgs,
-                          );
-                        }
-                      }
-                    }
-
-                    // Match by call_id if available, fall back to tool name
-                    const matchesActiveToolCall =
-                      activeToolCall.value &&
-                      ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
-                        (!data.call_id && activeToolCall.value.tool === data.tool));
-
-                    // If active tool call matches, complete it with result data
-                    if (matchesActiveToolCall) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value!.tool,
-                        message: activeToolCall.value!.message,
-                        context: activeToolCall.value!.context,
-                        call_id: activeToolCall.value!.call_id,
-                        ...resultData,
-                        ...(navigationAction && { navigationAction }),
-                      };
-                      pushCompletedToolCall(completedToolBlock);
-                      if (isActive()) activeToolCall.value = null;
-                    } else {
-                      // Tool was already completed — retroactively enrich the matching block
-                      const lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.contentBlocks) {
-                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
-                          const block = lastMessage.contentBlocks[i];
-                          const blockMatches = data.call_id
-                            ? block.call_id === data.call_id
-                            : block.type === "tool_call" &&
-                              block.tool === data.tool &&
-                              block.success === undefined;
-                          if (blockMatches) {
-                            Object.assign(block, resultData);
-                            if (navigationAction) {
-                              block.navigationAction = navigationAction;
-                            }
-                            break;
-                          }
-                        }
-                      }
-                    }
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle navigation_action events - check auto navigation setting
-                  // (clickable buttons on tool results are generated by frontend from tool_result data)
-                  if (data && data.type === "navigation_action") {
-                    localFinalizeTextBlock();
-
-                    // Skip navigation when stream is detached (background)
-                    if (!isActive()) continue;
-
-                    const navAction: NavigationAction = {
-                      resource_type: data.resource_type,
-                      action: data.action,
-                      label: data.label,
-                      target: data.target,
-                    };
-
-                    // Check if auto navigation is enabled
-                    if (isAutoNavigationEnabled.value) {
-                      // Auto-navigate without confirmation
-                      await handleNavigationAction(navAction);
-                    } else {
-                      // Show confirmation dialog
-                      // Store the navigation action for later use
-                      const confirmBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: "navigation_action",
-                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
-                        context: { navAction },
-                        pendingConfirmation: true,
-                        confirmationMessage: data.label,
-                        confirmationArgs: data.target || {},
-                      };
-                      activeToolCall.value = null;
-
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(confirmBlock);
-                      } else {
-                        msgs.push({
-                          role: "assistant",
-                          content: raw(""),
-                          contentBlocks: [confirmBlock],
-                        });
-                      }
-
-                      // Set pending confirmation with navigation action data
-                      pendingConfirmation.value = {
-                        tool: "navigation_action",
-                        args: data.target || {},
-                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
-                      };
-
-                      // Store the navigation action for later execution
-                      pendingConfirmation.value.navAction = navAction;
-
-                      await scrollToBottom();
-                    }
-                    continue;
-                  }
-
-                  // Handle error events - stream-level errors
-                  if (data && data.type === "error") {
-                    // Owning replica is gone — flag and stop; sendMessage restores
-                    // the conversation once the stream ends. Rendering the raw
-                    // error too would dead-end above the restored conversation.
-                    if (data.code === "session_owner_unavailable") {
-                      streamOwnerUnavailable.value = true;
-                      continue;
-                    }
-                    // Complete any active tool call as failed
-                    if (activeToolCall.value) {
-                      const failedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                        success: false,
-                        resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
-                        errorType: data.error_type || undefined,
-                        suggestion: data.suggestion || undefined,
-                      };
-                      pushCompletedToolCall(failedToolBlock);
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Add inline error block
-                    const rawErrorMessage =
-                      data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
-                    const authErr = isAuthError(rawErrorMessage, data.error_type);
-                    const errorBlock: ContentBlock = {
-                      type: "error",
-                      message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
-                      errorType: data.error_type || undefined,
-                      suggestion: authErr ? undefined : data.suggestion || undefined,
-                      recoverable: authErr ? false : (data.recoverable ?? undefined),
-                    };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(errorBlock);
-                    } else {
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(""),
-                        contentBlocks: [errorBlock],
-                      });
-                    }
-                    messageComplete = true;
-                    if (isActive()) await scrollToBottom();
-                    continue;
-                  }
-
-                  // Handle streamed deltas and full/legacy message content.
-                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
-                  // so an agent schema change doesn't silently drop text.
-                  const streamText = extractStreamText(data);
-                  if (typeof streamText === "string") {
-                    // Complete any active tool call first (add green checkmark to chat)
-                    if (activeToolCall.value) {
-                      const completedToolBlock: ContentBlock = {
-                        type: "tool_call",
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context,
-                        call_id: activeToolCall.value.call_id,
-                      };
-                      pushCompletedToolCall(completedToolBlock);
-                      if (isActive()) activeToolCall.value = null;
-                    }
-
-                    // Deltas (append verbatim) vs full/legacy messages (reformat
-                    // code fences). o2-ai streams text as type "message_delta";
-                    // any content arriving via a non-`content` fallback field is
-                    // also an incremental delta.
-                    const isMessageDelta =
-                      data.type === "message_delta" || typeof data.content !== "string";
-
-                    // Format code blocks with proper line breaks for full/legacy
-                    // messages. Deltas must be appended exactly as received.
-                    let content = streamText;
-                    if (!isMessageDelta) {
-                      content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                      content = content.replace(/([^`])\s*```/g, "$1\n```");
-                    }
-
-                    if (!isMessageDelta) {
-                      // Add newline separator if starting a new text segment after tool call
-                      if (streamingMsg && textSegment === "") {
-                        streamingMsg += "\n\n";
-                      }
-                      // Add newline between consecutive full/legacy message events if needed
-                      else if (
-                        streamingMsg &&
-                        !streamingMsg.endsWith("\n") &&
-                        !content.startsWith("\n")
-                      ) {
-                        streamingMsg += "\n\n";
-                        textSegment += "\n\n";
-                      }
-                    }
-
-                    // Accumulate to both total content and current segment
-                    streamingMsg += content;
-                    textSegment += content;
-                    syncStreamingRefs();
-
-                    // Start typewriter animation if not already running
-                    if (isActive() && !typewriterAnimationId.value) {
-                      animateStreamingText();
-                    }
-
-                    // Get or create assistant message
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (!lastMessage || lastMessage.role !== "assistant") {
-                      // Create new assistant message with text
-                      msgs.push({
-                        role: "assistant",
-                        content: raw(streamingMsg),
-                        contentBlocks: [{ type: "text", text: textSegment }],
-                      });
-                      // Save immediately when assistant message is first created to prevent data loss on reload
-                      await throttledSaveCtx(true);
-                    } else {
-                      // Update existing assistant message's total content
-                      lastMessage.content = raw(streamingMsg);
-
-                      // Update or add text block in contentBlocks
-                      if (!lastMessage.contentBlocks) {
-                        lastMessage.contentBlocks = [];
-                      }
-
-                      // Find the last text block and update it, or create new one
-                      const lastBlock =
-                        lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                      if (lastBlock && lastBlock.type === "text") {
-                        // Append to existing text block (same segment)
-                        lastBlock.text = textSegment;
-                      } else {
-                        // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({
-                          type: "text",
-                          text: textSegment,
-                        });
-                      }
-                      // Throttled save during streaming to preserve progress
-                      await throttledSaveCtx();
-                    }
-                    messageComplete = true;
-                    if (isActive()) await scrollToBottom();
-                  }
-                } catch (jsonError) {
-                  console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
-                  continue;
-                }
-              } catch (e) {
-                console.debug("Error processing line:", e, "Line:", line);
-                continue;
-              }
+              if (await applyEvent(data, "stream")) return;
+            } catch (jsonError) {
+              console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
+              continue;
             }
           }
         }
 
-        // Process any remaining complete data in buffer
-        if (buffer.trim()) {
-          const lines = buffer.split("\n");
-          for (const line of lines) {
-            if (line.trim().startsWith("data: ")) {
-              try {
-                const jsonStr = line.substring(line.indexOf("{"));
-                if (!jsonStr || !jsonStr.trim()) continue;
+        for (const jsonStr of extractTailFrames(buffer)) {
+          try {
+            const data = JSON.parse(jsonStr);
 
-                const data = JSON.parse(jsonStr);
-
-                // Handle title events
-                if (data && data.type === "title") {
-                  ctxTitle = data.title;
-                  if (isActive()) {
-                    aiGeneratedTitle.value = data.title;
-                    animateTitle(data.title);
-                  }
-                  continue;
-                }
-
-                // Handle tool_call events
-                if (data && data.type === "tool_call") {
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    pushCompletedToolCall(completedToolBlock);
-                  }
-
-                  if (isActive()) {
-                    activeToolCall.value = {
-                      tool: data.tool,
-                      message: data.message,
-                      context: data.context || {},
-                      call_id: data.call_id || undefined,
-                    };
-                  }
-
-                  localFinalizeTextBlock();
-                  continue;
-                }
-
-                // Handle error events
-                if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage
-                  // restores the conversation once the stream ends.
-                  if (data.code === "session_owner_unavailable") {
-                    streamOwnerUnavailable.value = true;
-                    continue;
-                  }
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    pushCompletedToolCall(completedToolBlock);
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const rawError =
-                    data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
-                  const errorText =
-                    typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
-
-                  // Check if this is an authorization/access error
-                  const authErr = isAuthError(errorText, data.error_type);
-                  // Widened to `string` — see the note on the sibling handler above.
-                  let errorMessage: string = authErr
-                    ? t(UNAUTHORIZED_MESSAGE_KEY)
-                    : t("common.errorPrefix", { message: errorText });
-                  if (data.suggestion && !authErr) {
-                    errorMessage += `\n\n${data.suggestion}`;
-                  }
-
-                  lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(errorMessage),
-                      contentBlocks: [{ type: "text", text: errorMessage }],
-                    });
-                  } else {
-                    if (lastMessage.content) {
-                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
-                    } else {
-                      lastMessage.content = raw(errorMessage);
-                    }
-                    if (!lastMessage.contentBlocks) {
-                      lastMessage.contentBlocks = [];
-                    }
-                    lastMessage.contentBlocks.push({
-                      type: "text",
-                      text: errorMessage,
-                    });
-                  }
-
-                  textSegment = "";
-                  syncStreamingRefs();
-
-                  await saveCtx();
-                  if (isActive()) await scrollToBottom();
-                  return;
-                }
-
-                // Handle complete events
-                if (data && data.type === "complete") {
-                  if (data.trace_id && isActive()) {
-                    lastTraceId.value = data.trace_id;
-                  }
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    pushCompletedToolCall(completedToolBlock);
-                    if (isActive()) activeToolCall.value = null;
-                  }
-                  continue;
-                }
-
-                // Handle tool_result events
-                if (data && data.type === "tool_result") {
-                  const resultData = {
-                    success: data.success !== false,
-                    resultMessage: data.message || "",
-                    summary: data.summary || undefined,
-                    errorType: data.error_type || undefined,
-                    suggestion: data.suggestion || undefined,
-                    details: data.details || undefined,
-                    response: data.response || undefined,
-                  };
-
-                  const matchesActive =
-                    activeToolCall.value &&
-                    ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
-                      (!data.call_id && activeToolCall.value.tool === data.tool));
-
-                  if (matchesActive) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value!.tool,
-                      message: activeToolCall.value!.message,
-                      context: activeToolCall.value!.context,
-                      call_id: activeToolCall.value!.call_id,
-                      ...resultData,
-                    };
-                    pushCompletedToolCall(completedToolBlock);
-                    if (isActive()) activeToolCall.value = null;
-                  } else {
-                    const lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.contentBlocks) {
-                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
-                        const block = lastMessage.contentBlocks[i];
-                        const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
-                        if (blockMatches) {
-                          Object.assign(block, resultData);
-                          break;
-                        }
-                      }
-                    }
-                  }
-                  continue;
-                }
-
-                // Handle error events - stream-level errors
-                if (data && data.type === "error") {
-                  // Owning replica is gone — flag and stop; sendMessage
-                  // restores the conversation once the stream ends.
-                  if (data.code === "session_owner_unavailable") {
-                    streamOwnerUnavailable.value = true;
-                    continue;
-                  }
-                  if (activeToolCall.value) {
-                    const failedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                      success: false,
-                      resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
-                      errorType: data.error_type || undefined,
-                      suggestion: data.suggestion || undefined,
-                    };
-                    pushCompletedToolCall(failedToolBlock);
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const rawErrorMessage =
-                    data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
-                  const authErr = isAuthError(rawErrorMessage, data.error_type);
-                  const errorBlock: ContentBlock = {
-                    type: "error",
-                    message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
-                    errorType: data.error_type || undefined,
-                    suggestion: authErr ? undefined : data.suggestion || undefined,
-                    recoverable: authErr ? false : (data.recoverable ?? undefined),
-                  };
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (lastMessage && lastMessage.role === "assistant") {
-                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                    lastMessage.contentBlocks.push(errorBlock);
-                  } else {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(""),
-                      contentBlocks: [errorBlock],
-                    });
-                  }
-                  messageComplete = true;
-                  continue;
-                }
-
-                // Handle streamed deltas and full/legacy message content.
-                // Tolerant of multiple event shapes (see extractStreamText).
-                const streamText = extractStreamText(data);
-                if (typeof streamText === "string") {
-                  if (activeToolCall.value) {
-                    const completedToolBlock: ContentBlock = {
-                      type: "tool_call",
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context,
-                      call_id: activeToolCall.value.call_id,
-                    };
-                    pushCompletedToolCall(completedToolBlock);
-                    if (isActive()) activeToolCall.value = null;
-                  }
-
-                  const isMessageDelta =
-                    data.type === "message_delta" || typeof data.content !== "string";
-
-                  let content = streamText;
-                  if (!isMessageDelta) {
-                    content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
-                    content = content.replace(/([^`])\s*```/g, "$1\n```");
-                  }
-
-                  if (!isMessageDelta) {
-                    if (streamingMsg && textSegment === "") {
-                      streamingMsg += "\n\n";
-                    } else if (
-                      streamingMsg &&
-                      !streamingMsg.endsWith("\n") &&
-                      !content.startsWith("\n")
-                    ) {
-                      streamingMsg += "\n\n";
-                      textSegment += "\n\n";
-                    }
-                  }
-
-                  streamingMsg += content;
-                  textSegment += content;
-                  syncStreamingRefs();
-
-                  if (isActive() && !typewriterAnimationId.value) {
-                    animateStreamingText();
-                  }
-
-                  let lastMessage = msgs[msgs.length - 1];
-                  if (!lastMessage || lastMessage.role !== "assistant") {
-                    msgs.push({
-                      role: "assistant",
-                      content: raw(streamingMsg),
-                      contentBlocks: [{ type: "text", text: textSegment }],
-                    });
-                    await throttledSaveCtx(true);
-                  } else {
-                    lastMessage.content = raw(streamingMsg);
-
-                    if (!lastMessage.contentBlocks) {
-                      lastMessage.contentBlocks = [];
-                    }
-                    const lastBlock =
-                      lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                    if (lastBlock && lastBlock.type === "text") {
-                      lastBlock.text = textSegment;
-                    } else {
-                      lastMessage.contentBlocks.push({
-                        type: "text",
-                        text: textSegment,
-                      });
-                    }
-                    await throttledSaveCtx();
-                  }
-                  messageComplete = true;
-                }
-              } catch (e) {
-                console.debug("Error processing remaining buffer:", e);
-                continue;
-              }
-            }
+            if (await applyEvent(data, "tailFlush")) return;
+          } catch (e) {
+            console.debug("Error processing remaining buffer:", e);
+            continue;
           }
         }
 
@@ -3260,18 +2275,6 @@ export default defineComponent({
         console.error("Error saving chat history:", error);
       } finally {
         saveHistoryLoading.value = false;
-      }
-    };
-
-    const loadHistory = async () => {
-      try {
-        // Load history using the composable (automatically prunes to 100 items)
-        const history = await dbLoadHistory();
-        chatHistory.value = history;
-        return chatHistory.value;
-      } catch (error) {
-        console.error("Error loading chat history:", error);
-        return [];
       }
     };
 
@@ -3381,75 +2384,6 @@ export default defineComponent({
       showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
-    };
-
-    const openHistory = async () => {
-      showHistory.value = true;
-      await loadHistory();
-    };
-
-    const openEditTitleDialog = () => {
-      editingTitle.value = displayedTitle.value || "";
-      showEditTitleDialog.value = true;
-    };
-
-    const saveEditedTitle = async () => {
-      if (!currentChatId.value || !editingTitle.value.trim()) {
-        showEditTitleDialog.value = false;
-        return;
-      }
-
-      try {
-        // Update title using the composable
-        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
-
-        if (success) {
-          // Update the displayed title
-          displayedTitle.value = editingTitle.value.trim();
-          aiGeneratedTitle.value = editingTitle.value.trim();
-
-          // Reload history to reflect changes
-          loadHistory();
-        }
-      } catch (error) {
-        console.error("Error updating chat title:", error);
-      } finally {
-        showEditTitleDialog.value = false;
-      }
-    };
-
-    const deleteChat = (chatId: number) => {
-      chatToDelete.value = chatId;
-      showDeleteChatConfirmDialog.value = true;
-    };
-
-    const confirmDeleteChat = async () => {
-      if (!chatToDelete.value) return;
-
-      try {
-        // Delete chat using the composable
-        const success = await dbDeleteChatById(chatToDelete.value);
-
-        if (success) {
-          // If the deleted chat is the current one, reset to new chat
-          if (currentChatId.value === chatToDelete.value) {
-            addNewChat();
-          }
-
-          // Reload history to reflect changes
-          loadHistory();
-        }
-      } catch (error) {
-        console.error("Error deleting chat:", error);
-      } finally {
-        // Reset state
-        chatToDelete.value = null;
-        showDeleteChatConfirmDialog.value = false;
-      }
-    };
-
-    const clearAllConversations = () => {
-      showClearAllConfirmDialog.value = true;
     };
 
     /** Resolve the pendingConfirmation block — mark as success or failure */
@@ -3599,179 +2533,11 @@ export default defineComponent({
       pendingConfirmation.value = null;
     };
 
-    // Generate navigation action from tool result data (generic, pattern-based)
-    //
-    // Expected backend response format:
-    // - Search tools: Must have SQL query in callArgs.request_body.query.sql
-    // - Create/Get/Update/Delete tools: Must return {resource}_id in response
-    //   Examples: alert_id, dashboard_id, pipeline_id, stream_id, etc.
-    //   Optional fields: name, folder (will use 'default' if not provided)
     const generateNavigationFromToolResult = (
       toolName: string,
       callArgs: any,
       responseBody: any,
-    ): NavigationAction | null => {
-      if (!callArgs) {
-        return null;
-      }
-
-      // Pattern 1: Search tools (has SQL query) → load_query navigation
-      const requestBody = callArgs.request_body || {};
-      const query = requestBody.query || {};
-      const sql = query.sql || "";
-
-      if (sql) {
-        const streamType = callArgs.stream_type || "logs";
-        let streamName = callArgs.stream_name || "";
-
-        // If stream_name is not in callArgs, try to extract it from the SQL query
-        if (!streamName) {
-          // Extract stream name from FROM clause (handles quoted and unquoted table names)
-          const fromMatch = sql.match(/FROM\s+["']?([^"'\s,()]+)["']?/i);
-          if (fromMatch) {
-            streamName = fromMatch[1];
-          }
-        }
-
-        const vrlFunction =
-          query.functionContent || requestBody.function || requestBody.functionContent;
-
-        // Don't generate navigation if time range is missing
-        if (query.start_time === undefined || query.end_time === undefined) {
-          return null;
-        }
-
-        // Don't generate navigation if stream name is still missing
-        if (!streamName) {
-          return null;
-        }
-
-        const target: any = {
-          query: sql,
-          sql_mode: true,
-          from: query.start_time,
-          to: query.end_time,
-          stream: streamName.split(","),
-        };
-
-        if (vrlFunction) {
-          target.functionContent = vrlFunction;
-        }
-
-        const streamLabel =
-          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
-            streamType as string
-          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
-        return {
-          resource_type: streamType,
-          action: "load_query",
-          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
-          target,
-        };
-      }
-
-      // Pattern 2: Create/Get tools (has ID) → navigate_direct
-      // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
-      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
-      if (!resourceTypeMatch) return null;
-
-      const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
-
-      // Parse response data - it might be in different formats
-      let parsedResponse: any = {};
-      if (responseBody) {
-        // If responseBody has a 'response' field (from SRE agent tool_result event)
-        if (responseBody.response) {
-          let responseData = responseBody.response;
-          // If response is a JSON string, parse it
-          if (typeof responseData === "string") {
-            try {
-              responseData = JSON.parse(responseData);
-            } catch (e) {
-              console.warn("[Navigation] Failed to parse response string:", e);
-            }
-          }
-          // Extract from versioned response (v8, v7, etc.) for dashboards
-          if (typeof responseData === "object" && responseData !== null) {
-            parsedResponse =
-              responseData.v8 ||
-              responseData.v7 ||
-              responseData.v6 ||
-              responseData.v5 ||
-              responseData;
-          } else {
-            parsedResponse = responseData;
-          }
-        }
-        // If responseBody has 'content' array (MCP format)
-        else if (
-          responseBody.content &&
-          Array.isArray(responseBody.content) &&
-          responseBody.content[0]?.text
-        ) {
-          try {
-            const textContent = responseBody.content[0].text;
-            const parsed = JSON.parse(textContent);
-            // Extract from versioned response (v8, v7, etc.)
-            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
-          } catch (e) {
-            console.warn("[Navigation] Failed to parse content text:", e);
-          }
-        }
-        // Otherwise use responseBody as-is
-        else {
-          parsedResponse = responseBody;
-        }
-      }
-
-      // Merge data from parsed response, call args, and call args request_body for ID/field lookup
-      const requestBodyFromArgs = (callArgs || {}).request_body || {};
-      const data = {
-        ...parsedResponse,
-        ...(callArgs || {}),
-        ...requestBodyFromArgs,
-      };
-
-      // Standard pattern: {resource}_id (e.g., alert_id, dashboard_id, pipeline_id)
-      const resourceIdField = `${resourceType}_id`;
-      let resourceId = data[resourceIdField] || data.id;
-
-      // Also check camelCase variants (dashboardId, alertId)
-      if (!resourceId) {
-        const camelCaseField = resourceType + "Id";
-        resourceId = data[camelCaseField];
-      }
-
-      if (!resourceId) {
-        return null;
-      }
-
-      // Build target with consistent {resource}_id pattern
-      const target: any = {
-        [resourceIdField]: resourceId, // e.g., alert_id, dashboard_id, pipeline_id
-      };
-
-      // Add name if available (required for some resources like alerts)
-      const name = data.name;
-      if (name) {
-        target.name = name;
-      }
-
-      // Add folder if available (default to 'default' for resources that use folders)
-      const folder = data.folder;
-      if (folder || resourceType === "alert" || resourceType === "dashboard") {
-        target.folder = folder || "default";
-      }
-
-      return {
-        resource_type: resourceType,
-        action: "navigate_direct",
-        label: t("aiAssistant.viewTarget", {
-          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
-        }),
-        target,
-      };
-    };
+    ): NavigationAction | null => generateNavigation(toolName, callArgs, responseBody, t);
 
     const handleNavigationAction = async (action: NavigationAction) => {
       // Detach the stream before navigating: the route change can unmount/
@@ -3783,108 +2549,15 @@ export default defineComponent({
       // processStream keeps running and the turn finishes in the background.
       detachCurrentStream();
 
-      // Helper to encode strings for URL (same as search history)
-      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
-
-      // Extract page name for success message
-      let pageName = action.label || "";
-      if (!pageName) {
-        // Fallback: use target name or resource type
-        pageName =
-          action.target.name ||
-          action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
-      }
+      const pageName = navigationPageName(action);
 
       // Perform navigation FIRST
-      if (action.action === "load_query") {
-        const targetPath = `/${action.resource_type}`;
-        const target = action.target;
-
-        // Build query object similar to SearchHistory goToLogs function
-        const queryParams: Record<string, string> = {
-          org_identifier: store.state.selectedOrganization.identifier,
-          stream_type: action.resource_type, // logs, metrics, traces
-          refresh: "0",
-          sql_mode: target.sql_mode?.toString() || "false",
-          quick_mode: "false",
-          show_histogram: "true",
-          type: "ai_chat_query",
-        };
-
-        // Add stream (comma-separated if array)
-        if (target.stream) {
-          queryParams.stream = Array.isArray(target.stream)
-            ? target.stream.join(",")
-            : target.stream;
-        }
-
-        // Add time range (prefer absolute from/to over period)
-        if (target.from !== undefined && target.to !== undefined) {
-          queryParams.from = target.from.toString();
-          queryParams.to = target.to.toString();
-        } else if (target.period) {
-          queryParams.period = target.period;
-        }
-
-        // Add base64 encoded query
-        if (target.query) {
-          queryParams.query = encodeForUrl(
-            typeof target.query === "string" ? target.query : JSON.stringify(target.query),
-          );
-        }
-
-        // Add VRL function if present
-        if (target.functionContent) {
-          queryParams.functionContent = encodeForUrl(target.functionContent);
-          queryParams.fn_editor = "true";
-        } else {
-          queryParams.fn_editor = "false";
-        }
-
-        // Navigate using same pattern as search history
-        await router.push({
-          path: targetPath,
-          query: queryParams,
-        });
-      } else if (action.action === "navigate_direct") {
-        // Direct navigation - build proper URLs based on resource type
-        let path = action.target.path || `/${action.resource_type}`;
-        // navigate_direct always carries the record form of `query`
-        const targetQuery = action.target.query as Record<string, any> | undefined;
-        const queryParams: Record<string, string> = {
-          org_identifier: store.state.selectedOrganization.identifier,
-          ...targetQuery,
-        };
-
-        // Resource-type-specific URL handling
-        if (action.resource_type === "alert") {
-          path = "/alerts";
-          const alertId = action.target.alert_id || targetQuery?.alert_id;
-          if (alertId) {
-            // Navigate to specific alert with update action
-            queryParams.action = "update";
-            queryParams.alert_id = alertId;
-            queryParams.name = action.target.name || targetQuery?.name;
-          }
-          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
-        } else if (action.resource_type === "dashboard") {
-          // Dashboards use /dashboards/view path
-          path = "/dashboards/view";
-          queryParams.dashboard =
-            action.target.dashboard_id || action.target.dashboardId || targetQuery?.dashboardId;
-          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
-          queryParams.tab = action.target.tab || "tab-1";
-          queryParams.refresh = "Off";
-          queryParams.period = "15m";
-          queryParams.print = "false";
-        } else if (action.resource_type === "pipeline") {
-          // Pipelines use /pipeline/pipelines/edit path
-          path = "/pipeline/pipelines/edit";
-          queryParams.id = action.target.pipeline_id || action.target.id || targetQuery?.id;
-          queryParams.name = action.target.name || targetQuery?.name;
-        }
-
-        await router.push({ path, query: queryParams });
+      const target = buildNavigationRoute(
+        action,
+        store.state.selectedOrganization.identifier,
+      );
+      if (target) {
+        await router.push({ path: target.path, query: target.query });
       }
 
       // Use setTimeout to add message AFTER navigation fully completes and settles
@@ -3924,25 +2597,6 @@ export default defineComponent({
           console.error("Error adding navigation success message:", error);
         }
       }, 500);
-    };
-
-    const confirmClearAllConversations = async () => {
-      try {
-        // Clear all history using the composable
-        const success = await dbClearAllHistory();
-
-        if (success) {
-          // Reset to new chat
-          addNewChat();
-
-          // Clear the chat history array
-          chatHistory.value = [];
-        }
-      } catch (error) {
-        console.error("Error clearing all conversations:", error);
-      } finally {
-        showClearAllConfirmDialog.value = false;
-      }
     };
 
     const loadChat = async (chatId: number) => {
@@ -4477,307 +3131,6 @@ export default defineComponent({
       contextReferences.value = refs;
     };
 
-    // Image handling functions
-    const triggerImageUpload = () => {
-      imageInputRef.value?.click();
-    };
-
-    const handleImageSelect = async (event: Event) => {
-      const input = event.target as HTMLInputElement;
-      const files = input.files;
-      if (!files) return;
-
-      for (const file of Array.from(files)) {
-        await addImage(file);
-      }
-      // Reset input so the same file can be selected again
-      input.value = "";
-    };
-
-    const addImage = async (file: File): Promise<boolean> => {
-      // Validate file size first (before reading)
-      if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
-            size: (file.size / 1024 / 1024).toFixed(1),
-          }),
-        });
-        return false;
-      }
-
-      // Basic file type check for immediate feedback (backend will detect actual type)
-      if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
-        });
-        return false;
-      }
-
-      // Convert to base64
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const base64 = (e.target?.result as string).split(",")[1]; // Remove data:image/...;base64, prefix
-          const imageRef = `@[${file.name}]`;
-
-          // Use file.type for display - backend will detect and correct actual mime type
-          pendingImages.value.push({
-            data: base64,
-            mimeType: file.type as "image/png" | "image/jpeg",
-            filename: file.name,
-            size: file.size,
-          });
-
-          // Insert image reference at cursor position
-          // Check if we're using RichTextInput (contenteditable)
-          const contenteditable =
-            chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-            chatInput.value?.$el?.querySelector(".rich-text-input");
-
-          if (contenteditable) {
-            // RichTextInput - insert at cursor position in contenteditable
-            const selection = window.getSelection();
-            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-
-            // Create a non-editable span for the image reference
-            const imageRefSpan = document.createElement("span");
-            imageRefSpan.contentEditable = "false";
-            imageRefSpan.className = "image-reference";
-            // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
-            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem; margin: 0 0.125rem; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 0.25rem; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
-
-            // Add image icon
-            const imageIcon = document.createElement("span");
-            imageIcon.textContent = "🖼️";
-            imageIcon.style.cssText = "font-size: var(--text-xs);";
-
-            // Add filename text
-            const filenameText = document.createElement("span");
-            filenameText.textContent = file.name;
-
-            // Add remove button
-            const removeBtn = document.createElement("button");
-            removeBtn.textContent = "×";
-            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 0.875rem; height: 0.875rem; padding: 0; margin-left: 0.125rem; background: transparent; border: none; border-radius: 0.1875rem; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
-            removeBtn.onmouseover = () => {
-              removeBtn.style.background = chartColor("--color-status-negative");
-              removeBtn.style.color = chartColor("--color-white");
-            };
-            removeBtn.onmouseout = () => {
-              removeBtn.style.background = "transparent";
-              removeBtn.style.color = chartColor("--color-status-success-text");
-            };
-            removeBtn.onclick = (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-
-              // Find and remove the image from pendingImages
-              const imageIndex = pendingImages.value.findIndex((img) => img.filename === file.name);
-              if (imageIndex !== -1) {
-                pendingImages.value.splice(imageIndex, 1);
-              }
-
-              // Remove the span
-              imageRefSpan.remove();
-
-              // Trigger input event
-              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            };
-
-            imageRefSpan.appendChild(imageIcon);
-            imageRefSpan.appendChild(filenameText);
-            imageRefSpan.appendChild(removeBtn);
-
-            if (range && contenteditable.contains(range.startContainer)) {
-              // Insert at cursor position
-              range.deleteContents();
-
-              // Add space before if needed
-              const textBefore = range.startContainer.textContent || "";
-              if (
-                textBefore.length > 0 &&
-                !textBefore.endsWith(" ") &&
-                !textBefore.endsWith("\n")
-              ) {
-                range.insertNode(document.createTextNode(" "));
-              }
-
-              range.insertNode(imageRefSpan);
-
-              // Add space after for cursor positioning
-              const spaceAfter = document.createTextNode(" ");
-              range.setStartAfter(imageRefSpan);
-              range.insertNode(spaceAfter);
-
-              // Move cursor after the space
-              range.setStartAfter(spaceAfter);
-              range.collapse(true);
-              selection?.removeAllRanges();
-              selection?.addRange(range);
-            } else {
-              // No selection or selection outside - append to end
-              const spaceNeeded =
-                contenteditable.textContent &&
-                !contenteditable.textContent.endsWith(" ") &&
-                !contenteditable.textContent.endsWith("\n");
-              if (spaceNeeded) {
-                contenteditable.appendChild(document.createTextNode(" "));
-              }
-              contenteditable.appendChild(imageRefSpan);
-              const spaceAfter = document.createTextNode(" ");
-              contenteditable.appendChild(spaceAfter);
-
-              // Move cursor to end
-              const newRange = document.createRange();
-              newRange.setStartAfter(spaceAfter);
-              newRange.collapse(true);
-              selection?.removeAllRanges();
-              selection?.addRange(newRange);
-            }
-
-            // Trigger input event to update model
-            contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            focusInput();
-          } else {
-            // Legacy textarea fallback
-            const textarea = chatInput.value?.$el?.querySelector(
-              "textarea",
-            ) as HTMLTextAreaElement | null;
-            if (textarea) {
-              const start = textarea.selectionStart || 0;
-              const end = textarea.selectionEnd || 0;
-              const text = inputMessage.value;
-              const before = text.substring(0, start);
-              const after = text.substring(end);
-
-              // Add space before if needed
-              const needsSpaceBefore =
-                before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n");
-              const needsSpaceAfter =
-                after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n");
-
-              const insertion =
-                (needsSpaceBefore ? " " : "") + imageRef + (needsSpaceAfter ? " " : "");
-              inputMessage.value = before + insertion + after;
-
-              // Set cursor position after the inserted reference
-              nextTick(() => {
-                const newPos = start + insertion.length;
-                textarea.setSelectionRange(newPos, newPos);
-                textarea.focus();
-              });
-            } else {
-              // Final fallback: append to end
-              const currentText = inputMessage.value;
-              const separator =
-                currentText && !currentText.endsWith(" ") && !currentText.endsWith("\n") ? " " : "";
-              inputMessage.value = currentText + separator + imageRef + " ";
-            }
-          }
-
-          resolve(true);
-        };
-        reader.onerror = () => {
-          toast({
-            variant: "error",
-            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
-          });
-          resolve(false);
-        };
-        reader.readAsDataURL(file);
-      });
-    };
-
-    const removeImage = (index: number) => {
-      // Get the filename before removing
-      const image = pendingImages.value[index];
-      if (image) {
-        const imageRef = `@[${image.filename}]`;
-
-        // Check if we're using RichTextInput (contenteditable)
-        const contenteditable =
-          chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
-          chatInput.value?.$el?.querySelector(".rich-text-input");
-
-        if (contenteditable) {
-          // Find and remove all image reference spans with this filename
-          const imageRefSpans = contenteditable.querySelectorAll(".image-reference");
-          imageRefSpans.forEach((span: Element) => {
-            if (span.textContent === imageRef) {
-              span.remove();
-            }
-          });
-
-          // Trigger input event to update model
-          contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-        } else {
-          // Legacy textarea - remove from text
-          inputMessage.value = inputMessage.value
-            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, "g"), " ")
-            .trim();
-        }
-      }
-      pendingImages.value.splice(index, 1);
-    };
-
-    // Helper to escape special regex characters
-    const escapeRegExp = (str: string) => {
-      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    };
-
-    const clearPendingImages = () => {
-      pendingImages.value = [];
-    };
-
-    // Handle drag and drop for images
-    const handleDragOver = (event: DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-    };
-
-    const handleDrop = async (event: DragEvent) => {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const files = event.dataTransfer?.files;
-      if (!files) return;
-
-      for (const file of Array.from(files)) {
-        if (file.type.startsWith("image/")) {
-          await addImage(file);
-        }
-      }
-    };
-
-    // Handle paste for images
-    const handlePaste = async (event: ClipboardEvent) => {
-      const items = event.clipboardData?.items;
-      if (!items) return;
-
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          const file = item.getAsFile();
-          if (file) {
-            event.preventDefault();
-            await addImage(file);
-          }
-        }
-      }
-    };
-
-    // Open image preview dialog
-    const openImagePreview = (img: ImageAttachment) => {
-      previewImage.value = img;
-      showImagePreview.value = true;
-    };
-
-    const closeImagePreview = () => {
-      showImagePreview.value = false;
-      previewImage.value = null;
-    };
-
     // Load query history from localStorage
     const loadQueryHistory = () => {
       try {
@@ -5004,10 +3357,7 @@ export default defineComponent({
       }
 
       // Clean up title animation interval
-      if (titleIntervalId) {
-        clearInterval(titleIntervalId);
-        titleIntervalId = null;
-      }
+      clearTitleInterval();
 
       // Clean up the trailing-edge streaming render timer. This matters more
       // here than a typical unmount cleanup: we intentionally let the stream
@@ -5121,201 +3471,6 @@ export default defineComponent({
       }
     });
 
-    // Filter markdown headers - convert # and ## to smaller formatting
-    // This should only process actual markdown headers, not code block comments
-    const filterMarkdownHeaders = (content: string): string => {
-      // First, protect code blocks by temporarily replacing them
-      const codeBlocks: string[] = [];
-      let filtered = content.replace(/```[\s\S]*?```/g, (match) => {
-        codeBlocks.push(match);
-        return `___CODE_BLOCK_${codeBlocks.length - 1}___`;
-      });
-
-      // Convert ## headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^## (.+)$/gm, "**$1:**");
-
-      // Convert # headers to bold with colon (only outside code blocks)
-      filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
-
-      // Restore code blocks
-      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
-        return codeBlocks[parseInt(index)];
-      });
-
-      return filtered;
-    };
-
-    // Process text block and return array of code/text blocks for rendering
-    const processTextBlock = (text: string) => {
-      // Filter headers before processing
-      const filteredContent = filterMarkdownHeaders(text);
-      const tokens = marked.lexer(filteredContent);
-      const blocks = [];
-
-      for (const token of tokens) {
-        if (token.type === "code") {
-          let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
-          }
-
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
-
-          blocks.push({
-            type: "code",
-            language: token.lang || "",
-            content: codeText,
-            highlightedContent,
-          });
-        } else {
-          blocks.push({
-            type: "text",
-            content: marked.parser([token]),
-          });
-        }
-      }
-
-      return blocks;
-    };
-
-    const processMessageContent = (content: string) => {
-      // Filter headers before processing
-      const filteredContent = filterMarkdownHeaders(content);
-      const tokens = marked.lexer(filteredContent);
-      const blocks = [];
-
-      for (const token of tokens) {
-        if (token.type === "code") {
-          // Remove comments at the beginning of code blocks
-          let codeText = token.text.trim();
-          while (
-            codeText.startsWith("--") ||
-            codeText.startsWith("//") ||
-            codeText.startsWith("#")
-          ) {
-            codeText = codeText.split("\n").slice(1).join("\n").trim();
-          }
-
-          const highlightedContent =
-            token.lang && hljs.getLanguage(token.lang)
-              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
-
-          blocks.push({
-            type: "code",
-            language: token.lang || "",
-            content: codeText,
-            highlightedContent,
-          });
-        } else {
-          blocks.push({
-            type: "text",
-            content: marked.parser([token]),
-          });
-        }
-      }
-
-      return blocks;
-    };
-
-    // Helper to format JSON with syntax highlighting
-    const formatLogEntryContent = (content: string): string => {
-      try {
-        const parsed = JSON.parse(content);
-        const formatted = JSON.stringify(parsed, null, 2);
-        // Apply syntax highlighting
-        const highlighted = formatted.replace(
-          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
-          (match) => {
-            let cls = "json-number";
-            if (/^"/.test(match)) {
-              if (/:$/.test(match)) {
-                cls = "json-key";
-              } else {
-                cls = "json-string";
-              }
-            } else if (/true|false/.test(match)) {
-              cls = "json-boolean";
-            } else if (/null/.test(match)) {
-              cls = "json-null";
-            }
-            return `<span class="${cls}">${match}</span>`;
-          },
-        );
-        return DOMPurify.sanitize(highlighted);
-      } catch {
-        // Not JSON, return plain text with HTML escaping
-        return DOMPurify.sanitize(
-          content
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;")
-            .replace(/\n/g, "<br>"),
-        );
-      }
-    };
-
-    // Parse log entries from message content and maintain order
-    const parseLogEntries = (content: string) => {
-      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
-      const orderedBlocks: any[] = [];
-      let lastIndex = 0;
-      let match;
-
-      // Reset regex state
-      logEntryPattern.lastIndex = 0;
-
-      while ((match = logEntryPattern.exec(content)) !== null) {
-        const [fullMatch, filename, lineStart, lineEnd, logContent] = match;
-        const matchIndex = match.index;
-
-        // Add text before this log entry (if any)
-        if (matchIndex > lastIndex) {
-          const textBefore = content.substring(lastIndex, matchIndex).trim();
-          if (textBefore) {
-            orderedBlocks.push({
-              type: "text",
-              text: textBefore,
-            });
-          }
-        }
-
-        // Add the log entry
-        orderedBlocks.push({
-          type: "log_entry",
-          filename,
-          lineStart: lineStart ? parseInt(lineStart) : undefined,
-          lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
-          content: logContent.trim(),
-          preview: createPreview(logContent.trim(), 60),
-        });
-
-        lastIndex = matchIndex + fullMatch.length;
-      }
-
-      // Add any remaining text after the last log entry
-      if (lastIndex < content.length) {
-        const textAfter = content.substring(lastIndex).trim();
-        if (textAfter) {
-          orderedBlocks.push({
-            type: "text",
-            text: textAfter,
-          });
-        }
-      }
-
-      return orderedBlocks;
-    };
-
     const processedMessages = computed(() => {
       return chatMessages.value.map((message) => {
         // For user messages, check for log entries
@@ -5364,68 +3519,9 @@ export default defineComponent({
       }
     };
 
-    const getLanguageDisplay = (lang: string) => {
-      const languageMap: { [key: string]: string } = {
-        js: "JavaScript",
-        javascript: "JavaScript",
-        ts: "TypeScript",
-        typescript: "TypeScript",
-        python: "Python",
-        py: "Python",
-        sql: "SQL",
-        vrl: "VRL",
-        json: "JSON",
-        css: "CSS",
-        scss: "SCSS",
-        bash: "Bash",
-        shell: "Shell",
-        yaml: "YAML",
-        yml: "YAML",
-        markdown: "Markdown",
-        md: "Markdown",
-      };
-
-      const normalizedLang = lang.toLowerCase();
-      return languageMap[normalizedLang] || lang.toUpperCase();
-    };
-
-    const processHtmlBlock = (content: string) => {
-      // Sanitize HTML to prevent XSS attacks
-      const sanitized = DOMPurify.sanitize(content);
-      // Replace pre tags with span and add our custom class
-      return sanitized
-        .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-        .replace(/<\/pre>/g, "</span>");
-    };
-
     const formatTime = (timestamp: string) => {
       const date = new Date(timestamp);
       return date.toLocaleString();
-    };
-
-    // Tool call context formatting helpers
-    const truncateQuery = (query: string) => {
-      if (!query) return "";
-      const maxLength = 100;
-      if (query.length <= maxLength) return query;
-      return query.substring(0, maxLength) + "...";
-    };
-
-    const formatContextKey = (key: string) => {
-      // Convert snake_case to Title Case
-      return key
-        .split("_")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-    };
-
-    const formatContextValue = (value: any) => {
-      if (typeof value === "string") {
-        // Truncate long strings
-        if (value.length > 30) return value.substring(0, 30) + "...";
-        return value;
-      }
-      return String(value);
     };
 
     // Tool call expansion helpers
@@ -5456,148 +3552,7 @@ export default defineComponent({
       return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
     };
 
-    // Extract display fields from tool call context (handles different tool schemas)
-    const getToolCallDisplayData = (context: any) => {
-      if (!context) return null;
-
-      const data: Record<string, any> = {};
-
-      // Handle nested request_body.query structure (SearchSQL, ExtractPatterns)
-      if (context.request_body?.query) {
-        const q = context.request_body.query;
-        if (q.sql) data.query = q.sql;
-        if (q.start_time) data.start_time = q.start_time;
-        if (q.end_time) data.end_time = q.end_time;
-        if (q.from !== undefined) data.from = q.from;
-        if (q.size !== undefined) data.size = q.size;
-        if (q.query_type) data.query_type = q.query_type;
-        if (q.vrl) data.vrl = q.vrl;
-      }
-
-      // Handle testFunction context (VRL validation)
-      if (context.vrl) data.vrl = context.vrl;
-      if (context.request_body?.function) data.vrl = context.request_body.function;
-
-      // Handle flat SQL from SearchSQL enriched context
-      if (context.sql) data.query = context.sql;
-
-      // Handle flat structure (StreamSchema, etc.)
-      if (context.stream_name) data.stream = context.stream_name;
-      if (context.type) data.type = context.type;
-
-      // CLI tools: surface the command string
-      if (context.command) data.command = context.command;
-
-      return Object.keys(data).length > 0 ? data : null;
-    };
-
-    // `response` is stamped onto blocks by the stream handler but is not part
-    // of the shared ContentBlock interface.
-    const hasToolCallDetails = (block: ContentBlock & { response?: Record<string, any> }) => {
-      // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
-      if (block.success === false) return true;
-      if (block.summary) return true;
-      if (block.response) return true;
-      return getToolCallDisplayData(block.context) !== null;
-    };
-
-    // Splits an already-interpolated sentence around the value that renders bold,
-    // so the header stays ONE translatable sentence instead of two fragments.
-    const splitAroundHighlight = (full: string, highlight: string) => {
-      const at = full.indexOf(highlight);
-      if (at < 0) return { text: full, highlight: null as string | null, suffix: "" };
-      return {
-        text: full.slice(0, at),
-        highlight: highlight as string | null,
-        suffix: full.slice(at + highlight.length),
-      };
-    };
-
-    const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
-      // Show error message for failed tools
-      // Tool-specific messages (both success and error)
-      if (block.tool === "testFunction") {
-        if (block.success === false) {
-          return {
-            text: t("aiAssistant.aiChat.toolVrlValidationFailed"),
-            highlight: null,
-            suffix: "",
-          };
-        }
-        return { text: t("aiAssistant.aiChat.toolVrlValidated"), highlight: null, suffix: "" };
-      }
-      if (block.tool === "SearchSQL") {
-        if (block.success === false) {
-          return {
-            text: t("aiAssistant.aiChat.toolQueryFailed"),
-            highlight: null,
-            suffix: "",
-          };
-        }
-        if (block.response?.total !== undefined) {
-          const streamType = block.context?.type || "logs";
-          return {
-            text: t("aiAssistant.aiChat.toolQueriedStream", { type: streamType }),
-            highlight: t("aiAssistant.aiChat.toolResultsCount", {
-              count: block.response.total,
-            }),
-            suffix: "",
-          };
-        }
-      }
-      if (block.tool === "StreamSchema" && block.context?.stream_name) {
-        const streamName = block.context.stream_name;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolStreamSchema", { name: streamName }),
-          streamName,
-        );
-      }
-      if (block.tool === "GetIncident" && block.context?.incident_id) {
-        const incidentId = block.context.incident_id;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
-          incidentId,
-        );
-      }
-      if (block.tool === "GetAlert" && block.context?.alert_id) {
-        const alertId = block.context.alert_id;
-        return splitAroundHighlight(t("aiAssistant.aiChat.toolGetAlert", { id: alertId }), alertId);
-      }
-      if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
-        const dashboardId = block.context.dashboard_id;
-        return splitAroundHighlight(
-          t("aiAssistant.aiChat.toolGetDashboard", { id: dashboardId }),
-          dashboardId,
-        );
-      }
-      // List tools: show count from normalized { total, items } response
-      if (block.response?.total !== undefined && block.success !== false) {
-        const base = block.message || block.tool || t("aiAssistant.aiChat.toolListedFallback");
-        return {
-          text: base + " ",
-          highlight: t("aiAssistant.aiChat.toolFoundCount", { count: block.response.total }),
-          suffix: "",
-        };
-      }
-      // Generic fallback
-      if (block.success === false && block.resultMessage) {
-        // Truncate long error messages for the header
-        const msg =
-          block.resultMessage.length > 60
-            ? block.resultMessage.substring(0, 60) + "..."
-            : block.resultMessage;
-        return { text: msg, highlight: null, suffix: "" };
-      }
-      if (block.success !== false && block.summary?.count !== undefined) {
-        const base = block.message || block.tool || t("aiAssistant.aiChat.toolFallback");
-        return {
-          text: base + " ",
-          highlight: t("aiAssistant.aiChat.toolResultsCount", { count: block.summary.count }),
-          suffix: "",
-        };
-      }
-      return { text: block.message, highlight: null, suffix: "" };
-    };
+    const formatToolCallMessage = (block: ToolCallBlock) => formatToolCall(block, t);
 
     const formatTimestamp = (timestamp: number) => {
       if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
@@ -5660,14 +3615,6 @@ export default defineComponent({
     });
     const getGenerateAiIcon = computed(() => {
       return getImageURL("images/common/ai_icon_dark.svg");
-    });
-
-    const filteredChatHistory = computed(() => {
-      if (!historySearchTerm.value) {
-        return chatHistory.value;
-      }
-      const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter((chat) => chat.title.toLowerCase().includes(searchTerm));
     });
 
     return {
