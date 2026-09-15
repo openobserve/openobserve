@@ -1324,7 +1324,7 @@ function escalateOutcome(result: EscalateResult | undefined): {
   if (result?.escalated_to === "ladder_exhausted") {
     return { variant: "info", message: t("oncall.escalateExhausted", { team: teamName.value }) };
   }
-  const reached = result?.escalated_to === "rung" ? [...result.recipients, ...result.chased] : [];
+  const reached = result?.escalated_to === "rung" ? result.recipients : [];
   if (!reached.length) {
     // A rung that resolved to nobody is a real outcome and the one worth
     // saying loudest: the ladder moved and no phone rang.
