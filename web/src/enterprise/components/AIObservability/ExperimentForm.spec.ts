@@ -73,6 +73,7 @@ const provider = {
   id: "pe-1",
   name: "Production OpenAI",
   providerType: "openai",
+  resolvedEndpoint: "https://api.openai.com/v1/chat/completions",
   availableModels: ["gpt-4o"],
 };
 
@@ -345,7 +346,7 @@ describe("ExperimentForm", () => {
     await flushPromises();
     const summary = wrapper.find('[data-test="ai-experiment-form-provider-summary"]');
     expect(summary.exists()).toBe(true);
-    expect(summary.text()).toContain("api.openai.com");
+    expect(summary.text()).toContain("https://api.openai.com/v1/chat/completions");
   });
 
   it("re-fetches the provider list from the refresh button", async () => {

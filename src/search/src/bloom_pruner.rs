@@ -516,21 +516,20 @@ fn try_predicate(cond: &Condition, bloom_indexed_fields: &HashSet<String>) -> Op
                 values: values.clone(),
             })
         }
-        Condition::Or(left, right) => {
-            let lp = try_predicate(left, bloom_indexed_fields)?;
-            let rp = try_predicate(right, bloom_indexed_fields)?;
-            if lp.field != rp.field {
-                return None;
+        Condition::Or(items) => {
+            let mut iter = items.iter();
+            let mut acc = try_predicate(iter.next()?, bloom_indexed_fields)?;
+            for item in iter {
+                let p = try_predicate(item, bloom_indexed_fields)?;
+                if p.field != acc.field {
+                    return None;
+                }
+                acc.values.extend(p.values);
             }
-            let mut values = lp.values;
-            values.extend(rp.values);
             // Dedup so e.g. `f = a OR f IN (a, b)` doesn't fetch the same row twice.
-            values.sort();
-            values.dedup();
-            Some(Predicate {
-                field: lp.field,
-                values,
-            })
+            acc.values.sort();
+            acc.values.dedup();
+            Some(acc)
         }
         _ => None,
     }
@@ -618,10 +617,10 @@ mod tests {
     fn test_collect_same_field_or_of_equals_flattens() {
         // `trace_id = b OR trace_id = a` → one Predicate, values sorted+deduped
         // (semantically `trace_id IN (a, b)`).
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "b".into())),
-            Box::new(Condition::Equal("trace_id".into(), "a".into())),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "b".into()),
+            Condition::Equal("trace_id".into(), "a".into()),
+        ])]);
         let p = collect_decidable(&c, &fields(&["trace_id"]));
         assert_eq!(p.len(), 1);
         assert_eq!(p[0].field, "trace_id");
@@ -631,14 +630,10 @@ mod tests {
     #[test]
     fn test_collect_same_field_or_mixed_eq_and_in_flattens() {
         // `trace_id = a OR trace_id IN (b, c)` → one Predicate { values: [a, b, c] }
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "a".into())),
-            Box::new(Condition::In(
-                "trace_id".into(),
-                vec!["b".into(), "c".into()],
-                false,
-            )),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "a".into()),
+            Condition::In("trace_id".into(), vec!["b".into(), "c".into()], false),
+        ])]);
         let p = collect_decidable(&c, &fields(&["trace_id"]));
         assert_eq!(p.len(), 1);
         assert_eq!(
@@ -650,14 +645,11 @@ mod tests {
     #[test]
     fn test_collect_nested_or_chain_flattens() {
         // (trace_id = 1 OR trace_id = 2) OR trace_id = 3 → one Predicate.
-        let inner = Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "1".into())),
-            Box::new(Condition::Equal("trace_id".into(), "2".into())),
-        );
-        let outer = Condition::Or(
-            Box::new(inner),
-            Box::new(Condition::Equal("trace_id".into(), "3".into())),
-        );
+        let inner = Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "1".into()),
+            Condition::Equal("trace_id".into(), "2".into()),
+        ]);
+        let outer = Condition::Or(vec![inner, Condition::Equal("trace_id".into(), "3".into())]);
         let p = collect_decidable(&cond(vec![outer]), &fields(&["trace_id"]));
         assert_eq!(p.len(), 1);
         assert_eq!(
@@ -669,14 +661,10 @@ mod tests {
     #[test]
     fn test_collect_or_dedups_values() {
         // `trace_id = a OR trace_id IN (a, b)` → values = [a, b], one row each.
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "a".into())),
-            Box::new(Condition::In(
-                "trace_id".into(),
-                vec!["a".into(), "b".into()],
-                false,
-            )),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "a".into()),
+            Condition::In("trace_id".into(), vec!["a".into(), "b".into()], false),
+        ])]);
         let p = collect_decidable(&c, &fields(&["trace_id"]));
         assert_eq!(p.len(), 1);
         assert_eq!(p[0].values, vec!["a".to_string(), "b".to_string()]);
@@ -686,20 +674,20 @@ mod tests {
     fn test_collect_cross_field_or_skipped() {
         // `trace_id = a OR service = x` — joining across fields would weaken
         // the filter, so the whole Or is dropped.
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "a".into())),
-            Box::new(Condition::Equal("service".into(), "x".into())),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "a".into()),
+            Condition::Equal("service".into(), "x".into()),
+        ])]);
         assert!(collect_decidable(&c, &fields(&["trace_id", "service"])).is_empty());
     }
 
     #[test]
     fn test_collect_or_with_negated_in_skipped() {
         // Any leaf we can't fold (here a negated In) collapses the whole Or.
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("trace_id".into(), "a".into())),
-            Box::new(Condition::In("trace_id".into(), vec!["b".into()], true)),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("trace_id".into(), "a".into()),
+            Condition::In("trace_id".into(), vec!["b".into()], true),
+        ])]);
         assert!(collect_decidable(&c, &fields(&["trace_id"])).is_empty());
     }
 
@@ -707,10 +695,10 @@ mod tests {
     fn test_collect_or_on_non_indexed_field_skipped() {
         // Both branches positive Eq on the same name, but the field is not in
         // the bloom-indexed set — leaves fold to None, whole Or is dropped.
-        let c = cond(vec![Condition::Or(
-            Box::new(Condition::Equal("body".into(), "a".into())),
-            Box::new(Condition::Equal("body".into(), "b".into())),
-        )]);
+        let c = cond(vec![Condition::Or(vec![
+            Condition::Equal("body".into(), "a".into()),
+            Condition::Equal("body".into(), "b".into()),
+        ])]);
         assert!(collect_decidable(&c, &fields(&["trace_id"])).is_empty());
     }
 
@@ -719,10 +707,10 @@ mod tests {
         // Top-level AND of (same-field Or) + (Equal on a different bloom field):
         // both produce a Predicate; pruner ANDs them.
         let c = cond(vec![
-            Condition::Or(
-                Box::new(Condition::Equal("trace_id".into(), "a".into())),
-                Box::new(Condition::Equal("trace_id".into(), "b".into())),
-            ),
+            Condition::Or(vec![
+                Condition::Equal("trace_id".into(), "a".into()),
+                Condition::Equal("trace_id".into(), "b".into()),
+            ]),
             Condition::Equal("user_id".into(), "u-1".into()),
         ]);
         let p = collect_decidable(&c, &fields(&["trace_id", "user_id"]));

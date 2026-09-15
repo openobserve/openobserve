@@ -499,6 +499,10 @@ export class LogsPage {
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
+        this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
+        this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2235,46 +2239,55 @@ export class LogsPage {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
         await this.waitForEditorValue(`FROM "${streamA}"`);
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLimit() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
-        // waitForEditorValue only confirms searchObj.data.query has flushed — it says
-        // nothing about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect
-        // (SearchBar.vue's onQueryEditorUpdate) that can still be mid-flight. A LIMIT
-        // clause is invalid outside SQL mode, so callers that skip an explicit SQL-mode
-        // step (e.g. Streams/streaming.spec.js) would race the backend into rejecting it
-        // with "LIMIT is not supported without SQL mode". Force the real flag here so this
-        // query is deterministically SQL-mode regardless of caller or auto-detect timing.
-        if (!(await this._isSqlModeEnabledViaVue())) {
-            await this._setSqlModeViaVue(true);
-        }
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLike() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameLeftJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the LEFT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('LEFT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameRightJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameFullJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
+    }
+
+    // waitForEditorValue only confirms searchObj.data.query has flushed — it says nothing
+    // about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect (SearchBar.vue's
+    // onQueryEditorUpdate) that can still be mid-flight. A join query built this way is
+    // invalid outside SQL mode (e.g. a LIMIT clause), so callers that skip an explicit
+    // SQL-mode step (e.g. Streams/streaming.spec.js) race the backend into rejecting it.
+    // Force the real flag here so every kubernetesContainerName*Join* helper is
+    // deterministically SQL-mode regardless of caller or auto-detect timing.
+    async _ensureSqlModeAfterJoinQuery() {
+        if (!(await this._isSqlModeEnabledViaVue())) {
+            await this._setSqlModeViaVue(true);
+        }
     }
 
     /**
@@ -10760,6 +10773,21 @@ export class LogsPage {
     async expectLogsTableVisible() {
         await expect(this.page.locator(this.logsSearchResultLogsTable)).toBeVisible({ timeout: 30000 });
         testLogger.info('Logs table is visible');
+    }
+
+    /** Assert the settled results grid shows real rows, not the skeleton or a banner. */
+    async expectResultsGridSettledWithRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
+        testLogger.info('Results grid settled with rows, no skeleton or loading banner');
+    }
+
+    /** Assert the results progress bar has faded out once the search settled. */
+    async expectResultsProgressBarFadedOut() {
+        // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
+        await expect(this.page.locator(this.resultsProgressBar)).toHaveClass(/opacity-0/);
+        testLogger.info('Results progress bar faded out after the search settled');
     }
 
     // ============================================================================

@@ -24,10 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @update:open="$emit('update:open', $event)"
   >
     <div data-test="dashboard-settings-main-container" class="h-full [min-height:inherit] p-0">
-      <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled>
+      <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled :horizontal="isMobile">
         <template v-slot:before>
           <div class="functions-tabs w-full">
-            <OTabs v-model="activeTab" orientation="vertical">
+            <OTabs v-model="activeTab" :orientation="isMobile ? 'horizontal' : 'vertical'">
               <OTab
                 name="generalSettings"
                 icon="settings"
@@ -85,7 +85,7 @@ import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
-import { defineComponent, ref } from "vue";
+import { computed, defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
@@ -93,6 +93,7 @@ import GeneralSettings from "../../components/dashboards/settings/GeneralSetting
 import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue";
 import TabsSettings from "../../components/dashboards/settings/TabsSettings.vue";
 import { getImageURL } from "../../utils/zincutils";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export default defineComponent({
   name: "AppSettings",
@@ -120,7 +121,15 @@ export default defineComponent({
     const router = useRouter();
     const activeTab: any = ref("generalSettings");
     const templates = ref([]);
-    const splitterModel = ref(220);
+    // < md the splitter is horizontal, so its size is the tab strip's height, not the rail width.
+    const { isMobile } = useBreakpoint();
+    const splitterWidth = ref(220);
+    const splitterModel = computed({
+      get: () => (isMobile.value ? 48 : splitterWidth.value),
+      set: (v: number) => {
+        if (!isMobile.value) splitterWidth.value = v;
+      },
+    });
 
     const refreshRequired = () => {
       emit("refresh");
@@ -131,6 +140,7 @@ export default defineComponent({
       store,
       router,
       splitterModel,
+      isMobile,
       activeTab,
       templates,
       getImageURL,
@@ -157,6 +167,14 @@ export default defineComponent({
 :deep(.o-splitter__before) {
   /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the splitter rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
   border-right: 1px solid var(--color-border-default);
+}
+
+@media (max-width: 47.99rem) {
+  :deep(.o-splitter__before) {
+    border-right: none;
+    /* eslint-disable-next-line local/no-hardcoded-px -- hairline, same as above */
+    border-bottom: 1px solid var(--color-border-default);
+  }
 }
 
 /* Let the settings tab content fill the splitter's full height so panels with a

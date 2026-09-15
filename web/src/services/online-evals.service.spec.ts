@@ -131,7 +131,6 @@ describe("URL construction", () => {
       providerId: "provider-1",
     });
   });
-
   it("providers.list hits /api/{orgId}/providers", async () => {
     mockGet.mockResolvedValue({ data: [] });
     await onlineEvalsService.providers.list("acme");

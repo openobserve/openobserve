@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250">
+  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250" compact-mode="strip">
     <template #tabs>
       <ORouteTab
         name="ingestLogs"

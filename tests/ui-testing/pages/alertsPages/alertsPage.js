@@ -2891,7 +2891,10 @@ export class AlertsPage {
         // The folder-list refetch after navigation lags under CI load, so reload + retry once
         // (mirrors verifyAlertCreated) rather than failing on a single slow fetch.
         const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
-        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+        // waitFor, NOT isVisible({timeout}) — locator.isVisible() IGNORES its timeout and answers in ~14ms, so the wait above was really "probe once, then always reload", leaving the row one post-reload window that times out under shard contention.
+        const rowAppeared = (timeout) =>
+            firstRow.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+        if (!(await rowAppeared(15000))) {
             await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
             await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
             // The reload just put us back on the default folder. Without re-selecting, the rows
@@ -2900,7 +2903,7 @@ export class AlertsPage {
             if (this.lastNavigatedFolder && this.lastNavigatedFolder !== 'default') {
                 await this.navigateToFolder(this.lastNavigatedFolder);
             }
-            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 30000 });
         }
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');

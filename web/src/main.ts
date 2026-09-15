@@ -32,6 +32,7 @@ import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -126,12 +127,17 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",
-        allowedTracingUrls: [
-          {
-            match: store.state.API_ENDPOINT + "/api",
-            propagatorTypes: ["openobserve", "tracecontext"],
-          },
-        ],
+        // Same-origin only: cross-origin (dev against a remote cluster) the
+        // injected headers fail the CORS preflight and kill every API call.
+        // See shouldPropagateTracing.
+        allowedTracingUrls: shouldPropagateTracing(store.state.API_ENDPOINT, window.location.origin)
+          ? [
+              {
+                match: store.state.API_ENDPOINT + "/api",
+                propagatorTypes: ["openobserve", "tracecontext"],
+              },
+            ]
+          : [],
         beforeSend: (event) => {
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {

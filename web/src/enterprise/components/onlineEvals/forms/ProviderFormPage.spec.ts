@@ -19,6 +19,7 @@ vi.mock("@/services/online-evals.service", () => ({
     providers: {
       create: vi.fn(),
       update: vi.fn(),
+
       testConfig: vi.fn(),
     },
   },
@@ -62,6 +63,7 @@ describe("ProviderFormPage", () => {
     vi.clearAllMocks();
     (onlineEvalsService.providers.create as any).mockResolvedValue({});
     (onlineEvalsService.providers.update as any).mockResolvedValue({});
+
     (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Connection OK");
   });
 

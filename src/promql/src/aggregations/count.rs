@@ -13,75 +13,63 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
-use hashbrown::HashMap;
-use promql_parser::parser::LabelModifier;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc};
+use crate::aggregations::{Accumulate, AggFunc, group_series};
 
-pub fn count(param: &Option<LabelModifier>, data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    let start = std::time::Instant::now();
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] count() started",
-        eval_ctx.trace_id,
-    );
-
-    let result = super::eval_aggregate(param, data, Count, eval_ctx);
-    log::info!(
-        "[trace_id: {}] [PromQL Timing] count() execution took: {:?}",
-        eval_ctx.trace_id,
-        start.elapsed()
-    );
-    result
-}
-
+#[derive(Clone, Copy)]
 pub struct Count;
 
 impl AggFunc for Count {
+    type Accumulator = CountAccumulate;
+
     fn name(&self) -> &'static str {
         "count"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(CountAccumulate::new())
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        CountAccumulate {
+            counts: vec![0; slots],
+        }
     }
 }
 
 pub struct CountAccumulate {
-    count: HashMap<i64, usize>,
+    counts: Vec<u64>,
 }
 
 impl CountAccumulate {
-    fn new() -> Self {
-        CountAccumulate {
-            count: HashMap::new(),
-        }
+    fn push(&mut self, slot: usize, _value: f64) {
+        self.counts[slot] += 1;
     }
 }
 
 impl Accumulate for CountAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let entry = self.count.entry(sample.timestamp).or_insert(0);
-        *entry += 1;
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, count) in other.count {
-            *self.count.entry(timestamp).or_insert(0) += count;
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+    fn merge(&mut self, other: Self) {
+        for (count, other) in self.counts.iter_mut().zip(other.counts) {
+            *count += other;
+        }
     }
 
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.count
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .counts
             .into_iter()
-            .map(|(timestamp, count)| Sample::new(timestamp, count as f64))
-            .collect()
+            .enumerate()
+            .filter(|(_, count)| *count > 0)
+            .map(|(slot, count)| Sample::new(timestamps[slot], count as f64))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
@@ -89,15 +77,16 @@ impl Accumulate for CountAccumulate {
 mod tests {
     use std::sync::Arc;
 
-    use config::meta::promql::value::{Label, RangeValue, Sample, Value};
+    use config::meta::promql::value::{EvalContext, Label, RangeValue, Sample, Value};
 
     use super::*;
+    use crate::aggregations::eval_aggregate;
 
     #[test]
     fn test_count_value_none_input() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = count(&None, Value::None, &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::None, Count, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -105,7 +94,7 @@ mod tests {
     fn test_count_invalid_input_returns_err() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = count(&None, Value::Float(1.0), &eval_ctx);
+        let result = eval_aggregate(&None, Value::Float(1.0), Count, &eval_ctx);
         assert!(result.is_err());
     }
 
@@ -113,7 +102,7 @@ mod tests {
     fn test_count_empty_matrix_returns_none() {
         let timestamp = 1640995200;
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
-        let result = count(&None, Value::Matrix(vec![]), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, Value::Matrix(vec![]), Count, &eval_ctx).unwrap();
         assert!(matches!(result, Value::None));
     }
 
@@ -156,7 +145,7 @@ mod tests {
         let eval_ctx = EvalContext::new(timestamp, timestamp + 1, 1, "test".to_string());
 
         // Test count without label grouping - all samples should be counted together
-        let result = count(&None, data.clone(), &eval_ctx).unwrap();
+        let result = eval_aggregate(&None, data.clone(), Count, &eval_ctx).unwrap();
 
         match result {
             Value::Matrix(matrix) => {

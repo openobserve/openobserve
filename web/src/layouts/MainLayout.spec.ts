@@ -2002,3 +2002,48 @@ describe("MainLayout Methods and Functions", () => {
     });
   });
 });
+
+// The AI Observability nav entry's visibility formula, pinned as a pure
+// predicate (mirroring this file's own style for computed-property logic
+// elsewhere): `isOnlineEvalsEnabled.value || isOssBuild`, where
+// `isOnlineEvalsEnabled = (isEnterprise || isCloud) && online_evals_enabled`
+// and `isOssBuild = !(isEnterprise || isCloud)`. A true OSS build always
+// shows the menu (Monitor ships there with no backend flag); enterprise/cloud
+// still gate the FULL module behind the online_evals_enabled flag as before.
+describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenuVisible)", () => {
+  function isAiObservabilityMenuVisible(
+    isEnterprise: "true" | "false",
+    isCloud: "true" | "false",
+    onlineEvalsEnabled: boolean,
+  ): boolean {
+    const isEnterpriseOrCloud = isEnterprise === "true" || isCloud === "true";
+    const isOnlineEvalsEnabled = isEnterpriseOrCloud && onlineEvalsEnabled;
+    const isOssBuild = !isEnterpriseOrCloud;
+    return isOnlineEvalsEnabled || isOssBuild;
+  }
+
+  it("shows the menu on a true OSS build regardless of the online_evals_enabled flag", () => {
+    expect(isAiObservabilityMenuVisible("false", "false", false)).toBe(true);
+    expect(isAiObservabilityMenuVisible("false", "false", true)).toBe(true);
+  });
+
+  it("hides the menu on an enterprise build when online_evals_enabled is false", () => {
+    expect(isAiObservabilityMenuVisible("true", "false", false)).toBe(false);
+  });
+
+  it("shows the menu on an enterprise build only once online_evals_enabled is true", () => {
+    expect(isAiObservabilityMenuVisible("true", "false", true)).toBe(true);
+  });
+
+  it("hides the menu on a cloud build when online_evals_enabled is false", () => {
+    expect(isAiObservabilityMenuVisible("false", "true", false)).toBe(false);
+  });
+
+  it("shows the menu on a cloud build once online_evals_enabled is true", () => {
+    expect(isAiObservabilityMenuVisible("false", "true", true)).toBe(true);
+  });
+
+  it("shows the menu when both isEnterprise and isCloud are true and the flag is on", () => {
+    expect(isAiObservabilityMenuVisible("true", "true", true)).toBe(true);
+  });
+});

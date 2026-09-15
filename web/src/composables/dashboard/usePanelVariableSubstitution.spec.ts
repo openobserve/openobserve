@@ -312,6 +312,47 @@ describe("replaceQueryValue", () => {
     expect(query).toContain("'staging'");
   });
 
+  // Regression: escaping must apply regardless of the variable's own
+  // escapeSingleQuotes flag (makeInstWithVar sets it to false above) — the
+  // substitution now always doubles an embedded single quote.
+  it("escapes an embedded single quote in a scalar variable even when escapeSingleQuotes is false", () => {
+    const inst = makeInstWithVar("city", "O'Hare");
+    const { query } = inst.replaceQueryValue("SELECT * WHERE city='$city'", 0, 300_000_000, "sql");
+    expect(query).toContain("city='O''Hare'");
+  });
+
+  it("escapes an embedded single quote in each multi-select value", () => {
+    const inst = makeInstWithVar("city", ["O'Hare", "plain"], true);
+    const { query } = inst.replaceQueryValue(
+      "SELECT * WHERE city IN ($city)",
+      0,
+      300_000_000,
+      "sql",
+    );
+    expect(query).toContain("'O''Hare'");
+    expect(query).toContain("'plain'");
+  });
+
+  // `=~"$host_name"` is a regex alternation, so a comma join would match nothing —
+  // this is what keeps the host_metrics dashboard working for 2+ selected hosts.
+  it("pipe-joins a multi-select variable for promql regex matching", () => {
+    const inst = makeInstWithVar("host_name", ["web-01", "web-02"], true);
+    const { query } = inst.replaceQueryValue(
+      'system_cpu_time{host_name=~"$host_name"}',
+      0,
+      300_000_000,
+      "promql",
+    );
+    expect(query).toBe('system_cpu_time{host_name=~"web-01|web-02"}');
+  });
+
+  it("pipe-joins the ${var} and :pipe spellings identically for promql", () => {
+    const inst = makeInstWithVar("host_name", ["web-01", "web-02"], true);
+    const run = (q: string) => inst.replaceQueryValue(q, 0, 300_000_000, "promql").query;
+    expect(run('x{h=~"${host_name}"}')).toBe('x{h=~"web-01|web-02"}');
+    expect(run('x{h=~"${host_name:pipe}"}')).toBe('x{h=~"web-01|web-02"}');
+  });
+
   it("uses SELECT_ALL_VALUE (*) for null scalar variable value", () => {
     const varValues = [
       {

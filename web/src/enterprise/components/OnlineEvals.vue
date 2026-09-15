@@ -139,7 +139,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching
                the other AI pages' AiPageShell header. -->
           <AiLastRefreshed
-            class="me-1"
+            class="me-1 max-lg:hidden"
             :last-run-at="qualityLastRunAt"
             :loading="qualityRefreshing"
             data-test="quality-last-refreshed"
@@ -148,6 +148,7 @@ the Free Software Foundation, either version 3 of the License, or
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
           <OButton
@@ -201,6 +202,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
+            :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
             :scorers="scorers"
@@ -219,6 +221,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
+            :forbidden="scorersForbidden"
             :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
             :jobs="jobs"
@@ -240,6 +243,7 @@ the Free Software Foundation, either version 3 of the License, or
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
+            :forbidden="jobsForbidden"
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
@@ -503,6 +507,9 @@ const {
   scoreConfigVersions,
   providers,
   isLoading,
+  jobsForbidden,
+  scorersForbidden,
+  scoreConfigsForbidden,
   loadAll,
   loadProviders,
   ensureScoreConfigVersions,

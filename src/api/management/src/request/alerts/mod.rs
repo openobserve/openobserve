@@ -24,7 +24,7 @@ use axum::{
 use axum_extra::extract::Query as ExtraQuery;
 use config::meta::{
     alerts::alert::{Alert as MetaAlert, AlertTypeFilter},
-    triggers::{Trigger, TriggerModule},
+    triggers::{ScheduledTriggerData, Trigger, TriggerModule},
 };
 use db::scheduler;
 use hashbrown::HashMap;
@@ -84,6 +84,87 @@ pub mod incidents;
 pub mod slack_oauth;
 pub mod templates;
 
+/// Reject an `oncall_team` that names no on-call team in this organization.
+///
+/// A mistyped or cross-org team id is not a loud failure later: routing takes
+/// `alerts.oncall_team` as its highest-precedence tier, finds no such team, and
+/// the page reaches nobody. Save is the one moment when somebody is looking, so
+/// the id is checked here rather than at 3am.
+///
+/// `None` — absent, `null` or an empty string — clears the binding and is always
+/// allowed.
+async fn validate_oncall_team(org_id: &str, team_id: Option<&str>) -> Result<(), Response> {
+    let Some(team_id) = team_id else {
+        return Ok(());
+    };
+    // `get` filters on org_id, so a real team belonging to another tenant reads
+    // as "not found" — which is exactly the answer this alert deserves.
+    match infra::table::oncall_teams::get(org_id, team_id).await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(MetaHttpResponse::bad_request(format!(
+            "oncall_team `{team_id}` is not an on-call team in this organization"
+        ))),
+        Err(e) => {
+            log::error!("[alerts] validating oncall_team: {e}");
+            Err(MetaHttpResponse::internal_error(e.to_string()))
+        }
+    }
+}
+
+/// Advisories about who this alert will page, for a save that has succeeded.
+///
+/// Same posture as `validate_oncall_team` — say it at save — but a warning
+/// rather than a refusal: routing is not being changed, and an operator who
+/// meant it must still be able to save. An alert bound to an explicit
+/// `oncall_team` is silent here, because ownership rules never get a say.
+async fn paging_warnings(_org_id: &str, _alert: &MetaAlert) -> Vec<String> {
+    #[cfg(feature = "enterprise")]
+    {
+        if _alert
+            .oncall_team
+            .as_deref()
+            .is_some_and(|t| !t.trim().is_empty())
+        {
+            return Vec::new();
+        }
+        let rules = match o2_enterprise::enterprise::oncall::routing::list_rules(_org_id).await {
+            Ok(rules) => rules,
+            Err(e) => {
+                // Never fails the save: the alert is already stored, and an
+                // advisory that cannot be computed is not an error the caller
+                // can act on.
+                log::error!("[alerts] reading ownership rules for save-time warnings: {e}");
+                return Vec::new();
+            }
+        };
+        let semantic_groups = db::system_settings::get_semantic_field_groups(_org_id).await;
+        o2_enterprise::enterprise::oncall::routing::paging_warnings(
+            &semantic_groups,
+            &_alert.query_condition,
+            &rules,
+        )
+    }
+    #[cfg(not(feature = "enterprise"))]
+    Vec::new()
+}
+
+/// Reject a `runbook_url` that is not a link.
+///
+/// Refused at save, when somebody is looking, rather than stored and left to
+/// fail at read. A runbook is read at exactly one moment — the middle of a page
+/// — and "the link does nothing" is then indistinguishable from "there is no
+/// runbook".
+///
+/// `None` clears the link and is always allowed.
+fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
+    let Some(url) = url else {
+        return Ok(());
+    };
+    config::meta::alerts::alert::normalize_runbook_url(url)
+        .map(|_| ())
+        .map_err(MetaHttpResponse::bad_request)
+}
+
 /// CreateAlert
 #[utoipa::path(
     post,
@@ -141,6 +222,12 @@ pub async fn create_alert(
     }
     let overwrite = is_overwrite(query_str);
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     if alert.owner.clone().filter(|o| !o.is_empty()).is_none() {
         alert.owner = Some(user_email.user_id.clone());
     }
@@ -148,11 +235,15 @@ pub async fn create_alert(
 
     let client = get_orm_client_rw().await;
     match alert::create(client, &org_id, &folder_id, alert, overwrite).await {
-        Ok(v) => MetaHttpResponse::json(
-            MetaHttpResponse::message(StatusCode::OK, "Alert saved")
-                .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
-                .with_name(v.name),
-        ),
+        Ok(v) => {
+            let warnings = paging_warnings(&org_id, &v).await;
+            MetaHttpResponse::json(
+                MetaHttpResponse::message(StatusCode::OK, "Alert saved")
+                    .with_id(v.id.map(|id| id.to_string()).unwrap_or_default())
+                    .with_name(v.name)
+                    .with_warnings(warnings),
+            )
+        }
         Err(e) => e.into(),
     }
 }
@@ -316,7 +407,7 @@ fn composite_input(
         warning_counts_as_firing: condition.warning_counts_as_firing,
         stale_child_policy: condition.stale_child_policy.storage_id(),
         destinations: alert.destinations,
-        template: alert.template,
+        template: alert.template.filter(|s| !s.is_empty()),
         context_attributes: alert
             .context_attributes
             .map(|value| serde_json::json!(value)),
@@ -494,12 +585,26 @@ async fn composite_detail_response(
 fn composite_list_item(
     definition: infra::table::entity::alert_composites::Model,
     folder_name: &str,
+    trigger_data: &mut HashMap<String, Trigger>,
 ) -> Option<ListAlertsResponseBodyItem> {
     let alert_id = Ksuid::from_str(&definition.id).ok()?;
     let tags = definition
         .tags
         .and_then(|tags| serde_json::from_value(tags).ok())
         .unwrap_or_default();
+
+    let (last_triggered_at, last_satisfied_at) =
+        if let Some(trigger) = trigger_data.remove(&alert_id.to_string()) {
+            (
+                trigger.end_time,
+                serde_json::from_str::<ScheduledTriggerData>(&trigger.data)
+                    .ok()
+                    .and_then(|trigger_data| trigger_data.last_satisfied_at),
+            )
+        } else {
+            (None, None)
+        };
+
     Some(ListAlertsResponseBodyItem {
         alert_id,
         folder_id: definition.folder_id.clone(),
@@ -511,8 +616,8 @@ fn composite_list_item(
         condition: None,
         trigger_condition: None,
         enabled: definition.enabled,
-        last_triggered_at: None,
-        last_satisfied_at: None,
+        last_triggered_at,
+        last_satisfied_at,
         is_real_time: false,
         last_trained_at: None,
         status: None,
@@ -523,6 +628,7 @@ fn composite_list_item(
         level: None,
         level_since: None,
         priority: definition.priority.map(|value| value as u8),
+        oncall_team: None,
         tags,
         destinations: Vec::new(),
         template: None,
@@ -1872,12 +1978,21 @@ pub async fn update_alert(
     let alert_fields_for_fallback = req_body.alert.clone();
 
     let mut alert: MetaAlert = req_body.into();
+    if let Err(resp) = validate_oncall_team(&org_id, alert.oncall_team.as_deref()).await {
+        return resp;
+    }
+    if let Err(resp) = validate_runbook_url(alert.runbook_url.as_deref()) {
+        return resp;
+    }
     alert.last_edited_by = Some(user_email.user_id.clone());
     alert.id = Some(alert_id);
 
     let client = get_orm_client_rw().await;
     match alert::update(client, &org_id, None, alert).await {
-        Ok(_) => MetaHttpResponse::ok("Alert Updated"),
+        Ok(v) => MetaHttpResponse::json(
+            MetaHttpResponse::message(StatusCode::OK, "Alert Updated")
+                .with_warnings(paging_warnings(&org_id, &v).await),
+        ),
         Err(AlertError::AlertNotFound) => {
             #[cfg(not(feature = "enterprise"))]
             {
@@ -2632,7 +2747,12 @@ pub async fn list_alerts(
                         .collect()
                 })
                 .unwrap_or_default();
-
+        let mut trigger_data = scheduler::list_by_org(&org_id, Some(TriggerModule::CompositeAlert))
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|t| (t.module_key.clone(), t))
+            .collect();
         for definition in composite_definitions {
             if !folder_slug
                 .as_ref()
@@ -2659,7 +2779,8 @@ pub async fn list_alerts(
                 .get(&definition.folder_id)
                 .cloned()
                 .unwrap_or_else(|| definition.folder_id.clone());
-            let Some(item) = composite_list_item(definition, &folder_name) else {
+            let Some(item) = composite_list_item(definition, &folder_name, &mut trigger_data)
+            else {
                 continue;
             };
             let priority_matches = match &priority_filter {

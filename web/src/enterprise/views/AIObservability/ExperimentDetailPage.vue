@@ -555,6 +555,8 @@ const metricCards = computed<MetricCard[]>(() => {
   const aggregate = results.aggregateSummary;
   const task = results.taskProgress;
   const scoring = results.scoringProgress;
+  const taskOutcomes = results.taskOutcomes;
+  const scoreOutcomes = results.scoreOutcomes;
   const scoreDistribution = (results.scoreSummaries ?? []).reduce(
     (distribution, summary) => ({
       success: distribution.success + summary.sampleCount,
@@ -607,21 +609,27 @@ const metricCards = computed<MetricCard[]>(() => {
   if (task) {
     cards.push({
       key: "progress",
-      label: t("aiObservability.experiments.detail.progress"),
+      label: t("aiObservability.experiments.detail.tasks"),
       value: `${task.completed}/${task.total}`,
-      footer: task.skipped
-        ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
-        : undefined,
+      footer: taskOutcomes
+        ? t("aiObservability.experiments.detail.taskDistribution", taskOutcomes)
+        : task.skipped
+          ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
+          : undefined,
       icon: "check-circle" as IconName,
       dataTest: "ai-experiment-detail-progress",
     });
   }
-  if (scoring && (scoring.total > 0 || results.scoreSummaries?.length)) {
+  if (scoring && (scoreOutcomes?.total || scoring.total > 0 || results.scoreSummaries?.length)) {
     cards.push({
       key: "scoring",
-      label: t("aiObservability.experiments.detail.scoring"),
-      value: `${scoring.completed}/${scoring.total}`,
-      footer: t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
+      label: t("aiObservability.experiments.detail.scores"),
+      value: scoreOutcomes
+        ? `${scoreOutcomes.completed}/${scoreOutcomes.total}`
+        : `${scoring.completed}/${scoring.total}`,
+      footer: scoreOutcomes
+        ? t("aiObservability.experiments.detail.scoreOutcomeDistribution", scoreOutcomes)
+        : t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
       icon: "fact-check" as IconName,
       dataTest: "ai-experiment-detail-scoring",
     });

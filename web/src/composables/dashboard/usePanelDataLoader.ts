@@ -137,6 +137,7 @@ export const usePanelDataLoader = (
       seriesLimiting: undefined as
         | {
             totalMetricsReceived: number;
+            uniqueSeriesSeen: number;
             metricsStored: number;
             maxSeries: number;
           }
@@ -145,6 +146,7 @@ export const usePanelDataLoader = (
       queries: any;
       seriesLimiting?: {
         totalMetricsReceived: number;
+        uniqueSeriesSeen: number;
         metricsStored: number;
         maxSeries: number;
       };
