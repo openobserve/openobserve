@@ -96,6 +96,14 @@ export function splitAroundHighlight(full: string, highlight: string) {
   };
 }
 
+export function formatTimestamp(timestamp: number, t: TranslateFn) {
+  if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
+  // Timestamp is in microseconds, convert to milliseconds
+  const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
+  const date = new Date(ms);
+  return date.toLocaleString();
+}
+
 export function formatToolCallMessage(block: ToolCallBlock, t: TranslateFn) {
   if (block.tool === "testFunction") {
     if (block.success === false) {
