@@ -212,11 +212,21 @@ describe("Variables Utils", () => {
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
+    // Deliberate: this function only renders HTML/Markdown panel text (its sole callers are
+    // HTMLRenderer.vue and MarkdownRenderer.vue), where a comma list is the readable form.
+    // PromQL/SQL panel queries go through usePanelVariableSubstitution.replaceQueryValue,
+    // which already pipe-joins for promql — do not "fix" this default to `|`.
     it("should handle array values with default comma separation", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
 
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("keeps the comma default for a regex-shaped placeholder in display text", () => {
+      const content = 'up{service=~"$service"}';
+
+      expect(processVariableContent(content, mockVariablesData)).toBe('up{service=~"api,web,db"}');
     });
 
     it("should handle array values with CSV formatting", () => {

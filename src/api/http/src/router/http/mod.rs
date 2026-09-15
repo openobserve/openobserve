@@ -39,8 +39,13 @@ use config::{
 };
 use futures::StreamExt;
 use hashbrown::HashMap;
-use http_body_util::BodyExt;
+use http_body_util::{BodyExt, Limited};
 use infra::cluster;
+
+mod hec;
+
+pub use hec::is_splunk_collector_route;
+use hec::{splunk_payload_too_large, splunk_server_busy};
 
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
@@ -155,8 +160,7 @@ async fn resolve_candidates(path: &str, base_uri: &str) -> Result<(String, Vec<N
     }
 
     let nodes = order_nodes(nodes);
-    let full_path = format!("{}{}", base_uri, path);
-    Ok((full_path, nodes))
+    Ok((format!("{}{}", base_uri, path), nodes))
 }
 
 /// Orders the candidate nodes so the preferred node (per dispatch strategy) is
@@ -230,18 +234,35 @@ async fn proxy_request(
     let headers = build_request_headers(req.headers(), is_streaming);
 
     // Read the request body once and keep it buffered so it can be re-sent on
-    // each fail-over attempt. The body is held fully in memory (bounded by the
-    // usual request size limits); buffering is required because a consumed
-    // stream cannot be replayed onto another node.
-    let body = match req.into_body().collect().await {
-        Ok(collected) => collected.to_bytes(),
-        Err(e) => {
-            log::error!("Failed to read request body: {:?}", e);
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to read request body",
-            )
-                .into_response();
+    // each fail-over attempt. The body is held fully in memory; buffering is
+    // required because a consumed stream cannot be replayed onto another node.
+    //
+    // `collect()` bypasses the extractor-based DefaultBodyLimit, so unauthenticated
+    // root-level routes have to carry their own cap here.
+    let body = if is_splunk_collector_route(query_path) {
+        match Limited::new(req.into_body(), get_config().limit.req_payload_limit / 10)
+            .collect()
+            .await
+        {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::warn!("Collector request body rejected: {e}");
+                // A HEC client parses the body, so a plain-text 413 here reads
+                // as a protocol error rather than "your batch is too big".
+                return splunk_payload_too_large();
+            }
+        }
+    } else {
+        match req.into_body().collect().await {
+            Ok(collected) => collected.to_bytes(),
+            Err(e) => {
+                log::error!("Failed to read request body: {:?}", e);
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to read request body",
+                )
+                    .into_response();
+            }
         }
     };
 
@@ -300,11 +321,17 @@ fn proxy_error_response(
                 node_addr,
                 start.elapsed().as_millis()
             );
+            if is_splunk_collector_route(path) {
+                return splunk_server_busy(StatusCode::BAD_GATEWAY);
+            }
             (
                 StatusCode::BAD_GATEWAY,
                 format!("Proxy request failed: {e}"),
             )
                 .into_response()
+        }
+        None if is_splunk_collector_route(path) => {
+            splunk_server_busy(StatusCode::SERVICE_UNAVAILABLE)
         }
         None => (StatusCode::SERVICE_UNAVAILABLE, "No online nodes").into_response(),
     }
@@ -759,9 +786,39 @@ pub fn create_router_routes() -> axum::Router {
         .route("/rum/{*path}", any(dispatch))
 }
 
+/// Proxy routes for the Splunk HEC collector, for router nodes only.
+///
+/// Kept out of [`create_router_routes`] because these are mounted outside the
+/// `base_uri` nest while everything there is mounted inside it; merging both
+/// onto one path would give axum two fallbacks for it and panic at startup.
+pub fn create_splunk_collector_proxy_routes() -> axum::Router {
+    use axum::routing::any;
+
+    // Splunk forwarders POST to a bare host, so the collector has to be
+    // reachable on a router node too.
+    axum::Router::new()
+        .route("/services/collector", any(dispatch))
+        .route("/services/collector/event", any(dispatch))
+        .route("/services/collector/health", any(dispatch))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_collector_is_an_ingester_route_not_a_querier_route() {
+        // Wrong here means every forwarder is proxied to a querier.
+        assert!(!is_querier_route("/services/collector"));
+        assert!(!is_querier_route("/services/collector/event"));
+    }
+
+    #[test]
+    fn test_collector_is_registered_as_an_ingester_route() {
+        // INGESTER_ROUTES is not a rate-limit list: its consumers are
+        // is_querier_route and the cloud trial gate.
+        assert!(config::router::INGESTER_ROUTES.contains(&"/services/collector"));
+    }
 
     #[test]
     fn test_is_querier_route() {
@@ -928,5 +985,29 @@ mod tests {
         assert_eq!(max_attempts(100), 1 + max_retries);
         // capped by the number of available nodes
         assert!(max_attempts(2) <= 2);
+    }
+
+    #[tokio::test]
+    async fn collector_proxy_failures_are_splunk_shaped_and_leak_nothing() {
+        let start = std::time::Instant::now();
+        for path in ["/services/collector", "/services/collector/event"] {
+            let resp = proxy_error_response(path, None, start);
+            assert_eq!(resp.status(), StatusCode::SERVICE_UNAVAILABLE);
+            let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            let json: json::Value = json::from_slice(&body).unwrap();
+            assert_eq!(json["code"], 9, "{path}");
+            assert_eq!(json["text"], "Server is busy", "{path}");
+        }
+    }
+
+    #[tokio::test]
+    async fn non_collector_proxy_failures_keep_their_plain_text_body() {
+        let resp = proxy_error_response("/api/default/_bulk", None, std::time::Instant::now());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&body[..], b"No online nodes");
     }
 }

@@ -74,7 +74,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // per migration written (they were revised in place before the feature
 // shipped anywhere; `init_db` compares for equality and never orders these,
 // so no path can tell an intermediate value ever existed).
-pub const DB_SCHEMA_VERSION: u64 = 79;
+// 80: add splunk_token to org_ingestion_tokens.
+pub const DB_SCHEMA_VERSION: u64 = 80;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
