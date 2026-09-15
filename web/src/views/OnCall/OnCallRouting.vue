@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :conflict="conflict"
       :ladder="ladder"
       :saving="saving"
+      :allow-remove="false"
       @update:open="(v: boolean) => (dialogOpen = v)"
       @save="saveRule"
       @preview="previewConflict"
