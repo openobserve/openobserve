@@ -115,7 +115,7 @@ A test exists but does not run. Each needs a decision, not authoring.
 |---|---|---|
 | #9996  | `test.skip` in `Logs/logs-bugs.spec.js` | "timing out in current test environment (selectStream failures)" |
 | #10103 | `test.skip` in `Logs/logs-bugs.spec.js` | no reason recorded |
-| #9550  | `test.skip` in `Logs/logs-bugs.spec.js` | VRL computed field never appears after the transform — product issue |
+| #9550  | `test.skip` in `Logs/logs-bugs.spec.js` | **not** a product issue — the VRL editor never opens. See "False green: the VRL toggle" below. |
 
 #9550 existed **only** in an untracked, gitignored `.bak` file and was recovered
 into the live tree in this batch. `Logs/logstable.spec.js` claimed it had
@@ -233,6 +233,33 @@ once the app has consumed it, so `response.text()` intermittently fails with
 `logs-histogram-severity.spec.js` patches `fetch` via `addInitScript` and
 `tee()`s the stream instead, which is deterministic and leaves the app's
 progressive rendering untouched.
+
+## False green: the VRL toggle (found 2026-09-15)
+
+`logsPage.clickVrlToggleButton` targets
+`[data-test="logs-search-bar-vrl-toggle-btn"]`, which does not exist in
+`web/src` at all. Both callers wrap it in `.catch(() => {})`, so it silently
+no-ops, and `getVrlEditor()`'s `.monaco-editor` fallback then matches the SQL
+editor — which IS visible, so a "VRL editor must be visible" assertion passes.
+
+Two consequences:
+
+- **#9690** ("should load VRL function correctly when opening saved view", P1,
+  live and green) never exercises VRL. It passes without the feature under test
+  being reachable.
+- **#9550** was skipped by an earlier author who read the same symptom as a
+  product bug. It is not one.
+
+Verified against o2latestmain: with a stream selected the page holds exactly one
+Monaco editor, `query-editor` / `logs-search-bar-editor-sql`, and the toggle
+locator resolves to nothing.
+
+The correct handles are `logs-search-bar-show-query-toggle-btn` (an OSwitch on
+`searchObj.meta.showTransformEditor`, already referenced 6x in `logsPage.js`),
+`logs-search-bar-function-editor-pinned-btn` when pinned, and
+`logs-vrl-function-editor` for the editor itself. Fixing the page object
+un-blocks #9550 and makes #9690 meaningful; both need a verification run
+afterwards, so it is deliberately not bundled into this branch.
 
 ## Known gaps worth a separate pass
 
