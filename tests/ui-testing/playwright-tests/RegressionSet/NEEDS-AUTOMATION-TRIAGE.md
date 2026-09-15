@@ -149,7 +149,10 @@ test can skip.
 | #9875  | `AddAlert.schema.spec.ts:87` — the `/[:#?\s'"%&]+/` rule rejects `"bad name"` | that the rule is actually wired to the form: a name with a space blocks Save and surfaces `alerts.nameNoSpecialChars` in the UI |
 | #7280  | `ReportList.spec.ts:574` — the row leaves the list model after delete | that the rendered list updates without a reload, through a real create→delete→create cycle |
 
-## Remaining UI queue (18, plus the 4 unit-covered above = 22)
+## Remaining UI queue (19)
+
+Includes the 4 unit-covered items and #9550 (skipped, needs a selector
+rewrite). ENT-tagged rows need a paired o2-enterprise PR on the same branch name.
 
 Ordered roughly by value over setup cost. `ENT` = service-graph / SLO /
 Incidents surface, ships in `ci_matrix*.ent.json`, so it needs a paired
@@ -166,14 +169,11 @@ o2-enterprise PR on the **same branch name**.
 | #2812  | Functions | confirmation on deleting a function from a stream association |
 | #7280  | Reports | deleted report still listed until refresh |
 | #7401  | Reports | pause/resume does not re-trigger a cached report |
-| #11441 | Logs | no histogram when `severity` is numeric |
-| #11353 | Logs | automatic stacked breakdown histogram |
 | #10270 | Logs | search-around returns inconsistent counts. Partially covered: `Logs/logspage.spec.js:498` drives the exact repro (`limit` + Search Around) but asserts only that *something* rendered. The gap is a **count** assertion — extend that test rather than writing a new one. |
 | #10602 | Logs | limit count, stream tooltip, stream-list scroll |
 | #7689  | Logs | histogram API fires before all data calls finish (needs request-order interception) |
 | #11351 | Logs/Metrics/Traces | needs a shard with `O2_PERSIST_LAST_SELECTED_STREAM` |
 | #11280 | Traces | sort triggers a backend call; span kind in the tree; no 2500 cap |
-| #13224 | Dashboards | favourite dashboards (localStorage) |
 | #11360 | Traces | pod/node metrics tabs — needs metrics data alongside traces |
 | #11590 | Traces `ENT` | service-details operations table duration sort |
 | #12611 | Incidents `ENT` | quick status filter tabs |
