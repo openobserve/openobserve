@@ -3018,6 +3018,35 @@ export class PipelinesPage {
     }
 
     /**
+     * Expand a field in the Associate Query sidebar and tick its first value.
+     * @param {string} fieldName
+     * @returns {Promise<string>} the value that was ticked
+     */
+    async addQueryFieldValueFilter(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        await expandBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expandBtn.click();
+
+        const firstValue = this.page
+            .locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`)
+            .first();
+        // Field values arrive from their own request after the panel opens.
+        await firstValue.waitFor({ state: 'visible', timeout: 30000 });
+        const dataTest = await firstValue.getAttribute('data-test');
+        await firstValue.locator('button[role="checkbox"], input[type="checkbox"]').first().click();
+        await this.page.waitForTimeout(1000);
+        return (dataTest ?? '').replace(`logs-search-subfield-add-${fieldName}-`, '');
+    }
+
+    /** Untick every selected value for the open field, which removes its query condition. */
+    async clearQueryFieldValueFilter() {
+        const clearBtn = this.page.locator('[data-test="field-values-panel-clear-selection-btn"]');
+        await clearBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await clearBtn.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
      * Wait for watcher to process stream change
      * Deterministic wait that checks for query state to stabilize
      * Replaces: await page.waitForTimeout(2000) after stream change

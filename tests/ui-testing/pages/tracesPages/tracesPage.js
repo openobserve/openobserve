@@ -1682,6 +1682,26 @@ export class TracesPage {
     return true;
   }
 
+  // The detail opens on the flame graph and the last tab persists per-browser (#13347), so select explicitly.
+  /** Open the first search result's trace details on the waterfall tab. */
+  async openFirstTraceWaterfall() {
+    const firstResult = this.getTraceResultItems().first();
+    await firstResult.waitFor({ state: 'visible', timeout: 30000 });
+    await firstResult.click();
+    await this.openTraceDetailsTab('waterfall');
+    await this.page.locator(this.traceDetailsTree).waitFor({ state: 'visible', timeout: 20000 });
+  }
+
+  /**
+   * How many spans in the open trace tree carry the given span-kind badge.
+   * @param {string} kind - e.g. 'server', 'client'
+   */
+  async countSpanKindBadges(kind) {
+    return await this.page
+      .locator(`[data-test="trace-tree-span-kind-badge-${kind}"]`)
+      .count();
+  }
+
   /**
    * Check if trace details tree is visible
    * @returns {Promise<boolean>}

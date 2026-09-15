@@ -8438,6 +8438,17 @@ export class LogsPage {
     // Rule 3 Compliance: Extract raw locators from spec files into POM
     // ============================================================================
 
+    // Idempotent: restoring a saved view re-opens the editor, so a blind toggle would close it.
+    async ensureVrlEditorOpen() {
+        const editor = this.page.locator(this.fnEditor).first();
+        if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info('VRL editor already open');
+            return;
+        }
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
+    }
+
     /**
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
@@ -12188,5 +12199,168 @@ export class LogsPage {
             );
         }
         testLogger.info('Field list loaded after stream selection');
+    }
+
+    // Timed in-page: the histogram leg is SSE and Chrome frees the body once consumed, so the response event cannot time it.
+    /** Record every `_search`/`_around` call's start and end in-page. */
+    async captureSearchRequestTimeline() {
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__searchCalls = [];
+            const origFetch = w.fetch;
+            w.fetch = async (...args) => {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                if (!/_search/.test(url)) return origFetch(...args);
+                const entry = {
+                    url,
+                    isHistogram: /is_ui_histogram=true/.test(url),
+                    start: performance.now(),
+                    end: -1,
+                };
+                w.__searchCalls.push(entry);
+                const res = await origFetch(...args);
+                // A streamed body is unfinished at header time; drain a clone so `end` marks real completion.
+                if (res.body) {
+                    const copy = res.clone();
+                    (async () => {
+                        try {
+                            const reader = copy.body.getReader();
+                            for (;;) {
+                                const { done } = await reader.read();
+                                if (done) break;
+                            }
+                        } catch {
+                            // aborted by a newer query; the partial timing still orders correctly
+                        }
+                        entry.end = performance.now();
+                    })();
+                } else {
+                    entry.end = performance.now();
+                }
+                return res;
+            };
+        });
+    }
+
+    async getSearchRequestTimeline() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__searchCalls || []);
+    }
+
+    // The requested size is in the query string and the honoured size is hits.length — both sides of #10270.
+    /** Record the `_around` responses in-page. */
+    async captureAroundResponses() {
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__aroundCalls = [];
+            const origFetch = w.fetch;
+            w.fetch = async (...args) => {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const res = await origFetch(...args);
+                if (!/_around/.test(url)) return res;
+                res
+                    .clone()
+                    .json()
+                    .then((body) => {
+                        w.__aroundCalls.push({
+                            requestedSize: Number(new URL(url, location.origin).searchParams.get('size')),
+                            hits: Array.isArray(body?.hits) ? body.hits.length : -1,
+                            total: Number(body?.total ?? -1),
+                        });
+                    })
+                    .catch(() => {
+                        // non-JSON error bodies are not the subject of this assertion
+                    });
+                return res;
+            };
+        });
+    }
+
+    async getAroundResponses() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__aroundCalls || []);
+    }
+
+    // Scoped to the visible title: Visualize renders a second, stale copy of SearchResult.
+    /** Hits currently held by the results grid, from the title's `data-hits-count`. */
+    async getResultHitsCount() {
+        const title = this.page.locator(`${this.paginationRowCountTitle}:visible`).first();
+        await expect(title).toBeVisible({ timeout: 30000 });
+        await expect(title).toHaveAttribute('data-search-state', 'complete', { timeout: 60000 });
+        const raw = (await title.getAttribute('data-hits-count')) ?? '0';
+        return Number.parseInt(raw, 10) || 0;
+    }
+
+    /** Open the row-detail drawer for a result row and trigger its Search Around. */
+    async runSearchAroundFromRow(rowIndex = 0) {
+        const cell = this.page
+            .locator('[data-test="logs-search-result-logs-table"] td[data-test^="o2-table-cell-"]')
+            .nth(rowIndex);
+        await cell.waitFor({ state: 'visible', timeout: 30000 });
+        await cell.click();
+        const aroundBtn = this.page.locator(this.logsDetailTableSearchAroundBtn);
+        await aroundBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await aroundBtn.click();
+    }
+
+    /** Write `code` into the VRL editor through Monaco so the debounced v-model fires. */
+    async setVrlFunction(code) {
+        await this.ensureVrlEditorOpen();
+        const applied = await this.page.evaluate(
+            ({ selector, text }) => {
+                if (!window.monaco?.editor?.getEditors) return false;
+                const hosts = Array.from(document.querySelectorAll(selector));
+                const ed = window.monaco.editor.getEditors().find((e) => {
+                    const n = e.getDomNode?.();
+                    return n && hosts.some((h) => h.contains(n));
+                });
+                if (!ed) return false;
+                ed.focus();
+                const model = ed.getModel();
+                if (model) ed.executeEdits('vrl', [{ range: model.getFullModelRange(), text }]);
+                return true;
+            },
+            { selector: this.fnEditor, text: code },
+        );
+        if (!applied) throw new Error('setVrlFunction: no Monaco editor mounted inside the VRL host');
+        // CodeQueryEditor debounces at 500ms before searchObj.data.tempFunctionContent updates.
+        await this.page.waitForTimeout(1000);
+        testLogger.info(`VRL function set to: ${code}`);
+    }
+
+    // The list is virtualised, so a recycled-row bug only surfaces after a scroll away and back.
+    /** Labels of the first rendered stream options after scrolling the popover to the end and back. */
+    async getStreamListTopLabelsAfterScroll() {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+
+        const options = this.page.locator('[data-test="log-search-index-list-select-stream-option"]');
+        await options.first().waitFor({ state: 'visible', timeout: 15000 });
+
+        const last = options.last();
+        await last.scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(500);
+        await options.first().scrollIntoViewIfNeeded();
+        await this.page.waitForTimeout(500);
+
+        const labels = [];
+        const sampled = Math.min(await options.count(), 3);
+        for (let i = 0; i < sampled; i++) {
+            labels.push(((await options.nth(i).textContent()) ?? '').trim());
+        }
+        await this.page.keyboard.press('Escape');
+        return labels;
+    }
+
+    // The buttons are gated on the column being a real schema field, which is the whole of #9550.
+    /** Count of include/exclude term buttons in a column's hover actions. */
+    async countCellSearchTermActions(columnId, rowIndex = 0) {
+        const cell = this.page.locator(`td[data-test="o2-table-cell-${columnId}"]`).nth(rowIndex);
+        await cell.waitFor({ state: 'visible', timeout: 30000 });
+        await cell.hover();
+        const actions = this.page.locator(`[data-test="o2-table-cell-hover-actions-${columnId}"]`);
+        await actions.waitFor({ state: 'visible', timeout: 10000 });
+        return await actions
+            .locator('[data-test^="log-details-include-field-"], [data-test^="log-details-exclude-field-"]')
+            .count();
     }
 }

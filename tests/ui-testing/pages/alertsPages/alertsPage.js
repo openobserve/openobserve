@@ -3192,6 +3192,16 @@ export class AlertsPage {
     }
 
     /**
+     * Current alert name, read from the value element — OFormInlineEdit only mounts an <input> while editing.
+     * @returns {Promise<string>}
+     */
+    async getAlertNameValue() {
+        const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        await valueEl.waitFor({ state: 'visible', timeout: 30000 });
+        return ((await valueEl.textContent()) ?? '').trim();
+    }
+
+    /**
      * Select stream type from dropdown
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
      */
@@ -4416,6 +4426,18 @@ export class AlertsPage {
         // <button type="button"> inside the "Alert if" row (the first is the
         // aggregation function selector).
         return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').nth(1);
+    }
+
+    /**
+     * Value selected in the measure ("of <field>") column select; empty means the placeholder is showing.
+     * @returns {Promise<string>}
+     */
+    async getMeasureColumnSelectedValue() {
+        const trigger = this.page
+            .locator('button[name="query_condition.aggregation.having.column"]:visible')
+            .first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        return (await trigger.getAttribute('data-test-selected-value')) ?? '';
     }
 
     /**

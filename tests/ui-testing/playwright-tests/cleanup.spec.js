@@ -169,6 +169,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up functions matching test patterns
     // Patterns from sanity/pipeline tests (default org only)
     const sanityFunctionPatterns = [
+      /^e2e_2812_/,                  // function-delete-confirm.spec.js (#2812)
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
