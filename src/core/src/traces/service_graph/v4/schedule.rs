@@ -25,7 +25,7 @@ use tokio::sync::{Mutex, RwLock};
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_RETAINED,
     ORG_TABLES, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings,
-    TableRef, V1_STOP_AFTER_MICROS,
+    TableRef, V1_STOP_AFTER_MICROS, V1_STOPPED_SEEN,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{SeriesKey, Staging},
     sql::{
@@ -119,9 +119,7 @@ pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    if !is_v1_stopped().await {
-        maybe_stop_v1(now).await;
-    }
+    maybe_stop_v1(now).await;
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
@@ -258,6 +256,13 @@ async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
 
 /// Write-once switch: v4 has been writing for 7 days; no per-org data check (user ruling).
 async fn maybe_stop_v1(now: i64) {
+    if V1_STOPPED_SEEN.load(Ordering::Relaxed) {
+        return;
+    }
+    if is_v1_stopped().await {
+        V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
+        return;
+    }
     let Some(started_at) = get_started_at().await else {
         return;
     };
@@ -265,7 +270,10 @@ async fn maybe_stop_v1(now: i64) {
         return;
     }
     match set_v1_stopped_if_absent().await {
-        Ok(()) => log::info!("[ServiceGraph] v4 has run for 7 days, v1 job stopped"),
+        Ok(()) => {
+            V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
+            log::info!("[ServiceGraph] v4 has run for 7 days, v1 job stopped");
+        }
         Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
     }
 }

@@ -59,6 +59,8 @@ pub(crate) static ORG_RETAINED: LazyLock<DashMap<String, (usize, usize)>> =
     LazyLock::new(DashMap::new);
 /// `started_at` is write-once per process; this guard avoids a meta-db read on every window.
 pub(crate) static STARTED_AT_WRITTEN: AtomicBool = AtomicBool::new(false);
+/// `v1/stopped` is write-once, so a true reading never has to be repeated.
+pub(crate) static V1_STOPPED_SEEN: AtomicBool = AtomicBool::new(false);
 
 pub type StateRef = Arc<Mutex<StreamState>>;
 pub type TableRef = Arc<RwLock<ResolutionTable>>;
