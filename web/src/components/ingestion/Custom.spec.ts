@@ -99,6 +99,7 @@ describe("Custom Component", () => {
       expect(Array.isArray(wrapper.vm.rumRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.traceRoutes)).toBe(true);
       expect(Array.isArray(wrapper.vm.metricRoutes)).toBe(true);
+      expect(Array.isArray(wrapper.vm.profileRoutes)).toBe(true);
 
       expect(wrapper.vm.metricRoutes).toEqual([
         "prometheus",
@@ -111,6 +112,7 @@ describe("Custom Component", () => {
       ]);
 
       expect(wrapper.vm.traceRoutes).toEqual(["tracesOTLP", "ingestTracesFromOtel"]);
+      expect(wrapper.vm.profileRoutes).toEqual(["profilesOtelCollector"]);
       expect(wrapper.vm.rumRoutes).toEqual(["frontendMonitoring"]);
     });
   });
@@ -180,6 +182,28 @@ describe("Custom Component", () => {
       });
 
       expect(wrapper.vm.tabs).toBe("ingestTraces");
+    });
+
+    it("should set tabs to 'ingestProfiles' for profiles routes", () => {
+      mockRouter.currentRoute.value.name = "profilesOtelCollector";
+
+      wrapper = mount(Custom, {
+        props: { currOrgIdentifier: "test-org" },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            OSplitter: {
+              template: '<div><slot name="before"></slot><slot name="after"></slot></div>',
+            },
+            OTabs: true,
+            ORouteTab: true,
+            "router-view": true,
+          },
+        },
+      });
+
+      expect(wrapper.vm.tabs).toBe("ingestProfiles");
     });
 
     it("should handle custom route by redirecting to curl", () => {
