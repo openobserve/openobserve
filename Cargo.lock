@@ -10407,7 +10407,7 @@ dependencies = [
 [[package]]
 name = "rmcp-openapi"
 version = "0.23.2"
-source = "git+https://github.com/openobserve/rmcp-openapi?branch=v0.23.2-feat#6587f6dcef81eaed9a9c037edc6bb98dec8e652a"
+source = "git+https://github.com/openobserve/rmcp-openapi?branch=v0.23.2-feat#fa758f70818f6fcf31efdd6f2b64a9480afb48bb"
 dependencies = [
  "base64 0.22.1",
  "bon",
