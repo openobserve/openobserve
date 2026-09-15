@@ -90,6 +90,7 @@ import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue"
 import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 export default defineComponent({
   name: "ApiDashboard",
@@ -274,7 +275,7 @@ export default defineComponent({
       variablesData.value?.values?.length &&
         variablesData.value.values.forEach((element: any) => {
           if (element.type === "query_values" && !!element.value) {
-            variablesString += ` and ${element.name}='${element.value}'`;
+            variablesString += ` and ${sqlEquals(element.name, element.value)}`;
           }
         });
 

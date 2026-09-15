@@ -199,6 +199,7 @@ import useDurationPercentiles, {
 } from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -512,11 +513,15 @@ export default defineComponent({
     const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
       if (action === "include") {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}>=${value}` : `${fieldName}='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}>=${value}`
+            : `${fieldName}='${escapeSingleQuotes(value)}'`,
         );
       } else {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}<=${value}` : `${fieldName}!='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}<=${value}`
+            : `${fieldName}!='${escapeSingleQuotes(value)}'`,
         );
       }
     };
@@ -524,7 +529,9 @@ export default defineComponent({
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
       const expressions = values.map((v) =>
-        action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+        action === "include"
+          ? `${fieldName}='${escapeSingleQuotes(v)}'`
+          : `${fieldName}!='${escapeSingleQuotes(v)}'`,
       );
       const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
