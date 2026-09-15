@@ -389,6 +389,80 @@ describe("replaceQueryValue", () => {
     expect(query).not.toContain("${region}");
     expect(query).toContain("us-east");
   });
+
+  it("resolves $__range_s and $__range_ms instead of suffixing $__range", () => {
+    const inst = makeComposable();
+    const { query } = inst.replaceQueryValue(
+      "[$__range] [$__range_s] [$__range_ms]",
+      0,
+      900_000_000,
+      "promql",
+    );
+    expect(query).toBe("[15m] [900] [900000]");
+  });
+
+  describe("variables sharing a name prefix", () => {
+    const traceVars = [
+      { name: "traceid", type: "textbox", value: "abc123", escapeSingleQuotes: false },
+      { name: "traceid_sql", type: "textbox", value: "xyz789", escapeSingleQuotes: false },
+    ];
+
+    const makeInst = (values: any[], query: string) =>
+      usePanelVariableSubstitution({
+        panelSchema: makePanelSchema([{ query }]),
+        variablesData: makeVariablesData(values),
+        chartPanelRef: makeChartPanelRef(),
+        store: makeStore(),
+        log,
+      });
+
+    it.each([
+      ["shorter name defined first", traceVars],
+      ["longer name defined first", [...traceVars].reverse()],
+    ])("resolves each name to its own value (%s)", (_, values) => {
+      const q = "WHERE a = '$traceid_sql' AND b = '$traceid' AND c = '${traceid_sql}'";
+      const { query } = makeInst(values, q).replaceQueryValue(q, 0, 300_000_000, "sql");
+      expect(query).toBe("WHERE a = 'xyz789' AND b = 'abc123' AND c = 'xyz789'");
+    });
+
+    it("does not make a panel using only $traceid_sql depend on traceid", () => {
+      const inst = makeInst(traceVars, "WHERE a = '$traceid_sql'");
+      expect(inst.getDependentVariablesData()?.map((v: any) => v.name)).toEqual(["traceid_sql"]);
+      expect(inst.getCurrentDependentVariablesData().map((v: any) => v.name)).toEqual([
+        "traceid_sql",
+      ]);
+    });
+
+    it("reports metadata only for the variable actually used", () => {
+      const q = "WHERE a = '$traceid_sql'";
+      const { metadata } = makeInst(traceVars, q).replaceQueryValue(q, 0, 300_000_000, "sql");
+      expect(metadata.filter((m: any) => m.type === "variable")).toEqual([
+        { type: "variable", name: "traceid_sql", value: "xyz789" },
+      ]);
+    });
+
+    it("still appends a literal suffix when no longer variable name matches", () => {
+      const q = "WHERE svc = '$env-api' AND region = '$env_west'";
+      const inst = makeInst(
+        [{ name: "env", type: "textbox", value: "prod", escapeSingleQuotes: false }],
+        q,
+      );
+      expect(inst.getDependentVariablesData()?.map((v: any) => v.name)).toEqual(["env"]);
+      expect(inst.replaceQueryValue(q, 0, 300_000_000, "sql").query).toBe(
+        "WHERE svc = 'prod-api' AND region = 'prod_west'",
+      );
+    });
+
+    it("does not substitute placeholders found inside a variable value", () => {
+      const q = "WHERE a = '$traceid' AND b = '$traceid_sql'";
+      const values = [
+        { name: "traceid", type: "textbox", value: "$traceid_sql", escapeSingleQuotes: false },
+        { name: "traceid_sql", type: "textbox", value: "xyz789", escapeSingleQuotes: false },
+      ];
+      const { query } = makeInst(values, q).replaceQueryValue(q, 0, 300_000_000, "sql");
+      expect(query).toBe("WHERE a = '$traceid_sql' AND b = 'xyz789'");
+    });
+  });
 });
 
 // ─── ifPanelVariablesCompletedLoading ─────────────────────────────────────────

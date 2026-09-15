@@ -28,15 +28,20 @@ use arrow::buffer::BooleanBuffer;
 use datafusion::{common::stats::Precision, datasource::listing::PartitionedFile};
 use tokio::runtime::Runtime;
 use vortex::{
-    array::{ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray},
+    array::{
+        ArrayRef, Canonical, ExecutionCtx, IntoArray, arrays::VarBinViewArray,
+        session::ArraySessionExt,
+    },
     buffer::Buffer,
     compressor::{BtrBlocksCompressor, BtrBlocksCompressorBuilder},
     dtype::DType,
+    editions::{ComponentKind, EditionSessionExt},
     encodings::zstd::Zstd,
     error::VortexResult,
     file::WriteStrategyBuilder,
     layout::{LayoutStrategy, layouts::compressed::CompressorPlugin},
     scan::selection::Selection,
+    session::VortexSession,
 };
 use vortex_btrblocks::{SchemeExt, schemes::integer::IntDictScheme};
 use vortex_datafusion::VortexAccessPlan;
@@ -100,11 +105,9 @@ struct LongTextCompressor {
 }
 
 impl LongTextCompressor {
-    fn new() -> Self {
+    fn new(builder: BtrBlocksCompressorBuilder) -> Self {
         Self {
-            btr_compressor: BtrBlocksCompressorBuilder::default()
-                .exclude_schemes([IntDictScheme.id()])
-                .build(),
+            btr_compressor: builder.exclude_schemes([IntDictScheme.id()]).build(),
             options: LongTextCompressionOptions::default(),
         }
     }
@@ -166,12 +169,6 @@ impl LongTextCompressor {
     }
 }
 
-impl Default for LongTextCompressor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CompressorPlugin for LongTextCompressor {
     fn compress_chunk(&self, chunk: &ArrayRef, ctx: &mut ExecutionCtx) -> VortexResult<ArrayRef> {
         self.compress(chunk, ctx)
@@ -183,16 +180,31 @@ impl CompressorPlugin for LongTextCompressor {
 /// OpenObserve's custom UTF8/Zstd compressor is used by default. Vortex's
 /// native compression strategy can be enabled with
 /// `ZO_VORTEX_USE_NATIVE_COMPRESSION=true`.
-pub(super) fn vortex_write_strategy() -> Arc<dyn LayoutStrategy> {
-    build_vortex_write_strategy(config::get_config().common.vortex_use_native_compression)
+pub(super) fn vortex_write_strategy(session: &VortexSession) -> Arc<dyn LayoutStrategy> {
+    build_vortex_write_strategy(
+        session,
+        config::get_config().common.vortex_use_native_compression,
+    )
 }
 
-fn build_vortex_write_strategy(use_native_compression: bool) -> Arc<dyn LayoutStrategy> {
-    let builder = WriteStrategyBuilder::default();
+fn build_vortex_write_strategy(
+    session: &VortexSession,
+    use_native_compression: bool,
+) -> Arc<dyn LayoutStrategy> {
+    // Custom strategies must filter editions because they bypass the writer's defaults.
+    let arrays = session.arrays();
+    let allowed = session
+        .enabled_component_ids(ComponentKind::Array)
+        .iter()
+        .filter_map(|id| arrays.registry().get(id))
+        .map(|plugin| plugin.id())
+        .collect();
+    let btrblocks = BtrBlocksCompressorBuilder::default().retain_allowed_encodings(&allowed);
+    let builder = WriteStrategyBuilder::default().with_btrblocks_builder(btrblocks.clone());
     if use_native_compression {
         builder.build()
     } else {
-        let compressor = LongTextCompressor::default();
+        let compressor = LongTextCompressor::new(btrblocks);
         builder
             .with_compressor(compressor.clone())
             .with_probe_compressor(compressor)
@@ -205,7 +217,10 @@ pub fn generate_vortex_access_plan(row_ids: &BooleanBuffer) -> Option<VortexAcce
     let indices: Vec<u64> = row_ids.set_indices().map(|i| i as u64).collect();
 
     let buffer = Buffer::from(indices);
-    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(buffer));
+    let selection = VortexAccessPlan::default().with_selection(Selection::IncludeByIndex(
+        vortex::scan::strict_sorted_buffer::StrictSortedBuffer::try_new(buffer)
+            .expect("bitmap set indices are strictly increasing"),
+    ));
     Some(selection)
 }
 
@@ -301,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_long_utf8_uses_zstd() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
         let strings = (0..1024)
             .map(|i| Some(format!("long log message {i}: {}", "x".repeat(192))))
             .collect::<Vec<_>>();
@@ -316,7 +331,7 @@ mod tests {
 
     #[test]
     fn test_short_utf8_delegates_to_btrblocks() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
         let strings: Vec<_> = (0..8192)
             .map(|i| Some(format!("node-{}", i % 32)))
             .collect();
@@ -332,7 +347,7 @@ mod tests {
     fn test_non_utf8_uses_btrblocks() {
         use vortex::array::arrays::PrimitiveArray;
 
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
         let array: PrimitiveArray = vec![1i32, 2, 3, 4, 5].into_iter().collect();
 
         let mut ctx = ExecutionCtx::new(VortexSession::default());
@@ -342,7 +357,7 @@ mod tests {
 
     #[test]
     fn test_empty_string_array() {
-        let compressor = LongTextCompressor::new();
+        let compressor = LongTextCompressor::new(BtrBlocksCompressorBuilder::default());
 
         let strings: Vec<Option<&str>> = vec![];
         let array =
@@ -356,15 +371,15 @@ mod tests {
     #[tokio::test]
     async fn test_native_and_custom_write_strategies_create_files() {
         for use_native_compression in [true, false] {
-            let strings = vec![Some("test"), Some("data"), Some("test")];
-            let array = VarBinViewArray::from_iter(strings, DType::Utf8(Nullability::NonNullable))
-                .into_array();
+            // Monotonic integers exercise encodings that require opt-in editions.
+            let array = vortex::array::arrays::PrimitiveArray::from_iter(0..8192i64).into_array();
             let dtype = array.dtype().clone();
             let session = VortexSession::default().with_tokio();
-            let write_options = VortexWriteOptions::new(session)
-                .with_strategy(build_vortex_write_strategy(use_native_compression));
+            let write_options = VortexWriteOptions::new(session.clone()).with_strategy(
+                build_vortex_write_strategy(&session, use_native_compression),
+            );
             let mut buf = Vec::new();
-            let mut writer = write_options.writer(&mut buf, dtype);
+            let mut writer = write_options.writer(&mut buf, dtype.clone());
 
             writer.push(array).await.unwrap();
             writer.finish().await.unwrap();
@@ -396,9 +411,9 @@ mod tests {
         let dtype = array.dtype().clone();
         let session = VortexSession::default().with_tokio();
         let write_options = VortexWriteOptions::new(session.clone())
-            .with_strategy(build_vortex_write_strategy(false));
+            .with_strategy(build_vortex_write_strategy(&session, false));
         let mut buf = Vec::new();
-        let mut writer = write_options.writer(&mut buf, dtype);
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
 
         writer.push(array).await.unwrap();
         writer.finish().await.unwrap();
@@ -409,7 +424,7 @@ mod tests {
             .unwrap()
             .scan()
             .unwrap()
-            .with_projection(select(["body", "tag"], root()))
+            .with_projection(select(["body", "tag"], root()).bind(&dtype).unwrap())
             .into_array_stream()
             .unwrap()
             .read_all()
