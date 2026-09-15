@@ -20,9 +20,11 @@
 
 import { ref } from "vue";
 
-export type PasswordResetReason = "policy_tightened" | "rotation_expired";
+// The two server reasons, plus the advisory one the expiry banner opens the dialog with.
+export type PasswordResetReason = "policy_tightened" | "rotation_expired" | "rotation_warning";
 
 const RESET_REQUIRED_CODE = "password_reset_required";
+const RESET_REQUIRED_FOR_WRITES_CODE = "password_reset_required_for_writes";
 
 /** Mirrors the server's DEFAULT_ORG — the one organization guaranteed to exist. */
 const DEFAULT_ORG = "default";
@@ -41,6 +43,15 @@ export const remediationOrg = (store: any): string =>
 // Module scope, not per-call: every consumer must see the same flag.
 const isOpen = ref(false);
 const reason = ref<PasswordResetReason | null>(null);
+// Only the blocked state is a trap; a user who opened the dialog voluntarily may close it.
+const dismissible = ref(false);
+// restrict_writes: the session stays usable, so a refused write gets an explanation, not a trap.
+const isRestrictedPromptOpen = ref(false);
+
+const serverReason = (nextReason?: string): PasswordResetReason =>
+  nextReason === "rotation_expired" || nextReason === "policy_tightened"
+    ? nextReason
+    : "policy_tightened";
 
 export function usePasswordReset() {
   /**
@@ -51,21 +62,56 @@ export function usePasswordReset() {
    */
   const open = (nextReason?: string) => {
     if (isOpen.value) return;
-    reason.value =
-      nextReason === "rotation_expired" || nextReason === "policy_tightened"
-        ? nextReason
-        : "policy_tightened";
+    reason.value = serverReason(nextReason);
+    dismissible.value = false;
+    isOpen.value = true;
+  };
+
+  /** Open the same dialog with a way back out — ahead of expiry, or from the read-only prompt. */
+  const openVoluntarily = (nextReason: PasswordResetReason = "rotation_warning") => {
+    if (isOpen.value) return;
+    reason.value = nextReason;
+    dismissible.value = true;
     isOpen.value = true;
   };
 
   const close = () => {
     isOpen.value = false;
     reason.value = null;
+    dismissible.value = false;
   };
 
-  /** Whether a rejected response is the middleware telling us the password must change. */
+  /** A write was refused under restrict_writes: explain once, and offer the way out. */
+  const promptRestricted = (nextReason?: string) => {
+    if (isOpen.value || isRestrictedPromptOpen.value) return;
+    reason.value = serverReason(nextReason);
+    isRestrictedPromptOpen.value = true;
+  };
+
+  const closeRestrictedPrompt = () => {
+    isRestrictedPromptOpen.value = false;
+  };
+
+  /** Whether a rejected response is the middleware refusing everything until the password changes. */
   const isPasswordResetError = (error: any): boolean =>
     error?.response?.status === 403 && error?.response?.data?.code === RESET_REQUIRED_CODE;
 
-  return { isOpen, reason, open, close, isPasswordResetError };
+  /** Whether a rejected response is the middleware refusing only this write. */
+  const isWriteRestrictedError = (error: any): boolean =>
+    error?.response?.status === 403 &&
+    error?.response?.data?.code === RESET_REQUIRED_FOR_WRITES_CODE;
+
+  return {
+    isOpen,
+    reason,
+    dismissible,
+    isRestrictedPromptOpen,
+    open,
+    openVoluntarily,
+    close,
+    promptRestricted,
+    closeRestrictedPrompt,
+    isPasswordResetError,
+    isWriteRestrictedError,
+  };
 }

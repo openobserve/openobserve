@@ -21,7 +21,7 @@ import i18n from "@/locales";
 import type { PasswordPolicy as PasswordPolicyType } from "@/services/passwordPolicy";
 
 import PasswordPolicy from "./PasswordPolicy.vue";
-import { buildPolicyPayload, complexityDefaults } from "./PasswordPolicy.schema";
+import { buildPolicyPayload, lockoutLadder, policyDefaults } from "./PasswordPolicy.schema";
 
 vi.mock("@/services/passwordPolicy", () => ({
   default: {
@@ -65,6 +65,8 @@ const CONFIGURED_POLICY: PasswordPolicyType = {
     backoff: "linear",
   },
   enforcement_mode: "hard_block",
+  cookie_max_age_secs: 0,
+  apply_to_root: false,
 };
 
 const store = createStore({
@@ -91,11 +93,12 @@ const mountPage = () => {
 
 // Drives the real form rather than calling the handler, so field coercion and the OForm submit
 // path are covered too.
-const editMinLength = async (wrapper: any, value: string) => {
-  const input = wrapper.find('[data-test="settings-password-policy-min-length"] input');
+const editField = async (wrapper: any, row: string, value: string) => {
+  const input = wrapper.find(`[data-test="settings-password-policy-${row}"] input`);
   await input.setValue(value);
   await flushPromises();
 };
+const editMinLength = (wrapper: any, value: string) => editField(wrapper, "min-length", value);
 
 // Awaits TanStack's own submit promise. A DOM `trigger("submit")` starts the same chain but
 // returns before the awaited onSubmit settles, which makes the assertions race it.
@@ -226,11 +229,100 @@ describe("PasswordPolicy", () => {
       expect.objectContaining({ variant: "success", message: expect.stringContaining("12") }),
     );
   });
+
+  it("writes every card's edits in one PUT, with lockout nested", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, "rotation-days", "30");
+    await editField(wrapper, "history-count", "8");
+    await editField(wrapper, "lockout-start-secs", "300");
+    await editField(wrapper, "cookie-max-age", "3600");
+    await submit(wrapper);
+
+    const [, body] = (passwordPolicyService.updatePolicy as any).mock.calls[0];
+    expect(body.rotation_days).toBe(30);
+    expect(body.history_count).toBe(8);
+    expect(body.lockout).toEqual({ ...CONFIGURED_POLICY.lockout, start_secs: 300 });
+    expect(body.cookie_max_age_secs).toBe(3600);
+  });
+
+  it.each([
+    ["rotation-warning-days", "91"],
+    ["history-max-retained", "4"],
+    ["lockout-start-secs", "7201"],
+  ])("refuses the cross-field rule on %s", async (row, value) => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, row, value);
+    await submit(wrapper);
+
+    expect(passwordPolicyService.updatePolicy).not.toHaveBeenCalled();
+    expect(wrapper.vm.form.state.isValid).toBe(false);
+  });
+
+  it("accepts a warning window equal to the rotation period", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, "rotation-warning-days", "90");
+    await submit(wrapper);
+
+    expect(passwordPolicyService.updatePolicy).toHaveBeenCalled();
+  });
+
+  it("returns the root switch to off when the acknowledgement is dismissed", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await wrapper
+      .find('[data-test="settings-password-policy-apply-to-root"] button[role="switch"]')
+      .trigger("click");
+    await flushPromises();
+    expect(wrapper.vm.form.state.values.apply_to_root).toBe(true);
+    expect(wrapper.vm.rootDialogOpen).toBe(true);
+
+    wrapper.vm.cancelApplyToRoot();
+    await flushPromises();
+
+    expect(wrapper.vm.form.state.values.apply_to_root).toBe(false);
+    expect(wrapper.find('[data-test="settings-password-policy-root-warning"]').exists()).toBe(
+      false,
+    );
+  });
+});
+
+describe("lockoutLadder", () => {
+  it("doubles per level and stops at the ceiling", () => {
+    expect(
+      lockoutLadder({
+        threshold: 5,
+        bucket_size: 3,
+        start_secs: 60,
+        max_secs: 600,
+        backoff: "exponential",
+      }),
+    ).toEqual([60, 120, 240, 480, 600]);
+  });
+
+  it("grows linearly and caps the entry count", () => {
+    expect(
+      lockoutLadder({
+        threshold: 5,
+        bucket_size: 0,
+        start_secs: 60,
+        max_secs: 3600,
+        backoff: "linear",
+      }),
+    ).toEqual([60, 120, 180, 240, 300, 360]);
+  });
 });
 
 describe("buildPolicyPayload", () => {
-  it("overrides only the seven complexity fields", () => {
+  it("trims the special set and keeps the unedited fields", () => {
     const payload = buildPolicyPayload(CONFIGURED_POLICY, {
+      ...policyDefaults(CONFIGURED_POLICY),
       min_length: 20,
       max_length: 0,
       require_uppercase: false,
@@ -254,7 +346,7 @@ describe("buildPolicyPayload", () => {
 
   it("clears the special set when the requirement is off", () => {
     const payload = buildPolicyPayload(CONFIGURED_POLICY, {
-      ...complexityDefaults(CONFIGURED_POLICY),
+      ...policyDefaults(CONFIGURED_POLICY),
       require_special: false,
       special_char_set: "!@#",
     });
@@ -264,7 +356,7 @@ describe("buildPolicyPayload", () => {
 
   it("coerces numeric inputs, which arrive from the DOM as strings", () => {
     const payload = buildPolicyPayload(CONFIGURED_POLICY, {
-      ...complexityDefaults(CONFIGURED_POLICY),
+      ...policyDefaults(CONFIGURED_POLICY),
       min_length: "12" as unknown as number,
       max_length: "40" as unknown as number,
     });

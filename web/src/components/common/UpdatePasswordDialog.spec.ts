@@ -126,6 +126,29 @@ describe("usePasswordReset", () => {
 
     expect(usePasswordReset().reason.value).toBe("policy_tightened");
   });
+
+  it("keeps the two middleware codes apart", () => {
+    const { isWriteRestrictedError } = usePasswordReset();
+    const restricted = {
+      response: { status: 403, data: { code: "password_reset_required_for_writes" } },
+    };
+
+    expect(isWriteRestrictedError(restricted)).toBe(true);
+    expect(isPasswordResetError(restricted)).toBe(false);
+  });
+
+  it("prompts on a refused write without trapping the session", () => {
+    const { promptRestricted, isRestrictedPromptOpen, closeRestrictedPrompt } = usePasswordReset();
+    promptRestricted("rotation_expired");
+    promptRestricted("policy_tightened");
+
+    expect(isRestrictedPromptOpen.value).toBe(true);
+    expect(isOpen.value).toBe(false);
+    expect(usePasswordReset().reason.value).toBe("rotation_expired");
+
+    closeRestrictedPrompt();
+    expect(isRestrictedPromptOpen.value).toBe(false);
+  });
 });
 
 describe("UpdatePasswordDialog", () => {

@@ -22,6 +22,8 @@
 import { useForm, revalidateLogic } from "@tanstack/vue-form";
 import type { DeepKeys } from "@tanstack/form-core";
 
+import type { I18nText } from "@/types/i18n";
+
 /**
  * The set of valid field-path strings for a form of shape `T` (what
  * setFieldValue/validateField/getFieldMeta accept as their first argument).
@@ -80,3 +82,17 @@ export function useOForm<T extends Record<string, unknown>>(options: UseOFormOpt
 
 /** The form instance returned by useOForm — accepted by <OForm :form>. */
 export type OFormInstance = ReturnType<typeof useOForm<any>>;
+
+/**
+ * Pin server-reported errors onto fields, or clear them with `{}`.
+ *
+ * TanStack never re-validates the `onServer` slot on change, so a lingering entry blocks every
+ * later submit: the owner must clear it once the user edits the field again. The cast is here
+ * because useOForm declares no server validator, which narrows the slot's type to `undefined`.
+ */
+export function setServerFieldErrors<T extends Record<string, unknown>>(
+  form: ReturnType<typeof useOForm<T>>,
+  fields: Partial<Record<FormFieldPath<T>, I18nText>>,
+) {
+  form.setErrorMap({ onServer: { form: undefined, fields } as any });
+}

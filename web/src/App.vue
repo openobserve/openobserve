@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <ConfirmDialogProvider />
     <CreateAlertDialogProvider />
     <UpdatePasswordDialog />
+    <PasswordRestrictedDialog />
   </ConfigProvider>
 </template>
 
@@ -35,6 +36,7 @@ import OToastProvider from "@/lib/feedback/Toast/OToastProvider.vue";
 import ConfirmDialogProvider from "@/components/ConfirmDialogProvider.vue";
 import CreateAlertDialogProvider from "@/components/alerts/CreateAlertDialogProvider.vue";
 import UpdatePasswordDialog from "@/components/common/UpdatePasswordDialog.vue";
+import PasswordRestrictedDialog from "@/components/common/PasswordRestrictedDialog.vue";
 
 export default {
   components: {
@@ -43,6 +45,7 @@ export default {
     ConfirmDialogProvider,
     CreateAlertDialogProvider,
     UpdatePasswordDialog,
+    PasswordRestrictedDialog,
   },
   setup() {
     const store = useStore();

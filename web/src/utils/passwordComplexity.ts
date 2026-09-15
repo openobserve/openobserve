@@ -146,3 +146,18 @@ export const validateAgainstComplexity = (
   const unmet = firstUnmetRequirement(buildPasswordRequirements(complexity, t), password);
   return unmet ? t("passwordReset.req.unmet", { requirement: unmet.label }) : null;
 };
+
+// The server's wording, which is the only signal it sends: the 400 carries no code, and the
+// history depth is not in the complexity projection, so the count comes from the message too.
+const REUSE_MESSAGE = /matches one of your last (\d+) passwords/;
+
+/**
+ * The inline error for a password the server refused as a recent reuse, or `null` for any other
+ * failure. Server-only: the console never sees password history, so every requirement row can be
+ * green while this still fails.
+ */
+export const reuseRejection = (error: unknown, t: TranslateFn): I18nText | null => {
+  const message = (error as any)?.response?.data?.message;
+  const match = typeof message === "string" ? REUSE_MESSAGE.exec(message) : null;
+  return match ? t("passwordReset.reused", { count: Number(match[1]) }) : null;
+};

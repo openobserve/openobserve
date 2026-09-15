@@ -15,22 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Persistent with no close button: the two ways out are setting a new password or signing
-       out, so there is deliberately no cancel. Everything else on the instance is refused until
-       one of them happens. -->
+  <!-- Blocked: persistent with no close button — the two ways out are setting a new password or
+       signing out, and everything else on the instance is refused until one of them happens.
+       Opened voluntarily from the expiry banner it is an ordinary, cancellable dialog. -->
   <ODialog
     v-if="isOpen"
     data-test="password-reset-dialog"
     :open="isOpen"
-    persistent
-    :show-close="false"
+    :persistent="!dismissible"
+    :show-close="dismissible"
     size="md"
     :title="t('passwordReset.title')"
     :sub-title="t('passwordReset.signedInAs', { email: raw(userEmail) })"
-    :neutral-button-label="t('passwordReset.signOut')"
+    :neutral-button-label="dismissible ? undefined : t('passwordReset.signOut')"
+    :secondary-button-label="dismissible ? t('common.cancel') : undefined"
     :primary-button-label="t('passwordReset.submit')"
     form-id="update-password-form"
     @click:neutral="signOut"
+    @click:secondary="close"
+    @update:open="(open: boolean) => !open && close()"
   >
     <div
       data-test="password-reset-dialog-banner"
@@ -40,13 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <span class="text-banner-warning-text text-sm">{{ bannerMessage }}</span>
     </div>
 
-    <OForm
-      id="update-password-form"
-      :schema="schema"
-      :default-values="updatePasswordDefaults()"
-      class="flex flex-col gap-5"
-      @submit="submit"
-    >
+    <OForm id="update-password-form" :form="form" class="flex flex-col gap-5">
       <OFormInput
         data-test="password-reset-dialog-current-password"
         name="old_password"
@@ -73,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :label="t('passwordReset.newPassword')"
           required
           autocomplete="new-password"
-          @update:model-value="(value: unknown) => (newPassword = String(value ?? ''))"
+          @update:model-value="onNewPasswordInput"
         >
           <template #icon-right>
             <OIcon
@@ -124,10 +121,12 @@ import { remediationOrg, usePasswordReset } from "@/composables/usePasswordReset
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import userService from "@/services/users";
 import { raw, useI18nTyped } from "@/types/i18n";
+import { reuseRejection } from "@/utils/passwordComplexity";
 import { invalidateLoginData, useLocalCurrentUser, useLocalUserInfo } from "@/utils/zincutils";
 
 import PasswordRequirementList from "./PasswordRequirementList.vue";
@@ -141,7 +140,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
 
-const { isOpen, reason, close } = usePasswordReset();
+const { isOpen, reason, dismissible, close } = usePasswordReset();
 const { complexity, requirements, load } = usePasswordComplexity();
 
 const isOldPwdHidden = ref(true);
@@ -153,21 +152,41 @@ const newPassword = ref("");
 
 const userEmail = computed(() => store.state.userInfo?.email ?? "");
 
-const bannerMessage = computed(() =>
-  reason.value === "rotation_expired"
-    ? t("passwordReset.reasonRotationExpired")
-    : t("passwordReset.reasonPolicyTightened"),
-);
+const bannerMessage = computed(() => {
+  switch (reason.value) {
+    case "rotation_expired":
+      return t("passwordReset.reasonRotationExpired");
+    case "rotation_warning":
+      return t("passwordReset.reasonRotationWarning");
+    default:
+      return t("passwordReset.reasonPolicyTightened");
+  }
+});
 
 // Reads the complexity on every run, so the schema instance created here follows the policy
 // arriving after the dialog has already opened.
 const schema = makeUpdatePasswordSchema(() => complexity.value, t);
+
+// Headless so the owner can pin the server's reuse rejection onto the field.
+const form = useOForm<UpdatePasswordForm>({
+  defaultValues: updatePasswordDefaults(),
+  schema,
+  onSubmit: (values) => submit(values),
+});
+
+// A server error is not re-validated on change, so it would block every later submit unless
+// cleared once the user starts over.
+const onNewPasswordInput = (value: unknown) => {
+  newPassword.value = String(value ?? "");
+  setServerFieldErrors(form, {});
+};
 
 watch(
   isOpen,
   (open) => {
     if (!open) return;
     newPassword.value = "";
+    form.reset(updatePasswordDefaults());
     // A failed fetch is not fatal: the form still submits and the server still validates.
     load();
   },
@@ -195,6 +214,13 @@ const submit = async (values: UpdatePasswordForm) => {
       userEmail.value,
     );
   } catch (error: any) {
+    // A reuse rejection belongs on the field: a toast would leave the user staring at a fully
+    // ticked checklist with no idea what to change.
+    const reused = reuseRejection(error, t);
+    if (reused) {
+      setServerFieldErrors(form, { new_password: reused });
+      return;
+    }
     toast({
       variant: "error",
       message: raw(error?.response?.data?.message) || t("passwordReset.updateFailed"),

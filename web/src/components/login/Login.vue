@@ -121,6 +121,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
+          <!-- Only retry_after is shown — never the attempt counters or the thresholds behind
+               them. Disabling Sign in is cosmetic: the server refuses regardless; this just stops
+               the user burning attempts. -->
+          <OBanner
+            v-if="lockoutSecondsLeft > 0"
+            variant="error"
+            icon="error"
+            dense
+            class="mb-3"
+            :content="
+              t('login.lockedOut', { duration: raw(durationFormatter(lockoutSecondsLeft)) })
+            "
+            data-test="login-lockout-banner"
+          />
           <OForm
             :schema="loginSchema"
             :default-values="loginDefaults"
@@ -155,6 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               block
               type="submit"
               :loading="submitting"
+              :disabled="lockoutSecondsLeft > 0"
             >
               {{ t("login.login") }}
             </OButton>
@@ -166,11 +181,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, onBeforeUnmount } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { durationFormatter } from "@/utils/formatters";
+import { usePasswordExpiryWarning } from "@/composables/usePasswordExpiryWarning";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -186,6 +203,7 @@ import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
@@ -195,13 +213,33 @@ import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
-  components: { OButton, OForm, OFormInput },
+  components: { OButton, OBanner, OForm, OFormInput },
 
   setup() {
     const store = useStore();
     const router = useRouter();
     const { isDark } = useTheme();
     const { t } = useI18nTyped();
+    const expiryWarning = usePasswordExpiryWarning();
+
+    // Counts down the server's retry_after locally; a countdown reaching zero is not "unlocked",
+    // it only re-enables the button so the server can answer again.
+    const lockoutSecondsLeft = ref(0);
+    let lockoutTimer: ReturnType<typeof setInterval> | null = null;
+    const startLockoutCountdown = (secs: number) => {
+      lockoutSecondsLeft.value = Math.ceil(secs);
+      if (lockoutTimer) clearInterval(lockoutTimer);
+      lockoutTimer = setInterval(() => {
+        lockoutSecondsLeft.value -= 1;
+        if (lockoutSecondsLeft.value <= 0 && lockoutTimer) {
+          clearInterval(lockoutTimer);
+          lockoutTimer = null;
+        }
+      }, 1000);
+    };
+    onBeforeUnmount(() => {
+      if (lockoutTimer) clearInterval(lockoutTimer);
+    });
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
@@ -277,6 +315,10 @@ export default defineComponent({
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
+                // Absent when there is nothing to warn about; clearing covers a previous user of
+                // this tab.
+                expiryWarning.dismiss();
+                expiryWarning.remember(res.data.password_rotation_warning);
                 //get user info from backend and extract auth token and set it into localstorage
                 getBasicAuth(name.value, password.value);
                 const userInfo = {
@@ -402,9 +444,14 @@ export default defineComponent({
                 });
               }
             })
-            .catch(() => {
-              //if any error occurs, show error message and reset form.
+            .catch((error: any) => {
               submitting.value = false;
+              const retryAfter = error?.response?.data?.lockout_retry_after_secs;
+              if (retryAfter > 0) {
+                startLockoutCountdown(retryAfter);
+                return;
+              }
+              //if any error occurs, show error message and reset form.
               toast({
                 variant: "error",
                 message: t("toastMessages.login.invalidUsernameOrPassword"),
@@ -422,6 +469,9 @@ export default defineComponent({
 
     return {
       t,
+      raw,
+      durationFormatter,
+      lockoutSecondsLeft,
       name,
       password,
       confirmpassword,

@@ -21,7 +21,12 @@ import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
 import { usePasswordReset } from "@/composables/usePasswordReset";
 
-const { open: openPasswordReset, isPasswordResetError } = usePasswordReset();
+const {
+  open: openPasswordReset,
+  promptRestricted,
+  isPasswordResetError,
+  isWriteRestrictedError,
+} = usePasswordReset();
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -117,6 +122,12 @@ const http = ({ headers } = {} as any) => {
       if (isPasswordResetError(error)) {
         openPasswordReset(error.response.data.reason);
         return new Promise(() => {});
+      }
+      // restrict_writes refuses only this write: explain, then let the action report its own
+      // failure — the session is usable and nothing here may leave a Save spinner hanging.
+      if (isWriteRestrictedError(error)) {
+        promptRestricted(error.response.data.reason);
+        return Promise.reject(error);
       }
       if (error && error.response && error.response.status) {
         switch (error.response.status) {

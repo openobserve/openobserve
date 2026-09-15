@@ -22,6 +22,7 @@ import {
   countMetRequirements,
   DEFAULT_COMPLEXITY,
   firstUnmetRequirement,
+  reuseRejection,
   validateAgainstComplexity,
 } from "./passwordComplexity";
 
@@ -153,5 +154,25 @@ describe("firstUnmetRequirement / validateAgainstComplexity", () => {
 
   it("accepts anything when the policy enforces nothing", () => {
     expect(validateAgainstComplexity("a", complexity({ min_length: 0 }), t)).toBeNull();
+  });
+});
+
+describe("reuseRejection", () => {
+  const tWithParams = ((key: string, params: Record<string, unknown>) =>
+    `${key}:${params.count}`) as unknown as TranslateFn;
+  const error = (message: string) => ({ response: { status: 400, data: { message } } });
+
+  it("reads the depth out of the server's message", () => {
+    expect(
+      reuseRejection(
+        error("New password matches one of your last 5 passwords, please choose a different one"),
+        tWithParams,
+      ),
+    ).toBe("passwordReset.reused:5");
+  });
+
+  it("leaves every other failure to the toast", () => {
+    expect(reuseRejection(error("Password too short"), tWithParams)).toBeNull();
+    expect(reuseRejection(new Error("network"), tWithParams)).toBeNull();
   });
 });
