@@ -420,15 +420,14 @@ fn push_admission(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::time::SECOND_MICRO_SECS;
+
     use super::{
-        super::{
-            MICROS,
-            sql::{Q1kRow, QlRow},
-        },
+        super::sql::{PairingRow, SelfIdentityRow},
         *,
     };
 
-    const NOW: i64 = 1_700_000_000 * MICROS;
+    const NOW: i64 = 1_700_000_000 * SECOND_MICRO_SECS;
 
     fn counts(n: u64) -> WindowCounts {
         WindowCounts {
@@ -455,9 +454,9 @@ mod tests {
     }
 
     fn known(table: &mut ResolutionTable, services: &[&str]) {
-        let rows: Vec<Q1kRow> = services
+        let rows: Vec<SelfIdentityRow> = services
             .iter()
-            .map(|s| Q1kRow {
+            .map(|s| SelfIdentityRow {
                 service_name: s.to_string(),
                 infer_self_key: None,
                 infer_self_port: None,
@@ -467,12 +466,12 @@ mod tests {
                 requests: 1,
             })
             .collect();
-        table.learn_q1k(&rows, NOW);
+        table.learn_self_identity(&rows, NOW);
     }
 
     fn self_key(table: &mut ResolutionTable, svc: &str, key: &str) {
-        table.learn_q1k(
-            &[Q1kRow {
+        table.learn_self_identity(
+            &[SelfIdentityRow {
                 service_name: svc.to_string(),
                 infer_self_key: Some(key.to_string()),
                 infer_self_port: None,
@@ -545,8 +544,8 @@ mod tests {
                 ambiguous: false
             }
         );
-        t.learn_ql(
-            &[QlRow {
+        t.learn_pairing(
+            &[PairingRow {
                 client: "load-generator".into(),
                 peer_key: Some("frontend-proxy".into()),
                 peer_port: None,
@@ -627,7 +626,7 @@ mod tests {
         let mut staging = Staging::default();
         let rows = vec![row("checkout", Some("api.stripe.com"))];
         for w in 1..=3 {
-            let (out, staged) = staging.classify_window(&rows, &t, NOW, w * MICROS, 10);
+            let (out, staged) = staging.classify_window(&rows, &t, NOW, w * SECOND_MICRO_SECS, 10);
             assert!(out.is_empty());
             assert_eq!(staged, 1);
         }
@@ -641,11 +640,18 @@ mod tests {
         );
         assert_eq!(admitted[0].tier, None);
         let ends: Vec<i64> = admitted[0].windows.iter().map(|w| w.0).collect();
-        assert_eq!(ends, vec![MICROS, 2 * MICROS, 3 * MICROS]);
+        assert_eq!(
+            ends,
+            vec![
+                SECOND_MICRO_SECS,
+                2 * SECOND_MICRO_SECS,
+                3 * SECOND_MICRO_SECS
+            ]
+        );
         assert!(admitted[0].windows.iter().all(|w| w.1.requests == 1));
         assert!(staging.is_empty());
 
-        staging.classify_window(&rows, &t, NOW, 4 * MICROS, 10);
+        staging.classify_window(&rows, &t, NOW, 4 * SECOND_MICRO_SECS, 10);
         known(&mut t, &["api"]);
         let admitted = staging.learning_pass(&t, NOW);
         assert_eq!(admitted[0].key, SeriesKey::edge("checkout", "api", ""));
@@ -658,18 +664,18 @@ mod tests {
         let mut staging = Staging::default();
         let key = StagingKey::from_row(&row("a", Some("x.example")));
         for w in 1..=5 {
-            staging.stage(key.clone(), w * MICROS, counts(1), 2);
+            staging.stage(key.clone(), w * SECOND_MICRO_SECS, counts(1), 2);
         }
         let entry = &staging.entries[&key];
         assert_eq!(entry.windows.len(), 2);
-        assert_eq!(entry.windows[0], (4 * MICROS, counts(2)));
-        assert_eq!(entry.windows[1].0, 5 * MICROS);
+        assert_eq!(entry.windows[0], (4 * SECOND_MICRO_SECS, counts(2)));
+        assert_eq!(entry.windows[1].0, 5 * SECOND_MICRO_SECS);
         assert_eq!(entry.windows[1].1.requests, 3);
         assert_eq!(Staging::max_windows(60), 10);
         assert_eq!(Staging::max_windows(600), 2);
 
         let key2 = StagingKey::from_row(&row("b", Some("y.example")));
-        staging.stage(key2, 6 * MICROS, counts(1), 2);
+        staging.stage(key2, 6 * SECOND_MICRO_SECS, counts(1), 2);
         let early = staging.finalize_oldest(1);
         assert_eq!(early.len(), 1);
         assert_eq!(early[0].key, SeriesKey::edge("a", "x.example", "external"));
@@ -681,8 +687,8 @@ mod tests {
     fn test_ambiguous_adds_unresolved_contribution() {
         let mut t = ResolutionTable::new(0, 0);
         self_key(&mut t, "a", "gw");
-        t.learn_q1k(
-            &[Q1kRow {
+        t.learn_self_identity(
+            &[SelfIdentityRow {
                 service_name: "b".into(),
                 infer_self_key: Some("gw".into()),
                 infer_self_port: None,
@@ -694,7 +700,8 @@ mod tests {
             NOW,
         );
         let mut staging = Staging::default();
-        let (out, staged) = staging.classify_window(&[row("c", Some("gw"))], &t, NOW, MICROS, 10);
+        let (out, staged) =
+            staging.classify_window(&[row("c", Some("gw"))], &t, NOW, SECOND_MICRO_SECS, 10);
         assert_eq!(staged, 0);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].key, SeriesKey::edge("c", "a", ""));

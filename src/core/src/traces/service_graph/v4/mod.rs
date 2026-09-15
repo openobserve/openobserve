@@ -24,16 +24,16 @@ pub mod writer;
 
 use std::sync::{Arc, LazyLock, atomic::AtomicBool};
 
+use config::utils::time::SECOND_MICRO_SECS;
 use dashmap::DashMap;
 use tokio::sync::{Mutex, RwLock};
 
 use self::{resolution::ResolutionTable, state::StreamState};
 
-pub const MICROS: i64 = 1_000_000;
 /// Caps catch-up per tick so one far-behind stream cannot hold a scheduler task for hours.
 pub const MAX_WINDOWS_PER_TICK: usize = 120;
 pub const LEARN_INTERVAL_SECS: i64 = 300;
-pub const SERIES_TTL_MICROS: i64 = 24 * 3600 * MICROS;
+pub const SERIES_TTL_MICROS: i64 = 24 * 3600 * SECOND_MICRO_SECS;
 pub const RESOLUTION_MAX_KEYS: usize = 200_000;
 pub const SNAPSHOT_INTERVAL_SECS: i64 = 600;
 pub const GRACE_LEARN_CYCLES: u32 = 2;
@@ -41,9 +41,9 @@ pub const EDGE_HARD_CAP: usize = 50_000;
 pub const NODE_HARD_CAP: usize = 15_000;
 pub const LEARN_SAMPLE: u32 = 64;
 /// An offset further behind than this jumps to the present; there is no history backfill.
-pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * MICROS;
+pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * SECOND_MICRO_SECS;
 /// v1 stops once v4 has run and holds data for this long; a design §10 constant, not configurable.
-pub const V1_STOP_AFTER_MICROS: i64 = 7 * 24 * 3600 * MICROS;
+pub const V1_STOP_AFTER_MICROS: i64 = 7 * 24 * 3600 * SECOND_MICRO_SECS;
 pub const PROCESSED_TIMESTAMP_STREAM: &str = "traces_service_graph_processed_timestamp";
 
 /// Per-(org, stream) series state; only the stream's holder task touches an entry.
@@ -85,12 +85,12 @@ impl Settings {
     }
 
     pub fn flush_micros(&self) -> i64 {
-        (self.flush_secs as i64).max(1) * MICROS
+        (self.flush_secs as i64).max(1) * SECOND_MICRO_SECS
     }
 
     /// Newest window end allowed: data younger than `cache_delay_secs` may still be in flight.
     pub fn horizon(&self, now: i64) -> i64 {
-        now - self.cache_delay_secs * MICROS
+        now - self.cache_delay_secs * SECOND_MICRO_SECS
     }
 }
 
@@ -113,10 +113,13 @@ mod tests {
             flush_secs: 60,
             cache_delay_secs: 300,
         };
-        assert_eq!(s.flush_micros(), 60 * MICROS);
-        assert_eq!(s.horizon(1_000 * MICROS), 700 * MICROS);
+        assert_eq!(s.flush_micros(), 60 * SECOND_MICRO_SECS);
+        assert_eq!(
+            s.horizon(1_000 * SECOND_MICRO_SECS),
+            700 * SECOND_MICRO_SECS
+        );
         let zero = Settings { flush_secs: 0, ..s };
-        assert_eq!(zero.flush_micros(), MICROS);
+        assert_eq!(zero.flush_micros(), SECOND_MICRO_SECS);
     }
 
     #[test]

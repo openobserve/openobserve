@@ -27,6 +27,7 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
+pub static SECOND_MICRO_SECS: i64 = 1_000_000;
 
 pub enum HourFormat {
     Zero,

@@ -22,15 +22,16 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use config::utils::time::SECOND_MICRO_SECS;
 use lru::LruCache;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    MICROS, RESOLUTION_MAX_KEYS,
-    sql::{Q1kRow, QlRow},
+    RESOLUTION_MAX_KEYS,
+    sql::{PairingRow, SelfIdentityRow},
 };
 
-pub const HOUR_MICROS: i64 = 3600 * MICROS;
+pub const HOUR_MICROS: i64 = 3600 * SECOND_MICRO_SECS;
 pub const WINDOW_24H_MICROS: i64 = 24 * HOUR_MICROS;
 /// Second place at or above this share of the winner marks the lookup ambiguous.
 pub const AMBIGUOUS_RATIO: f64 = 0.3;
@@ -85,8 +86,8 @@ pub struct ResolutionTable {
     pairing: LruCache<TypedKey, ServiceCounts>,
     self_key: LruCache<TypedKey, ServiceCounts>,
     pub known_services: HashMap<String, HourBuckets>,
-    pub q1k_up_to: i64,
-    pub ql_up_to: i64,
+    pub self_identity_up_to: i64,
+    pub pairing_up_to: i64,
     pub last_learn_at: i64,
     pub last_snapshot_at: i64,
     pub has_unresolved: bool,
@@ -99,8 +100,8 @@ pub struct Snapshot {
     pairing: Vec<(TypedKey, ServiceCounts)>,
     self_key: Vec<(TypedKey, ServiceCounts)>,
     known_services: HashMap<String, HourBuckets>,
-    q1k_up_to: i64,
-    ql_up_to: i64,
+    self_identity_up_to: i64,
+    pairing_up_to: i64,
 }
 
 impl TypedKey {
@@ -195,18 +196,18 @@ impl Snapshot {
 }
 
 impl ResolutionTable {
-    pub fn new(q1k_up_to: i64, ql_up_to: i64) -> Self {
-        Self::with_capacity(RESOLUTION_MAX_KEYS / 2, q1k_up_to, ql_up_to)
+    pub fn new(self_identity_up_to: i64, pairing_up_to: i64) -> Self {
+        Self::with_capacity(RESOLUTION_MAX_KEYS / 2, self_identity_up_to, pairing_up_to)
     }
 
-    pub fn with_capacity(per_layer: usize, q1k_up_to: i64, ql_up_to: i64) -> Self {
+    pub fn with_capacity(per_layer: usize, self_identity_up_to: i64, pairing_up_to: i64) -> Self {
         let cap = NonZeroUsize::new(per_layer.max(1)).unwrap();
         Self {
             pairing: LruCache::new(cap),
             self_key: LruCache::new(cap),
             known_services: HashMap::new(),
-            q1k_up_to,
-            ql_up_to,
+            self_identity_up_to,
+            pairing_up_to,
             last_learn_at: 0,
             last_snapshot_at: 0,
             has_unresolved: false,
@@ -236,7 +237,7 @@ impl ResolutionTable {
         Self::prune_layer(&mut self.self_key, now);
     }
 
-    pub fn learn_q1k(&mut self, rows: &[Q1kRow], now: i64) {
+    pub fn learn_self_identity(&mut self, rows: &[SelfIdentityRow], now: i64) {
         for row in rows {
             self.known_services
                 .entry(row.service_name.clone())
@@ -270,7 +271,7 @@ impl ResolutionTable {
         }
     }
 
-    pub fn learn_ql(&mut self, rows: &[QlRow], now: i64) {
+    pub fn learn_pairing(&mut self, rows: &[PairingRow], now: i64) {
         for row in rows {
             let mut keys = vec![];
             if let Some(k) = &row.peer_key {
@@ -370,14 +371,14 @@ impl ResolutionTable {
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
             known_services: self.known_services.clone(),
-            q1k_up_to: self.q1k_up_to,
-            ql_up_to: self.ql_up_to,
+            self_identity_up_to: self.self_identity_up_to,
+            pairing_up_to: self.pairing_up_to,
         }
     }
 
     pub fn from_snapshot_json(bytes: &[u8], now: i64) -> Result<Self, serde_json::Error> {
         let snap: Snapshot = serde_json::from_slice(bytes)?;
-        let mut table = Self::new(snap.q1k_up_to, snap.ql_up_to);
+        let mut table = Self::new(snap.self_identity_up_to, snap.pairing_up_to);
         let mut known = snap.known_services;
         known.retain(|_, b| {
             b.prune(now);
@@ -511,17 +512,17 @@ pub fn read_snapshot_file(path: &Path, now: i64) -> Option<ResolutionTable> {
 mod tests {
     use super::*;
 
-    const NOW: i64 = 1_700_000_000 * MICROS;
+    const NOW: i64 = 1_700_000_000 * SECOND_MICRO_SECS;
 
-    fn q1k(
+    fn self_identity(
         svc: &str,
         key: Option<&str>,
         port: Option<u16>,
         ip: Option<&str>,
         rpc: Option<&str>,
         n: u64,
-    ) -> Q1kRow {
-        Q1kRow {
+    ) -> SelfIdentityRow {
+        SelfIdentityRow {
             service_name: svc.to_string(),
             infer_self_key: key.map(str::to_string),
             infer_self_port: port,
@@ -532,8 +533,8 @@ mod tests {
         }
     }
 
-    fn ql(client: &str, key: Option<&str>, callee: &str, n: u64) -> QlRow {
-        QlRow {
+    fn pairing(client: &str, key: Option<&str>, callee: &str, n: u64) -> PairingRow {
+        PairingRow {
             client: client.to_string(),
             peer_key: key.map(str::to_string),
             peer_port: None,
@@ -617,8 +618,8 @@ mod tests {
     #[test]
     fn test_pairing_beats_self_key() {
         let mut t = ResolutionTable::new(0, 0);
-        t.learn_q1k(
-            &[q1k(
+        t.learn_self_identity(
+            &[self_identity(
                 "frontend",
                 Some("frontend-proxy"),
                 None,
@@ -628,8 +629,8 @@ mod tests {
             )],
             NOW,
         );
-        t.learn_ql(
-            &[ql(
+        t.learn_pairing(
+            &[pairing(
                 "load-generator",
                 Some("frontend-proxy"),
                 "frontend-proxy",
@@ -646,10 +647,10 @@ mod tests {
     #[test]
     fn test_host_miss_then_ip_hit_and_rpc_only() {
         let mut t = ResolutionTable::new(0, 0);
-        t.learn_q1k(
+        t.learn_self_identity(
             &[
-                q1k("currency", None, None, Some("10.0.0.5"), None, 10),
-                q1k(
+                self_identity("currency", None, None, Some("10.0.0.5"), None, 10),
+                self_identity(
                     "product-catalog",
                     None,
                     None,
@@ -684,17 +685,20 @@ mod tests {
     #[test]
     fn test_majority_and_ambiguous() {
         let mut t = ResolutionTable::new(0, 0);
-        t.learn_q1k(
+        t.learn_self_identity(
             &[
-                q1k("a", Some("gw"), None, None, None, 70),
-                q1k("b", Some("gw"), None, None, None, 30),
+                self_identity("a", Some("gw"), None, None, None, 70),
+                self_identity("b", Some("gw"), None, None, None, 30),
             ],
             NOW,
         );
         let r = t.resolve_candidates(&host("gw"), NOW).unwrap();
         assert_eq!(r.service, "a");
         assert!(r.ambiguous);
-        t.learn_q1k(&[q1k("a", Some("gw"), None, None, None, 100)], NOW);
+        t.learn_self_identity(
+            &[self_identity("a", Some("gw"), None, None, None, 100)],
+            NOW,
+        );
         let r = t.resolve_candidates(&host("gw"), NOW).unwrap();
         assert_eq!(r.service, "a");
         assert!(!r.ambiguous);
@@ -703,7 +707,7 @@ mod tests {
     #[test]
     fn test_bucket_expiry_after_24h() {
         let mut t = ResolutionTable::new(0, 0);
-        t.learn_q1k(&[q1k("old", Some("h"), None, None, None, 5)], NOW);
+        t.learn_self_identity(&[self_identity("old", Some("h"), None, None, None, 5)], NOW);
         assert!(t.resolve_candidates(&host("h"), NOW).is_some());
         let later = NOW + WINDOW_24H_MICROS + HOUR_MICROS;
         assert!(t.resolve_candidates(&host("h"), later).is_none());
@@ -721,8 +725,8 @@ mod tests {
         let mut t = ResolutionTable::new(0, 0);
         for i in 0..50 {
             let at = NOW + i * HOUR_MICROS;
-            t.learn_q1k(
-                &[q1k(
+            t.learn_self_identity(
+                &[self_identity(
                     &format!("svc{i}"),
                     Some("stable-host"),
                     None,
@@ -732,8 +736,15 @@ mod tests {
                 )],
                 at,
             );
-            t.learn_q1k(
-                &[q1k("only-old", Some(&format!("h{i}")), None, None, None, 1)],
+            t.learn_self_identity(
+                &[self_identity(
+                    "only-old",
+                    Some(&format!("h{i}")),
+                    None,
+                    None,
+                    None,
+                    1,
+                )],
                 at,
             );
         }
@@ -757,8 +768,15 @@ mod tests {
     fn test_lru_cap() {
         let mut t = ResolutionTable::with_capacity(2, 0, 0);
         for i in 0..3 {
-            t.learn_q1k(
-                &[q1k("s", Some(&format!("h{i}")), None, None, None, 1)],
+            t.learn_self_identity(
+                &[self_identity(
+                    "s",
+                    Some(&format!("h{i}")),
+                    None,
+                    None,
+                    None,
+                    1,
+                )],
                 NOW,
             );
         }
@@ -770,12 +788,15 @@ mod tests {
     #[test]
     fn test_snapshot_round_trip_and_corrupt_fallback() {
         let mut t = ResolutionTable::new(100, 200);
-        t.learn_q1k(&[q1k("svc", Some("h"), Some(80), None, None, 3)], NOW);
-        t.learn_ql(&[ql("c", Some("h"), "svc2", 2)], NOW);
+        t.learn_self_identity(
+            &[self_identity("svc", Some("h"), Some(80), None, None, 3)],
+            NOW,
+        );
+        t.learn_pairing(&[pairing("c", Some("h"), "svc2", 2)], NOW);
         let bytes = t.to_snapshot_json().unwrap();
         let back = ResolutionTable::from_snapshot_json(&bytes, NOW).unwrap();
-        assert_eq!(back.q1k_up_to, 100);
-        assert_eq!(back.ql_up_to, 200);
+        assert_eq!(back.self_identity_up_to, 100);
+        assert_eq!(back.pairing_up_to, 200);
         assert_eq!(back.key_count(), 2);
         assert!(back.is_known_service("svc", NOW));
         let c = Candidates {

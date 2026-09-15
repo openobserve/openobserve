@@ -17,20 +17,25 @@
 
 use std::sync::{Arc, atomic::Ordering};
 
-use config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros};
+use config::{
+    cluster::LOCAL_NODE,
+    meta::stream::StreamType,
+    utils::time::{SECOND_MICRO_SECS, now_micros},
+};
 use futures::StreamExt;
 use infra::{cluster::get_node_by_uuid, dist_lock};
 use tokio::sync::{Mutex, RwLock};
 
 use super::{
-    LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_RETAINED,
-    ORG_TABLES, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings,
-    TableRef, V1_STOP_AFTER_MICROS, V1_STOPPED_SEEN,
+    LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, ORG_RETAINED, ORG_TABLES,
+    RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings, TableRef,
+    V1_STOP_AFTER_MICROS, V1_STOPPED_SEEN,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{SeriesKey, Staging},
     sql::{
-        Columns, Q1Row, Q1kRow, Q2Row, Q3Row, QlRow, WindowCounts, build_q1, build_q1k, build_q2,
-        build_q3, build_ql, validate_stream_name,
+        Columns, PairingRow, Q1Row, Q2Row, Q3Row, SelfIdentityRow, WindowCounts,
+        build_pairing_query, build_q1, build_q2, build_q3, build_self_identity_query,
+        validate_stream_name,
     },
     state::{Batch, StreamState},
     stream_concurrency, writer,
@@ -51,9 +56,10 @@ pub enum ClaimDecision {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The two identity-learning passes of design §4.3: self keys (Q1k) and sampled pairing (QL).
 enum LearnKind {
-    Q1k,
-    Ql,
+    SelfIdentity,
+    Pairing,
 }
 
 struct StreamJob {
@@ -107,11 +113,17 @@ pub fn window_ends(offset: i64, horizon: i64, flush: i64, max_windows: usize) ->
     ends
 }
 
-/// A QL pass that was needed but failed keeps its trigger so the range is retried, not skipped.
-pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool, horizon: i64) {
+/// A pairing pass that was needed but failed keeps its trigger so the range is retried, not
+/// skipped.
+pub fn settle_ql_trigger(
+    table: &mut ResolutionTable,
+    need_ql: bool,
+    pairing_ok: bool,
+    horizon: i64,
+) {
     if !need_ql {
-        table.ql_up_to = table.ql_up_to.max(horizon);
-    } else if ql_ok {
+        table.pairing_up_to = table.pairing_up_to.max(horizon);
+    } else if pairing_ok {
         table.has_unresolved = false;
     }
 }
@@ -137,7 +149,8 @@ pub async fn run_tick(settings: &Settings) {
         }
         let offsets: Vec<i64> = claimed.iter().map(|(_, o)| *o).collect();
         let table = org_table(&org, &offsets, settings, now).await;
-        let learn_due = now - table.read().await.last_learn_at >= LEARN_INTERVAL_SECS * MICROS;
+        let learn_due =
+            now - table.read().await.last_learn_at >= LEARN_INTERVAL_SECS * SECOND_MICRO_SECS;
         if learn_due {
             learn_org(&org, &streams, &table, settings, now).await;
         }
@@ -293,8 +306,8 @@ async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now:
         let boundary = ResolutionTable::cold_start_boundary(claimed_offsets, settings.horizon(now));
         ResolutionTable::new(boundary, boundary)
     });
-    table.q1k_up_to = table.q1k_up_to.max(floor);
-    table.ql_up_to = table.ql_up_to.max(floor);
+    table.self_identity_up_to = table.self_identity_up_to.max(floor);
+    table.pairing_up_to = table.pairing_up_to.max(floor);
     table.last_snapshot_at = now;
     let table = Arc::new(RwLock::new(table));
     ORG_TABLES.insert(org.to_string(), table.clone());
@@ -302,12 +315,12 @@ async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now:
 }
 
 async fn learn_org(org: &str, streams: &[String], table: &TableRef, settings: &Settings, now: i64) {
-    let (q1k_from, ql_from, need_ql) = {
+    let (self_identity_from, pairing_from, need_ql) = {
         let mut t = table.write().await;
         t.last_learn_at = now;
         t.learn_gen += 1;
         t.prune(now);
-        (t.q1k_up_to, t.ql_up_to, t.has_unresolved)
+        (t.self_identity_up_to, t.pairing_up_to, t.has_unresolved)
     };
     let horizon = settings.horizon(now);
     let mut cols_by_stream = vec![];
@@ -328,27 +341,27 @@ async fn learn_org(org: &str, streams: &[String], table: &TableRef, settings: &S
         org,
         &cols_by_stream,
         table,
-        q1k_from,
+        self_identity_from,
         horizon,
         now,
-        LearnKind::Q1k,
+        LearnKind::SelfIdentity,
     )
     .await;
-    let ql_ok = if need_ql {
+    let pairing_ok = if need_ql {
         learn_chunks(
             org,
             &cols_by_stream,
             table,
-            ql_from,
+            pairing_from,
             horizon,
             now,
-            LearnKind::Ql,
+            LearnKind::Pairing,
         )
         .await
     } else {
         false
     };
-    settle_ql_trigger(&mut *table.write().await, need_ql, ql_ok, horizon);
+    settle_ql_trigger(&mut *table.write().await, need_ql, pairing_ok, horizon);
 }
 
 /// `LEARN_INTERVAL` chunks; a boundary moves only after a fully successful chunk.
@@ -361,15 +374,17 @@ async fn learn_chunks(
     now: i64,
     kind: LearnKind,
 ) -> bool {
-    let step = LEARN_INTERVAL_SECS * MICROS;
+    let step = LEARN_INTERVAL_SECS * SECOND_MICRO_SECS;
     let mut start = from;
     while start < horizon {
         let end = (start + step).min(horizon);
         let mut hits = vec![];
         for (stream, cols) in streams {
             let sql = match kind {
-                LearnKind::Q1k => Some(build_q1k(cols, stream, start, end)),
-                LearnKind::Ql => build_ql(cols, stream, start, end),
+                LearnKind::SelfIdentity => {
+                    Some(build_self_identity_query(cols, stream, start, end))
+                }
+                LearnKind::Pairing => build_pairing_query(cols, stream, start, end),
             };
             let Some(sql) = sql else {
                 continue;
@@ -385,17 +400,18 @@ async fn learn_chunks(
             }
         }
         match kind {
-            LearnKind::Q1k => {
-                let rows: Vec<Q1kRow> = hits.iter().filter_map(Q1kRow::parse).collect();
+            LearnKind::SelfIdentity => {
+                let rows: Vec<SelfIdentityRow> =
+                    hits.iter().filter_map(SelfIdentityRow::parse).collect();
                 let mut t = table.write().await;
-                t.learn_q1k(&rows, now);
-                t.q1k_up_to = end;
+                t.learn_self_identity(&rows, now);
+                t.self_identity_up_to = end;
             }
-            LearnKind::Ql => {
-                let rows: Vec<QlRow> = hits.iter().filter_map(QlRow::parse).collect();
+            LearnKind::Pairing => {
+                let rows: Vec<PairingRow> = hits.iter().filter_map(PairingRow::parse).collect();
                 let mut t = table.write().await;
-                t.learn_ql(&rows, now);
-                t.ql_up_to = end;
+                t.learn_pairing(&rows, now);
+                t.pairing_up_to = end;
             }
         }
         start = end;
@@ -406,7 +422,7 @@ async fn learn_chunks(
 async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
     let snap = {
         let mut t = table.write().await;
-        if now - t.last_snapshot_at < SNAPSHOT_INTERVAL_SECS * MICROS {
+        if now - t.last_snapshot_at < SNAPSHOT_INTERVAL_SECS * SECOND_MICRO_SECS {
             return;
         }
         t.last_snapshot_at = now;
@@ -686,47 +702,53 @@ mod tests {
 
     #[test]
     fn test_window_arithmetic() {
-        let flush = 60 * MICROS;
-        assert_eq!(align_down(125 * MICROS, flush), 120 * MICROS);
-        assert_eq!(align_down(120 * MICROS, flush), 120 * MICROS);
-        let horizon = 1_000 * MICROS;
+        let flush = 60 * SECOND_MICRO_SECS;
+        assert_eq!(
+            align_down(125 * SECOND_MICRO_SECS, flush),
+            120 * SECOND_MICRO_SECS
+        );
+        assert_eq!(
+            align_down(120 * SECOND_MICRO_SECS, flush),
+            120 * SECOND_MICRO_SECS
+        );
+        let horizon = 1_000 * SECOND_MICRO_SECS;
         assert_eq!(
             initial_offset(0, horizon, flush, MAX_BACKLOG_MICROS),
-            (960 * MICROS, false)
+            (960 * SECOND_MICRO_SECS, false)
         );
         assert_eq!(
-            initial_offset(700 * MICROS, horizon, flush, MAX_BACKLOG_MICROS),
-            (700 * MICROS, false)
+            initial_offset(700 * SECOND_MICRO_SECS, horizon, flush, MAX_BACKLOG_MICROS),
+            (700 * SECOND_MICRO_SECS, false)
         );
-        let far = horizon - MAX_BACKLOG_MICROS - MICROS;
+        let far = horizon - MAX_BACKLOG_MICROS - SECOND_MICRO_SECS;
         assert_eq!(
             initial_offset(far, horizon, flush, MAX_BACKLOG_MICROS),
-            (960 * MICROS, true)
+            (960 * SECOND_MICRO_SECS, true)
         );
         assert_eq!(
-            window_ends(960 * MICROS, horizon, flush, 120),
+            window_ends(960 * SECOND_MICRO_SECS, horizon, flush, 120),
             Vec::<i64>::new()
         );
         assert_eq!(
-            window_ends(940 * MICROS, horizon, flush, 120),
-            vec![1_000 * MICROS]
+            window_ends(940 * SECOND_MICRO_SECS, horizon, flush, 120),
+            vec![1_000 * SECOND_MICRO_SECS]
         );
         assert_eq!(
-            window_ends(700 * MICROS, horizon, flush, 120),
+            window_ends(700 * SECOND_MICRO_SECS, horizon, flush, 120),
             vec![
-                760 * MICROS,
-                820 * MICROS,
-                880 * MICROS,
-                940 * MICROS,
-                1_000 * MICROS
+                760 * SECOND_MICRO_SECS,
+                820 * SECOND_MICRO_SECS,
+                880 * SECOND_MICRO_SECS,
+                940 * SECOND_MICRO_SECS,
+                1_000 * SECOND_MICRO_SECS
             ]
         );
         assert_eq!(
-            window_ends(700 * MICROS, horizon, flush, 2),
-            vec![760 * MICROS, 820 * MICROS]
+            window_ends(700 * SECOND_MICRO_SECS, horizon, flush, 2),
+            vec![760 * SECOND_MICRO_SECS, 820 * SECOND_MICRO_SECS]
         );
         assert_eq!(
-            window_ends(0, 10_000 * MICROS, flush, MAX_WINDOWS_PER_TICK).len(),
+            window_ends(0, 10_000 * SECOND_MICRO_SECS, flush, MAX_WINDOWS_PER_TICK).len(),
             MAX_WINDOWS_PER_TICK
         );
     }
@@ -737,11 +759,11 @@ mod tests {
         t.has_unresolved = true;
         settle_ql_trigger(&mut t, true, false, 900);
         assert!(t.has_unresolved);
-        assert_eq!(t.ql_up_to, 100);
+        assert_eq!(t.pairing_up_to, 100);
         let need_ql = t.has_unresolved;
         settle_ql_trigger(&mut t, need_ql, true, 900);
         assert!(!t.has_unresolved);
         settle_ql_trigger(&mut t, false, false, 900);
-        assert_eq!(t.ql_up_to, 900);
+        assert_eq!(t.pairing_up_to, 900);
     }
 }

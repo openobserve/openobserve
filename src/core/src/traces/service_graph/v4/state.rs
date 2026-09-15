@@ -407,12 +407,11 @@ pub fn budgets(services: usize) -> Budgets {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        super::{MICROS, resolve::REASON_NO_PEER},
-        *,
-    };
+    use config::utils::time::SECOND_MICRO_SECS;
 
-    const NOW: i64 = 1_700_000_000 * MICROS;
+    use super::{super::resolve::REASON_NO_PEER, *};
+
+    const NOW: i64 = 1_700_000_000 * SECOND_MICRO_SECS;
 
     fn counts(n: u64) -> WindowCounts {
         WindowCounts {
@@ -466,7 +465,7 @@ mod tests {
     #[test]
     fn test_t_base_fixed_and_first_emission_has_baseline() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         st.merge_window("o", w1, NOW, 1, vec![(edge(1), counts(5))]);
         let s = &st.series[&edge(1)];
         assert_eq!(s.t_base, w1 - 1000);
@@ -478,7 +477,7 @@ mod tests {
         assert!(!s.dirty && s.first_emitted);
         assert_eq!(s.last_sample_ts, w1);
 
-        let w2 = w1 + 60 * MICROS;
+        let w2 = w1 + 60 * SECOND_MICRO_SECS;
         st.merge_window("o", w2, NOW, 1, vec![(edge(1), counts(3))]);
         assert_eq!(st.series[&edge(1)].t_base, w1 - 1000);
         let batch = st.emit(w2);
@@ -492,10 +491,10 @@ mod tests {
     #[test]
     fn test_window_without_delta_repeats_last_value() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         st.merge_window("o", w1, NOW, 1, vec![(edge(1), counts(5))]);
         st.mark_clean(&st.emit(w1));
-        let w2 = w1 + 60 * MICROS;
+        let w2 = w1 + 60 * SECOND_MICRO_SECS;
         st.merge_window("o", w2, NOW, 1, vec![]);
         let batch = st.emit(w2);
         assert_eq!(ts_requests(&batch, &edge(1)), vec![(w2, 5)]);
@@ -505,7 +504,7 @@ mod tests {
     #[test]
     fn test_staged_admission_case1_replays_in_order() {
         let mut st = StreamState::new();
-        let w = |i: i64| 100 * MICROS + i * 60 * MICROS;
+        let w = |i: i64| 100 * SECOND_MICRO_SECS + i * 60 * SECOND_MICRO_SECS;
         st.merge_window("o", w(3), NOW, 1, vec![(SeriesKey::node("s1"), counts(1))]);
         st.mark_clean(&st.emit(w(3)));
         let windows = vec![(w(1), counts(2)), (w(2), counts(3)), (w(3), counts(4))];
@@ -527,7 +526,7 @@ mod tests {
     #[test]
     fn test_staged_keys_converging_on_one_unemitted_edge_merge_per_window() {
         let mut st = StreamState::new();
-        let w = |i: i64| 100 * MICROS + i * 60 * MICROS;
+        let w = |i: i64| 100 * SECOND_MICRO_SECS + i * 60 * SECOND_MICRO_SECS;
         st.admit_staged("o", vec![(edge(1), vec![(w(2), counts(1))])], NOW);
         st.admit_staged(
             "o",
@@ -560,7 +559,7 @@ mod tests {
     #[test]
     fn test_staged_admission_case2_folds_into_next_sample() {
         let mut st = StreamState::new();
-        let w = |i: i64| 100 * MICROS + i * 60 * MICROS;
+        let w = |i: i64| 100 * SECOND_MICRO_SECS + i * 60 * SECOND_MICRO_SECS;
         st.merge_window("o", w(1), NOW, 1, vec![(edge(1), counts(5))]);
         st.mark_clean(&st.emit(w(1)));
         st.merge_window("o", w(2), NOW, 1, vec![(edge(1), counts(1))]);
@@ -581,7 +580,7 @@ mod tests {
     #[test]
     fn test_admission_never_emits_at_or_before_last_sample() {
         let mut st = StreamState::new();
-        let w = |i: i64| 100 * MICROS + i * 60 * MICROS;
+        let w = |i: i64| 100 * SECOND_MICRO_SECS + i * 60 * SECOND_MICRO_SECS;
         for i in 1..=5 {
             st.merge_window("o", w(i), NOW, 1, vec![(SeriesKey::node("s1"), counts(1))]);
             st.mark_clean(&st.emit(w(i)));
@@ -604,7 +603,7 @@ mod tests {
     #[test]
     fn test_dirty_series_never_evicted_and_ttl_eviction() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         st.merge_window(
             "o",
             w1,
@@ -621,8 +620,8 @@ mod tests {
                 .filter(|s| s.key == edge(2))
                 .collect(),
         });
-        let later = NOW + SERIES_TTL_MICROS + MICROS;
-        let report = st.merge_window("o", w1 + 60 * MICROS, later, 1, vec![]);
+        let later = NOW + SERIES_TTL_MICROS + SECOND_MICRO_SECS;
+        let report = st.merge_window("o", w1 + 60 * SECOND_MICRO_SECS, later, 1, vec![]);
         assert_eq!(report.evicted_ttl, 1);
         assert!(st.series.contains_key(&edge(1)));
         assert!(!st.series.contains_key(&edge(2)));
@@ -632,7 +631,7 @@ mod tests {
     #[test]
     fn test_cardinality_drop_counted_and_cap_eviction() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         let many: Vec<(SeriesKey, WindowCounts)> = (0..20_001)
             .map(|i| (edge(i), counts(if i == 20_000 { 1 } else { 100 })))
             .collect();
@@ -645,8 +644,14 @@ mod tests {
         assert_eq!(st.retained().1, 1);
 
         st.mark_clean(&st.emit(w1));
-        let w2 = w1 + 60 * MICROS;
-        let report = st.merge_window("o", w2, NOW + MICROS, 1, vec![(edge(20_001), counts(9))]);
+        let w2 = w1 + 60 * SECOND_MICRO_SECS;
+        let report = st.merge_window(
+            "o",
+            w2,
+            NOW + SECOND_MICRO_SECS,
+            1,
+            vec![(edge(20_001), counts(9))],
+        );
         assert_eq!(report.evicted_cap, 1);
         assert_eq!(report.dropped_cardinality, 0);
         assert!(st.series.contains_key(&edge(20_001)));
@@ -656,7 +661,7 @@ mod tests {
     #[test]
     fn test_cap_candidates_consumed_once_then_rejected() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         let full: Vec<(SeriesKey, WindowCounts)> =
             (0..20_000).map(|i| (edge(i), counts(10))).collect();
         st.merge_window("o", w1, NOW, 1, full);
@@ -669,10 +674,10 @@ mod tests {
                 .filter(|s| s.key == edge(0) || s.key == edge(1))
                 .collect(),
         });
-        let w2 = w1 + 60 * MICROS;
+        let w2 = w1 + 60 * SECOND_MICRO_SECS;
         let newcomers: Vec<(SeriesKey, WindowCounts)> =
             (20_000..20_005).map(|i| (edge(i), counts(50))).collect();
-        let report = st.merge_window("o", w2, NOW + MICROS, 1, newcomers);
+        let report = st.merge_window("o", w2, NOW + SECOND_MICRO_SECS, 1, newcomers);
         assert_eq!(report.evicted_cap, 2);
         assert_eq!(report.dropped_cardinality, 150);
         assert!(!st.series.contains_key(&edge(0)) && !st.series.contains_key(&edge(1)));
@@ -682,7 +687,7 @@ mod tests {
     #[test]
     fn test_cap_victim_dirtied_before_eviction_is_skipped() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         let full: Vec<(SeriesKey, WindowCounts)> =
             (0..20_000).map(|i| (edge(i), counts(10))).collect();
         st.merge_window("o", w1, NOW, 1, full);
@@ -696,7 +701,7 @@ mod tests {
                 (edge(1), vec![(w1, counts(5))]),
                 (y.clone(), vec![(w1, counts(1))]),
             ],
-            NOW + MICROS,
+            NOW + SECOND_MICRO_SECS,
         );
         assert_eq!(report.evicted_cap, 2);
         assert!(!st.series.contains_key(&edge(0)));
@@ -711,7 +716,7 @@ mod tests {
     #[test]
     fn test_node_cap_drops_unresolved_client() {
         let mut st = StreamState::new();
-        let w1 = 100 * MICROS;
+        let w1 = 100 * SECOND_MICRO_SECS;
         let mut contributions: Vec<(SeriesKey, WindowCounts)> = (0..5_000)
             .map(|i| (SeriesKey::node(&format!("n{i}")), counts(50)))
             .collect();

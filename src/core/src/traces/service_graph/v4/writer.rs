@@ -261,7 +261,9 @@ fn record(name: &str, kind: &str, ts: i64, value: f64, labels: &Map<String, Valu
 
 #[cfg(test)]
 mod tests {
-    use super::{super::MICROS, *};
+    use config::utils::time::SECOND_MICRO_SECS;
+
+    use super::*;
 
     fn counts() -> WindowCounts {
         let mut buckets = [0u64; 17];
@@ -280,10 +282,10 @@ mod tests {
 
     fn batch(key: SeriesKey) -> Batch {
         Batch {
-            window_end: 60 * MICROS,
+            window_end: 60 * SECOND_MICRO_SECS,
             samples: vec![Sample {
                 key,
-                ts: 60 * MICROS,
+                ts: 60 * SECOND_MICRO_SECS,
                 counts: counts(),
             }],
         }
@@ -301,7 +303,7 @@ mod tests {
         assert_eq!(total.len(), 1);
         assert_eq!(total[0]["__type__"], "counter");
         assert_eq!(total[0]["value"], 5.0);
-        assert_eq!(total[0]["_timestamp"], 60 * MICROS);
+        assert_eq!(total[0]["_timestamp"], 60 * SECOND_MICRO_SECS);
         assert_eq!(total[0]["trace_stream"], "traces");
         assert_eq!(total[0]["client"], "a");
         assert_eq!(total[0]["server"], "b");

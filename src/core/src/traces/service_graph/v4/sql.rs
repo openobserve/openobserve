@@ -74,7 +74,7 @@ pub struct Q1Row {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Q1kRow {
+pub struct SelfIdentityRow {
     pub service_name: String,
     pub infer_self_key: Option<String>,
     pub infer_self_port: Option<u16>,
@@ -85,7 +85,7 @@ pub struct Q1kRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct QlRow {
+pub struct PairingRow {
     pub client: String,
     pub peer_key: Option<String>,
     pub peer_port: Option<u16>,
@@ -224,7 +224,7 @@ impl Q1Row {
     }
 }
 
-impl Q1kRow {
+impl SelfIdentityRow {
     pub fn parse(v: &Value) -> Option<Self> {
         Some(Self {
             service_name: str_field(v, "service_name")?,
@@ -238,7 +238,7 @@ impl Q1kRow {
     }
 }
 
-impl QlRow {
+impl PairingRow {
     pub fn parse(v: &Value) -> Option<Self> {
         Some(Self {
             client: str_field(v, "client")?,
@@ -319,7 +319,8 @@ pub fn build_q1(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
     )
 }
 
-pub fn build_q1k(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
+/// Self-identity learner (design §4.2 "Q1k"): how SERVER/CONSUMER spans name themselves.
+pub fn build_self_identity_query(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
     format!(
         "SELECT service_name, {self_key}, {self_port}, {self_ip}, {rpc}, \
          COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5')) AS server_requests, COUNT(*) AS requests \
@@ -333,8 +334,8 @@ pub fn build_q1k(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
     )
 }
 
-/// Pairing learner; `None` when a join column is missing (a missing column is a hard SQL error).
-pub fn build_ql(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
+/// Pairing learner (design §4.2 "QL"); `None` when a join column is missing (a hard SQL error).
+pub fn build_pairing_query(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
     if !cols.supports_join() {
         return None;
     }
@@ -639,8 +640,8 @@ mod tests {
     }
 
     #[test]
-    fn test_q1k_substitution_keeps_positions() {
-        let full = build_q1k(&Columns::all(), "t", 1, 2);
+    fn test_self_identity_substitution_keeps_positions() {
+        let full = build_self_identity_query(&Columns::all(), "t", 1, 2);
         let cols = Columns {
             infer_self_key: false,
             infer_self_port: false,
@@ -649,7 +650,7 @@ mod tests {
             reference_parent_span_id: false,
             ..Columns::all()
         };
-        let bare = build_q1k(&cols, "t", 1, 2);
+        let bare = build_self_identity_query(&cols, "t", 1, 2);
         assert_eq!(select_aliases(&full), select_aliases(&bare));
         assert_eq!(group_by(&full), "1,2,3,4,5");
         assert_eq!(group_by(&bare), "1,2,3,4,5");
@@ -706,9 +707,9 @@ mod tests {
                 "span_id" => cols.span_id = false,
                 _ => cols.reference_parent_span_id = false,
             }
-            assert!(build_ql(&cols, "t", 1, 2).is_none(), "{missing}");
+            assert!(build_pairing_query(&cols, "t", 1, 2).is_none(), "{missing}");
         }
-        let sql = build_ql(&Columns::all(), "t", 1, 2).unwrap();
+        let sql = build_pairing_query(&Columns::all(), "t", 1, 2).unwrap();
         assert!(sql.contains("right(c.trace_id, 2) IN ('00','40','80','c0')"));
         assert!(sql.contains("right(p.trace_id, 2) IN ('00','40','80','c0')"));
         assert!(
@@ -720,7 +721,7 @@ mod tests {
             operation_name: false,
             ..Columns::all()
         };
-        let sql = build_ql(&no_op, "t", 1, 2).unwrap();
+        let sql = build_pairing_query(&no_op, "t", 1, 2).unwrap();
         assert!(sql.contains("CAST(NULL AS VARCHAR) AS peer_sig"));
     }
 
@@ -778,12 +779,15 @@ mod tests {
         let q1 = Q1Row::parse(&json!({"service_name": "s", "requests": 3})).unwrap();
         assert_eq!(q1.root_requests, 0);
         assert_eq!(q1.counts.requests, 3);
-        let ql = QlRow::parse(&json!({"client": "a", "callee": "b", "n": 7, "peer_port": "443"}))
-            .unwrap();
-        assert_eq!(ql.peer_port, Some(443));
-        assert_eq!(ql.n, 7);
+        let pairing =
+            PairingRow::parse(&json!({"client": "a", "callee": "b", "n": 7, "peer_port": "443"}))
+                .unwrap();
+        assert_eq!(pairing.peer_port, Some(443));
+        assert_eq!(pairing.n, 7);
         assert!(Q3Row::parse(&json!({"client": "topic"})).is_none());
-        let q1k = Q1kRow::parse(&json!({"service_name": "s", "infer_self_port": 70000})).unwrap();
-        assert_eq!(q1k.infer_self_port, None);
+        let self_identity =
+            SelfIdentityRow::parse(&json!({"service_name": "s", "infer_self_port": 70000}))
+                .unwrap();
+        assert_eq!(self_identity.infer_self_port, None);
     }
 }
