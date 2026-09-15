@@ -147,17 +147,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            announced. Safe actions first, destructive last. -->
       <template #cell-actions="{ row }">
         <OButton
-          v-if="canConfigure"
-          variant="ghost"
-          size="icon-sm"
-          icon-left="edit"
-          :aria-label="t('oncall.editTeam')"
-          :data-test="`oncall-team-edit-${row.id}`"
-          @click.stop="openEdit(row)"
-        >
-          <OTooltip side="bottom" :content="t('oncall.editTeam')" />
-        </OButton>
-        <OButton
           v-if="canConfigure && row.id !== defaultTeamId"
           variant="ghost"
           size="icon-sm"
@@ -168,6 +157,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="setDefaultTeam(row)"
         >
           <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
+        </OButton>
+        <div v-else-if="canConfigure" class="w-8 h-8 shrink-0" />
+        <OButton
+          v-if="canConfigure"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="edit"
+          :aria-label="t('oncall.editTeam')"
+          :data-test="`oncall-team-edit-${row.id}`"
+          @click.stop="openEdit(row)"
+        >
+          <OTooltip side="bottom" :content="t('oncall.editTeam')" />
         </OButton>
         <OButton
           v-if="canConfigure"
