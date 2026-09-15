@@ -4582,7 +4582,7 @@
     "fieldSelectTooltip": "Wybierz pole lub użyj zmiennej takiej jak $fieldVariable. Jeśli strumień używa zmiennej, lista pól będzie pusta - wpisz nazwę pola ręcznie.",
     "filterInfoTooltip": "W filtrach możesz użyć wartości innej zmiennej, aby filtrować wartość bieżącej zmiennej. Można to zrobić, używając nazwy innej zmiennej. Na przykład:",
     "defaultSelectAll": "Domyślnie - Zaznacz wszystkie",
-    "escapeSingleQuotesTooltip": "Jeśli włączone, pojedyncze cudzysłowy będą poprzedzone znakiem ucieczki w zapytaniu. Na przykład wartość `O'Reilly` zostanie zastąpiona jako `O''Reilly`.",
+    "escapeSingleQuotesTooltip": "Pojedyncze cudzysłowy są zawsze escapowane w zapytaniu. Na przykład wartość taka jak `O'Reilly` jest zastępowana przez `O''Reilly`.",
     "byDefaultSelect": "Domyślnie wybierz:",
     "firstValue": "Pierwsza wartość",
     "allValues": "Wszystkie wartości",

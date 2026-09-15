@@ -24,9 +24,9 @@ use config::{
     utils::rand::generate_random_string,
 };
 use datafusion::{
-    common::{DataFusionError, Result},
+    common::{DataFusionError, Result, tree_node::TreeNodeRecursion},
     execution::{SendableRecordBatchStream, TaskContext},
-    physical_expr::{EquivalenceProperties, Partitioning},
+    physical_expr::{EquivalenceProperties, Partitioning, PhysicalExpr},
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, PlanProperties,
         execution_plan::{Boundedness, EmissionType},
@@ -205,6 +205,13 @@ impl DisplayAs for RemoteScanExec {
 }
 
 impl ExecutionPlan for RemoteScanExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "RemoteScanExec"
     }

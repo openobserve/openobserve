@@ -4582,7 +4582,7 @@
     "fieldSelectTooltip": "Selecione um campo ou use uma variável como $fieldVariable. Se o stream usar uma variável, a lista de campos ficará vazia - digite o nome do campo manualmente.",
     "filterInfoTooltip": "Em filtros, você pode usar o valor de outra variável para filtrar o valor da variável atual. Isso pode ser feito usando o nome da outra variável. Por exemplo:",
     "defaultSelectAll": "Padrão - Selecionar tudo",
-    "escapeSingleQuotesTooltip": "Se ativada, as aspas simples serão ignoradas na consulta. Por exemplo, um valor como `O'Reilly` será substituído por `O\"Reilly`.",
+    "escapeSingleQuotesTooltip": "Aspas simples são sempre escapadas na consulta. Por exemplo, um valor como `O'Reilly` é substituído por `O''Reilly`.",
     "byDefaultSelect": "Por padrão, selecione:",
     "firstValue": "Primeiro valor",
     "allValues": "Todos os valores",

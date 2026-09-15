@@ -37,10 +37,12 @@ import TelegrafConfig from "@/components/ingestion/metrics/TelegrafConfig.vue";
 import CloudWatchMetricConfig from "@/components/ingestion/metrics/CloudWatchMetrics.vue";
 import IngestLogs from "@/components/ingestion/logs/Index.vue";
 import IngestMetrics from "@/components/ingestion/metrics/Index.vue";
+import IngestProfiles from "@/components/ingestion/profiles/Index.vue";
 import IngestTraces from "@/components/ingestion/traces/Index.vue";
 import Recommended from "@/components/ingestion/Recommended.vue";
 import Custom from "@/components/ingestion/Custom.vue";
 import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
+import ProfilesOtelCollector from "@/components/ingestion/profiles/OtelCollector.vue";
 
 import RUMWeb from "@/components/ingestion/recommended/FrontendRumConfig.vue";
 import KubernetesConfig from "@/components/ingestion/recommended/KubernetesConfig.vue";
@@ -306,6 +308,24 @@ const useIngestionRoutes = () => {
                   path: "cloudwatchMetrics",
                   name: "cloudwatchMetrics",
                   component: CloudWatchMetricConfig,
+                  beforeEnter(to: any, from: any, next: any) {
+                    routeGuard(to, from, next);
+                  },
+                },
+              ],
+            },
+            {
+              path: "profiles",
+              name: "ingestProfiles",
+              component: IngestProfiles,
+              beforeEnter(to: any, from: any, next: any) {
+                routeGuard(to, from, next);
+              },
+              children: [
+                {
+                  path: "otelcollector",
+                  name: "profilesOtelCollector",
+                  component: ProfilesOtelCollector,
                   beforeEnter(to: any, from: any, next: any) {
                     routeGuard(to, from, next);
                   },
