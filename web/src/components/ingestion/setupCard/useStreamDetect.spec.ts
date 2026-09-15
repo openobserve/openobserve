@@ -59,6 +59,55 @@ describe("useStreamDetect", () => {
     expect(search).not.toHaveBeenCalled();
   });
 
+  it('keyword "system_" connects on the hostmetrics system_* streams', async () => {
+    // The tightened host-agent keyword (design 4.5): underscore included.
+    nameList.mockResolvedValue({
+      data: { list: [{ name: "system_cpu_time" }, { name: "system_memory_usage" }] },
+    });
+
+    const d = useStreamDetect({
+      config: () => ({
+        orgId: "default",
+        streamType: "metrics",
+        streamName: "system_",
+        match: "keyword",
+        filter: "",
+      }),
+    });
+
+    await d.check();
+
+    expect(d.connected.value).toBe(true);
+    expect(d.count.value).toBe(2);
+  });
+
+  it('keyword "system_" does NOT match an underscore-less near-miss like mysystemd', async () => {
+    // nameList filters by substring server-side — the mock must behave like that API.
+    nameList.mockImplementation(
+      (_org: any, _type: any, _schema: any, _f: any, _t: any, kw: string) => {
+        const all = ["mysystemd", "systemdaemon_metrics"];
+        return Promise.resolve({
+          data: { list: all.filter((n) => n.includes(kw)).map((name) => ({ name })) },
+        });
+      },
+    );
+
+    const d = useStreamDetect({
+      config: () => ({
+        orgId: "default",
+        streamType: "metrics",
+        streamName: "system_",
+        match: "keyword",
+        filter: "",
+      }),
+    });
+
+    await d.check();
+
+    expect(d.connected.value).toBe(false);
+    expect(d.stalled.value).toBe(true);
+  });
+
   it("exact mode (the regression) does NOT connect on a substring-only match", async () => {
     // Same streams, but without match:"keyword" the detector needs a stream named
     // exactly "sqlserver" — which doesn't exist — so it must report stalled.
