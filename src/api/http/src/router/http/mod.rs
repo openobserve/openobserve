@@ -42,9 +42,6 @@ use hashbrown::HashMap;
 use http_body_util::{BodyExt, Limited};
 use infra::cluster;
 
-/// Compressed-body cap on the router hop for the unauthenticated collector path.
-const SPLUNK_COLLECTOR_PROXY_BODY_LIMIT: usize = 10 * 1024 * 1024;
-
 /// Global HTTP client for connection pooling.
 /// Using OnceLock ensures thread-safe lazy initialization.
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -193,15 +190,18 @@ fn splunk_status(status: StatusCode, code: u16, text: &str) -> Response {
 
 /// True for the Splunk HEC collector paths, which are never under `base_uri`.
 ///
-/// A `..` segment is refused: this is the one route whose forwarded path skips
-/// the `base_uri` prefix, and the proxy's URL parser would collapse the segment
-/// into a backend path outside it.
+/// An exact allowlist, NOT a prefix match: this is the one route whose forwarded
+/// path skips the `base_uri` prefix, so anything accepted here is sent verbatim
+/// to the backend. reqwest parses that path per WHATWG, which percent-DECODES a
+/// segment before resolving it — `%2e%2e`, `%2E%2E`, `.%2e` and `%2e.` all mean
+/// `..` there — so `/services/collector/%2e%2e/%2e%2e/api/default/_bulk`
+/// collapses to `/api/default/_bulk` and escapes the mount on an unauthenticated
+/// route. Rejecting the literal `..` alone does not catch any of those spellings.
 pub fn is_splunk_collector_route(path: &str) -> bool {
-    let path = extract_path_without_query(path);
-    if path.split('/').any(|seg| seg == "..") {
-        return false;
-    }
-    path == "/services/collector" || path.starts_with("/services/collector/")
+    matches!(
+        extract_path_without_query(path),
+        "/services/collector" | "/services/collector/event" | "/services/collector/health"
+    )
 }
 
 /// Orders the candidate nodes so the preferred node (per dispatch strategy) is
@@ -281,7 +281,7 @@ async fn proxy_request(
     // `collect()` bypasses the extractor-based DefaultBodyLimit, so unauthenticated
     // root-level routes have to carry their own cap here.
     let body = if is_splunk_collector_route(query_path) {
-        match Limited::new(req.into_body(), SPLUNK_COLLECTOR_PROXY_BODY_LIMIT)
+        match Limited::new(req.into_body(), get_config().limit.req_payload_limit / 10)
             .collect()
             .await
         {
@@ -855,16 +855,33 @@ mod tests {
         assert!(!is_splunk_collector_route("/services/collectorfoo"));
         assert!(!is_splunk_collector_route("/api/default/_hec"));
         assert!(!is_splunk_collector_route("/services"));
-        // `..` would be collapsed by the proxy's URL parser into a backend path
-        // outside base_uri, which this route alone is allowed to skip.
-        assert!(!is_splunk_collector_route(
-            "/services/collector/../../api/x/_bulk"
-        ));
-        assert!(!is_splunk_collector_route("/services/collector/../x?a=b"));
-        // A percent-encoded `..` is not a path segment to the URL parser either,
-        // so it stays a literal path component and needs no special case.
-        assert!(is_splunk_collector_route("/services/collector/..%2f"));
-        assert!(is_splunk_collector_route("/services/collector/event"));
+        // Nothing outside the three real paths is forwarded, because whatever is
+        // accepted here reaches the backend verbatim without the base_uri prefix.
+        assert!(!is_splunk_collector_route("/services/collector/raw"));
+        assert!(!is_splunk_collector_route("/services/collector/event/x"));
+    }
+
+    #[test]
+    fn a_percent_encoded_dot_segment_cannot_escape_the_collector_mount() {
+        // reqwest parses the forwarded path per WHATWG, which DECODES a segment
+        // before resolving it, so every spelling below means `..` to the backend
+        // URL parser. Verified against the `url` crate: the first case resolves
+        // to `/api/default/_bulk`, i.e. straight out of the mount on a route
+        // that carries no authentication.
+        for path in [
+            "/services/collector/%2e%2e/%2e%2e/api/default/_bulk",
+            "/services/collector/%2E%2E/api/default/_bulk",
+            "/services/collector/.%2e/api/default/_bulk",
+            "/services/collector/%2e./api/default/_bulk",
+            "/services/collector/../../api/x/_bulk",
+            "/services/collector/../x?a=b",
+            "/services/collector/..%2f",
+        ] {
+            assert!(
+                !is_splunk_collector_route(path),
+                "must not forward {path} unchanged"
+            );
+        }
     }
 
     #[test]

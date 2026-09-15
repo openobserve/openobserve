@@ -2005,7 +2005,7 @@ pub fn splunk_collector_routes() -> Router {
         )
         // Applied innermost so it caps the DECOMPRESSED body: `.layer` wraps
         // outermost-last, so everything below this runs before it.
-        .layer(DefaultBodyLimit::max(hec_collector::HEC_MAX_BODY_BYTES))
+        .layer(DefaultBodyLimit::max(hec_collector::hec_max_body_bytes()))
         // Root-level routers inherit nothing from `service_routes`, so the
         // decompression pair has to be re-applied here.
         .layer(RequestDecompressionLayer::new())
@@ -2371,7 +2371,7 @@ mod tests {
         // decompressed one, so a single-node deployment accepted a 100 MiB
         // unauthenticated body — and answered in plain text when it did refuse.
         let app = splunk_collector_routes();
-        let body = vec![b'x'; logs::hec_collector::HEC_MAX_WIRE_BYTES + 1];
+        let body = vec![b'x'; logs::hec_collector::hec_max_wire_bytes() + 1];
         let req = Request::builder()
             .method(Method::POST)
             .uri("/services/collector")
@@ -2392,7 +2392,7 @@ mod tests {
     #[tokio::test]
     async fn a_body_that_decompresses_over_the_limit_is_413_with_the_splunk_triple() {
         // The wire-limit test above cannot reach this: a compression bomb is
-        // tiny on the wire and only blows past HEC_MAX_BODY_BYTES inside the
+        // tiny on the wire and only blows past the decompressed cap inside the
         // `Bytes` extractor, where `DefaultBodyLimit` rejects with a plain-text
         // body unless the handler maps the rejection itself.
         const GUID: &str = "abcdabcd-0000-4000-8000-abcdabcdabcd";
@@ -2412,10 +2412,10 @@ mod tests {
         common::infra::config::ORG_INGESTION_TOKENS
             .insert("g1org/o2oi_g1value".to_string(), "g1".to_string());
 
-        let raw = vec![b'x'; logs::hec_collector::HEC_MAX_BODY_BYTES + 1024];
+        let raw = vec![b'x'; logs::hec_collector::hec_max_body_bytes() + 1024];
         let compressed = zstd::encode_all(&raw[..], 3).unwrap();
         // Small enough on the wire that wire_body_limit_middleware passes it.
-        assert!(compressed.len() < logs::hec_collector::HEC_MAX_WIRE_BYTES);
+        assert!(compressed.len() < logs::hec_collector::hec_max_wire_bytes());
 
         let req = Request::builder()
             .method(Method::POST)

@@ -27,7 +27,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::infra::config::{ORG_INGESTION_TOKENS, SPLUNK_HEC_TOKENS};
-use config::{DEFAULT_STREAM_NAME, meta::stream::StreamType, metrics, utils::str::mask_secret};
+use config::{
+    DEFAULT_STREAM_NAME, get_config, meta::stream::StreamType, metrics, utils::str::mask_secret,
+};
 use db::org_ingestion_tokens::SPLUNK_HEC_TOKENS_LOADED;
 use ingestion_common::IngestUser;
 use serde::{Deserialize, Serialize};
@@ -37,10 +39,19 @@ use crate::service::{
     logs::hec::{HecParseError, parse_body, preflight_records, preflight_streams},
 };
 
-/// Maximum decompressed body the collector will accept.
-pub const HEC_MAX_BODY_BYTES: usize = 100 * 1024 * 1024;
-/// Maximum body on the wire, before any decompression can amplify it.
-pub const HEC_MAX_WIRE_BYTES: usize = 10 * 1024 * 1024;
+/// Maximum decompressed body the collector will accept: the same
+/// `ZO_PAYLOAD_LIMIT` every other ingest route uses, so operators tune one knob.
+pub fn hec_max_body_bytes() -> usize {
+    get_config().limit.req_payload_limit
+}
+
+/// Maximum body on the wire, before decompression can amplify it.
+///
+/// A tenth of the decompressed cap: this route is unauthenticated, so a
+/// compression bomb must be refused on the wire rather than after inflating.
+pub fn hec_max_wire_bytes() -> usize {
+    hec_max_body_bytes() / 10
+}
 
 /// The org and token row resolved by [`splunk_auth_middleware`].
 #[derive(Clone, Debug)]
@@ -311,7 +322,7 @@ pub async fn splunk_auth_middleware(mut req: Request, next: Next) -> Response {
 /// DECOMPRESSED body; a compressed bomb has to be stopped before that.
 pub async fn wire_body_limit_middleware(req: Request, next: Next) -> Response {
     let (parts, body) = req.into_parts();
-    let bytes = match axum::body::to_bytes(body, HEC_MAX_WIRE_BYTES).await {
+    let bytes = match axum::body::to_bytes(body, hec_max_wire_bytes()).await {
         Ok(b) => b,
         Err(_) => return count_and_respond(HecCollectorStatus::RequestEntityTooLarge, ""),
     };
@@ -479,7 +490,7 @@ fn body_rejection_status(rejection: &BytesRejection) -> HecCollectorStatus {
 /// `text/plain`, `application/x-ndjson` and nothing at all interchangeably, and
 /// the parser is what decides whether a body is usable.
 async fn ingest_collector_body(auth: &HecAuth, body: Bytes) -> HecCollectorStatus {
-    if body.len() > HEC_MAX_BODY_BYTES {
+    if body.len() > hec_max_body_bytes() {
         return HecCollectorStatus::RequestEntityTooLarge;
     }
 
