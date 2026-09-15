@@ -177,7 +177,7 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.referenceDrawer()).toBeHidden();
   });
 
-  test.fixme('A6b · opening the conflict drawer moves focus into it (#14461)', async ({ page }) => {
+  test('A6b · opening the conflict drawer moves focus into it', async ({ page }) => {
     const { a } = await seedComposite(page, 'a6b');
 
     await pm.compositeAlertsPage.openList();
@@ -185,20 +185,16 @@ test.describe('Composite alerts — list', {
     await pm.compositeAlertsPage.attemptRowDelete(a.name);
     await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
 
-    // Focus is never moved into the drawer, so a keyboard user is left on the
-    // alert-list search input behind it, with no indication it appeared.
-    //
-    // Cause is in ODrawer, not here: handleOpenAutoFocus() calls
-    // event.preventDefault() unconditionally — suppressing reka-ui's own focus
-    // placement — then focuses the first input/textarea in the drawer BODY,
-    // falling back to its primary button. This drawer has neither (body is
-    // link buttons, show-close is false and the control lives in
-    // #header-right), so focus is suppressed and nothing replaces it. The bare
-    // `autofocus` attribute on the close button is all that remains, and that
-    // is not dependable for dynamically inserted content: it holds locally and
-    // never fires in CI. The fix is an explicit focus() on open, and it applies
-    // to every ODrawer whose content is not a form.
+    // ODrawer moves focus in explicitly. Its body is link buttons and it
+    // declares no primary action, so neither of the handler's original targets
+    // exists — the close control is reached through the `[autofocus]` it
+    // declares in #header-right. Asserting the bare HTML attribute would prove
+    // nothing: it is not dependable for content inserted after parse, which is
+    // precisely why the drawer used to strand focus outside itself.
     await expect(pm.compositeAlertsPage.referenceClose()).toBeFocused();
+    // Focus landed there on open, so Enter alone dismisses it.
+    await page.keyboard.press('Enter');
+    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeHidden();
   });
 
   test('A10 · removing the parent first frees its children for deletion', async ({ page }) => {
