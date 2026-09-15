@@ -449,21 +449,6 @@ pub static O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::
     .expect("Metric created")
 });
 
-pub static O2_SERVICE_GRAPH_WRITE_FAILED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
-    IntCounterVec::new(
-        Opts::new(
-            "o2_service_graph_write_failed_total",
-            "Service graph v4 metric batches partially rejected by the ingester, by org."
-                .to_owned()
-                + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["org"],
-    )
-    .expect("Metric created")
-});
-
 /// Usage rows the self-reporting queue REFUSED — SPEC §9B.1 row 8, alerted on
 /// by **A4**. The only observable failure in the emit path: `report_usage`
 /// spawns and returns `()`, so callers cannot see a failure; the enqueue inside
@@ -2701,9 +2686,6 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(O2_SERVICE_GRAPH_WRITE_FAILED_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -3515,7 +3497,6 @@ mod tests {
         let _ = O2_SERVICE_GRAPH_RETAINED_NODES.clone();
         let _ = O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone();
         let _ = O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone();
-        let _ = O2_SERVICE_GRAPH_WRITE_FAILED_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_SEARCHING_FILES.clone();

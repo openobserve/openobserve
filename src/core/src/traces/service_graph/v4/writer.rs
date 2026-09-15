@@ -119,9 +119,6 @@ pub async fn write_batch(org: &str, chunks: Vec<Vec<u8>>) -> WriteOutcome {
                         log::warn!(
                             "[ServiceGraph] org {org}: metrics batch partially failed (207)"
                         );
-                        config::metrics::O2_SERVICE_GRAPH_WRITE_FAILED_TOTAL
-                            .with_label_values(&[org])
-                            .inc();
                     }
                     break;
                 }
