@@ -365,7 +365,11 @@ import {
 
 const DAY_MS = 86_400_000;
 
-const { t } = useI18nTyped();
+type RejectedResponse = { response?: { status?: number; data?: { message?: string } } };
+
+const responseOf = (error: unknown) => (error as RejectedResponse | undefined)?.response;
+
+const { t, locale } = useI18nTyped();
 const store = useStore();
 const { confirm } = useConfirmDialog();
 
@@ -387,7 +391,7 @@ const form = useOForm<PolicyForm>({
   onSubmit: (values) => save(values),
 });
 
-const values = form.useStore((s: any) => s.values as PolicyForm);
+const values = form.useStore((s: { values: PolicyForm }) => s.values);
 
 const backoffOptions = [
   { label: t("passwordPolicy.backoffExponential"), value: "exponential" },
@@ -419,7 +423,7 @@ const lockoutPreview = computed(() => {
     // 0 reuses the first threshold for every later lockout.
     bucket: Number(lockout.bucket_size) || Number(lockout.threshold),
     first: raw(first),
-    rest: raw(rest.join(", ")),
+    rest: raw(new Intl.ListFormat(locale.value, { type: "unit" }).format(rest)),
     max: raw(durationFormatter(Number(lockout.max_secs))),
   });
 });
@@ -442,12 +446,12 @@ const loadPolicy = async () => {
   loadError.value = false;
 
   try {
-    const response: any = await passwordPolicy.getPolicy(metaOrg.value);
+    const response = await passwordPolicy.getPolicy(metaOrg.value);
     loadedPolicy.value = response.data;
     formDefaults.value = policyDefaults(response.data);
     form.reset(formDefaults.value);
-  } catch (error: any) {
-    if (error?.response?.status === 403) forbidden.value = true;
+  } catch (error: unknown) {
+    if (responseOf(error)?.status === 403) forbidden.value = true;
     else loadError.value = true;
   } finally {
     loading.value = false;
@@ -485,7 +489,7 @@ const save = async (formValues: PolicyForm) => {
   if (!confirmed) return;
 
   try {
-    const response: any = await passwordPolicy.updatePolicy(
+    const response = await passwordPolicy.updatePolicy(
       metaOrg.value,
       buildPolicyPayload(loadedPolicy.value, formValues),
     );
@@ -498,10 +502,10 @@ const save = async (formValues: PolicyForm) => {
       variant: "success",
       message: t("passwordPolicy.saved", { count: flagged }, flagged),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast({
       variant: "error",
-      message: raw(error?.response?.data?.message) || t("passwordPolicy.saveFailed"),
+      message: raw(responseOf(error)?.data?.message) || t("passwordPolicy.saveFailed"),
     });
   }
 };

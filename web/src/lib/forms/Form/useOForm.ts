@@ -94,5 +94,9 @@ export function setServerFieldErrors<T extends Record<string, unknown>>(
   form: ReturnType<typeof useOForm<T>>,
   fields: Partial<Record<FormFieldPath<T>, I18nText>>,
 ) {
-  form.setErrorMap({ onServer: { form: undefined, fields } as any });
+  form.setErrorMap({
+    onServer: { form: undefined, fields } as unknown as Parameters<
+      typeof form.setErrorMap
+    >[0]["onServer"],
+  });
 }

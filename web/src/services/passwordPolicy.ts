@@ -57,13 +57,16 @@ export interface SetPasswordPolicyResponse {
 const passwordPolicy = {
   /** Readable by any authenticated user — the only policy route a flagged user can reach. */
   getComplexity: (orgIdentifier: string) => {
-    return http().get(`/api/${orgIdentifier}/password_complexity`);
+    return http().get<PasswordComplexity>(`/api/${orgIdentifier}/password_complexity`);
   },
   getPolicy: (metaOrg: string) => {
-    return http().get(`/api/${metaOrg}/settings/password_policy`);
+    return http().get<PasswordPolicy>(`/api/${metaOrg}/settings/password_policy`);
   },
   updatePolicy: (metaOrg: string, policy: PasswordPolicy) => {
-    return http().put(`/api/${metaOrg}/settings/password_policy`, policy);
+    return http().put<SetPasswordPolicyResponse>(
+      `/api/${metaOrg}/settings/password_policy`,
+      policy,
+    );
   },
 };
 
