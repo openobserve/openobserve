@@ -177,8 +177,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
+            <!-- A draft has no folder until promoted, so it is not claimed by default. -->
             <template #cell-folder_name="{ row }">
-              {{ row.folder_name || t("common.defaultLabel") }}
+              {{ row.is_draft ? "—" : row.folder_name || t("common.defaultLabel") }}
             </template>
 
             <template #cell-updated_at="{ row }">
@@ -434,6 +435,12 @@ watch(activeFolderId, (folderId) => {
 const clearFilters = () => {
   filterQuery.value = "";
   activeTab.value = "all";
+  // The toggle would otherwise stay lit on "All folders" while the list drops back
+  // to the current one. Refetched here because the query watcher then no-ops.
+  if (searchAcrossFolders.value) {
+    searchAcrossFolders.value = false;
+    getWorkflows();
+  }
 };
 
 const onFolderScopeChange = (v: string) => {

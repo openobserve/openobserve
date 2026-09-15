@@ -25,6 +25,7 @@ use sea_orm_migration::prelude::*;
 use svix_ksuid::{Ksuid, KsuidLike};
 
 const FK_NAME: &str = "workflows_folder_fk";
+const NOT_NULL_CHECK_NAME: &str = "workflows_folder_id_not_null";
 const IDX_NAME: &str = "workflows_org_folder_idx";
 const WORKFLOWS_FOLDER_TYPE: i16 = 4;
 
@@ -54,10 +55,7 @@ impl MigrationTrait for Migration {
         // SQLite cannot add a foreign key to an existing table and is dev-only
         // here, so it keeps a nullable, unconstrained column.
         if backend == sea_orm::DbBackend::Postgres {
-            manager
-                .get_connection()
-                .execute_unprepared("ALTER TABLE workflows ALTER COLUMN folder_id SET NOT NULL")
-                .await?;
+            set_folder_id_not_null(manager).await?;
         }
 
         if backend == sea_orm::DbBackend::Postgres && !fk_exists(manager).await? {
@@ -179,6 +177,27 @@ async fn backfill_default_folders(manager: &SchemaManager<'_>) -> Result<(), DbE
             .await?;
     }
 
+    Ok(())
+}
+
+/// Postgres only. A bare `SET NOT NULL` scans the heap under ACCESS EXCLUSIVE,
+/// which on a large table can outlast the dist_lock; validating a CHECK takes only
+/// SHARE UPDATE EXCLUSIVE and lets PG12+ skip that scan. The CHECK is then redundant.
+async fn set_folder_id_not_null(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
+    let conn = manager.get_connection();
+    // ADD CONSTRAINT has no IF NOT EXISTS, so a re-run drops the leftover first.
+    for stmt in [
+        format!("ALTER TABLE workflows DROP CONSTRAINT IF EXISTS {NOT_NULL_CHECK_NAME}"),
+        format!(
+            "ALTER TABLE workflows ADD CONSTRAINT {NOT_NULL_CHECK_NAME} \
+             CHECK (folder_id IS NOT NULL) NOT VALID"
+        ),
+        format!("ALTER TABLE workflows VALIDATE CONSTRAINT {NOT_NULL_CHECK_NAME}"),
+        "ALTER TABLE workflows ALTER COLUMN folder_id SET NOT NULL".to_string(),
+        format!("ALTER TABLE workflows DROP CONSTRAINT {NOT_NULL_CHECK_NAME}"),
+    ] {
+        conn.execute_unprepared(&stmt).await?;
+    }
     Ok(())
 }
 

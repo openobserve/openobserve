@@ -365,7 +365,8 @@ pub async fn save_workflow(
 
 /// `resolve_folder_pk` treats a blank slug as the default folder, so the
 /// ownership tuple must normalize identically or the two name different folders.
-fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
+/// Public so the handlers authorize the same slug they end up writing to.
+pub fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
     folder_slug
         .map(str::trim)
         .filter(|s| !s.is_empty())

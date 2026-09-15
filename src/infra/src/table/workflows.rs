@@ -210,6 +210,9 @@ pub async fn list_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
 ///
 /// Both columns, to match what the in-folder list filters on in the browser.
 /// `folder_pk` is the folder's primary key, not the slug from the URL.
+///
+/// The leading-wildcard LIKE cannot use an index; the scan is accepted because
+/// `workflows_org_folder_idx` bounds it to one org. Revisit with `pg_trgm` if that grows.
 pub async fn list_by_org_folder(
     org_id: &str,
     folder_pk: Option<&str>,
