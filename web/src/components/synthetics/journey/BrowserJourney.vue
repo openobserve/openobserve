@@ -1191,7 +1191,6 @@ const isCompositionEnabled = computed(
 // ── Executed step cap ────────────────────────────────────────────────────
 // Undefined `ownStepCount` (a child could not be loaded) shows no notice; the server backstop applies.
 const overCap = computed(() => props.ownStepCount !== undefined && props.ownStepCount > MAX_STEPS);
-const hasReference = computed(() => props.modelValue.some((s) => s.action === "subtest"));
 const ownStepTotal = computed(() => props.modelValue.filter((s) => s.action !== "subtest").length);
 /** One entry per reference row in journey order — the same child twice runs twice. */
 const capChildren = computed(() =>
@@ -1413,14 +1412,6 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           {{ t("synthetics.journey.steps") }}
         </h3>
         <OBadge variant="default" size="sm" class="ms-1">{{ modelValue.length }}</OBadge>
-        <OBadge
-          v-if="hasReference && ownStepCount !== undefined"
-          :variant="overCap ? 'error' : 'default'"
-          size="sm"
-          class="ms-1"
-          data-test="synthetics-journey-executed-badge"
-          >{{ t("synthetics.journey.subtest.executedBadge", { count: ownStepCount }) }}</OBadge
-        >
       </div>
 
       <JourneySuggestions

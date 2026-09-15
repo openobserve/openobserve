@@ -1121,17 +1121,6 @@ describe("BrowserJourney Add Subtest button", () => {
       behavior: "smooth",
     });
   });
-
-  it("should count the new reference in the executed badge like an editor-chosen subtest", async () => {
-    wrapper = mountWithModel([{ id: "s1", action: "navigate", name: "Open app" }]);
-    await wrapper.setProps({ ownStepCount: 1 });
-    expect(wrapper.find('[data-test="synthetics-journey-executed-badge"]').exists()).toBe(false);
-
-    await wrapper.find(ADD_SUBTEST).trigger("click");
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="synthetics-journey-executed-badge"]').exists()).toBe(true);
-  });
 });
 
 // Phase 5 / SE-4. The evidence existed and was discarded: JourneySteps declares a
@@ -1933,7 +1922,6 @@ describe("BrowserJourney step cap", () => {
   let w: VueWrapper;
 
   const CAP_NOTICE = '[data-test="synthetics-journey-cap-notice"]';
-  const EXECUTED_BADGE = '[data-test="synthetics-journey-executed-badge"]';
 
   const journey: BrowserStep[] = [
     { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.example.com" },
@@ -2044,38 +2032,6 @@ describe("BrowserJourney step cap", () => {
 
     expect(w.find(CAP_NOTICE).exists()).toBe(true);
     expect(w.findAll('[data-status-bar="true"]')).toHaveLength(0);
-  });
-
-  it("shows the executed badge only when the journey holds a reference, in the error variant past the limit", async () => {
-    w = mountWithRealSteps({ modelValue: plainJourney, childrenCache: cache(), ownStepCount: 3 });
-    await flushPromises();
-    expect(w.find(EXECUTED_BADGE).exists()).toBe(false);
-    w.unmount();
-
-    // A reference with an unknown count has no number to show.
-    w = mountWithRealSteps({
-      modelValue: journey,
-      childrenCache: cache(),
-      ownStepCount: undefined,
-    });
-    await flushPromises();
-    expect(w.find(EXECUTED_BADGE).exists()).toBe(false);
-    w.unmount();
-
-    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 48 });
-    await flushPromises();
-    let badge = w.find(EXECUTED_BADGE);
-    expect(badge.exists()).toBe(true);
-    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.executedBadge", { count: 48 });
-    expect(badge.attributes("variant")).toBe("default");
-    w.unmount();
-
-    w = mountWithRealSteps({ modelValue: journey, childrenCache: cache(), ownStepCount: 51 });
-    await flushPromises();
-    badge = w.find(EXECUTED_BADGE);
-    expect(badge.exists()).toBe(true);
-    expect(mockT).toHaveBeenCalledWith("synthetics.journey.subtest.executedBadge", { count: 51 });
-    expect(badge.attributes("variant")).toBe("error");
   });
 
   it("exposes revealCapNotice which scrolls the notice into view", async () => {
