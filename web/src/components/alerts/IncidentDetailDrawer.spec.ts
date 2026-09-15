@@ -1349,6 +1349,7 @@ describe("IncidentDetailDrawer.vue", () => {
             },
           ],
           traces: [],
+          profiles: [],
         },
         matched_set_id: "kubernetes",
       },
