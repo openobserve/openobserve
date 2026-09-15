@@ -1,0 +1,31 @@
+{
+  "feature_slug": "alerts-anomaly-detection",
+  "feature_title": "Alerts Anomaly Detection",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-anomaly-detection.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue",
+    "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.schema.ts",
+    "web/src/components/alerts/AlertConfigSummary.vue",
+    "web/src/components/alerts/AnomalyDetectionChart.vue",
+    "web/src/composables/useAlertForm.ts",
+    "web/src/utils/alerts/anomalySummaryGenerator.ts",
+    "web/src/utils/alerts/anomalyChartQuery.ts"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "both — the changed paths span both repos: web/src/** and src/api/management/** are OSS-owned locations, while o2_enterprise/src/enterprise/anomaly_detection/** (plus o2_enterprise/tests/**) are enterprise-owned. The enterprise anomaly_detection module and its keywords corroborate the ENT half, but the UI and API surface lives in OSS paths, so the change is a linked OSS+ENT pair.",
+    "skip": "no skip — the change is user-facing: it alters the alerts anomaly-detection UI (AnomalyDetectionConfig.vue, AlertConfigSummary.vue, AnomalyDetectionChart.vue) under web/src. No skip label or comment was provided (trigger_comment.txt is empty) and the diff is not docs/CI-only, so no opt-out or no-user-facing-change condition applies.",
+    "e2e": "E2E is warranted — the diff introduces and alters a user-exercisable anomaly-detection configuration flow (percentile sensitivity tier vs per-day alert budget modes) and changes the sensitivity hint text/copy in the alerts UI; those are interactive UI behaviors a browser test should verify.",
+    "area": "Alerts — the UI changes live in web/src/components/alerts and web/src/components/anomaly_detection (the alert add/edit flow), and the existing E2E spec sits under tests/ui-testing/playwright-tests/Alerts/, matching that product area.",
+    "group": "Alerts — ci_matrix_env.json defines an Alerts shard (actual_folder Alerts), and the enterprise overlay ci_matrix.ent.json already appends alerts-anomaly-detection.spec.js to that same Alerts shard, so the spec belongs there.",
+    "existing_tests": "the diff modifies tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js — a genuine Playwright E2E spec — so E2E coverage already exists in the diff and the Architect should enhance/extend it to cover the new percentile-vs-budget threshold semantics and the updated hint assertions. The many *.spec.ts files under web/src/** are Vitest unit tests and do not count as E2E coverage."
+  }
+}

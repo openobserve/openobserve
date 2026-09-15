@@ -862,6 +862,189 @@ test.describe('Anomaly Detection', () => {
     });
   });
 
+  // ════════════════════════════════════════════════════════════════════════
+  // Budget mode — the delivered-alert-per-day cap (edit-only sensitivity).
+  //
+  // `sensitivity_mode` derives from `alert_budget_per_day` presence, and there
+  // is no UI toggle that enters budget mode, so a budget config is only
+  // reachable by editing one that already carries a budget — seeded through the
+  // API. These tests only READ config; they never run detection.
+  // ════════════════════════════════════════════════════════════════════════
+
+  test.describe('Budget mode (edit-only sensitivity)', () => {
+    test.describe.configure({ mode: 'parallel' });
+
+    // Same own-record pattern as the lifecycle block: create through the API
+    // (the wizard cannot enter budget mode), settle, reload (the list is
+    // fetched once on tab mount), then edit. Omitting budgetPerDay seeds a
+    // plain percentile config instead, for the no-budget regression guard.
+    const ownConfig = async (page, suffix, budgetPerDay) => {
+      const name = anomalyName(suffix);
+      await createAnomalyViaApi(page, name, { alert_budget_per_day: budgetPerDay });
+      await waitForAnomalyListed(page, name);
+      await page.reload();
+      await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
+      await pm.anomalyDetectionPage.navigateToAnomalyTab();
+      await pm.anomalyDetectionPage.searchAnomaly(name);
+      await expect(
+        pm.anomalyDetectionPage.getRow(name),
+        `${name} was created via the API but never appeared in the list`,
+      ).toBeVisible({ timeout: 20000 });
+      return name;
+    };
+
+    test('budget controls replace the percentile tier when a config carries a budget', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'budget', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('4');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
+      await expect(pm.anomalyDetectionPage.getPercentileTierLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a budget tier preset fans out into count and period', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'tiers', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      for (const [tier, count, period] of [['1_week', '1', 'week'], ['1_day', '1', 'day'], ['4_day', '4', 'day']]) {
+        await pm.anomalyDetectionPage.selectBudgetTier(tier);
+        expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe(count);
+        expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe(period);
+        expect(await pm.anomalyDetectionPage.getActiveBudgetTier()).toBe(tier);
+      }
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a sub-1/day stored budget surfaces as alerts per week', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'subdaily', 0.5);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('3.5');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('week');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('an invalid budget count blocks save with the budget-range message', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'invalid', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.setBudgetCount(0);
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the budget hint names the cap and is suppressed on invalid input', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'hint', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
+      await expect(hint).toBeVisible();
+      await expect(hint).toContainText('4');
+
+      await pm.anomalyDetectionPage.setBudgetCount(0);
+      await expect(hint).toBeHidden();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('saving a budget config persists alert_budget_per_day', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'persist', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.selectBudgetTier('4_day');
+      await pm.anomalyDetectionPage.saveAndExpectSuccess();
+
+      const configs = await listAnomalyDetections(page);
+      const saved = configs.find((c) => c.name === name);
+      expect(saved, `${name} should still be listed after save`).toBeTruthy();
+      // The budget save payload sends the per-day cap, not the percentile; the
+      // persisted cap is the observable proof.
+      expect(saved.alert_budget_per_day).toBe(4);
+    });
+
+    test('a config without a budget still renders the percentile tier', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'nobudget');
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await expect(pm.anomalyDetectionPage.getPercentileTierLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeHidden();
+      expect(await pm.anomalyDetectionPage.getSensitivityPercentile()).toBe('97');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('an off-tier budget count is accepted with no tier selected', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'offtier', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      await pm.anomalyDetectionPage.setBudgetCount(3);
+      await expect(pm.anomalyDetectionPage.getSensitivityErrorLocator()).toBeHidden();
+      expect(await pm.anomalyDetectionPage.getActiveBudgetTier()).toBeNull();
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toContainText('3');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('budget mode still requires a destination when notifications are enabled', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'destreq', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openAlertingTab();
+      await pm.anomalyDetectionPage.toggleNotifications(true);
+      await pm.anomalyDetectionPage.save();
+
+      await expect(pm.anomalyDetectionPage.getDestinationErrorLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('a per-day budget of exactly 1 stays in day units', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'boundary', 1);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('1');
+      expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+  });
+
   test.afterAll(async ({ browser }) => {
     if (
       !process.env.ZO_BASE_URL ||

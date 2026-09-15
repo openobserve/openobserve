@@ -1,0 +1,12 @@
+[
+  { "title": "budget controls replace the percentile tier when a config carries a budget", "action": "append", "verifies": "edit-load flips sensitivity_mode to budget and renders the budget cap control, hiding the percentile tier" },
+  { "title": "a budget tier preset fans out into count and period", "action": "append", "verifies": "each budget preset writes its count and period and lights the clicked tier" },
+  { "title": "a sub-1/day stored budget surfaces as alerts per week", "action": "append", "verifies": "a per-day budget below 1 displays as an equivalent per-week count (0.5/day -> 3.5/week)" },
+  { "title": "an invalid budget count blocks save with the budget-range message", "action": "append", "verifies": "a non-positive budget count paints the sensitivity error and blocks save" },
+  { "title": "the budget hint names the cap and is suppressed on invalid input", "action": "append", "verifies": "the budget hint names the per-day cap and disappears when the count is invalid" },
+  { "title": "saving a budget config persists alert_budget_per_day", "action": "append", "verifies": "the budget save payload persists the per-day cap to the config" },
+  { "title": "a config without a budget still renders the percentile tier", "action": "append", "verifies": "budget mode does not leak into default edits; percentile tier remains with its value" },
+  { "title": "an off-tier budget count is accepted with no tier selected", "action": "append", "verifies": "a non-preset budget count is valid, lights no preset, and shows the hint" },
+  { "title": "budget mode still requires a destination when notifications are enabled", "action": "append", "verifies": "enabling notifications on a budget config without a destination blocks save" },
+  { "title": "a per-day budget of exactly 1 stays in day units", "action": "append", "verifies": "the per-day/week boundary at 1.0 stays in day units" }
+]

@@ -72,6 +72,11 @@ class AnomalyDetectionPage {
             sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
+            // Budget mode (edit-only sensitivity): renders when the config
+            // carries alert_budget_per_day, replacing the percentile tier.
+            budgetTiers: '[data-test="anomaly-budget-tiers"]',
+            budgetCount: '[data-test="anomaly-budget-count"]',
+            budgetPeriod: '[data-test="anomaly-budget-period"]',
             sqlPreview: '[data-test="anomaly-sql-preview"]',
 
             // Alerting step
@@ -105,6 +110,7 @@ class AnomalyDetectionPage {
             rowRetrain: (name) => `[data-test="alert-list-${name}-retrain-anomaly"]`,
 
             sensitivityTierItem: (pct) => `[data-test="anomaly-sensitivity-tier-${pct}"]`,
+            budgetTierItem: (value) => `[data-test="anomaly-budget-tier-${value}"]`,
             queryTab: (mode) => `[data-test="anomaly-query-tab-${mode}"]`,
             filterField: (idx) => `[data-test="anomaly-filter-field-${idx}"]`,
             filterOperator: (idx) => `[data-test="anomaly-filter-operator-${idx}"]`,
@@ -462,6 +468,47 @@ class AnomalyDetectionPage {
 
     getSensitivityErrorLocator() {
         return this.page.locator(this.selectors.sensitivityError);
+    }
+
+    // Budget mode (edit-only sensitivity)
+
+    /** @param {'1_week'|'1_day'|'4_day'} value */
+    async selectBudgetTier(value) {
+        const tier = this.page.locator(this.selectors.budgetTierItem(value));
+        await tier.click();
+        await expect(tier).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    }
+
+    /** The active budget preset, or null when no preset matches (an off-tier count). */
+    async getActiveBudgetTier() {
+        const active = this.page.locator(`${this.selectors.budgetTiers} [data-state="on"]`);
+        if ((await active.count()) === 0) return null;
+        const dataTest = await active.first().getAttribute('data-test');
+        return dataTest ? dataTest.replace('anomaly-budget-tier-', '') : null;
+    }
+
+    async getBudgetCount() {
+        return this.getFormInputValue(this.selectors.budgetCount);
+    }
+
+    async setBudgetCount(count) {
+        await this.fillFormInput(this.selectors.budgetCount, count);
+    }
+
+    /** The selected budget period ('day' | 'week'), read from the OSelect value. */
+    async getBudgetPeriod() {
+        const trigger = this.page
+            .locator(`${this.selectors.budgetPeriod} [data-test$="-trigger"]`)
+            .first();
+        return trigger.getAttribute('data-test-selected-value');
+    }
+
+    getBudgetTiersLocator() {
+        return this.page.locator(this.selectors.budgetTiers);
+    }
+
+    getPercentileTierLocator() {
+        return this.page.locator(this.selectors.sensitivityTier);
     }
 
     // Alerting step
