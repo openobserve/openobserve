@@ -43,6 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         @row-click="openDetail"
         :footer-title="t('aiObservability.datasets.listTitle')"
         :global-filter="search"
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="edit"
+              class="max-md:hidden"
               :data-test="`ai-datasets-edit-${row.id}`"
               @click.stop="openEdit(row)"
             >
@@ -151,11 +153,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :data-test="`ai-datasets-delete-${row.id}`"
               @click.stop="removeDataset(row)"
             >
               <OTooltip side="bottom" :content="t('common.delete')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-datasets-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`ai-datasets-edit-${row.id}-menu`"
+                @select="openEdit(row)"
+              >
+                <span>{{ t("common.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-datasets-delete-${row.id}-menu`"
+                @select="removeDataset(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -239,6 +271,8 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -279,6 +313,7 @@ function openDetail(row: LlmDataset) {
 
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 const numberedRows = useNumberedRows(datasets);
@@ -369,10 +404,15 @@ const columns = computed<OTableColumnDef[]>(() => [
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     datasets.value = await llmDatasetsService.list(orgId.value);
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.datasets.loadError") });
+    }
   } finally {
     loading.value = false;
   }

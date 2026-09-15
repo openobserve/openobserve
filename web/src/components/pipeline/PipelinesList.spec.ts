@@ -17,7 +17,7 @@ import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi, type MockedFunction } from "vitest";
 import PipelinesList from "@/components/pipeline/PipelinesList.vue";
 import i18n from "@/locales";
-import { nextTick } from "vue";
+import { nextTick, reactive } from "vue";
 import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
 
@@ -32,13 +32,13 @@ vi.mock("@/services/pipelines", () => ({
   },
 }));
 
-// Mock router
+// Mock router — currentRoute.value is reactive() so the component's route-name watch fires on mutation, matching vue-router's real currentRoute.
 const mockRouter = {
   currentRoute: {
-    value: {
+    value: reactive({
       name: "pipelines",
       query: {},
-    },
+    }),
   },
   push: vi.fn(),
 };
@@ -226,6 +226,8 @@ describe("PipelinesList", () => {
       },
     });
 
+    // Reset in case a previous test navigated away (route-name watcher tests below).
+    mockRouter.currentRoute.value.name = "pipelines";
     vi.clearAllMocks();
 
     (pipelineService.getPipelines as MockedFunction<any>).mockResolvedValue({
@@ -962,6 +964,84 @@ describe("PipelinesList", () => {
       required.forEach((m) => {
         expect(typeof wrapper.vm[m]).toBe("function");
       });
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  describe("Page restoration across route navigation (OTable pagination-reset fix)", () => {
+    it("defaults currentPage to 1", () => {
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", () => {
+      wrapper.vm.onPageChange(4);
+
+      expect(wrapper.vm.currentPage).toBe(4);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", () => {
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+
+      wrapper.vm.restorePageIndex();
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+      vi.useRealTimers();
+    });
+
+    it("reasserts the restored page after returning from the pipeline editor route", async () => {
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+
+      // OTable is destroyed (v-if) while the editor is open; simulate leaving and returning.
+      mockRouter.currentRoute.value.name = "pipelineEditor";
+      await nextTick();
+
+      mockRouter.currentRoute.value.name = "pipelines";
+      // Drain the whole re-fetch (OTable's `v-if` remount plus every re-render its props trigger, each of which re-binds the plain template ref) without flushPromises()/setImmediate, which fake timers would stall.
+      await nextTick();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+      await nextTick();
+      await nextTick();
+
+      // Only now, once nothing will re-render and re-bind the ref again, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+
+      vi.runAllTimers();
+
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+      vi.useRealTimers();
+    });
+
+    it("does not reassert the page on an unrelated route-name change (e.g. re-entering pipelines from itself)", async () => {
+      wrapper.vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+
+      // Same name twice: the watcher's guard (`newName === oldName`) must skip it.
+      mockRouter.currentRoute.value.name = "pipelines";
+      await flushPromises();
+
+      expect(setPageIndex).not.toHaveBeenCalled();
+    });
+
+    it("resets currentPage to 1 when the user explicitly switches tabs", () => {
+      wrapper.vm.currentPage = 5;
+
+      wrapper.vm.onTabChange("scheduled");
+
+      expect(wrapper.vm.currentPage).toBe(1);
+      expect(wrapper.vm.activeTab).toBe("scheduled");
     });
   });
 });

@@ -17,12 +17,25 @@ import { getUUID, getUUIDv7 } from "@/utils/uuid";
 // Matched exactly, not by prefix, so the rest of the Settings tree stays gated.
 export const emptyDataAllowedPaths = ["/settings", "/settings/general"];
 
+// Route SUBTREES that stay reachable with nothing ingested. On-call is
+// configured before data flows — teams, schedules, escalation and routing are
+// exactly what a fresh org sets up first, and bouncing those clicks to
+// /ingestion made every on-call screen unreachable by navigation (I14). A
+// prefix list because these routes carry dynamic segments (:teamId, :tab),
+// which the exact-match list above cannot express. A prefix admits its whole
+// subtree — add a screen's root here only when everything under it is
+// configuration rather than a data view.
+export const emptyDataAllowedPrefixes = ["/oncall"];
+
 // "/settings/general/" and "/settings/general" are the same page; an exact match
 // must not hinge on a trailing slash.
 const normalizePath = (path: string) =>
   path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
 
 export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
+
+// Kept out of the empty-data guard; "settings" only redirects on to general.
+export const trialPaywallAllowedPath = [...trialPeriodAllowedPath, "settings", "general"];
 
 export const getUserInfo = (loginString: string) => {
   try {
@@ -106,23 +119,35 @@ export const getDueDays = (microTimestamp: number): number => {
   return dueDays;
 };
 
+// Absent/empty/zero expiry means no trial is tracked, not a lapsed one.
+export const isTrialExpired = (expiry: unknown): boolean => {
+  if (expiry === undefined || expiry === null || expiry === "") return false;
+  const expiryMicros = Number(expiry);
+  if (!Number.isFinite(expiryMicros) || expiryMicros === 0) return false;
+  return getDueDays(expiryMicros) <= 0;
+};
+
+// Only cloud builds populate free_trial_expiry, so no other edition can paywall.
+export const shouldPaywallRoute = (expiry: unknown, routeName: unknown): boolean =>
+  config.isCloud === "true" &&
+  isTrialExpired(expiry) &&
+  trialPaywallAllowedPath.indexOf(routeName as string) === -1;
+
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
-  if (config.isCloud) {
-    if (store.state.organizationData?.organizationSettings?.free_trial_expiry !== "") {
-      const trialDueDays = getDueDays(
-        store.state.organizationData?.organizationSettings?.free_trial_expiry,
-      );
-      if (trialDueDays <= 0 && trialPeriodAllowedPath.indexOf(to.name) === -1) {
-        next({
-          name: "plans",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
-        return;
-      }
-    }
+  if (
+    shouldPaywallRoute(
+      store.state.organizationData?.organizationSettings?.free_trial_expiry,
+      to.name,
+    )
+  ) {
+    next({
+      name: "plans",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+    return;
   }
 
   if (
@@ -130,6 +155,10 @@ export const routeGuard = async (to: any, from: any, next: any) => {
     to.path.indexOf("/iam") === -1 &&
     to.name !== "iam" &&
     emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
+    !emptyDataAllowedPrefixes.some(
+      (prefix) =>
+        normalizePath(to.path) === prefix || normalizePath(to.path).startsWith(prefix + "/"),
+    ) &&
     trialPeriodAllowedPath.indexOf(to.name) === -1 &&
     Object.prototype.hasOwnProperty.call(store.state.zoConfig, "restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&

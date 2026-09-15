@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// On-call keeps its metrics in their own file: the set is a coherent story
+// about one subsystem, and reading it as a block is the only way to see that
+// the bad outcomes are all covered.
+pub mod oncall;
+
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
@@ -2495,6 +2500,35 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
+pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_auth_total",
+            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed, org_blocked, store_unavailable)".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result", "organization"],
+    )
+    .expect("Metric created")
+});
+
+// Deliberate: `organization`, not spec §14.1's `org_id`, as for HEC_AUTH_TOTAL.
+pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_requests_total",
+            "Splunk HEC collector requests by response status".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status", "organization"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2510,6 +2544,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(GRPC_RESPONSE_TIME.clone()))
+        .expect("Metric registered");
+
+    // splunk hec collector
+    registry
+        .register(Box::new(HEC_AUTH_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -3099,6 +3141,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
+
+    // on-call paging and escalation
+    oncall::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {
@@ -3342,6 +3387,12 @@ mod tests {
         let _ = HTTP_RESPONSE_TIME.clone();
         let _ = GRPC_INCOMING_REQUESTS.clone();
         let _ = GRPC_RESPONSE_TIME.clone();
+    }
+
+    #[test]
+    fn test_statics_hec() {
+        let _ = HEC_AUTH_TOTAL.clone();
+        let _ = HEC_REQUESTS_TOTAL.clone();
     }
 
     #[test]

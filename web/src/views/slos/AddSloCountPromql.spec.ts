@@ -163,8 +163,40 @@ const setField = async (w: Form, test: string, value: string) => {
   await flushPromises();
 };
 
+/**
+ * Save, seeding the required fields a test has not set.
+ *
+ * These tests are about the PAYLOAD, not about identity or the objective — but
+ * the form refuses to submit while a required field is blank, so supplying one
+ * is setup rather than subject. Left out, every assertion below would fail as
+ * "no request was made" instead of naming what it actually checks.
+ */
 const save = async (w: Form) => {
+  await seedRequired(w);
   await w.find('[data-test="slos-addslo-save"]').trigger("click");
+  await flushPromises();
+};
+
+/** Fill any required field the test left empty, and only those. */
+const seedRequired = async (w: Form) => {
+  const name = w.find('[data-test="slos-addslo-name-field"]');
+  if (!(name.element as HTMLInputElement).value) await name.setValue("payload-fixture");
+
+  // Only rendered on the time-slice branch, and only that branch requires it.
+  const threshold = w.find('[data-test="slos-addslo-threshold-field"]');
+  if (threshold.exists() && !(threshold.element as HTMLInputElement).value) {
+    await threshold.setValue("1");
+  }
+
+  // Exactly one of these is mounted, and a PromQL count mounts neither.
+  for (const test of ["slos-addslo-stream", "slos-addslo-timeslice-stream"]) {
+    const picker = w
+      .findAllComponents(OSelect)
+      .find((c) => String(c.vm.$attrs["data-test"]) === test);
+    if (picker && !picker.props("modelValue")) {
+      picker.vm.$emit("update:modelValue", "fixture_stream");
+    }
+  }
   await flushPromises();
 };
 
@@ -226,15 +258,17 @@ describe("AddSlo — count PromQL", () => {
 
     // `CountSource` has no `deny_unknown_fields`, so a spare key is ignored —
     // but a MISSING one is a deserialization failure (axum `Json` -> 422), and
-    // 422 says nothing a user can act on. Sent empty, the same mistake comes
-    // back as the validator's own `EmptyExpression`.
-    it("always sends both keys, even when an expression is still empty", async () => {
+    // 422 says nothing a user can act on. The form now stops the half-filled
+    // pair before it becomes that 422, which is the only reason `pruned()`
+    // dropping the empty key is no longer a problem — so the guard is that no
+    // request is made at all.
+    it("refuses a half-filled pair rather than sending one key", async () => {
       const w = await mountForm();
       await setSelect(w, "slos-addslo-stream-type", "metrics");
       await setField(w, "slos-addslo-promql-good", GOOD);
       await save(w);
 
-      expect(savedSource().query).toEqual({ good: GOOD, total: "" });
+      expect(vi.mocked(sloService.create)).not.toHaveBeenCalled();
     });
 
     // The other half of the rule, and the one with existing SLOs behind it:

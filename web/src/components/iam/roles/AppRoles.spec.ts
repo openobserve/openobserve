@@ -208,6 +208,38 @@ describe("AppRoles - onRoleAdded", () => {
     );
   });
 
+  it("forwards the dbm preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "DBM", startFrom: "dbm" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ preset: "dbm" }),
+      }),
+    );
+  });
+
+  it("forwards the k8s preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "K8s", startFrom: "k8s" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "editRole",
+        params: { role_name: "K8s" },
+        query: expect.objectContaining({ tab: "permissions", preset: "k8s" }),
+      }),
+    );
+  });
+
+  it("does not set a preset when startFrom is omitted", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "NoPreset" });
+    const call = spy.mock.calls[0][0] as any;
+    expect(call.query.preset).toBeUndefined();
+  });
+
   it("does not set a preset for the custom start option", async () => {
     const wrapper = await mountAppRoles();
     const spy = vi.spyOn(router, "push");

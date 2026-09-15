@@ -138,6 +138,7 @@ import jumpcloudUrl from "@/assets/images/ingestion/jumpcloud.svg";
 import openvpnUrl from "@/assets/images/ingestion/openvpn.png";
 import office365Url from "@/assets/images/ingestion/office-365.png";
 import criblUrl from "@/assets/images/ingestion/cribl.webp";
+import splunkUrl from "@/assets/images/ingestion/splunk.webp";
 import syslogUrl from "@/assets/images/ingestion/syslog.svg";
 import netflowUrl from "@/assets/images/ingestion/netflow.svg";
 import kinesisUrl from "@/assets/images/ingestion/kinesis_firehose.svg";
@@ -184,6 +185,7 @@ export const GLYPH_REGISTRY = {
   apache: ApacheHttp,
   cloudflare: Cloudflare,
   iis: iisUrl,
+  splunk: splunkUrl,
   syslog: syslogUrl,
   netflow: netflowUrl,
   openvpn: openvpnUrl,

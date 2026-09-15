@@ -101,6 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :column-visibility="columnVisibility"
         row-key="id"
         :loading="isLoading"
+        :forbidden="forbidden"
         pagination="client"
         :page-size="selectedPerPage"
         :page-size-options="perPageOptionsList"
@@ -274,6 +275,7 @@ const fetchFilterValues = async () => {
 
 // State
 const isLoading = ref(false);
+const forbidden = ref(false);
 const sourceMaps = ref<any[]>([]);
 const groupedSourceMaps = ref<any[]>([]);
 const expandedIds = ref<string[]>([]);
@@ -343,6 +345,7 @@ const perPageOptionsList = [20, 50, 100, 250];
 // Fetch source maps
 const fetchSourceMaps = async () => {
   isLoading.value = true;
+  forbidden.value = false;
 
   try {
     const params: any = {};
@@ -360,8 +363,9 @@ const fetchSourceMaps = async () => {
 
     // Group source maps by service, version, and environment
     groupSourceMaps();
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching source maps:", error);
+    forbidden.value = error?.response?.status === 403;
     sourceMaps.value = [];
     groupedSourceMaps.value = [];
   } finally {

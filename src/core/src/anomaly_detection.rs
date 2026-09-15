@@ -151,16 +151,15 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
     }
 
     // Auto-create the default Alerts folder on first use, same as alert::create does.
-    if name == DEFAULT_FOLDER {
-        if crate::folders::ensure_default_folder(org_id, FolderType::Alerts)
+    if name == DEFAULT_FOLDER
+        && crate::folders::ensure_default_folder(org_id, FolderType::Alerts)
             .await
             .is_ok()
-        {
-            return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
-                .await
-                .ok()
-                .flatten();
-        }
+    {
+        return infra::table::folders::get_pk_by_name(org_id, name, FolderType::Alerts)
+            .await
+            .ok()
+            .flatten();
     }
 
     None

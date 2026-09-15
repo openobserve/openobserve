@@ -61,6 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             table-id="settings-regex-patterns"
             :show-global-filter="false"
             :loading="listLoading"
+            :forbidden="forbidden"
             @update:selected-ids="handleSelectedIdsUpdate"
           >
             <template #toolbar>
@@ -118,6 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="export"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('settings.regexPatternList.exportTitle')"
                   @click.stop="exportRegexPattern(row)"
                   icon-left="download"
@@ -127,6 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="edit"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('regex_patterns.edit')"
                   @click.stop="editRegexPattern(row)"
                   icon-left="edit"
@@ -136,15 +139,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="delete"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('regex_patterns.delete')"
                   @click.stop="confirmDeleteRegexPattern(row)"
                   icon-left="delete"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="regex-pattern-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="download"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-export-regex-pattern-menu`"
+                    @select="exportRegexPattern(row)"
+                  >
+                    <span>{{ t("settings.regexPatternList.exportTitle") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-update-regex-pattern-menu`"
+                    @select="editRegexPattern(row)"
+                  >
+                    <span>{{ t("regex_patterns.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`regex-pattern-list-${row.id}-delete-regex-pattern-menu`"
+                    @select="confirmDeleteRegexPattern(row)"
+                  >
+                    <span>{{ t("regex_patterns.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
             <template #bottom>
               <div class="flex items-center gap-2">
-                <span class="text-xs font-normal">
+                <span class="text-xs font-normal max-md:hidden">
                   {{ t("regex_patterns.bottom_header", { count: resultTotal }) }}
                 </span>
                 <OButton
@@ -210,6 +251,8 @@ import ImportRegexPattern from "./ImportRegexPattern.vue";
 import config from "@/aws-exports";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -231,6 +274,8 @@ export default defineComponent({
     ImportRegexPattern,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OSearchInput,
     OTable,
@@ -308,6 +353,7 @@ export default defineComponent({
     const resultTotal = ref(0);
 
     const listLoading = ref(false);
+    const forbidden = ref(false);
 
     const showImportRegexPatternDialog = ref(false);
 
@@ -359,6 +405,7 @@ export default defineComponent({
 
     const getRegexPatterns = async () => {
       listLoading.value = true;
+      forbidden.value = false;
       try {
         const response = await regexPatternsService.list(
           store.state.selectedOrganization.identifier,
@@ -371,10 +418,14 @@ export default defineComponent({
         store.dispatch("setRegexPatterns", regexPatterns.value);
         resultTotal.value = regexPatterns.value.length;
       } catch (error: any) {
-        toast({
-          message: error.data.message || t("settings.regexPatternList.errorFetching"),
-          variant: "error",
-        });
+        forbidden.value = error?.response?.status === 403;
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (!forbidden.value) {
+          toast({
+            message: error.data.message || t("settings.regexPatternList.errorFetching"),
+            variant: "error",
+          });
+        }
       } finally {
         listLoading.value = false;
       }
@@ -548,6 +599,7 @@ export default defineComponent({
       resultTotal,
       createRegexPattern,
       listLoading,
+      forbidden,
       editRegexPattern,
       deleteRegexPattern,
       deleteDialog,

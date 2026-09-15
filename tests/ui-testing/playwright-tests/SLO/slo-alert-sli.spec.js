@@ -158,7 +158,12 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
 
   /**
    * An ineligible source is LISTED but not selectable, with the server's reason
-   * folded into its label.
+   * on its own line UNDER the alert name.
+   *
+   * The reason is a paragraph. Folded into the label it produced one truncated
+   * line per row in which the name was the first thing cut, so the list could
+   * not be scanned at all — hence the assertion below that the name is the
+   * label and the reason is the sub-label, not one run-on string.
    *
    * A silence-gated alert is used because it violates exactly one clause, so a
    * failure here points at that clause rather than at any of the other five.
@@ -221,6 +226,7 @@ test.describe('SLO alert SLI', { tag: ['@slo', '@sloAlertSli', '@all'] }, () => 
     await pm.sloFormPage.gotoNew(ORG);
     await pm.sloFormPage.selectSliType('alert');
     await pm.sloFormPage.expectAlertSourceOptionDisabled(gatedId, name);
+    await pm.sloFormPage.expectAlertSourceOptionReason(gatedId, name);
   });
 
   /**

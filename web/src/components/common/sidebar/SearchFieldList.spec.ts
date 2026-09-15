@@ -699,6 +699,28 @@ describe("FieldList.vue Comprehensive Coverage", () => {
     });
   });
 
+  describe("Embedded Single Quote Escaping", () => {
+    // Regression: a value containing a literal ' must have it doubled before
+    // being wrapped in the outer quotes, otherwise the generated SQL is invalid.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "include")).toBe(
+        "op='notificationHandling''s'",
+      );
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "exclude")).toBe(
+        "op!='notificationHandling''s'",
+      );
+    });
+  });
+
   describe("CopyContentValue Function Tests", () => {
     it("should copy value to clipboard successfully", async () => {
       wrapper = createWrapper();

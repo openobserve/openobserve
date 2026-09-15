@@ -97,10 +97,15 @@ const { track } = useReo();
 
 // "Start from" preset options — the selected value is form-owned (startFrom):
 // "custom" = empty role (default); "readonly" = seed read-only permissions
-// (AllowList + AllowGet) once the user lands on EditRole.
+// (AllowList + AllowGet) on every resource; "dbm" = seed the same read
+// permissions on the DB Monitoring module and the metric streams its Metrics
+// tab reads; "k8s" = seed them on the curated Kubernetes/host metric streams.
+// Each seeds once the user lands on EditRole.
 const startFromOptions = computed(() => [
   { label: t("iam.role.startFrom.custom"), value: "custom" },
   { label: t("iam.role.startFrom.readonly"), value: "readonly" },
+  { label: t("iam.role.startFrom.dbm"), value: "dbm" },
+  { label: t("iam.role.startFrom.k8s"), value: "k8s" },
 ]);
 
 const store = useStore();

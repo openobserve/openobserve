@@ -159,6 +159,8 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   scoringStatus?: string | null;
   executionProgress?: ExperimentProgress | null;
   scoringProgress?: ExperimentProgress | null;
+  taskOutcomes?: ExperimentTaskOutcomes | null;
+  scoreOutcomes?: ExperimentScoreOutcomes | null;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary | null;
 }
@@ -214,6 +216,8 @@ export interface ExperimentResultRow {
   expectedOutput: unknown | null;
   trialCount: number;
   status: ExperimentSlotStatus;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
   output: unknown | null;
   scoreSummaries: ExperimentScoreSummary[];
   p50LatencyMs: number | null;
@@ -258,6 +262,8 @@ export interface ExperimentResults {
   pagination?: ExperimentResultPagination;
   taskProgress?: ExperimentProgress;
   scoringProgress?: ExperimentProgress;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
@@ -306,6 +312,24 @@ export interface ExperimentProgress {
   completed: number;
   total: number;
   skipped: number;
+}
+
+export interface ExperimentTaskOutcomes {
+  total: number;
+  succeeded: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+}
+
+export interface ExperimentScoreOutcomes {
+  completed: number;
+  total: number;
+  scored: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+  unscored: number;
 }
 
 export interface ExperimentSkipSummary {
@@ -588,6 +612,12 @@ function normalizeExperiment(input: any): LlmExperiment {
     scoringProgress: hasSummaryField(input, "scoringProgress", "scoring_progress")
       ? normalizeProgress(value<any>(input, "scoringProgress", "scoring_progress", {}))
       : undefined,
+    taskOutcomes: hasSummaryField(input, "taskOutcomes", "task_outcomes")
+      ? normalizeTaskOutcomes(value<any>(input, "taskOutcomes", "task_outcomes", {}))
+      : undefined,
+    scoreOutcomes: hasSummaryField(input, "scoreOutcomes", "score_outcomes")
+      ? normalizeScoreOutcomes(value<any>(input, "scoreOutcomes", "score_outcomes", {}))
+      : undefined,
     scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
       ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
       : undefined,
@@ -603,6 +633,28 @@ function hasSummaryField(input: any, camel: string, snake: string): boolean {
 
 function numberOrNull(input: unknown): number | null {
   return input === null || input === undefined || input === "" ? null : Number(input);
+}
+
+function normalizeTaskOutcomes(input: any): ExperimentTaskOutcomes {
+  return {
+    total: Number(input?.total ?? 0),
+    succeeded: Number(input?.succeeded ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+  };
+}
+
+function normalizeScoreOutcomes(input: any): ExperimentScoreOutcomes {
+  return {
+    completed: Number(input?.completed ?? 0),
+    total: Number(input?.total ?? 0),
+    scored: Number(input?.scored ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+    unscored: Number(input?.unscored ?? 0),
+  };
 }
 
 function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSummary {
@@ -639,6 +691,18 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
     "scoring_progress",
     value<any>(input, "scoringProgress", "scoring_progress", {}),
   );
+  const taskOutcomes = value<any>(
+    experimentSummary,
+    "taskOutcomes",
+    "task_outcomes",
+    value<any>(input, "taskOutcomes", "task_outcomes", undefined),
+  );
+  const scoreOutcomes = value<any>(
+    experimentSummary,
+    "scoreOutcomes",
+    "score_outcomes",
+    value<any>(input, "scoreOutcomes", "score_outcomes", undefined),
+  );
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   const pagination = value<any>(input, "pagination", "pagination", {});
   const aggregateSummary = value<any>(
@@ -669,6 +733,8 @@ function normalizeResults(input: any, experimentSummary: any = {}): ExperimentRe
     },
     taskProgress: normalizeProgress(taskProgress),
     scoringProgress: normalizeProgress(scoringProgress),
+    taskOutcomes: taskOutcomes === undefined ? undefined : normalizeTaskOutcomes(taskOutcomes),
+    scoreOutcomes: scoreOutcomes === undefined ? undefined : normalizeScoreOutcomes(scoreOutcomes),
     skipSummary: {
       fullySkippedSlots: Number(value(skipSummary, "fullySkippedSlots", "fully_skipped_slots", 0)),
       partiallySkippedSlots: Number(
@@ -775,6 +841,12 @@ export function normalizeExperimentResultRowPage(input: any): ExperimentResultRo
       expectedOutput: value(row, "expectedOutput", "expected_output", null),
       trialCount: Number(value(row, "trialCount", "trial_count", 0)),
       status: row?.status as ExperimentSlotStatus,
+      taskOutcomes: hasSummaryField(row, "taskOutcomes", "task_outcomes")
+        ? normalizeTaskOutcomes(value<any>(row, "taskOutcomes", "task_outcomes", {}))
+        : undefined,
+      scoreOutcomes: hasSummaryField(row, "scoreOutcomes", "score_outcomes")
+        ? normalizeScoreOutcomes(value<any>(row, "scoreOutcomes", "score_outcomes", {}))
+        : undefined,
       output: row?.output ?? null,
       scoreSummaries: value<any[]>(row, "scoreSummaries", "score_summaries", []).map(
         normalizeScoreSummary,

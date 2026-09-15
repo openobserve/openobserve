@@ -9,8 +9,8 @@
         :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
       >
         <div class="chat-title flex w-full items-center justify-between font-bold">
-          <div class="flex items-center gap-2">
-            <div class="inline-flex h-6 w-6 overflow-hidden rounded-full">
+          <div class="flex min-w-0 items-center gap-2">
+            <div class="inline-flex h-6 w-6 shrink-0 overflow-hidden rounded-full">
               <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
             </div>
 
@@ -19,11 +19,11 @@
                 <OButton
                   variant="ghost"
                   size="sm"
-                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-52.5 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
+                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-40 min-w-0 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
                 >
-                  <div class="flex max-w-55 items-center gap-2">
+                  <div class="flex min-w-0 items-center gap-2">
                     <span
-                      class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
+                      class="chat-title-text text-text-body block min-w-0 truncate text-sm font-medium"
                     >
                       {{ displayedTitle || t("common.newChat") }}
                       <OTooltip
@@ -65,7 +65,7 @@
                       <OButton
                         variant="ghost"
                         size="icon-xs-circle"
-                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100 max-md:opacity-100"
                         @click.stop="deleteChat(chat.id)"
                       >
                         <OIcon name="delete" size="sm" />
@@ -102,7 +102,7 @@
             </ODropdown>
           </div>
 
-          <div class="chat-header-actions flex items-center gap-1">
+          <div class="chat-header-actions flex shrink-0 items-center gap-1">
             <!-- Edit title button -->
             <OButton
               v-if="currentChatId"

@@ -48,10 +48,6 @@
       </OButton>
     </template>
 
-    <OBanner v-if="error" variant="error" class="mb-3" data-test="slos-addslo-error">
-      {{ error }}
-    </OBanner>
-
     <!-- A regeneration is not a normal edit: it discards every measurement
          taken under the old definition. Warned before saving, not after. -->
     <OBanner
@@ -82,13 +78,16 @@
           <!-- One row: folder, name, tags — in that order. The folder column
                is fixed-width so the name (the field people actually type in)
                takes the slack; tags get their own share. Wraps to a column on
-               narrow screens rather than crushing three controls. -->
-          <div class="grid grid-cols-1 items-end gap-3 md:grid-cols-[14rem_1fr_1fr]">
+               narrow screens rather than crushing three controls.
+               `items-start`, not `items-end`: OTagInput is taller than an
+               OInput, and bottom-aligning the cells lifted its label clear of
+               the other two so the row read as three unrelated fields. -->
+          <div class="grid grid-cols-1 items-start gap-3 md:grid-cols-[14rem_1fr_1fr]">
             <div>
-              <label class="text-text-secondary mb-1 block text-xs">
-                {{ t("slos.field.folder") }}
-              </label>
-              <!-- type="alerts": SLOs live in alert folders (there is no SLO
+              <!-- No label here: SelectFolderDropDown renders its own, and a
+                   second one above it left this column a row taller than the
+                   two beside it.
+                   type="alerts": SLOs live in alert folders (there is no SLO
                    folder type), so this offers the same folders the Alerts
                    page does. -->
               <SelectFolderDropDown
@@ -100,6 +99,8 @@
             <OInput
               v-model="form.name"
               :label="t('slos.field.name')"
+              :error="!!fieldError('name')"
+              :error-message="fieldError('name') || undefined"
               :placeholder="t('slos.field.namePlaceholder')"
               required
               data-test="slos-addslo-name"
@@ -157,6 +158,8 @@
                 :label="t('slos.field.streamType')"
                 :options="streamTypeOptions"
                 :searchable="false"
+                :error="!!fieldError('config.stream_type')"
+                :error-message="fieldError('config.stream_type') || undefined"
                 data-test="slos-addslo-stream-type"
                 @update:model-value="onStreamTypeChange"
               />
@@ -168,6 +171,8 @@
                 :disabled="!form.config.stream_type"
                 :placeholder="t('slos.field.streamPlaceholder')"
                 required
+                :error="!!fieldError('config.stream')"
+                :error-message="fieldError('config.stream') || undefined"
                 data-test="slos-addslo-stream"
               />
             </div>
@@ -209,6 +214,7 @@
                 language="prom_ql"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.good') || undefined"
                 data-test="slos-addslo-promql-good"
               />
               <SloExpressionField
@@ -219,6 +225,7 @@
                 language="prom_ql"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.total') || undefined"
                 data-test="slos-addslo-promql-total"
               />
               <!-- The evaluator samples at slice ends, so a range selector that
@@ -250,6 +257,7 @@
                 :field-value-resolver="resolveFieldValues"
                 required
                 class="mt-3"
+                :error-message="fieldError('config.good_expr') || undefined"
                 data-test="slos-addslo-good-expr"
               />
             </template>
@@ -262,6 +270,8 @@
                 :label="t('slos.field.streamType')"
                 :options="streamTypeOptions"
                 :searchable="false"
+                :error="!!fieldError('config.stream_type')"
+                :error-message="fieldError('config.stream_type') || undefined"
                 data-test="slos-addslo-timeslice-stream-type"
                 @update:model-value="onStreamTypeChange"
               />
@@ -273,6 +283,8 @@
                 :disabled="!form.config.stream_type"
                 :placeholder="t('slos.field.streamPlaceholder')"
                 required
+                :error="!!fieldError('config.stream')"
+                :error-message="fieldError('config.stream') || undefined"
                 data-test="slos-addslo-timeslice-stream"
               />
             </div>
@@ -312,6 +324,7 @@
               :field-value-resolver="resolveFieldValues"
               class="mt-3"
               required
+              :error-message="fieldError('config.query') || undefined"
               data-test="slos-addslo-aggregate"
             />
             <!-- Prometheus keeps answering for a metric that stopped being
@@ -329,12 +342,16 @@
                 v-model="form.config.comparator"
                 :label="t('slos.field.comparator')"
                 :options="comparatorOptions"
+                :error="!!fieldError('config.comparator')"
+                :error-message="fieldError('config.comparator') || undefined"
                 data-test="slos-addslo-comparator"
               />
               <OInput
                 v-model.number="form.config.threshold"
                 :label="t('slos.field.threshold')"
                 type="number"
+                :error="!!fieldError('config.threshold')"
+                :error-message="fieldError('config.threshold') || undefined"
                 data-test="slos-addslo-threshold"
               />
             </div>
@@ -366,10 +383,10 @@
               :options="alertSourceOptions"
               :loading="isFetchingAlertSources"
               :placeholder="t('slos.alertSli.sourcePlaceholder')"
-              :error="!!alertSourceError"
-              :error-message="alertSourceError || undefined"
               required
               class="mt-3"
+              :error="!!sourceError"
+              :error-message="sourceError || undefined"
               data-test="slos-addslo-alert-source"
               @update:model-value="onAlertSourceChange"
             />
@@ -396,6 +413,8 @@
               step="0.001"
               suffix="%"
               required
+              :error="!!fieldError('target')"
+              :error-message="fieldError('target') || undefined"
               data-test="slos-addslo-target"
             />
             <div class="text-compact text-text-secondary flex items-end pb-2">
@@ -464,6 +483,8 @@
             multiple
             :disabled="isAlertSli"
             :placeholder="t('slos.field.groupByPlaceholder')"
+            :error="!!fieldError('group_by')"
+            :error-message="fieldError('group_by') || undefined"
             data-test="slos-addslo-group-by"
           />
           <p
@@ -566,7 +587,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
+import { makeAddSloSchema } from "./AddSlo.schema";
+import { scrollToFirstError } from "@/lib/forms/Form/scrollToFirstError";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
@@ -600,7 +623,6 @@ const router = useRouter();
 const store = useStore();
 
 const saving = ref(false);
-const error = ref<string | null>(null);
 const original = ref<string>("");
 
 const sloId = computed(() => String(route.params.slo_id || ""));
@@ -936,13 +958,89 @@ const alertSourceError = ref<I18nText | null>(null);
 
 const hasEligibleAlert = computed(() => alertSources.value.some((a) => a.eligible));
 
+/// One message for one field.
+///
+/// A failed load outranks "required" (#14277 vs the required-field check): with
+/// no list to pick from, telling the user the field is required is advice they
+/// cannot act on, and the load error names the actual problem.
+const sourceError = computed<I18nText>(
+  () => alertSourceError.value ?? fieldError("config.alert_id"),
+);
+
+// The reason is a PARAGRAPH, and every row that carries one costs three lines
+// — at twenty alerts the list stops being a list. So the row states WHICH rule
+// it failed as a chip and keeps the sentence for the hover, which is the same
+// trade the panel field list makes with its type badges.
+//
+// Keyed off `reason_code`, never off the sentence: the copy is the validator's
+// and is free to change.
+/// The picker judges every alert against the COARSEST slice there is, because
+/// no SLO exists yet to supply a narrower grid — same constant the server uses.
+const SLICE_CEILING_SECS = 300;
+
+const INELIGIBILITY_CODES = [
+  "not_scheduled",
+  "grouped",
+  "not_referenceable",
+  "cron",
+  "too_infrequent",
+  "silenced",
+] as const;
+
+/** `snake_case` code -> the `camelCase` half of its two locale keys. */
+const INELIGIBILITY_KEYS: Record<string, string> = Object.fromEntries(
+  INELIGIBILITY_CODES.map((code) => [
+    code,
+    code.replace(/_(.)/g, (_, c: string) => c.toUpperCase()),
+  ]),
+);
+
+/** A cadence in the units a person would say it in, not always minutes. */
+function formatDuration(secs: number): string {
+  if (secs <= 0) return t("slos.alertSli.ineligible.noFixedInterval");
+  // The third argument is the plural INDEX — vue-i18n picks the branch of a
+  // `one | many` message from it, not from the named `count`.
+  const plural = (key: string, count: number) => t(key, { count }, count);
+  if (secs % 86400 === 0) return plural("slos.duration.days", secs / 86400);
+  if (secs % 3600 === 0) return plural("slos.duration.hours", secs / 3600);
+  if (secs % 60 === 0) return plural("slos.duration.minutes", secs / 60);
+  return plural("slos.duration.seconds", secs);
+}
+
+/// What to change, in the reader's words.
+///
+/// The server's own sentence explains the measurement theory — why an
+/// unmeasured gap biases an SLI upward — which is the right level for an API
+/// error and the wrong one for someone picking an alert from a list. These say
+/// what is wrong and what to do about it instead; the original stays on the
+/// API for anyone debugging.
+function ineligibilityReason(a: SloEligibleAlert): string | undefined {
+  const key = INELIGIBILITY_KEYS[a.reason_code ?? ""];
+  // No key means a rule this build has not been taught. The server's sentence
+  // is denser than we would like but it is accurate, so it beats saying nothing.
+  if (!key) return a.reason ?? undefined;
+  return t(`slos.alertSli.ineligible.why.${key}`, {
+    frequency: formatDuration(a.frequency_secs),
+    slice: formatDuration(SLICE_CEILING_SECS),
+  });
+}
+
 const alertSourceOptions = computed(() =>
   alertSources.value.map((a) => ({
     value: a.alert_id,
-    label: a.eligible
-      ? raw(a.name)
-      : t("slos.alertSli.ineligibleOption", { name: a.name, reason: a.reason ?? "" }),
+    label: raw(a.name),
     disabled: !a.eligible,
+    // An unrecognised code still gets a chip — an ineligible row with no
+    // marker reads as a rendering bug rather than as a rule.
+    badge: a.eligible
+      ? undefined
+      : t(
+          (INELIGIBILITY_KEYS[a.reason_code ?? ""]
+            ? `slos.alertSli.ineligible.${INELIGIBILITY_KEYS[a.reason_code ?? ""]}`
+            : "slos.alertSli.ineligible.other") as I18nKey,
+        ),
+    badgeTitle: a.eligible ? undefined : ineligibilityReason(a),
+    badgeMuted: !a.eligible,
   })),
 );
 
@@ -1052,9 +1150,8 @@ function definitionKey(): string {
 
 const backTarget = computed(() => ({
   name: "sloList",
-  // Carry the folder back, or cancelling out of a folder lands on default and
-  // the SLO just saved looks like it vanished.
-  query: { org_identifier: org.value, folder: form.folder_id },
+  // Spread first so page/etc. survive the round trip; folder is overridden explicitly since the form may have switched away from the one the list opened with.
+  query: { ...route.query, org_identifier: org.value, folder: form.folder_id },
 }));
 
 function onFolderSelected(folder: any) {
@@ -1169,8 +1266,71 @@ function payload() {
   };
 }
 
+/// Per-field validation, mirroring what the API enforces.
+///
+/// The form previously had NONE: `required` on OSelect renders an asterisk and
+/// nothing else, Save was never disabled, and every rejection came back from the
+/// server. For a missing field that server answer is a deserialization 422 whose
+/// body carries no `message`, so `save()` fell through to axios's own string and
+/// the user was told "Request failed with status code 422" about a field they
+/// left blank — with nothing marking which field.
+///
+/// These checks pre-empt the server rather than replace it: the API remains the
+/// authority, and anything it rejects still surfaces as an error toast.
+/// What they add is naming the field, at the field.
+const attemptedSave = ref(false);
+
+/// The rules live in `AddSlo.schema.ts` — same arrangement as the alert forms,
+/// where the zod schema is a sibling file the component composes. Keeping them
+/// out of here is what makes them unit-testable per SLI shape without mounting
+/// a 1,200-line form.
+const validation = computed(() =>
+  makeAddSloSchema(t, {
+    isPromqlCount: isPromqlCount.value,
+    isPromqlTimeSlice: isPromqlTimeSlice.value,
+    isGrouped: isGrouped.value,
+  }).safeParse({ ...form, group_by: groupByList.value }),
+);
+
+/// Issues keyed by their dotted path, so a field asks for its own message.
+const validationIssues = computed<Record<string, I18nText>>(() => {
+  const result = validation.value;
+  if (result.success) return {};
+  const out: Record<string, I18nText> = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path.join(".");
+    // First issue wins: the rules are ordered from "missing" to "malformed",
+    // and telling someone their blank field is not a number helps nobody.
+    if (!(key in out)) out[key] = issue.message as I18nText;
+  }
+  return out;
+});
+
+/** The "no message" value. Branded so it is assignable to `error-message`. */
+const NO_ERROR = raw("");
+
+/** Errors are shown only AFTER a save attempt.
+ *
+ *  This is `revalidateLogic({ mode: "submit", modeAfterSubmission: "change" })`,
+ *  the timing `useOForm` configures for every other form in the product: a
+ *  brand-new form is empty by definition, so surfacing every "required" on
+ *  mount would paint the page red before the user has typed anything. */
+const fieldError = (path: string): I18nText =>
+  attemptedSave.value ? (validationIssues.value[path] ?? NO_ERROR) : NO_ERROR;
+
 async function save() {
-  error.value = null;
+  // Block the request outright. Sending a knowingly-invalid definition just to
+  // read the server's rejection is what produced "Request failed with status
+  // code 422" with no indication of which field was at fault.
+  attemptedSave.value = true;
+  if (!validation.value.success) {
+    // On a form this long the offending field is usually scrolled out of view,
+    // so a banner alone still leaves the user hunting for it.
+    await scrollToFirstError();
+    toast({ variant: "error", message: t("alerts.messages.fixHighlightedFields") });
+    return;
+  }
+
   saving.value = true;
   try {
     if (isEdit.value) {
@@ -1184,13 +1344,16 @@ async function save() {
     // The backend's budget rejection carries its arithmetic (§6b.4d); show it
     // verbatim rather than replacing it with a generic message. A rejected
     // JSON body (missing/mistyped field) comes back as a plain-text response,
-    // not `{message}`, so that shape has to be read directly too.
+    // not `{message}`, so that shape has to be read directly too (#14277).
     const body = e?.response?.data;
-    error.value =
-      body?.message ||
-      (typeof body === "string" && body.trim()) ||
-      e?.message ||
-      t("slos.saveFailed");
+    toast({
+      variant: "error",
+      message:
+        body?.message ||
+        (typeof body === "string" && body.trim()) ||
+        e?.message ||
+        t("slos.saveFailed"),
+    });
   } finally {
     saving.value = false;
   }

@@ -456,33 +456,9 @@ pub async fn get_system_templates(Path(org_id): Path<String>) -> Response {
     )
 )]
 pub async fn preview_template(
-    Path(org_id): Path<String>,
-    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+    Path(_org_id): Path<String>,
     Json(req): Json<PreviewRequest>,
 ) -> Response {
-    #[cfg(feature = "enterprise")]
-    {
-        let user_id = &user_email.user_id;
-        if !is_root_user(user_id)
-            && !check_permissions(
-                "templates",
-                &org_id,
-                user_id,
-                "template",
-                "GET",
-                None,
-                false,
-                false,
-                false,
-            )
-            .await
-        {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = &org_id;
-
     match preview(&req) {
         Ok(resp) => MetaHttpResponse::json(resp),
         Err(e @ PreviewError::UnknownChannel(_))

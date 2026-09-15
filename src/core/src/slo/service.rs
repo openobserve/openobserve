@@ -431,6 +431,9 @@ pub struct SloEligibleAlert {
     pub eligible: bool,
     /// The validator's own message, verbatim — not a second wording of it.
     pub reason: Option<String>,
+    /// A stable identifier for `reason`, so the picker can label the row
+    /// without parsing the sentence. See `SloValidationError::source_alert_code`.
+    pub reason_code: Option<String>,
 }
 
 /// Reduce one alert to its picker row, or `None` if it cannot be referenced.
@@ -449,6 +452,10 @@ pub fn slo_eligibility(alert: &Alert) -> Option<SloEligibleAlert> {
         name: alert.name.clone(),
         frequency_secs: facts.frequency_secs,
         eligible: reason.is_none(),
+        reason_code: reason
+            .as_ref()
+            .and_then(|e| e.source_alert_code())
+            .map(str::to_string),
         reason: reason.map(|e| e.to_string()),
     })
 }
