@@ -1059,7 +1059,7 @@ export default defineComponent({
       if (!rows.length) return;
       const gridWidth = Math.round(grid.clientWidth);
       const headerOffset = Math.max(0, Math.round(grid.getBoundingClientRect().top));
-      const pageH = Math.round(gridWidth / 1.414);
+      const pageH = Math.round(gridWidth * (7.7 / 10.2));
       let extra = 0;
       let maxBottom = 0;
       for (const r of rows) {
