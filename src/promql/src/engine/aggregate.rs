@@ -79,6 +79,10 @@ impl Engine {
                 if let Some(value) = self.fused_agg(agg_op, expr, modifier).await? {
                     return Ok(value);
                 }
+                log::info!(
+                    "[trace_id: {}] [PromQL] agg path: generic, op {agg_op:?}",
+                    self.trace_id
+                );
                 let input = self.exec_expr(expr).await?;
                 agg_op.eval_aggregate(modifier, input, &eval_ctx)
             }
@@ -136,6 +140,11 @@ impl Engine {
         let Some(range_arg) = shape.range_arg else {
             return Ok(None);
         };
+        log::info!(
+            "[trace_id: {}] [PromQL] agg path: materialized fused, op {agg_op:?}, func {}",
+            self.trace_id,
+            shape.func.name()
+        );
         let range_input = self.exec_expr(range_arg).await?;
         self.materialized_fused_agg(modifier, range_input, shape.func, agg_op)
             .await

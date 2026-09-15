@@ -42,7 +42,7 @@ vi.mock("@/services/service_streams", () => ({
       service_name: "frontend",
       matched_dimensions: {},
       additional_dimensions: {},
-      related_streams: { logs: [], metrics: [], traces: [] },
+      related_streams: { logs: [], metrics: [], traces: [], profiles: [] },
     },
   }),
   getSemanticGroups: vi.fn().mockResolvedValue({ data: [] }),
@@ -515,7 +515,7 @@ describe("ServiceGraphNodeSidePanel", () => {
           service_name: "frontend",
           matched_dimensions: {},
           additional_dimensions: {},
-          related_streams: { logs: [], metrics: ["prom-stream"], traces: [] },
+          related_streams: { logs: [], metrics: ["prom-stream"], traces: [], profiles: [] },
         },
       } as any);
 
@@ -806,6 +806,7 @@ describe("ServiceGraphNodeSidePanel", () => {
             ],
             metrics: [],
             traces: [],
+            profiles: [],
           },
         },
       } as any);

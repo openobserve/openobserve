@@ -493,6 +493,12 @@ export default defineComponent({
         name: "traces",
       },
       {
+        title: t("menu.profiles"),
+        icon: "account-tree",
+        link: "/profiles",
+        name: "profiles",
+      },
+      {
         title: raw("RUM"),
         icon: "devices",
         link: "/rum",
@@ -772,8 +778,10 @@ export default defineComponent({
 
       if (isAiObservabilityMenuVisible.value) {
         if (existingIndex !== -1) return;
-        const tracesIndex = linksList.value.findIndex((link: any) => link.name === "traces");
-        const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+        const anchorIndex = linksList.value.findIndex(
+          (link: any) => link.name === "profiles" || link.name === "traces",
+        );
+        const insertAt = anchorIndex === -1 ? linksList.value.length : anchorIndex + 1;
         linksList.value.splice(insertAt, 0, {
           title: t("menu.aiObservability"),
           icon: "auto-awesome",
