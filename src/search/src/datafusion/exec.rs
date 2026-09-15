@@ -91,7 +91,7 @@ fn create_session_config(
         .execution
         .listing_table_ignore_subdirectory = false;
 
-    // Keep grouped execution aligned with the accumulator-state streaming cache merger.
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
     config.options_mut().execution.enable_migration_aggregate = false;
 
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;

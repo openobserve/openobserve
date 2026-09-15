@@ -200,7 +200,8 @@ impl ExecutionPlan for StreamingAggsExec {
         &self,
         _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
     ) -> Result<TreeNodeRecursion> {
-        self.aggregate_plan.apply_expressions(_f)
+        // aggregate_plan columns index its own input schema, not this node's child.
+        Ok(TreeNodeRecursion::Continue)
     }
 
     fn name(&self) -> &'static str {
