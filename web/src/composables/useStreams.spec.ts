@@ -942,15 +942,35 @@ describe("useStreams Composable", () => {
       expect(StreamService.nameList).toHaveBeenCalledTimes(6);
     });
 
-    it("getStreamsFetchedAt reports the oldest type list, or nothing when none is cached", () => {
+    it("getStreamsFetchedAt reports the oldest type list, or nothing when none is cached", async () => {
       queryClient.clear();
       const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
       queryClient.setQueryData(key("logs"), [], { updatedAt: 2000 });
       queryClient.setQueryData(key("metrics"), [], { updatedAt: 1000 });
 
-      expect(streamsInstance.getStreamsFetchedAt()).toBe(1000);
-      expect(streamsInstance.getStreamsFetchedAt("logs")).toBe(2000);
-      expect(streamsInstance.getStreamsFetchedAt("traces")).toBeUndefined();
+      expect(await streamsInstance.getStreamsFetchedAt()).toBe(1000);
+      expect(await streamsInstance.getStreamsFetchedAt("logs")).toBe(2000);
+      expect(await streamsInstance.getStreamsFetchedAt("traces")).toBeUndefined();
+    });
+
+    it("getStreamsFetchedAt reports a list restored from disk at its saved time, not the restore time", async () => {
+      queryClient.clear();
+      const key = ["org", "test-org", "streams", "nameList", "enrichment_tables"];
+      const savedAt = Date.now() - 60_000;
+      window.localStorage.setItem(
+        `${LS_PREFIX}-${hashKey(key)}`,
+        JSON.stringify({
+          queryKey: key,
+          queryHash: hashKey(key),
+          buster: LS_BUSTER,
+          state: { data: [{ name: "saved-table" }], dataUpdatedAt: savedAt, errorUpdatedAt: 0 },
+        }),
+      );
+
+      await streamsInstance.getStreams("enrichment_tables", false, false);
+
+      expect(StreamService.nameList).not.toHaveBeenCalled();
+      expect(await streamsInstance.getStreamsFetchedAt("enrichment_tables")).toBe(savedAt);
     });
   });
 });

@@ -723,7 +723,7 @@ export default defineComponent({
           }),
         ]);
         // Read from the rows' own list query: the statuses read above swallows its failures.
-        lastUpdatedAt.value = getStreamsFetchedAt("enrichment_tables") ?? Date.now();
+        lastUpdatedAt.value = (await getStreamsFetchedAt("enrichment_tables")) ?? Date.now();
 
         const res: any = streamsRes;
         const urlJobMap: Record<string, any> = statusRes || {};

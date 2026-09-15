@@ -51,7 +51,7 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
-    getStreamsFetchedAt: vi.fn(() => undefined),
+    getStreamsFetchedAt: vi.fn(async () => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),

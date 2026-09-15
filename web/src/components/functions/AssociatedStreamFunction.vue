@@ -397,7 +397,9 @@ export default defineComponent({
                   stream_type: data.stream_type,
                 };
               });
-            lastUpdatedAt.value = getStreamsFetchedAt() ?? Date.now();
+            void getStreamsFetchedAt().then((at) => {
+              lastUpdatedAt.value = at ?? Date.now();
+            });
 
             if (logStream.value.length > 0) {
               getAllFunctions();

@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { notifyManager } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
@@ -402,7 +403,9 @@ const useStreams = (t: TranslateFn) => {
   };
 
   // "all" is one query per type, so its age is the oldest of them.
-  const getStreamsFetchedAt = (streamType: string = "all"): number | undefined => {
+  const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
+    // A list restored from disk is stamped "now" first and gets its saved time in a later notify flush; wait for that flush.
+    await new Promise<void>((resolve) => notifyManager.schedule(resolve));
     const org = store.state.selectedOrganization.identifier;
     const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
     const times = types
