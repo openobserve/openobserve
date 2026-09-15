@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Bir alan seçin veya $fieldVariable gibi bir değişken kullanın. Akış bir değişken kullanıyorsa, alan listesi boş olacaktır - alan adını manuel olarak yazın.",
     "filterInfoTooltip": "Filtrelerde, geçerli değişkenin değerini filtrelemek için başka bir değişkenin değerini kullanabilirsiniz. Bu, diğer değişkenin adı kullanılarak yapılabilir. Örneğin:",
     "defaultSelectAll": "Varsayılan - Tümünü Seç",
-    "escapeSingleQuotesTooltip": "Etkinleştirilirse, sorguda tek tırnak işaretlerinden kurtulur. Örneğin, `O'Reilly` gibi bir değer `O\"Reilly` olarak değiştirilecektir.",
+    "escapeSingleQuotesTooltip": "Tek tırnak işaretleri sorguda her zaman kaçış karakteriyle yazılır. Örneğin, `O'Reilly` gibi bir değer `O''Reilly` olarak değiştirilir.",
     "byDefaultSelect": "Varsayılan Olarak Seçin:",
     "firstValue": "İlk değer",
     "allValues": "Tüm değerler",

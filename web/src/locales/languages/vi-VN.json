@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Chọn một trường hoặc sử dụng một biến như $fieldVariable. Nếu luồng sử dụng biến, danh sách trường sẽ trống - hãy nhập tên trường thủ công.",
     "filterInfoTooltip": "Trong bộ lọc, bạn có thể sử dụng giá trị của một biến khác để lọc giá trị của biến hiện tại. Điều này có thể thực hiện bằng cách sử dụng tên của biến kia. Ví dụ:",
     "defaultSelectAll": "Mặc định - Chọn tất cả",
-    "escapeSingleQuotesTooltip": "Nếu được bật, dấu nháy đơn sẽ được thoát trong truy vấn. Ví dụ, giá trị như `O'Reilly` sẽ được thay thế thành `O''Reilly`.",
+    "escapeSingleQuotesTooltip": "Dấu nháy đơn luôn được escape trong truy vấn. Ví dụ, một giá trị như `O'Reilly` sẽ được thay bằng `O''Reilly`.",
     "byDefaultSelect": "Mặc định chọn:",
     "firstValue": "Giá trị đầu tiên",
     "allValues": "Tất cả giá trị",

@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Selecteer een veld of gebruik een variabele zoals $FieldVariable. Als de stream een variabele gebruikt, is de veldenlijst leeg. Voer de veldnaam handmatig in.",
     "filterInfoTooltip": "In filters kun je de waarde van een andere variabele gebruiken om de waarde van de huidige variabele te filteren. Dit kan gedaan worden door de naam van de andere variabele te gebruiken. Bijvoorbeeld:",
     "defaultSelectAll": "Standaard - Alles selecteren",
-    "escapeSingleQuotesTooltip": "Indien ingeschakeld, worden enkele aanhalingstekens in de query als escapet weergegeven. Een waarde zoals `O'Reilly` wordt bijvoorbeeld vervangen door `O\"Reilly`.",
+    "escapeSingleQuotesTooltip": "Enkele aanhalingstekens worden altijd geëscaped in de query. Een waarde zoals `O'Reilly` wordt bijvoorbeeld vervangen door `O''Reilly`.",
     "byDefaultSelect": "Selecteer standaard:",
     "firstValue": "Eerste waarde",
     "allValues": "Alle waarden",

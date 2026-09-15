@@ -702,6 +702,37 @@ describe("EventDetailDrawerContent", () => {
       expect(noActionWrapper.findAll('[data-test="related-resource-item"]').length).toBe(0);
       noActionWrapper.unmount();
     });
+
+    it("escapes an embedded single quote in action_id in the related-resources query", async () => {
+      // Regression: action_id comes from ingested RUM data — an embedded '
+      // must not break out of the LIKE/equality string literals.
+      let capturedSql = "";
+      if (globalThis.server) {
+        globalThis.server.use(
+          http.post(
+            `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
+            async ({ request }) => {
+              const body = (await request.json()) as any;
+              if (body?.query?.sql?.includes("action_id")) {
+                capturedSql = body.query.sql;
+              }
+              return HttpResponse.json({ took: 0, hits: [], total: 0 });
+            },
+          ),
+        );
+      }
+
+      const quotedWrapper = mountComponent({
+        props: {
+          rawEvent: createMockRawEvent({ action_id: "action'1" }),
+        },
+      });
+      await flushPromises();
+
+      expect(capturedSql).toContain("action_id LIKE '%action''1%'");
+      expect(capturedSql).toContain("action_id='action''1'");
+      quotedWrapper.unmount();
+    });
   });
 
   // ==========================================================================
