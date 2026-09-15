@@ -248,6 +248,16 @@ const contentStyle = computed(() => {
 const bodyRef = ref<HTMLElement | null>(null);
 const primaryBtnRef = ref<InstanceType<typeof OButton> | null>(null);
 
+const panelRef = ref<InstanceType<typeof DialogContent> | null>(null);
+
+/** The drawer panel element; reka-ui exposes it as `$el` on some builds. */
+function panelElement(): HTMLElement | null {
+  const value = panelRef.value;
+  if (!value) return null;
+  const el = (value as { $el?: unknown }).$el ?? value;
+  return el instanceof HTMLElement ? el : null;
+}
+
 function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
@@ -271,7 +281,29 @@ function handleOpenAutoFocus(event: Event) {
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
+      return;
     }
+
+    const panel = panelElement();
+    if (!panel) return;
+
+    // A drawer that declares its own target — typically a close button in
+    // #header-right — gets it honoured. The bare `autofocus` attribute does
+    // not reliably move focus for content inserted after parse, so the
+    // consumer's intent has to be applied here rather than by the browser.
+    const declared = panel.querySelector<HTMLElement>("[autofocus]");
+    if (declared) {
+      declared.focus();
+      return;
+    }
+
+    // Last resort: the panel itself, which is what reka-ui would have focused
+    // had preventDefault() above not cancelled it. Without this a drawer whose
+    // content is neither a form nor a primary action — references, help, any
+    // read-only panel — left focus outside it entirely, stranding keyboard
+    // users on the element behind (#14461).
+    if (!panel.hasAttribute("tabindex")) panel.setAttribute("tabindex", "-1");
+    panel.focus();
   });
 }
 
@@ -369,6 +401,7 @@ watch(internalOpen, (open) => {
 
       <!-- Drawer panel -->
       <DialogContent
+        ref="panelRef"
         :force-mount="inline ? true : undefined"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
