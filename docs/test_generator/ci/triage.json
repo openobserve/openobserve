@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-relative-time-range",
+  "feature_title": "Dashboard Relative Time Range Refresh",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-relative-time-range.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-relative-time-range.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/views/Dashboards/ViewDashboard.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed path is web/src/views/Dashboards/ViewDashboard.vue, which lives in the OSS frontend tree. No enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) appear, and no enterprise keywords (cipher, SSO, SAML, RBAC, SDR, sensitive-data, logo-management) are present in the path or symbol names. This is an open-source change.",
+    "skip": "Not skipping. The change is user-facing dashboard behavior, not docs/CI/comment-only, and there is no tests-added label or skip request in the trigger comment. No explicit opt-out is present.",
+    "e2e": "E2E is warranted. ViewDashboard.vue's computeAllPanelTimes now distinguishes relative from absolute global time ranges, comparing relative ranges by span and only updating the __global time when the span actually changed. This alters user-visible refresh behavior: relative-range dashboards should stop spuriously refetching panels on load while still refreshing correctly on forced refresh. That behavior needs verification in a real UI flow.",
+    "area": "Dashboards. The sole changed file is the core dashboard view (web/src/views/Dashboards/ViewDashboard.vue), and the sibling E2E specs live under tests/ui-testing/playwright-tests/Dashboards/.",
+    "group": "Dashboards-Core. The change is in the core dashboard view's global time-range propagation to all panels; the closest existing shard with actual_folder Dashboards covering core view behavior is Dashboards-Core (contains dashboard.spec.js, dashboard2.spec.js). A relative-time-specific spec can join that shard.",
+    "existing_tests": "No E2E specs in the diff. Only a Vue source file (web/src/views/Dashboards/ViewDashboard.vue) changed; no tests/ui-testing/playwright-tests/**/*.spec.js was added or modified, so existing_tests_in_diff is false."
+  }
+}

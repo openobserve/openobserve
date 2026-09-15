@@ -1,0 +1,22 @@
+[
+  {
+    "title": "should re-resolve relative time window and re-query panels on manual refresh",
+    "action": "new",
+    "verifies": "clicking the global refresh button on a fresh relative (15m) dashboard re-issues panel queries while the period label and URL stay at 15m"
+  },
+  {
+    "title": "should advance window and update URL period when relative period changes",
+    "action": "new",
+    "verifies": "changing the global relative period from 15m to 6h re-queries panels and rewrites the URL to period=6h with a Past 6 Hours label"
+  },
+  {
+    "title": "should re-query panels on auto-refresh interval tick for a relative range",
+    "action": "new",
+    "verifies": "the auto-refresh interval drives the same relative-refresh path and re-queries panels without changing the period URL param"
+  },
+  {
+    "title": "should not spuriously refetch queries during a passive settle window",
+    "action": "new",
+    "verifies": "a settled relative dashboard with no user action fires zero new search queries, proving the span-comparison fix suppresses spurious refetch"
+  }
+]

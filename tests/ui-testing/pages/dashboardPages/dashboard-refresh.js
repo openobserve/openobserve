@@ -23,6 +23,15 @@ export default class DashboardTimeRefresh {
       '[data-test="logs-search-off-refresh-interval"]'
     );
     this.refresh = page.locator('[data-test="dashboard-refresh-btn"]');
+    this.globalTimeTrigger = page.locator(
+      '[data-test="dashboard-global-date-time-picker"] [data-test="date-time-btn"]'
+    );
+    // The dashboard renders AutoRefreshInterval in full mode (its trigger carries
+    // a "-dropdown" suffix); the logs search bar uses the compact trigger. Match
+    // either so this helper works regardless of which one is mounted.
+    this.autoRefreshTrigger = page.locator(
+      '[data-test="logs-search-bar-refresh-interval-btn"], [data-test="logs-search-bar-refresh-interval-btn-dropdown"]'
+    );
   }
 
   //relative time selection
@@ -160,5 +169,34 @@ export default class DashboardTimeRefresh {
   //Refresh dashboard
   async refreshDashboard() {
     await this.refresh.click();
+  }
+
+  // Read the global time picker trigger label. For a relative range this is a
+  // whole-sentence i18n key ("Past 15 Minutes" / "Past 6 Hours"), so assert on
+  // the label with toContain, never on an exact string.
+  async getGlobalTimeLabel() {
+    await this.globalTimeTrigger.waitFor({ state: "visible", timeout: 10000 });
+    const text = await this.globalTimeTrigger.textContent();
+    return (text || "").trim();
+  }
+
+  // Enable auto-refresh at the given interval in seconds (5s respects the
+  // default min_auto_refresh_interval floor).
+  async enableAutoRefresh(seconds) {
+    await this.autoRefreshTrigger.first().waitFor({ state: "visible", timeout: 10000 });
+    await this.autoRefreshTrigger.first().click();
+    const option = this.page.locator(
+      `[data-test="logs-search-bar-refresh-time-${seconds}"]`
+    );
+    await option.waitFor({ state: "visible", timeout: 5000 });
+    await option.click();
+  }
+
+  // Turn auto-refresh off by selecting the "off" option in the interval dropdown.
+  async disableAutoRefresh() {
+    await this.autoRefreshTrigger.first().waitFor({ state: "visible", timeout: 10000 });
+    await this.autoRefreshTrigger.first().click();
+    await this.offBtn.waitFor({ state: "visible", timeout: 5000 });
+    await this.offBtn.click();
   }
 }

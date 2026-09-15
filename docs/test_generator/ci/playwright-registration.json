@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Core",
+  "spec_filename": "dashboard-relative-time-range.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}
