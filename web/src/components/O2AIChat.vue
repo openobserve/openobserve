@@ -1094,9 +1094,16 @@
             <div class="tool-call-content flex w-full items-center gap-3">
               <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
               <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
-                <span
-                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
-                  >{{ block.message }}</span
+                <!-- Same formatter as the attached block below, so a finished
+                     step reads "Queried logs · N results" rather than staying
+                     on the call-time label ("Querying logs") it was created
+                     with — `message` is copied at call time and never updated. -->
+                <span class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
+                  >{{ formatToolCallMessage(block).text
+                  }}<strong v-if="formatToolCallMessage(block).highlight">{{
+                    formatToolCallMessage(block).highlight
+                  }}</strong
+                  >{{ formatToolCallMessage(block).suffix }}</span
                 >
               </div>
             </div>
@@ -3634,6 +3641,26 @@ export default defineComponent({
     const addNewChat = () => {
       detachCurrentStream();
 
+      // detachCurrentStream() early-returns when no request is in flight, so its
+      // cleanup can't be relied on here — and it never cleared pendingToolCalls
+      // anyway. These indicators render OUTSIDE the chatMessages v-for, so
+      // emptying the transcript below does not remove them: a turn that ended
+      // without a `complete` event (idle cut, dropped connection) leaves its
+      // rows stranded on the new chat's empty page.
+      isLoading.value = false;
+      activeToolCall.value = null;
+      pendingToolCalls.value = [];
+      pendingConfirmation.value = null;
+      stopAnalyzingRotation();
+      currentStreamingMessage.value = "";
+      currentTextSegment.value = "";
+      displayedStreamingContent.value = "";
+      streamOwnerUnavailable.value = false;
+      // Keyed positionally ("messageIndex-blockIndex"), so without this the new
+      // chat's first tool block inherits the old chat's expansion state at "0-0".
+      expandedToolCalls.value.clear();
+      expandedLogEntries.value.clear();
+
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
@@ -4375,6 +4402,12 @@ export default defineComponent({
       // session.
       streamOwnerUnavailable.value = false;
 
+      // Hoisted out of the try so the finally below can tell whether this turn
+      // is still the one on screen. Seeded with the array the user message was
+      // just pushed into, so the check still holds on the early-return paths
+      // that never reach the reassignment below.
+      let streamMsgs = chatMessages.value;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4469,7 +4502,7 @@ export default defineComponent({
         // Capture the controller, messages ref, and sessionId so we can detect
         // detachment and clean up after processStream
         const streamController = currentAbortController.value;
-        const streamMsgs = chatMessages.value;
+        streamMsgs = chatMessages.value;
 
         await processStream(reader);
 
@@ -4558,24 +4591,59 @@ export default defineComponent({
           content: raw(errorMessage),
         });
         await saveToHistory(); // Save after error
+      } finally {
+        // `finally` rather than straight-line code after the catch: the early
+        // returns above (fetch threw, response.cancelled) used to skip all of
+        // this, stranding the spinner and the session flag forever.
+        //
+        // Only touch the live view if this turn is still the one on screen — a
+        // detached stream finishing must not clear indicators, or the abort
+        // controller, that now belong to a newer turn.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+
+        if (stillOnScreen) {
+          // Steps that finish before the assistant produces any text sit in
+          // pendingToolCalls until a `complete`, `message_delta` or `error`
+          // event attaches them to a message. None of those arrive on an idle
+          // cut or a dropped connection, so drain here as well — otherwise the
+          // steps stay as flat unclickable rows and, because they render
+          // outside the transcript, follow the user into the next chat.
+          if (pendingToolCalls.value.length) {
+            const msgs = streamMsgs;
+            const lastMessage = msgs[msgs.length - 1];
+            if (lastMessage && lastMessage.role === "assistant") {
+              if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+              lastMessage.contentBlocks.push(...pendingToolCalls.value);
+            } else {
+              msgs.push({
+                role: "assistant",
+                content: raw(""),
+                contentBlocks: [...pendingToolCalls.value],
+              });
+            }
+            pendingToolCalls.value = [];
+            await saveToHistory();
+          }
+
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+        }
+
+        // Mark the session's stream as finished in the cross-instance registry so
+        // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+        // its own loading indicator. Runs on all exit paths (success/abort/error).
+        // Uses the id captured before the request, not currentSessionId — by the
+        // time an early failure lands here the user may have switched chats, and
+        // clearing the wrong session leaves the real one flagged as streaming.
+        sessionStreamingState[streamSessionId] = false;
+
+        if (stillOnScreen) {
+          // Clean up AbortController after request completion (success or error)
+          currentAbortController.value = null;
+          await scrollToBottom();
+        }
       }
-
-      isLoading.value = false;
-      activeToolCall.value = null;
-      stopAnalyzingRotation();
-
-      // Mark the session's stream as finished in the cross-instance registry so
-      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
-      // its own loading indicator. Runs on all exit paths (success/abort/error).
-      // Uses the id captured before the request, not currentSessionId — by the
-      // time an early failure lands here the user may have switched chats, and
-      // clearing the wrong session leaves the real one flagged as streaming.
-      sessionStreamingState[streamSessionId] = false;
-
-      // Clean up AbortController after request completion (success or error)
-      currentAbortController.value = null;
-
-      await scrollToBottom();
     };
 
     const selectCapability = (capability: string) => {
