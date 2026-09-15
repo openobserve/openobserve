@@ -4,7 +4,10 @@
     data-test="oncall-response-detail-page"
     :title="title"
     icon="notifications-active"
-    :back="{ label: t('oncall.backToResponses'), to: { name: 'onCallResponses' } }"
+    :back="{
+      label: t('oncall.backToResponses'),
+      to: { name: 'onCallResponses', query: { org_identifier: orgId } },
+    }"
   >
     <!-- Team, which firing this is, and when it opened — the tagline reads as
          one short line rather than a metadata grid below the fold. Team is a

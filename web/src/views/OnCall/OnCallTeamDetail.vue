@@ -5,7 +5,10 @@
     :title="team ? raw(team.name) : t('oncall.teamDetail')"
     :subtitle="subtitle"
     icon="group-work"
-    :back="{ label: t('oncall.backToTeams'), to: { name: 'onCallTeams' } }"
+    :back="{
+      label: t('oncall.backToTeams'),
+      to: { name: 'onCallTeams', query: { org_identifier: orgId } },
+    }"
   >
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
