@@ -48,8 +48,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 
 import passwordPolicyService from "@/services/passwordPolicy";
 
-// A policy with every non-complexity feature configured — the values a complexity-only edit must
-// carry back untouched.
+// Every non-complexity feature configured: the values a complexity-only edit must carry back untouched.
 const CONFIGURED_POLICY: PasswordPolicyType = {
   min_length: 10,
   max_length: 64,
@@ -81,8 +80,7 @@ const store = createStore({
   },
 });
 
-// Tracked so every mount is torn down: a live component left over from an earlier case keeps
-// resolving its own load promise and writes into the mocks the next case is asserting on.
+// Tracked so every mount is torn down: a leftover component writes into the mocks the next case asserts on.
 let wrappers: any[] = [];
 
 const mountPage = () => {
@@ -96,8 +94,7 @@ const mountPage = () => {
   return wrapper;
 };
 
-// Drives the real form rather than calling the handler, so field coercion and the OForm submit
-// path are covered too.
+// Drives the real form rather than the handler, so field coercion and the OForm submit path are covered.
 const editField = async (wrapper: any, row: string, value: string) => {
   const input = wrapper.find(`[data-test="settings-password-policy-${row}"] input`);
   await input.setValue(value);
@@ -105,8 +102,7 @@ const editField = async (wrapper: any, row: string, value: string) => {
 };
 const editMinLength = (wrapper: any, value: string) => editField(wrapper, "min-length", value);
 
-// Awaits TanStack's own submit promise. A DOM `trigger("submit")` starts the same chain but
-// returns before the awaited onSubmit settles, which makes the assertions race it.
+// A DOM `trigger("submit")` returns before the awaited onSubmit settles, so the assertions would race it.
 const submit = async (wrapper: any) => {
   await wrapper.vm.form.handleSubmit();
   await flushPromises();

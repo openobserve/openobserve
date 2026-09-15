@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Section header is provided full-width by the Settings shell. This is a CONSTRAINED section,
-       so ConstrainedPage owns the scroll and gutter — the content just flows. -->
+  <!-- The Settings shell owns the header, scroll and gutter; the content just flows. -->
   <div class="password-policy">
     <div v-if="loading" data-test="password-policy-loading" class="py-8 text-center">
       <OSpinner size="sm" />
     </div>
 
-    <!-- A non-admin of _meta is a designed state, not an error: the section is visible to every
-         member of the org because the console has no per-org role to gate the nav entry on. -->
+    <!-- A non-admin of _meta is a designed state: the console has no per-org role to gate the nav entry on. -->
     <OEmptyState
       v-else-if="forbidden"
       data-test="password-policy-not-admin-empty-state"
@@ -46,8 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     />
 
     <template v-else>
-      <!-- Headless form: the owner reads it (form.useStore) for the dependent rows, the previews
-           and the dirty comparison against the loaded policy. -->
+      <!-- Headless: the owner reads the form for the dependent rows, previews and dirty check. -->
       <OForm id="password-policy-form" :form="form" v-slot="{ isSubmitting }">
         <div class="flex flex-col gap-4">
           <OFormSection :title="t('passwordPolicy.complexity')">
@@ -260,8 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormSwitch name="apply_to_root" @update:model-value="onApplyToRootChange" />
             </OSettingRow>
 
-            <!-- Standing, not one-off: a warning that only appears once is a warning the next
-                 administrator never sees. -->
+            <!-- Standing, not one-off: a warning shown once is one the next administrator never sees. -->
             <OBanner
               v-if="values.apply_to_root"
               variant="error-soft"
@@ -296,8 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </OForm>
 
-      <!-- The one control on this page that can lock the instance out of itself gets its own
-           acknowledgement; switching it back OFF is the safe direction and confirms nothing. -->
+      <!-- Switching apply_to_root back OFF is the safe direction and confirms nothing. -->
       <ODialog
         :open="rootDialogOpen"
         data-test="settings-password-policy-root-dialog"
@@ -373,8 +368,7 @@ const { t, locale } = useI18nTyped();
 const store = useStore();
 const { confirm } = useConfirmDialog();
 
-// The WHOLE policy as the server returned it. Held rather than reduced to the edited fields
-// because the PUT is a full replacement — see buildPolicyPayload.
+// The WHOLE policy as the server returned it: the PUT is a full replacement (see buildPolicyPayload).
 const loadedPolicy = ref<PasswordPolicy | null>(null);
 const loading = ref(true);
 const forbidden = ref(false);
@@ -430,8 +424,7 @@ const lockoutPreview = computed(() => {
 
 const isDirty = computed(() => {
   if (!loadedPolicy.value) return false;
-  // Compare the payload this form would send, not the raw field values: a number input hands back
-  // a string, so retyping the same number would otherwise read as a change.
+  // Compares the payload, not the raw values: a number input hands back a string.
   return (
     JSON.stringify(buildPolicyPayload(loadedPolicy.value, values.value)) !==
     JSON.stringify(loadedPolicy.value)
@@ -477,10 +470,7 @@ const cancelApplyToRoot = () => {
 const save = async (formValues: PolicyForm) => {
   if (!loadedPolicy.value) return;
 
-  // Every save confirms, not only a tightening. The frontend deliberately holds no copy of the
-  // server's is_stricter_than(): the sweep it triggers cannot be undone — there is no un-flag
-  // endpoint, and loosening the policy back clears nothing — so the value of asking is that it
-  // happens BEFORE the write, not that it is precisely targeted.
+  // Every save confirms, not only a tightening: the sweep a save triggers cannot be undone.
   const confirmed = await confirm({
     title: t("passwordPolicy.confirmTitle"),
     message: t("passwordPolicy.confirmMessage"),

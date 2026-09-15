@@ -171,7 +171,6 @@ export default defineComponent({
         store.state.zoConfig?.synthetics_enabled === false;
       if (name === "syntheticsLocations" && syntheticsBlocked) {
         toGeneral();
-        return;
       }
     };
 

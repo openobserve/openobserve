@@ -121,9 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
-          <!-- Only retry_after is shown — never the attempt counters or the thresholds behind
-               them. Disabling Sign in is cosmetic: the server refuses regardless; this just stops
-               the user burning attempts. -->
+          <!-- Only retry_after is shown, never the attempt counters or the thresholds behind them. -->
           <OBanner
             v-if="lockoutSecondsLeft > 0"
             variant="error"
@@ -222,8 +220,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const expiryWarning = usePasswordExpiryWarning();
 
-    // Counts down the server's retry_after locally; a countdown reaching zero is not "unlocked",
-    // it only re-enables the button so the server can answer again.
+    // A countdown reaching zero is not "unlocked"; it only lets the server answer again.
     const lockoutSecondsLeft = ref(0);
     let lockoutTimer: ReturnType<typeof setInterval> | null = null;
     const startLockoutCountdown = (secs: number) => {
@@ -315,8 +312,7 @@ export default defineComponent({
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
-                // Absent when there is nothing to warn about; clearing covers a previous user of
-                // this tab.
+                // Absent when there is nothing to warn about; clearing covers a previous user of this tab.
                 expiryWarning.dismiss();
                 expiryWarning.remember(res.data.password_rotation_warning);
                 //get user info from backend and extract auth token and set it into localstorage

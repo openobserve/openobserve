@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Validation for the whole policy page. Only the server's four cross-field rules are mirrored;
-// every other field is a plain integer bound, and no floor is enforced on purpose — the API accepts
-// a weak policy, so the console must too.
+// Only the server's four cross-field rules are mirrored; no floor is enforced because the API accepts a weak policy.
 
 import { z } from "zod";
 
@@ -79,8 +77,7 @@ export const makePolicySchema = (t: TranslateFn) =>
     if (val.max_length !== 0 && val.max_length < val.min_length) {
       issue(["max_length"], t("passwordPolicy.maxLengthTooSmall"));
     }
-    // Equal is valid (warn from the first sign-in); only a LONGER window describes a deadline
-    // that never exists. Skipped entirely while rotation is off.
+    // Equal is valid (warn from the first sign-in); only a LONGER window describes a deadline that never exists.
     if (val.rotation_days !== 0 && val.rotation_warning_days > val.rotation_days) {
       issue(["rotation_warning_days"], t("passwordPolicy.warningDaysTooLong"));
     }
@@ -111,13 +108,7 @@ export const policyDefaults = (policy: PasswordPolicy): PolicyForm => ({
   apply_to_root: policy.apply_to_root,
 });
 
-/**
- * The body to PUT: the loaded policy with every edited field overridden.
- *
- * Spread over the loaded object rather than built from the form alone: PUT is a full replacement
- * over a `#[serde(default)]` struct, so a field the console does not know about yet would be
- * silently reset to its default if the body omitted it.
- */
+/** Spread over the loaded policy: PUT is a full replacement, so an omitted field would reset to its default. */
 export const buildPolicyPayload = (
   loadedPolicy: PasswordPolicy,
   values: PolicyForm,
@@ -129,8 +120,7 @@ export const buildPolicyPayload = (
   require_lowercase: values.require_lowercase,
   require_digit: values.require_digit,
   require_special: values.require_special,
-  // A set is meaningless with the requirement off, and keeping a stale one would resurrect it the
-  // next time someone flips the switch back on.
+  // A stale set would resurrect the next time someone flips the switch back on.
   special_char_set: values.require_special ? values.special_char_set.trim() : "",
   rotation_days: Number(values.rotation_days),
   rotation_warning_days: Number(values.rotation_warning_days),
@@ -148,12 +138,7 @@ export const buildPolicyPayload = (
   apply_to_root: values.apply_to_root,
 });
 
-/**
- * The lockout durations an account would serve, level by level, until the ceiling is reached.
- *
- * Five integers and an enum do not communicate a ladder; the resulting sequence does. Capped at
- * six entries so a policy whose ceiling is far away still renders as one line.
- */
+/** The lockout durations an account would serve, level by level, capped so a far ceiling still renders as one line. */
 export const lockoutLadder = (lockout: LockoutPolicy, maxLevels = 6): number[] => {
   const start = Number(lockout.start_secs);
   const max = Number(lockout.max_secs);

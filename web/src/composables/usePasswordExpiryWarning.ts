@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The days-until-expiry the sign-in response carried, held for the life of the session. Written
-// once by the login page, read by the banner MainLayout mounts. sessionStorage rather than a
-// module ref so the number survives a reload without re-fetching — the count moves once a day, and
-// the start of a session is the one moment it needs computing.
+// sessionStorage rather than a module ref so the sign-in response's count survives a reload.
 
 import { ref } from "vue";
 

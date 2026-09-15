@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Turns the instance password policy into the two things every password form
-// needs: the requirement rows it shows, and the validation it runs. Pure — no
-// Vue, no fetching — so both are testable without mounting anything, and the
-// reset dialog and the user forms cannot drift apart.
+// Pure (no Vue, no fetching) so the reset dialog and the user forms share one rule set.
 
 import type { PasswordComplexity } from "@/services/passwordPolicy";
 import { raw, type I18nText, type TranslateFn } from "@/types/i18n";
@@ -49,12 +46,7 @@ const isSpecialChar = (char: string, specialCharSet: string): boolean => {
 const hasSpecialChar = (password: string, specialCharSet: string): boolean =>
   password.split("").some((char) => isSpecialChar(char, specialCharSet));
 
-/**
- * The requirement rows for a policy — only the ones it actually enforces.
- *
- * Generated rather than hardcoded so the console can never state a rule the server does not check,
- * nor miss one it does.
- */
+/** The requirement rows for a policy, generated so the console never states a rule the server does not check. */
 export const buildPasswordRequirements = (
   complexity: PasswordComplexity,
   t: TranslateFn,
@@ -120,24 +112,14 @@ export const countMetRequirements = (
   password: string,
 ): number => requirements.filter((requirement) => requirement.isMet(password)).length;
 
-/**
- * The first requirement a password fails, or `null` when it satisfies all of them.
- *
- * One message rather than a list: the requirement rows are already on screen, so an inline error
- * only has to name the next thing to fix.
- */
+/** The first requirement a password fails, or `null`; the rows on screen already list the rest. */
 export const firstUnmetRequirement = (
   requirements: PasswordRequirement[],
   password: string,
 ): PasswordRequirement | null =>
   requirements.find((requirement) => !requirement.isMet(password)) ?? null;
 
-/**
- * Validate a password against the policy, returning the message for the first failure.
- *
- * The server is still authoritative — this only saves a round trip for something the user can see
- * spelled out above the field.
- */
+/** The message for the first failure, or `null`; the server is still authoritative. */
 export const validateAgainstComplexity = (
   password: string,
   complexity: PasswordComplexity,
@@ -147,15 +129,10 @@ export const validateAgainstComplexity = (
   return unmet ? t("passwordReset.req.unmet", { requirement: unmet.label }) : null;
 };
 
-// The server's wording, which is the only signal it sends: the 400 carries no code, and the
-// history depth is not in the complexity projection, so the count comes from the message too.
+// The 400 carries no code, so the server's wording is the only signal and the count comes from it too.
 const REUSE_MESSAGE = /matches one of your last (\d+) passwords/;
 
-/**
- * The inline error for a password the server refused as a recent reuse, or `null` for any other
- * failure. Server-only: the console never sees password history, so every requirement row can be
- * green while this still fails.
- */
+/** The inline error for a reuse rejection, or `null`; every requirement row can be green while this fails. */
 export const reuseRejection = (error: unknown, t: TranslateFn): I18nText | null => {
   const message = (error as any)?.response?.data?.message;
   const match = typeof message === "string" ? REUSE_MESSAGE.exec(message) : null;

@@ -14,16 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!--
-  One labelled setting inside a settings card: name and one line of description on the left, the
-  control on the right, hairline rule between rows.
-
-  It exists so a card of settings is a list of these rather than a stack of hand-tuned flex divs —
-  the divider, the gap, and the label/description typography are decisions made once. The last row
-  drops its own rule, so a card needs no per-row conditionals.
-
-  Pair it with OFormSection, which supplies the card.
--->
+<!-- The last row drops its own rule, so a card needs no per-row conditionals. -->
 <template>
   <div
     class="border-border-default flex items-center justify-between gap-4 border-b py-3 last:border-b-0"

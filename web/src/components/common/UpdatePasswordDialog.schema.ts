@@ -33,12 +33,7 @@ export const updatePasswordDefaults = (): UpdatePasswordForm => ({
   confirm_password: "",
 });
 
-/**
- * Validation for the forced password reset.
- *
- * `getComplexity` is read on every run rather than captured, so one stable schema instance follows
- * the policy landing after mount — the dialog opens before the fetch resolves.
- */
+/** `getComplexity` is read on every run, so one schema instance follows a policy landing after mount. */
 export const makeUpdatePasswordSchema = (getComplexity: () => PasswordComplexity, t: TranslateFn) =>
   updatePasswordBaseSchema.superRefine((val, zctx) => {
     // Required-only: it is an existing credential, and may predate the policy being enforced now.

@@ -21,17 +21,11 @@ import passwordPolicy, { type PasswordComplexity } from "@/services/passwordPoli
 import { useI18nTyped } from "@/types/i18n";
 import { buildPasswordRequirements, DEFAULT_COMPLEXITY } from "@/utils/passwordComplexity";
 
-// Cached across mounts: a blocked user meets this on every page, and the policy does not change
-// mid-session often enough to justify refetching per form.
+// Cached across mounts: a blocked user meets this on every page.
 const complexity = ref<PasswordComplexity | null>(null);
 let inFlight: Promise<void> | null = null;
 
-/**
- * The instance password requirements, and the rows a form shows for them.
- *
- * `loaded` is false when the fetch has not succeeded. Callers should still let the user submit —
- * the server validates regardless, and a missing hint is recoverable where a blocked form is not.
- */
+/** `loaded` false must not block submit: the server validates regardless, and a missing hint is recoverable. */
 export function usePasswordComplexity() {
   const store = useStore();
   const { t } = useI18nTyped();

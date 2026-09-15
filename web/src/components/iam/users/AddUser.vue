@@ -189,8 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="user-new-password-requirements"
           />
         </div>
-        <!-- Rendered only while the user is locked, read once on open. Unlock is STAGED, not
-             sent: one PUT carries it alongside any other edit, and Cancel discards it. -->
+        <!-- Unlock is STAGED, not sent: one PUT carries it alongside any other edit. -->
         <OBanner
           v-if="lockout?.locked"
           variant="warning"
@@ -447,8 +446,7 @@ export default defineComponent({
           delete payload.old_password;
           delete payload.new_password;
         }
-        // A security-relevant action on someone else's account confirms before the write. The
-        // second sentence heads off the assumption that it also resets the password.
+        // A security-relevant action on someone else's account confirms before the write.
         if (unlockStaged.value) {
           const confirmed = await confirm({
             title: t("user.lockout.confirmTitle", { email: raw(userEmail) }),
@@ -546,9 +544,7 @@ export default defineComponent({
     // via <OForm :form="form"> — ONE source of truth. The schema takes a context
     // GETTER so a single stable instance follows mode flips (e.g. the 422
     // add-existing → create-new switch) with no remount.
-    // The instance policy, not a hardcoded rule: the server validates every password against
-    // whatever an admin configured, so a fixed mirror here would reject passwords it accepts and
-    // accept passwords it rejects.
+    // The instance policy, not a hardcoded rule: a fixed mirror would drift from what the server enforces.
     const {
       complexity: passwordComplexity,
       requirements: passwordRequirements,
@@ -584,14 +580,12 @@ export default defineComponent({
     const formPassword = form.useStore((s: any) => s.values.password);
     const formNewPassword = form.useStore((s: any) => s.values.new_password);
 
-    // A server error is not re-validated on change, so it would block every later submit unless
-    // cleared once the user starts over.
+    // A server error is not re-validated on change, so it would block every later submit unless cleared.
     const clearServerErrors = () => {
       setServerFieldErrors(form, {});
     };
 
-    // Only when administering someone else: a locked-out user must not lift their own lock, and
-    // the route is Root/Admin-only. Exempt accounts are never locked, so they need no special case.
+    // Only when administering someone else: a locked-out user must not lift their own lock.
     const loadLockoutState = (email: string) => {
       lockout.value = null;
       unlockStaged.value = false;

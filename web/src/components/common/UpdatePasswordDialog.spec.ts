@@ -24,8 +24,7 @@ import i18n from "@/locales";
 import UpdatePasswordDialog from "./UpdatePasswordDialog.vue";
 import type { UpdatePasswordForm } from "./UpdatePasswordDialog.schema";
 
-// Reka portals dialog content into <body>. Render it inline so the assertions can reach it —
-// the same stub ODialog's own spec uses.
+// Reka portals dialog content into <body>; rendered inline so the assertions can reach it.
 vi.mock("reka-ui", async (importOriginal) => {
   const actual = await importOriginal<typeof import("reka-ui")>();
   return { ...actual, DialogPortal: actual.DialogContent };
@@ -128,10 +127,7 @@ describe("UpdatePasswordDialog", () => {
   });
 
   it("still fetches the complexity when no organization is selected", async () => {
-    // The blocked user's org-list request is one of the calls the middleware refuses, so no
-    // organization is ever selected for them. Building the URL from selectedOrganization sent
-    // /api/undefined/password_complexity, and the dialog silently showed the compiled defaults
-    // instead of the policy the server was actually enforcing.
+    // A blocked user's org list is refused too, so no organization is ever selected for them.
     store.state.selectedOrganization = undefined as any;
 
     open("policy_tightened");
@@ -144,9 +140,7 @@ describe("UpdatePasswordDialog", () => {
   });
 
   it("submits the password change to a real org when none is selected", async () => {
-    // Same root cause as above, with a nastier symptom: the PUT went to /api/undefined/users/...,
-    // which 401s, and http.ts's global 401 handler force-logs-out — so a change that never
-    // happened looked exactly like one that succeeded.
+    // /api/undefined/users 401s, and the global 401 handler would make a failed change look like a success.
     store.state.selectedOrganization = undefined as any;
 
     open("policy_tightened");

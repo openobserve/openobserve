@@ -15,9 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <!-- Blocked: persistent with no close button — the two ways out are setting a new password or
-       signing out, and everything else on the instance is refused until one of them happens.
-       Opened voluntarily from the expiry banner it is an ordinary, cancellable dialog. -->
+  <!-- Blocked: no close button, since every other request is refused until the password changes. -->
   <ODialog
     v-if="isOpen"
     data-test="password-reset-dialog"
@@ -132,8 +130,7 @@ const bannerMessage = computed(() => {
   }
 });
 
-// Reads the complexity on every run, so the schema instance created here follows the policy
-// arriving after the dialog has already opened.
+// Reads the complexity on every run: the policy may arrive after the dialog has opened.
 const schema = makeUpdatePasswordSchema(() => complexity.value, t);
 
 // Headless so the owner can pin the server's reuse rejection onto the field.
@@ -180,8 +177,7 @@ const submit = async (values: UpdatePasswordForm) => {
       userEmail.value,
     );
   } catch (error: any) {
-    // A reuse rejection belongs on the field: a toast would leave the user staring at a fully
-    // ticked checklist with no idea what to change.
+    // A reuse rejection belongs on the field, not a toast: every checklist row is ticked.
     const reused = reuseRejection(error, t);
     if (reused) {
       setServerFieldErrors(form, { new_password: reused });
@@ -194,9 +190,7 @@ const submit = async (values: UpdatePasswordForm) => {
     return;
   }
 
-  // The session cookie IS the password (Basic email:password, re-verified per request), so the
-  // credential in the browser went stale the moment the change landed — every later call would
-  // 401. Signing out is the only correct end to this flow.
+  // The session cookie IS the password, so the browser's credential went stale the moment the change landed.
   toast({ variant: "success", message: t("passwordReset.updated") });
   signOut();
 };

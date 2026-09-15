@@ -14,8 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- Advisory, dismissible, once per session: a session held open across the expiry date is not
-     re-warned — it simply meets the block, the same outcome as a user who ignored this. -->
+<!-- Once per session: a session held open across the expiry date simply meets the block. -->
 <template>
   <OBanner
     v-if="daysRemaining !== null"

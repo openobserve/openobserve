@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Whether the signed-in user owes the instance a new password. Written by the
-// http interceptor (a service, not a component), read by the dialog App.vue
-// mounts — so the state lives here rather than in either of them, the same way
-// useConfirmDialog does.
+// Written by the http interceptor and read by the dialog App.vue mounts, so the state lives in neither.
 
 import { ref } from "vue";
 
@@ -32,14 +29,7 @@ type OrgStore = { state?: { selectedOrganization?: { identifier?: string } } };
 /** Mirrors the server's DEFAULT_ORG — the one organization guaranteed to exist. */
 const DEFAULT_ORG = "default";
 
-/**
- * The org identifier to use on the two routes a blocked user may still call.
- *
- * It cannot come from `selectedOrganization`: listing organizations is itself one of the requests
- * the middleware refuses, so a blocked user never has one selected and the identifier is
- * `undefined`. That produced `/api/undefined/...`, which 401s — and the global 401 handler then
- * signs the user out, making a failed password change look like a successful one.
- */
+/** A blocked user's org list is refused too, so `selectedOrganization` alone would yield `/api/undefined/...`. */
 export const remediationOrg = (store: OrgStore | undefined): string =>
   store?.state?.selectedOrganization?.identifier || DEFAULT_ORG;
 
@@ -57,12 +47,7 @@ const serverReason = (nextReason?: string): PasswordResetReason =>
     : "policy_tightened";
 
 export function usePasswordReset() {
-  /**
-   * Enter the blocked state.
-   *
-   * The already-open guard is what stops a page firing several requests at once from stacking one
-   * dialog per rejected request.
-   */
+  /** Enter the blocked state; the already-open guard stops parallel rejections stacking dialogs. */
   const open = (nextReason?: string) => {
     if (isOpen.value) return;
     reason.value = serverReason(nextReason);

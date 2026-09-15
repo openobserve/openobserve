@@ -10,7 +10,6 @@ import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
 // Settable rather than a fixed `false`: meta-org-only sections cannot be covered otherwise.
-// Defaults to false, so every case written before this stays unchanged.
 const { isMetaOrgRef } = vi.hoisted(() => ({ isMetaOrgRef: { value: false } }));
 
 vi.mock("@/composables/useIsMetaOrg", () => ({
