@@ -412,25 +412,11 @@ import {
 const { fetchAiChat, submitFeedback } = useAiChat();
 const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
-// --- Shared, cross-instance streaming registry ---
-// O2AIChat is instantiated more than once (the Home page's inline AI tab and
-// the sidebar panel in MainLayout are SEPARATE component instances). When the
-// user starts a chat on Home and navigates to another page, the Home instance
-// unmounts and the sidebar instance mounts — a brand new setup() scope.
-//
-// For an in-flight stream to keep rendering after that hand-off, the detach/
-// re-attach bookkeeping MUST live outside setup() so both instances see the
-// same live array + AbortController. When these were per-instance, the sidebar
-// instance's map was empty, so loadChat() never re-attached and fell back to
-// the stale IndexedDB snapshot — the stream kept running but its text never
-// rendered in the new instance. Module scope is what makes the hand-off work.
+// Module scope, not setup(): O2AIChat mounts in both HomeView and MainLayout, and a stream handed off between them must share this state.
 const backgroundStreams = new Set<AbortController>();
 const MAX_BACKGROUND_STREAMS = 3;
 
-// Map sessionId → live stream context for re-attachment when a (possibly
-// different) instance loads the same session. loadChat swaps chatMessages.value
-// back to `msgs` so processStream's isActive() becomes true again and the UI
-// updates in real-time.
+// loadChat swaps chatMessages.value back to the live msgs so processStream's isActive() identity check writes to the UI again.
 const backgroundStreamMap = new Map<
   string,
   {
@@ -440,19 +426,10 @@ const backgroundStreamMap = new Map<
   }
 >();
 
-// Cross-instance streaming status, keyed by sessionId. processStream runs in the
-// closure of the instance that STARTED it, so its completion resets isLoading on
-// THAT instance's ref — not on a different instance that re-attached to the same
-// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
-// this shared reactive map for its current session and clears its own streaming
-// UI when the background turn finishes, so the sidebar's loading indicator
-// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
+// Module scope: processStream resets isLoading only on the instance that started it, so a re-attached instance watches this to clear its spinner.
 const sessionStreamingState = reactive<Record<string, boolean>>({});
 
-// Detached streams deliberately outlive the component that started them, and
-// this registry is module scope, so nothing else will ever stop them. Call when
-// the turn is no longer authorized for what it is writing — org switch, logout
-// — never for ordinary navigation, which is the case detaching exists for.
+// Detached streams outlive their component; call only when the turn loses authorization (org switch, logout), never on navigation.
 const abortBackgroundStreams = () => {
   for (const controller of backgroundStreams) controller.abort();
   backgroundStreams.clear();
@@ -491,7 +468,6 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
-    //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
     aiChatInputContext: {
       type: String,
       default: "",
@@ -520,11 +496,11 @@ export default defineComponent({
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
-    const chatInput = ref<any>(null); // RichTextInput component instance
+    const chatInput = ref<any>(null);
     const currentStreamingMessage = ref("");
-    const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
+    const currentTextSegment = ref("");
     const currentChatId = ref<number | null>(null);
-    const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
+    const currentSessionId = ref<string | null>(null);
     const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
     const store = useStore();
     const { isDark } = useTheme();
@@ -532,8 +508,6 @@ export default defineComponent({
     const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
 
-    // Typewriter placeholder — only animates on the home tab (centeredStart) when no chat is open.
-    // On the sidepanel the placeholder stays static ("Write your prompt").
     const typewriterPrompts = computed(() => [
       t("aiAssistant.placeholderRotation.one"),
       t("aiAssistant.placeholderRotation.two"),
@@ -555,7 +529,6 @@ export default defineComponent({
         : t("common.writeYourPrompt"),
     );
 
-    // Chat history composable
     const {
       saveToHistory: dbSaveToHistory,
       loadHistory: dbLoadHistory,
@@ -581,7 +554,6 @@ export default defineComponent({
       scrollToLoadingIndicator,
     } = useChatScroll(messagesContainer);
 
-    // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{
       tool: string;
       args: Record<string, any>;
@@ -642,13 +614,10 @@ export default defineComponent({
       addNewChat: () => addNewChat(),
     });
 
-    // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
-    // Track expanded log entries by message index and block index
     const expandedLogEntries = ref<Set<string>>(new Set());
 
-    // Active tool call state - for showing tool progress outside message box
     const activeToolCall = ref<{
       tool: string;
       message: I18nText;
@@ -656,18 +625,11 @@ export default defineComponent({
       call_id?: string;
     } | null>(null);
 
-    // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
-
-    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
-    // declared at MODULE scope (above defineComponent), not here. They must be
-    // shared across all O2AIChat instances so an in-flight stream started on the
-    // Home tab keeps rendering after navigating to a page where the sidebar
-    // instance takes over. See the comment on their declaration for why.
 
     // Throttle save during streaming to prevent data loss on page reload
     const lastStreamingSaveTime = ref<number>(0);
-    const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
+    const STREAMING_SAVE_INTERVAL = 3000;
 
     const {
       pendingImages,
@@ -691,15 +653,12 @@ export default defineComponent({
       t,
     );
 
-    // Context references for rich text input chips
     const contextReferences = ref<ReferenceChip[]>([]);
 
-    // Component readiness tracking
     const componentReady = ref(false);
     const pendingChips = ref<ReferenceChip[]>([]);
 
-    // Set true in onUnmounted so watchers firing during teardown don't re-attach
-    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    // Set in onUnmounted so the chatUpdated watch can't re-attach a just-detached stream to this dying instance.
     const isUnmounting = ref(false);
 
     const { historyIndex, isOnFirstLine, navigateHistory, loadQueryHistory, addToHistory } =
@@ -727,52 +686,38 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Cancels the currently ongoing AI chat request if one exists
-     * This will stop the streaming response and clean up the request state
-     * Shows a user-friendly notification about the cancellation
-     *
-     * Called when user clicks the "Stop" button during message generation
-     */
     const cancelCurrentRequest = async () => {
       if (currentAbortController.value) {
         currentAbortController.value.abort();
         currentAbortController.value = null;
 
-        // Show user notification about successful cancellation
         toast({
           message: t("toastMessages.components.responseGenerationStopped"),
           variant: "info",
         });
 
-        // Update UI state to reflect cancellation
         isLoading.value = false;
         activeToolCall.value = null;
         stopAnalyzingRotation();
 
-        // Immediately show all buffered text (like ChatGPT's "Stop generating")
         displayedStreamingContent.value = currentTextSegment.value;
         if (typewriterAnimationId.value) {
           cancelAnimationFrame(typewriterAnimationId.value);
           typewriterAnimationId.value = null;
         }
 
-        // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
           if (lastMessage.role === "assistant") {
             if (!lastMessage.content) {
-              // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
             } else if (currentStreamingMessage.value) {
-              // Update final text in contentBlocks to show all buffered content
               if (lastMessage.contentBlocks) {
                 const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
                 if (lastBlock && lastBlock.type === "text") {
                   lastBlock.text = currentTextSegment.value;
                 }
               }
-              // Keep partial content but indicate it was cancelled
               lastMessage.content = raw(
                 lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
               );
@@ -780,28 +725,22 @@ export default defineComponent({
           }
         }
 
-        // Reset streaming state
         currentStreamingMessage.value = "";
         currentTextSegment.value = "";
         displayedStreamingContent.value = "";
 
-        // Save the current state including cancellation
         await saveToHistory();
 
-        // Scroll to show the final state
         await scrollToBottom();
       }
     };
 
-    // Process any pending chips that were queued before component was ready
     const processPendingChips = () => {
       if (pendingChips.value.length > 0) {
         nextTick(() => {
           if (chatInput.value && typeof chatInput.value.insertChip === "function") {
-            // Focus input first to ensure cursor is positioned correctly
             focusInput();
 
-            // Only clear if appendMode is false and there are no existing chips
             // Check DOM directly for existing chips instead of relying on reactive state
             const inputElement = chatInput.value.$el || chatInput.value;
             const editableDiv =
@@ -810,10 +749,6 @@ export default defineComponent({
             const hasExistingChips = editableDiv?.querySelector(".reference-chip") !== null;
             const hasExistingText = editableDiv?.textContent?.trim().length > 0;
 
-            // Only clear if:
-            // 1. appendMode is false (user wants to replace content)
-            // 2. AND there are no existing chips
-            // 3. AND there is no existing text
             if (!props.appendMode && !hasExistingChips && !hasExistingText) {
               if (chatInput.value && typeof chatInput.value.clear === "function") {
                 chatInput.value.clear();
@@ -821,7 +756,6 @@ export default defineComponent({
               inputMessage.value = "";
             }
 
-            // Insert all pending chips at the cursor position
             pendingChips.value.forEach((chip) => {
               chatInput.value.insertChip(chip);
             });
@@ -835,12 +769,9 @@ export default defineComponent({
       () => props.aiChatInputContext,
       (newAiChatInputContext: string) => {
         if (newAiChatInputContext) {
-          // Create a reference chip from the context
           const contextChip: ReferenceChip = {
             id: `context-${Date.now()}`,
-            // Not translated: this filename is spliced verbatim into the
-            // `--- Log Entry ---` delimiter of the prompt sent to the LLM, so the
-            // delimiter must stay stable across locales.
+            // Not translated: this filename is spliced into the prompt's `--- Log Entry ---` delimiter, which must stay stable across locales.
             filename: raw("Log Entry"),
             preview: createPreview(newAiChatInputContext, 10),
             fullContent: newAiChatInputContext,
@@ -848,10 +779,8 @@ export default defineComponent({
             type: "context",
           };
 
-          // Always queue the chip first for consistent behavior
           pendingChips.value.push(contextChip);
 
-          // If component is ready, process immediately with proper timing
           if (
             componentReady.value &&
             chatInput.value &&
@@ -864,8 +793,7 @@ export default defineComponent({
               }, 50);
             });
           }
-          // If component not ready, chips will be processed when componentReady becomes true
-          // No fallback text needed - avoids flickering when chat opens
+          // Not ready yet: queued chips are processed when componentReady becomes true.
         }
       },
     );
@@ -885,8 +813,6 @@ export default defineComponent({
         }
       },
     );
-
-    //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
     const fetchInitialMessage = async () => {
       isLoading.value = true;
@@ -911,10 +837,7 @@ export default defineComponent({
       let buffer = "";
       let messageComplete = false;
 
-      // --- Stream context: captured at call time ---
-      // When the user switches sessions mid-stream, chatMessages.value gets
-      // replaced with a new array. This captured reference keeps the stream
-      // writing to the ORIGINAL array so data isn't lost.
+      // Captured array: isActive() is identity against it, so a detached stream keeps writing its own array after a session switch.
       const msgs = chatMessages.value;
       let ctxSessionId = currentSessionId.value;
       let ctxChatId = currentChatId.value;
@@ -933,7 +856,6 @@ export default defineComponent({
         }
       };
 
-      // Context-aware save: uses captured metadata when detached
       const saveCtx = async () => {
         if (msgs.length === 0) return;
         if (!ctxSessionId) {
@@ -946,8 +868,7 @@ export default defineComponent({
         if (!chatId && resultId) {
           if (isActive()) {
             currentChatId.value = resultId;
-            // Carry the new-chat preference onto the chat id. Persist the actual
-            // value (ON by default) so an explicit user disable is honored.
+            // Persist the actual value (ON by default) so an explicit user disable is honored.
             autoNavigationPreferences.value.set(resultId, pendingAutoNavigation.value);
             saveAutoNavigationPreferences();
           } else {
@@ -1083,14 +1004,12 @@ export default defineComponent({
         await runEffects(effects);
         return state.halted;
       };
-      // --- End stream context ---
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
 
           const { events, rest } = extractFrames(buffer);
@@ -1119,17 +1038,14 @@ export default defineComponent({
           }
         }
 
-        // If we completed a message, save to history
         if (messageComplete) {
           if (isActive()) {
-            // Immediately show all remaining text and stop typewriter animation
             displayedStreamingContent.value = textSegment;
             if (typewriterAnimationId.value) {
               cancelAnimationFrame(typewriterAnimationId.value);
               typewriterAnimationId.value = null;
             }
           }
-          // Update final text in contentBlocks
           const lastMessage = msgs[msgs.length - 1];
           if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
             const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
@@ -1140,16 +1056,13 @@ export default defineComponent({
           await saveCtx();
         }
       } catch (error) {
-        // Handle different types of errors appropriately
         if (error instanceof Error && error.name === "AbortError") {
-          // Request was cancelled by user - this is expected behavior, not an error
-          // Do a final save for background streams before exiting
+          // User cancel is expected; a detached stream still needs its final save.
           if (!isActive() && msgs.length > 0 && ctxSessionId) {
             await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId);
           }
-          return; // Exit gracefully without logging as error
+          return;
         } else {
-          // Genuine error occurred during stream processing
           console.error("Error reading stream:", error);
         }
       }
@@ -1163,15 +1076,12 @@ export default defineComponent({
       }
 
       try {
-        // Generate session ID if not already set for this chat
         if (!currentSessionId.value) {
           currentSessionId.value = getUUIDv7();
         }
 
-        // Prefer AI-generated title, fallback to default
         const title = aiGeneratedTitle.value || undefined;
 
-        // Save using the composable
         const chatId = await dbSaveToHistory(
           chatMessages.value,
           currentSessionId.value,
@@ -1179,12 +1089,10 @@ export default defineComponent({
           currentChatId.value,
         );
 
-        // Update current chat ID if this is a new chat
         if (!currentChatId.value && chatId) {
           currentChatId.value = chatId;
 
-          // Apply pending auto navigation preference to the new chat. Persist the
-          // actual value (ON by default) so an explicit user disable is honored.
+          // Persist the actual value (ON by default) so an explicit user disable is honored.
           autoNavigationPreferences.value.set(chatId, pendingAutoNavigation.value);
           saveAutoNavigationPreferences();
         }
@@ -1195,19 +1103,11 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Detach the current streaming request so it continues in the background.
-     * processStream's captured context (msgs) keeps writing to the old array
-     * while we clear the UI for a new session. When the stream completes,
-     * processStream saves to IndexedDB via saveCtx().
-     */
+    /** Detach the stream so it keeps writing its captured array in the background and saves via saveCtx() when done. */
     const detachCurrentStream = () => {
       if (!currentAbortController.value) return;
 
-      // Move controller to background set so onUnmounted can clean it up
-      // and enforce the max background stream limit.
       if (backgroundStreams.size >= MAX_BACKGROUND_STREAMS) {
-        // Abort the oldest background stream to stay within limits
         const oldest = backgroundStreams.values().next().value;
         if (oldest) {
           oldest.abort();
@@ -1218,8 +1118,7 @@ export default defineComponent({
       backgroundStreams.add(detachedController);
       currentAbortController.value = null;
 
-      // Register for re-attachment: when user navigates back to this session,
-      // loadChat swaps chatMessages.value to this live array so the UI resumes.
+      // loadChat re-attaches by swapping chatMessages.value to this live array.
       if (currentSessionId.value) {
         backgroundStreamMap.set(currentSessionId.value, {
           msgs: chatMessages.value,
@@ -1228,7 +1127,6 @@ export default defineComponent({
         });
       }
 
-      // Clean up UI state — processStream continues silently in background
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
@@ -1241,10 +1139,7 @@ export default defineComponent({
       displayedStreamingContent.value = "";
     };
 
-    // Logout has to kill the foreground turn too, not just the detached ones.
-    // MainLayout.signout() fires this as a window event because it lives in the
-    // Options API half of that file and can't reach setup scope directly (same
-    // pattern as o2:home-switch-tab).
+    // Logout must kill the foreground turn too; MainLayout.signout() sends a window event because its Options API half can't reach setup scope.
     const abortAllStreams = () => {
       abortBackgroundStreams();
       if (currentAbortController.value) {
@@ -1255,14 +1150,11 @@ export default defineComponent({
 
     const toggleExpand = () => {
       if (!store.state.isAiChatEnabled) {
-        // Closed → Open inline sidebar
         store.dispatch("setIsAiChatEnabled", true);
         store.dispatch("setIsAiChatExpanded", false);
       } else if (!store.state.isAiChatExpanded) {
-        // Inline sidebar → Expanded overlay
         store.dispatch("setIsAiChatExpanded", true);
       } else {
-        // Expanded overlay → Back to inline sidebar
         store.dispatch("setIsAiChatExpanded", false);
       }
       window.dispatchEvent(new Event("resize"));
@@ -1291,19 +1183,18 @@ export default defineComponent({
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
-      lastTraceId.value = null; // Reset trace correlation for new chat
+      lastTraceId.value = null;
       showHistory.value = false;
       currentChatTimestamp.value = null;
-      shouldAutoScroll.value = true; // Reset auto-scroll for new chat
-      resetTitleState(); // Clear AI-generated title for new chat
-      resetTypewriterState(); // Clear typewriter animation state for new chat
-      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
-      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
+      shouldAutoScroll.value = true;
+      resetTitleState();
+      resetTypewriterState();
+      pendingAutoNavigation.value = true;
+      showScrollToBottom.value = false;
       store.dispatch("setCurrentChatTimestamp", null);
       store.dispatch("setChatUpdated", true);
     };
 
-    /** Resolve the pendingConfirmation block — mark as success or failure */
     const resolveConfirmationBlock = (approved: boolean) => {
       for (const msg of chatMessages.value) {
         if (msg.contentBlocks) {
@@ -1321,17 +1212,14 @@ export default defineComponent({
       }
     };
 
-    // Set by processStream when a session's owning replica is gone. The stream has
-    // already returned 200 by then, so sendMessage reads this once it ends.
+    // Set by processStream when the owning replica is gone; the stream already returned 200, so sendMessage reads it after it ends.
     const streamOwnerUnavailable = ref(false);
 
-    // Shown after a successful restore: only the dialogue came back, not the tool
-    // results, files or permission decisions from before the interruption.
+    // Shown after a restore: only the dialogue came back, not tool results, files or permission decisions.
     const RESTORED_NOTICE =
       "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
 
-    // Keyed on the explicit server code, never guessed from a generic failure:
-    // restoring means abandoning the current session.
+    // Keyed on the explicit server code, never a generic failure: restoring abandons the current session.
     const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
       // `unknown`, not `any` — narrow before reading, or a non-object body throws.
       if (typeof errorBody !== "object" || errorBody === null) return false;
@@ -1340,7 +1228,6 @@ export default defineComponent({
       return code === "session_owner_unavailable";
     };
 
-    /** Surface a message inline in the transcript, as stream errors are shown. */
     const appendErrorBlock = (message: string, recoverable = false) => {
       const block: ContentBlock = { type: "error", message: raw(message), recoverable };
       const msgs = chatMessages.value;
@@ -1353,11 +1240,7 @@ export default defineComponent({
       }
     };
 
-    /**
-     * POST a confirmation answer and report whether it landed. The response used
-     * to be discarded, so an answer reaching a replica with no record of the
-     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
-     */
+    /** POST a confirmation answer and report whether it landed, so a 404 from a replica without the pending confirmation isn't silent. */
     const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
       try {
         const orgId = store.state.selectedOrganization.identifier;
@@ -1395,7 +1278,6 @@ export default defineComponent({
     const handleToolConfirm = async () => {
       resolveConfirmationBlock(true);
 
-      // Check if this is a navigation action
       if (pendingConfirmation.value?.tool === "navigation_action") {
         const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
@@ -1414,9 +1296,7 @@ export default defineComponent({
     const handleToolCancel = async () => {
       resolveConfirmationBlock(false);
 
-      // Check if this is a navigation action
       if (pendingConfirmation.value?.tool === "navigation_action") {
-        // Just clear the confirmation, don't navigate
         pendingConfirmation.value = null;
         return;
       }
@@ -1428,13 +1308,10 @@ export default defineComponent({
     };
 
     const handleToolAlwaysConfirm = async () => {
-      // Enable auto navigation for this chat
       isAutoNavigationEnabled.value = true;
 
-      // Then proceed with confirmation
       resolveConfirmationBlock(true);
 
-      // Check if this is a navigation action
       if (pendingConfirmation.value?.tool === "navigation_action") {
         const navAction = pendingConfirmation.value?.navAction;
         if (navAction) {
@@ -1457,18 +1334,11 @@ export default defineComponent({
     ): NavigationAction | null => generateNavigation(toolName, callArgs, responseBody, t);
 
     const handleNavigationAction = async (action: NavigationAction) => {
-      // Detach the stream before navigating: the route change can unmount/
-      // recreate this component, and onUnmounted aborts currentAbortController
-      // to avoid leaking requests. Without detaching first, that abort races
-      // an in-flight opencode turn and kills any tool calls still queued
-      // after this navigation (e.g. create dashboard -> create alert -> nav).
-      // detachCurrentStream() moves the controller to backgroundStreams so
-      // processStream keeps running and the turn finishes in the background.
+      // Detach before navigating so the route change can't abort the in-flight turn and its queued tool calls.
       detachCurrentStream();
 
       const pageName = navigationPageName(action);
 
-      // Perform navigation FIRST
       const target = buildNavigationRoute(
         action,
         store.state.selectedOrganization.identifier,
@@ -1480,19 +1350,16 @@ export default defineComponent({
       // Use setTimeout to add message AFTER navigation fully completes and settles
       setTimeout(async () => {
         try {
-          // Add success message AFTER navigation completes
           const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
           let lastMessage = chatMessages.value[chatMessages.value.length - 1];
 
           if (!lastMessage || lastMessage.role !== "assistant") {
-            // Create new assistant message
             chatMessages.value.push({
               role: "assistant",
               content: raw(successMessage),
               contentBlocks: [{ type: "text", text: successMessage }],
             });
           } else {
-            // Append to existing assistant message
             if (lastMessage.content) {
               lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
             } else {
@@ -1507,7 +1374,6 @@ export default defineComponent({
             });
           }
 
-          // Save to history after adding message
           await saveToHistory();
           await scrollToBottom();
         } catch (error) {
@@ -1523,52 +1389,37 @@ export default defineComponent({
           return;
         }
 
-        // Detach any in-progress stream so it continues in the background
         detachCurrentStream();
 
-        // Load chat using the composable
         const chat = await dbLoadChat(chatId);
 
         if (chat) {
-          // Check if this session has an active background stream.
-          // If so, re-attach by using the LIVE array that processStream is writing to
-          // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
-          // same array makes processStream's isActive() true again, so UI updates resume.
+          // Re-attach to a live background stream: assigning its array makes processStream's isActive() identity true again.
           const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
 
           if (bgCtx) {
-            // Re-attach: use the live streaming array
             chatMessages.value = bgCtx.msgs;
             currentChatId.value = bgCtx.chatId || chatId;
             currentSessionId.value = chat.sessionId || null;
 
-            // Move controller back to foreground
             currentAbortController.value = bgCtx.controller;
             backgroundStreams.delete(bgCtx.controller);
             backgroundStreamMap.delete(chat.sessionId!);
 
-            // Restore streaming UI state so loading indicator shows
             isLoading.value = true;
             startAnalyzingRotation();
 
-            // Prime the typewriter from whatever the stream has accumulated so
-            // far, in THIS fresh instance. processStream only syncs the segment
-            // refs and (re)starts the animation on the NEXT chunk that arrives
-            // while isActive(); text already streamed before we re-attached
-            // would otherwise sit invisible until the next delta. Reveal the
-            // existing text instantly, then let the ongoing stream continue.
+            // Prime the typewriter with text streamed before re-attach; processStream only syncs on the next chunk, so the backlog would stay invisible.
             const lastMsg = chatMessages.value[chatMessages.value.length - 1];
             if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
               const lastBlock = lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
               if (lastBlock?.type === "text" && lastBlock.text) {
                 currentStreamingMessage.value = lastMsg.content || lastBlock.text;
                 currentTextSegment.value = lastBlock.text;
-                // Instant reveal (no per-char catch-up) for the backlog.
                 displayedStreamingContent.value = lastBlock.text;
               }
             }
           } else {
-            // Normal load from IndexedDB snapshot (no active stream)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
@@ -1585,7 +1436,6 @@ export default defineComponent({
           showHistory.value = false;
           shouldAutoScroll.value = true;
 
-          // Load title from history (no animation for existing chats)
           displayedTitle.value = chat.title || "";
           aiGeneratedTitle.value = chat.title || null;
           isTypingTitle.value = false;
@@ -1595,7 +1445,6 @@ export default defineComponent({
             store.dispatch("setChatUpdated", true);
           }
 
-          // Scroll to bottom after loading chat
           await nextTick();
           scrollToBottom();
         }
@@ -1604,24 +1453,16 @@ export default defineComponent({
       }
     };
 
-    /**
-     * Sends a message to the AI chat service with streaming response handling
-     * Creates a new AbortController for each request to enable cancellation
-     * Manages the complete request lifecycle from user input to streaming response
-     */
     const sendMessage = async () => {
-      // Allow sending with text or images (or both)
       const hasText = inputMessage.value.trim().length > 0;
       const hasImages = pendingImages.value.length > 0;
       if ((!hasText && !hasImages) || isLoading.value) return;
 
-      // Get the message for backend (with unwrapped chips)
       let backendMessage = inputMessage.value;
       if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
         backendMessage = chatInput.value.getMessageForBackend();
       }
 
-      // Use the plain text message for display
       const userMessage = inputMessage.value;
       const messagesToSend = [...pendingImages.value]; // Capture images before clearing
 
@@ -1630,84 +1471,69 @@ export default defineComponent({
         addToHistory(userMessage);
       }
 
-      // Push user message with images for display
-      // But we'll use backendMessage for the API call
       chatMessages.value.push({
         role: "user",
-        content: raw(backendMessage), // Use backend message with full context
+        content: raw(backendMessage),
         ...(hasImages && { images: messagesToSend }),
       });
       inputMessage.value = "";
-      contextReferences.value = []; // Clear reference chips
+      contextReferences.value = [];
       if (chatInput.value && typeof chatInput.value.clear === "function") {
-        chatInput.value.clear(); // Clear the rich text input
+        chatInput.value.clear();
       }
-      clearPendingImages(); // Clear pending images after capturing
-      shouldAutoScroll.value = true; // Reset auto-scroll for new message
-      await scrollToBottom(); // Scroll after user message
-      await saveToHistory(); // Save after user message
+      clearPendingImages();
+      shouldAutoScroll.value = true;
+      await scrollToBottom();
+      await saveToHistory();
 
       isLoading.value = true;
       currentStreamingMessage.value = "";
       currentTextSegment.value = "";
-      resetTypewriterState(); // Reset typewriter animation for new message
-      startAnalyzingRotation(); // Start rotating analyzing messages
+      resetTypewriterState();
+      startAnalyzingRotation();
 
-      // Mint the session id here rather than inside the try below. A new chat
-      // has none yet, and the cleanup on every exit path has to clear the flag
-      // for the SAME id we set it on — otherwise an instance that re-attached
-      // never sees the streaming->done transition and spins forever.
+      // Mint the session id before the try so every exit path's cleanup clears the SAME id, or a re-attached instance spins forever.
       if (!currentSessionId.value) {
         currentSessionId.value = getUUIDv7();
       }
       const streamSessionId = currentSessionId.value;
 
-      // Mark this session as actively streaming in the cross-instance registry
-      // so that if another instance re-attaches, it knows when to stop showing
-      // its own loading indicator (see sessionStreamingState declaration).
       sessionStreamingState[streamSessionId] = true;
 
-      // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
 
-      // Reseed state for this turn: at most one restore attempt, and a pending
-      // notice to show once the replacement request succeeds.
+      // At most one restore attempt per turn; the notice shows only once the replacement request succeeds.
       let hasReseeded = false;
       let reseedNotice = false;
 
-      // Clear any flag left by a previous turn that threw or was aborted before
-      // the clear at the end of the try block — a stale `true` abandons a healthy
-      // session.
+      // Clear any flag left by a turn that threw or aborted early; a stale `true` abandons a healthy session.
       streamOwnerUnavailable.value = false;
 
       try {
         // Don't add empty assistant message here - wait for actual content
-        await scrollToLoadingIndicator(); // Scroll directly to loading indicator
+        await scrollToLoadingIndicator();
 
         let response: any;
         try {
-          // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
             currentAbortController.value.signal,
             undefined, // explicitContext
-            currentSessionId.value, // sessionId for x-o2-session-id header
-            hasImages ? messagesToSend : undefined, // images for multimodal queries
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
           );
         } catch (error) {
           console.error("Error fetching AI chat:", error);
           return;
         }
 
-        // Check if request was cancelled before processing response
         if (response && response.cancelled) {
           return;
         }
 
         if (!response.ok) {
-          // Read the actual error body before throwing
           let errorBody = null;
           try {
             errorBody = await response.json();
@@ -1715,17 +1541,14 @@ export default defineComponent({
             // body may not be JSON
           }
 
-          // The session is gone but the transcript is still here, so resend under
-          // a fresh session and let the server seed it from those messages.
-          // Deliberately narrow — this code only, once only.
+          // Session gone but transcript remains: resend under a fresh session for the server to seed; this code only, once only.
           if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
             hasReseeded = true;
             console.warn(
               `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
             );
 
-            // A NEW id — reusing the old one would be refused again. streamSessionId
-            // (captured above) stays pinned to the original, and cleanup keys off it.
+            // A NEW id, since the old one would be refused again; streamSessionId stays pinned to the original for cleanup.
             currentSessionId.value = getUUIDv7();
             reseedNotice = true;
 
@@ -1758,8 +1581,7 @@ export default defineComponent({
           throw err;
         }
 
-        // Tell the user before the content arrives — continuing silently hides
-        // that the assistant lost the earlier tool results and file state.
+        // Announce before content arrives; silence hides that earlier tool results and file state were lost.
         if (reseedNotice) {
           reseedNotice = false;
           appendErrorBlock(RESTORED_NOTICE, true);
@@ -1771,20 +1593,12 @@ export default defineComponent({
 
         const reader = response.body.getReader();
 
-        // Capture the controller, messages ref, and sessionId so we can detect
-        // detachment and clean up after processStream
         const streamController = currentAbortController.value;
         const streamMsgs = chatMessages.value;
 
         await processStream(reader);
 
-        // The streaming counterpart of the pre-stream 409 above: once the stream
-        // has opened the failure arrives as an SSE event inside a 200, so
-        // response.ok can no longer be branched on. Same recovery.
-        //
-        // Only while this turn is still on screen — if the user switched chats
-        // mid-stream, restoring would clobber THAT conversation's session id and
-        // transcript instead. They can resend from the affected chat.
+        // A streaming 409 arrives as an SSE event inside a 200; restore only while this turn is on screen, or it clobbers another chat's session.
         const stillOnScreen = chatMessages.value === streamMsgs;
         if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
           streamOwnerUnavailable.value = false;
@@ -1793,8 +1607,7 @@ export default defineComponent({
           if (streamController) backgroundStreams.delete(streamController);
           if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
-          // The cross-instance streaming registry has to follow the new id, or
-          // another instance re-attaching never sees this stream finish.
+          // The streaming registry must follow the new id, or a re-attaching instance never sees this stream finish.
           const restoredSessionId = getUUIDv7();
           currentSessionId.value = restoredSessionId;
           sessionStreamingState[restoredSessionId] = true;
@@ -1810,27 +1623,22 @@ export default defineComponent({
           );
 
           if (retry && !retry.cancelled && retry.ok && retry.body) {
-            // Announced only once the replacement request is accepted, as on the
-            // pre-stream path — otherwise the claim can turn out to be false.
+            // Announced only once the replacement is accepted, or the claim can turn out false.
             appendErrorBlock(RESTORED_NOTICE, true);
             await processStream(retry.body.getReader());
           } else if (!(retry && retry.cancelled)) {
-            // The retry failed — non-OK, no body, or null (a network error).
-            // hasReseeded blocks any further attempt, so staying quiet here would
-            // end the turn with no answer and no explanation. A cancel is silent.
+            // Retry failed and hasReseeded blocks another attempt, so explain instead of ending silently; a cancel stays silent.
             appendErrorBlock(
               "This conversation was interrupted and could not be restored. Please try sending your message again.",
             );
           }
 
-          // The restored turn is done either way; clear its entry, or a
-          // re-attaching instance shows a loading indicator forever.
+          // Clear the restored turn's entry either way, or a re-attaching instance spins forever.
           sessionStreamingState[restoredSessionId] = false;
           backgroundStreamMap.delete(restoredSessionId);
         }
         streamOwnerUnavailable.value = false;
 
-        // Remove controller from background set and clean up re-attachment map
         if (streamController) backgroundStreams.delete(streamController);
         if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
@@ -1841,8 +1649,6 @@ export default defineComponent({
           store.dispatch("setChatUpdated", true);
         }
       } catch (error: any) {
-        // Remove the empty assistant message that was added before the error
-        //this will impact in the case of error showing empty message above the error message in the chat
         if (
           chatMessages.value.length > 0 &&
           chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
@@ -1855,29 +1661,22 @@ export default defineComponent({
           role: "assistant",
           content: raw(errorMessage),
         });
-        await saveToHistory(); // Save after error
+        await saveToHistory();
       }
 
       isLoading.value = false;
       activeToolCall.value = null;
       stopAnalyzingRotation();
 
-      // Mark the session's stream as finished in the cross-instance registry so
-      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
-      // its own loading indicator. Runs on all exit paths (success/abort/error).
-      // Uses the id captured before the request, not currentSessionId — by the
-      // time an early failure lands here the user may have switched chats, and
-      // clearing the wrong session leaves the real one flagged as streaming.
+      // Clear by the id captured before the request, not currentSessionId, which may belong to another chat by an early failure.
       sessionStreamingState[streamSessionId] = false;
 
-      // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
 
       await scrollToBottom();
     };
 
     const selectCapability = (capability: string) => {
-      // Remove the number prefix and set as input
       inputMessage.value = capability.replace(/^\d+\.\s/, "");
     };
 
@@ -1890,7 +1689,7 @@ export default defineComponent({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault(); // Prevent the default enter behavior
+        e.preventDefault();
         sendMessage();
       } else if (e.key === "Backspace") {
         handleImageReferenceBackspace(e);
@@ -1909,22 +1708,18 @@ export default defineComponent({
 
     const focusInput = () => {
       if (chatInput.value) {
-        // For RichTextInput component, call its focusInput method
         if (typeof chatInput.value.focusInput === "function") {
           chatInput.value.focusInput();
         } else {
-          // Fallback for other input types
           chatInput.value.focus();
         }
       }
     };
 
-    // Handle reference chip updates from RichTextInput
     const handleReferencesUpdate = (refs: ReferenceChip[]) => {
       contextReferences.value = refs;
     };
 
-    // Watch for isOpen changes to fetch initial message when opened
     watch(
       () => props.isOpen,
       (newValue) => {
@@ -1932,10 +1727,9 @@ export default defineComponent({
           if (chatMessages.value.length === 0) {
             fetchInitialMessage();
           }
-          loadHistory(); // Load history when chat is opened
+          loadHistory();
 
-          // Mark component as ready and process any pending chips
-          // Use a slight delay to ensure RichTextInput is fully mounted
+          // Slight delay so RichTextInput is fully mounted before pending chips are processed.
           nextTick(() => {
             setTimeout(() => {
               componentReady.value = true;
@@ -1947,7 +1741,6 @@ export default defineComponent({
       },
     );
 
-    // Auto-focus input when chat is expanded
     watch(
       () => store.state.isAiChatExpanded,
       (isExpanded) => {
@@ -1961,14 +1754,12 @@ export default defineComponent({
       },
     );
 
-    // Watch for organization switches — reset current chat and reload history
-    // scoped to the new org so users never see cross-org chat history.
+    // Reset on org switch so users never see cross-org chat history.
     watch(
       () => store.state.selectedOrganization?.identifier,
       (newOrgId, oldOrgId) => {
         if (newOrgId && newOrgId !== oldOrgId) {
-          // A turn started under the old org must not keep streaming and
-          // writing chat history after the switch.
+          // A turn started under the old org must not keep streaming and writing history after the switch.
           abortBackgroundStreams();
           addNewChat();
           if (props.isOpen) {
@@ -1978,42 +1769,30 @@ export default defineComponent({
       },
     );
 
-    // When this instance has re-attached to a stream that another instance
-    // started (its processStream completion runs in the OTHER instance's
-    // closure and can't reset our isLoading), watch the shared streaming
-    // registry and clear our own streaming UI once that session finishes.
     watch(
       () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
       (isStreaming) => {
-        // React to the session going false, not to a true->false transition: an
-        // instance that re-attached mid-stream never observed the `true`, so it
-        // would see undefined->false and skip the cleanup, spinning forever.
-        // isLoading guards against acting when we aren't showing a stream.
+        // React to false, not true->false: a mid-stream re-attach never saw `true`, so it would skip cleanup and spin forever.
         if (isStreaming === false && isLoading.value) {
           isLoading.value = false;
           activeToolCall.value = null;
           stopAnalyzingRotation();
-          // The owning instance's processStream already wrote the final text
-          // into the message blocks, so this instance only clears its own
-          // typewriter UI.
+          // The owning instance's processStream already wrote the final text, so only clear this instance's typewriter UI.
           resetTypewriterState();
-          // Reflect the completed turn into the sync handshake + history so a
-          // later mount reads the finished chat, not a mid-stream snapshot.
+          // Publish the finished turn so a later mount reads it, not a mid-stream snapshot.
           store.dispatch("setCurrentChatTimestamp", currentChatId.value);
           nextTick(() => scrollToBottom());
         }
       },
     );
 
-    // Only fetch initial message if component starts as open
     onMounted(() => {
       if (props.isOpen) {
         fetchInitialMessage();
-        loadHistory(); // Load history on mount if chat is open
+        loadHistory();
         loadChat(store.state.currentChatTimestamp);
 
-        // Mark component as ready and process any pending chips
-        // Use a slight delay to ensure RichTextInput is fully mounted
+        // Slight delay so RichTextInput is fully mounted before pending chips are processed.
         nextTick(() => {
           setTimeout(() => {
             componentReady.value = true;
@@ -2023,10 +1802,8 @@ export default defineComponent({
         });
       }
 
-      // Load query history from localStorage
       loadQueryHistory();
 
-      // Load auto navigation preferences from localStorage
       loadAutoNavigationPreferences();
 
       window.addEventListener("o2:abort-ai-streams", abortAllStreams);
@@ -2034,28 +1811,16 @@ export default defineComponent({
 
     onUnmounted(() => {
       window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
-      // Mark unmounting FIRST so any reactive watcher that fires during teardown
-      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
-      // not re-attach the just-detached stream back to this dying instance.
+      // Mark unmounting FIRST so the chatUpdated watch fired by the dispatch below can't re-attach the detached stream here.
       isUnmounting.value = true;
 
-      // Detach (not abort) any in-flight request: every mount site except
-      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
-      // panels), so ordinary navigation tears this instance down and used to
-      // kill the answer mid-word. Unmount is the only hook that knows the
-      // component is actually going away — a route watcher can't tell the
-      // difference between "leaving" and "the page updated its query string".
+      // Detach, not abort: most mount sites sit behind a v-if, so ordinary navigation unmounts this instance mid-answer.
       const wasStreaming = !!currentAbortController.value;
       detachCurrentStream();
-      // detachCurrentStream early-returns when no controller is set, so clear the
-      // rotation interval directly rather than relying on that path.
+      // detachCurrentStream early-returns without a controller, so clear the rotation interval directly.
       stopAnalyzingRotation();
 
-      // Home runs the chat in its own inline tab with the sidebar closed. If we
-      // leave Home mid-stream, open the sidebar so its instance can re-attach
-      // and keep rendering. Skip when we're still on Home (the user only
-      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
-      // opening it would show the panel and the Home AI tab at once.
+      // Leaving Home mid-stream opens the sidebar so its instance can re-attach; skip on Home, where it would show beside the AI tab.
       if (
         wasStreaming &&
         props.centeredStart &&
@@ -2065,55 +1830,28 @@ export default defineComponent({
         store.dispatch("setIsAiChatEnabled", true);
       }
 
-      // Note: background streams are intentionally NOT aborted here.
-      // detachCurrentStream() moves a turn's controller into backgroundStreams
-      // specifically so it keeps running after this component instance goes
-      // away (e.g. navigation, logout); aborting them on unmount would defeat
-      // that guarantee in exactly the scenario it exists for.
+      // Background streams are intentionally NOT aborted: surviving unmount is why they were detached.
 
-      // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
       }
 
-      // Clean up title animation interval
       clearTitleInterval();
 
-      // Clean up the trailing-edge streaming render timer. This matters more
-      // here than a typical unmount cleanup: we intentionally let the stream
-      // keep running (see detachCurrentStream above), so displayedStreamingContent
-      // may still be ticking as this instance dies and a flush is often pending.
-      // Left alone it fires after unmount and writes into this dead instance's
-      // chatMessages, keeping the whole setup closure alive across the routine
-      // home <-> sidebar hand-off.
+      // The stream outlives this instance, so a pending render flush would write into dead chatMessages and pin the closure.
       if (streamingRenderFlushTimer) {
         clearTimeout(streamingRenderFlushTimer);
         streamingRenderFlushTimer = null;
       }
       pendingStreamingRenderContent = null;
 
-      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
-      // them via the store: publish which chat is current + a "chatUpdated" pulse
-      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
-      //
-      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
-      // itself here. detachCurrentStream() (above) just registered the in-flight
-      // turn in backgroundStreamMap for the survivor to re-attach to; calling
-      // loadChat() on ourselves would immediately re-attach it back to THIS
-      // instance and delete the map entry, so the survivor then finds nothing
-      // and falls back to the stale IndexedDB snapshot — the exact reason the
-      // streamed text stopped rendering after navigating away mid-stream.
-      // Only publish the handoff state; let the survivor act on it.
+      // Only publish the handoff: loadChat() here would re-attach the stream to this dying instance and steal it from the survivor.
       store.dispatch("setCurrentChatTimestamp", currentChatId.value);
       store.dispatch("setChatUpdated", true);
     });
-    //this watch is added to make sure that the chat gets updated
-    // when the component is unmounted so that the main layout component can load the correct chat
     watch(chatUpdated, (newChatUpdated: boolean) => {
-      // A dying instance must not react to the handoff pulse it just published —
-      // otherwise it re-attaches its own detached stream and steals it from the
-      // surviving instance. Let the survivor handle it.
+      // A dying instance must not react to its own handoff pulse, or it steals its detached stream back from the survivor.
       if (isUnmounting.value) return;
       if (newChatUpdated && store.state.currentChatTimestamp) {
         loadChat(store.state.currentChatTimestamp);
@@ -2124,18 +1862,8 @@ export default defineComponent({
       store.dispatch("setChatUpdated", false);
     });
 
-    // Writing displayedStreamingContent into chatMessages triggers a
-    // re-render of the message list, which re-runs formatMessage() ->
-    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
-    // accumulated text, not just the new characters. The typewriter ticks
-    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
-    // O(n^2) over a response and eventually can't keep up with
-    // requestAnimationFrame, so the page appears to hang with data already
-    // in memory but not painted, then "snaps" to the final text once the
-    // stream ends and the last write goes through. Throttle how often the
-    // expensive reactive write happens, independent of how often the cheap
-    // per-character animation ref ticks; the animation itself stays smooth.
-    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
+    // Throttle the reactive write: each one re-parses and re-highlights the whole markdown, which is O(n^2) at typewriter tick rate.
+    const STREAMING_RENDER_INTERVAL = 80;
     let lastStreamingRenderTime = 0;
     let pendingStreamingRenderContent: string | null = null;
     let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2152,11 +1880,7 @@ export default defineComponent({
       if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
         const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
         if (lastBlock && lastBlock.type === "text") {
-          // Additive-only: the stream handler writes the FULL accumulated
-          // textSegment into this block as it arrives; the typewriter only
-          // reveals a prefix of it. Never let a lagging/stalled typewriter
-          // reveal (or an empty reset) shorten what's already rendered — that
-          // was a source of "text arrived but nothing/less showed". Only grow.
+          // Additive-only: the typewriter reveals a prefix of text already written here, so a lagging or reset reveal must never shorten it.
           if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
             lastBlock.text = content;
           }
@@ -2164,12 +1888,9 @@ export default defineComponent({
       }
     };
 
-    // Watch for typewriter animation updates to refresh the displayed text
     watch(displayedStreamingContent, (newContent) => {
       if (!isLoading.value) return;
-      // Don't overwrite existing text with empty string when displayedStreamingContent
-      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
-      // "clear previous content".
+      // An empty displayedStreamingContent means a new segment starts, not that previous content should be cleared.
       if (!newContent) return;
 
       const now = Date.now();
@@ -2178,8 +1899,7 @@ export default defineComponent({
         return;
       }
 
-      // Trailing edge: make sure the latest content always lands even if
-      // ticks keep arriving faster than the interval.
+      // Trailing edge: the latest content must land even if ticks keep arriving faster than the interval.
       pendingStreamingRenderContent = newContent;
       if (!streamingRenderFlushTimer) {
         const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
@@ -2194,11 +1914,9 @@ export default defineComponent({
 
     const processedMessages = computed(() => {
       return chatMessages.value.map((message) => {
-        // For user messages, check for log entries
         if (message.role === "user") {
           const orderedBlocks = parseLogEntries(message.content);
 
-          // If we have ordered blocks from parsing, combine them with existing contentBlocks
           const combinedContentBlocks =
             orderedBlocks.length > 0
               ? [...orderedBlocks, ...(message.contentBlocks || [])]
@@ -2211,7 +1929,6 @@ export default defineComponent({
           };
         }
 
-        // For assistant messages, keep as is
         return {
           ...message,
           blocks: processMessageContent(message.content),
@@ -2223,15 +1940,12 @@ export default defineComponent({
     const retryGeneration = async (message: any) => {
       if (!message || message.role !== "assistant") return;
 
-      // Find the index of this assistant message
       const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
       if (messageIndex === -1) return;
 
-      // Find the corresponding user message that came before this assistant message
       let userMessageIndex = messageIndex - 1;
       while (userMessageIndex >= 0) {
         if (chatMessages.value[userMessageIndex].role === "user") {
-          // Set the user message and trigger send without removing previous messages
           inputMessage.value = chatMessages.value[userMessageIndex].content;
           await sendMessage();
           break;
@@ -2245,7 +1959,6 @@ export default defineComponent({
       return date.toLocaleString();
     };
 
-    // Tool call expansion helpers
     const toggleToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedToolCalls.value.has(key)) {
@@ -2259,7 +1972,6 @@ export default defineComponent({
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
     };
 
-    // Log entry expansion helpers
     const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
       const key = `${messageIndex}-${blockIndex}`;
       if (expandedLogEntries.value.has(key)) {
@@ -2359,19 +2071,16 @@ export default defineComponent({
       clearAllConversations,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
-      // Tool confirmation
       pendingConfirmation,
       handleToolConfirm,
       handleToolCancel,
       handleToolAlwaysConfirm,
       handleNavigationAction,
       sendConfirmation,
-      // Session restore
       isSessionOwnerUnavailable,
       appendErrorBlock,
       streamOwnerUnavailable,
       currentSessionId,
-      // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
       processTextBlock,
@@ -2411,11 +2120,9 @@ export default defineComponent({
       toggleLogEntryExpanded,
       isLogEntryExpanded,
       formatLogEntryContent,
-      // AI-generated title
       aiGeneratedTitle,
       displayedTitle,
       isTypingTitle,
-      // Image handling
       pendingImages,
       imageInputRef,
       triggerImageUpload,
@@ -2424,7 +2131,6 @@ export default defineComponent({
       handleDragOver,
       handleDrop,
       handlePaste,
-      // Image preview
       showImagePreview,
       previewImage,
       openImagePreview,
@@ -2438,12 +2144,8 @@ export default defineComponent({
 </script>
 
 <style scoped>
-/* keep(keyframes): @keyframes and the `animation:` that consumes it must live in
-   the same block — the scoped compiler renames both together. */
+/* keep(keyframes): @keyframes and its consuming `animation:` must share a block; the scoped compiler renames both together. */
 
-/* ============================================================
-   keep(keyframes) — each consumer sits next to its @keyframes
-   ============================================================ */
 /* Deliberate copy in O2AIChatToolCallIndicator.vue: the standalone loading box here shares this class. */
 .tool-call-indicator {
   animation: fadeIn 0.3s ease;
@@ -2475,8 +2177,6 @@ export default defineComponent({
   }
 }
 
-/* Scroll-to-bottom button entrance. Rises from below with a slight scale-up, so
-   it is not the same curve as fadeIn/fadeInSlide above (those drop from above). */
 .scroll-to-bottom-btn {
   animation: fadeInUp 0.3s ease;
 }
