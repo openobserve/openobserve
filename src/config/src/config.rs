@@ -2219,6 +2219,12 @@ pub struct Common {
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PROFILING_ENABLED",
+        default = false,
+        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+    )]
+    pub profiling_enabled: bool,
 }
 
 impl Common {
