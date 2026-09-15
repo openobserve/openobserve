@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "organizationStatusSteps.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}

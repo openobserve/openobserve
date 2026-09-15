@@ -1,7 +1,0 @@
-[
-  { "title": "should render Status Steps Used and Total columns in the org list", "action": "new", "verifies": "the meta-org admin list surfaces the two new Status Steps columns with correct headers and numeric, comma-formatted cells" },
-  { "title": "should set the Status Steps allowance from the Status Steps tab", "action": "new", "verifies": "an admin opens the usage-limits dialog, sets a new Status Steps limit, and the row's Status Steps Total cell updates after save" },
-  { "title": "should show its own wording and used-count on the Status Steps tab", "action": "new", "verifies": "the Status Steps tab renders its own title/subtitle/label and the status-steps used-count, distinct from the protocol tab" },
-  { "title": "should reject non-integer and negative Status Steps values", "action": "new", "verifies": "the Status Steps limit input blocks fractional and negative values with a validation error and keeps the dialog open" },
-  { "title": "should expose status-step fields via the admin org-list API", "action": "new", "verifies": "GET /api/_meta/organizations returns status_steps_used and status_steps_limit as numbers per org" }
-]
