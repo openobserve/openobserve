@@ -897,3 +897,46 @@ def test_composite_timeline_returns_child_lanes_plus_a_result_lane(
     # lane deliberately has none, which is how it is told apart from a child.
     assert sorted(lane["slot"] for lane in body["children"]) == [0, 1], body
     assert "slot" not in body["result"], body
+
+
+def test_list_exposes_the_name_resolved_expression_for_composite_rows(
+    client: OpenObserveClient, composite_prereqs: dict[str, Any]
+):
+    """A composite row has no stream or query, so the expression is the only
+    thing on it that says what it evaluates.
+
+    Resolved server-side because the list row carries no children: the UI has
+    nothing to turn `{id}` operands into names with.
+    """
+    child_a, child_b, _ = composite_prereqs["child_ids"]
+    names = {
+        child_a: composite_prereqs["child_payloads"][child_a]["name"],
+        child_b: composite_prereqs["child_payloads"][child_b]["name"],
+    }
+    composite = _tracked_create(
+        client,
+        composite_prereqs,
+        _composite_payload(
+            name=unique_name("cmp_summary"),
+            child_ids=[child_a, child_b],
+            expression=f"{{{child_a}}} && !{{{child_b}}}",
+        ),
+    )
+
+    rows = _list(client)
+    row = next(item for item in rows if item["alert_id"] == composite)
+    summary = row["expression_summary"]
+
+    assert names[child_a] in summary, summary
+    assert names[child_b] in summary, summary
+    assert "AND" in summary and "NOT" in summary, summary
+    # The operand IDs must not survive into the summary — it is a display
+    # string, and a KSUID in it is both unreadable and a disclosure.
+    assert child_a not in summary, summary
+    assert child_b not in summary, summary
+
+    # Only composites carry one — a scheduled alert has a query instead, and
+    # the field must not appear on rows it means nothing for.
+    for item in rows:
+        if item.get("alert_type") != "composite":
+            assert item.get("expression_summary") is None, item

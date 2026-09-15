@@ -155,6 +155,11 @@ pub struct ListAlertsResponseBodyItem {
     /// Count of parent composites currently readable to the caller.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub referenced_by_composite_count: Option<usize>,
+    /// Composite rows only: the trigger expression with child IDs resolved to names.
+    // Omitted when any child is unreadable by the caller, rather than leaking a
+    // name or a KSUID through the summary.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expression_summary: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -492,6 +497,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_firing_is_lower_bound: None,
             child_count: None,
             referenced_by_composite_count: None,
+            expression_summary: None,
         })
     }
 }
@@ -611,6 +617,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         groups_firing_is_lower_bound: None,
         child_count: None,
         referenced_by_composite_count: None,
+        expression_summary: None,
     })
 }
 
@@ -700,6 +707,7 @@ mod tests {
             groups_firing_is_lower_bound: None,
             child_count: None,
             referenced_by_composite_count: None,
+            expression_summary: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
