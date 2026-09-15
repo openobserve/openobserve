@@ -417,6 +417,9 @@ describe("ServicesCatalog", () => {
     };
     mockSearchObj.meta.searchMode = "services-catalog";
     mockSearchObj.meta.serviceColors = {};
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "default" }, { name: "production" }],
+    });
 
     // Default: fetch does nothing (no data, no complete call)
     mockFetchQueryDataWithHttpStream.mockReset();
@@ -1489,7 +1492,6 @@ describe("ServicesCatalog", () => {
   // -----------------------------------------------------------------------
   describe("loadServicesCatalog", () => {
     it("should call fetch with default stream when both selectedStream and localStorage are empty", async () => {
-      // Set both sources to empty so streamFilter cascades to "default"
       localStorage.removeItem("servicesCatalog_streamFilter");
       mockSearchObj.data.stream.selectedStream = {
         label: "",
@@ -1499,8 +1501,7 @@ describe("ServicesCatalog", () => {
       wrapper = mountServicesCatalog();
       await flushPromises();
 
-      // With the cascade "tracesStream || storedStreamFilter || 'default'",
-      // streamFilter becomes "default" when both sources are empty.
+      expect(wrapper.vm.streamFilter).toBe("default");
       expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
     });
 
@@ -1588,6 +1589,24 @@ describe("ServicesCatalog", () => {
         const selector = wrapper.find('[data-test="services-catalog-stream-selector"]');
         expect(selector.exists()).toBe(true);
         expect(wrapper.vm.availableStreams).toEqual([]);
+        expect(wrapper.vm.streamFilter).toBe("");
+        expect(mockFetchQueryDataWithHttpStream).not.toHaveBeenCalled();
+      });
+
+      it("should select the stream with the latest data when default is unavailable", async () => {
+        mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+        mockGetStreams.mockResolvedValueOnce({
+          list: [
+            { name: "older", stats: { doc_time_max: 10 } },
+            { name: "newer", stats: { doc_time_max: 20 } },
+          ],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("newer");
+        expect(mockFetchQueryDataWithHttpStream).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -1772,6 +1791,19 @@ describe("ServicesCatalog", () => {
         await flushPromises();
 
         expect(wrapper.vm.streamFilter).toBe("selected-stream");
+      });
+
+      it("should ignore a stale localStorage value", async () => {
+        localStorage.setItem("servicesCatalog_streamFilter", "missing");
+        mockSearchObj.data.stream.selectedStream = { label: "", value: "" };
+        mockGetStreams.mockResolvedValueOnce({
+          list: [{ name: "default" }, { name: "staging" }],
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.streamFilter).toBe("default");
       });
     });
 
