@@ -16,6 +16,7 @@ Reference for the O2 display and content primitives under `@/lib/core/*`. Each e
 - [OEmptyState](#oemptystate)
 - [OIcon](#oicon)
 - [OSeparator](#oseparator)
+- [OSettingRow](#osettingrow)
 - [OShortcut](#oshortcut)
 - [OText](#otext)
 - [OVirtualScroll](#ovirtualscroll)
@@ -345,6 +346,32 @@ Note: delete/bin icon names render in the destructive (red) colour by default; o
 <OSeparator vertical />
 ```
 **Family:** Commonly used inside `OCard`. Standalone.
+
+---
+
+### OSettingRow
+**Import:** `@/lib/core/SettingRow/OSettingRow.vue`
+**Use when:** One labelled setting inside a settings card — name and one-line description on the left, the control on the right, hairline rule between rows (the last row drops its own).
+**Don't use for:** Form fields with a label above the control — use `OFormField`/`OFormInput` directly.
+**Key props:**
+- `label` (`I18nText`, required — the setting's name)
+- `description` (`I18nText` — one line saying what the setting does or what a special value means)
+- `disabled` (boolean, default `false` — renders the row muted only; the control owns its own disabled state)
+- `dataTest` (string)
+
+**Slots:** `default` — the control on the right
+**Emits:** none
+**Example:**
+```vue
+<OSettingRow
+  :label="t('passwordPolicy.minLength')"
+  :description="t('passwordPolicy.minLengthDesc')"
+  data-test="settings-password-policy-min-length"
+>
+  <OFormInput name="min_length" type="number" :min="1" class="w-24" />
+</OSettingRow>
+```
+**Family:** Pair with `OFormSection`, which supplies the card.
 
 ---
 
