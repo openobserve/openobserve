@@ -58,13 +58,15 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use transform::TRANSFORM_FAILED;
 
-use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    LogRecord, O2IngestLogData, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record,
+};
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
     service::get_formatted_stream_name,
 };
 
-type LogDataByStream = HashMap<String, (Vec<(i64, json::Map<String, json::Value>)>, Option<usize>)>;
+type LogDataByStream = HashMap<String, O2IngestLogData>;
 
 struct FinalizeRecordContext<'a> {
     stream_name: &'a str,
@@ -188,6 +190,7 @@ pub async fn ingest(
     let mut stream_params = vec![stream_param];
     let mut pipeline_inputs = Vec::with_capacity(stream_params.len());
     let mut original_options = Vec::with_capacity(stream_params.len());
+    let mut input_sizes = Vec::with_capacity(stream_params.len());
     // End pipeline params construction
 
     if !executable_pipelines.is_empty() {
@@ -316,15 +319,18 @@ pub async fn ingest(
 
         // we report stream size before pushing data to pipeline
         // this is to capture the actual size of stream at the time of ingestion
+        let item_size = estimate_json_bytes(&item);
         let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-        *size += estimate_json_bytes(&item);
+        *size += item_size;
 
         if !executable_pipelines.is_empty() {
             // buffer the records, timestamp, and originals for pipeline batch processing
             pipeline_inputs.push(item);
             original_options.push(original_data);
+            input_sizes.push(item_size);
         } else if !finalize_and_buffer_record(
             item,
+            item_size,
             original_data,
             &mut FinalizeRecordContext {
                 stream_name: &stream_name,
@@ -521,7 +527,11 @@ pub async fn ingest(
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_insert_with(|| (Vec::new(), None));
-                            ts_data.push((timestamp, local_val));
+                            ts_data.push(LogRecord {
+                                timestamp,
+                                size: original_size,
+                                value: local_val,
+                            });
                             *fn_num = need_usage_report.then_some(function_no);
 
                             // Since we report the size for the original stream before the
@@ -567,6 +577,7 @@ pub async fn ingest(
             for (idx, item) in pipeline_inputs.iter().enumerate() {
                 let _ = finalize_and_buffer_record(
                     item.clone(),
+                    input_sizes[idx],
                     original_options[idx].clone(),
                     &mut FinalizeRecordContext {
                         stream_name: &stream_name,
@@ -740,6 +751,7 @@ fn count_timestamp_rejection(status: &mut ingestion_common::RecordStatus, e: &an
 /// (the caller should `continue`).
 fn finalize_and_buffer_record(
     item: json::Value,
+    size: usize,
     original_data: Option<String>,
     ctx: &mut FinalizeRecordContext<'_>,
 ) -> bool {
@@ -828,18 +840,20 @@ fn finalize_and_buffer_record(
             json::Value::String(values.join(" ")),
         );
     }
+    let record = LogRecord {
+        timestamp,
+        size,
+        value: local_val,
+    };
     match ctx.json_data_by_stream.get_mut(ctx.stream_name) {
         Some((ts_data, fn_num)) => {
-            ts_data.push((timestamp, local_val));
+            ts_data.push(record);
             *fn_num = ctx.need_usage_report.then_some(0);
         }
         None => {
             ctx.json_data_by_stream.insert(
                 ctx.stream_name.to_string(),
-                (
-                    vec![(timestamp, local_val)],
-                    ctx.need_usage_report.then_some(0),
-                ),
+                (vec![record], ctx.need_usage_report.then_some(0)),
             );
         }
     };
