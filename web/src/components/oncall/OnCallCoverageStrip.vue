@@ -24,6 +24,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex flex-col gap-2" data-test="oncall-coverage-strip">
+    <!-- The single most-asked question, answered without a hover: this used
+         to be a tooltip-only fact, so checking it meant guessing which band
+         to point at. -->
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm" data-test="oncall-coverage-now">
+      <span class="text-text-secondary text-xs">{{ t("oncall.onCallNow") }}</span>
+      <template v-if="current.primary">
+        <span data-test="oncall-coverage-now-primary">{{
+          t("oncall.coveragePrimaryOnly", { primary: raw(current.primary) })
+        }}</span>
+        <span
+          v-if="current.secondary"
+          class="text-text-secondary"
+          data-test="oncall-coverage-now-secondary"
+        >
+          {{ t("oncall.coverageSecondaryOnly", { secondary: raw(current.secondary) }) }}
+        </span>
+      </template>
+      <span v-else class="text-status-error-text" data-test="oncall-coverage-now-nobody">
+        {{ t("oncall.coverNobody") }}
+      </span>
+    </div>
+
     <!-- The sentence the picture cannot say on its own. A strip answers "is
          there a hole" at a glance; the one thing a reader actually acts on is
          WHEN, and a fortnight of green looks identical whether the hole is
@@ -255,6 +277,12 @@ const holderRuns = computed<HolderRun[]>(() => {
   return out;
 });
 
+// Same arithmetic that colors the first band, so this line can never disagree with the picture below it.
+const current = computed<Sample>(() => sampleAt(start.value));
+
+/** Handover rows shown before a tooltip defers to the on-call-now line above. */
+const TOOLTIP_MAX_ROWS = 2;
+
 /** One row of a band's tooltip. */
 interface TooltipSegment {
   key: string;
@@ -266,19 +294,18 @@ interface TooltipSegment {
 }
 
 /// A gap already says "Nobody" on the band itself; a tooltip would repeat it.
-/// Covered/partial bands get one row per handover inside them, so a run that
-/// merges several days of "somebody's on call" still names the right somebody
-/// for the stretch under the pointer. Primary and secondary are separate
-/// fields, not one joined sentence, so the template can put them on their own
-/// lines and rule off one handover from the next.
+/// Covered/partial bands get one row per handover inside them, capped at
+/// TOOLTIP_MAX_ROWS — a run with many handovers dumped every one of them here
+/// with no way to scan it, and "who's on now" is already answered above.
 function tooltipFor(bandKey: string): TooltipSegment[] {
   const run = runs.value.find((r) => `${r.from}` === bandKey);
   if (!run || run.cover === "none") return [];
 
   const segments = holderRuns.value.filter((h) => h.from < run.to && h.to > run.from);
-  const showRange = segments.length > 1;
+  const shown = segments.slice(0, TOOLTIP_MAX_ROWS);
+  const showRange = shown.length > 1;
 
-  return segments.map((segment) => ({
+  const rows: TooltipSegment[] = shown.map((segment) => ({
     key: `${segment.from}`,
     range: showRange
       ? raw(
@@ -290,6 +317,20 @@ function tooltipFor(bandKey: string): TooltipSegment[] {
       ? t("oncall.coverageSecondaryOnly", { secondary: raw(segment.secondary) })
       : null,
   }));
+
+  // Deferred to "Open schedule" rather than listed: exact times for every
+  // remaining handover is the full schedule's job, not a hover's.
+  const hidden = segments.length - shown.length;
+  if (hidden > 0) {
+    rows.push({
+      key: "more",
+      range: null,
+      primary: t("oncall.coverageMoreChanges", { count: hidden }, hidden),
+      secondary: null,
+    });
+  }
+
+  return rows;
 }
 
 const tracks = computed<ScheduleTrack[]>(() => {

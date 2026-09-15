@@ -18617,6 +18617,7 @@
     "coverageGapNowOpen": "Nobody is on call, and nobody is scheduled in the next {days} days",
     "coveragePrimaryOnly": "Primary: {primary}",
     "coverageSecondaryOnly": "Secondary: {secondary}",
+    "coverageMoreChanges": "+{count} more change | +{count} more changes",
     "reachTeamTitle": "Reach the team",
     "reachTeamHint": "during an incident",
     "contactSendTest": "Send test page",
