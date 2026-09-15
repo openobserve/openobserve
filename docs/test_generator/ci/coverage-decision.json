@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/profilesMenu.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/status-pages-enterprise-gating.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the Profiles left-rail menu gate. The two closest specs (status-pages-enterprise-gating.spec.js, edition-features.spec.js) demonstrate the exact pattern to reuse — detect the gate's source value from the live /api/{org}/config response and test.skip() when the environment can't reach the alternate state — but they test different features (Status Pages dropdown gating, Edition upsell dialog). The run-context names a dedicated spec path (tests/ui-testing/playwright-tests/GeneralTests/profilesMenu.spec.js) under GeneralTests. This is a new spec and must be registered in ci_matrix.json's GeneralTests run_files (it is not there today; neither status-pages-enterprise-gating nor any profiles spec is present)."
+}

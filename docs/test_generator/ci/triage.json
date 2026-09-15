@@ -1,0 +1,25 @@
+{
+  "feature_slug": "profiles-menu-gate",
+  "feature_title": "Profiles Menu Feature Flag",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "profilesMenu.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/profilesMenu.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All three changed paths are open-source locations: src/api/management/src/request/status/mod.rs, src/config/src/config.rs, and web/src/layouts/MainLayout.vue. None live under enterprise/, o2_enterprise/, or any enterprise-owned directory. The only 'enterprise' markers in the diff are pre-existing #[cfg(feature = \"enterprise\")] fields (last_usage_report_ts) that this change does not touch, and the newly added profiling_enabled field is not enterprise-gated. No enterprise keywords (SSO/SAML/RBAC/SDR/cipher/logo-management) appear. Classified OSS.",
+    "skip": "Not skipped. No tests-added label or skip request was provided (trigger_comment.txt and feature_hint.txt are both empty). The change is user-facing: MainLayout.vue now shows or hides the Profiles nav menu item based on the ZO_FEATURE_PROFILING_ENABLED flag, so it is not a docs-only or CI-only change.",
+    "e2e": "E2E is warranted. The diff alters a user-facing navigation flow: the Profiles menu entry was previously always present in the left nav and is now conditionally inserted after Traces only when profiling_enabled is true, and removed otherwise. A Playwright spec should verify the menu item is hidden with the default flag off and appears when the flag is enabled.",
+    "area": "The change lives in web/src/layouts/MainLayout.vue, the shared application shell/navigation, rather than any single data-type area (Logs/Traces/etc.). There is no Profiles test folder, and the behavior under test is a config-flag-gated nav menu item, which is the same category as existing GeneralTests specs such as theme-management.spec.js and ingestion-config.spec.js, so GeneralTests is the best fit.",
+    "group": "GeneralTests is the matrix shard whose actual_folder is GeneralTests and whose run_files already contain general UI/feature-flag specs (theme-management.spec.js, logoManagement.spec.js, ingestion-config.spec.js). A profiles-menu-gate spec belongs in that shard alongside them.",
+    "existing_tests": "No E2E specs in the diff. The three changed files are two Rust backend files (src/api/management/src/request/status/mod.rs and src/config/src/config.rs) and one Vue layout file (web/src/layouts/MainLayout.vue). None are under tests/ui-testing/playwright-tests/, so there is no dev-authored Playwright coverage to enhance or extend."
+  }
+}

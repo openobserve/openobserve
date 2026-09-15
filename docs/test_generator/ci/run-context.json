@@ -1,0 +1,17 @@
+{
+  "feature_slug": "profiles-menu-gate",
+  "feature_title": "Profiles Menu Feature Flag",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "profilesMenu.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/profilesMenu.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

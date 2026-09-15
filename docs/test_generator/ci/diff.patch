@@ -1,0 +1,111 @@
+===== COMPLETE LIST OF CHANGED FILES (3 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/management/src/request/status/mod.rs
+src/config/src/config.rs
+web/src/layouts/MainLayout.vue
+===== END CHANGED FILES =====
+
+diff --git a/src/api/management/src/request/status/mod.rs b/src/api/management/src/request/status/mod.rs
+index 3f23668b275..bd89ed82ee2 100644
+--- a/src/api/management/src/request/status/mod.rs
++++ b/src/api/management/src/request/status/mod.rs
+@@ -238,6 +238,7 @@ struct ConfigResponse<'a> {
+     show_fts_field_values: bool,
+     search_inspector_enabled: bool,
+     auto_query_enabled: bool,
++    profiling_enabled: bool,
+     #[cfg(feature = "enterprise")]
+     last_usage_report_ts: i64,
+     #[cfg(feature = "enterprise")]
+@@ -608,6 +609,7 @@ pub async fn zo_config(
+         show_fts_field_values: cfg.common.show_fts_field_values,
+         search_inspector_enabled,
+         auto_query_enabled: cfg.common.auto_query_enabled,
++        profiling_enabled: cfg.common.profiling_enabled,
+         #[cfg(feature = "enterprise")]
+         last_usage_report_ts,
+         #[cfg(feature = "enterprise")]
+diff --git a/src/config/src/config.rs b/src/config/src/config.rs
+index 0ed2d4a99dd..38d8489a7bd 100644
+--- a/src/config/src/config.rs
++++ b/src/config/src/config.rs
+@@ -2216,6 +2216,12 @@ pub struct Common {
+         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
+     )]
+     pub auto_query_enabled: bool,
++    #[env_config(
++        name = "ZO_FEATURE_PROFILING_ENABLED",
++        default = false,
++        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
++    )]
++    pub profiling_enabled: bool,
+ }
+ 
+ impl Common {
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 9f9f8313ba0..ae43154011c 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -455,6 +455,11 @@ export default defineComponent({
+       return Boolean(store.state.zoConfig?.synthetics_enabled);
+     });
+ 
++    // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
++    const isProfilingEnabled = computed(() => {
++      return Boolean(store.state.zoConfig?.profiling_enabled);
++    });
++
+     // Real entries carry `identifier`; the placeholder literal only sets label/value.
+     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
+       { label: Number, value: String },
+@@ -492,12 +497,6 @@ export default defineComponent({
+         link: "/traces",
+         name: "traces",
+       },
+-      {
+-        title: t("menu.profiles"),
+-        icon: "account-tree",
+-        link: "/profiles",
+-        name: "profiles",
+-      },
+       {
+         title: raw("RUM"),
+         icon: "devices",
+@@ -828,6 +827,28 @@ export default defineComponent({
+       immediate: false,
+     });
+ 
++    const updateProfilesMenu = () => {
++      const existingIndex = linksList.value.findIndex((l: any) => l.name === "profiles");
++
++      if (!isProfilingEnabled.value) {
++        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
++        return;
++      }
++      if (existingIndex !== -1) return;
++
++      const tracesIndex = linksList.value.findIndex((l: any) => l.name === "traces");
++      const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
++
++      linksList.value.splice(insertAt, 0, {
++        title: t("menu.profiles"),
++        icon: "account-tree",
++        link: "/profiles",
++        name: "profiles",
++      });
++    };
++
++    watch(isProfilingEnabled, () => updateProfilesMenu(), { immediate: false });
++
+     // On-call's Pages/Teams/Routing entries live entirely inside the
+     // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
+     // A separate top-level rail item here would be a second gate to keep in
+@@ -836,6 +857,7 @@ export default defineComponent({
+       updateIncidentsMenu();
+       updateWorkflowsMenu();
+       updateSyntheticMenu();
++      updateProfilesMenu();
+       updateAIObservabilityMenu();
+ 
+       const disableMenus = new Set(

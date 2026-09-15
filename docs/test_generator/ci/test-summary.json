@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Profiles rail tile is hidden when profiling is disabled",
+    "action": "new",
+    "verifies": "the Profiles rail tile is absent from the nav rail when zoConfig.profiling_enabled is false"
+  },
+  {
+    "title": "Profiles page is reachable by direct URL even when the menu is hidden",
+    "action": "new",
+    "verifies": "the /profiles route is not flag-gated and mounts via deep link (stream picker or no-stream empty state)"
+  },
+  {
+    "title": "Profiles rail tile appears after the Traces group when profiling is enabled",
+    "action": "new",
+    "verifies": "with profiling_enabled true the tile is visible, ordered after the Traces group, and navigates to /profiles"
+  }
+]
