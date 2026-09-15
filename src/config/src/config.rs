@@ -75,8 +75,11 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // shipped anywhere; `init_db` compares for equality and never orders these,
 // so no path can tell an intermediate value ever existed).
 // 80: add splunk_token to org_ingestion_tokens.
-// 81: add profiles_streams to service_streams.
-pub const DB_SCHEMA_VERSION: u64 = 81;
+// 81: anomaly_detection_config retries reset, last_failed_at,
+// last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
+// one bump for the whole anomaly phase, same rationale as 79.
+// 82: add profiles_streams to service_streams.
+pub const DB_SCHEMA_VERSION: u64 = 82;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
