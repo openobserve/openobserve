@@ -14124,8 +14124,7 @@
         "capTitle": "This test executes {total} steps — the limit is {limit}.",
         "capOwn": "{count} of its own",
         "capChild": "{count} from \"{name}\"",
-        "capRemedy": "Remove a subtest, or shorten this test's own steps.",
-        "executedBadge": "{count} executed"
+        "capRemedy": "Remove a subtest, or shorten this test's own steps."
       }
     },
     "labels": {
