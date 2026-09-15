@@ -248,19 +248,20 @@ mod tests {
         failed: u32,
         error: Option<&str>,
     ) -> ingestion_common::IngestionResponse {
-        ingestion_common::IngestionResponse {
+        let mut resp = ingestion_common::IngestionResponse::new(
             code,
-            status: vec![StreamStatus {
+            vec![StreamStatus {
                 name: "m".to_string(),
                 status: RecordStatus {
                     successful: 1,
                     failed,
-                    error: String::new(),
+                    ..Default::default()
                 },
                 items: vec![],
             }],
-            error: error.map(str::to_string),
-        }
+        );
+        resp.error = error.map(str::to_string);
+        resp
     }
 
     #[test]
