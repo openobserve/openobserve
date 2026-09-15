@@ -17960,6 +17960,8 @@
     "addTeam": "Add team",
     "newTeam": "New team",
     "editTeam": "Edit team",
+    "defaultTeamBadge": "Default",
+    "setDefaultTeam": "Set as default team",
     "manageTeamCta": "Manage members, schedule & escalation",
     "teamName": "Name",
     "teamNameHint": "How this team is referred to on a page",

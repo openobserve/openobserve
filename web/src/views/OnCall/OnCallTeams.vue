@@ -74,6 +74,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
+      <!-- The routing screen is the only place this fact lived, so a reader
+           had to leave the list to learn who catches everything it can't
+           place. -->
+      <template #cell-name="{ row }">
+        <span class="flex items-center gap-2">
+          <span>{{ row.name }}</span>
+          <OTag
+            v-if="row.id === defaultTeamId"
+            variant="primary-soft"
+            size="sm"
+            :data-test="`oncall-team-default-badge-${row.id}`"
+          >
+            {{ t("oncall.defaultTeamBadge") }}
+          </OTag>
+        </span>
+      </template>
+
       <!-- The question this page is really asked: if something breaks now, who
            wakes up? Two columns rather than one stacked cell — a primary and a
            secondary in one box read as one long address, and neither could be
@@ -138,6 +155,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click.stop="openEdit(row)"
         >
           <OTooltip side="bottom" :content="t('oncall.editTeam')" />
+        </OButton>
+        <OButton
+          v-if="canConfigure && row.id !== defaultTeamId"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="star-outline"
+          :loading="settingDefaultTeamId === row.id"
+          :aria-label="t('oncall.setDefaultTeam')"
+          :data-test="`oncall-team-set-default-${row.id}`"
+          @click.stop="setDefaultTeam(row)"
+        >
+          <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
         </OButton>
         <OButton
           v-if="canConfigure"
@@ -221,7 +250,9 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -233,6 +264,12 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
+const { confirm } = useConfirmDialog();
+const {
+  config: routingConfig,
+  load: loadRoutingConfig,
+  refresh: refreshRoutingConfig,
+} = useOnCallRoutingConfig();
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
@@ -246,8 +283,11 @@ const teamToDelete = ref<OnCallTeam | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallPosition[]>>({});
+// Which row's default-team save is in flight, for the same reason.
+const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
 
 /// The first rotation, and everything else.
 ///
@@ -423,6 +463,50 @@ async function deleteTeam() {
   }
 }
 
+// Mirrors the routing screen's own check: nominating a team is the one
+// moment "nobody is on call" is still avoidable, so an unstaffed pick warns
+// before it starts silently swallowing unrouted signals.
+async function isTeamUnstaffed(teamId: string): Promise<boolean> {
+  try {
+    const { data } = await oncallService.coverageGaps({ org_identifier: orgId.value, limit: 200 });
+    return data.teams.some((gap) => gap.id === teamId);
+  } catch {
+    return false;
+  }
+}
+
+async function setDefaultTeam(team: OnCallTeam) {
+  if (await isTeamUnstaffed(team.id)) {
+    const proceed = await confirm({
+      title: t("oncall.defaultTeamUnstaffedTitle"),
+      message: t("oncall.defaultTeamUnstaffedMessage", { team: raw(team.name) }),
+      confirmLabel: t("oncall.defaultTeamUnstaffedConfirm"),
+    });
+    if (!proceed) return;
+  }
+
+  settingDefaultTeamId.value = team.id;
+  try {
+    await oncallService.setRoutingConfig({
+      org_identifier: orgId.value,
+      data: { default_team_id: team.id },
+    });
+    await refreshRoutingConfig(orgId.value);
+    toast({ variant: "success", message: t("oncall.defaultTeamSaved") });
+  } catch (err: any) {
+    noteConfigurationDenied(err);
+    toast({
+      variant: "error",
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.defaultTeamSaveFailed"),
+    });
+  } finally {
+    settingDefaultTeamId.value = null;
+  }
+}
+
 function openCreate() {
   editingTeam.value = null;
   formOpen.value = true;
@@ -477,6 +561,7 @@ watch(() => route.query.action, syncFromRoute);
 
 onMounted(() => {
   fetchTeams();
+  loadRoutingConfig(orgId.value);
   syncFromRoute();
 });
 </script>
