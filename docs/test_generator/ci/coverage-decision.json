@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/organizationStatusSteps.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/org.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/logoManagement.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing Playwright spec touches the settings-area Organization Management page (web/src/components/settings/OrganizationManagement.vue, route /web/settings/organization_management). org.spec.js exercises a different component — the IAM Organizations CRUD list (ListOrganizations.vue) — and logoManagement.spec.js only visits settings/general. The new Status Steps tab + two Status Steps columns live in the usage-limits dialog of OrganizationManagement.vue, which has no page object and no spec. A new spec (and a new page object) is required; the file must be added to the GeneralTests run_files in ci_matrix.json."
+}

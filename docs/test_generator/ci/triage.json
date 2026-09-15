@@ -1,0 +1,33 @@
+{
+  "feature_slug": "synthetics-status-steps-quota",
+  "feature_title": "Synthetics Status Steps Quota (Organization Management)",
+  "area": "GeneralTests",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "organizationStatusSteps.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/organizationStatusSteps.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/OrganizationManagement.vue",
+    "web/src/components/settings/OrganizationManagement.spec.ts",
+    "src/api/management/src/request/organization/org.rs",
+    "src/common/src/meta/organization.rs",
+    "src/core/src/trial_quota.rs",
+    "src/infra/src/table/trial_quota_usage.rs",
+    "src/infra/src/table/status_pages.rs",
+    "src/synthetics/src/pool.rs",
+    "src/synthetics/src/scheduler.rs"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The complete file list spans both codebases: OSS paths (`src/`, `web/src/`, `scripts/`) plus enterprise-owned paths under `o2_enterprise/src/enterprise/` (cloud table migration, `common/config.rs`, `metering/common.rs`, `metering/synthetics_grants.rs`). The feature is implemented in the OSS core/trial-quota and frontend, with the enterprise layer contributing the cloud-only DB migration, the `synthetics_free_status_step_pool` config knob, and the metering/grant accounting, so edition is `both`.",
+    "skip": "Not skipped. The diff is not docs-only/CI-only and has a real user-facing change (OrganizationManagement.vue). Neither the trigger comment nor any `tests-added` label is present, so there is no explicit opt-out.",
+    "e2e": "E2E is warranted. The change adds a user-facing UI flow in `web/src/components/settings/OrganizationManagement.vue`: two new columns (`status_steps_used`, `status_steps_total`) and a new `synthetics_status_protocol` tab in the per-org usage-limits dialog, with its own input label, title and subtitle wording. An admin can now view and set the new monthly status-steps grant, which is an interaction worth verifying.",
+    "area": "The bulk of the UI change is in the settings-area Organization Management page. There is no dedicated Settings/Organizations folder under `tests/ui-testing/playwright-tests/`, and sibling admin/settings specs (e.g. `logoManagement.spec.js`, `languageTranslation.spec.js`) live in GeneralTests, so GeneralTests is the closest fit.",
+    "group": "`GeneralTests` is the matrix shard (ci-matrix) whose `run_files` already carries the admin/settings-adjacent specs this new organization-management spec should join.",
+    "existing_tests": "No E2E specs in the diff. The only test file changed is `web/src/components/settings/OrganizationManagement.spec.ts`, which is a Vitest unit test (not a Playwright spec under `tests/ui-testing/playwright-tests/`), so there is no existing Playwright E2E coverage to enhance."
+  }
+}
