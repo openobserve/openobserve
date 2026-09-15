@@ -17777,6 +17777,8 @@
     "notifiedAge": "Notified · Age",
     "channelUndeliverable": "{channel} has no provider behind it — nothing is sent",
     "assignTeamShort": "Assign a team",
+    "assignTeamFailed": "Could not assign the team",
+    "noTeamsToAssign": "No teams to assign yet",
     "contextTitle": "Context worth having before you ack",
     "contextFired": "Fired",
     "contextFiredCount": "{count}× in {days} days",

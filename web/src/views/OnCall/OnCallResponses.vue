@@ -593,15 +593,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
         <span class="flex items-center justify-between" :style="{ width: actionsColumnWidthVar }">
-          <OButton
-            v-if="!row.latest.team_id"
-            variant="outline"
-            size="xs"
-            :data-test="`oncall-row-assign-${row.rowKey}`"
-            @click.stop="goTo('onCallRouting')"
-          >
-            {{ t("oncall.assignTeamShort") }}
-          </OButton>
+          <ODropdown v-if="!row.latest.team_id">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="xs"
+                :loading="busyId === row.rowKey"
+                :data-test="`oncall-row-assign-${row.rowKey}`"
+                @click.stop
+              >
+                {{ t("oncall.assignTeamShort") }}
+              </OButton>
+            </template>
+
+            <ODropdownItem
+              v-for="team in teams"
+              :key="team.id"
+              :data-test="`oncall-row-assign-${row.rowKey}-${team.id}`"
+              @select="assignTeamToRow(row, team.id, team.name)"
+            >
+              {{ raw(team.name) }}
+            </ODropdownItem>
+            <ODropdownItem v-if="!teams.length" disabled data-test="oncall-row-assign-no-teams">
+              {{ t("oncall.noTeamsToAssign") }}
+            </ODropdownItem>
+          </ODropdown>
           <template v-else>
             <!-- Primary is `primaryAction(row)`: claiming is loud because it is
                  the one somebody is woken for; closing and reading are ordinary
@@ -1421,6 +1437,35 @@ async function resolveRow(row: PageRow) {
   }
 }
 
+/// Handoff, not a dedicated "assign" endpoint: it sets team_id unconditionally
+/// whether the row currently has none or another team, so it doubles as first
+/// assignment. Applied to every unresolved firing in the group, same as resolve.
+async function assignTeamToRow(row: PageRow, teamId: string, teamName: string) {
+  busyId.value = row.rowKey;
+  try {
+    const results = await Promise.allSettled(
+      row.firings
+        .filter((r) => r.state !== "resolved")
+        .map((r) =>
+          oncallService.handoffResponse({
+            org_identifier: orgId.value,
+            response_id: r.id,
+            to_team_id: teamId,
+          }),
+        ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) {
+      toast({ variant: "error", message: t("oncall.assignTeamFailed") });
+    } else {
+      toast({ variant: "success", message: t("oncall.assignTeamDone", { team: raw(teamName) }) });
+    }
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
 /// The records the selection stands for. `pick` narrows to the ones the action
 /// can legally touch, so a bulk action never fires a request that must fail.
 function selectedRecords(pick: (row: PageRow) => OnCallResponse[]): string[] {
@@ -1814,10 +1859,6 @@ watch(expandedIds, (ids) => {
   if (row) void fetchExpandedEvents(row.latest.id);
   else expandedEvents.value = [];
 });
-
-function goTo(name: string) {
-  router.push({ name, query: { org_identifier: orgId.value } });
-}
 
 /// The setup checklist's first step, which is only ever shown to an org with no
 /// team at all. It lands on the teams screen with the form already open —
