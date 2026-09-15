@@ -35,90 +35,66 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @click:secondary="close"
     @update:open="(open: boolean) => !open && close()"
   >
-    <div
-      data-test="password-reset-dialog-banner"
-      class="bg-banner-warning-bg border-banner-warning-border rounded-default mb-4 flex items-start gap-2 border p-3"
-    >
-      <OIcon name="warning" size="sm" class="text-banner-warning-text mt-0.5 shrink-0" />
-      <span class="text-banner-warning-text text-sm">{{ bannerMessage }}</span>
-    </div>
+    <div class="flex flex-col gap-4">
+      <OBanner
+        variant="warning"
+        icon="warning"
+        :content="bannerMessage"
+        data-test="password-reset-dialog-banner"
+      />
 
-    <OForm id="update-password-form" :form="form" class="flex flex-col gap-5">
-      <OFormInput
-        data-test="password-reset-dialog-current-password"
-        name="old_password"
-        :type="isOldPwdHidden ? 'password' : 'text'"
-        :label="t('passwordReset.currentPassword')"
-        required
-        autocomplete="current-password"
-      >
-        <template #icon-right>
-          <OIcon
-            :name="isOldPwdHidden ? 'visibility-off' : 'visibility'"
-            size="sm"
-            class="cursor-pointer"
-            @click="isOldPwdHidden = !isOldPwdHidden"
-          />
-        </template>
-      </OFormInput>
-
-      <div>
+      <OForm id="update-password-form" :form="form" class="flex flex-col gap-5">
         <OFormInput
-          data-test="password-reset-dialog-new-password"
-          name="new_password"
-          :type="isNewPwdHidden ? 'password' : 'text'"
-          :label="t('passwordReset.newPassword')"
+          data-test="password-reset-dialog-current-password"
+          name="old_password"
+          type="password"
+          revealable
+          :label="t('passwordReset.currentPassword')"
+          required
+          autocomplete="current-password"
+        />
+
+        <div>
+          <OFormInput
+            data-test="password-reset-dialog-new-password"
+            name="new_password"
+            type="password"
+            revealable
+            :label="t('passwordReset.newPassword')"
+            required
+            autocomplete="new-password"
+          />
+
+          <PasswordRequirementList
+            :requirements="requirements"
+            :password="newPassword"
+            show-strength
+            data-test="password-reset-dialog-requirements"
+          />
+        </div>
+
+        <OFormInput
+          data-test="password-reset-dialog-confirm-password"
+          name="confirm_password"
+          type="password"
+          revealable
+          :label="t('passwordReset.confirmPassword')"
           required
           autocomplete="new-password"
-          @update:model-value="onNewPasswordInput"
-        >
-          <template #icon-right>
-            <OIcon
-              :name="isNewPwdHidden ? 'visibility-off' : 'visibility'"
-              size="sm"
-              class="cursor-pointer"
-              @click="isNewPwdHidden = !isNewPwdHidden"
-            />
-          </template>
-        </OFormInput>
-
-        <PasswordRequirementList
-          :requirements="requirements"
-          :password="newPassword"
-          show-strength
-          data-test="password-reset-dialog-requirements"
         />
-      </div>
-
-      <OFormInput
-        data-test="password-reset-dialog-confirm-password"
-        name="confirm_password"
-        :type="isConfirmPwdHidden ? 'password' : 'text'"
-        :label="t('passwordReset.confirmPassword')"
-        required
-        autocomplete="new-password"
-      >
-        <template #icon-right>
-          <OIcon
-            :name="isConfirmPwdHidden ? 'visibility-off' : 'visibility'"
-            size="sm"
-            class="cursor-pointer"
-            @click="isConfirmPwdHidden = !isConfirmPwdHidden"
-          />
-        </template>
-      </OFormInput>
-    </OForm>
+      </OForm>
+    </div>
   </ODialog>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import { usePasswordComplexity } from "@/composables/usePasswordComplexity";
 import { remediationOrg, usePasswordReset } from "@/composables/usePasswordReset";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { setServerFieldErrors, useOForm } from "@/lib/forms/Form/useOForm";
@@ -142,13 +118,6 @@ const router = useRouter();
 
 const { isOpen, reason, dismissible, close } = usePasswordReset();
 const { complexity, requirements, load } = usePasswordComplexity();
-
-const isOldPwdHidden = ref(true);
-const isNewPwdHidden = ref(true);
-const isConfirmPwdHidden = ref(true);
-// Mirrored out of the form purely to drive the live checklist and strength bar; the form field
-// itself stays the single source of truth for the value that gets submitted.
-const newPassword = ref("");
 
 const userEmail = computed(() => store.state.userInfo?.email ?? "");
 
@@ -174,18 +143,15 @@ const form = useOForm<UpdatePasswordForm>({
   onSubmit: (values) => submit(values),
 });
 
-// A server error is not re-validated on change, so it would block every later submit unless
-// cleared once the user starts over.
-const onNewPasswordInput = (value: unknown) => {
-  newPassword.value = String(value ?? "");
-  setServerFieldErrors(form, {});
-};
+const newPassword = form.useStore((s) => s.values.new_password);
+
+// A server error is not re-validated on change, so it would block every later submit unless cleared.
+watch(newPassword, () => setServerFieldErrors(form, {}));
 
 watch(
   isOpen,
   (open) => {
     if (!open) return;
-    newPassword.value = "";
     form.reset(updatePasswordDefaults());
     // A failed fetch is not fatal: the form still submits and the server still validates.
     load();
