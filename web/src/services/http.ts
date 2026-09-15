@@ -20,13 +20,7 @@ import config from "../aws-exports";
 import { useLocalUserInfo, useLocalCurrentUser } from "@/utils/zincutils";
 import { addUnauthorizedError } from "@/composables/useUnauthorizedErrorGrouper";
 import { usePasswordReset } from "@/composables/usePasswordReset";
-
-const {
-  open: openPasswordReset,
-  promptRestricted,
-  isPasswordResetError,
-  isWriteRestrictedError,
-} = usePasswordReset();
+import { isPasswordResetError, isWriteRestrictedError } from "@/utils/passwordResetErrors";
 
 // Shared refresh state — ensures only one dex_refresh request is in-flight
 // at a time across all axios instances and streaming fetch requests. All
@@ -115,18 +109,15 @@ const http = ({ headers } = {} as any) => {
       return response;
     },
     function (error) {
-      // Ahead of the status switch: a reset-required 403 is a policy state, not an authorization
-      // failure, so it must not reach the unauthorized-error grouper below. Swallowed rather than
-      // re-rejected because a page firing several requests would otherwise stack one error toast
-      // per rejection behind a dialog the user cannot dismiss.
+      // Ahead of the status switch: a reset-required 403 is a policy state, not an authorization failure.
       if (isPasswordResetError(error)) {
-        openPasswordReset(error.response.data.reason);
+        usePasswordReset().open(error.response.data.reason);
+        // A blocked page fires many requests behind an undismissable dialog; one toast per rejection would stack.
         return new Promise(() => {});
       }
-      // restrict_writes refuses only this write: explain, then let the action report its own
-      // failure — the session is usable and nothing here may leave a Save spinner hanging.
+      // restrict_writes refuses only this write, so the action still reports its own failure.
       if (isWriteRestrictedError(error)) {
-        promptRestricted(error.response.data.reason);
+        usePasswordReset().promptRestricted(error.response.data.reason);
         return Promise.reject(error);
       }
       if (error && error.response && error.response.status) {
