@@ -1082,25 +1082,6 @@
               </div>
             </div>
           </div>
-          <!-- Completed tool calls during streaming - keep progress visible
-               so each step stays on screen instead of flashing away while it
-               sits in pendingToolCalls waiting for the assistant's text. -->
-          <div
-            v-for="(block, pIdx) in pendingToolCalls"
-            v-show="block.type === 'tool_call'"
-            :key="'pending-tc-' + pIdx"
-            class="tool-call-indicator rounded-default border-border-default my-1 flex items-center border px-4 py-2 [background:var(--color-chat-bubble-user)]"
-          >
-            <div class="tool-call-content flex w-full items-center gap-3">
-              <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
-              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
-                <span
-                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
-                  >{{ block.message }}</span
-                >
-              </div>
-            </div>
-          </div>
           <!-- Tool call indicator - shows outside message box -->
           <div
             v-if="activeToolCall"
@@ -1688,9 +1669,6 @@ export default defineComponent({
       call_id?: string;
     } | null>(null);
 
-    // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
-    const pendingToolCalls = ref<ContentBlock[]>([]);
-
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
@@ -2030,29 +2008,6 @@ export default defineComponent({
           }
         }
 
-        // Persist any tool calls that completed before the user hit Stop.
-        // During the tool phase (before the assistant streams text) completed
-        // steps sit in pendingToolCalls and aren't attached to a message yet,
-        // so without this they'd vanish on cancel. Runs after the partial-
-        // message cleanup above so the empty-assistant-message pop can't drop
-        // the message we attach them to.
-        if (pendingToolCalls.value.length) {
-          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage && lastMessage.role === "assistant") {
-            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-            // Tools ran before any text, so place them ahead of it.
-            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
-          } else {
-            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
-            chatMessages.value.push({
-              role: "assistant",
-              content: raw(stoppedNote),
-              contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
-            });
-          }
-          pendingToolCalls.value = [];
-        }
-
         // Reset streaming state
         currentStreamingMessage.value = "";
         currentTextSegment.value = "";
@@ -2333,6 +2288,17 @@ export default defineComponent({
         textSegment = "";
         syncStreamingRefs();
       };
+
+      // Creates the assistant placeholder in msgs if needed, so a completed step renders expandable immediately instead of waiting for stream completion.
+      const pushCompletedToolCall = (block: ContentBlock) => {
+        let lastMessage = msgs[msgs.length - 1];
+        if (!lastMessage || lastMessage.role !== "assistant") {
+          lastMessage = { role: "assistant", content: raw(""), contentBlocks: [] };
+          msgs.push(lastMessage);
+        }
+        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+        lastMessage.contentBlocks.push(block);
+      };
       // --- End stream context ---
 
       try {
@@ -2451,9 +2417,8 @@ export default defineComponent({
                       msgs.push({
                         role: "assistant",
                         content: raw(""),
-                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                        contentBlocks: [confirmBlock],
                       });
-                      pendingToolCalls.value = [];
                     }
                     pendingConfirmation.value = {
                       tool: data.tool,
@@ -2477,13 +2442,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                       };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
+                      pushCompletedToolCall(completedToolBlock);
                     }
 
                     // Show active indicator (blue spinner box) - don't add to chat yet
@@ -2519,12 +2478,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                       };
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
+                      pushCompletedToolCall(completedToolBlock);
                       if (isActive()) activeToolCall.value = null;
                     }
 
@@ -2553,12 +2507,8 @@ export default defineComponent({
                       msgs.push({
                         role: "assistant",
                         content: raw(errorMessage),
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: errorMessage },
-                        ],
+                        contentBlocks: [{ type: "text", text: errorMessage }],
                       });
-                      pendingToolCalls.value = [];
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
@@ -2573,8 +2523,6 @@ export default defineComponent({
                         type: "text",
                         text: errorMessage,
                       });
-                      // Clear pending tool calls to avoid leaking into later messages
-                      pendingToolCalls.value = [];
                     }
 
                     // Reset streaming state
@@ -2603,35 +2551,8 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                       };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
+                      pushCompletedToolCall(completedToolBlock);
                       if (isActive()) activeToolCall.value = null;
-                    }
-                    // Flush any tool calls that completed before the assistant
-                    // produced text. With opencode, action-only turns (dashboard/
-                    // alert creation, navigation) finish without any `message`
-                    // event, so these blocks would otherwise stay stranded in
-                    // pendingToolCalls and never render — the user sees progress
-                    // "flash and disappear".
-                    if (pendingToolCalls.value.length) {
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(...pendingToolCalls.value);
-                      } else {
-                        msgs.push({
-                          role: "assistant",
-                          content: raw(""),
-                          contentBlocks: [...pendingToolCalls.value],
-                        });
-                      }
-                      pendingToolCalls.value = [];
-                      if (isActive()) await throttledSaveCtx(true);
                     }
                     continue;
                   }
@@ -2705,13 +2626,7 @@ export default defineComponent({
                         ...resultData,
                         ...(navigationAction && { navigationAction }),
                       };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
+                      pushCompletedToolCall(completedToolBlock);
                       if (isActive()) activeToolCall.value = null;
                     } else {
                       // Tool was already completed — retroactively enrich the matching block
@@ -2731,19 +2646,6 @@ export default defineComponent({
                             }
                             break;
                           }
-                        }
-                      }
-                      // Also check pending tool calls
-                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
-                        const block = pendingToolCalls.value[i];
-                        const blockMatches = data.call_id
-                          ? block.call_id === data.call_id
-                          : block.type === "tool_call" &&
-                            block.tool === data.tool &&
-                            block.success === undefined;
-                        if (blockMatches) {
-                          Object.assign(block, resultData);
-                          break;
                         }
                       }
                     }
@@ -2792,9 +2694,8 @@ export default defineComponent({
                         msgs.push({
                           role: "assistant",
                           content: raw(""),
-                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                          contentBlocks: [confirmBlock],
                         });
-                        pendingToolCalls.value = [];
                       }
 
                       // Set pending confirmation with navigation action data
@@ -2834,13 +2735,7 @@ export default defineComponent({
                         errorType: data.error_type || undefined,
                         suggestion: data.suggestion || undefined,
                       };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(failedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(failedToolBlock);
-                      }
+                      pushCompletedToolCall(failedToolBlock);
                       if (isActive()) activeToolCall.value = null;
                     }
 
@@ -2863,9 +2758,8 @@ export default defineComponent({
                       msgs.push({
                         role: "assistant",
                         content: raw(""),
-                        contentBlocks: [...pendingToolCalls.value, errorBlock],
+                        contentBlocks: [errorBlock],
                       });
-                      pendingToolCalls.value = [];
                     }
                     messageComplete = true;
                     if (isActive()) await scrollToBottom();
@@ -2886,13 +2780,7 @@ export default defineComponent({
                         context: activeToolCall.value.context,
                         call_id: activeToolCall.value.call_id,
                       };
-                      let lastMessage = msgs[msgs.length - 1];
-                      if (lastMessage && lastMessage.role === "assistant") {
-                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                        lastMessage.contentBlocks.push(completedToolBlock);
-                      } else {
-                        pendingToolCalls.value.push(completedToolBlock);
-                      }
+                      pushCompletedToolCall(completedToolBlock);
                       if (isActive()) activeToolCall.value = null;
                     }
 
@@ -2940,16 +2828,12 @@ export default defineComponent({
                     // Get or create assistant message
                     let lastMessage = msgs[msgs.length - 1];
                     if (!lastMessage || lastMessage.role !== "assistant") {
-                      // Create new assistant message with pending tool calls + text
+                      // Create new assistant message with text
                       msgs.push({
                         role: "assistant",
                         content: raw(streamingMsg),
-                        contentBlocks: [
-                          ...pendingToolCalls.value,
-                          { type: "text", text: textSegment },
-                        ],
+                        contentBlocks: [{ type: "text", text: textSegment }],
                       });
-                      pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
                       await throttledSaveCtx(true);
                     } else {
@@ -3023,13 +2907,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                     };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
+                    pushCompletedToolCall(completedToolBlock);
                   }
 
                   if (isActive()) {
@@ -3062,12 +2940,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                     };
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
+                    pushCompletedToolCall(completedToolBlock);
                     if (isActive()) activeToolCall.value = null;
                   }
 
@@ -3091,12 +2964,8 @@ export default defineComponent({
                     msgs.push({
                       role: "assistant",
                       content: raw(errorMessage),
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: errorMessage },
-                      ],
+                      contentBlocks: [{ type: "text", text: errorMessage }],
                     });
-                    pendingToolCalls.value = [];
                   } else {
                     if (lastMessage.content) {
                       lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
@@ -3110,7 +2979,6 @@ export default defineComponent({
                       type: "text",
                       text: errorMessage,
                     });
-                    pendingToolCalls.value = [];
                   }
 
                   textSegment = "";
@@ -3134,13 +3002,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                     };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
+                    pushCompletedToolCall(completedToolBlock);
                     if (isActive()) activeToolCall.value = null;
                   }
                   continue;
@@ -3172,13 +3034,7 @@ export default defineComponent({
                       call_id: activeToolCall.value!.call_id,
                       ...resultData,
                     };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
+                    pushCompletedToolCall(completedToolBlock);
                     if (isActive()) activeToolCall.value = null;
                   } else {
                     const lastMessage = msgs[msgs.length - 1];
@@ -3194,18 +3050,6 @@ export default defineComponent({
                           Object.assign(block, resultData);
                           break;
                         }
-                      }
-                    }
-                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
-                      const block = pendingToolCalls.value[i];
-                      const blockMatches = data.call_id
-                        ? block.call_id === data.call_id
-                        : block.type === "tool_call" &&
-                          block.tool === data.tool &&
-                          block.success === undefined;
-                      if (blockMatches) {
-                        Object.assign(block, resultData);
-                        break;
                       }
                     }
                   }
@@ -3232,13 +3076,7 @@ export default defineComponent({
                       errorType: data.error_type || undefined,
                       suggestion: data.suggestion || undefined,
                     };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(failedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(failedToolBlock);
-                    }
+                    pushCompletedToolCall(failedToolBlock);
                     if (isActive()) activeToolCall.value = null;
                   }
 
@@ -3260,9 +3098,8 @@ export default defineComponent({
                     msgs.push({
                       role: "assistant",
                       content: raw(""),
-                      contentBlocks: [...pendingToolCalls.value, errorBlock],
+                      contentBlocks: [errorBlock],
                     });
-                    pendingToolCalls.value = [];
                   }
                   messageComplete = true;
                   continue;
@@ -3280,13 +3117,7 @@ export default defineComponent({
                       context: activeToolCall.value.context,
                       call_id: activeToolCall.value.call_id,
                     };
-                    let lastMessage = msgs[msgs.length - 1];
-                    if (lastMessage && lastMessage.role === "assistant") {
-                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
-                      lastMessage.contentBlocks.push(completedToolBlock);
-                    } else {
-                      pendingToolCalls.value.push(completedToolBlock);
-                    }
+                    pushCompletedToolCall(completedToolBlock);
                     if (isActive()) activeToolCall.value = null;
                   }
 
@@ -3325,12 +3156,8 @@ export default defineComponent({
                     msgs.push({
                       role: "assistant",
                       content: raw(streamingMsg),
-                      contentBlocks: [
-                        ...pendingToolCalls.value,
-                        { type: "text", text: textSegment },
-                      ],
+                      contentBlocks: [{ type: "text", text: textSegment }],
                     });
-                    pendingToolCalls.value = [];
                     await throttledSaveCtx(true);
                   } else {
                     lastMessage.content = raw(streamingMsg);
@@ -5892,7 +5719,6 @@ export default defineComponent({
       // Auto navigation
       isAutoNavigationEnabled,
       processedMessages,
-      pendingToolCalls,
       processTextBlock,
       copyToClipboard,
       retryGeneration,
