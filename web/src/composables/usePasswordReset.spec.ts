@@ -79,6 +79,7 @@ describe("usePasswordReset", () => {
 
       await promptRestricted("policy_tightened");
 
+      expect(confirmMock).toHaveBeenCalledTimes(1);
       expect(isOpen.value).toBe(false);
     });
 
@@ -89,12 +90,16 @@ describe("usePasswordReset", () => {
       );
 
       const first = promptRestricted("rotation_expired");
-      const second = promptRestricted("rotation_expired");
+      const second = promptRestricted("policy_tightened");
       expect(confirmMock).toHaveBeenCalledTimes(1);
+      expect(isOpen.value).toBe(false);
+      // The first reason wins: a second refused write must not rewrite the prompt under the user.
+      expect(reason.value).toBe("rotation_expired");
 
       resolveConfirm(true);
       await Promise.all([first, second]);
       expect(isOpen.value).toBe(true);
+      expect(reason.value).toBe("rotation_expired");
     });
 
     it("prompts again once the previous prompt has settled", async () => {

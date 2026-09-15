@@ -449,6 +449,7 @@ describe("SettingsIndex.vue", () => {
     afterEach(() => {
       isMetaOrgRef.value = false;
       config.isEnterprise = "false";
+      mockRouter.currentRoute.value.name = "settings";
     });
 
     it("is offered in the meta org of an enterprise build", () => {
@@ -474,6 +475,16 @@ describe("SettingsIndex.vue", () => {
       wrapper = createWrapper();
 
       expect(findEntry(wrapper)?.visible).toBe(false);
+    });
+
+    it("sends an enterprise non-meta org back to General", () => {
+      config.isEnterprise = "true";
+      isMetaOrgRef.value = false;
+      mockRouter.currentRoute.value.name = "passwordPolicy";
+      mockPush.mockClear();
+      wrapper = createWrapper({ zoConfig: { meta_org: "_meta" } });
+
+      expect(mockPush).toHaveBeenCalledWith(expect.objectContaining({ path: "/settings/general" }));
     });
 
     it("renders in the centered reading column, like the other form sections", () => {

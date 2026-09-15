@@ -44,6 +44,7 @@ describe("PasswordRequirementList", () => {
     // One of four rows is met: only lowercase.
     expect(bar.props("value")).toBeCloseTo(1 / 4);
     expect(bar.props("variant")).toBe("default");
+    expect(bar.props("size")).toBe("xs");
   });
 
   it("turns the meter green only once every requirement is met", () => {
