@@ -85,13 +85,27 @@ jobs:
               core.setFailed(`refusing to delete a non-autoe2e ref: ${name}`);
               return;
             }
+            const closedPr = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+
+            // Closing one PR does not make the branch unreferenced: a second PR can share the head, and
+            // a stacked PR can sit on it as base — deleting would close that one too. Same invariant the
+            // sweep holds, enforced here as well.
+            const blockers = (await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            }, (res) => res.data)).filter(pr => pr.head.ref === name || pr.base.ref === name);
+            if (blockers.length) {
+              core.notice(`Keeping ${name} — still referenced by open PR(s) ${blockers.map(p => '#' + p.number).join(', ')}.`);
+              return;
+            }
+
             if (process.env.REAPER_DISABLED === 'true') {
-              core.notice(`Reaper disabled: would have deleted ${name} (PR #${context.payload.pull_request.number} closed unmerged).`);
+              core.notice(`Reaper disabled: would have deleted ${name} at ${sha} (PR #${closedPr} closed unmerged).`);
               return;
             }
             try {
               await github.rest.git.deleteRef({ owner, repo, ref: `heads/${name}` });
-              core.notice(`Deleted ${name} — test PR #${context.payload.pull_request.number} was closed without merging.`);
+              core.notice(`Deleted ${name} at ${sha} — test PR #${closedPr} was closed without merging. Restore: git push origin ${sha}:refs/heads/${name}`);
             } catch (e) {
               core.warning(`Could not delete ${name}: ${e.message}`);
             }
@@ -238,6 +252,24 @@ jobs:
               // `git push origin <sha>:refs/heads/<branch>`.
               const sha = (b.sha || '').slice(0, 12);
               if (dryRun) { reaped.push([b.name, b.why, sha, 'would delete']); survivors.push(b.name); continue; }
+              // liveRefs was read before the per-branch closed-PR round-trips, so a branch can have
+              // gained a PR since — a Council run opening one mid-sweep is exactly that. Re-check
+              // against the ref itself immediately before deleting.
+              try {
+                const fresh = await github.rest.pulls.list({
+                  owner, repo, state: 'open', head: `${owner}:${b.name}`, per_page: 1,
+                });
+                if (fresh.data.length) {
+                  kept.push([b.name, `open PR #${fresh.data[0].number} appeared mid-sweep`]);
+                  survivors.push(b.name);
+                  continue;
+                }
+              } catch (e) {
+                // Could not confirm it is still unreferenced — keep it and try again tomorrow.
+                kept.push([b.name, `re-check failed, kept: ${e.message}`]);
+                survivors.push(b.name);
+                continue;
+              }
               try {
                 await github.rest.git.deleteRef({ owner, repo, ref: `heads/${b.name}` });
                 reaped.push([b.name, b.why, sha, 'deleted']);
