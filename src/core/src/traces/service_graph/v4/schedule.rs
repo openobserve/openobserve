@@ -17,19 +17,15 @@
 
 use std::sync::{Arc, atomic::Ordering};
 
-use config::{
-    cluster::LOCAL_NODE,
-    meta::stream::{StreamStats, StreamType},
-    utils::time::now_micros,
-};
+use config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros};
 use futures::StreamExt;
 use infra::{cluster::get_node_by_uuid, dist_lock};
 use tokio::sync::{Mutex, RwLock};
 
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_RETAINED,
-    ORG_TABLES, PROCESSED_TIMESTAMP_STREAM, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN,
-    STREAM_STATES, Settings, TableRef, V1_STOP_AFTER_MICROS,
+    ORG_TABLES, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings,
+    TableRef, V1_STOP_AFTER_MICROS,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{SeriesKey, Staging},
     sql::{
@@ -111,11 +107,6 @@ pub fn window_ends(offset: i64, horizon: i64, flush: i64, max_windows: usize) ->
     ends
 }
 
-/// Default / missing stats mean "no data yet", never "old data".
-pub fn data_old_enough(stats: &StreamStats, now: i64) -> bool {
-    stats.doc_num > 0 && stats.doc_time_min > 0 && stats.doc_time_min <= now - V1_STOP_AFTER_MICROS
-}
-
 /// A QL pass that was needed but failed keeps its trigger so the range is retried, not skipped.
 pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool, horizon: i64) {
     if !need_ql {
@@ -128,9 +119,8 @@ pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    let orgs: Vec<String> = discovered.iter().map(|(org, _)| org.clone()).collect();
     if !is_v1_stopped().await {
-        maybe_stop_v1(&orgs, now).await;
+        maybe_stop_v1(now).await;
     }
 
     let mut jobs = vec![];
@@ -266,30 +256,16 @@ async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
     claimed
 }
 
-/// Write-once switch: v4 has run for 7 days and its output stream really holds 7-day-old data.
-async fn maybe_stop_v1(orgs: &[String], now: i64) {
-    if orgs.is_empty() {
-        return;
-    }
+/// Write-once switch: v4 has been writing for 7 days; no per-org data check (user ruling).
+async fn maybe_stop_v1(now: i64) {
     let Some(started_at) = get_started_at().await else {
         return;
     };
     if now - started_at < V1_STOP_AFTER_MICROS {
         return;
     }
-    let old_enough = orgs.iter().any(|org| {
-        let stats = infra::cache::stats::get_stream_stats(
-            org,
-            PROCESSED_TIMESTAMP_STREAM,
-            StreamType::Metrics,
-        );
-        data_old_enough(&stats, now)
-    });
-    if !old_enough {
-        return;
-    }
     match set_v1_stopped_if_absent().await {
-        Ok(()) => log::info!("[ServiceGraph] v4 has 7 days of data, v1 job stopped"),
+        Ok(()) => log::info!("[ServiceGraph] v4 has run for 7 days, v1 job stopped"),
         Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
     }
 }
@@ -759,22 +735,5 @@ mod tests {
         assert!(!t.has_unresolved);
         settle_ql_trigger(&mut t, false, false, 900);
         assert_eq!(t.ql_up_to, 900);
-    }
-
-    #[test]
-    fn test_data_age_guard() {
-        let now = 1_700_000_000 * MICROS;
-        assert!(!data_old_enough(&StreamStats::default(), now));
-        let mut stats = StreamStats {
-            doc_num: 10,
-            ..Default::default()
-        };
-        assert!(!data_old_enough(&stats, now));
-        stats.doc_time_min = now - V1_STOP_AFTER_MICROS + MICROS;
-        assert!(!data_old_enough(&stats, now));
-        stats.doc_time_min = now - V1_STOP_AFTER_MICROS;
-        assert!(data_old_enough(&stats, now));
-        stats.doc_num = 0;
-        assert!(!data_old_enough(&stats, now));
     }
 }
