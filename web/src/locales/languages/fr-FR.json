@@ -9549,14 +9549,11 @@
       "noAgentsDescription": "Aucun agent GenAI détecté pour la fenêtre temporelle sélectionnée. Essayez une plage plus large ou revenez à la vue flux.",
       "viewByStream": "Voir par flux",
       "search": {
-        "placeholderUser": "Rechercher par utilisateur",
-        "placeholderMessage": "Rechercher dans le texte des messages",
-        "userTitle": "Sessions dont l'ID utilisateur contient le texte",
-        "messageTitle": "Rechercher du texte dans les messages de la conversation",
+        "placeholder": "Rechercher par utilisateur ou message",
+        "title": "Correspond aux sessions dont l'ID utilisateur ou le texte de conversation contient le texte",
         "noResultsTitle": "Aucune session ne correspond à votre recherche",
         "noResultsDescription": "Essayez un autre terme, un autre champ ou une plage de temps plus large.",
-        "clear": "Effacer la recherche",
-        "pressEnter": "Appuyez sur Entrée pour rechercher"
+        "clear": "Effacer la recherche"
       }
     },
     "sessionDetail": {

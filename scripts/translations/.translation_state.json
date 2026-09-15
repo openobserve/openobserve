@@ -18141,6 +18141,13 @@
       "noAgentsDescription": "9cc0fb42091c2bde",
       "noAgentsTitle": "0033e6efa2b5ae49",
       "retry": "942087cc2d41e013",
+      "search": {
+        "clear": "3b7ea51793e9d906",
+        "noResultsDescription": "d7f474f58e1453e4",
+        "noResultsTitle": "5da0df2b26ae4e06",
+        "placeholder": "dfdf19300240d7e4",
+        "title": "86d34e63ba95a339"
+      },
       "sessions": "1225ae6c1ae69dcb",
       "stream": "1eec3071dd26e224",
       "streamLabel": "1eec3071dd26e224",

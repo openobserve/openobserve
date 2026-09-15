@@ -9549,14 +9549,11 @@
       "noAgentsDescription": "Seçilen zaman aralığında GenAI ajanı tespit edilmedi. Daha geniş bir aralık deneyin veya akış görünümüne geri dönün.",
       "viewByStream": "Akışa Göre Görüntüle",
       "search": {
-        "placeholderUser": "Kullanıcıya göre ara",
-        "placeholderMessage": "Mesaj metninde ara",
-        "userTitle": "Kullanıcı kimliği metni içeren oturumları eşleştir",
-        "messageTitle": "Konuşma mesajlarında metin ara",
+        "placeholder": "Kullanıcı veya mesaja göre ara",
+        "title": "Kullanıcı kimliği veya konuşma metni, arama metnini içeren oturumları eşleştir",
         "noResultsTitle": "Aramanızla eşleşen oturum yok",
         "noResultsDescription": "Farklı bir terim, başka bir alan veya daha geniş bir zaman aralığı deneyin.",
-        "clear": "Aramayı temizle",
-        "pressEnter": "Aramak için Enter'a basın"
+        "clear": "Aramayı temizle"
       }
     },
     "sessionDetail": {
