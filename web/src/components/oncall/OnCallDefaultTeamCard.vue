@@ -31,10 +31,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <OButton
       :variant="defaultTeamId ? 'outline' : 'warning'"
       size="sm-action"
+      class="max-w-64"
+      :title="triggerLabel"
       data-test="oncall-default-team-open"
       @click="openDialog"
     >
-      {{ triggerLabel }}
+      <span class="min-w-0 truncate">{{ triggerLabel }}</span>
     </OButton>
 
     <ODialog

@@ -191,8 +191,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <span class="flex min-w-0 flex-1 flex-col">
             <span
-              class="text-sm font-medium"
+              class="truncate text-sm font-medium"
               :class="defaultTeamId ? 'text-text-heading' : 'text-status-error-text'"
+              :title="defaultTeamId ? teamNameOf(defaultTeamId) : undefined"
               data-test="oncall-routing-catch-all-team"
             >
               {{
