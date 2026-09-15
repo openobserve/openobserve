@@ -476,7 +476,7 @@ export default defineComponent({
           } else {
             toast({
               variant: "error",
-              message: err.response.data.message,
+              message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
             });
           }
         }
@@ -510,7 +510,7 @@ export default defineComponent({
             if (err.response?.status != 403 || err?.status != 403) {
               toast({
                 variant: "error",
-                message: err.response.data.message,
+                message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
               });
             }
           }
@@ -534,7 +534,7 @@ export default defineComponent({
         } catch (err: any) {
           toast({
             variant: "error",
-            message: err.response.data.message,
+            message: raw(err.response?.data?.message) || t("toastMessages.iam.userSaveFailed"),
           });
         }
         track("Button Click", { button: "Create User", page: "Add User" });
