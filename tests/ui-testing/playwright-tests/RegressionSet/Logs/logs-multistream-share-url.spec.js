@@ -1,26 +1,3 @@
-/**
- * Multi-stream selection survives a shared Logs URL — #7332.
- *
- * The report is "the stream settings are not a part of share url": with more
- * than one stream selected, the shared link came back with the selection lost.
- * `Logs/shareLink.spec.js` already covers the single-stream case thoroughly, so
- * this spec only adds the multi-stream one.
- *
- * It MUST go through `clickShareLinkAndGetUrl` (the short link), not the
- * address bar. Verified against o2latestmain: with two streams selected the
- * index list shows both, but `window.location` carries only the first, and
- * that is by design — multi-stream state is held server-side against the
- * short link, which is what the fix for #7332 addressed (the closing
- * verification on the issue cites a `/web/short/…` URL). Asserting on the
- * address bar therefore fails on a correctly working build.
- *
- * Consequence: this spec needs a deployment with `web_url` set, because
- * `ShareButton` is disabled outright without it
- * (components/common/ShareButton.vue). The regression workflow sets
- * `ZO_WEB_URL`, so it runs in CI; it cannot run against a dev env that leaves
- * `web_url` empty.
- */
-
 const { test, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
@@ -40,8 +17,7 @@ test.describe("Logs multi-stream share URL", () => {
     testLogger.info('Multi-stream share URL setup completed');
   });
 
-  // seedLogStreams creates real streams; without this they accumulate in the
-  // org on every nightly run, and cleanup.spec.js has no pattern for them.
+  // Without this the seeded streams accumulate in the org on every nightly run.
   test.afterEach(async () => {
     while (seededStreams.length) {
       const name = seededStreams.pop();
@@ -50,11 +26,6 @@ test.describe("Logs multi-stream share URL", () => {
       );
     }
   });
-
-  // ==========================================================================
-  // Bug #7332: when I select multi stream, share URL does not work
-  // https://github.com/openobserve/openobserve/issues/7332
-  // ==========================================================================
   test("a shared Logs URL should restore every selected stream, not just the first", {
     tag: ['@bug-7332', '@P2', '@regression', '@logsRegression', '@logsRegressionShareUrl']
   }, async ({ page, context }) => {
@@ -71,8 +42,7 @@ test.describe("Logs multi-stream share URL", () => {
 
     await pm.logsPage.selectStream(streams[0]);
 
-    // The second stream has to be added through its checkbox: clicking the
-    // option's label zone REPLACES the selection instead of extending it.
+    // Must click the checkbox: the option's label zone replaces the selection instead.
     await pm.logsPage.fillStreamFilter(streams[1]);
     await pm.logsPage.toggleStreamSelection(streams[1]);
     await page.keyboard.press('Escape');
@@ -86,9 +56,7 @@ test.describe("Logs multi-stream share URL", () => {
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
     testLogger.info(`Shared short URL: ${sharedUrl}`);
 
-    // A fresh page, so the restored selection cannot come from this page's
-    // in-memory state. No Refresh click after arriving — the selection has to
-    // be restored by the link alone.
+    // Fresh page, and no Refresh after arriving: the link alone must restore the selection.
     const reopened = await context.newPage();
     try {
       await reopened.goto(sharedUrl);
@@ -96,9 +64,7 @@ test.describe("Logs multi-stream share URL", () => {
       await reopenedPm.logsPage.waitForRedirectComplete();
       await reopened.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-      // The index list is the assertion, not the URL: the short link restores
-      // the selection into app state, and only the first stream ever reaches
-      // window.location even on a working build.
+      // Asserts app state, not the URL: only the first stream reaches window.location.
       await reopenedPm.logsPage.expectLogsSearchIndexListContainsText(streams.join(', '));
 
       testLogger.info('✓ PASSED: multi-stream selection restored from shared link (Bug #7332)');
