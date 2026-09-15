@@ -122,7 +122,7 @@ export const queryClient = new QueryClient({
       },
       // Off everywhere: this console is often left open on a wall display and several endpoints are expensive.
       refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
+      refetchOnReconnect: false,
     },
     mutations: { retry: false },
   },
