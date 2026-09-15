@@ -72,7 +72,8 @@
     "run_files": [
       "traces-regression.spec.js",
       "traces-bugs.spec.js",
-      "traces-filter-reset.spec.js"
+      "traces-filter-reset.spec.js",
+      "traces-share-url.spec.js"
     ],
     "disabled": []
   },

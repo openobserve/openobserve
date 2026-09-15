@@ -32,11 +32,12 @@ usually the backend contract or the rendered page. But it is never the answer to
 - A new spec must be added to `run_files` in
   `tests/ui-testing/ci-matrix/ci_matrix_regression.json` or it never runs.
 
-## Done — automated (10 tests, 10 issues)
+## Done — automated (11 tests, 11 issues)
 
 | Issue | Spec | Test |
 |---|---|---|
 | #12703 | `Traces/traces-filter-reset.spec.js` | reset clears the error-only `span_status` filter |
+| #11392 | `Traces/traces-share-url.spec.js` | shared short link restores the filter and loads data on arrival — CI only (needs `web_url`) |
 | #2067  | `Pipelines/enrichment-lifecycle.spec.js` | duplicate name refused, original data intact |
 | #2937  | `Pipelines/enrichment-lifecycle.spec.js` | list reflects create/delete with no refresh |
 | #12647 <br> #9498 | `Pipelines/pipeline-preview-bounds.spec.js` | row View preview stays inside the viewport |
@@ -148,7 +149,7 @@ test can skip.
 | #9875  | `AddAlert.schema.spec.ts:87` — the `/[:#?\s'"%&]+/` rule rejects `"bad name"` | that the rule is actually wired to the form: a name with a space blocks Save and surfaces `alerts.nameNoSpecialChars` in the UI |
 | #7280  | `ReportList.spec.ts:574` — the row leaves the list model after delete | that the rendered list updates without a reload, through a real create→delete→create cycle |
 
-## Remaining UI queue (19, plus the 4 unit-covered above = 23)
+## Remaining UI queue (18, plus the 4 unit-covered above = 22)
 
 Ordered roughly by value over setup cost. `ENT` = service-graph / SLO /
 Incidents surface, ships in `ci_matrix*.ent.json`, so it needs a paired
@@ -156,7 +157,6 @@ o2-enterprise PR on the **same branch name**.
 
 | Issue | Area | Note |
 |---|---|---|
-| #11392 | Traces | **attempted and withdrawn.** Shared-URL params. On the CI build the address bar carries `query=` EMPTY even with the filter applied and the index list showing it — four retries, all empty — while the same flow writes the base64 query against o2latestmain. Any address-bar assertion is environment-dependent until that difference is explained. The short-link path (as used for #7332) is the likely route. |
 | #11619 | Alerts | logs/traces must not preselect a condition value |
 | #9875  | Alerts | alert name from a dashboard panel contains a space and fails validation |
 | #10202 | Alerts | test-destination on the update page errors; custom destination cannot test/preview |
@@ -234,32 +234,40 @@ once the app has consumed it, so `response.text()` intermittently fails with
 `tee()`s the stream instead, which is deterministic and leaves the app's
 progressive rendering untouched.
 
-## False green: the VRL toggle (found 2026-09-15)
+## Fixed: the VRL toggle false green (2026-09-15)
 
-`logsPage.clickVrlToggleButton` targets
-`[data-test="logs-search-bar-vrl-toggle-btn"]`, which does not exist in
-`web/src` at all. Both callers wrap it in `.catch(() => {})`, so it silently
-no-ops, and `getVrlEditor()`'s `.monaco-editor` fallback then matches the SQL
-editor — which IS visible, so a "VRL editor must be visible" assertion passes.
+`logsPage.clickVrlToggleButton` targeted
+`[data-test="logs-search-bar-vrl-toggle-btn"]`, which exists nowhere in
+`web/src`. Both callers swallowed the throw with `.catch()`, and
+`getVrlEditor()`'s `.monaco-editor` fallback then matched the SQL editor —
+which IS visible, so "VRL editor must be visible" passed against the wrong
+element. **#9690** (P1) was therefore green without ever exercising VRL.
 
-Two consequences:
+Fixed:
 
-- **#9690** ("should load VRL function correctly when opening saved view", P1,
-  live and green) never exercises VRL. It passes without the feature under test
-  being reachable.
-- **#9550** was skipped by an earlier author who read the same symptom as a
-  product bug. It is not one.
+- `clickVrlToggleButton` delegates to `toggleQueryModeEditor`, the existing
+  retry-hardened path through the utilities ("More") dropdown.
+- `getVrlEditor` is scoped to the `logs-vrl-function-editor` container so it can
+  never resolve to the SQL editor.
+- The dead `vrlToggleBtn` locator is deleted (it was referenced nowhere).
+- Both call sites no longer swallow the failure.
+- New `ensureVrlEditorOpen` is idempotent — restoring a saved view that carried
+  a function re-opens the editor itself, so #9690's blind toggle was closing it.
+- #9690 given a 6-minute timeout: it only fitted the default while the toggle
+  was a no-op and most of the work never ran.
 
-Verified against o2latestmain: with a stream selected the page holds exactly one
-Monaco editor, `query-editor` / `logs-search-bar-editor-sql`, and the toggle
-locator resolves to nothing.
+**#9690 now genuinely passes**, with `VRL editor content after load:
+.test_field = "bug9690_test"` in the log — a real assertion on real state.
 
-The correct handles are `logs-search-bar-show-query-toggle-btn` (an OSwitch on
-`searchObj.meta.showTransformEditor`, already referenced 6x in `logsPage.js`),
-`logs-search-bar-function-editor-pinned-btn` when pinned, and
-`logs-vrl-function-editor` for the editor itself. Fixing the page object
-un-blocks #9550 and makes #9690 meaningful; both need a verification run
-afterwards, so it is deliberately not bundled into this branch.
+**#9550 stays skipped**, but the recorded reason was wrong twice over. It is not
+a product issue and not the toggle: its selectors were never right. The field
+list uses `logs-field-list-item-<field>`,
+`log-search-index-list-filter-<field>-field-btn` (the "=" icon the issue is
+about) and `log-search-index-list-interesting-<field>-field-btn`, whereas the
+test invents `[data-test*="computed_field"]` and a `[class*="equal"]` sibling.
+Verified: after applying a VRL transform, `computed_field` appears nowhere in
+the field list. The issue title says "when added to the table", so the table
+column may be the real subject. Needs a rewrite, not a re-enable.
 
 ## Known gaps worth a separate pass
 
