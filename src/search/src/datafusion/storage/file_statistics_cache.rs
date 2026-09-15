@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::VecDeque,
     sync::{
         Arc, LazyLock as Lazy,
         atomic::{AtomicI64, Ordering},
@@ -25,13 +25,13 @@ use std::{
 use config::metrics;
 use dashmap::DashMap;
 use datafusion::{
-    common::{Statistics, TableReference},
+    common::{HashMap, TableReference},
     execution::cache::{
-        CacheAccessor, TableScopedPath,
-        cache_manager::{self, CachedFileMetadata, FileStatisticsCacheEntry},
+        Cache, CacheEntryInfo, CacheValue, TableScopedPath, cache_manager::CachedFileMetadata,
     },
+    physical_expr::{LexOrdering, PhysicalExpr, PhysicalSortExpr, expressions::Column},
 };
-use object_store::{ObjectMeta, path::Path};
+use object_store::path::Path;
 
 use super::TRACE_ID_SEPARATOR;
 
@@ -41,7 +41,7 @@ pub static GLOBAL_CACHE: Lazy<Arc<FileStatisticsCache>> =
 /// Collected statistics for files
 /// Cache is invalided when file size or last modification has changed
 pub struct FileStatisticsCache {
-    statistics: DashMap<String, (ObjectMeta, Arc<Statistics>, usize)>,
+    statistics: DashMap<String, (CachedFileMetadata, usize)>,
     cacher: parking_lot::Mutex<VecDeque<String>>,
     current_memory: AtomicI64,
 }
@@ -67,34 +67,32 @@ impl FileStatisticsCache {
         self.current_memory.load(Ordering::Relaxed).max(0) as usize
     }
 
-    fn estimate_entry_size(key: &str, meta: &ObjectMeta, stats: &Statistics) -> usize {
-        // Key is stored both in the DashMap and the eviction queue
-        let mut size = (std::mem::size_of::<String>() + key.len()) * 2;
+    fn estimate_entry_size(key: &str, value: &CachedFileMetadata) -> usize {
+        // Count both key copies and inline storage; CacheValue only reports heap allocations.
+        (std::mem::size_of::<String>() + key.len()) * 2
+            + std::mem::size_of::<(CachedFileMetadata, usize)>()
+            + value.size()
+            + Self::estimate_ordering_size(value.ordering.as_ref())
+            + 64
+    }
 
-        size += std::mem::size_of::<ObjectMeta>();
-        size += meta.location.as_ref().len();
-        if let Some(ref etag) = meta.e_tag {
-            size += std::mem::size_of::<String>() + etag.len();
-        }
-        if let Some(ref version) = meta.version {
-            size += std::mem::size_of::<String>() + version.len();
-        }
-
-        size += std::mem::size_of::<Statistics>();
-        size += std::mem::size_of::<usize>(); // tracked entry size field
-        // Arc<Statistics> header (strong + weak counter) and DashMap bucket
-        // overhead (hash + slot metadata). Conservative fixed overhead per
-        // entry so the memory budget is not systematically underestimated.
-        size += 64;
-
-        for col in &stats.column_statistics {
-            size += std::mem::size_of::<datafusion::common::ColumnStatistics>();
-            size += col.min_value.get_value().map(|v| v.size()).unwrap_or(0);
-            size += col.max_value.get_value().map(|v| v.size()).unwrap_or(0);
-            size += col.sum_value.get_value().map(|v| v.size()).unwrap_or(0);
-        }
-
-        size
+    // CacheValue::size skips the ordering; the schema fingerprint is shared per table, so skip it.
+    fn estimate_ordering_size(ordering: Option<&LexOrdering>) -> usize {
+        ordering.map_or(0, |ordering| {
+            ordering
+                .iter()
+                .map(|sort_expr| {
+                    let name_len = sort_expr
+                        .expr
+                        .downcast_ref::<Column>()
+                        .map_or(0, |column| column.name().len());
+                    std::mem::size_of::<PhysicalSortExpr>()
+                        + std::mem::size_of::<Arc<dyn PhysicalExpr>>()
+                        + std::mem::size_of::<Column>()
+                        + name_len
+                })
+                .sum()
+        })
     }
 
     fn evict(&self, max_bytes: usize) {
@@ -113,7 +111,7 @@ impl FileStatisticsCache {
             let batch = (w.len() / 20).max(1).min(w.len());
             let mut removed_total = 0i64;
             for k in w.drain(0..batch) {
-                if let Some((_, (_, _, size))) = self.statistics.remove(&k) {
+                if let Some((_, (_, size))) = self.statistics.remove(&k) {
                     removed_total += size as i64;
                 }
             }
@@ -149,7 +147,7 @@ impl Default for FileStatisticsCache {
     }
 }
 
-impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
+impl Cache<TableScopedPath, CachedFileMetadata> for FileStatisticsCache {
     /// Get cached metadata for file location.
     fn get(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
         let k = self.format_key(&k.path);
@@ -158,12 +156,7 @@ impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache 
                 metrics::QUERY_PARQUET_METADATA_CACHE_HITS_TOTAL
                     .with_label_values::<&str>(&[])
                     .inc();
-                let (meta, statistics, _) = s.value();
-                Some(CachedFileMetadata::new(
-                    meta.clone(),
-                    statistics.clone(),
-                    None,
-                ))
+                Some(s.value().0.clone())
             }
             None => {
                 metrics::QUERY_PARQUET_METADATA_CACHE_MISS_TOTAL
@@ -177,13 +170,10 @@ impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache 
     /// Save collected file statistics
     fn put(&self, k: &TableScopedPath, value: CachedFileMetadata) -> Option<CachedFileMetadata> {
         let k = self.format_key(&k.path);
-        let entry_size = Self::estimate_entry_size(&k, &value.meta, &value.statistics);
+        let entry_size = Self::estimate_entry_size(&k, &value);
 
-        let old = self.statistics.insert(
-            k.clone(),
-            (value.meta.clone(), value.statistics.clone(), entry_size),
-        );
-        let old_size = old.as_ref().map(|(_, _, s)| *s).unwrap_or(0);
+        let old = self.statistics.insert(k.clone(), (value, entry_size));
+        let old_size = old.as_ref().map(|(_, s)| *s).unwrap_or(0);
         let delta = entry_size as i64 - old_size as i64;
         self.current_memory.fetch_add(delta, Ordering::Relaxed);
 
@@ -202,15 +192,15 @@ impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache 
             self.evict(max_bytes);
         }
 
-        old.map(|(meta, stats, _)| CachedFileMetadata::new(meta, stats, None))
+        old.map(|(value, _)| value)
     }
 
     fn remove(&self, k: &TableScopedPath) -> Option<CachedFileMetadata> {
         let k = self.format_key(&k.path);
-        self.statistics.remove(&k).map(|(_, (meta, stats, size))| {
+        self.statistics.remove(&k).map(|(_, (value, size))| {
             self.current_memory
                 .fetch_sub(size as i64, Ordering::Relaxed);
-            CachedFileMetadata::new(meta, stats, None)
+            value
         })
     }
 
@@ -232,9 +222,7 @@ impl CacheAccessor<TableScopedPath, CachedFileMetadata> for FileStatisticsCache 
     fn name(&self) -> String {
         "FileStatisticsCache".to_string()
     }
-}
 
-impl cache_manager::FileStatisticsCache for FileStatisticsCache {
     fn cache_limit(&self) -> usize {
         config::get_config()
             .limit
@@ -248,35 +236,35 @@ impl cache_manager::FileStatisticsCache for FileStatisticsCache {
         // per query) with its own per-session limit;
     }
 
-    fn list_entries(&self) -> HashMap<TableScopedPath, FileStatisticsCacheEntry> {
-        let mut entries = HashMap::<TableScopedPath, FileStatisticsCacheEntry>::new();
-
-        for entry in &self.statistics {
-            let path = TableScopedPath {
-                table: None,
-                path: Path::from(entry.key().as_str()),
-            };
-            let (object_meta, stats, _) = entry.value();
-            entries.insert(
-                path,
-                FileStatisticsCacheEntry {
-                    object_meta: object_meta.clone(),
-                    num_rows: stats.num_rows,
-                    num_columns: stats.column_statistics.len(),
-                    table_size_bytes: stats.total_byte_size,
-                    statistics_size_bytes: 0,
-                    has_ordering: false,
-                },
-            );
-        }
-
-        entries
+    fn cache_ttl(&self) -> Option<std::time::Duration> {
+        None
     }
 
-    fn drop_table_entries(
-        &self,
-        _table_ref: &Option<TableReference>,
-    ) -> datafusion::error::Result<()> {
+    fn update_cache_ttl(&self, _ttl: Option<std::time::Duration>) {}
+
+    fn list_entries(&self) -> HashMap<TableScopedPath, CacheEntryInfo<CachedFileMetadata>> {
+        self.statistics
+            .iter()
+            .map(|entry| {
+                let path = TableScopedPath {
+                    table: None,
+                    path: Path::from(entry.key().as_str()),
+                };
+                let (value, size) = entry.value();
+                (
+                    path,
+                    CacheEntryInfo {
+                        value: value.clone(),
+                        size_bytes: *size,
+                        hits: 0,
+                        expires: None,
+                    },
+                )
+            })
+            .collect()
+    }
+
+    fn drop_table_entries(&self, _table_ref: &TableReference) -> datafusion::error::Result<()> {
         Ok(())
     }
 }
@@ -284,7 +272,11 @@ impl cache_manager::FileStatisticsCache for FileStatisticsCache {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Utc};
-    use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema, TimeUnit},
+        common::Statistics,
+    };
+    use object_store::ObjectMeta;
 
     use super::*;
 
@@ -321,7 +313,14 @@ mod tests {
     fn put(cache: &FileStatisticsCache, meta: ObjectMeta, stats: Arc<Statistics>) {
         cache.put(
             &key(&meta.location),
-            CachedFileMetadata::new(meta, stats, None),
+            CachedFileMetadata::new(
+                meta,
+                Arc::new(
+                    datafusion::execution::cache::SchemaFingerprint::from_schema(&Schema::empty()),
+                ),
+                stats,
+                None,
+            ),
         );
     }
 
@@ -340,22 +339,83 @@ mod tests {
 
         // exact match is valid
         let cached = cache.get(&key(&meta.location)).expect("entry present");
-        assert!(cached.is_valid_for(&meta));
+        assert!(cached.is_valid_for(&meta, &cached.schema_fingerprint));
 
         // same location but file size changed -> cached but stale
         let mut changed = meta.clone();
         changed.size = 2048;
         let cached = cache.get(&key(&changed.location)).expect("entry present");
-        assert!(!cached.is_valid_for(&changed));
+        assert!(!cached.is_valid_for(&changed, &cached.schema_fingerprint));
 
         // same location but last_modified changed -> cached but stale
         let mut changed = meta.clone();
         changed.last_modified = ts("2024-01-15T01:00:00+00:00");
         let cached = cache.get(&key(&changed.location)).expect("entry present");
-        assert!(!cached.is_valid_for(&changed));
+        assert!(!cached.is_valid_for(&changed, &cached.schema_fingerprint));
 
         // different location -> miss
         assert!(cache.get(&key(&Path::from("test2"))).is_none());
+    }
+
+    #[test]
+    fn test_cache_preserves_schema_fingerprint_and_ordering() {
+        use datafusion::{
+            execution::cache::SchemaFingerprint,
+            physical_expr::{LexOrdering, PhysicalSortExpr, expressions::Column},
+        };
+
+        let schema = Schema::new(vec![Field::new("value", DataType::Int64, false)]);
+        let fingerprint = Arc::new(SchemaFingerprint::from_schema(&schema));
+        let changed = Arc::new(SchemaFingerprint::from_schema(&Schema::new(vec![
+            Field::new("value", DataType::Utf8, false),
+        ])));
+        let meta = object_meta("schema_evolution", 128);
+        let key = key(&meta.location);
+        let value = CachedFileMetadata::new(
+            meta.clone(),
+            fingerprint.clone(),
+            Arc::new(Statistics::new_unknown(&schema)),
+            LexOrdering::new(vec![PhysicalSortExpr::new_default(Arc::new(Column::new(
+                "value", 0,
+            )))]),
+        );
+        let cache = FileStatisticsCache::new();
+        assert!(cache.put(&key, value.clone()).is_none());
+        let cached = cache.get(&key).unwrap();
+        assert_eq!(cached, value);
+        assert!(cached.is_valid_for(&meta, &fingerprint));
+        assert!(!cached.is_valid_for(&meta, &changed));
+        assert_eq!(cache.list_entries()[&key].value, value);
+        assert_eq!(cache.put(&key, value.clone()), Some(value.clone()));
+        assert_eq!(cache.remove(&key), Some(value));
+        assert_eq!(cache.memory_size(), 0);
+    }
+
+    #[test]
+    fn test_ordering_is_charged_to_memory_size() {
+        use datafusion::{
+            execution::cache::SchemaFingerprint,
+            physical_expr::{LexOrdering, PhysicalSortExpr, expressions::Column},
+        };
+
+        let schema = Schema::new(vec![Field::new("value", DataType::Int64, false)]);
+        let meta = object_meta("ordered", 128);
+        let entry = |ordering| {
+            CachedFileMetadata::new(
+                meta.clone(),
+                Arc::new(SchemaFingerprint::from_schema(&schema)),
+                Arc::new(Statistics::new_unknown(&schema)),
+                ordering,
+            )
+        };
+        let unordered = FileStatisticsCache::estimate_entry_size("k", &entry(None));
+        let ordered = FileStatisticsCache::estimate_entry_size(
+            "k",
+            &entry(LexOrdering::new(vec![PhysicalSortExpr::new_default(
+                Arc::new(Column::new("value", 0)),
+            )])),
+        );
+        assert!(ordered > unordered);
     }
 
     #[test]
@@ -434,7 +494,7 @@ mod tests {
 
     #[test]
     fn test_list_entries() {
-        use datafusion::execution::cache::cache_manager::FileStatisticsCache as FscTrait;
+        use datafusion::execution::cache::Cache as FscTrait;
 
         let cache = FileStatisticsCache::new();
         let meta = object_meta("list_test", 256);

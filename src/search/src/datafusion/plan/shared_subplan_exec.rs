@@ -21,14 +21,14 @@ use datafusion::{
     common::{
         Result, plan_err,
         runtime::SpawnedTask,
-        tree_node::{Transformed, TransformedResult, TreeNode},
+        tree_node::{Transformed, TransformedResult, TreeNode, TreeNodeRecursion},
     },
     error::{DataFusionError, SharedResult},
     execution::{
-        SendableRecordBatchStream, TaskContext,
-        disk_manager::RefCountedTempFile,
+        SendableRecordBatchStream, SpillFile, TaskContext,
         memory_pool::{MemoryConsumer, MemoryLimit, MemoryPool, MemoryReservation},
     },
+    physical_expr::PhysicalExpr,
     physical_plan::{
         DisplayAs, DisplayFormatType, ExecutionPlan, ExecutionPlanProperties, PlanProperties,
         SpillManager, Statistics,
@@ -79,6 +79,13 @@ impl DisplayAs for SharedSubplanMarkerExec {
 }
 
 impl ExecutionPlan for SharedSubplanMarkerExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "SharedSubplanMarkerExec"
     }
@@ -118,8 +125,19 @@ impl ExecutionPlan for SharedSubplanMarkerExec {
         self.input.execute(partition, context)
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
-        self.input.partition_statistics(partition)
+    fn child_stats_requests(
+        &self,
+        partition: Option<usize>,
+    ) -> Vec<datafusion::physical_plan::ChildStats> {
+        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    }
+
+    fn statistics_from_inputs(
+        &self,
+        input_stats: &[Arc<Statistics>],
+        _args: &datafusion::physical_plan::StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        Ok(Arc::clone(&input_stats[0]))
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {
@@ -201,6 +219,13 @@ impl DisplayAs for SharedSubplanExec {
 }
 
 impl ExecutionPlan for SharedSubplanExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "SharedSubplanExec"
     }
@@ -254,8 +279,19 @@ impl ExecutionPlan for SharedSubplanExec {
         Some(self.metrics.clone_inner())
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
-        self.input.partition_statistics(partition)
+    fn child_stats_requests(
+        &self,
+        partition: Option<usize>,
+    ) -> Vec<datafusion::physical_plan::ChildStats> {
+        vec![datafusion::physical_plan::ChildStats::At(partition)]
+    }
+
+    fn statistics_from_inputs(
+        &self,
+        input_stats: &[Arc<Statistics>],
+        _args: &datafusion::physical_plan::StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        Ok(Arc::clone(&input_stats[0]))
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {
@@ -278,6 +314,13 @@ impl DisplayAs for SharedSubplanReaderExec {
 }
 
 impl ExecutionPlan for SharedSubplanReaderExec {
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        Ok(TreeNodeRecursion::Continue)
+    }
+
     fn name(&self) -> &'static str {
         "SharedSubplanReaderExec"
     }
@@ -314,8 +357,13 @@ impl ExecutionPlan for SharedSubplanReaderExec {
             .replay(partition, context, Arc::clone(&self.schema))
     }
 
-    fn partition_statistics(&self, partition: Option<usize>) -> Result<Arc<Statistics>> {
-        self.state.input.read().partition_statistics(partition)
+    fn statistics_from_inputs(
+        &self,
+        _input_stats: &[Arc<Statistics>],
+        args: &datafusion::physical_plan::StatisticsArgs,
+    ) -> Result<Arc<Statistics>> {
+        datafusion::physical_plan::StatisticsContext::new()
+            .compute(self.state.input.read().as_ref(), args)
     }
 
     fn cardinality_effect(&self) -> CardinalityEffect {
@@ -414,7 +462,7 @@ impl MaterializedSubplan {
 
 enum PartitionData {
     Memory(Vec<RecordBatch>),
-    Spilled(RefCountedTempFile),
+    Spilled(Arc<dyn SpillFile>),
 }
 
 // Shared by all partition collectors; a partition that stops fitting moves to disk.

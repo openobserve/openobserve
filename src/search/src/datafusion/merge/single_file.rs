@@ -26,13 +26,8 @@ use datafusion::{
     error::{DataFusionError, Result},
 };
 use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
+    VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+    io::session::RuntimeSessionExt, session::VortexSession,
 };
 
 use super::{MergeMode, MergeOutput, MergedFile, append_metadata};
@@ -124,18 +119,21 @@ async fn write_vortex(
         VORTEX_RUNTIME.block_on(async move {
             let mut buf = Vec::new();
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
             let write_options = VortexWriteOptions::new(session.clone())
-                .with_strategy(vortex_write_strategy())
+                .with_strategy(vortex_write_strategy(&session))
                 .with_metadata_segment(VORTEX_FILE_META_KEY, file_meta);
             let mut writer = write_options.writer(&mut buf, dtype);
 
             while let Some(batch) = rx.recv().await {
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch, schema.as_ref())
+                    .map_err(|e| {
+                        DataFusionError::Execution(format!(
+                            "Failed to convert arrow array to vortex array: {e}"
+                        ))
+                    })?;
                 writer.push(array).await?;
             }
 
