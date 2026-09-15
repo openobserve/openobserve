@@ -836,7 +836,11 @@ test.describe("Logs Regression Bug Fixes", () => {
       await pm.logsPage.selectStream('e2e_automate');
       await page.waitForTimeout(1000);
 
-      // Step 1: Enable VRL toggle
+      // WARNING: this step is currently a silent no-op — the selector behind
+      // clickVrlToggleButton is dead (see the #9550 note at the end of this
+      // file), so the VRL editor never opens and the assertion below passes
+      // against the SQL editor instead. This test is green without exercising
+      // VRL at all; it needs the same page-object fix.
       testLogger.info('Step 1: Enabling VRL function toggle');
       await pm.logsPage.clickVrlToggleButton().catch(() => {
         testLogger.warn('VRL toggle click failed, trying alternative');
@@ -2108,10 +2112,22 @@ test.describe("Logs Regression Bug Fixes", () => {
   // Bug #9550: VRL-generated fields should not offer include/exclude (=)
   // https://github.com/openobserve/openobserve/issues/9550
   // ==========================================================================
-  // Skipped on a product blocker, not a test blocker: the VRL computed field
-  // does not appear in the field list after the transformation runs, so the
-  // assertion below has nothing to hover. Re-enable once that is fixed — the
-  // body is already correct and needs no rewrite.
+  // Skipped because the VRL editor is never actually opened, NOT because of a
+  // product issue — the reason inherited from the pre-refactor copy of this
+  // test was wrong. Verified against o2latestmain: `clickVrlToggleButton` uses
+  // `[data-test="logs-search-bar-vrl-toggle-btn"]`, which exists nowhere in
+  // web/src, so the call throws and the `.catch` below swallows it. The page
+  // then holds exactly ONE Monaco editor (the SQL one), and
+  // `getVrlEditor()` falls through to its `.monaco-editor` selector, so the
+  // VRL source below is typed into the SQL editor and no computed field is
+  // ever produced.
+  //
+  // To re-enable: the editor is gated on `searchObj.meta.showTransformEditor`,
+  // toggled by `logs-search-bar-show-query-toggle-btn` (already used elsewhere
+  // in logsPage.js) or `logs-search-bar-function-editor-pinned-btn` when
+  // pinned, and renders as `logs-vrl-function-editor` — fix
+  // `logsPage.clickVrlToggleButton`/`getVrlEditor` to those, then drop the
+  // `.catch` so a failure to open is a failure rather than a silent pass.
   test.skip("should not display include/exclude icon for VRL-generated fields", {
     tag: ['@bug-9550', '@P2', '@regression', '@logsRegression', '@logsRegressionVrl']
   }, async ({ page }) => {
