@@ -38,6 +38,7 @@ const {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(() => undefined),
   }),
 }));
 
@@ -261,7 +262,7 @@ describe("AssociatedStreamFunction", () => {
       });
 
       await flushPromises();
-      expect(mockGetStreams).toHaveBeenCalledWith("", false);
+      expect(mockGetStreams).toHaveBeenCalledWith("", false, false, false);
     });
 
     it("should call getAllFunctions when streams are loaded", async () => {
@@ -297,7 +298,8 @@ describe("AssociatedStreamFunction", () => {
       await refreshBtn.trigger("click");
       await flushPromises();
 
-      expect(mockGetStreams).toHaveBeenCalled();
+      // The button must reach the server; an unforced read answers from memory.
+      expect(mockGetStreams).toHaveBeenCalledWith("", false, false, true);
     });
   });
 

@@ -73,20 +73,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+                :last-run-at="lastUpdatedAt"
                 :loading="fetching"
+                shortcut-id="functionsRefresh"
                 data-test="functions-list-refresh-btn"
                 @click="refreshJSTransforms"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="functionsRefresh"
-                />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -290,7 +285,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
@@ -317,7 +312,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OSearchInput,
-    OTooltip,
+    ORefreshButton,
   },
   emits: [
     "updated:fields",
@@ -415,6 +410,8 @@ export default defineComponent({
       return e?.status === 403 || e?.response?.status === 403;
     });
     const fetching = functions.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = functions.dataUpdatedAt;
     // main restored the page inside the old chain's `.finally`; the query has no
     // such hook, so the same restore rides the cold read settling instead.
     watch(
@@ -817,6 +814,7 @@ export default defineComponent({
       selectedDelete,
       loading,
       fetching,
+      lastUpdatedAt,
       refreshJSTransforms,
       forbidden,
       resultTotal,

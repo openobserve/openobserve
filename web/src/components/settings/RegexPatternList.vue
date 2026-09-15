@@ -72,20 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+                :last-run-at="lastUpdatedAt"
                 :loading="fetching"
+                shortcut-id="regexPatternsRefresh"
                 data-test="regex-pattern-list-refresh-btn"
                 @click="refreshRegexPatterns"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="regexPatternsRefresh"
-                />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -258,7 +253,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
@@ -281,7 +276,7 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
+    ORefreshButton,
     OSearchInput,
     OTable,
     OCodeCell,
@@ -379,6 +374,8 @@ export default defineComponent({
     // Request in flight, with rows still on screen — the refresh button's
     // spinner. `listLoading` stays for the skeleton, which only a cold read wants.
     const fetching = regexPatternsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = regexPatternsList.dataUpdatedAt;
 
     const showImportRegexPatternDialog = ref(false);
 
@@ -638,6 +635,7 @@ export default defineComponent({
       createRegexPattern,
       listLoading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       editRegexPattern,
       deleteRegexPattern,

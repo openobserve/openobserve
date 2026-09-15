@@ -95,20 +95,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="iamUsersRefresh"
               data-test="user-list-refresh-btn"
               @click="refreshUsers"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamUsersRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -339,9 +334,9 @@ import { userKeys } from "@/services/users.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { defineComponent, ref, onActivated, onBeforeMount, watch, computed } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
@@ -381,9 +376,9 @@ export default defineComponent({
     AddUser,
     MemberInvitation,
     OButton,
+    ORefreshButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
     OTag,
     OStatStrip,
     OIcon,
@@ -815,6 +810,7 @@ export default defineComponent({
     // A request in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     // The ?email= deep link opens the edit dialog, so it is latched — the
     // cached paint and the fresh one must not open it twice.
@@ -924,6 +920,8 @@ export default defineComponent({
             }
 
             applyUsers(users);
+            lastUpdatedAt.value =
+              queryClient.getQueryState(orgUsersQuery(org).queryKey)?.dataUpdatedAt ?? Date.now();
             dismiss();
 
             // Resolve immediately so the caller (onBeforeMount) can run
@@ -1511,6 +1509,7 @@ export default defineComponent({
       columns,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       orgData,
       confirmDelete,

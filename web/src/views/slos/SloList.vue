@@ -127,16 +127,14 @@
            (OTable renders toolbar → column toggle → toolbar-trailing). Inside
            #toolbar it sat before the toggle and the two pages disagreed. -->
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="fetching"
           data-test="slos-slolist-refresh"
           @click="refresh"
-        >
-          <OTooltip side="bottom" :content="t('slos.refresh')" />
-        </OButton>
+        />
       </template>
 
       <!-- Health tiles sit in #subheader so search and the type filter stay
@@ -490,7 +488,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -546,6 +544,8 @@ const loading = slosList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = slosList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = slosList.dataUpdatedAt;
 // A failed read has to reach the table. `loadError` is only for the imperative
 // refresh path; a mount read that fails (a disabled-feature 501, say) sets the
 // query's error and nothing else, so the table used to render an empty list

@@ -110,20 +110,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="alertDestinationsRefresh"
               data-test="alert-destinations-list-refresh-btn"
               @click="refreshDestinations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertDestinationsRefresh"
-              />
-            </OButton>
+            />
           </template>
 
           <template #bottom="{ totalRows }">
@@ -373,7 +368,7 @@ import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -397,12 +392,12 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     OIcon,
+    ORefreshButton,
     AddDestination,
     OEmptyState,
     ConfirmDialog,
     ImportDestination,
     OButton,
-    OTooltip,
     ODropdown,
     ODropdownItem,
     OSearchInput,
@@ -607,6 +602,7 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     // Bound to refresh / post-write reloads: always reaches the server.
     const refreshDestinations = () => getDestinations(true);
 
@@ -653,6 +649,8 @@ export default defineComponent({
         .fetchQuery(options)
         .then((list: any[]) => {
           applyRows(list);
+          lastUpdatedAt.value =
+            queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
           // Kept out of `apply`, which runs again for the cached paint:
           // rebuilding the graph is three more list calls. Only a forced read
           // can have changed it — every add/edit/delete reloads with force — so
@@ -997,6 +995,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      lastUpdatedAt,
       depGraph,
       showDestinationEditor,
       destinations,

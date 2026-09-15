@@ -929,4 +929,28 @@ describe("useStreams Composable", () => {
       );
     });
   });
+
+  describe("Forced full read and fetched-at", () => {
+    it("a forced read of the whole list fetches every type, memory hits included", async () => {
+      queryClient.clear();
+      for (const type of ["logs", "metrics", "traces", "enrichment_tables", "index", "metadata"]) {
+        (mockStore.state.streams as any)[type] = { list: [{ name: "cached" }] };
+      }
+
+      await streamsInstance.getStreams("all", false, false, true);
+
+      expect(StreamService.nameList).toHaveBeenCalledTimes(6);
+    });
+
+    it("getStreamsFetchedAt reports the oldest type list, or nothing when none is cached", () => {
+      queryClient.clear();
+      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
+      queryClient.setQueryData(key("logs"), [], { updatedAt: 2000 });
+      queryClient.setQueryData(key("metrics"), [], { updatedAt: 1000 });
+
+      expect(streamsInstance.getStreamsFetchedAt()).toBe(1000);
+      expect(streamsInstance.getStreamsFetchedAt("logs")).toBe(2000);
+      expect(streamsInstance.getStreamsFetchedAt("traces")).toBeUndefined();
+    });
+  });
 });

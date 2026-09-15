@@ -103,20 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="fetching"
+            shortcut-id="alertIncidentsRefresh"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
-          >
-            <OTooltip
-              side="bottom"
-              :content="t('common.refresh')"
-              shortcut-id="alertIncidentsRefresh"
-            />
-          </OButton>
+          />
         </template>
         <template #cell-status="{ row }">
           <OTag
@@ -317,6 +312,7 @@ import incidentsService, { Incident } from "@/services/incidents";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -343,6 +339,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -376,6 +373,8 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = incidentsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = incidentsList.dataUpdatedAt;
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = incidentsList.error.value;
@@ -938,6 +937,7 @@ export default defineComponent({
       t,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       allIncidents,
       visibleIncidents,

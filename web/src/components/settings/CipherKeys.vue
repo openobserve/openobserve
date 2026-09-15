@@ -61,20 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="cipherKeysRefresh"
               data-test="cipher-keys-list-refresh-btn"
               @click="refreshData"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="cipherKeysRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -192,7 +187,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -212,7 +207,7 @@ export default defineComponent({
     OButton,
     ODropdown,
     ODropdownItem,
-    OTooltip,
+    ORefreshButton,
     OSearchInput,
     OTable,
   },
@@ -231,6 +226,8 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = cipherKeysList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = cipherKeysList.dataUpdatedAt;
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = cipherKeysList.error.value;
@@ -573,6 +570,7 @@ export default defineComponent({
       router,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       tabledata,
       columns,

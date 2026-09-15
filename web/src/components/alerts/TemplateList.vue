@@ -108,20 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="alertTemplatesRefresh"
               data-test="template-list-refresh-btn"
               @click="refreshTemplates"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertTemplatesRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -355,7 +350,7 @@ import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -482,6 +477,8 @@ const loading = templatesList.isPending;
 // Request in flight with rows still on screen — the refresh button's spinner.
 // `loading` is the skeleton, for a cold read only.
 const fetching = templatesList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = templatesList.dataUpdatedAt;
 // Bound to refresh / post-write reloads: always reaches the server.
 const refreshTemplates = () => getTemplates(true);
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.

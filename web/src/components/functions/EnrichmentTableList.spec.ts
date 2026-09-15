@@ -51,6 +51,7 @@ vi.mock("@/services/jstransform", async (importOriginal) => {
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(() => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),
@@ -552,7 +553,8 @@ describe("EnrichmentTableList", () => {
       vm.restorePageIndex();
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 

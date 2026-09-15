@@ -61,20 +61,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="iamGroupsRefresh"
               data-test="iam-groups-refresh-btn"
               @click="refreshGroups"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamGroupsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center">
@@ -193,7 +188,7 @@ import { groupsQuery } from "@/services/iam.queries";
 import { ref, onBeforeMount, computed, watch } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -327,6 +322,7 @@ const loading = groupsList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = groupsList.isFetching;
+const lastUpdatedAt = groupsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = groupsList.error.value;

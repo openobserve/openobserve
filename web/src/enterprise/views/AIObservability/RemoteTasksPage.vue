@@ -71,16 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="loading"
             data-test="ai-remote-tasks-refresh-btn"
             @click="refresh(true)"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #empty>
@@ -224,6 +222,7 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -267,6 +266,7 @@ const DEFAULT_COLUMN_VISIBILITY = { httpMethod: false };
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
 const tasks = ref<RemoteTask[]>([]);
+const lastUpdatedAt = ref<number | null>(null);
 const loading = ref(false);
 const forbidden = ref(false);
 const search = ref("");
@@ -448,7 +448,9 @@ async function refresh(force = false) {
     if (force) {
       await queryClient.invalidateQueries({ queryKey: remoteTaskKeys.all(orgId.value) });
     }
-    tasks.value = await queryClient.fetchQuery(remoteTasksListQuery(orgId.value));
+    const opts = remoteTasksListQuery(orgId.value);
+    tasks.value = await queryClient.fetchQuery(opts);
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
     forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.

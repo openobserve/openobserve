@@ -1002,7 +1002,8 @@ describe("FunctionList", () => {
       vm.restorePageIndex();
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 

@@ -130,20 +130,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="modelPricingRefresh"
               data-test="model-pricing-list-refresh-btn"
               @click="refreshModels"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="modelPricingRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #tree-warning="{ row }">
             <div class="flex items-center gap-2 py-1 text-sm leading-none">
@@ -654,6 +649,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -687,6 +683,8 @@ const loading = modelsQuery.isPending;
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = modelsQuery.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = modelsQuery.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = modelsQuery.error.value;

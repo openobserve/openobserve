@@ -242,13 +242,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              class="w-8!"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
-              :title="t('common.refresh')"
               data-test="synthetic-monitoring-refresh-btn"
               @click="loadMonitors(undefined, true)"
             />
@@ -440,6 +438,7 @@ import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -611,6 +610,7 @@ const forbidden = computed(() => {
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = monitorsList.isFetching;
+const lastUpdatedAt = monitorsList.dataUpdatedAt;
 
 /** Resolves once orgIdentifier is populated — on browser back-navigation the
  *  store may not be hydrated synchronously yet. */

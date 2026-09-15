@@ -105,16 +105,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+                :last-run-at="lastUpdatedAt"
                 :loading="fetching"
                 data-test="workflow-list-refresh"
                 @click="refreshWorkflows"
-              >
-                <OTooltip side="bottom" :content="t('workflow.refresh')" />
-              </OButton>
+              />
             </template>
 
             <template #cell-name="{ row }">
@@ -280,6 +278,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -316,6 +315,8 @@ const loading = workflowsList.isPending;
 // Request in flight, with rows still on screen — the refresh button's
 // spinner. `loading` stays for the skeleton, which only a cold read wants.
 const fetching = workflowsList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = workflowsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = workflowsList.error.value;

@@ -108,20 +108,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="pipelinesRefresh"
               data-test="pipeline-list-refresh-btn"
               @click="refreshPipelines"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="pipelinesRefresh"
-              />
-            </OButton>
+            />
           </template>
 
           <template #cell-type="{ row }">
@@ -552,6 +547,7 @@ import ResumePipelineDialog from "../ResumePipelineDialog.vue";
 import CreateBackfillJobDialog from "@/components/pipelines/CreateBackfillJobDialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -688,8 +684,7 @@ const confirmDialogMeta: any = ref({
   onConfirm: () => {},
 });
 const activeTab = ref("all");
-// Derived, not assigned: a copy written only by updateActiveTab() is empty on a
-// cold mount, because that runs before the query resolves and nothing re-runs it.
+// Derived, not assigned: a copy written only by updateActiveTab() is empty on a cold mount.
 const filteredPipelines = computed<any[]>(() =>
   activeTab.value === "all"
     ? pipelines.value
@@ -1075,6 +1070,8 @@ const forbidden = computed(() => {
   const e: any = pipelinesList.error.value;
   return e?.status === 403 || e?.response?.status === 403;
 });
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = pipelinesList.dataUpdatedAt;
 // Bound to the refresh button: always hits the server.
 const refreshPipelines = () => getPipelines(true);
 

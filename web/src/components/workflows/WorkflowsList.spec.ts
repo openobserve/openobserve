@@ -868,7 +868,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.restorePageIndex();
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -892,7 +893,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -923,7 +925,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
   });

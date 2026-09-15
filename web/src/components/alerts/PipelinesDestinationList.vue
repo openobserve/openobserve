@@ -64,20 +64,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="pipelineDestinationsRefresh"
               data-test="pipeline-destination-list-refresh-btn"
               @click="refreshDestinations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="pipelineDestinationsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -225,7 +220,7 @@ import type { Template } from "@/ts/interfaces/index";
 
 import { useReo } from "@/services/reodotdev_analytics";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -256,11 +251,11 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     OPageLayout,
+    ORefreshButton,
     PipelineDestinationEditor,
     OEmptyState,
     ConfirmDialog,
     OButton,
-    OTooltip,
     OIcon,
     OTag,
     OSearchInput,
@@ -380,6 +375,7 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     // Bound to refresh / post-write reloads: always reaches the server.
     const refreshDestinations = () => getDestinations(true);
@@ -418,7 +414,11 @@ export default defineComponent({
       }
       return queryClient
         .fetchQuery(options)
-        .then((list: any[]) => applyRows(list))
+        .then((list: any[]) => {
+          applyRows(list);
+          lastUpdatedAt.value =
+            queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
+        })
         .catch((err: any) => {
           forbidden.value = err?.response?.status === 403;
           if (!forbidden.value) {
@@ -718,6 +718,7 @@ export default defineComponent({
 
     return {
       t,
+      lastUpdatedAt,
       showDestinationEditor,
       destinations,
       columns,

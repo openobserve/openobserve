@@ -39,16 +39,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <div class="col-md-2 w-full">
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="sm"
-            @click="refreshPatterns"
+            :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="built-in-pattern-refresh-btn"
-          >
-            <template #icon-left><OIcon name="refresh" size="sm" /></template>
-            {{ t("regex_patterns.refresh") }}
-          </OButton>
+            @click="refreshPatterns"
+          />
         </div>
       </div>
     </div>
@@ -235,6 +233,7 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
@@ -258,6 +257,7 @@ export default defineComponent({
   name: "BuiltInPatternsTab",
   components: {
     OButton,
+    ORefreshButton,
     ODialog,
     OSpinner,
     OIcon,
@@ -284,6 +284,7 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = builtInList.isFetching;
+    const lastUpdatedAt = builtInList.dataUpdatedAt;
     const error = ref("");
     const searchQuery = ref("");
     const selectedTags = ref<string[]>([]);
@@ -454,6 +455,7 @@ export default defineComponent({
       previewedPattern,
       fetchPatterns,
       refreshPatterns,
+      lastUpdatedAt,
       updateSelection,
       previewPattern,
       importSinglePattern,

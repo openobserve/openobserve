@@ -79,20 +79,15 @@
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="isLoading"
+              :last-run-at="lastUpdatedAt"
+              :loading="isFetching"
+              shortcut-id="llmProvidersRefresh"
               data-test="llm-providers-list-refresh-btn"
-              @click="loadProviders"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="llmProvidersRefresh"
-              />
-            </OButton>
+              @click="() => loadProviders(true)"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -190,15 +185,15 @@ import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
-import { deleteProviderMutation } from "@/services/online-evals.service.queries";
-import { useMutation } from "@tanstack/vue-query";
+import { type Provider } from "@/services/online-evals.service";
+import { deleteProviderMutation, providersQuery } from "@/services/online-evals.service.queries";
+import { useMutation, useQuery } from "@tanstack/vue-query";
 import {
   defaultModelOf,
   providerTypeOf,
@@ -218,9 +213,6 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 
-const providers = ref<Provider[]>([]);
-const isLoading = ref(false);
-const forbidden = ref(false);
 const searchQuery = ref("");
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
 
@@ -229,7 +221,24 @@ const pendingDeleteRow = ref<Provider | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
-// `loadProviders` only refreshes this page; the Online Evals surfaces read `providersQuery`, which the mutation drops.
+// The same entry the Online Evals surfaces read, so a write on either page reaches both.
+const providersList = useQuery(() =>
+  Object.assign(providersQuery(orgId.value), { enabled: !!orgId.value }),
+);
+const providers = computed<Provider[]>(() => providersList.data.value ?? []);
+const isLoading = providersList.isPending;
+const isFetching = providersList.isFetching;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = providersList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+const lastUpdatedAt = providersList.dataUpdatedAt;
+// The grouped access toast already reports a 403; a second red toast adds nothing.
+watch(providersList.error, (err: any) => {
+  if (err && !forbidden.value) showError(err, t("llmProviders.loadError"));
+});
+
 const deleteProvider = useMutation(() => deleteProviderMutation(orgId.value));
 
 const columns = computed(() => [
@@ -298,6 +307,8 @@ const filteredProviders = computed(() => {
 
 onBeforeMount(async () => {
   await loadProviders();
+  // An edit deep link pre-fills the form from this read, so it must not come from the disk copy.
+  if (route.query.action === "update") await loadProviders(true);
   syncFromRoute();
 });
 
@@ -306,19 +317,11 @@ watch(
   () => syncFromRoute(),
 );
 
-async function loadProviders() {
+// The mount read is the query's own; only an explicit refresh forces the server.
+async function loadProviders(force = false) {
   if (!orgId.value) return;
-  isLoading.value = true;
-  forbidden.value = false;
-  try {
-    providers.value = await onlineEvalsService.providers.list(orgId.value);
-  } catch (err: any) {
-    forbidden.value = err?.response?.status === 403;
-    // The grouped access toast already reports a 403; a second red toast adds nothing.
-    if (!forbidden.value) showError(err, t("llmProviders.loadError"));
-  } finally {
-    isLoading.value = false;
-  }
+  if (force) await providersList.refetch();
+  else await providersList.suspense();
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {
@@ -350,10 +353,10 @@ function closeForm() {
   clearRouteAction();
 }
 
-async function handleSaved() {
+// The save mutation's `invalidates` already refetches the list.
+function handleSaved() {
   formPage.value = null;
   clearRouteAction();
-  await loadProviders();
 }
 
 function syncFromRoute() {
@@ -392,7 +395,6 @@ async function performDelete() {
       variant: "success",
       message: t("onlineEvals.deleted", { label: t("onlineEvals.singular.providers") }),
     });
-    await loadProviders();
   } catch (err: any) {
     showError(
       err,
@@ -407,7 +409,7 @@ useShortcuts([
   {
     id: "llmProvidersRefresh",
     handler: () => {
-      if (!isInputFocused()) loadProviders();
+      if (!isInputFocused()) loadProviders(true);
     },
   },
 ]);

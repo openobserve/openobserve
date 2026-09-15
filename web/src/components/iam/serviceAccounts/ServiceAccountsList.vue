@@ -72,20 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="iamServiceAccountsRefresh"
               data-test="iam-service-accounts-refresh-btn"
               @click="refreshServiceAccounts"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamServiceAccountsRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -491,6 +486,7 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -540,6 +536,7 @@ export default defineComponent({
     OIcon,
     OPageLayout,
     OTooltip,
+    ORefreshButton,
     OTable,
     OTag,
     OCodeCell,
@@ -806,6 +803,8 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = serviceAccountsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = serviceAccountsList.dataUpdatedAt;
     // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
     const forbidden = computed(() => {
       const e: any = serviceAccountsList.error.value;
@@ -1176,6 +1175,7 @@ export default defineComponent({
       columns,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       orgData,
       confirmDelete,

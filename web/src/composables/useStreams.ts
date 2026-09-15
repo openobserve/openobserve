@@ -111,9 +111,10 @@ const useStreams = (t: TranslateFn) => {
                 "metadata",
               ];
 
-              const streamsToFetch = streamList.filter(
-                (_streamType) => !streamsCache[_streamType]?.value,
-              );
+              // A forced read must not skip the types already in memory, or the invalidation above fetches nothing.
+              const streamsToFetch = force
+                ? streamList
+                : streamList.filter((_streamType) => !streamsCache[_streamType]?.value);
 
               // One cached query per type: a hit resolves without a request.
               Promise.allSettled(
@@ -126,7 +127,7 @@ const useStreams = (t: TranslateFn) => {
                 .then((results: any) => {
                   results.forEach((result: any, index: number) => {
                     if (result.status === "fulfilled" && result.value?.length > 0) {
-                      setStreams(streamsToFetch[index], result.value);
+                      setStreams(streamsToFetch[index], result.value, force);
                     }
                   });
 
@@ -398,6 +399,16 @@ const useStreams = (t: TranslateFn) => {
     }
 
     return isStreamFetched;
+  };
+
+  // "all" is one query per type, so its age is the oldest of them.
+  const getStreamsFetchedAt = (streamType: string = "all"): number | undefined => {
+    const org = store.state.selectedOrganization.identifier;
+    const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
+    const times = types
+      .map((type) => queryClient.getQueryState(streamKeys.nameList(org, type))?.dataUpdatedAt)
+      .filter((t): t is number => !!t);
+    return times.length ? Math.min(...times) : undefined;
   };
 
   const setStreams = (
@@ -777,6 +788,7 @@ const useStreams = (t: TranslateFn) => {
     getPaginatedStreams,
     isStreamExists,
     isStreamFetched,
+    getStreamsFetchedAt,
     addNewStreams,
     // Internal functions exposed for testing
     updateStreamsInStore,

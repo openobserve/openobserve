@@ -56,16 +56,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @row-click="openDetail"
       >
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="ai-queues-refresh-btn"
             @click="refreshQueues"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #toolbar>
@@ -360,6 +358,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -399,6 +398,8 @@ const queues = computed<LlmQueue[]>(() => (queuesList.data.value ?? []) as LlmQu
 const loading = queuesList.isPending;
 // Request in flight with rows still on screen — the refresh control's spinner.
 const fetching = queuesList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = queuesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = queuesList.error.value;

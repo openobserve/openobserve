@@ -68,6 +68,7 @@ const mockResetStreamType = vi.fn();
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
     getStreams: mockGetStreams,
+    getStreamsFetchedAt: vi.fn(() => undefined),
     resetStreamType: mockResetStreamType,
     getStream: mockGetStream,
   }),

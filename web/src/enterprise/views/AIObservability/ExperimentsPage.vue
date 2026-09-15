@@ -32,6 +32,7 @@
           v-else
           :org-id="orgId"
           :loading="loading"
+          :last-updated-at="lastUpdatedAt"
           :experiments="experiments"
           :datasets="datasets"
           @new="openCreate"
@@ -72,6 +73,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experiments = ref<LlmExperiment[]>([]);
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 
 function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
   experiments.value = experiments.value.map((row) => {
@@ -89,10 +91,12 @@ async function refresh(force = false) {
     if (force) {
       await queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
     }
+    const opts = experimentsListQuery(orgId.value);
     [experiments.value, datasets.value] = await Promise.all([
-      queryClient.fetchQuery(experimentsListQuery(orgId.value)),
+      queryClient.fetchQuery(opts),
       llmDatasetsService.list(orgId.value),
     ]);
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
     // Surface the server's message; a bare catch here hid a stale ?selected=
     // 404 behind "failed to load experiments" while the list rendered fine.

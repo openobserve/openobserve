@@ -665,7 +665,8 @@ describe("IncidentList.vue", () => {
       (wrapper.vm as any).qTableRef.table = { setPageIndex };
 
       await flushPromises();
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
 
       expect(setPageIndex).toHaveBeenCalledWith(2);
       store.state.incidents = { incidents: {}, isInitialized: false };

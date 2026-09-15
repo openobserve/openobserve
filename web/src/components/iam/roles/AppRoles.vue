@@ -43,20 +43,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @create="addRole"
         >
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="iamRolesRefresh"
               data-test="iam-roles-refresh-btn"
               @click="refreshRoles"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamRolesRefresh"
-              />
-            </OButton>
+            />
           </template>
         </RoleTable>
       </div>
@@ -92,7 +87,7 @@ import { queryClient } from "@/composables/query/queryClient";
 import { computed, onBeforeMount, ref, watch } from "vue";
 import AddRole from "./AddRole.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import RoleTable from "./RoleTable.vue";
@@ -197,6 +192,7 @@ const loading = rolesList.isPending;
 // A request in flight while rows stay on screen — the refresh button's spinner.
 // `loading` is the skeleton, which only a cold read wants.
 const fetching = rolesList.isFetching;
+const lastUpdatedAt = rolesList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = rolesList.error.value;

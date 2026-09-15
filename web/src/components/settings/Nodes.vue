@@ -464,16 +464,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+                :last-run-at="lastUpdatedAt"
                 :loading="fetching"
+                shortcut-id="nodesRefresh"
                 data-test="nodes-list-refresh-btn"
                 @click="refreshData"
-              >
-                <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="nodesRefresh" />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -570,6 +569,7 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ORange from "@/lib/forms/Range/ORange.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -593,6 +593,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OProgressBar,
     OInput,
     OCheckbox,
@@ -644,6 +645,8 @@ export default defineComponent({
     // A request is in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = nodesList.isFetching;
+    // 0 until the gated first read; the button renders that as "not yet refreshed".
+    const lastUpdatedAt = nodesList.dataUpdatedAt;
     const splitterModel = ref(250);
     const { isMobile } = useBreakpoint();
     watch(
@@ -1278,6 +1281,7 @@ export default defineComponent({
 
     return {
       refreshData,
+      lastUpdatedAt,
       t,
       raw,
       store,

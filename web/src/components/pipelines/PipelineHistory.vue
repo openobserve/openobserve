@@ -58,17 +58,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:column-visibility="setColumnVisibility"
         @reset:column-sizes="tableRef?.resetColumnSizes()"
       />
-      <OButton
+      <ORefreshButton
+        layout="inline"
         variant="outline"
-        size="icon-sm"
         class="shrink-0"
-        @click="refreshData"
-        data-test="pipeline-history-refresh-btn"
+        :last-run-at="lastUpdatedAt"
         :loading="loading"
-        icon-left="refresh"
-      >
-        <OTooltip :content="t('common.refresh')" side="top" />
-      </OButton>
+        data-test="pipeline-history-refresh-btn"
+        @click="refreshData"
+      />
     </Teleport>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div
@@ -457,7 +455,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import * as dateUtils from "@/utils/date";
 import DateTime from "@/components/DateTime.vue";
-import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -482,6 +480,7 @@ const store = useStore();
 
 // Data
 const loading = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref(false);
 const rows = ref<any[]>([]);
 const searchQuery = ref("");
@@ -739,6 +738,8 @@ const fetchPipelineHistory = async (force = false) => {
       });
     }
     const historyData: any = await queryClient.fetchQuery(options);
+    // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
 
     if (historyData) {
       // Map the hits array or handle empty response

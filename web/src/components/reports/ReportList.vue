@@ -139,20 +139,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #toolbar-trailing>
-                <OButton
+                <ORefreshButton
+                  layout="inline"
                   variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="isRefreshingReports"
+                  :last-run-at="lastUpdatedAt"
+                  :loading="fetching"
+                  shortcut-id="reportsRefresh"
                   data-test="report-list-refresh-btn"
                   @click="refreshReports"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="t('reports.reloadReports')"
-                    shortcut-id="reportsRefresh"
-                  />
-                </OButton>
+                />
               </template>
               <template #empty>
                 <OEmptyState
@@ -405,7 +400,7 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
@@ -468,8 +463,8 @@ const forbidden = computed(() => {
 });
 
 const isLoadingReports = ref(true);
-// Request in flight with rows still on screen — the refresh button's spinner.
-const isRefreshingReports = ref(false);
+const fetching = reportsList.isFetching;
+const lastUpdatedAt = reportsList.dataUpdatedAt;
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -608,7 +603,6 @@ watch(reportsList.data, (rows: any) => {
 watch(reportsList.error, (err: any) => {
   if (!err) return;
   isLoadingReports.value = false;
-  isRefreshingReports.value = false;
   if (err?.response?.status !== 403) {
     toast({
       variant: "error",
@@ -622,7 +616,6 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
   // the button instead.
   const warm = staticReportsList.value.length > 0;
   isLoadingReports.value = !warm;
-  isRefreshingReports.value = true;
   const dismiss = warm
     ? () => {}
     : toast({
@@ -654,7 +647,6 @@ const loadReports = async (folderId: string, nameQuery?: string, force = false) 
   } finally {
     dismiss();
     isLoadingReports.value = false;
-    isRefreshingReports.value = false;
   }
 };
 

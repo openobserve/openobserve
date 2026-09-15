@@ -216,20 +216,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #toolbar-trailing>
-                <OButton
+                <ORefreshButton
+                  layout="inline"
                   variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
+                  :last-run-at="lastUpdatedAt"
                   :loading="fetching"
+                  shortcut-id="alertsRefresh"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="t('alerts.reloadAlertsTooltip')"
-                    shortcut-id="alertsRefresh"
-                  />
-                </OButton>
+                />
               </template>
 
               <template #cell-name="{ row }">
@@ -997,6 +992,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -1040,6 +1036,7 @@ export default defineComponent({
     OTooltip,
     SelectFolderDropDown,
     OButton,
+    ORefreshButton,
     OIcon,
     ODialog,
     ODropdown,
@@ -1125,6 +1122,7 @@ export default defineComponent({
     // A request in flight while rows stay on screen — the refresh button's
     // spinner. `loading` is the skeleton, which only a cold read wants.
     const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
@@ -2101,15 +2099,16 @@ export default defineComponent({
         alertKeys.list(org, folderId, query, alertType),
       );
       const painted = cachedRows ? renderAlerts(cachedRows) : false;
+      const opts = alertsListQuery(org, folderId, query, alertType);
       const pending = force
         ? queryClient
             .invalidateQueries({
-              queryKey: alertsListQuery(org, folderId, query, alertType).queryKey,
+              queryKey: opts.queryKey,
               exact: true,
               refetchType: "none",
             })
-            .then(() => queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType)))
-        : queryClient.fetchQuery(alertsListQuery(org, folderId, query, alertType));
+            .then(() => queryClient.fetchQuery(opts))
+        : queryClient.fetchQuery(opts);
 
       loading.value = !painted;
       fetching.value = true;
@@ -2127,6 +2126,8 @@ export default defineComponent({
           dismiss();
           return;
         }
+        // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+        lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
         // `?action=…` deep links are handled by the immediate watcher on
         // `query.action` below. Handling them here too re-opened a blank form
         // after every save: the post-save refresh reads the route before
@@ -3731,6 +3732,7 @@ export default defineComponent({
       isFetchingStreams,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       isSubmitting,
       filterQuery,

@@ -116,16 +116,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="isRefreshing"
+              shortcut-id="streamsRefresh"
               data-test="log-stream-refresh-stats-btn"
               @click="refreshStreams"
-            >
-              <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="streamsRefresh" />
-            </OButton>
+            />
           </template>
           <!--
             Render the stream-name cell with a deterministic per-name data-test.
@@ -447,7 +446,7 @@ import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
 import AddStream from "@/components/logstream/AddStream.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -469,7 +468,7 @@ export default defineComponent({
     EmptyStateIngestionChip,
     AddStream,
     OButton,
-    OTooltip,
+    ORefreshButton,
     ODialog,
     ODropdown,
     ODropdownItem,
@@ -504,6 +503,7 @@ export default defineComponent({
     // A refresh with rows already on screen: the button spins, the table does not
     // go back to a skeleton.
     const isRefreshing = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const searchKeyword = ref("");
     const deleteAssociatedAlertsPipelines = ref(true);
@@ -758,15 +758,16 @@ export default defineComponent({
         const painted = cachedPage !== undefined;
         if (painted) applyStreams(cachedPage);
         isRefreshing.value = true;
+        const opts = streamPageQuery(org, type, params);
         const streamResponse = _refresh
           ? queryClient
               .invalidateQueries({
-                queryKey: streamPageQuery(org, type, params).queryKey,
+                queryKey: opts.queryKey,
                 exact: true,
                 refetchType: "none",
               })
-              .then(() => queryClient.fetchQuery(streamPageQuery(org, type, params)))
-          : queryClient.fetchQuery(streamPageQuery(org, type, params));
+              .then(() => queryClient.fetchQuery(opts))
+          : queryClient.fetchQuery(opts);
 
         loadingState.value = !painted;
         const dismiss = painted
@@ -780,6 +781,9 @@ export default defineComponent({
         streamResponse
           .then((res: any) => {
             applyStreams(res);
+            // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+            lastUpdatedAt.value =
+              queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
 
             logStream.value.forEach((element: any) => {
               if (element.name == router.currentRoute.value.query.dialog) {
@@ -1374,6 +1378,7 @@ export default defineComponent({
       onStreamsEmptyStateAction,
       loadingState,
       isRefreshing,
+      lastUpdatedAt,
       forbidden,
       isDeleting,
       searchKeyword,

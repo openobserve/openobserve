@@ -40,16 +40,14 @@
             {{ t("aiObservability.experiments.compare") }}
           </OButton>
         </OTooltip>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="ai-experiment-refresh"
           @click="$emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -293,6 +291,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -333,8 +332,9 @@ const props = withDefaults(
     syncUrl?: boolean;
     /** Spins the refresh icon while the page re-fetches. */
     loading?: boolean;
+    lastUpdatedAt?: number | null;
   }>(),
-  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
+  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false, lastUpdatedAt: null },
 );
 
 const emit = defineEmits<{

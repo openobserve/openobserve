@@ -105,20 +105,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
+                :last-run-at="lastUpdatedAt"
                 :loading="fetching"
+                shortcut-id="enrichmentTablesRefresh"
                 data-test="enrichment-tables-list-refresh-btn"
                 @click="refreshList"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="enrichmentTablesRefresh"
-                />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -504,6 +499,7 @@ import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -532,6 +528,7 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    ORefreshButton,
     ODrawer,
     ODropdown,
     ODropdownItem,
@@ -564,6 +561,7 @@ export default defineComponent({
     // Request in flight with rows still on screen — the refresh button's
     // spinner. `loading` is the skeleton, for a cold read only.
     const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
     const currentPage = ref(1);
@@ -655,7 +653,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams(t);
+    const { getStreams, getStreamsFetchedAt, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();
@@ -705,32 +703,27 @@ export default defineComponent({
           });
 
       try {
+        const opts = enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier);
         // Fetch both streams and URL job statuses in parallel
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
           (force
             ? queryClient
                 .invalidateQueries({
-                  queryKey: enrichmentTableStatusesQuery(
-                    store.state.selectedOrganization.identifier,
-                  ).queryKey,
+                  queryKey: opts.queryKey,
                   exact: true,
                   refetchType: "none",
                 })
-                .then(() =>
-                  queryClient.fetchQuery(
-                    enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
-                  ),
-                )
-            : queryClient.fetchQuery(
-                enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier),
-              )
+                .then(() => queryClient.fetchQuery(opts))
+            : queryClient.fetchQuery(opts)
           ).catch((err: any) => {
             // If status API fails, continue with empty status map
             console.warn("Error fetching URL statuses:", err);
             return {};
           }),
         ]);
+        // Read from the rows' own list query: the statuses read above swallows its failures.
+        lastUpdatedAt.value = getStreamsFetchedAt("enrichment_tables") ?? Date.now();
 
         const res: any = streamsRes;
         const urlJobMap: Record<string, any> = statusRes || {};
@@ -1175,6 +1168,7 @@ export default defineComponent({
       getLookupTables,
       loading,
       fetching,
+      lastUpdatedAt,
       forbidden,
       resultTotal,
       refreshList,

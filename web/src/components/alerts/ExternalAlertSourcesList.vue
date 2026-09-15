@@ -67,20 +67,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
+              :last-run-at="lastUpdatedAt"
               :loading="fetching"
+              shortcut-id="alertSourcesRefresh"
               data-test="alert-sources-refresh-btn"
               @click="refreshAll"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('alert_sources.refresh')"
-                shortcut-id="alertSourcesRefresh"
-              />
-            </OButton>
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -343,6 +338,7 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -386,6 +382,7 @@ export default defineComponent({
   components: {
     OPageLayout,
     OButton,
+    ORefreshButton,
     OTag,
     OTable,
     OIcon,
@@ -433,6 +430,7 @@ export default defineComponent({
       // spinner. `loading` is the skeleton, for a cold read only.
       fetching: false,
       forbidden: false,
+      lastUpdatedAt: null as number | null,
       filterQuery: "",
       showAddDrawer: false,
       editTargetIntegration: undefined as AlertSourceIntegration | undefined,
@@ -627,6 +625,8 @@ export default defineComponent({
           });
         }
         this.integrations = await queryClient.fetchQuery(options);
+        this.lastUpdatedAt =
+          queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
       } catch (e: any) {
         this.forbidden = e?.response?.status === 403;
         // The grouped access toast already reports a 403; a second red toast adds nothing.

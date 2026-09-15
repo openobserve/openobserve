@@ -58,16 +58,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="h-full w-full"
       >
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="fetching"
             data-test="ai-datasets-refresh-btn"
             @click="refreshDatasets"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+          />
         </template>
 
         <template #toolbar>
@@ -273,6 +271,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
@@ -323,6 +322,8 @@ const datasets = computed<LlmDataset[]>(() => (datasetsList.data.value ?? []) as
 const loading = datasetsList.isPending;
 // Request in flight with rows still on screen — the refresh control's spinner.
 const fetching = datasetsList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = datasetsList.dataUpdatedAt;
 // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
 const forbidden = computed(() => {
   const e: any = datasetsList.error.value;
