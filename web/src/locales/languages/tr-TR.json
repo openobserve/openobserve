@@ -1287,7 +1287,37 @@
     "databases": "Veritabanları",
     "hosts": "Ana Bilgisayarlar",
     "kubernetes": "Kubernetes",
-    "topQueries": "En Çok Kullanılan Sorgular"
+    "topQueries": "En Çok Kullanılan Sorgular",
+    "profiles": "Profiller"
+  },
+  "profiles": {
+    "title": "Profiller",
+    "stream": "Akış",
+    "dataSource": "Veri kaynağı",
+    "service": "Hizmet",
+    "profileType": "Profil türü",
+    "tagKey": "Etiket anahtarı",
+    "tagValue": "Etiket değeri",
+    "addFilter": "Filtre ekle",
+    "runQuery": "Sorguyu çalıştır",
+    "timeSeriesTitle": "Zaman içinde profil değerleri",
+    "resultTitle": "Profil sonucu",
+    "viewTop": "En üst tablo",
+    "viewFlame": "Alev grafiği",
+    "viewTree": "Yığın ağacı",
+    "self": "Kendi",
+    "total": "Toplam",
+    "cpuDuration": "CPU süresi",
+    "percent": "%",
+    "noStreams": "Kullanılabilir profil akışı yok",
+    "noSeries": "Bu aralıkta zaman serisi verisi yok",
+    "noResults": "Bu aralıkta profil sonucu yok",
+    "filters": "Filtreler",
+    "expand": "Genişlet",
+    "collapse": "Daralt",
+    "errors": {
+      "loadFailed": "Profil verileri yüklenemedi"
+    }
   },
   "rum": {
     "noSessionReplay": "Oturum tekrarı mevcut değil",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Günlükler",
     "labelMetrics": "Metrikler",
     "labelTraces": "İzler",
+    "labelProfiles": "Profiller",
     "labelMetadata": "Meta veriler",
     "add": "Akış Ekle",
     "dataRetention": "Veri Saklama (gün cinsinden)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Özel",
     "logsLabel": "Günlükler",
     "metricsLabel": "Metrikler",
+    "profilesLabel": "Profiller",
     "tracesLabel": "İzler",
     "redirectionIngestionMsg": "Not: IAM dışındaki sayfalara erişmek için, veri alımının geçerli kuruluş içinde başlatılması gerekir.",
     "databaseLabel": "Veritabanları",
@@ -5936,7 +5968,8 @@
       "or": "Veya:",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "Yapay zeka entegrasyonları",
-      "shippers": "Kütük göndericileri"
+      "shippers": "Kütük göndericileri",
+      "profiles": "Profiller"
     },
     "indexSizeLbl": "Endeks Boyutu",
     "docsCountLbl": "Olaylar",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Loglarda Bulundu",
       "foundInTraces": "İzlerde Bulundu",
       "foundInMetrics": "Metriklerde Bulundu",
+      "foundInProfiles": "Profillerde bulundu",
       "distinguishByLabel": "Servisleri Şuna Göre Ayırt Et",
       "distinguishByHelp": "Servislerinizin nerede çalıştığını tanımlayan alanları seçin. Örneğin, küme + ad alanı + dağıtım birlikte her servis için benzersiz bir kimlik oluşturur. En fazla 5 alan.",
       "serviceOptionalLabel": "Servis özniteliği olmadan ilişkilendir",

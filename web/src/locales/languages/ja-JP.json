@@ -1287,7 +1287,37 @@
     "databases": "データベース",
     "hosts": "ホスト",
     "kubernetes": "Kubernetes",
-    "topQueries": "トップクエリ"
+    "topQueries": "トップクエリ",
+    "profiles": "プロファイル"
+  },
+  "profiles": {
+    "title": "プロファイル",
+    "stream": "ストリーム",
+    "dataSource": "データソース",
+    "service": "サービス",
+    "profileType": "プロファイルタイプ",
+    "tagKey": "タグキー",
+    "tagValue": "タグ値",
+    "addFilter": "フィルターを追加",
+    "runQuery": "クエリを実行",
+    "timeSeriesTitle": "プロファイル値の推移",
+    "resultTitle": "プロファイル結果",
+    "viewTop": "トップテーブル",
+    "viewFlame": "フレームグラフ",
+    "viewTree": "スタックツリー",
+    "self": "セルフ",
+    "total": "合計",
+    "cpuDuration": "CPU 時間",
+    "percent": "%",
+    "noStreams": "利用可能なプロファイルストリームがありません",
+    "noSeries": "この期間に時系列データがありません",
+    "noResults": "この期間にプロファイル結果がありません",
+    "filters": "フィルター",
+    "expand": "展開",
+    "collapse": "折りたたむ",
+    "errors": {
+      "loadFailed": "プロファイルデータの読み込みに失敗しました"
+    }
   },
   "rum": {
     "noSessionReplay": "セッションリプレイは利用できません",
@@ -2564,6 +2594,7 @@
     "labelLogs": "ログ",
     "labelMetrics": "メトリックス",
     "labelTraces": "トレース",
+    "labelProfiles": "プロファイル",
     "labelMetadata": "メタデータ",
     "add": "ストリームを追加",
     "dataRetention": "データ保持期間 (日数)",
@@ -3633,6 +3664,7 @@
     "customLabel": "カスタム",
     "logsLabel": "ログ",
     "metricsLabel": "メトリクス",
+    "profilesLabel": "プロファイル",
     "tracesLabel": "トレース",
     "redirectionIngestionMsg": "注: IAM以外のページにアクセスするには、現在の組織でデータの取り込みを開始する必要があります。",
     "databaseLabel": "データベース",
@@ -5936,7 +5968,8 @@
       "or": "または:",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "AI インテグレーション",
-      "shippers": "ログシッパー"
+      "shippers": "ログシッパー",
+      "profiles": "プロファイル"
     },
     "indexSizeLbl": "インデックスサイズ",
     "docsCountLbl": "イベント",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "ログ内で発見",
       "foundInTraces": "トレース内で検出",
       "foundInMetrics": "メトリクス内で発見",
+      "foundInProfiles": "プロファイルで見つかりました",
       "distinguishByLabel": "サービスの区別基準",
       "distinguishByHelp": "サービスが稼働する場所を定義するフィールドを選択します。たとえば、cluster + namespace + deployment を組み合わせると、各サービスに一意のアイデンティティが作成されます。最大5フィールド。",
       "serviceOptionalLabel": "サービス属性なしで相関付け",

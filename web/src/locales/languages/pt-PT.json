@@ -1287,7 +1287,37 @@
     "databases": "Bancos de dados",
     "hosts": "Hosts",
     "kubernetes": "Kubernetes",
-    "topQueries": "Principais consultas"
+    "topQueries": "Principais consultas",
+    "profiles": "Perfis"
+  },
+  "profiles": {
+    "title": "Perfis",
+    "stream": "Stream",
+    "dataSource": "Fonte de dados",
+    "service": "Serviço",
+    "profileType": "Tipo de perfil",
+    "tagKey": "Chave da tag",
+    "tagValue": "Valor da tag",
+    "addFilter": "Adicionar filtro",
+    "runQuery": "Executar consulta",
+    "timeSeriesTitle": "Valores de perfil ao longo do tempo",
+    "resultTitle": "Resultado do perfil",
+    "viewTop": "Tabela top",
+    "viewFlame": "Gráfico de chamas",
+    "viewTree": "Árvore de pilha",
+    "self": "Próprio",
+    "total": "Total",
+    "cpuDuration": "Duração de CPU",
+    "percent": "%",
+    "noStreams": "Nenhum stream de perfil disponível",
+    "noSeries": "Nenhum dado de série temporal neste intervalo",
+    "noResults": "Nenhum resultado de perfil neste intervalo",
+    "filters": "Filtros",
+    "expand": "Expandir",
+    "collapse": "Recolher",
+    "errors": {
+      "loadFailed": "Falha ao carregar os dados de perfil"
+    }
   },
   "rum": {
     "noSessionReplay": "Nenhum replay de sessão disponível",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Registros",
     "labelMetrics": "Métricas",
     "labelTraces": "Rastreamentos",
+    "labelProfiles": "Perfis",
     "labelMetadata": "Metadados",
     "add": "Adicionar stream",
     "dataRetention": "Retenção de dados (em dias)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Personalizado",
     "logsLabel": "Registros",
     "metricsLabel": "Métricas",
+    "profilesLabel": "Perfis",
     "tracesLabel": "Rastreamentos",
     "redirectionIngestionMsg": "Observação: para acessar páginas diferentes do IAM, a ingestão de dados deve ser iniciada na organização atual.",
     "databaseLabel": "bancos de dados",
@@ -5936,7 +5968,8 @@
       "or": "Ou:",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "Integrações de IA",
-      "shippers": "Expedidores de toras"
+      "shippers": "Expedidores de toras",
+      "profiles": "Perfis"
     },
     "indexSizeLbl": "Tamanho do índice",
     "docsCountLbl": "Eventos",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Encontrado em Logs",
       "foundInTraces": "Encontrado em Traces",
       "foundInMetrics": "Encontrado em Métricas",
+      "foundInProfiles": "Encontrado em Perfis",
       "distinguishByLabel": "Distinguir Serviços Por",
       "distinguishByHelp": "Escolha campos que definam onde seus serviços são executados. Por exemplo, cluster + namespace + deployment juntos criam uma identidade única para cada serviço. Até 5 campos.",
       "serviceOptionalLabel": "Correlacionar sem o atributo de serviço",

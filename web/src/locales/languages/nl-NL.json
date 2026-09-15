@@ -1287,7 +1287,37 @@
     "databases": "Databases",
     "hosts": "Hosts",
     "kubernetes": "Kubernetes",
-    "topQueries": "Top Queries"
+    "topQueries": "Top Queries",
+    "profiles": "Profielen"
+  },
+  "profiles": {
+    "title": "Profielen",
+    "stream": "Stream",
+    "dataSource": "Gegevensbron",
+    "service": "Service",
+    "profileType": "Profieltype",
+    "tagKey": "Tag-sleutel",
+    "tagValue": "Tag-waarde",
+    "addFilter": "Filter toevoegen",
+    "runQuery": "Query uitvoeren",
+    "timeSeriesTitle": "Profielwaarden in de tijd",
+    "resultTitle": "Profielresultaat",
+    "viewTop": "Toptabel",
+    "viewFlame": "Vlammengrafiek",
+    "viewTree": "Stackboom",
+    "self": "Zelf",
+    "total": "Totaal",
+    "cpuDuration": "CPU-duur",
+    "percent": "%",
+    "noStreams": "Geen profielstreams beschikbaar",
+    "noSeries": "Geen tijdreeksgegevens in dit bereik",
+    "noResults": "Geen profielresultaat in dit bereik",
+    "filters": "Filters",
+    "expand": "Uitvouwen",
+    "collapse": "Inklappen",
+    "errors": {
+      "loadFailed": "Kan profielgegevens niet laden"
+    }
   },
   "rum": {
     "noSessionReplay": "Geen sessieherhaling beschikbaar",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Logboeken",
     "labelMetrics": "Metrieken",
     "labelTraces": "Traces",
+    "labelProfiles": "Profielen",
     "labelMetadata": "Metagegevens",
     "add": "Stream toevoegen",
     "dataRetention": "Bewaring van gegevens (in dagen)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Op maat",
     "logsLabel": "Logboeken",
     "metricsLabel": "Metrieken",
+    "profilesLabel": "Profielen",
     "tracesLabel": "Traces",
     "redirectionIngestionMsg": "Opmerking: Om toegang te krijgen tot andere pagina's dan de IAM, moet de gegevensinvoer binnen de huidige organisatie worden gestart.",
     "databaseLabel": "Databanken",
@@ -5936,7 +5968,8 @@
       "or": "Of:",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "AI-integraties",
-      "shippers": "Verzenders van logboeken"
+      "shippers": "Verzenders van logboeken",
+      "profiles": "Profielen"
     },
     "indexSizeLbl": "Indexgrootte",
     "docsCountLbl": "Gebeurtenissen",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Gevonden in Logs",
       "foundInTraces": "Gevonden in traces",
       "foundInMetrics": "Gevonden in Metrics",
+      "foundInProfiles": "Gevonden in Profielen",
       "distinguishByLabel": "Services onderscheiden op",
       "distinguishByHelp": "Kies velden die bepalen waar je services draaien. Bijvoorbeeld: cluster + namespace + deployment vormen samen een unieke identiteit voor elke service. Maximaal 5 velden.",
       "serviceOptionalLabel": "Correleren zonder service-attribuut",

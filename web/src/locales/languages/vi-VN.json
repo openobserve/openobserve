@@ -1287,7 +1287,37 @@
     "databases": "Cơ sở dữ liệu",
     "hosts": "Máy chủ",
     "kubernetes": "Kubernetes",
-    "topQueries": "Truy vấn hàng đầu"
+    "topQueries": "Truy vấn hàng đầu",
+    "profiles": "Profiles"
+  },
+  "profiles": {
+    "title": "Profiles",
+    "stream": "Stream",
+    "dataSource": "Nguồn dữ liệu",
+    "service": "Dịch vụ",
+    "profileType": "Loại profile",
+    "tagKey": "Khóa tag",
+    "tagValue": "Giá trị tag",
+    "addFilter": "Thêm bộ lọc",
+    "runQuery": "Chạy truy vấn",
+    "timeSeriesTitle": "Giá trị profile theo thời gian",
+    "resultTitle": "Kết quả profile",
+    "viewTop": "Bảng top",
+    "viewFlame": "Biểu đồ flame",
+    "viewTree": "Cây stack",
+    "self": "Riêng",
+    "total": "Tổng",
+    "cpuDuration": "Thời lượng CPU",
+    "percent": "%",
+    "noStreams": "Không có stream profile nào",
+    "noSeries": "Không có dữ liệu chuỗi thời gian trong khoảng này",
+    "noResults": "Không có kết quả profile trong khoảng này",
+    "filters": "Bộ lọc",
+    "expand": "Mở rộng",
+    "collapse": "Thu gọn",
+    "errors": {
+      "loadFailed": "Không tải được dữ liệu profile"
+    }
   },
   "rum": {
     "noSessionReplay": "Không có bản phát lại phiên nào",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Nhật ký",
     "labelMetrics": "Chỉ số",
     "labelTraces": "Trace",
+    "labelProfiles": "Profiles",
     "labelMetadata": "Siêu dữ liệu",
     "add": "Luồng mới",
     "dataRetention": "Lưu giữ dữ liệu (ngày)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Tùy chỉnh",
     "logsLabel": "Nhật ký",
     "metricsLabel": "Chỉ số",
+    "profilesLabel": "Profiles",
     "tracesLabel": "Truy vết",
     "redirectionIngestionMsg": "Lưu ý: Để truy cập các trang khác ngoài IAM, việc đưa dữ liệu vào phải được khởi tạo trong tổ chức hiện tại.",
     "databaseLabel": "Cơ sở dữ liệu",
@@ -5936,7 +5968,8 @@
       "or": "Hoặc:",
       "aws": "AWS / CloudWatch",
       "aiIntegrations": "Tích hợp AI",
-      "shippers": "Trình gửi nhật ký"
+      "shippers": "Trình gửi nhật ký",
+      "profiles": "Profiles"
     },
     "indexSizeLbl": "Kích thước chỉ mục",
     "docsCountLbl": "Sự kiện",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Tìm thấy trong Nhật ký",
       "foundInTraces": "Tìm thấy trong Trace",
       "foundInMetrics": "Tìm thấy trong Metrics",
+      "foundInProfiles": "Tìm thấy trong Profiles",
       "distinguishByLabel": "Phân biệt Dịch vụ Theo",
       "distinguishByHelp": "Chọn các trường xác định nơi dịch vụ của bạn chạy. Ví dụ: cluster + namespace + deployment cùng tạo ra một định danh duy nhất cho mỗi dịch vụ. Tối đa 5 trường.",
       "serviceOptionalLabel": "Tương quan mà không có thuộc tính dịch vụ",

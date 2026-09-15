@@ -1287,7 +1287,37 @@
     "databases": "資料庫",
     "hosts": "主機",
     "kubernetes": "Kubernetes",
-    "topQueries": "熱門查詢"
+    "topQueries": "熱門查詢",
+    "profiles": "效能剖析"
+  },
+  "profiles": {
+    "title": "效能剖析",
+    "stream": "串流",
+    "dataSource": "資料來源",
+    "service": "服務",
+    "profileType": "剖析類型",
+    "tagKey": "標籤鍵",
+    "tagValue": "標籤值",
+    "addFilter": "新增篩選條件",
+    "runQuery": "執行查詢",
+    "timeSeriesTitle": "剖析值隨時間變化",
+    "resultTitle": "剖析結果",
+    "viewTop": "排名表格",
+    "viewFlame": "火焰圖",
+    "viewTree": "堆疊樹",
+    "self": "自身",
+    "total": "總計",
+    "cpuDuration": "CPU 持續時間",
+    "percent": "%",
+    "noStreams": "沒有可用的剖析串流",
+    "noSeries": "此範圍內沒有時間序列資料",
+    "noResults": "此範圍內沒有剖析結果",
+    "filters": "篩選條件",
+    "expand": "展開",
+    "collapse": "收合",
+    "errors": {
+      "loadFailed": "載入剖析資料失敗"
+    }
   },
   "rum": {
     "noSessionReplay": "沒有可用的工作階段重播",
@@ -2564,6 +2594,7 @@
     "labelLogs": "日誌",
     "labelMetrics": "指標",
     "labelTraces": "追蹤",
+    "labelProfiles": "效能剖析",
     "labelMetadata": "中繼資料",
     "add": "新增串流",
     "dataRetention": "資料保留期限 (天)",
@@ -3633,6 +3664,7 @@
     "customLabel": "自訂",
     "logsLabel": "日誌",
     "metricsLabel": "指標",
+    "profilesLabel": "效能剖析",
     "tracesLabel": "追蹤",
     "redirectionIngestionMsg": "注意：若要存取 IAM 以外的頁面，必須先在目前組織中啟動資料攝取。",
     "databaseLabel": "資料庫",
@@ -5931,7 +5963,8 @@
       "or": "或：",
       "aws": "AWS / CloudWatch",
       "aiIntegrations": "AI 整合",
-      "shippers": "日誌傳送工具"
+      "shippers": "日誌傳送工具",
+      "profiles": "效能剖析"
     },
     "indexSizeLbl": "索引大小",
     "docsCountLbl": "事件",
@@ -8920,6 +8953,7 @@
       "foundInLogs": "在日誌中發現",
       "foundInTraces": "在追蹤中發現",
       "foundInMetrics": "在指標中發現",
+      "foundInProfiles": "在效能剖析中找到",
       "distinguishByLabel": "服務區分依據",
       "distinguishByHelp": "選擇定義服務執行位置的欄位。例如，叢集 + 命名空間 + 部署一起為每個服務建立唯一識別。最多 5 個欄位。",
       "serviceOptionalLabel": "不使用服務屬性進行關聯",

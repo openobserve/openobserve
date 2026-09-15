@@ -1287,7 +1287,37 @@
     "databases": "Bases de données",
     "hosts": "Hôtes",
     "kubernetes": "Kubernetes",
-    "topQueries": "Requêtes principales"
+    "topQueries": "Requêtes principales",
+    "profiles": "Profils"
+  },
+  "profiles": {
+    "title": "Profils",
+    "stream": "Flux",
+    "dataSource": "Source de données",
+    "service": "Service",
+    "profileType": "Type de profil",
+    "tagKey": "Clé de tag",
+    "tagValue": "Valeur de tag",
+    "addFilter": "Ajouter un filtre",
+    "runQuery": "Exécuter la requête",
+    "timeSeriesTitle": "Valeurs de profil dans le temps",
+    "resultTitle": "Résultat du profil",
+    "viewTop": "Tableau des principaux",
+    "viewFlame": "Graphique de flammes",
+    "viewTree": "Arborescence de pile",
+    "self": "Propre",
+    "total": "Total",
+    "cpuDuration": "Durée CPU",
+    "percent": "%",
+    "noStreams": "Aucun flux de profils disponible",
+    "noSeries": "Aucune donnée de série temporelle dans cette plage",
+    "noResults": "Aucun résultat de profil dans cette plage",
+    "filters": "Filtres",
+    "expand": "Développer",
+    "collapse": "Réduire",
+    "errors": {
+      "loadFailed": "Échec du chargement des données de profil"
+    }
   },
   "rum": {
     "noSessionReplay": "Aucune relecture de session disponible",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Logs",
     "labelMetrics": "Métriques",
     "labelTraces": "Traces",
+    "labelProfiles": "Profils",
     "labelMetadata": "Métadonnées",
     "add": "Ajouter un stream",
     "dataRetention": "Conservation des données (en jours)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Personnalisé",
     "logsLabel": "Logs",
     "metricsLabel": "Métriques",
+    "profilesLabel": "Profils",
     "tracesLabel": "Traces",
     "redirectionIngestionMsg": "Remarque : Pour accéder à des pages autres que l'IAM, l'ingestion de données doit être initiée au sein de l'organisation actuelle.",
     "databaseLabel": "bases de données",
@@ -5936,7 +5968,8 @@
       "or": "Ou :",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "Intégrations d'IA",
-      "shippers": "Expéditeurs de grumes"
+      "shippers": "Expéditeurs de grumes",
+      "profiles": "Profils"
     },
     "indexSizeLbl": "Taille de l'indice",
     "docsCountLbl": "Événements",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Trouvé dans les logs",
       "foundInTraces": "Trouvé dans les traces",
       "foundInMetrics": "Trouvé dans les métriques",
+      "foundInProfiles": "Trouvé dans Profils",
       "distinguishByLabel": "Distinguer les services par",
       "distinguishByHelp": "Choisissez les champs qui définissent où vos services s'exécutent. Par exemple, cluster + namespace + déploiement créent ensemble une identité unique pour chaque service. Jusqu'à 5 champs.",
       "serviceOptionalLabel": "Corréler sans attribut de service",
