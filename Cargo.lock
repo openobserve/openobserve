@@ -8219,6 +8219,7 @@ dependencies = [
  "ingester",
  "ingestion-common",
  "itertools 0.14.0",
+ "itoa",
  "jsonwebtoken",
  "lettre",
  "log",
