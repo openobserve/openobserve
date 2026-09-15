@@ -196,8 +196,18 @@ export class CompositeAlertsPage {
     return this.page.locator(this.locators.referenceClose);
   }
 
-  async openReferences() {
-    await this.referenceChip().first().click();
+  /**
+   * Open the references drawer from a specific row's chip.
+   *
+   * Scoped by row on purpose: every referenced child carries a chip, so the
+   * bare data-test matches once per such row and an unscoped click is a strict
+   * mode violation the moment the list holds more than one.
+   */
+  async openReferences(alertId) {
+    const chip = alertId
+      ? this.listReferenceCount(alertId).locator(this.locators.referenceChip)
+      : this.referenceChip().first();
+    await chip.click();
     await expect(this.referenceDrawer()).toBeVisible();
   }
 

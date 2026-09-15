@@ -1931,6 +1931,11 @@ export default defineComponent({
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
+            // How many composites use this alert as a child. Without it the
+            // "referenced by" chip never renders and the row gives no sign it
+            // is load-bearing, so the first warning a user gets is a refused
+            // delete (#14459).
+            referenced_by_composite_count: data.referenced_by_composite_count ?? 0,
             // Whether the alert CURRENTLY evaluates per group — either the
             // aggregation opt-in or the PromQL per-series one. The counts
             // below survive an opt-out (§5.3 leaves the rollup row alone), so

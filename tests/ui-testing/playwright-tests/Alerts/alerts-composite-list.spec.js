@@ -96,16 +96,19 @@ test.describe('Composite alerts — list', {
     await expect(cell).not.toContainText(a.id);
   });
 
-  test.fixme('A5 · a referenced child shows a "referenced by" chip (#14459)', async ({ page }) => {
-    const { a } = await seedComposite(page, 'a5');
+  test('A5 · a referenced child shows a "referenced by" chip', async ({ page }) => {
+    const { a, parent } = await seedComposite(page, 'a5');
 
     await pm.compositeAlertsPage.openList();
     await pm.alertsPage.searchAlert(a.name);
 
-    // The API sends referenced_by_composite_count; the scheduled-row mapping
-    // drops it, so the chip never renders. Un-fixme once the mapping copies it.
-    await expect(pm.compositeAlertsPage.listReferenceCount(a.id)).toBeVisible();
-    await expect(pm.compositeAlertsPage.referenceChip()).toBeVisible();
+    // The advance warning: a child alert says it is in use BEFORE a delete is
+    // attempted, rather than only when one is refused.
+    const row = pm.compositeAlertsPage.listReferenceCount(a.id);
+    await expect(row).toBeVisible();
+    await expect(row.locator('[data-test="alerts-composite-reference-chip"]')).toBeVisible();
+    await pm.compositeAlertsPage.openReferences(a.id);
+    await expect(pm.compositeAlertsPage.referenceParent(parent.id)).toBeVisible();
   });
 
   test('A5b · the API supplies the reference count the chip needs', async ({ page }) => {
