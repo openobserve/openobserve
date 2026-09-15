@@ -1847,9 +1847,11 @@ test.describe("Logs Regression Bug Fixes", () => {
   // ==========================================================================
   // Bug #5277: After moving column, click on query again and position changes back
   // https://github.com/openobserve/openobserve/issues/5277
+  // #4483 is the same defect filed again; both numbers are tagged so a
+  // coverage audit keyed on either one finds this test.
   // ==========================================================================
   test("column positions should persist after re-running query", {
-    tag: ['@bug-5277', '@P2', '@regression', '@logsRegression']
+    tag: ['@bug-5277', '@bug-4483', '@P2', '@regression', '@logsRegression']
   }, async ({ page }) => {
     testLogger.info('Test: Column positions persist after re-query (Bug #5277)');
 
@@ -2100,6 +2102,58 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     testLogger.info('✓ PASSED: Non-builder saved view handled correctly (Bug #14228)');
+  });
+
+  // ==========================================================================
+  // Bug #9550: VRL-generated fields should not offer include/exclude (=)
+  // https://github.com/openobserve/openobserve/issues/9550
+  // ==========================================================================
+  // Skipped on a product blocker, not a test blocker: the VRL computed field
+  // does not appear in the field list after the transformation runs, so the
+  // assertion below has nothing to hover. Re-enable once that is fixed — the
+  // body is already correct and needs no rewrite.
+  test.skip("should not display include/exclude icon for VRL-generated fields", {
+    tag: ['@bug-9550', '@P2', '@regression', '@logsRegression', '@logsRegressionVrl']
+  }, async ({ page }) => {
+    test.setTimeout(120000);
+    testLogger.info('Test: Verify VRL fields do not show include/exclude icon (Bug #9550)');
+
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`;
+    await page.goto(logsUrl);
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.logsPage.selectStream('e2e_automate');
+    await page.waitForTimeout(1000);
+
+    await pm.logsPage.clickVrlToggleButton().catch(() => {
+      testLogger.warn('VRL toggle may already be enabled or not visible');
+    });
+    await page.waitForTimeout(1000);
+
+    const vrlEditor = pm.logsPage.getVrlEditor().first();
+    await expect(vrlEditor, 'Bug #9550: VRL editor must be visible').toBeVisible({ timeout: 5000 });
+
+    await vrlEditor.click();
+    await page.keyboard.type('.computed_field = .kubernetes_pod_name + "_computed"');
+
+    await pm.logsPage.clickSearchBarRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    await pm.logsPage.fillIndexFieldSearchInput('computed_field');
+    await page.waitForTimeout(500);
+
+    const computedFieldBtn = pm.logsPage.getComputedFieldButton().first();
+    await expect(computedFieldBtn, 'Bug #9550: computed_field must appear').toBeVisible({ timeout: 5000 });
+
+    await computedFieldBtn.hover();
+    await page.waitForTimeout(300);
+
+    const hasIncludeExcludeIcon = await pm.logsPage.getIncludeExcludeIcon().isVisible().catch(() => false);
+    const hasEqualsIcon = await pm.logsPage.getEqualsIcon().isVisible().catch(() => false);
+
+    expect(hasIncludeExcludeIcon || hasEqualsIcon,
+      'Bug #9550: VRL fields should not have include/exclude icon').toBe(false);
+    testLogger.info('\u2713 PASSED: VRL field has no include/exclude icon - Bug #9550 is fixed');
   });
 
   test.afterEach(async () => {
