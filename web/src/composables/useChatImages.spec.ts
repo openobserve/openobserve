@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
@@ -257,6 +257,50 @@ describe("triggerImageUpload", () => {
     api.imageInputRef.value = el;
     api.triggerImageUpload();
     expect(click).toHaveBeenCalled();
+  });
+});
+
+describe("handleImageReferenceBackspace", () => {
+  const backspace = (target: EventTarget) => {
+    const e = new KeyboardEvent("keydown", { key: "Backspace", cancelable: true });
+    Object.defineProperty(e, "target", { value: target });
+    return e;
+  };
+
+  it("removes a chip that addImage inserted, but its text never matches @[name] so the image stays pending", async () => {
+    const { api, host } = setup("rich");
+    await api.addImage(png("a.png"));
+    const editable = host.querySelector('[contenteditable="true"]')!;
+    const chipEl = editable.querySelector(".image-reference")!;
+    const range = document.createRange();
+    range.setStartAfter(chipEl);
+    range.collapse(true);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+
+    const e = backspace(editable);
+    expect(api.handleImageReferenceBackspace(e)).toBeUndefined();
+    expect(e.defaultPrevented).toBe(true);
+    expect(editable.querySelector(".image-reference")).toBeNull();
+    expect(api.pendingImages.value).toHaveLength(1);
+  });
+
+  it("edits the shared input ref on the textarea path and defers the caret to the next tick", async () => {
+    const { api, inputMessage } = setup("none");
+    api.pendingImages.value.push({ data: "d", mimeType: "image/png", filename: "a.png", size: 1 });
+    inputMessage.value = "x @[a.png]";
+    const ta = document.createElement("textarea");
+    ta.value = "x @[a.png]";
+    document.body.appendChild(ta);
+    ta.selectionStart = ta.selectionEnd = 10;
+
+    const e = backspace(ta);
+    api.handleImageReferenceBackspace(e);
+    expect(inputMessage.value).toBe("x ");
+    expect(api.pendingImages.value).toHaveLength(0);
+    expect(ta.selectionStart).toBe(10);
+    await nextTick();
+    expect([ta.selectionStart, ta.selectionEnd]).toEqual([2, 2]);
   });
 });
 

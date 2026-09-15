@@ -360,6 +360,9 @@ import O2AIChatToolCallIndicator from "@/components/ai-assistant/chat/O2AIChatTo
 import { useChatHistory } from "@/composables/useChatHistory";
 import { useChatImages } from "@/composables/useChatImages";
 import { useChatHistoryList } from "@/composables/useChatHistoryList";
+import { usePromptHistory } from "@/composables/usePromptHistory";
+import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
+import { useChatScroll } from "@/composables/useChatScroll";
 import { useTypewriter } from "@/composables/useTypewriter";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
@@ -374,7 +377,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
-import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
 import { extractFrames, extractTailFrames } from "@/components/O2AIChat.framing";
 import {
   reduce,
@@ -389,6 +391,7 @@ import {
   navigationPageName,
 } from "@/components/O2AIChat.navigation";
 import {
+  chatErrorMessage,
   createPreview,
   formatLogEntryContent,
   getLanguageDisplay,
@@ -568,8 +571,15 @@ export default defineComponent({
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
-    const shouldAutoScroll = ref(true);
-    const showScrollToBottom = ref(false);
+    const {
+      shouldAutoScroll,
+      showScrollToBottom,
+      getScrollThreshold,
+      checkIfShouldAutoScroll,
+      scrollToBottom,
+      scrollToBottomSmooth,
+      scrollToLoadingIndicator,
+    } = useChatScroll(messagesContainer);
 
     // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
     const pendingConfirmation = ref<{
@@ -579,29 +589,13 @@ export default defineComponent({
       navAction?: NavigationAction;
     } | null>(null);
 
-    // Auto navigation state - per chat ID
-    // Stores chat ID -> boolean mapping for auto navigation preference
-    const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
-
-    // Pending auto navigation preference for new chats (before chat ID is created)
-    const pendingAutoNavigation = ref(true);
-
-    // Current chat's auto navigation state (defaults to true)
-    const isAutoNavigationEnabled = computed({
-      get: () => {
-        if (!currentChatId.value) return pendingAutoNavigation.value;
-        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
-      },
-      set: (value: boolean) => {
-        if (currentChatId.value) {
-          autoNavigationPreferences.value.set(currentChatId.value, value);
-          saveAutoNavigationPreferences();
-        } else {
-          // Store temporarily for new chats
-          pendingAutoNavigation.value = value;
-        }
-      },
-    });
+    const {
+      autoNavigationPreferences,
+      pendingAutoNavigation,
+      isAutoNavigationEnabled,
+      loadAutoNavigationPreferences,
+      saveAutoNavigationPreferences,
+    } = useAutoNavigationPreferences(currentChatId);
 
     const {
       currentAnalyzingMessage,
@@ -687,6 +681,7 @@ export default defineComponent({
       handleDragOver,
       handleDrop,
       handlePaste,
+      handleImageReferenceBackspace,
       openImagePreview,
       closeImagePreview,
     } = useChatImages(
@@ -707,11 +702,8 @@ export default defineComponent({
     // a just-detached stream back to this dying instance (see chatUpdated watch).
     const isUnmounting = ref(false);
 
-    // Query history functionality
-    const queryHistory = ref<string[]>([]);
-    const historyIndex = ref(-1);
-    const HISTORY_KEY = "ai-chat-query-history";
-    const MAX_HISTORY_SIZE = 10;
+    const { historyIndex, isOnFirstLine, navigateHistory, loadQueryHistory, addToHistory } =
+      usePromptHistory(inputMessage);
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -732,56 +724,6 @@ export default defineComponent({
       } catch (e) {
         console.error("Error formatting message:", e);
         return content;
-      }
-    };
-
-    const getScrollThreshold = () => {
-      return 50; // Fixed 50px threshold for all screens
-    };
-
-    const checkIfShouldAutoScroll = () => {
-      if (!messagesContainer.value) return;
-
-      const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
-      const threshold = getScrollThreshold();
-      const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-
-      shouldAutoScroll.value = isAtBottom;
-
-      // Show scroll to bottom button when user scrolls up significantly
-      // Only show if there's enough content to scroll and user is not at bottom
-      const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
-      const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
-
-      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
-    };
-
-    const scrollToBottom = async () => {
-      await nextTick();
-      if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-      }
-    };
-
-    const scrollToBottomSmooth = async () => {
-      await nextTick();
-      if (messagesContainer.value) {
-        messagesContainer.value.scrollTo({
-          top: messagesContainer.value.scrollHeight,
-          behavior: "smooth",
-        });
-        // Hide the button immediately when user clicks it
-        showScrollToBottom.value = false;
-        // Reset auto-scroll when user manually scrolls to bottom
-        shouldAutoScroll.value = true;
-      }
-    };
-
-    const scrollToLoadingIndicator = async () => {
-      await nextTick();
-      const loadingElement = document.getElementById("loading-indicator");
-      if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
       }
     };
 
@@ -1908,14 +1850,7 @@ export default defineComponent({
         ) {
           chatMessages.value.pop();
         }
-        let errorMessage: string;
-        if (error.status === 403) {
-          errorMessage = t(UNAUTHORIZED_MESSAGE_KEY);
-        } else if (error.message && error.message !== "No response body") {
-          errorMessage = error.message;
-        } else {
-          errorMessage = t("aiAssistant.aiChat.serverResponseError");
-        }
+        const errorMessage = chatErrorMessage(error, t);
         chatMessages.value.push({
           role: "assistant",
           content: raw(errorMessage),
@@ -1958,93 +1893,7 @@ export default defineComponent({
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
       } else if (e.key === "Backspace") {
-        // Handle backspace for RichTextInput (contenteditable)
-        const target = e.target as HTMLElement;
-        const contenteditable =
-          target.closest('[contenteditable="true"]') ||
-          target.querySelector('[contenteditable="true"]');
-
-        if (contenteditable) {
-          // Check if cursor is right after an image reference span
-          const selection = window.getSelection();
-          if (!selection || selection.rangeCount === 0) return;
-
-          const range = selection.getRangeAt(0);
-          const cursorNode = range.startContainer;
-          let imageRefSpan: Element | null = null;
-
-          // Case 1: Cursor is in a text node at position 0, check previous sibling
-          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
-            const prevSibling = cursorNode.previousSibling;
-            if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
-              imageRefSpan = prevSibling as Element;
-            }
-          }
-          // Case 2: Cursor is in an element node, check the child before cursor
-          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
-            const element = cursorNode as Element;
-            const prevChild = element.childNodes[range.startOffset - 1];
-            if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
-              imageRefSpan = prevChild as Element;
-            }
-          }
-
-          // If we found an image reference to delete
-          if (imageRefSpan) {
-            e.preventDefault();
-
-            // Extract filename from the span text
-            const refText = imageRefSpan.textContent || "";
-            const match = refText.match(/@\[([^\]]+)\]/);
-
-            if (match) {
-              const filename = match[1];
-
-              // Remove the associated image from pendingImages
-              const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
-              if (imageIndex !== -1) {
-                pendingImages.value.splice(imageIndex, 1);
-              }
-            }
-
-            // Remove the span element
-            imageRefSpan.remove();
-
-            // Trigger input event to update model
-            if (contenteditable) {
-              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-          }
-        } else {
-          // Legacy textarea handling
-          const textarea = e.target as HTMLTextAreaElement;
-          const cursorPos = textarea.selectionStart;
-          const text = inputMessage.value;
-
-          // Find if cursor is at the end of a @[filename] pattern
-          const textBeforeCursor = text.substring(0, cursorPos);
-          const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
-
-          if (match) {
-            e.preventDefault();
-            const filename = match[1];
-            const refStart = cursorPos - match[0].length;
-
-            // Remove the entire @[filename] reference from text
-            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
-
-            // Remove the associated image from pendingImages
-            const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
-            if (imageIndex !== -1) {
-              pendingImages.value.splice(imageIndex, 1);
-            }
-
-            // Set cursor position after the deletion
-            nextTick(() => {
-              textarea.selectionStart = textarea.selectionEnd = refStart;
-            });
-          }
-        }
+        handleImageReferenceBackspace(e);
       } else if (e.key === "ArrowUp") {
         const target = e.target as HTMLElement;
         const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
@@ -2055,37 +1904,6 @@ export default defineComponent({
       } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
         e.preventDefault();
         navigateHistory("down");
-      }
-    };
-
-    // Check if cursor is on the first line of textarea
-    const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
-      if (!textarea) return false;
-
-      const cursorPosition = textarea.selectionStart;
-      const textBeforeCursor = textarea.value.substring(0, cursorPosition);
-
-      // Check if there are any newlines before cursor position
-      return !textBeforeCursor.includes("\n");
-    };
-
-    // Navigate through query history
-    const navigateHistory = (direction: "up" | "down") => {
-      if (queryHistory.value.length === 0) return;
-
-      if (direction === "up") {
-        if (historyIndex.value < queryHistory.value.length - 1) {
-          historyIndex.value++;
-          inputMessage.value = queryHistory.value[historyIndex.value];
-        }
-      } else if (direction === "down") {
-        if (historyIndex.value > 0) {
-          historyIndex.value--;
-          inputMessage.value = queryHistory.value[historyIndex.value];
-        } else if (historyIndex.value === 0) {
-          historyIndex.value = -1;
-          inputMessage.value = "";
-        }
       }
     };
 
@@ -2104,78 +1922,6 @@ export default defineComponent({
     // Handle reference chip updates from RichTextInput
     const handleReferencesUpdate = (refs: ReferenceChip[]) => {
       contextReferences.value = refs;
-    };
-
-    // Load query history from localStorage
-    const loadQueryHistory = () => {
-      try {
-        const stored = localStorage.getItem(HISTORY_KEY);
-        if (stored) {
-          queryHistory.value = JSON.parse(stored);
-        }
-      } catch (error) {
-        console.error("Error loading query history:", error);
-        queryHistory.value = [];
-      }
-    };
-
-    // Save query history to localStorage
-    const saveQueryHistory = () => {
-      try {
-        localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
-      } catch (error) {
-        console.error("Error saving query history:", error);
-      }
-    };
-
-    // Auto navigation preferences localStorage functions
-    const AUTO_NAV_KEY = "ai-chat-auto-navigation";
-
-    const loadAutoNavigationPreferences = () => {
-      try {
-        const stored = localStorage.getItem(AUTO_NAV_KEY);
-        if (stored) {
-          const data = JSON.parse(stored);
-          autoNavigationPreferences.value = new Map(
-            Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]),
-          );
-        }
-      } catch (error) {
-        console.error("Error loading auto navigation preferences:", error);
-        autoNavigationPreferences.value = new Map();
-      }
-    };
-
-    const saveAutoNavigationPreferences = () => {
-      try {
-        const data = Object.fromEntries(autoNavigationPreferences.value);
-        localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
-      } catch (error) {
-        console.error("Error saving auto navigation preferences:", error);
-      }
-    };
-
-    // Add query to history
-    const addToHistory = (query: string) => {
-      const trimmedQuery = query.trim();
-      if (!trimmedQuery) return;
-
-      // Remove if already exists to avoid duplicates
-      const existingIndex = queryHistory.value.indexOf(trimmedQuery);
-      if (existingIndex > -1) {
-        queryHistory.value.splice(existingIndex, 1);
-      }
-
-      // Add to beginning of array
-      queryHistory.value.unshift(trimmedQuery);
-
-      // Keep only last MAX_HISTORY_SIZE entries
-      if (queryHistory.value.length > MAX_HISTORY_SIZE) {
-        queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
-      }
-
-      saveQueryHistory();
-      historyIndex.value = -1; // Reset index
     };
 
     // Watch for isOpen changes to fetch initial message when opened

@@ -314,6 +314,97 @@ export function useChatImages(
     }
   };
 
+  // Returns early on a missing selection; callers must have nothing left to run after it.
+  const handleImageReferenceBackspace = (e: KeyboardEvent) => {
+    // Handle backspace for RichTextInput (contenteditable)
+    const target = e.target as HTMLElement;
+    const contenteditable =
+      target.closest('[contenteditable="true"]') ||
+      target.querySelector('[contenteditable="true"]');
+
+    if (contenteditable) {
+      // Check if cursor is right after an image reference span
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      const cursorNode = range.startContainer;
+      let imageRefSpan: Element | null = null;
+
+      // Case 1: Cursor is in a text node at position 0, check previous sibling
+      if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
+        const prevSibling = cursorNode.previousSibling;
+        if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
+          imageRefSpan = prevSibling as Element;
+        }
+      }
+      // Case 2: Cursor is in an element node, check the child before cursor
+      else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+        const element = cursorNode as Element;
+        const prevChild = element.childNodes[range.startOffset - 1];
+        if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
+          imageRefSpan = prevChild as Element;
+        }
+      }
+
+      // If we found an image reference to delete
+      if (imageRefSpan) {
+        e.preventDefault();
+
+        // Extract filename from the span text
+        const refText = imageRefSpan.textContent || "";
+        const match = refText.match(/@\[([^\]]+)\]/);
+
+        if (match) {
+          const filename = match[1];
+
+          // Remove the associated image from pendingImages
+          const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
+          if (imageIndex !== -1) {
+            pendingImages.value.splice(imageIndex, 1);
+          }
+        }
+
+        // Remove the span element
+        imageRefSpan.remove();
+
+        // Trigger input event to update model
+        if (contenteditable) {
+          contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+    } else {
+      // Legacy textarea handling
+      const textarea = e.target as HTMLTextAreaElement;
+      const cursorPos = textarea.selectionStart;
+      const text = inputMessage.value;
+
+      // Find if cursor is at the end of a @[filename] pattern
+      const textBeforeCursor = text.substring(0, cursorPos);
+      const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+
+      if (match) {
+        e.preventDefault();
+        const filename = match[1];
+        const refStart = cursorPos - match[0].length;
+
+        // Remove the entire @[filename] reference from text
+        inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
+
+        // Remove the associated image from pendingImages
+        const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
+        if (imageIndex !== -1) {
+          pendingImages.value.splice(imageIndex, 1);
+        }
+
+        // Set cursor position after the deletion
+        nextTick(() => {
+          textarea.selectionStart = textarea.selectionEnd = refStart;
+        });
+      }
+    }
+  };
+
   const openImagePreview = (img: ImageAttachment) => {
     previewImage.value = img;
     showImagePreview.value = true;
@@ -337,6 +428,7 @@ export function useChatImages(
     handleDragOver,
     handleDrop,
     handlePaste,
+    handleImageReferenceBackspace,
     openImagePreview,
     closeImagePreview,
   };
