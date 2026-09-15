@@ -8,15 +8,19 @@ import config from "@/aws-exports";
 import OTable from "@/lib/core/Table/OTable.vue";
 
 // Mock the organizations service
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list: vi.fn(),
-    // get_admin_org is mocked purely so a regression that reintroduces the
-    // all-orgs endpoint here fails loudly instead of hitting the network.
-    get_admin_org: vi.fn(),
-    delete_org: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      // getOrganizations() sources the list from the _meta admin endpoint (so it can
+      // surface status / deleted_at); resurrect_org + delete_org are used by row actions.
+      get_admin_org: vi.fn(),
+      resurrect_org: vi.fn(),
+      delete_org: vi.fn(),
+    },
+  });
+});
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({

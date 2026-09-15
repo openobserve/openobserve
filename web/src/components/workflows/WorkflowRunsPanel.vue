@@ -64,16 +64,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               : t("workflow.history.showTestRuns", { count: testRunCount })
           }}
         </OButton>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="workflowObj.runsHistory.fetchedAt || null"
           :loading="loading"
           data-test="workflow-runs-refresh"
           @click="fetchHistory"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -210,6 +208,7 @@ import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import DateTime from "@/components/DateTime.vue";
 import WorkflowExecutionTimeline from "@/components/alerts/AlertHistoryTimeline.vue";

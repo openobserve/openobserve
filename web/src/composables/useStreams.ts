@@ -13,15 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { notifyManager } from "@tanstack/vue-query";
+import { streamNameListQuery } from "@/services/stream.queries";
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { dropPersistedCopies } from "@/composables/query/persisters";
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
-import { ref } from "vue";
 import { deepCopy } from "@/utils/zincutils";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn, I18nText } from "@/types/i18n";
-
-const getStreamsPromise: any = ref(null);
 
 // Keep the HTTP status on the rejection: callers need it to tell a denial (403)
 // apart from any other failure, and a bare Error would drop it.
@@ -66,8 +68,27 @@ const useStreams = (t: TranslateFn) => {
       schema = false;
       void (async () => {
         try {
-          if (getStreamsPromise.value) {
-            await getStreamsPromise.value;
+          // No global in-flight promise any more: each stream type is its own
+          // query key, so concurrent callers share a request per type instead of
+          // every type queueing behind whichever fetch started first.
+          // `force` must reach the server: drop the cached list first, otherwise
+          // the query would answer from cache and force would be a no-op.
+          if (force) {
+            const org = store.state.selectedOrganization.identifier;
+            if (streamName === "all") {
+              await dropPersistedCopies(streamKeys.all(org));
+              await queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
+            } else {
+              // One type, exactly: a Metrics Explorer mount must not throw away the logs and traces lists too.
+              await dropPersistedCopies(streamKeys.nameList(org, streamName), true);
+              await Promise.all([
+                queryClient.invalidateQueries({
+                  queryKey: streamKeys.nameList(org, streamName),
+                  exact: true,
+                }),
+                queryClient.invalidateQueries({ queryKey: streamKeys.pagesAll(org) }),
+              ]);
+            }
           }
           if (!isStreamFetched(streamName || "all") || force) {
             // Added adddtional check to fetch all streamstype separately if streamName is all
@@ -91,29 +112,23 @@ const useStreams = (t: TranslateFn) => {
                 "metadata",
               ];
 
-              const streamsToFetch = streamList.filter(
-                (_streamType) => !streamsCache[_streamType]?.value,
-              );
+              // A forced read must not skip the types already in memory, or the invalidation above fetches nothing.
+              const streamsToFetch = force
+                ? streamList
+                : streamList.filter((_streamType) => !streamsCache[_streamType]?.value);
 
-              getStreamsPromise.value = Promise.allSettled(
+              // One cached query per type: a hit resolves without a request.
+              Promise.allSettled(
                 [...streamsToFetch].map((streamType) =>
-                  StreamService.nameList(
-                    store.state.selectedOrganization.identifier,
-                    streamType,
-                    schema,
+                  queryClient.fetchQuery(
+                    streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
                   ),
                 ),
-              );
-
-              getStreamsPromise.value
+              )
                 .then((results: any) => {
                   results.forEach((result: any, index: number) => {
-                    if (
-                      result.status === "fulfilled" &&
-                      Object.hasOwn(result, "value") &&
-                      result?.value?.data?.list.length > 0
-                    ) {
-                      setStreams(streamsToFetch[index], result?.value?.data?.list);
+                    if (result.status === "fulfilled" && result.value?.length > 0) {
+                      setStreams(streamsToFetch[index], result.value, force);
                     }
                   });
 
@@ -121,36 +136,29 @@ const useStreams = (t: TranslateFn) => {
                     streamList.every((stream) => !!streamsCache[stream].value),
                   );
 
-                  getStreamsPromise.value = null;
-
                   dismiss();
                   resolve(getAllStreamsPayload());
                 })
                 .catch((e: any) => {
-                  getStreamsPromise.value = null;
                   dismiss();
                   reject(withResponse(new Error(e.message), e));
                 });
             } else {
-              getStreamsPromise.value = StreamService.nameList(
-                store.state.selectedOrganization.identifier,
-                _streamName,
-                schema,
-              );
-              getStreamsPromise.value
-                .then((res: any) => {
-                  setStreams(streamName, res.data.list, force);
+              queryClient
+                .fetchQuery(
+                  streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
+                )
+                .then((list: any) => {
+                  setStreams(streamName, list, force);
                   const streamData = {
                     name: streamName,
-                    list: res.data.list,
+                    list,
                     schema: false,
                   };
-                  getStreamsPromise.value = null;
                   dismiss();
                   resolve(streamData);
                 })
                 .catch((e: any) => {
-                  getStreamsPromise.value = null;
                   dismiss();
                   reject(withResponse(new Error(e.message), e));
                 });
@@ -187,9 +195,6 @@ const useStreams = (t: TranslateFn) => {
       schema = false;
       void (async () => {
         try {
-          if (getStreamsPromise.value) {
-            await getStreamsPromise.value;
-          }
           // Added adddtional check to fetch all streamstype separately if streamName is all
           const dismiss = notify
             ? toast({
@@ -199,7 +204,7 @@ const useStreams = (t: TranslateFn) => {
               })
             : () => {};
 
-          getStreamsPromise.value = StreamService.nameList(
+          const pageResponse = StreamService.nameList(
             store.state.selectedOrganization.identifier,
             _streamType,
             schema,
@@ -209,7 +214,7 @@ const useStreams = (t: TranslateFn) => {
             sort,
             asc,
           );
-          getStreamsPromise.value
+          pageResponse
             .then((res: any) => {
               const streamData = {
                 name: streamType,
@@ -217,12 +222,10 @@ const useStreams = (t: TranslateFn) => {
                 schema: false,
                 total: res.data.total,
               };
-              getStreamsPromise.value = null;
               dismiss();
               resolve(streamData);
             })
             .catch((e: any) => {
-              getStreamsPromise.value = null;
               dismiss();
               reject(withResponse(new Error(e.message), e));
             });
@@ -257,11 +260,8 @@ const useStreams = (t: TranslateFn) => {
           resolve(null);
         }
 
-        // Wait for the streams to be fetched if they are being fetched
-        if (getStreamsPromise.value) {
-          await getStreamsPromise.value;
-        }
-
+        // No global wait: the `getStreams` call below dedupes through the query
+        // cache, so a schema read no longer queues behind an unrelated type.
         // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams
         if (!isStreamFetched(streamType)) {
           try {
@@ -402,6 +402,18 @@ const useStreams = (t: TranslateFn) => {
     return isStreamFetched;
   };
 
+  // "all" is one query per type, so its age is the oldest of them.
+  const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
+    // A list restored from disk is stamped "now" first and gets its saved time in a later notify flush; wait for that flush.
+    await new Promise<void>((resolve) => notifyManager.schedule(resolve));
+    const org = store.state.selectedOrganization.identifier;
+    const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
+    const times = types
+      .map((type) => queryClient.getQueryState(streamKeys.nameList(org, type))?.dataUpdatedAt)
+      .filter((t): t is number => !!t);
+    return times.length ? Math.min(...times) : undefined;
+  };
+
   const setStreams = (
     streamName: string = "all",
     streamList: any[] = [],
@@ -479,6 +491,12 @@ const useStreams = (t: TranslateFn) => {
   // Don't add delete log here, it will create issue
   // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
+    const org = store.state.selectedOrganization.identifier;
+    // Ahead of the early return: the disk copy and the page entries hold the deleted row whether Vuex does or not.
+    void dropPersistedCopies(streamKeys.nameList(org, streamType), true).then(() =>
+      queryClient.invalidateQueries({ queryKey: streamKeys.all(org) }),
+    );
+
     const indexMapping = store.state.streams.streamsIndexMapping[streamType];
 
     // Bail out safely when the mapping/cache for this type isn't populated.
@@ -540,7 +558,6 @@ const useStreams = (t: TranslateFn) => {
     });
     updateStreamIndexMappingInStore({});
     updateStreamsFetchedInStore(false);
-    getStreamsPromise.value = null;
     store.dispatch("setIsDataIngested", false);
   };
 
@@ -774,6 +791,7 @@ const useStreams = (t: TranslateFn) => {
     getPaginatedStreams,
     isStreamExists,
     isStreamFetched,
+    getStreamsFetchedAt,
     addNewStreams,
     // Internal functions exposed for testing
     updateStreamsInStore,

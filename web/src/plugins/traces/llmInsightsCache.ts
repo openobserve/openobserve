@@ -33,6 +33,7 @@
  * Bounded (`MAX_ENTRIES`) so a long session that visits many windows can't grow
  * without limit — the oldest entry is evicted FIFO when full.
  */
+import { quantizeRange } from "@/composables/query/queryClient";
 import type { LLMKPI, LLMSparklineSeries } from "./composables/useLLMInsights";
 
 const MAX_ENTRIES = 60;
@@ -54,7 +55,11 @@ export interface KpiSnapshot {
  * name/placeholder.)
  */
 export function selectionKey(stream: string, agent: string, start: number, end: number): string {
-  return `${stream}::${agent}::${start}-${end}`;
+  // Relative windows re-anchor to `now` on every mount; keying on the raw
+  // anchors meant no visit could ever hit the caches. Only the key buckets —
+  // the queries still run with the caller's exact timestamps.
+  const { start: s, end: e } = quantizeRange(start, end);
+  return `${stream}::${agent}::${s}-${e}`;
 }
 
 export function createSelectionCache<T>() {

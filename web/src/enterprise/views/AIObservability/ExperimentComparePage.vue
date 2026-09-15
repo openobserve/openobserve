@@ -139,6 +139,8 @@ import llmExperimentsService, {
   type ExperimentRowDetail,
   type LlmExperiment,
 } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { aiExperimentCompareRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIExperimentComparePage" });
@@ -220,7 +222,7 @@ async function loadExperiments() {
   if (!orgId.value) return;
   optionsLoading.value = true;
   try {
-    experiments.value = await llmExperimentsService.list(orgId.value);
+    experiments.value = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
   } catch (error: any) {
     toast({
       variant: "error",

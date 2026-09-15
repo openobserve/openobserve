@@ -17,15 +17,26 @@ import { describe, it, expect } from "vitest";
 import { selectionKey, createSelectionCache } from "./llmInsightsCache";
 
 describe("selectionKey", () => {
-  it("composes stream + agent + window into a stable string", () => {
-    expect(selectionKey("default", "_stream", 100, 200)).toBe("default::_stream::100-200");
+  it("composes stream + agent + the quantized window into a stable string", () => {
+    // The window is bucketed to the minute before it enters the key.
+    expect(selectionKey("default", "_stream", 60_000, 120_000)).toBe(
+      "default::_stream::60000-120000",
+    );
   });
 
-  it("differs by selection and by window", () => {
-    const a = selectionKey("s", "_stream", 1, 2);
-    const b = selectionKey("s", "o2-ai", 1, 2); // different agent
-    const c = selectionKey("s", "_stream", 1, 3); // different window
+  it("differs by selection and by window bucket", () => {
+    const a = selectionKey("s", "_stream", 60_000, 120_000);
+    const b = selectionKey("s", "o2-ai", 60_000, 120_000); // different agent
+    const c = selectionKey("s", "_stream", 60_000, 180_000); // different window bucket
     expect(new Set([a, b, c]).size).toBe(3);
+  });
+
+  it("buckets two nearly-identical windows onto one key", () => {
+    // The point of quantizing: a relative range re-anchors to `now` on every
+    // mount, and keying on the raw anchors meant no visit could ever hit.
+    expect(selectionKey("s", "_stream", 60_000, 120_100)).toBe(
+      selectionKey("s", "_stream", 60_500, 120_900),
+    );
   });
 });
 

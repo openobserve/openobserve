@@ -307,6 +307,8 @@ import useStreams from "@/composables/useStreams";
 import genAiAgentMappingService, {
   type GenAiAgentListItem,
 } from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { buildAgentTraceFilter } from "./llmAgentFilter";
 import { useAgentScope } from "@/enterprise/composables/useAgentScope";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
@@ -706,7 +708,7 @@ async function loadAgents(startTime?: number, endTime?: number) {
   const windowKey = `${start}-${end}`;
   if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
   try {
-    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    const agentList = await queryClient.fetchQuery(genAiAgentsQuery(orgId, start, end));
     agents.value = agentList.agents;
     agentsLoadedWindow = windowKey;
     // Proactively seed the panel-cache stub for every selection at this window —

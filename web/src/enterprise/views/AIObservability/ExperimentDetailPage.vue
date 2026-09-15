@@ -319,6 +319,13 @@ import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
 import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
+import {
+  cancelExperimentMutation,
+  cloneExperimentMutation,
+  retryExperimentMutation,
+  retryExperimentSlotMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
@@ -775,6 +782,11 @@ async function refreshRows() {
     rowsLoading.value = false;
   }
 }
+// `refresh` only re-reads this page; the list's run status comes from the mutations' scope drop.
+const cancelWrite = useMutation(() => cancelExperimentMutation(orgId.value));
+const retryWrite = useMutation(() => retryExperimentMutation(orgId.value));
+const retrySlotWrite = useMutation(() => retryExperimentSlotMutation(orgId.value));
+const cloneWrite = useMutation(() => cloneExperimentMutation(orgId.value));
 
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
@@ -832,13 +844,12 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    await llmExperimentsService.retrySlot(
-      orgId.value,
-      experimentId.value,
-      slot.rowId,
-      slot.trialIndex,
-      globalThis.crypto.randomUUID(),
-    );
+    await retrySlotWrite.mutateAsync({
+      experimentId: experimentId.value,
+      rowId: slot.rowId,
+      trialIndex: slot.trialIndex,
+      idempotencyKey: globalThis.crypto.randomUUID(),
+    });
     await loadRowDetail(slot.rowId);
     await refresh();
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
@@ -853,14 +864,14 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
 }
 
 async function cancelExperiment() {
-  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value), {
+  await runAction(() => cancelWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.cancelSuccess"),
     error: t("aiObservability.experiments.cancelError"),
   });
 }
 
 async function retryExperiment() {
-  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value), {
+  await runAction(() => retryWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.retrySuccess"),
     error: t("aiObservability.experiments.retryError"),
   });
@@ -884,7 +895,7 @@ async function cloneExperiment() {
   }
   acting.value = true;
   try {
-    const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
+    const clone = await cloneWrite.mutateAsync({ experimentId: experimentId.value });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(orgId.value, clone.id));
   } catch (error: any) {

@@ -71,16 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="loading"
             data-test="ai-remote-tasks-refresh-btn"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+            @click="refresh(true)"
+          />
         </template>
 
         <template #empty>
@@ -224,6 +222,7 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -237,7 +236,9 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
-import llmExperimentsService from "@/services/llm-experiments.service";
+import { remoteTasksListQuery, experimentsListQuery } from "@/services/llm-experiments.queries";
+import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   canEditRemoteTask,
   remoteTaskState,
@@ -265,6 +266,7 @@ const DEFAULT_COLUMN_VISIBILITY = { httpMethod: false };
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
 const tasks = ref<RemoteTask[]>([]);
+const lastUpdatedAt = ref<number | null>(null);
 const loading = ref(false);
 const forbidden = ref(false);
 const search = ref("");
@@ -423,7 +425,7 @@ function onEmptyAction(id?: string) {
  *  better than one that fails because a second, unrelated request did. */
 async function loadReferenceCounts() {
   try {
-    const experiments = await llmExperimentsService.list(orgId.value);
+    const experiments = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
     const counts: Record<string, number> = {};
     for (const experiment of experiments) {
       if (experiment.task?.type !== "remote") continue;
@@ -437,12 +439,18 @@ async function loadReferenceCounts() {
   }
 }
 
-async function refresh() {
+// `force` reaches the server: the mount may serve the cached list, but Refresh and the post-delete reload must not.
+async function refresh(force = false) {
   if (!orgId.value) return;
   loading.value = true;
   forbidden.value = false;
   try {
-    tasks.value = await remoteTasksService.list(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: remoteTaskKeys.all(orgId.value) });
+    }
+    const opts = remoteTasksListQuery(orgId.value);
+    tasks.value = await queryClient.fetchQuery(opts);
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
     forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -469,7 +477,7 @@ async function removeTask(row: RemoteTask) {
   try {
     await remoteTasksService.delete(orgId.value, row.entityId);
     toast({ variant: "success", message: t("aiObservability.remoteTasks.delete.success") });
-    await refresh();
+    await refresh(true);
   } catch (error: any) {
     toast({
       variant: "error",

@@ -218,6 +218,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { resetPasscodeMutation } from "@/services/organizations.queries";
+import { createRumTokenMutation, updateRumTokenMutation } from "@/services/api_keys.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { ingestionTokensQuery } from "@/services/organizations.queries";
+import { orgPasscodeQuery } from "@/services/organizations.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { rumTokensQuery } from "@/services/api_keys.queries";
 import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -229,11 +237,9 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
-import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
-import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
@@ -391,18 +397,20 @@ export default defineComponent({
     });
 
     const getOrganizationPasscode = () => {
-      organizationsService
-        .get_organization_passcode(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          if (res.data.data.passcode == "") {
+      // Returned so callers can await the load — it never was, which only
+      // worked while the fetch resolved in a single microtask.
+      return queryClient
+        .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
+        .then((res: any) => {
+          if (res.data.passcode == "") {
             toast({
               variant: "error",
               message: t("toastMessages.views.passcodeNotFound"),
               timeout: 5000,
             });
           } else {
-            store.dispatch("setOrganizationPasscode", res.data.data.passcode);
-            store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
+            store.dispatch("setOrganizationPasscode", res.data.passcode);
+            store.dispatch("setOrganizationPasscodeUser", res.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
@@ -412,15 +420,17 @@ export default defineComponent({
     };
 
     const getRUMToken = () => {
-      apiKeysService.listRUMTokens(store.state.selectedOrganization.identifier).then((res) => {
-        store.dispatch("setRUMToken", res.data.data);
-      });
+      return queryClient
+        .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
+        .then((res: any) => {
+          store.dispatch("setRUMToken", res.data);
+        });
     };
 
     const updatePasscode = () => {
-      organizationsService
-        .update_organization_passcode(store.state.selectedOrganization.identifier)
-        .then((res) => {
+      const request = resetPasscode
+        .mutateAsync()
+        .then((res: any) => {
           if (res.data.data.passcode == "") {
             toast({
               variant: "error",
@@ -454,6 +464,9 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
+
+      // Returned so callers (and tests) can await the whole flow.
+      return request;
     };
 
     const showResetDefaultDialogFn = () => {
@@ -465,10 +478,10 @@ export default defineComponent({
     };
 
     const fetchOrgTokens = () => {
-      organizationsService
-        .list_org_ingestion_tokens(store.state.selectedOrganization.identifier)
-        .then((res) => {
-          store.dispatch("setOrgTokens", res.data.data);
+      return queryClient
+        .fetchQuery(ingestionTokensQuery(store.state.selectedOrganization.identifier))
+        .then((res: any) => {
+          store.dispatch("setOrgTokens", res.data);
         })
         .catch(() => {
           // Silently fail — settings page will retry on load
@@ -502,10 +515,18 @@ export default defineComponent({
       });
     };
 
+    const orgIdForWrites = useOrgId();
+    const createRumToken = useMutation(() => createRumTokenMutation(orgIdForWrites.value));
+    // `getRUMToken` below is a bare fetchQuery, so only the mutation's invalidation stops it re-serving the old token.
+    const updateRumToken = useMutation(() => updateRumTokenMutation(orgIdForWrites.value));
+    const resetPasscode = useMutation(() => resetPasscodeMutation(orgIdForWrites.value));
+
     const generateRUMToken = () => {
-      apiKeysService
-        .createRUMToken(store.state.selectedOrganization.identifier)
-        .then((res) => {
+      // Held rather than returned inline: the `segment.track` call below must
+      // still run synchronously, exactly as it did before.
+      const request = createRumToken
+        .mutateAsync()
+        .then((res: any) => {
           store.dispatch("setRUMToken", {
             rum_token: res.data.data.new_key,
           });
@@ -532,21 +553,23 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
+
+      // Returned so callers (and tests) can await the whole flow: `mutateAsync`
+      // settles a tick later than a bare service promise did.
+      return request;
     };
 
+    // Returned so the dialog handler (and the spec) can await the write.
     const updateRUMToken = () => {
-      apiKeysService
-        .updateRUMToken(
-          store.state.selectedOrganization.identifier,
-          store.state.organizationData.rumToken.id,
-        )
-        .then(() => {
-          getRUMToken();
+      const done = updateRumToken
+        .mutateAsync(store.state.organizationData.rumToken.id)
+        .then(async () => {
           toast({
             variant: "success",
             message: t("toastMessages.views.rumTokenUpdatedSuccessfully"),
             timeout: 5000,
           });
+          getRUMToken();
         })
         .catch((e) => {
           if (e.response.status != 403) {
@@ -564,6 +587,8 @@ export default defineComponent({
         user_id: store.state.userInfo.email,
         page: "Ingestion",
       });
+
+      return done;
     };
 
     // Global search functionality across all ingestion tabs

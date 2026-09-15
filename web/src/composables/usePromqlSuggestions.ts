@@ -1,4 +1,5 @@
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { getFieldValuesForSuggestion, requestFieldValues } from "@/composables/fieldValueStore";
 import { nextTick, ref } from "vue";
 import { PROMQL_CATALOG } from "@/utils/query/promqlCompletion";
@@ -245,8 +246,10 @@ const usePromqlSuggestions = () => {
           const cacheKey = metricLabelCacheKey(org, metricName);
           let labels = metricLabelCache.get(cacheKey);
           if (!labels) {
-            const response: any = await streamService.schema(org, metricName, "metrics");
-            const columns = response?.data?.schema ?? response?.data?.uds_schema ?? [];
+            const response: any = await queryClient.fetchQuery(
+              streamSchemaQuery(org, metricName, "metrics"),
+            );
+            const columns = response?.schema ?? response?.uds_schema ?? [];
             labels = columns
               .map((column: any) => column?.name)
               .filter((name: string) => name && !NON_LABEL_COLUMNS.has(name));

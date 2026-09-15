@@ -68,7 +68,10 @@ const ConfirmDialogStub = {
 
 // Mock the external dependencies
 vi.mock("vue-router");
-vi.mock("@/services/dashboards");
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { automockService } = await import("@/test/unit/helpers/mockService");
+  return automockService(await importOriginal());
+});
 vi.mock("@/utils/commons", () => ({
   getFoldersListByType: vi.fn(),
   deleteFolderByIdByType: vi.fn(),

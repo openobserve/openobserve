@@ -61,15 +61,18 @@ vi.mock("@/composables/useSearchWebSocket", () => ({
 const { mockDeleteRunningQueries } = vi.hoisted(() => ({
   mockDeleteRunningQueries: vi.fn(),
 }));
-vi.mock("@/services/search", () => ({
-  default: {
-    delete_running_queries: mockDeleteRunningQueries,
-    get_regions: vi.fn().mockResolvedValue({ data: {} }),
-    search: vi.fn(),
-    partition: vi.fn(),
-    result_schema: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      delete_running_queries: mockDeleteRunningQueries,
+      get_regions: vi.fn().mockResolvedValue({ data: {} }),
+      search: vi.fn(),
+      partition: vi.fn(),
+      result_schema: vi.fn(),
+    },
+  });
+});
 
 const { mockGetAllFunctions } = vi.hoisted(() => ({
   mockGetAllFunctions: vi.fn(),
@@ -115,9 +118,12 @@ vi.mock("@/aws-exports", () => ({
 const { mockSavedViewsGet } = vi.hoisted(() => ({
   mockSavedViewsGet: vi.fn(),
 }));
-vi.mock("@/services/saved_views", () => ({
-  default: { get: mockSavedViewsGet },
-}));
+vi.mock("@/services/saved_views", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { get: mockSavedViewsGet },
+  });
+});
 
 vi.mock("@/utils/query/sqlIdentifiers", () => ({
   quoteSqlIdentifierIfNeeded: vi.fn((s: string) => `"${s}"`),

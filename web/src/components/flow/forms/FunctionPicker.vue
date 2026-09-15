@@ -356,6 +356,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import functionsService from "@/services/jstransform";
+import { saveFunctionMutation } from "@/services/jstransform.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { isJsFunction } from "@/utils/functionLanguage";
 
 const AddFunction = defineAsyncComponent(() => import("@/components/functions/AddFunction.vue"));
@@ -590,6 +593,10 @@ const fnPayload = (name: string) => ({
   transType: wantsJs.value ? 1 : 0,
 });
 
+const orgId = useOrgId();
+const createFunction = useMutation(() => saveFunctionMutation(orgId.value, () => false));
+const updateFunction = useMutation(() => saveFunctionMutation(orgId.value, () => true));
+
 const afterSaved = async (name: string) => {
   await getFunctions();
   await nextTick();
@@ -601,10 +608,7 @@ const onSavedSubmit = async (v: SavedFunctionForm) => {
   if (v.isSavedFunctionAction === "create") {
     savingFn.value = true;
     try {
-      const res: any = await functionsService.create(
-        store.state.selectedOrganization.identifier,
-        fnPayload(v.savedFunctionName),
-      );
+      const res: any = await createFunction.mutateAsync(fnPayload(v.savedFunctionName));
       toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.saved")) });
       savedDialog.value = false;
       await afterSaved(v.savedFunctionName);
@@ -626,10 +630,7 @@ const onSavedSubmit = async (v: SavedFunctionForm) => {
 const executeUpdate = async () => {
   savingFn.value = true;
   try {
-    const res: any = await functionsService.update(
-      store.state.selectedOrganization.identifier,
-      fnPayload(fnToUpdateName.value),
-    );
+    const res: any = await updateFunction.mutateAsync(fnPayload(fnToUpdateName.value));
     toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.updated")) });
     fnUpdateConfirm.value = false;
     savedDialog.value = false;

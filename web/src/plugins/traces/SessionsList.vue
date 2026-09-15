@@ -276,7 +276,8 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import type { AcceptableValue } from "reka-ui";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type { SessionSortField, SessionSortOrder } from "@/services/sessions";
 import { buildAgentSessionFilter } from "./llmAgentFilter";
 import { splitNumberWithUnit, splitDuration } from "./llmInsightsDashboard.utils";
@@ -636,7 +637,7 @@ async function loadAgents(startTime?: number, endTime?: number) {
   if (!orgId || !start || !end) return;
   agentsLoaded.value = false;
   try {
-    const agentList = await genAiAgentMappingService.listAgents(orgId, start, end);
+    const agentList = await queryClient.fetchQuery(genAiAgentsQuery(orgId, start, end));
     agents.value = agentList.agents;
     // The cascade selection is reconciled against the fresh list by
     // useAgentScope's watcher (invalid env/name/version fall back / clear), so

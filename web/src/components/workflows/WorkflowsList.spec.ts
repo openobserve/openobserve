@@ -17,7 +17,7 @@
 // (pause/resume, edit, delete), the history drawer and the child-route escape
 // hatch. Heavy children (OTable, drawers, the graph preview) are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockRouter, mockToast, mockHydrate } = vi.hoisted(() => ({
   mockRouter: {
@@ -34,13 +34,16 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: vi.fn(),
-    deleteWorkflow: vi.fn(),
-    enableWorkflow: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: vi.fn(),
+      deleteWorkflow: vi.fn(),
+      enableWorkflow: vi.fn(),
+    },
+  });
+});
 
 // Re-export the real trigger registry so triggerLabel() resolves kinds to labels
 // (the list mocks the canvas composable, but the registry is pure data).
@@ -60,7 +63,6 @@ vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   },
 }));
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -866,7 +868,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.restorePageIndex();
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -890,7 +893,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -921,7 +925,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
   });
