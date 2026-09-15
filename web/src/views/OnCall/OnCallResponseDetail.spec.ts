@@ -1048,7 +1048,7 @@ describe("OnCallResponseDetail", () => {
     const ack = stats.find((s: any) => s.key === "ack");
     const resolve = stats.find((s: any) => s.key === "resolve");
 
-    expect(ack.label).toBe("Unacked for");
+    expect(ack.label).toBe("Unacknowledged for");
     expect(ack.value).not.toBe("—");
 
     expect(resolve.label).toBe("Open for");
