@@ -329,8 +329,9 @@ pub(crate) fn get_cache_file_path_from_streaming_id(streaming_id: &str) -> Resul
 
 #[cfg(test)]
 mod tests {
-
-    use datafusion::physical_plan::ExecutionPlan;
+    use datafusion::physical_plan::{
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
+    };
 
     use super::*;
     use crate::datafusion::distributed_plan::streaming_aggs_exec::exec::StreamingAggsExec;
@@ -638,7 +639,12 @@ mod tests {
         assert_eq!(exec.children().len(), 1);
         assert_eq!(exec.benefits_from_input_partitioning(), vec![false]);
         // Test statistics method (returns Statistics with unknown values)
-        let _stats = exec.partition_statistics(Some(0)).unwrap();
+        let _stats = datafusion::physical_plan::StatisticsContext::new()
+            .compute(
+                &exec,
+                &datafusion::physical_plan::StatisticsArgs::new().with_partition(Some(0)),
+            )
+            .unwrap();
         // Just verify statistics() method doesn't panic - we can't easily test Precision enum
         // values
     }
@@ -686,7 +692,12 @@ mod tests {
 
         // Test with_new_children
         let new_input = Arc::new(EmptyExec::new(schema.clone()));
-        let new_exec = exec.with_new_children(vec![new_input]).unwrap();
+        let new_exec = exec
+            .replace_children(
+                vec![new_input],
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )
+            .unwrap();
 
         // Verify it's a StreamingAggsExec
         assert!(new_exec.downcast_ref::<StreamingAggsExec>().is_some());
@@ -1255,7 +1266,10 @@ mod tests {
 
         // Test with correct number of children (should succeed)
         let new_input = Arc::new(EmptyExec::new(schema.clone()));
-        let result = exec.clone().with_new_children(vec![new_input]);
+        let result = exec.clone().replace_children(
+            vec![new_input],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        );
         assert!(result.is_ok()); // Should succeed with one child
 
         // Note: The original code doesn't actually validate the number of children in
