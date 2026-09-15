@@ -22,7 +22,6 @@ export const orgUsersQuery = (org: string) =>
   queryOptions({
     queryKey: userKeys.users(org),
     queryFn: async (): Promise<any[]> => (await users.orgUsers(org)).data?.data ?? [],
-    refetchOnWindowFocus: true,
   });
 
 /** Org configuration — the same option list for every user form and the list page. */
@@ -39,5 +38,4 @@ export const allUserRolesQuery = (org: string) =>
   queryOptions({
     queryKey: userKeys.allUserRoles(org),
     queryFn: async () => (await users.getAllUserRoles(org)).data ?? null,
-    refetchOnWindowFocus: true,
   });

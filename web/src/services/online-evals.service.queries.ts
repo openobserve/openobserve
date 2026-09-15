@@ -32,21 +32,18 @@ export const scoreConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.scoreConfigs(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.scoreConfigs.list(org),
-    refetchOnWindowFocus: true,
   });
 
 export const scorersQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.scorers(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.scorers.list(org),
-    refetchOnWindowFocus: true,
   });
 
 export const evalJobsQuery = (org: string) =>
   queryOptions({
     queryKey: onlineEvalKeys.jobs(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.jobs.list(org),
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

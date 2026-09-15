@@ -21,12 +21,10 @@ export const invoiceHistoryQuery = (org: string) =>
   queryOptions({
     queryKey: billingKeys.invoices(org),
     queryFn: async () => (await billings.list_invoice_history(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 export const aiUsageQuery = (org: string) =>
   queryOptions({
     queryKey: billingKeys.aiUsage(org),
     queryFn: async () => (await billings.get_ai_usage(org)).data,
-    refetchOnWindowFocus: true,
   });

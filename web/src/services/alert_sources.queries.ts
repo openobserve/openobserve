@@ -21,5 +21,4 @@ export const alertSourcesQuery = (org: string) =>
   queryOptions({
     queryKey: alertSourceKeys.list(org),
     queryFn: async (): Promise<any[]> => (await alertSources.list(org)).data?.integrations ?? [],
-    refetchOnWindowFocus: true,
   });

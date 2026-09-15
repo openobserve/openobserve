@@ -56,7 +56,6 @@ export const enrichmentTableStatusesQuery = (org: string) =>
     queryKey: functionKeys.enrichmentStatuses(org),
     queryFn: async (): Promise<Record<string, unknown>> =>
       (await jstransform.get_all_enrichment_table_statuses(org)).data ?? {},
-    refetchOnWindowFocus: true,
   });
 
 /** Create or update, chosen by the caller — both invalidate the same scope. */

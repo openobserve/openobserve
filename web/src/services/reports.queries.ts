@@ -31,7 +31,6 @@ export const reportsQuery = (org: string, filters: ReportListFilters) =>
           filters.nameQuery || undefined,
         )
       ).data ?? [],
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

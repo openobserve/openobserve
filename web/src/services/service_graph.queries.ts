@@ -22,5 +22,4 @@ export const serviceTopologyQuery = (org: string, range: TopologyRange) =>
   queryOptions({
     queryKey: topologyKeys.current(org, range),
     queryFn: async () => (await serviceGraphService.getCurrentTopology(org, range)).data,
-    refetchOnWindowFocus: true,
   });

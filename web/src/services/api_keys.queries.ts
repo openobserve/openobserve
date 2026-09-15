@@ -22,7 +22,6 @@ export const rumTokensQuery = (org: string) =>
   queryOptions({
     queryKey: apiKeyKeys.rumTokens(org),
     queryFn: async () => (await apiKeys.listRUMTokens(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

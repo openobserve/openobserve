@@ -24,5 +24,4 @@ export const licenseQuery = () =>
     queryFn: async () => (await licenseServer.get_license()).data,
     staleTime: 0,
     gcTime: 60_000,
-    refetchOnWindowFocus: true,
   });

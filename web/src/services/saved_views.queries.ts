@@ -21,7 +21,6 @@ export const savedViewsQuery = (org: string) =>
   queryOptions({
     queryKey: savedViewKeys.list(org),
     queryFn: async (): Promise<any[]> => (await savedViews.get(org)).data?.views ?? [],
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

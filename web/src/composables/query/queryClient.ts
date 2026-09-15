@@ -120,9 +120,7 @@ export const queryClient = new QueryClient({
           return false;
         return failureCount < 2;
       },
-      // Off by default: this console is often left open on a wall display and
-      // several endpoints are expensive. Cheap volatile lists opt back in via
-      // their tier.
+      // Off everywhere: this console is often left open on a wall display and several endpoints are expensive.
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },

@@ -21,7 +21,6 @@ export const slosQuery = (org: string, folder?: string) =>
   queryOptions({
     queryKey: sloKeys.list(org, folder),
     queryFn: async (): Promise<any[]> => (await slos.list(org, folder)).data?.list ?? [],
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

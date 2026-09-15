@@ -28,14 +28,12 @@ export const experimentsListQuery = (org: string, datasetId?: string) =>
         includeSummary: true,
         ...(datasetId ? { datasetId } : {}),
       }),
-    refetchOnWindowFocus: true,
   });
 
 export const remoteTasksListQuery = (org: string) =>
   queryOptions({
     queryKey: remoteTaskKeys.list(org),
     queryFn: (): Promise<RemoteTask[]> => remoteTasksService.list(org),
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

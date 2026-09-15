@@ -23,7 +23,6 @@ export const dashboardsByFolderQuery = (org: string, folderId: string) =>
     queryKey: dashboardKeys.byFolder(org, folderId),
     queryFn: async (): Promise<any[]> =>
       (await dashboards.list(0, 1000, "name", false, "", org, folderId, "")).data?.dashboards ?? [],
-    refetchOnWindowFocus: true,
   });
 
 /**

@@ -21,7 +21,6 @@ export const incidentsQuery = (org: string, status: string, limit: number, offse
   queryOptions({
     queryKey: incidentKeys.list(org, status, limit, offset),
     queryFn: async () => (await incidents.list(org, status, limit, offset)).data,
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

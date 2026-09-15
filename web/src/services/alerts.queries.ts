@@ -42,7 +42,6 @@ export const alertsListQuery = (
           alertType ?? "",
         )
       ).data?.list ?? [],
-    refetchOnWindowFocus: true,
   });
 
 /**
@@ -91,7 +90,6 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
   return queryOptions({
     queryKey: alertKeys.history(org, q),
     queryFn: async () => (await alerts.getHistory(org, q)).data ?? {},
-    refetchOnWindowFocus: true,
   });
 };
 

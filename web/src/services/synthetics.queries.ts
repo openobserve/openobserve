@@ -25,14 +25,12 @@ export const syntheticsMonitorsQuery = (org: string, folderId?: string) =>
       const data = (await syntheticsService.listByFolderId(org, folderId)).data as any;
       return data?.checks ?? data?.monitors ?? [];
     },
-    refetchOnWindowFocus: true,
   });
 
 export const agentTokensQuery = (org: string) =>
   queryOptions({
     queryKey: syntheticsKeys.agentTokens(org),
     queryFn: async () => (await syntheticsService.listAgentTokens(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

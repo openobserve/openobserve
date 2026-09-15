@@ -46,7 +46,6 @@ export const streamPageQuery = (org: string, type: string, params: StreamPagePar
       );
       return { list: res.data.list ?? [], total: res.data.total ?? 0 };
     },
-    refetchOnWindowFocus: true,
   });
 
 /** Resolves to the payload, not the axios envelope, so the cache never holds an XHR object; `useStreams` keeps its own copy on purpose. */

@@ -31,7 +31,6 @@ export const orgSummaryQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.summary(org),
     queryFn: async () => (await organizations.get_organization_summary(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 // `metaOrg` is the org that serves the endpoint, not the one being cleaned up — it is deployment-configurable, so the caller reads it from config.
@@ -46,21 +45,18 @@ export const cleanupTasksQuery = (org: string, targetOrg: string, metaOrg = "_me
         .catch(() => []),
     staleTime: 0,
     gcTime: 60_000,
-    refetchOnWindowFocus: true,
   });
 
 export const ingestionTokensQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.ingestionTokens(org),
     queryFn: async () => (await organizations.list_org_ingestion_tokens(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 export const orgPasscodeQuery = (org: string) =>
   queryOptions({
     queryKey: organizationKeys.passcode(org),
     queryFn: async () => (await organizations.get_organization_passcode(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

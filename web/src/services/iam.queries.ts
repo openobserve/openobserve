@@ -35,14 +35,12 @@ export const groupsQuery = (org: string) =>
   queryOptions({
     queryKey: iamKeys.groups(org),
     queryFn: async () => (await getGroups(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 export const rolesQuery = (org: string) =>
   queryOptions({
     queryKey: iamKeys.roles(org),
     queryFn: async () => (await getRoles(org)).data,
-    refetchOnWindowFocus: true,
   });
 
 export const resourcesQuery = (org: string) =>

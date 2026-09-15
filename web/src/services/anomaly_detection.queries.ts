@@ -21,14 +21,12 @@ export const anomalyConfigsQuery = (org: string) =>
   queryOptions({
     queryKey: anomalyKeys.list(org),
     queryFn: async (): Promise<any[]> => (await anomaly_detection.list(org)).data ?? [],
-    refetchOnWindowFocus: true,
   });
 
 export const anomalyHistoryQuery = (org: string, limit: number) =>
   queryOptions({
     queryKey: anomalyKeys.history(org, limit),
     queryFn: async () => (await anomaly_detection.getAllHistory(org, limit)).data,
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

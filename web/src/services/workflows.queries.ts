@@ -25,5 +25,4 @@ export const workflowsQuery = (org: string) =>
       const data = (await workflows.listWorkflows(org)).data;
       return Array.isArray(data) ? data : ((data as any)?.list ?? []);
     },
-    refetchOnWindowFocus: true,
   });

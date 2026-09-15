@@ -21,7 +21,6 @@ export const serviceAccountsQuery = (org: string) =>
   queryOptions({
     queryKey: serviceAccountKeys.list(org),
     queryFn: async (): Promise<any[]> => (await service_accounts.list(org)).data?.data ?? [],
-    refetchOnWindowFocus: true,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
