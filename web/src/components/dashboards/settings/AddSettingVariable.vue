@@ -460,6 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.escapeSingleQuotes')"
               data-test="dashboard-variable-escape-single-quotes"
               size="lg"
+              disabled
             >
               <template #tooltip>
                 <OTooltip max-width="18.75rem">
@@ -592,7 +593,7 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
-      escapeSingleQuotes: false,
+      escapeSingleQuotes: true,
     });
     const { t } = useI18nTyped();
 
@@ -885,7 +886,7 @@ export default defineComponent({
         hideOnDashboard: variable.hideOnDashboard ?? false,
         selectAllValueForMultiSelect: variable.selectAllValueForMultiSelect ?? "first",
         customMultiSelectValue: variable.customMultiSelectValue ?? [],
-        escapeSingleQuotes: variable.escapeSingleQuotes ?? false,
+        escapeSingleQuotes: variable.escapeSingleQuotes ?? true,
       };
     };
 

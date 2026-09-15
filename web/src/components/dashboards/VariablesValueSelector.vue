@@ -123,7 +123,10 @@ import { isInvalidDate } from "@/utils/date";
 import { addLabelsToSQlQuery } from "@/utils/query/sqlUtils";
 import { b64EncodeUnicode, escapeSingleQuotes, generateTraceContext } from "@/utils/zincutils";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+} from "@/utils/dashboard/variables/variablesUtils";
 import useHttpStreaming from "@/composables/useStreamingSearch";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { getVariableKey } from "@/composables/dashboard/useVariablesManager";
@@ -1889,49 +1892,35 @@ export default defineComponent({
       // Normalize spaces inside variable syntax before replacement
       queryContext = normalizeVariableSyntax(queryContext);
 
+      const variablesByName = new Map<string, any>();
       for (const variable of variablesToResolve) {
-        // Skip dynamic_filters as they don't participate in standard variable replacement
-        // and their value structure (array of objects) causes issues with escapeSingleQuotes
-        if (variable.type === "dynamic_filters") continue;
-
-        if (variable.isVariablePartialLoaded) {
-          // Escape special regex characters in variable name
-          const escapedVarName = variable.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-          // Replace array values
-          if (Array.isArray(variable.value)) {
-            const arrayValues = variable.value
-              .map((value: any) => `'${escapeSingleQuotes(value)}'`)
-              .join(", ");
-
-            // Mustache patterns: {{variable}} and {{variable:format}}
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
-            queryContext = queryContext.replace(mustachePattern, arrayValues);
-
-            // Dollar-sign patterns (existing)
-            // Pattern 1: Unquoted placeholder like IN($variable) -> IN('val1', 'val2')
-            const unquotedPattern = new RegExp(`\\$${escapedVarName}(?!')`, "g");
-            // Pattern 2: Quoted placeholder like '$variable' -> 'val1', 'val2'
-            const quotedPattern = new RegExp(`'\\$${escapedVarName}'`, "g");
-
-            // First replace unquoted patterns (for IN clauses)
-            queryContext = queryContext.replace(unquotedPattern, arrayValues);
-            // Then replace quoted patterns
-            queryContext = queryContext.replace(quotedPattern, arrayValues);
-          } else if (variable.value !== null && variable.value !== undefined) {
-            // Replace single values with regex to replace all occurrences
-            const replacedValue = escapeSingleQuotes(variable.value);
-
-            // Mustache pattern
-            const mustachePattern = new RegExp(`\\{\\{${escapedVarName}(?::[a-zA-Z]+)?\\}\\}`, "g");
-            queryContext = queryContext.replace(mustachePattern, replacedValue);
-
-            // Dollar-sign pattern (existing)
-            const pattern = new RegExp(`\\$${escapedVarName}`, "g");
-            queryContext = queryContext.replace(pattern, replacedValue);
-          }
+        // dynamic_filters values are arrays of objects, never placeholder values
+        if (variable.type === "dynamic_filters" || !variable.name) continue;
+        const existing = variablesByName.get(variable.name);
+        if (!existing || (!existing.isVariablePartialLoaded && variable.isVariablePartialLoaded)) {
+          variablesByName.set(variable.name, variable);
         }
       }
+
+      queryContext = replaceVariablePlaceholders(
+        queryContext,
+        variablesByName.keys(),
+        ({ name, quoted }) => {
+          const variable = variablesByName.get(name);
+          // an unloaded variable keeps its placeholder rather than resolving as a shorter name
+          if (!variable.isVariablePartialLoaded) return undefined;
+
+          if (Array.isArray(variable.value)) {
+            const values = variable.value.map((value: any) => escapeSingleQuotes(value));
+            // '$name' already supplies the outer quotes: '$name' -> 'a', 'b'
+            return quoted
+              ? values.join("', '")
+              : values.map((value: any) => `'${value}'`).join(", ");
+          }
+          if (variable.value === null || variable.value === undefined) return undefined;
+          return `${escapeSingleQuotes(variable.value)}`;
+        },
+      );
 
       // Base64 encode the query context
       return b64EncodeUnicode(queryContext);

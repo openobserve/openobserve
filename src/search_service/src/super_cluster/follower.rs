@@ -27,7 +27,9 @@ use config::{
 };
 use datafusion::{
     common::{TableReference, tree_node::TreeNode},
-    physical_plan::{ExecutionPlan, aggregates::AggregateExec},
+    physical_plan::{
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions, aggregates::AggregateExec,
+    },
     prelude::SessionContext,
 };
 use datafusion_proto::bytes::physical_plan_from_bytes_with_extension_codec;
@@ -306,7 +308,10 @@ fn add_region_remote_scan_partial_reduce(
     if physical_plan.name() == "SortPreservingMergeExec" {
         let top_merge_node = physical_plan.clone();
         let remote_scan_exec = Arc::new(RemoteScanExec::new(physical_plan, remote_scan_node)?);
-        return Ok(top_merge_node.with_new_children(vec![remote_scan_exec])?);
+        return Ok(top_merge_node.replace_children(
+            vec![remote_scan_exec],
+            ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+        )?);
     }
 
     let source_plan = physical_plan.clone();

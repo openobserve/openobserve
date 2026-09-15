@@ -27,7 +27,9 @@ use datafusion::{
         },
     },
     datasource::DefaultTableSource,
-    logical_expr::{Limit, LogicalPlan, Projection, Sort, SortExpr, TableScan, TableSource, col},
+    logical_expr::{
+        Limit, LogicalPlan, Projection, Sort, SortExpr, TableScanBuilder, TableSource, col,
+    },
     physical_plan::ExecutionPlan,
     prelude::Expr,
     scalar::ScalarValue,
@@ -261,13 +263,12 @@ impl TreeNodeRewriter for ChangeTableScanSchema {
                     p.push(timestamp_idx);
                     p
                 });
-                let mut table_scan = TableScan::try_new(
-                    scan.table_name,
-                    scan.source,
-                    projection,
-                    scan.filters,
-                    scan.fetch,
-                )?;
+                let mut table_scan = TableScanBuilder::new(scan.table_name, scan.source)
+                    .with_projection(projection)
+                    .with_filters(scan.filters)
+                    .with_fetch(scan.fetch)
+                    .with_statistics_requests(scan.statistics_requests)
+                    .build()?;
                 if !is_metrics {
                     // non-metrics files are timestamp-descending.
                     table_scan.source =
