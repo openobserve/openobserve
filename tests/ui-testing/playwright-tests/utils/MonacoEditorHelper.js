@@ -68,7 +68,10 @@ class MonacoEditorHelper {
      */
     async clear(container) {
         await this.focus(container);
-        await this.page.keyboard.press('Control+a');
+        // ControlOrMeta, not Control: on macOS Control+a is "move to line start",
+        // so a plain Control+a leaves the editor untouched and the next type()
+        // appends to the existing query instead of replacing it.
+        await this.page.keyboard.press('ControlOrMeta+a');
         await this.page.keyboard.press('Backspace');
     }
 

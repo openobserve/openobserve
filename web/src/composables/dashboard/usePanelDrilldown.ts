@@ -161,7 +161,7 @@ export function usePanelDrilldown({
         let value = obj[key];
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       }
     }
 
@@ -183,7 +183,7 @@ export function usePanelDrilldown({
         }
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       },
     );
   };
@@ -258,7 +258,7 @@ export function usePanelDrilldown({
       : "";
 
     if (breakdownColumn && breakdownValue) {
-      const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
+      const breakdownCondition = `${breakdownColumn} = '${escapeSingleQuotes(String(breakdownValue))}'`;
       whereClause += whereClause ? ` AND ${breakdownCondition}` : ` WHERE ${breakdownCondition}`;
     }
 
@@ -384,9 +384,7 @@ export function usePanelDrilldown({
       let variableValue = "";
       if (Array.isArray(variable.value)) {
         const value = variable.value
-          .map(
-            (value: any) => `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
-          )
+          .map((value: any) => `'${escapeSingleQuotes(String(value))}'`)
           .join(",");
         const possibleVariablesPlaceHolderTypes = [
           // Mustache forms
@@ -449,11 +447,7 @@ export function usePanelDrilldown({
         });
       } else {
         variableValue =
-          variable.value === null
-            ? ""
-            : `${
-                variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value
-              }`;
+          variable.value === null ? "" : `${escapeSingleQuotes(String(variable.value))}`;
         // if (query.includes(variableName)) {
         //   metadata.push({
         //     type: "variable",

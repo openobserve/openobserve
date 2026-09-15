@@ -45,6 +45,11 @@ pub enum MergedFile {
     Standard { data: Vec<u8>, meta: FileMeta },
     /// Metrics output ordered by `(__hash__, _timestamp)` and retained in memory.
     MetricsHashSorted { data: Vec<u8>, meta: FileMeta },
+    /// Open-hour round output spooled to local disk, no `.midx`.
+    MetricsHashMerged {
+        data_path: tempfile::TempPath,
+        meta: FileMeta,
+    },
     /// Finalized indexed metrics output spooled to local disk.
     MetricsIndexed {
         data_path: tempfile::TempPath,
@@ -58,6 +63,7 @@ impl MergedFile {
         match self {
             Self::Standard { .. } => None,
             Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsHashMerged { .. } => Some(MetricsFileLayout::HashMerged),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
@@ -84,9 +90,11 @@ impl MergedFile {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta))
             }
-            Self::MetricsIndexed { .. } => Err(DataFusionError::Execution(
-                "ingester cannot consume indexed metrics output".to_string(),
-            )),
+            Self::MetricsHashMerged { .. } | Self::MetricsIndexed { .. } => {
+                Err(DataFusionError::Execution(
+                    "ingester cannot consume compactor metrics output".to_string(),
+                ))
+            }
         }
     }
 
@@ -97,6 +105,9 @@ impl MergedFile {
         match self {
             Self::Standard { data, meta } | Self::MetricsHashSorted { data, meta } => {
                 Ok((data, meta, None))
+            }
+            Self::MetricsHashMerged { data_path, meta } => {
+                Ok((tokio::fs::read(&data_path).await?, meta, None))
             }
             Self::MetricsIndexed {
                 data_path,

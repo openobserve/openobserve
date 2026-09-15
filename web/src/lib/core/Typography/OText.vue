@@ -22,6 +22,8 @@ const variantDefaultAs: Record<NonNullable<TextProps["variant"]>, string> = {
   section: "h2",
   // <h3> for card and panel titles.
   "panel-title": "h3",
+  // <h3> for the heading of a section pane on a detail page.
+  "card-title": "h3",
   // <p> for block-level body paragraphs.
   body: "p",
   // <strong> carries semantic emphasis for screen readers.
@@ -53,6 +55,11 @@ const variantClasses: Record<NonNullable<TextProps["variant"]>, string> = {
   // Panel / card title: mixed-case, slightly heavier than body, primary color.
   // For collapsible triggers, sidebar group headings, widget card headers.
   "panel-title": ["text-xs font-medium", "text-typography-panel-title", "leading-tight"].join(" "),
+
+  // Section-pane heading on a detail page. One step up from panel-title in both
+  // size and weight: these headings label the panes a reader scans the page by,
+  // so they have to be findable at a glance across a two-column layout.
+  "card-title": ["text-sm font-semibold", "text-typography-panel-title", "leading-tight"].join(" "),
 
   // Default body text. Most table cells, descriptions, and paragraphs.
   body: ["text-sm font-normal", "text-typography-body"].join(" "),

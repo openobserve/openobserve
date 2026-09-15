@@ -1111,6 +1111,171 @@ describe("Index.vue (Main Traces Page)", () => {
     });
   });
 
+  describe("Streaming page writes (issue #14317)", () => {
+    // The shared beforeEach does not reset currentPage, so it would leak into later tests.
+    afterEach(() => {
+      mockSearchObj.data.resultGrid.currentPage = 0;
+    });
+
+    const meta = (hits: any[] = []) => ({
+      type: "search_response_metadata",
+      content: { results: { hits } },
+    });
+    const chunk = (hits: any[]) => ({
+      type: "search_response_hits",
+      content: { results: { hits } },
+    });
+    const spans = (prefix: string, n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        span_id: `${prefix}-${i}`,
+        trace_id: `t-${prefix}-${i}`,
+        service_name: "svc",
+        operation_name: "op",
+        _timestamp: 1700000000000000 + i,
+      }));
+
+    const mountPage = async () => {
+      mockSearchObj.meta.searchMode = "spans";
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      wrapper = mount(Index, {
+        attachTo: node,
+        global: {
+          plugins: [i18n, router],
+          provide: { store: store },
+          stubs: {
+            "search-bar": true,
+            "index-list": true,
+            "search-result": true,
+            "service-graph": true,
+            "services-catalog": true,
+            SanitizedHtmlRenderer: true,
+          },
+        },
+      });
+      await flushPromises();
+      // Mounting runs loadPageData, which can reset the stream selection.
+      mockSearchObj.data.stream.selectedStream = { label: "default", value: "default" };
+      // getQueryData derives `from` from currentPage, so this is what makes it page 2.
+      mockSearchObj.data.resultGrid.currentPage = 1;
+      mockSearchObj.meta.resultGrid.rowsPerPage = 25;
+      mockSearchObj.data.queryPayload = {
+        query: {
+          sql: "",
+          start_time: 1700000000000000,
+          end_time: 1700003600000000,
+          from: 0,
+          size: 25,
+        },
+      };
+      return wrapper;
+    };
+
+    const lastCallbacks = () => {
+      const calls = mockFetchQueryDataWithHttpStream.mock.calls;
+      return calls[calls.length - 1][1];
+    };
+
+    it("replaces the previous page when the stream opens with an empty batch", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      const page2 = spans("p2", 25);
+      // The backend opens every page past the first with an empty batch.
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(page2));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toHaveLength(25);
+      expect(ids).toEqual(page2.map((h) => h.span_id));
+      expect(ids.some((id: string) => id.startsWith("p1-"))).toBe(false);
+    });
+
+    it("joins batches within one page instead of replacing them", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const cb = lastCallbacks();
+      const first = spans("a", 5);
+      const second = spans("b", 20);
+      cb.data(null, meta([]));
+      cb.data(null, chunk(first));
+      cb.data(null, meta([]));
+      cb.data(null, chunk(second));
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual([...first, ...second].map((h) => h.span_id));
+    });
+
+    it("clears the grid when a page streams no rows at all", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      mockSearchObj.data.queryResults.hits = spans("p1", 25);
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.complete(null);
+
+      expect(mockSearchObj.data.queryResults.hits).toEqual([]);
+    });
+
+    // Logs shows its error banner over the last results rather than blanking; traces matches it.
+    it("keeps the previous rows when a page fails before writing any", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+
+      const page1 = spans("p1", 25);
+      mockSearchObj.data.queryResults.hits = [...page1];
+
+      const cb = lastCallbacks();
+      cb.data(null, meta([]));
+      cb.data(null, chunk([]));
+      cb.error(null, { content: { message: "boom", code: 500 } });
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(page1.map((h) => h.span_id));
+    });
+
+    it("ignores batches from a request that a newer search superseded", async () => {
+      await mountPage();
+      mockFetchQueryDataWithHttpStream.mockClear();
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const stale = lastCallbacks();
+
+      // A second search cancels the first and takes ownership of the grid.
+      await wrapper.vm.getQueryData(true);
+      await flushPromises();
+      const current = lastCallbacks();
+
+      const fresh = spans("new", 25);
+      current.data(null, meta([]));
+      current.data(null, chunk(fresh));
+
+      stale.data(null, meta([]));
+      stale.data(null, chunk(spans("old", 25)));
+      stale.complete(null);
+
+      const ids = mockSearchObj.data.queryResults.hits.map((h: any) => h.span_id);
+      expect(ids).toEqual(fresh.map((h) => h.span_id));
+    });
+  });
+
   describe("Metrics Filters Integration", () => {
     // Spies for SearchBar ref methods exposed via stub
     const mockApplyFilters = vi.fn();

@@ -104,6 +104,7 @@ const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
+import { SearchHistoryPage } from "./logsPages/searchHistoryPage.js";
 import UnflattenedPage from "./logsPages/unflattened.js";
 
 // ===== SDR (SENSITIVE DATA REDACTION) PAGE OBJECTS =====
@@ -120,7 +121,6 @@ const FunctionsFormValidationPage = require("./functionsPages/functionsFormValid
 
 // ===== ANOMALY DETECTION PAGE OBJECTS =====
 const { AnomalyDetectionPage } = require("./anomalyPages/anomalyDetectionPage.js");
-const { AnomalyFormValidationPage } = require("./anomalyPages/anomalyFormValidationPage.js");
 
 class PageManager {
   /**
@@ -179,6 +179,7 @@ class PageManager {
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);
+    this.searchHistoryPage = new SearchHistoryPage(page);
     this.streamsPage = new StreamsPage(page);
     this.alertTemplatesPage = new AlertTemplatesPage(page);
     this.alertDestinationsPage = new AlertDestinationsPage(page);
@@ -253,7 +254,6 @@ class PageManager {
 
     // ===== ANOMALY DETECTION PAGE OBJECTS =====
     this.anomalyDetectionPage = new AnomalyDetectionPage(page, this.commonActions);
-    this.anomalyFormValidation = new AnomalyFormValidationPage(page);
     this.aiToolsetsFormValidation = new AiToolsetsFormValidationPage(page);
 
     // ===== RUM PAGE OBJECTS =====

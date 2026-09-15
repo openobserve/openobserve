@@ -19,22 +19,25 @@ use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::ErrorCodes;
 use promql_parser::parser::{
     Call, Expr as PromExpr, LabelModifier, MatrixSelector, VectorSelector, token,
 };
 
 use super::Engine;
-use crate::{aggregations, functions, fused};
+use crate::{
+    aggregations::{self, AggOp},
+    functions, series_stream, streaming_eval,
+};
 
 /// A recognized fused shape: `agg(range_func(...))`, or `agg(instant_selector)` read as
 /// `last_over_time` over the lookback window.
 struct FusedAggShape<'a> {
-    op: fused::FusedAggOp,
     func: Arc<dyn functions::RangeFunc>,
     /// The range function's argument to materialize; `None` for the instant shape, which has
     /// no range function and stays generic when it cannot stream.
     range_arg: Option<&'a PromExpr>,
-    /// The plain selector under the shape, when it can be planned as ordered shard streams;
+    /// The plain selector under the shape, when it can be planned as ordered partition streams;
     /// a `None` range is the instant lookback.
     selector: Option<(&'a VectorSelector, Option<Duration>)>,
 }
@@ -47,120 +50,107 @@ impl Engine {
         param: &Option<Box<PromExpr>>,
         modifier: &Option<LabelModifier>,
     ) -> Result<Value> {
-        // fused shapes fold the range function into the aggregation; others stay generic
-        if let Some(shape) = fused_agg_shape(op, expr) {
-            if let Some((selector, range)) = shape.selector {
-                let range =
-                    range.unwrap_or_else(|| Duration::from_micros(self.ctx.lookback_delta as u64));
-                if let Some(value) = self
-                    .try_streaming_fused_agg(
-                        selector,
-                        range,
-                        modifier,
-                        shape.func.clone(),
-                        shape.op,
-                    )
-                    .await?
-                {
-                    return Ok(value);
-                }
-            }
-            if let Some(range_arg) = shape.range_arg {
-                let range_input = self.exec_expr(range_arg).await?;
-                return fused::matrix::fused_agg(
-                    modifier,
-                    range_input,
-                    shape.func,
-                    shape.op,
-                    &self.eval_ctx,
-                    self.ctx.query_ctx.timeout,
-                )
-                .await;
-            }
-        }
-
-        let input = self.exec_expr(expr).await?;
-
+        let param = match param {
+            Some(param) => Some(self.exec_expr(param).await?),
+            None => None,
+        };
         let eval_ctx = self.eval_ctx.clone();
-
-        Ok(match op.id() {
-            token::T_SUM => aggregations::sum(modifier, input, &eval_ctx)?,
-            token::T_AVG => aggregations::avg(modifier, input, &eval_ctx)?,
-            token::T_COUNT => aggregations::count(modifier, input, &eval_ctx)?,
-            token::T_MIN => aggregations::min(modifier, input, &eval_ctx)?,
-            token::T_MAX => aggregations::max(modifier, input, &eval_ctx)?,
-            token::T_GROUP => aggregations::group(modifier, input, &eval_ctx)?,
-            token::T_STDDEV => aggregations::stddev(modifier, input, &eval_ctx)?,
-            token::T_STDVAR => aggregations::stdvar(modifier, input, &eval_ctx)?,
-            token::T_TOPK => {
-                let param_expr = param.clone().unwrap();
-                let k_value = self.exec_expr(&param_expr).await?;
-                let k = match k_value {
-                    Value::Float(f) => f as usize,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[topk] param must be a number".to_string(),
-                        ));
-                    }
+        match op.id() {
+            token::T_QUANTILE => {
+                let Some(Value::Float(value)) = param else {
+                    return Err(DataFusionError::Plan(
+                        "[quantile] param must be a number".to_string(),
+                    ));
                 };
-                aggregations::topk(k, modifier, input, &eval_ctx)?
-            }
-            token::T_BOTTOMK => {
-                let param_expr = param.clone().unwrap();
-                let k_value = self.exec_expr(&param_expr).await?;
-                let k = match k_value {
-                    Value::Float(f) => f as usize,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[bottomk] param must be a number".to_string(),
-                        ));
-                    }
-                };
-                aggregations::bottomk(k, modifier, input, &eval_ctx)?
+                let input = self.exec_expr(expr).await?;
+                aggregations::quantile(value, input, &eval_ctx)
             }
             token::T_COUNT_VALUES => {
-                let param_expr = param.clone().unwrap();
-                let label_name = self.exec_expr(&param_expr).await?;
-                let label_name_str = match label_name {
-                    Value::String(s) => s,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[count_values] param must be a string".to_string(),
-                        ));
-                    }
+                let Some(Value::String(label_name)) = param else {
+                    return Err(DataFusionError::Plan(
+                        "[count_values] param must be a string".to_string(),
+                    ));
                 };
-                aggregations::count_values(&label_name_str, modifier, input, &eval_ctx)?
-            }
-            token::T_QUANTILE => {
-                let param_expr = param.clone().unwrap();
-                let qtile_value = self.exec_expr(&param_expr).await?;
-                let qtile = match qtile_value {
-                    Value::Float(f) => f,
-                    _ => {
-                        return Err(DataFusionError::Plan(
-                            "[quantile] param must be a number".to_string(),
-                        ));
-                    }
-                };
-                aggregations::quantile(qtile, input, &eval_ctx)?
+                let input = self.exec_expr(expr).await?;
+                aggregations::count_values(&label_name, modifier, input, &eval_ctx)
             }
             _ => {
-                return Err(DataFusionError::NotImplemented(format!(
-                    "Unsupported Aggregate: {op:?}"
-                )));
+                let agg_op = AggOp::new(op, param)?;
+                if let Some(value) = self.fused_agg(agg_op, expr, modifier).await? {
+                    return Ok(value);
+                }
+                let input = self.exec_expr(expr).await?;
+                agg_op.eval_aggregate(modifier, input, &eval_ctx)
             }
-        })
+        }
+    }
+
+    /// The fused fold over an already-materialized matrix, bounded by the query timeout.
+    pub(super) async fn materialized_fused_agg(
+        &self,
+        modifier: &Option<LabelModifier>,
+        data: Value,
+        func: Arc<dyn functions::RangeFunc>,
+        op: AggOp,
+    ) -> Result<Value> {
+        let Some((sources, range)) = series_stream::matrix::group_sources(
+            data,
+            modifier,
+            func.name(),
+            op.needs_series_labels(),
+        )?
+        else {
+            return Ok(Value::None);
+        };
+        let eval = Arc::new(streaming_eval::RangeExpr::new(func, range, &self.eval_ctx));
+        let timeout = Duration::from_secs(self.ctx.query_ctx.timeout);
+        let (value, _) =
+            tokio::time::timeout(timeout, streaming_eval::aggregate(sources, op, eval))
+                .await
+                .map_err(|_| {
+                    DataFusionError::from(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                })??;
+        Ok(value)
+    }
+
+    async fn fused_agg(
+        &mut self,
+        agg_op: AggOp,
+        expr: &PromExpr,
+        modifier: &Option<LabelModifier>,
+    ) -> Result<Option<Value>> {
+        let Some(shape) = fused_agg_shape(expr) else {
+            return Ok(None);
+        };
+        if let Some((selector, range)) = shape.selector {
+            let range = range.unwrap_or_else(|| self.ctx.lookback());
+            if let Some(value) = self
+                .try_streaming_fused_agg(selector, range, modifier, shape.func.clone(), agg_op)
+                .await?
+            {
+                return Ok(Some(value));
+            }
+        }
+        let Some(range_arg) = shape.range_arg else {
+            return Ok(None);
+        };
+        let range_input = self.exec_expr(range_arg).await?;
+        self.materialized_fused_agg(modifier, range_input, shape.func, agg_op)
+            .await
+            .map(Some)
     }
 }
 
-fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<FusedAggShape<'a>> {
+/// The shapes the fused fold recognizes, every operator alike behind the fused-fold flag.
+fn fused_agg_shape(expr: &PromExpr) -> Option<FusedAggShape<'_>> {
     if !config::get_config()
         .search
         .feature_metrics_fused_agg_enabled
     {
         return None;
     }
-    let agg_op = fused::FusedAggOp::from_token(op.id())?;
     match expr {
         PromExpr::Call(Call { func, args }) => {
             let [range_arg] = args.args.as_slice() else {
@@ -173,7 +163,6 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
                 _ => None,
             };
             Some(FusedAggShape {
-                op: agg_op,
                 func: Arc::from(range_func),
                 range_arg: Some(range_arg),
                 selector,
@@ -182,8 +171,7 @@ fn fused_agg_shape<'a>(op: &token::TokenType, expr: &'a PromExpr) -> Option<Fuse
         // an instant selector picks the last sample in the lookback window and keeps the metric
         // name, which is exactly last_over_time
         PromExpr::VectorSelector(selector) => Some(FusedAggShape {
-            op: agg_op,
-            func: Arc::from(functions::fusable_range_func("last_over_time")?),
+            func: functions::instant_lookback_func(),
             range_arg: None,
             selector: Some((selector, None)),
         }),
@@ -197,11 +185,67 @@ mod tests {
 
     use super::*;
 
+    #[tokio::test]
+    async fn test_numeric_aggregation_dispatch() {
+        use crate::{engine::tests::*, exec::PromqlContext};
+
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        for (name, param) in [("topk", "1"), ("bottomk", "1"), ("quantile", "0.5")] {
+            let mut expr = parse(&format!("{name}({param}, vector(5))")).unwrap();
+            let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix for {name}");
+            };
+            assert_eq!(series.len(), 1);
+            assert_eq!(series[0].samples[0].value, 5.0);
+
+            let PromExpr::Aggregate(aggregate) = &mut expr else {
+                unreachable!();
+            };
+            aggregate.param = Some(Box::new(parse(r#""invalid""#).unwrap()));
+            let result = engine.exec_expr(&expr).await;
+            assert!(
+                matches!(result, Err(DataFusionError::Plan(message)) if message == format!("[{name}] param must be a number"))
+            );
+        }
+    }
+
+    /// A k that is not a literal is evaluated after the input and builds the same operator.
+    #[tokio::test]
+    async fn test_non_literal_k_evaluates_generically() {
+        use crate::{engine::tests::*, exec::PromqlContext};
+
+        let mut engine = Engine::new(
+            "test",
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx("test", "test_org", 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+        for query in ["topk(2 - 1, vector(5))", "bottomk(1 + 0, vector(5))"] {
+            let expr = parse(query).unwrap();
+            let Value::Matrix(series) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix for {query}");
+            };
+            assert_eq!(series.len(), 1, "{query}");
+            assert_eq!(series[0].samples[0].value, 5.0, "{query}");
+        }
+    }
+
     fn shape(query: &str) -> Option<(String, bool, Option<Option<Duration>>)> {
-        let PromExpr::Aggregate(AggregateExpr { op, expr, .. }) = parse(query).unwrap() else {
+        let PromExpr::Aggregate(AggregateExpr { expr, .. }) = parse(query).unwrap() else {
             panic!("{query} is not an aggregation");
         };
-        fused_agg_shape(&op, &expr).map(|shape| {
+        fused_agg_shape(&expr).map(|shape| {
             (
                 shape.func.name().to_string(),
                 shape.range_arg.is_some(),
@@ -230,6 +274,26 @@ mod tests {
             Some(("last_over_time".to_string(), false, Some(None)))
         );
         assert_eq!(shape("sum(abs(m))"), None);
-        assert_eq!(shape("topk(3, rate(m[5m]))"), None);
+    }
+
+    #[test]
+    fn test_fused_agg_shape_ignores_the_parameter() {
+        assert_eq!(
+            shape("topk(3, rate(m[5m]))"),
+            Some((
+                "rate".to_string(),
+                true,
+                Some(Some(Duration::from_secs(300)))
+            ))
+        );
+        assert_eq!(
+            shape("bottomk by(instance) (2, m{job=\"a\"} offset 1m)"),
+            Some(("last_over_time".to_string(), false, Some(None)))
+        );
+        assert_eq!(
+            shape("topk(scalar(m), m)"),
+            Some(("last_over_time".to_string(), false, Some(None)))
+        );
+        assert_eq!(shape("topk(3, abs(m))"), None);
     }
 }

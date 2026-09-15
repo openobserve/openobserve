@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :key="tab.value"
               :value="tab.value"
               size="sm"
+              :data-test="`anomaly-query-tab-${tab.value}`"
             >
               {{ tab.label }}
             </OToggleGroupItem>
@@ -50,9 +51,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="(filter, idx) in filterRows"
               :key="idx"
               class="mb-2 flex items-center gap-2"
+              data-test="anomaly-filter-row"
             >
               <OFormSelect
                 :name="`filters[${idx}].field`"
+                :data-test="`anomaly-filter-field-${idx}`"
                 :options="filteredStreamFields"
                 :placeholder="filter.field ? raw('') : t('alerts.anomaly.fieldPlaceholder')"
                 class="alert-v3-select filter-field-select"
@@ -71,6 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFormSelect>
               <OFormSelect
                 :name="`filters[${idx}].operator`"
+                :data-test="`anomaly-filter-operator-${idx}`"
                 :options="filterOperators"
                 class="alert-v3-select"
                 style="width: 6.875rem"
@@ -78,6 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OFormInput
                 v-if="operatorNeedsValue(filter.operator)"
                 :name="`filters[${idx}].value`"
+                :data-test="`anomaly-filter-value-${idx}`"
                 :placeholder="t('alerts.placeholders.value')"
                 class="alert-v3-input"
                 style="max-width: 10rem"
@@ -85,11 +90,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 variant="ghost"
                 size="icon-sm"
+                data-test="anomaly-filter-row-remove"
                 @click="removeFilter(idx)"
                 icon-left="close"
               />
             </div>
-            <OButton variant="outline" size="sm-action" class="mt-2" @click="addFilter">
+            <OButton
+              variant="outline"
+              size="sm-action"
+              class="mt-2"
+              data-test="anomaly-filter-add"
+              @click="addFilter"
+            >
               {{ t("alerts.anomaly.addFilter") }}
             </OButton>
           </div>

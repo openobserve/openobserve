@@ -64,6 +64,7 @@ const row = (over: Partial<EligibleRow> = {}): EligibleRow => ({
   frequency_secs: 60,
   eligible: true,
   reason: null,
+  reason_code: null,
   ...over,
 });
 
@@ -76,6 +77,7 @@ const ELIGIBLE = [
     frequency_secs: 604800,
     eligible: false,
     reason: "a cron-scheduled alert cannot be an SLI source",
+    reason_code: "cron",
   }),
   row({
     alert_id: "alert-silenced",
@@ -83,6 +85,7 @@ const ELIGIBLE = [
     frequency_secs: 60,
     eligible: false,
     reason: "set the source's silence to 0 or give it a warning threshold",
+    reason_code: "silenced",
   }),
   // Scheduled, ungrouped and not cron — refused purely on cadence, because
   // 300 is the coarsest supported slice.
@@ -92,6 +95,7 @@ const ELIGIBLE = [
     frequency_secs: 600,
     eligible: false,
     reason: "an alert-based SLI needs a source that evaluates at least once per slice",
+    reason_code: "too_infrequent",
   }),
 ];
 
@@ -117,10 +121,11 @@ function byTest(wrapper: VueWrapper, component: Component, test: string) {
   return hit;
 }
 
-async function mountForm() {
+async function mountForm(setup?: () => void) {
   vi.mocked(sloService.eligibleAlerts).mockResolvedValue({
     data: { list: ELIGIBLE },
   } as never);
+  setup?.();
 
   const wrapper = mount(AddSlo, {
     attachTo: node,
@@ -196,24 +201,74 @@ describe("AddSlo — alert SLI", () => {
 
   // Without this the picker offers alerts the server will reject, and the user
   // learns why only on save.
-  it("disables the ineligible alerts and shows why", async () => {
+  //
+  // The reason is a PARAGRAPH. In the label it truncated the name; under it, it
+  // cost three lines per row and a twenty-alert org got an unreadable list. So
+  // the row keeps one line: the name, a chip naming the rule it failed, and the
+  // sentence on hover.
+  //
+  // The chip comes from `reason_code`, never from the sentence — the copy is the
+  // validator's and is free to change.
+  it("disables the ineligible alerts and names the rule on a chip", async () => {
     const wrapper = await mountForm();
     await selectAlertType(wrapper);
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
+      badge?: string;
+      badgeTitle?: string;
       disabled?: boolean;
     }[];
 
-    expect(options.find((o) => o.value === "alert-fast")?.disabled).toBeFalsy();
+    const eligible = options.find((o) => o.value === "alert-fast");
+    expect(eligible?.disabled).toBeFalsy();
+    // An eligible alert has nothing to explain, so it carries no chip.
+    expect(eligible?.badge).toBeUndefined();
+    expect(eligible?.badgeTitle).toBeUndefined();
 
     const cron = options.find((o) => o.value === "alert-cron");
     expect(cron?.disabled).toBe(true);
-    expect(cron?.label).toContain("cron");
+    // The name is the whole label, so the list stays scannable.
+    expect(cron?.label).toBe("weekly report");
+    expect(cron?.badge).toBe("Cron schedule");
+    // The hover says what to CHANGE. The server's own sentence explains the
+    // measurement theory behind the rule, which is the right level for an API
+    // error and the wrong one for someone picking from a list.
+    expect(cron?.badgeTitle).toContain("Change it to a fixed interval");
 
     const silenced = options.find((o) => o.value === "alert-silenced");
     expect(silenced?.disabled).toBe(true);
-    expect(silenced?.label).toContain("silence to 0");
+    expect(silenced?.badge).toBe("Has silence");
+    expect(silenced?.badgeTitle).toContain("Set its silence period to 0");
+  });
+
+  // A code the frontend does not know about must still mark the row: an
+  // ineligible option with no chip reads as a rendering bug, not as a rule.
+  it("falls back to a generic chip for an unrecognised reason", async () => {
+    vi.mocked(sloService.eligibleAlerts).mockResolvedValueOnce({
+      data: {
+        list: [
+          row({
+            alert_id: "alert-future",
+            name: "future rule",
+            eligible: false,
+            reason: "something the UI has not been taught yet",
+            reason_code: "a_rule_added_later",
+          }),
+        ],
+      },
+    } as any);
+
+    const wrapper = await mountForm();
+    await selectAlertType(wrapper);
+    const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
+      value: string;
+      badge?: string;
+      badgeTitle?: string;
+    }[];
+    const future = options.find((o) => o.value === "alert-future");
+    expect(future?.badge).toBe("Not eligible");
+    expect(future?.badgeTitle).toBe("something the UI has not been taught yet");
   });
 
   // A source evaluating slower than 300s cannot be used at all — 300 is the
@@ -224,11 +279,17 @@ describe("AddSlo — alert SLI", () => {
     const options = byTest(wrapper, OSelect, "slos-addslo-alert-source").props("options") as {
       value: string;
       label: string;
+      badge?: string;
+      badgeTitle?: string;
       disabled?: boolean;
     }[];
     const slow = options.find((o) => o.value === "alert-slow");
     expect(slow?.disabled).toBe(true);
-    expect(slow?.label).toContain("once per slice");
+    expect(slow?.badge).toBe("Runs too rarely");
+    // The cadence is named in the units a person would say it in, and the
+    // requirement is stated as a number they can act on.
+    expect(slow?.badgeTitle).toContain("runs every 10 minutes");
+    expect(slow?.badgeTitle).toContain("at least every 5 minutes");
   });
 
   it("defaults the slice to 60 for a one-minute source", async () => {
@@ -288,6 +349,10 @@ describe("AddSlo — alert SLI", () => {
     const wrapper = await mountForm();
     await selectAlertType(wrapper);
     await pickSource(wrapper, "alert-fast");
+    // The name is required and this test is about the config, so supplying one
+    // is setup — without it the save is refused and nothing reaches the spy.
+    await wrapper.find('[data-test="slos-addslo-name-field"]').setValue("payload-fixture");
+    await flushPromises();
     await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
     await flushPromises();
 
@@ -305,6 +370,79 @@ describe("AddSlo — alert SLI", () => {
   });
 });
 
+describe("AddSlo — alert source load failure", () => {
+  beforeEach(() => {
+    vi.mocked(sloService.eligibleAlerts).mockClear();
+  });
+
+  /**
+   * Both the load failure (#14279) and the required-field check want the same
+   * error slot, and the merge that brought them together produced two `:error`
+   * bindings on one element — where Vue silently keeps the last.
+   *
+   * The load failure has to win: with no list to pick from, "Source alert is
+   * required" is advice the user cannot act on.
+   */
+  it("shows the load failure rather than the required-field message", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
+        response: { data: { message: "alerts service unavailable" } },
+      });
+    });
+    await selectAlertType(wrapper);
+    // Attempt a save so the required-field check is live and would otherwise
+    // claim the slot.
+    await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
+    await flushPromises();
+
+    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
+    expect(select.props("errorMessage")).toBe("alerts service unavailable");
+  });
+
+  // The picker itself carries the error now (:error / :error-message on
+  // OSelect), not a sibling OBanner — so the failure has to surface through
+  // the select's own error slot.
+  it("surfaces the server's message on the source picker", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
+        response: { data: { message: "org has no alerts configured" } },
+      });
+    });
+    await selectAlertType(wrapper);
+
+    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
+    expect(select.props("error")).toBe(true);
+    expect(select.props("errorMessage")).toBe("org has no alerts configured");
+    expect(wrapper.text()).toContain("org has no alerts configured");
+  });
+
+  // No server message at all (network failure, 500 with no body) falls back
+  // to the generic copy rather than showing "undefined" or an empty banner.
+  it("falls back to the generic message when the server gives no reason", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue(new Error("network down"));
+    });
+    await selectAlertType(wrapper);
+
+    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
+    expect(select.props("error")).toBe(true);
+    expect(select.props("errorMessage")).toBe(i18n.global.t("slos.alertSli.loadFailed"));
+  });
+
+  // Without the `!alertSourceError` guard, the "no eligible alerts" info
+  // banner and the picker's error would show side by side.
+  it("hides the empty-state banner while a load error is showing", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
+        response: { data: { message: "boom" } },
+      });
+    });
+    await selectAlertType(wrapper);
+
+    expect(wrapper.find('[data-test="slos-addslo-alert-source-empty"]').exists()).toBe(false);
+  });
+});
+
 describe("AddSlo — time-slice SLI", () => {
   beforeEach(() => {
     vi.mocked(sloService.create).mockClear();
@@ -313,6 +451,22 @@ describe("AddSlo — time-slice SLI", () => {
   it("sends the query language required by the API", async () => {
     const wrapper = await mountForm();
     await wrapper.find('[data-test="slos-addslo-sli-type-time_slice"]').trigger("click");
+    // A time slice needs a name, a stream, an aggregate and a threshold before
+    // the form will submit at all; the subject here is only what the payload
+    // then DECLARES as its language.
+    await wrapper.find('[data-test="slos-addslo-name-field"]').setValue("payload-fixture");
+    await wrapper.find('[data-test="slos-addslo-threshold-field"]').setValue("1");
+    byTest(wrapper, OSelect, "slos-addslo-timeslice-stream").vm.$emit(
+      "update:modelValue",
+      "fixture_stream",
+    );
+    // SloExpressionField is auto-stubbed here, so it is found by its declared
+    // `dataTest` PROP rather than by an attribute.
+    wrapper
+      .findAllComponents({ name: "SloExpressionField" })
+      .find((c) => c.props("dataTest") === "slos-addslo-aggregate")!
+      .vm.$emit("update:modelValue", "avg(took)");
+    await flushPromises();
     await wrapper.find('[data-test="slos-addslo-save"]').trigger("click");
     await flushPromises();
 

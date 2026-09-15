@@ -121,6 +121,7 @@ describe("IngestionTokens — Create Token form", () => {
       expect(getForm(wrapper).props("defaultValues")).toEqual({
         name: "",
         description: "",
+        splunk_token: false,
       });
     });
 
@@ -160,7 +161,7 @@ describe("IngestionTokens — Create Token form", () => {
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledTimes(1);
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        { name: "my-token", description: "for ingestion" },
+        { name: "my-token", description: "for ingestion", splunk_token: false },
       );
     });
 
@@ -175,7 +176,7 @@ describe("IngestionTokens — Create Token form", () => {
 
       expect(organizationsService.create_org_ingestion_token).toHaveBeenCalledWith(
         store.state.selectedOrganization.identifier,
-        { name: "only-name", description: "" },
+        { name: "only-name", description: "", splunk_token: false },
       );
     });
   });
@@ -194,6 +195,27 @@ describe("IngestionTokens — Create Token form", () => {
       expect(wrapper.vm.showCreateForm).toBe(false);
       expect(wrapper.vm.showRevealedDialog).toBe(true);
       expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    });
+
+    it("carries the Splunk token back for the reveal dialog", async () => {
+      vi.spyOn(store, "dispatch").mockResolvedValue(undefined as any);
+      vi.mocked(organizationsService.create_org_ingestion_token).mockResolvedValue({
+        data: { data: { token: "tok_abc", splunk_token: "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90" } },
+      } as any);
+
+      await getNameInput(wrapper).setValue("my-token");
+      await submitForm(wrapper);
+
+      expect(wrapper.vm.revealedToken).toEqual({
+        name: "my-token",
+        token: "tok_abc",
+        splunk_token: "7b3d9f2c-4a11-4e55-9c8b-2f6a01c34d90",
+      });
+    });
+
+    it("points the HEC URL at the server root, never under a base URI", () => {
+      expect(wrapper.vm.hecUrl).toBe(`${window.location.origin}/services/collector`);
+      expect(wrapper.vm.hecUrl).toContain("/services/collector");
     });
 
     it("shows an error toast and keeps the dialog open on failure", async () => {

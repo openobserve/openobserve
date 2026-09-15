@@ -17,6 +17,10 @@ import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
+import { shouldPaywallRoute } from "@/utils/auth";
+import config from "@/aws-exports";
+
+const EXPIRED_MICROS = (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000;
 
 // ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
 // update:open / click:* emits). Mirrors stubs used in other migrated specs.
@@ -725,6 +729,7 @@ describe("MainLayout Methods and Functions", () => {
     it("should have correct language list", () => {
       const langList = [
         { code: "en-us", label: "English" },
+        { code: "ar", label: "العربية" },
         { code: "tr-turk", label: "Türkçe" },
         { code: "zh-cn", label: "简体中文" },
         { code: "zh-tw", label: "繁體中文" },
@@ -741,7 +746,7 @@ describe("MainLayout Methods and Functions", () => {
         { code: "vi", label: "Tiếng Việt" },
       ];
 
-      expect(langList).toHaveLength(15);
+      expect(langList).toHaveLength(16);
       expect(langList[0].code).toBe("en-us");
       expect(langList[0].label).toBe("English");
     });
@@ -1736,16 +1741,36 @@ describe("MainLayout Methods and Functions", () => {
       expect(days).toBeLessThanOrEqual(7);
     });
 
-    it("should check trial period allowed paths", () => {
-      const isAllowedPath = (currentPath: string, allowedPaths: string[]) => {
-        return allowedPaths.some((path) => currentPath.includes(path));
-      };
+    // MainLayout's boot paywall calls this; "plans" 404s on a non-cloud build.
+    it("never paywalls a non-cloud build", () => {
+      (config as any).isCloud = "false";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(false);
+    });
 
-      const allowedPaths = ["iam", "users", "organizations"];
+    it("paywalls an expired cloud org on a paid route", () => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, "logs")).toBe(true);
+    });
 
-      expect(isAllowedPath("/iam/settings", allowedPaths)).toBe(true);
-      expect(isAllowedPath("/users/list", allowedPaths)).toBe(true);
-      expect(isAllowedPath("/dashboards", allowedPaths)).toBe(false);
+    // The nav lands on "settings", which redirects to general; both must pass.
+    it.each(["settings", "general"])("exempts %s so the org stays deletable", (name) => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(false);
+    });
+
+    // Exact match: a route embedding an exempt name must not inherit the exemption.
+    it.each(["settingsExport", "generalReports", "iamAudit", "orgSettings"])(
+      "still paywalls %s",
+      (name) => {
+        (config as any).isCloud = "true";
+        expect(shouldPaywallRoute(EXPIRED_MICROS, name)).toBe(true);
+      },
+    );
+
+    it("does not paywall an org with no trial tracked", () => {
+      (config as any).isCloud = "true";
+      expect(shouldPaywallRoute(null, "logs")).toBe(false);
+      expect(shouldPaywallRoute("", "logs")).toBe(false);
     });
   });
 
@@ -1975,5 +2000,50 @@ describe("MainLayout Methods and Functions", () => {
       expect(result.trace_id_field_name).toBe("traceId");
       expect(result.custom_setting).toBe("default_value");
     });
+  });
+});
+
+// The AI Observability nav entry's visibility formula, pinned as a pure
+// predicate (mirroring this file's own style for computed-property logic
+// elsewhere): `isOnlineEvalsEnabled.value || isOssBuild`, where
+// `isOnlineEvalsEnabled = (isEnterprise || isCloud) && online_evals_enabled`
+// and `isOssBuild = !(isEnterprise || isCloud)`. A true OSS build always
+// shows the menu (Monitor ships there with no backend flag); enterprise/cloud
+// still gate the FULL module behind the online_evals_enabled flag as before.
+describe("MainLayout — AI Observability menu visibility (isAiObservabilityMenuVisible)", () => {
+  function isAiObservabilityMenuVisible(
+    isEnterprise: "true" | "false",
+    isCloud: "true" | "false",
+    onlineEvalsEnabled: boolean,
+  ): boolean {
+    const isEnterpriseOrCloud = isEnterprise === "true" || isCloud === "true";
+    const isOnlineEvalsEnabled = isEnterpriseOrCloud && onlineEvalsEnabled;
+    const isOssBuild = !isEnterpriseOrCloud;
+    return isOnlineEvalsEnabled || isOssBuild;
+  }
+
+  it("shows the menu on a true OSS build regardless of the online_evals_enabled flag", () => {
+    expect(isAiObservabilityMenuVisible("false", "false", false)).toBe(true);
+    expect(isAiObservabilityMenuVisible("false", "false", true)).toBe(true);
+  });
+
+  it("hides the menu on an enterprise build when online_evals_enabled is false", () => {
+    expect(isAiObservabilityMenuVisible("true", "false", false)).toBe(false);
+  });
+
+  it("shows the menu on an enterprise build only once online_evals_enabled is true", () => {
+    expect(isAiObservabilityMenuVisible("true", "false", true)).toBe(true);
+  });
+
+  it("hides the menu on a cloud build when online_evals_enabled is false", () => {
+    expect(isAiObservabilityMenuVisible("false", "true", false)).toBe(false);
+  });
+
+  it("shows the menu on a cloud build once online_evals_enabled is true", () => {
+    expect(isAiObservabilityMenuVisible("false", "true", true)).toBe(true);
+  });
+
+  it("shows the menu when both isEnterprise and isCloud are true and the flag is on", () => {
+    expect(isAiObservabilityMenuVisible("true", "true", true)).toBe(true);
   });
 });

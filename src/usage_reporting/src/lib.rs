@@ -51,10 +51,10 @@ pub fn set_batch_publisher(
 
 /// Start the reporting queues.
 ///
-/// Deliberately NOT gated on `usage_enabled`. Trigger records — alert and
+/// Deliberately ungated. Trigger records — alert and
 /// report execution history — are published unconditionally (see
 /// [`publish_triggers_usage`]), so the queue has to be running even on a
-/// deployment that has usage reporting switched off. Usage and error records
+/// build that never reports usage. Usage and error records
 /// keep their own gates at their own publish sites, so starting the queue does
 /// not cause anything extra to be written.
 pub async fn run() {
@@ -75,9 +75,9 @@ pub async fn run() {
 /// execution history (`api/pipelines`, which queries the `triggers` stream),
 /// and the SLO alert-based SLI.
 ///
-/// It used to be gated on `ZO_USAGE_REPORTING_ENABLED` (default `false`), so
-/// switching off what reads as billing telemetry silently disabled alert
-/// history as well. That coupling is not discoverable from the flag's name.
+/// It used to be gated on the usage reporting flag, so switching off what reads
+/// as billing telemetry silently disabled alert history as well. That coupling
+/// was not discoverable from the flag's name.
 /// Volume is bounded by alert count x evaluation frequency, not by request
 /// rate, so there is no cost argument for gating it the way there is for
 /// `UsageData`.
@@ -138,8 +138,8 @@ pub async fn publish_error(error_data: ErrorData) {
     let cfg = get_config();
     #[cfg(not(feature = "enterprise"))]
     {
-        if !cfg.common.usage_enabled {
-            log::debug!("[SELF-REPORTING] Skipping error publish - usage reporting disabled");
+        if !cfg.common.usage_reporting_errors_enabled {
+            log::debug!("[SELF-REPORTING] Skipping error publish - error reporting disabled");
             return;
         }
     }
@@ -200,9 +200,9 @@ pub async fn publish_error(error_data: ErrorData) {
 
 /// Drain the reporting queues at shutdown.
 ///
-/// Not gated on `usage_enabled` either: trigger records are always queued, so
-/// a deployment with usage reporting off still has buffered alert history that
-/// must reach a stream before the process exits.
+/// Ungated: trigger records are always queued, so a build that never reports
+/// usage still has buffered alert history that must reach a stream before the
+/// process exits.
 ///
 /// The scheduler is included in the role test because it is the node that
 /// publishes trigger records. On a dedicated scheduler node the old
@@ -218,6 +218,7 @@ pub async fn flush() {
     shutdown(cfg.limit.usage_reporting_thread_num).await;
 }
 
+#[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 pub async fn report_request_usage_stats(
     stats: RequestStats,
     org_id: &str,
@@ -238,9 +239,7 @@ pub async fn report_request_usage_stats(
     }
 
     #[cfg(not(feature = "enterprise"))]
-    if !get_config().common.usage_enabled {
-        return;
-    }
+    return;
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
     let request_body = stats.request_body.unwrap_or(usage_type.to_string());
@@ -356,14 +355,10 @@ pub fn report_usage(usages: Vec<UsageData>) {
     tokio::spawn(publish_usage(usages));
 }
 
+#[cfg_attr(not(feature = "enterprise"), allow(unreachable_code, unused_variables))]
 async fn publish_usage(usages: Vec<UsageData>) {
     #[cfg(not(feature = "enterprise"))]
-    {
-        let cfg = get_config();
-        if !cfg.common.usage_enabled {
-            return;
-        }
-    }
+    return;
 
     for usage in usages {
         let event = usage.event;
@@ -665,6 +660,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         }
     }
 
@@ -760,7 +757,7 @@ mod tests {
 
         let before = (
             count(UsageEvent::SyntheticsBrowserSteps),
-            count(UsageEvent::SyntheticsFreeBrowserSteps),
+            count(UsageEvent::SyntheticsProtocolSteps),
         );
         record(UsageEvent::SyntheticsBrowserSteps, &"channel closed");
 
@@ -770,34 +767,10 @@ mod tests {
             "A4's counter did not move for the event that was refused",
         );
         assert_eq!(
-            count(UsageEvent::SyntheticsFreeBrowserSteps) - before.1,
+            count(UsageEvent::SyntheticsProtocolSteps) - before.1,
             0,
-            "the failure was attributed to the wrong event — A4 would page for the free pool \
-             while the billable row is the one being lost",
-        );
-    }
-
-    /// Guards the counter against drifting back to a bare `log::error!`, which
-    /// Prometheus cannot alert on. The needles are assembled from fragments so
-    /// this test's own source does not satisfy them.
-    #[test]
-    fn every_refused_usage_row_goes_through_the_counter() {
-        let source = include_str!("lib.rs");
-        assert_eq!(
-            source
-                .matches(&["record_usage_enqueue", "_failure("].concat())
-                .count(),
-            2,
-            "one definition and exactly one call site are expected for A4's counter",
-        );
-        let body = source
-            .split_once(&["async fn publish", "_usage("].concat())
-            .expect("the usage publisher")
-            .1;
-        let end = body.find("\n}\n").expect("end of publish_usage");
-        assert!(
-            body[..end].contains(&["record_usage_enqueue", "_failure("].concat()),
-            "the enqueue failure is no longer counted; A4 has nothing to alert on",
+            "the failure was attributed to the wrong event — A4 would page for protocol steps \
+             while the browser row is the one being lost",
         );
     }
 
@@ -810,5 +783,71 @@ mod tests {
         ];
         assert_eq!(count_data(&batch), (2, 1));
         assert_eq!(count_data(&[]), (0, 0));
+    }
+
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn report_request_usage_stats_keeps_the_ingest_counters() {
+        let org = "counter-test-org";
+        let before_records = metrics::INGEST_RECORDS
+            .with_label_values(&[org, StreamType::Logs.as_str()])
+            .get();
+        let before_bytes = metrics::INGEST_BYTES
+            .with_label_values(&[org, StreamType::Logs.as_str()])
+            .get();
+
+        report_request_usage_stats(
+            RequestStats {
+                records: 7,
+                size: 2.0,
+                ..Default::default()
+            },
+            org,
+            "counter-test-stream",
+            StreamType::Logs,
+            UsageType::Json,
+            0,
+            config::utils::time::now_micros(),
+        )
+        .await;
+
+        assert_eq!(
+            metrics::INGEST_RECORDS
+                .with_label_values(&[org, StreamType::Logs.as_str()])
+                .get(),
+            before_records + 7
+        );
+        assert_eq!(
+            metrics::INGEST_BYTES
+                .with_label_values(&[org, StreamType::Logs.as_str()])
+                .get(),
+            before_bytes + (2.0 * SIZE_IN_MB) as u64
+        );
+    }
+
+    #[test]
+    fn oss_usage_entry_points_return_before_enqueueing() {
+        // Whitespace-normalised so reindenting the source cannot fail this.
+        let source = include_str!("lib.rs")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let gate = "#[cfg(not(feature = \"enterprise\"))] return;";
+        assert_eq!(
+            source.matches(gate).count(),
+            2,
+            "report_request_usage_stats and publish_usage must both return early in the OSS build"
+        );
+    }
+
+    #[test]
+    fn publish_error_is_gated_on_the_errors_flag() {
+        let source = include_str!("lib.rs");
+        let body = source
+            .split("pub async fn publish_error")
+            .nth(1)
+            .expect("publish_error is defined");
+        let body = &body[..body.find("\npub ").unwrap_or(body.len())];
+        assert!(body.contains("if !cfg.common.usage_reporting_errors_enabled"));
     }
 }

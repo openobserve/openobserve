@@ -50,6 +50,12 @@ export interface VariableConfig {
     selected?: boolean;
   }>;
   selectAllValueForMultiSelect?: "first" | "all" | "custom";
+  /**
+   * Load options even when an "all" default already fixes the value. Dashboards
+   * built at runtime have no saved `options` to fall back on, so without this the
+   * picker renders its select-all label over an empty list.
+   */
+  loadOptionsWithAllDefault?: boolean;
   customMultiSelectValue?: string[];
   isVariableLoadingPending?: boolean;
   isLoading?: boolean;
@@ -480,7 +486,11 @@ export const useVariablesManager = (t: TranslateFn) => {
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-        if (!hasCustomOrAllDefault) {
+        // An "all" default fixes the VALUE without an API call but leaves the
+        // OPTION list empty, so the picker renders its select-all label over
+        // nothing until the user's own interaction refetches it. Opt-in, because
+        // every saved dashboard uses the "first" default and never hits this.
+        if (!hasCustomOrAllDefault || v.loadOptionsWithAllDefault === true) {
           v.isVariableLoadingPending = true;
         }
       }
@@ -514,12 +524,16 @@ export const useVariablesManager = (t: TranslateFn) => {
           // Parent is non-API type if:
           // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
           // - OR it's a query_values with custom/all default (no API call needed)
+          // loadOptionsWithAllDefault makes an "all" parent genuinely fetch, so it
+          // is NOT synchronous: pre-marking its child races the parent's response
+          // and ships the child's filter with the parent placeholder unsubstituted.
           const parentIsNonAPIType =
             parentVar.type === "custom" ||
             parentVar.type === "constant" ||
             parentVar.type === "textbox" ||
             parentVar.type === "dynamic_filters" ||
             (parentVar.type === "query_values" &&
+              parentVar.loadOptionsWithAllDefault !== true &&
               (parentVar.selectAllValueForMultiSelect === "custom" ||
                 parentVar.selectAllValueForMultiSelect === "all"));
 
@@ -848,8 +862,30 @@ export const useVariablesManager = (t: TranslateFn) => {
   };
 
   // ========== URL SYNCHRONIZATION ==========
+  // A URL-restored value is marked loaded WITHOUT a fetch, and only a completed
+  // fetch notifies children, so a restored parent's chain would never start.
+  const scheduleChildrenOfRestored = (restoredKeys: string[]) => {
+    if (restoredKeys.length === 0) return;
+
+    const allVars = getAllVariablesFlat();
+    const restored = new Set(restoredKeys);
+
+    restoredKeys.forEach((parentKey) => {
+      (dependencyGraph.value[parentKey]?.children || []).forEach((childKey) => {
+        // The URL carried this child too, so its value stands and a fetch would overwrite it.
+        if (restored.has(childKey)) return;
+        const childVar = findVariableByKey(childKey, allVars);
+        if (!childVar || childVar.type !== "query_values") return;
+        if (childVar.isVariablePartialLoaded || childVar.isVariableLoadingPending) return;
+        if (!canVariableLoad(childVar)) return;
+        childVar.isVariableLoadingPending = true;
+      });
+    });
+  };
+
   const loadFromUrl = (route: any) => {
     const query = route.query;
+    const restoredKeys: string[] = [];
 
     Object.entries(query).forEach(([key, value]) => {
       if (!key.startsWith("var-")) return;
@@ -869,6 +905,7 @@ export const useVariablesManager = (t: TranslateFn) => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(getVariableKey(parsed.name, "global"));
         }
 
         // ALSO apply to all tab/panel instances of same name (drilldown compatibility)
@@ -881,6 +918,7 @@ export const useVariablesManager = (t: TranslateFn) => {
             tabVar.isVariablePartialLoaded = true;
             tabVar.isVariableLoadingPending = false;
             tabVar.isLoading = false;
+            restoredKeys.push(getVariableKey(tabVar.name, "tabs", tabVar.tabId));
           }
         });
 
@@ -893,6 +931,9 @@ export const useVariablesManager = (t: TranslateFn) => {
             panelVar.isVariablePartialLoaded = true;
             panelVar.isVariableLoadingPending = false;
             panelVar.isLoading = false;
+            restoredKeys.push(
+              getVariableKey(panelVar.name, "panels", panelVar.tabId, panelVar.panelId),
+            );
           }
         });
       } else {
@@ -905,9 +946,14 @@ export const useVariablesManager = (t: TranslateFn) => {
           variable.isVariablePartialLoaded = true;
           variable.isVariableLoadingPending = false;
           variable.isLoading = false;
+          restoredKeys.push(
+            getVariableKey(parsed.name, parsed.scope, parsed.tabId, parsed.panelId),
+          );
         }
       }
     });
+
+    scheduleChildrenOfRestored(restoredKeys);
   };
 
   interface ParsedUrlKey {

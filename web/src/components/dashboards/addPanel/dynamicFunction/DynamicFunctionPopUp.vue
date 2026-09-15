@@ -3,11 +3,11 @@
 <template>
   <div data-test="dynamic-function-popup-root" class="flex flex-col">
     <!-- Body -->
-    <div :class="fullMode ? 'flex min-h-0' : 'flex flex-col'">
+    <div :class="fullMode ? 'flex min-h-0 max-md:flex-col' : 'flex flex-col'">
       <!-- Property pane -->
       <div
-        class="flex w-52 shrink-0 flex-col gap-3.5 p-3"
-        :class="fullMode ? 'border-border-default border-e' : ''"
+        class="flex w-52 shrink-0 flex-col gap-3.5 p-3 max-md:w-full"
+        :class="fullMode ? 'border-border-default border-e max-md:border-e-0 max-md:border-b' : ''"
       >
         <div class="text-compact font-semibold" data-test="dynamic-function-popup-property-label">
           {{ t("dashboard.dynamicFunctionPopUp.property") }}

@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
@@ -47,6 +46,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class=""
         >
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              class="block truncate"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </span>
+          </template>
+
           <template #subtitle>
             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
@@ -98,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
-                <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
+                <!-- sm + py-1! keeps both count chips at 1.1875rem: anything over the header's fixed 1.25rem subtitle band grows into the title's descenders. -->
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  size="sm"
+                  data-test="trace-details-spans-count"
+                  class="py-1!"
+                >
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
                     {{ t("traces.spansLabel") }}
@@ -114,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="logsResultChip"
                   value="error"
+                  size="sm"
                   data-test="trace-details-error-spans-count"
+                  class="py-1!"
                 >
                   <span
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
@@ -904,7 +923,7 @@ import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
@@ -918,6 +937,7 @@ import {
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
 import useResizer from "@/composables/useResizer";
+import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
@@ -927,6 +947,7 @@ import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
@@ -1471,10 +1492,10 @@ export default defineComponent({
         };
       }
       // Standalone mode - get from URL
-      return {
-        from: Number(router.currentRoute.value.query.from),
-        to: Number(router.currentRoute.value.query.to),
-      };
+      return resolveUrlTimeRange(
+        router.currentRoute.value.query.from,
+        router.currentRoute.value.query.to,
+      );
     });
 
     const effectiveOrgIdentifier = computed(() => {
@@ -2754,7 +2775,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${escapeSingleQuotes(String(spanList.value[0]["trace_id"]))}'`,
       );
 
       router.push({
@@ -2937,10 +2958,13 @@ export default defineComponent({
       window.open(route.href, "_blank");
     };
 
-    const routeToTracesList = () => {
-      // Only navigate if in standalone mode
-      if (props.mode !== "standalone") return;
-
+    // Real browser back when there's history to pop — this trace can be
+    // reached from many AI Observability pages (Sessions, Discovery, Queue
+    // Workbench, Experiments, Eval Jobs, LLM Insights) as well as the plain
+    // Traces search, and router.back() returns to whichever one it actually
+    // was, filters and all. The hand-built push below only fires as a
+    // fallback (direct link / reload, no history to pop).
+    const { goBack: backToTracesList } = useSmartBack(() => {
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -2951,12 +2975,13 @@ export default defineComponent({
         query.to = searchObj.data.datetime.endTime.toString();
       }
 
-      router.push({
-        name: "traces",
-        query: {
-          ...query,
-        },
-      });
+      return { name: "traces", query: { ...query } };
+    });
+
+    const routeToTracesList = () => {
+      // Only navigate if in standalone mode
+      if (props.mode !== "standalone") return;
+      backToTracesList();
     };
 
     const openTraceLink = async () => {

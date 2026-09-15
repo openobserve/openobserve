@@ -265,36 +265,99 @@ export default class DashboardVariables {
   }
 
   /**
-   * Click the trigger to open a variable's dropdown
+   * Open a variable's dropdown, retrying the click until the popover is actually up.
+   * A single click is not enough: a selector whose options are still loading
+   * re-renders on arrival and swallows the pointer event, so the popover never
+   * opens and every downstream wait burns its full timeout.
    * @param {string} variableName - Variable name
    */
   async clickVariableTrigger(variableName) {
     const trigger = this.variableTrigger(variableName);
-    await trigger.waitFor({ state: 'visible', timeout: 10000 });
-    await trigger.click();
-    await this.variablePopover(variableName).waitFor({ state: 'visible', timeout: 5000 });
+    const popover = this.variablePopover(variableName);
+    await trigger.waitFor({ state: "visible", timeout: 15000 });
+
+    await expect
+      .poll(
+        async () => {
+          if (await popover.isVisible().catch(() => false)) return true;
+          await trigger.click({ timeout: 5000 }).catch(() => {});
+          return await popover
+            .waitFor({ state: "visible", timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        },
+        { timeout: 20000, intervals: [500, 1000, 1500, 2000, 2000] }
+      )
+      .toBe(true);
   }
 
   /**
-   * Fill the search input inside an already-open variable dropdown
+   * Type a search term into a variable's dropdown and wait for the refetch it triggers.
+   * Re-opens the dropdown when the input is gone — a values response landing between
+   * two fills re-renders the selector and detaches the input mid-action.
    * @param {string} variableName - Variable name
    * @param {string} term - Search term
    */
   async fillVariableSearch(variableName, term) {
     const searchInput = this.variableSearchInput(variableName);
-    await searchInput.waitFor({ state: 'visible', timeout: 5000 });
+
+    if (!(await searchInput.isVisible().catch(() => false))) {
+      await this.clickVariableTrigger(variableName);
+      await searchInput.waitFor({ state: "visible", timeout: 10000 });
+    }
+
+    // Resolves on response headers, so it is unaffected by whether the SSE body
+    // can be read back through CDP — a search that legitimately hits cache and
+    // issues no request just falls through to the caller's own wait.
+    const valuesRequest = this.page
+      .waitForResponse((r) => r.url().includes("_values_stream"), { timeout: 15000 })
+      .catch(() => null);
+
     await searchInput.fill(term);
+    await valuesRequest;
   }
 
   /**
-   * Select an option from an open variable dropdown by its exact value
+   * Select an option from an open variable dropdown by its exact value.
+   * The option list is backed by a query over just-ingested data, so a missing
+   * option means "not indexed yet" as often as "not there" — re-issue the values
+   * query by reopening the dropdown until it shows up.
    * @param {string} variableName - Variable name
    * @param {string} value - Option value (data-test-value attribute)
    */
   async selectVariableOption(variableName, value) {
     const option = this.variableOptionByValue(variableName, value);
-    await option.waitFor({ state: 'visible', timeout: 10000 });
+    const searchInput = this.variableSearchInput(variableName);
+
+    await expect
+      .poll(
+        async () => {
+          if (await option.isVisible().catch(() => false)) return true;
+          await this.page.keyboard.press("Escape").catch(() => {});
+          await this.clickVariableTrigger(variableName).catch(() => {});
+          if (await searchInput.isVisible().catch(() => false)) {
+            await this.fillVariableSearch(variableName, value).catch(() => {});
+          }
+          return await option.isVisible().catch(() => false);
+        },
+        { timeout: 30000, intervals: [1000, 2000, 3000, 5000, 5000] }
+      )
+      .toBe(true);
+
     await option.click();
+  }
+
+  /**
+   * Close a variable's dropdown and wait for the popover to be gone.
+   * A multi-select selector stays open after a value is picked, and its portal
+   * then eats clicks aimed at the editor behind it.
+   * @param {string} variableName - Variable name
+   */
+  async closeVariableDropdown(variableName) {
+    const popover = this.variablePopover(variableName);
+    if (!(await popover.isVisible().catch(() => false))) return;
+    await this.page.keyboard.press("Escape").catch(() => {});
+    await popover.waitFor({ state: "hidden", timeout: 10000 }).catch(() => {});
   }
 
   // Dynamic function to fill input by label

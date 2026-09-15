@@ -46,6 +46,7 @@
           :key="option.value"
           :value="option.value"
           size="sm"
+          :data-test="`alerts-anomalydetectionchart-range-${option.value}`"
         >
           {{ option.label }}
         </OToggleGroupItem>

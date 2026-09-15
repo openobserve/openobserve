@@ -432,6 +432,28 @@ describe("useAgentScope — Env→Agent→Version cascade (Plan 2)", () => {
     // Single-dropdown path still resolves the first agent unchanged.
     expect(scope.selectedAgent.value).toEqual(agentA);
   });
+
+  it("selectAgentByScope pins the exact env+name+version triple, not just the first name match", () => {
+    const scope = makeCascade(CASCADE_AGENTS);
+    // "a" exists in production@v1, production@v2 and staging@v1 — an exact
+    // triple must resolve the SPECIFIC one, not whichever comes first.
+    expect(scope.selectAgentByScope("production", "a", "v2")).toBe(true);
+    expect(scope.selectedEnv.value).toBe("production");
+    expect(scope.selectedAgentName.value).toBe("a");
+    expect(scope.selectedVersion.value).toBe("v2");
+  });
+
+  it("selectAgentByScope falls back to selectAgentByName when the exact triple no longer exists", () => {
+    const scope = makeCascade(CASCADE_AGENTS);
+    // No agent "a" in a "decommissioned" env at all — falls back to the
+    // first "a" match anywhere (production@v1) rather than resolving nothing.
+    expect(scope.selectAgentByScope("decommissioned", "a", "v1")).toBe(true);
+    expect(scope.selectedAgent.value).toMatchObject({
+      name: "a",
+      env: "production",
+      version: "v1",
+    });
+  });
 });
 
 describe("useAgentScope — stream options", () => {

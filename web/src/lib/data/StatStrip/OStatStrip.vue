@@ -68,14 +68,14 @@ const onCardClick = (item: StatItem) => {
 </script>
 
 <template>
-  <div class="flex flex-wrap gap-2" data-test="o-stat-strip">
+  <div class="flex flex-wrap gap-2 max-lg:gap-1.5" data-test="o-stat-strip">
     <!-- The basis is the wrap threshold, not a fixed width: tiles still grow to
          fill a wide strip. The default suits long labels; `compact` is for short
          ones, where basis-52 would wrap a five-tile strip onto two rows. -->
     <OStatCard
       v-for="item in items"
       :key="item.key"
-      class="grow"
+      class="grow max-lg:shrink-0 max-lg:basis-auto"
       :class="compact ? 'basis-36' : 'basis-52'"
       :label="item.label"
       :value="item.value"

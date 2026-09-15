@@ -42,16 +42,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="bg-card-glass-bg h-full">
           <OTable
-            ref="qTable"
+            ref="oTableRef"
             :frame="false"
             data-test="enrichment-tables-list-table"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
             :page-size="selectedPerPage"
             :page-size-options="perPageOptionsList"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             sorting="client"
             filter-mode="client"
             show-index
@@ -68,8 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
                 <OToggleGroup
+                  mobile-dropdown
                   :model-value="selectedFilter"
                   @update:model-value="
                     (v) => {
@@ -95,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ms-auto w-64"
+                  class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
@@ -232,6 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.explore')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="exploreEnrichmentTable(row)"
                   icon-left="search"
                   data-row-action="view"
@@ -246,6 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.schemaHeader')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="listSchema(row)"
                   icon-left="format-list-bulleted"
                   data-row-action="view"
@@ -263,6 +269,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.enrichmentTables')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showAddUpdateFn(row)"
                   icon-left="edit"
                   data-row-action="edit"
@@ -274,10 +281,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showDeleteDialogFn(row)"
                   icon-left="delete"
                   data-row-action="delete"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="enrichment-table-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="search"
+                    class="md:hidden"
+                    :data-test="`${row.name}-explore-btn-menu`"
+                    @select="exploreEnrichmentTable(row)"
+                  >
+                    <span>{{ t("logStream.explore") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="format-list-bulleted"
+                    class="md:hidden"
+                    :data-test="`${row.name}-schema-btn-menu`"
+                    @select="listSchema(row)"
+                  >
+                    <span>{{ t("logStream.schemaHeader") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed' ||
+                      row.aggregateStatus === 'failed'
+                    "
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`${row.name}-edit-btn-menu`"
+                    @select="showAddUpdateFn(row)"
+                  >
+                    <span>{{ t("function.enrichmentTables") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`${row.name}-delete-btn-menu`"
+                    @select="showDeleteDialogFn(row)"
+                  >
+                    <span>{{ t("function.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
@@ -298,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal">
+                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal }} {{ t("function.enrichmentTables") }}
                 </div>
                 <OButton
@@ -435,6 +504,8 @@ import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
@@ -460,6 +531,8 @@ export default defineComponent({
     OToggleGroupItem,
     OButton,
     ODrawer,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -475,7 +548,6 @@ export default defineComponent({
     const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
-    const qTable: any = ref(null);
     const selectedDelete: any = ref(null);
     const isUpdated: any = ref(false);
     const confirmDelete = ref<boolean>(false);
@@ -486,7 +558,20 @@ export default defineComponent({
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
-    const loading = ref(false);
+    const loading = ref(true);
+    const forbidden = ref(false);
+    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      }, 0);
+    };
     const { track } = useReo();
     const { toast } = useToast();
     const columns: OTableColumnDef[] = [
@@ -597,6 +682,7 @@ export default defineComponent({
 
     const getLookupTables = async (force: boolean = false) => {
       loading.value = true;
+      forbidden.value = false;
       const dismiss = toast({
         variant: "loading",
         message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
@@ -707,7 +793,8 @@ export default defineComponent({
       } catch (err: any) {
         console.info("Error while fetching enrichment tables", err);
         dismiss();
-        if (err.response?.status != 403) {
+        forbidden.value = err?.response?.status === 403;
+        if (!forbidden.value) {
           toast({
             variant: "error",
             message: err.response?.data?.message || t("functions.fetchFunctionsError"),
@@ -715,6 +802,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        restorePageIndex();
       }
     };
 
@@ -1043,7 +1131,10 @@ export default defineComponent({
     return {
       t,
       raw,
-      qTable,
+      oTableRef,
+      currentPage,
+      onPageChange,
+      restorePageIndex,
       store,
       router,
       jsTransforms,
@@ -1054,6 +1145,7 @@ export default defineComponent({
       selectedDelete,
       getLookupTables,
       loading,
+      forbidden,
       resultTotal,
       refreshList,
       perPageOptionsList,

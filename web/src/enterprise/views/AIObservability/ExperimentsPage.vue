@@ -34,10 +34,10 @@
           :loading="loading"
           :experiments="experiments"
           :datasets="datasets"
-          :details="experimentDetails"
           @new="openCreate"
           @refresh="refresh"
           @select="openExperiment"
+          @baseline-changed="onBaselineChanged"
           sync-url
         />
       </section>
@@ -56,11 +56,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
-import { fetchExperimentDetails } from "./experimentDiscovery";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentCreateRoute, aiExperimentDetailRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIExperimentsPage" });
@@ -71,20 +67,25 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const experiments = ref<LlmExperiment[]>([]);
-const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
   try {
     [experiments.value, datasets.value] = await Promise.all([
-      llmExperimentsService.list(orgId.value),
+      llmExperimentsService.list(orgId.value, { includeSummary: true }),
       llmDatasetsService.list(orgId.value),
     ]);
-    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
-      llmExperimentsService.get(orgId.value, experimentId),
-    );
   } catch (error: any) {
     // Surface the server's message; a bare catch here hid a stale ?selected=
     // 404 behind "failed to load experiments" while the list rendered fine.

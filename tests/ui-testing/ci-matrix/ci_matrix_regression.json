@@ -8,7 +8,8 @@
       "logs-bugs.spec.js",
       "logs-9754.spec.js",
       "logs-9044-7354.spec.js",
-      "logs-multistream-matchall-pagination.spec.js"
+      "logs-multistream-matchall-pagination.spec.js",
+      "logs-14303-streaming-render.spec.js"
     ],
     "disabled": []
   },
@@ -66,7 +67,8 @@
     "actual_folder": "RegressionSet/Metrics",
     "browser": "chrome",
     "run_files": [
-      "metrics-regression.spec.js"
+      "metrics-regression.spec.js",
+      "metrics-14238-stale-nodata.spec.js"
     ],
     "disabled": []
   },

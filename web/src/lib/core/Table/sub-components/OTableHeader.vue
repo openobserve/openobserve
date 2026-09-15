@@ -214,6 +214,12 @@ function isAutoWidthColumn(header: any): boolean {
   return (header.column.columnDef.meta as any)?.autoWidth === true;
 }
 
+// A fillRemaining column stretches past its content, so a growing label would
+// strand the close button at the cell's far right instead of beside the label.
+function isFillRemainingColumn(header: any): boolean {
+  return (header.column.columnDef.meta as any)?.fillRemaining === true;
+}
+
 // Mirrors the autoWidth branch of OTableBodyCell's `cellStyle`.
 function autoWidthHeaderStyle(header: any): Record<string, string> {
   const style: Record<string, string> = {};
@@ -585,7 +591,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             :class="[
-              'flex min-w-0 flex-1 cursor-pointer items-center gap-1',
+              'flex min-w-0 cursor-pointer items-center gap-1',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
             data-test="o2-table-th-sort-trigger"
@@ -649,7 +656,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-else
             :class="[
-              'flex min-w-0 flex-1 flex-col justify-center',
+              'flex min-w-0 flex-col justify-center',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerSubLabel(header)
                 ? ['gap-px', headerStackAlignClass(header)]
                 : headerAlignClass(header),
@@ -676,7 +684,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
             :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >
@@ -914,7 +922,8 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           <div
             v-if="(header.column.columnDef.meta as any)?.sortable"
             :class="[
-              'flex flex-1 cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
+              'flex cursor-pointer items-center gap-1 overflow-hidden whitespace-nowrap',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
               headerAlignClass(header),
             ]"
             data-test="o2-table-th-sort-trigger"
@@ -968,7 +977,14 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               />
             </template>
           </div>
-          <div v-else :class="['min-w-0 flex-1 truncate', headerAlignClass(header)]">
+          <div
+            v-else
+            :class="[
+              'min-w-0 truncate',
+              isFillRemainingColumn(header) ? 'flex-none' : 'flex-1',
+              headerAlignClass(header),
+            ]"
+          >
             <FlexRender
               v-if="!header.isPlaceholder"
               :render="header.column.columnDef.header"
@@ -981,7 +997,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="(header.column.columnDef.meta as any)?.closable"
             type="button"
             :data-test="`o2-table-th-remove-${header.id}-btn`"
-            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100"
+            class="rounded-default text-text-secondary hover:text-text-body hover:bg-table-row-hover-bg inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
             :aria-label="t('components.table.removeColumnAria')"
             @click.stop="emit('close-column', header.column.columnDef)"
           >

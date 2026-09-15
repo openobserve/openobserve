@@ -92,7 +92,7 @@ function handleClick(e: MouseEvent) {
     <!-- relative timestamp -->
     <span
       v-if="lastRunAt"
-      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none"
+      class="text-text-secondary text-xs whitespace-nowrap tabular-nums select-none max-md:hidden"
     >
       {{ relativeTime || t("refreshButton.justNow") }}
       <OTooltip :content="exactTime" />

@@ -79,6 +79,7 @@ describe("VariableQueryValueSelector", () => {
       <div
         data-test="dashboard-variable-query-value-selector"
         class="o-select"
+        :data-disabled="String(!!disabled)"
       >
         <input
           :value="modelValue"
@@ -103,6 +104,7 @@ describe("VariableQueryValueSelector", () => {
       "labelPosition",
       "labelKey",
       "valueKey",
+      "disabled",
     ],
     emits: ["update:modelValue", "search", "open", "close", "keydown"],
     methods: {
@@ -1172,6 +1174,62 @@ describe("VariableQueryValueSelector", () => {
 
       // Should not throw errors when accessing refs after unmount
       expect(() => wrapper.vm.selectRef).not.toThrow();
+    });
+  });
+  // ── Not-applicable picker (curated-pages design §6.4, pass-4 finding 5) ────
+  // A page-level picker whose active section does not scope on it accepts a
+  // selection and changes nothing — a declared no-op is still a no-op to the
+  // person operating it. Additive prop, default false, so stored dashboards are
+  // unaffected (same posture as the PanelContainer badge).
+  describe("disabled prop forwarding", () => {
+    // The stub's own static `data-test` never reaches the DOM: the component
+    // binds `:data-test="variable-selector-<name>-inner"` on OSelect and a bound
+    // fallthrough attribute OVERWRITES the stub root's static one. So these read
+    // the component's real selector; `data-disabled` is the stub echoing the
+    // forwarded prop either way.
+    const oSelect = () => wrapper.find('[data-test="variable-selector-region-inner"]');
+
+    it("forwards disabled:true to OSelect", () => {
+      wrapper = createWrapper({ disabled: true });
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("true");
+    });
+
+    it("defaults to NOT disabled when the prop is omitted — the stored-dashboard guard", () => {
+      wrapper = createWrapper();
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("false");
+    });
+
+    it("forwards disabled:false explicitly", () => {
+      wrapper = createWrapper({ disabled: false });
+      expect(oSelect().attributes("data-disabled")).toBe("false");
+    });
+
+    it("renders the disabled-reason tooltip TEXT, with its params interpolated", () => {
+      // Asserting the ATTRIBUTE proved nothing: nothing in web/src consumed
+      // data-tooltip-key, so the reason never reached a user. The pin has to
+      // read the rendered copy, with its params interpolated.
+      wrapper = createWrapper({
+        disabled: true,
+        disabledTooltipKey: "infra.curated.fieldUnresolved",
+        disabledTooltipParams: { display: "Namespace", stream: "k8s_pod_memory_usage" },
+      });
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      const content = tooltip.props("content") as string;
+      expect(content).toBe("No Namespace field found on k8s_pod_memory_usage.");
+      // No unsubstituted placeholder ever reaches the user.
+      expect(content).not.toContain("{display}");
+      expect(content).not.toContain("{stream}");
+    });
+
+    it("renders NO tooltip when the picker is enabled", () => {
+      // Paired with the positive case above so this cannot pass merely because
+      // the affordance does not exist yet — that one must be green for this to
+      // mean anything.
+      wrapper = createWrapper({ disabledTooltipKey: "infra.curated.fieldUnresolved" });
+      expect(wrapper.find('[data-test="variable-disabled-tooltip"]').exists()).toBe(false);
     });
   });
 });

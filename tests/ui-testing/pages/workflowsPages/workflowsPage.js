@@ -47,6 +47,7 @@ class WorkflowsPage {
     this.nameValue = '[data-test="workflow-editor-name-value"]';
     this.descTrigger = '[data-test="workflow-editor-description-trigger"]';
     this.descInput = '[data-test="workflow-editor-description-input"]';
+    this.descValue = '[data-test="workflow-editor-description-value"]';
     // Workflow single-screen function editor: the AddFunction body is ALWAYS
     // visible below the associate-function select (FunctionPicker's `createButton`
     // mode), so there is no "Create New" toggle. Save routes through the icon
@@ -66,6 +67,34 @@ class WorkflowsPage {
     this.paletteCondition = '[data-test="workflow-palette-condition-default-btn"]';
     this.paletteFunction = '[data-test="workflow-palette-function-default-btn"]';
     this.paletteDestination = '[data-test="workflow-palette-destination-output-btn"]';
+    this.paletteBranch = '[data-test="workflow-palette-branch-default-btn"]';
+    // Branch node (N-way fan-out, #14027). Rows key on the case's STABLE handle, never
+    // its index: a surviving arm must keep the handle its edges are already wired to,
+    // so `case-N` comes off a high-water mark and is kept for the node's whole life.
+    this.stepBranch = '[data-test="workflow-step-branch"]';
+    this.branchBody = '[data-test="workflow-branch-body"]';
+    this.branchAddCase = '[data-test="workflow-branch-add-case"]';
+    this.branchElse = '[data-test="workflow-branch-else"]';
+    this.branchCaseRows = '[data-test^="workflow-branch-case-"]';
+    this.branchOrderBadges = '[data-test^="workflow-branch-order-"]';
+    this.branchCaseFor = (h) => `[data-test="workflow-branch-case-${h}"]`;
+    this.branchLabelFieldFor = (h) => `[data-test="workflow-branch-label-${h}-field"]`;
+    this.branchMoveUpFor = (h) => `[data-test="workflow-branch-move-up-${h}"]`;
+    this.branchMoveDownFor = (h) => `[data-test="workflow-branch-move-down-${h}"]`;
+    this.branchRemoveFor = (h) => `[data-test="workflow-branch-remove-case-${h}"]`;
+    // The else arm is a permanent row: it is what guarantees every record leaves by
+    // exactly one handle, so it renders WITHOUT a remove control.
+    this.branchElseRemove = '[data-test="workflow-branch-else-remove"]';
+    this.branchUnwiredBadge = '[data-test="workflow-node-branch-unwired-badge"]';
+    // Hover-only "+" on the canvas: one per OPEN (still unwired) source handle, in
+    // declared arm order, so nth(i) addresses arm i of what remains unwired.
+    this.flowAppendAdd = '[data-test="workflow-flow-append-add"]';
+    // Edge labels name the arm each connector leaves by — the only on-canvas evidence of
+    // which path a destination is actually wired to. They are HTML in vue-flow's label
+    // LAYER, not SVG <text>, and the layer also holds the (empty) hover-"+" wrappers, so
+    // callers must filter blanks rather than index children positionally. Note the class
+    // is plural: `.vue-flow__edge-label` matches nothing here.
+    this.edgeLabelLayer = '.vue-flow__edge-labels';
     // Trigger node (delete only visible on node hover). The hover-`+` add-out
     // button no longer exists — clicking the node's SOURCE HANDLE opens the step
     // picker instead.
@@ -98,6 +127,8 @@ class WorkflowsPage {
     this.destPickerCreateToggle = '[data-test="destination-picker-create-toggle-btn"]';
     this.destPickerSelectTrigger = '[data-test="destination-picker-select-trigger"]';
     this.destPickerSelectPopover = '[data-test="destination-picker-select-popover"]';
+    this.destPickerSelectSearch = '[data-test="destination-picker-select-search"]';
+    this.destPickerSelectOption = '[data-test="destination-picker-select-option"]';
     // Inline "create destination" wizard: step 1 choose-type card + continue, step 2 connection.
     this.destTypeCard = (t) => `[data-test="destination-type-card-${t}"]`;
     this.destStep1Continue = '[data-test="step1-continue-btn"]';
@@ -126,6 +157,48 @@ class WorkflowsPage {
     this.nodeTestErrorFor = (t) => `[data-test="workflow-node-${t}-test-error"]`;
     this.listRowPrefixFor = (n) => `[data-test^="workflow-list-${n}-"]`;
     this.listRowActionFor = (n, a) => `[data-test="workflow-list-${n}-${a}"]`;
+    this.listDraftTag = '[data-test="workflow-list-draft-tag"]';
+    this.listTriggerTag = '[data-test="workflow-list-trigger-tag"]';
+    this.listRefresh = '[data-test="workflow-list-refresh"]';
+    // Draft vs published is the editor's whole mode switch: a draft offers
+    // Save-as-Draft + Publish, a published workflow offers Save + History instead.
+    this.editorDraftTag = '[data-test="workflow-editor-draft-tag"]';
+    this.saveDraftBtn = '[data-test="workflow-editor-save-draft"]';
+    this.historyBtn = '[data-test="workflow-editor-history"]';
+    this.unsavedDialog = '[data-test="workflows-editor-unsaved-dialog"]';
+    // Per-node hover actions. The rail only renders while the node is hovered, so
+    // every one of these needs a hover on the node first.
+    this.nodeActionsFor = (t) => `[data-test="workflow-node-${t}-actions"]`;
+    this.nodeDeleteBtnFor = (t) => `[data-test="workflow-node-${t}-delete-btn"]`;
+    this.nodeIncompleteBadgeFor = (t) => `[data-test="workflow-node-${t}-incomplete-badge"]`;
+    this.nodeDisabledBadgeFor = (t) => `[data-test="workflow-node-${t}-disabled-badge"]`;
+    this.nodeDisableToggle = '[data-test="workflows-node-disable-toggle"]';
+    this.nodeCommentIndicator = '[data-test="workflows-node-comment-indicator"]';
+    // Rename + comment live in the node DRAWER, not on the card.
+    // Rename is an OInlineEdit (trigger opens, -input edits, -value reads); the comment
+    // is an OTextarea whose writable element is -field. Both data-tests land on wrappers.
+    this.nodeRenameTrigger = '[data-test="workflows-node-rename-input-trigger"]';
+    this.nodeRenameField = '[data-test="workflows-node-rename-input-input"]';
+    this.nodeCommentField = '[data-test="workflows-node-comment-input-field"]';
+    this.canvasUndo = '[data-test="workflows-canvas-undo"]';
+    this.canvasTidy = '[data-test="workflows-canvas-tidy"]';
+    // Test drawer (reworked in #14027): the payload can come from the seeded sample
+    // or a previous run, and destinations are suppressed by DEFAULT so a rehearsal
+    // never posts to production — turning that off is what raises the dispatch warning.
+    this.testDrawer = '[data-test="workflow-test-drawer"]';
+    this.testInputSource = '[data-test="workflow-test-input-source"]';
+    this.testRunPicker = '[data-test="workflow-test-run-picker"]';
+    this.testRunFrom = '[data-test="workflow-test-run-from"]';
+    this.testRevertInput = '[data-test="workflow-test-revert-input"]';
+    this.testResetSample = '[data-test="workflow-test-reset-sample"]';
+    this.testSuppressDestinations = '[data-test="workflow-test-suppress-destinations"]';
+    this.testSuppressDestinationsBtn = '[data-test="workflow-test-suppress-destinations-btn"]';
+    this.testDispatchWarning = '[data-test="workflow-test-dispatch-warning"]';
+    this.ndvPrevStep = '[data-test="workflow-ndv-prev-step"]';
+    this.ndvNextStep = '[data-test="workflow-ndv-next-step"]';
+    this.runsPage = '[data-test="workflow-runs-page"]';
+    this.configSummaryBranch = '[data-test="workflow-config-summary-branch"]';
+    this.configSummaryBranchPaths = '[data-test^="workflow-config-summary-branch-path-"]';
     // NDV output pane — on a successful destination send this holds the sink's
     // response body, which is what makes delivery assertable.
     this.ndvOutput = '[data-test="workflow-ndv-output"]';
@@ -140,7 +213,7 @@ class WorkflowsPage {
     this.warningToast = '[data-test^="o-toast-"][data-test-variant="warning"]';
     this.anyToast = '[role="alert"], .q-notification__message';
     this.confirmButton =
-      '[data-test$="-confirm-button"], [data-test="dlg-primary"], button:has-text("OK"), button:has-text("Delete")';
+      '[data-test="o-dialog-primary-btn"], [data-test$="-confirm-button"], [data-test="dlg-primary"], button:has-text("OK"), button:has-text("Delete")';
     // Destination header rows are keyed by the header's CURRENT key, so these are
     // functions rather than constants — a blank row answers to the empty-key form.
     this.destHeaderKeyField = (key = '') => `[data-test="add-destination-header-${key}-key-input-field"]`;
@@ -359,6 +432,375 @@ class WorkflowsPage {
     await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
     await node.click({ timeout: DRAWER_TIMEOUT_MS });
     await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Add a Branch from the palette and open its drawer. Same insert-immediately flow as
+   * addNodeFromPalette, but a Branch opens on one seeded row: a case-less Branch is
+   * rejected by the backend validator, so the panel never shows zero paths.
+   */
+  async addBranchFromPalette() {
+    await this.closeOpenDrawer();
+    await this.ensureNodePaletteOpen();
+    await this.page.locator(this.paletteBranch).click({ timeout: DRAWER_TIMEOUT_MS });
+    const node = this.page.locator(this.nodeFor('branch')).last();
+    await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await node.click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.branchBody).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async openBranchDrawer() {
+    await this.closeOpenDrawer();
+    await this.page.locator(this.nodeFor('branch')).first().dblclick({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.branchBody).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async addBranchCase() {
+    const before = await this.branchCaseCount();
+    await this.page.locator(this.branchAddCase).click({ timeout: DRAWER_TIMEOUT_MS });
+    await expect.poll(async () => this.branchCaseCount(), { timeout: DRAWER_TIMEOUT_MS }).toBe(before + 1);
+  }
+
+  async removeBranchCase(handle) {
+    const before = await this.branchCaseCount();
+    await this.page.locator(this.branchRemoveFor(handle)).click({ timeout: DRAWER_TIMEOUT_MS });
+    await expect.poll(async () => this.branchCaseCount(), { timeout: DRAWER_TIMEOUT_MS }).toBe(before - 1);
+  }
+
+  async moveBranchCase(handle, direction /* 'up' | 'down' */) {
+    const sel = direction === 'up' ? this.branchMoveUpFor(handle) : this.branchMoveDownFor(handle);
+    await this.page.locator(sel).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async branchCaseCount() {
+    return this.page.locator(this.branchCaseRows).count();
+  }
+
+  /**
+   * The ordinal badge on each case row, in rendered order. These are the user-visible
+   * statement of evaluation order, so they must renumber when rows move or are removed.
+   */
+  async branchOrderValues() {
+    return this.page
+      .locator(this.branchOrderBadges)
+      .evaluateAll((els) => els.map((e) => (e.textContent || '').trim()));
+  }
+
+  /** Handles in RENDERED order — which is evaluation order, since first match wins. */
+  async branchCaseHandles() {
+    return this.page.locator(this.branchCaseRows).evaluateAll((els) =>
+      els.map((e) => (e.getAttribute('data-test') || '').replace('workflow-branch-case-', ''))
+    );
+  }
+
+  /**
+   * Path labels in rendered order. Scoped to the label field by data-test, NOT to `input`:
+   * every row also contains its ConditionBuilder's value input, which would interleave a
+   * blank entry after each label.
+   */
+  async branchCaseLabels() {
+    return this.page
+      .locator(`${this.branchCaseRows} [data-test^="workflow-branch-label-"][data-test$="-field"]`)
+      .evaluateAll((els) => els.map((e) => e.value));
+  }
+
+  /**
+   * Configure one path. Every branch row renders its OWN ConditionBuilder, so the
+   * column/operator triggers must be scoped to the row; the option popover is a portal
+   * and stays global (only one is open at a time).
+   */
+  async setBranchCase(handle, { label, column, operator = '=', value } = {}) {
+    const row = this.branchCaseFor(handle);
+    if (label !== undefined) {
+      await this.page.locator(this.branchLabelFieldFor(handle)).fill(label);
+    }
+    if (column !== undefined) {
+      await this.dismissConditionGuidelinesIfPresent();
+      await this.pickSelectOption(`${row} ${this.condColumnTrigger}`, this.condColumnOption, column);
+      await this.pickSelectOption(`${row} ${this.condOperatorTrigger}`, this.condOperatorOption, operator);
+      if (value !== undefined) {
+        await this.page.locator(`${row} ${this.condValueField}`).fill(value);
+      }
+    }
+  }
+
+  /**
+   * Wire the nth still-unwired arm to a destination. The per-arm "+" is hover-only, so
+   * the node must be hovered first; `nth` indexes the OPEN handles in declared order,
+   * which shifts as arms get wired — wire left to right and it stays predictable.
+   */
+  async wireArmToDestination(nth, { destName, url, existing } = {}) {
+    await this.page.locator(this.nodeFor('branch')).first().hover({ timeout: DRAWER_TIMEOUT_MS });
+    const plus = this.page.locator(this.flowAppendAdd).nth(nth);
+    await plus.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await plus.click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.stepDestination).click({ timeout: DRAWER_TIMEOUT_MS });
+    const node = this.page.locator(this.nodeFor('destination')).last();
+    await node.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await node.dblclick({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    if (existing) await this.pickExistingDestination(existing);
+    else await this.createDestinationInline({ name: destName, url });
+    await this.saveNodeDrawer();
+  }
+
+  // ---------- draft lifecycle ----------
+
+  /** Save as Draft. Drafts skip the connectivity checks, so a half-built graph persists. */
+  async saveAsDraft() {
+    await this.page.locator(this.saveDraftBtn).first().evaluate((el) => el.click());
+    await this.page.locator(this.listTable).first().waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+  }
+
+  async expectDraftTagInEditor() {
+    await expect(this.page.locator(this.editorDraftTag)).toBeVisible();
+  }
+
+  async expectNoDraftTagInEditor() {
+    await expect(this.page.locator(this.editorDraftTag)).toHaveCount(0);
+  }
+
+  /** A published workflow offers Save + History; a draft offers Save-as-Draft + Publish. */
+  async expectPublishedEditorControls() {
+    await expect(this.page.locator(this.saveBtn)).toBeVisible();
+    await expect(this.page.locator(this.saveDraftBtn)).toHaveCount(0);
+  }
+
+  async expectHistoryControl() {
+    await expect(this.page.locator(this.historyBtn)).toBeVisible();
+  }
+
+  /** Leave with unsaved edits and discard them; the guard dialog must appear first. */
+  async cancelAndDiscard() {
+    await this.page.locator(this.cancelBtn).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.unsavedDialog).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.drawerPrimary).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.listTable).first().waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+  }
+
+  /**
+   * Row tags are not name-scoped in the markup, so these are only meaningful after a
+   * search has narrowed the list to the workflow under test.
+   */
+  async expectDraftTagOnRow(name) {
+    await this.rowByName(name).first().waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    await expect(this.page.locator(this.listDraftTag).first()).toBeVisible();
+  }
+
+  async expectTriggerTagOnRow() {
+    await expect(this.page.locator(this.listTriggerTag).first()).toBeVisible();
+  }
+
+  /** 'pause' when the workflow is running, 'resume' when it is paused. */
+  async rowActionState(name) {
+    return this.page
+      .locator(this.listRowActionFor(name, 'pause-start-action'))
+      .first()
+      .getAttribute('data-row-action');
+  }
+
+  async refreshList() {
+    await this.page.locator(this.listRefresh).click({ timeout: LIST_TIMEOUT_MS });
+    await this.waitForListReady();
+  }
+
+  /**
+   * The row's View control is a HOVER PREVIEW, not a route: the button carries an OTooltip
+   * rendering a WorkflowView summary and has no click handler. Hovering is the interaction.
+   */
+  async hoverViewPreview(name) {
+    await this.rowByName(name).first().waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    await this.page.locator(this.listRowActionFor(name, 'view')).first().hover({ timeout: LIST_TIMEOUT_MS });
+  }
+
+  async expectViewPreview(name) {
+    await expect(this.page.getByRole('tooltip').first()).toContainText(name, { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /** Read-only means the save paths are ABSENT, not disabled — assert on count. */
+  async expectReadOnlyEditor() {
+    await expect(this.page.locator(this.publishBtn)).toHaveCount(0);
+    await expect(this.page.locator(this.saveDraftBtn)).toHaveCount(0);
+  }
+
+  async expectDescriptionValue(text) {
+    await this.page.locator(this.editorPage).waitFor({ state: 'visible', timeout: LIST_TIMEOUT_MS });
+    await expect(this.page.locator(this.descValue).first()).toContainText(text, {
+      timeout: DRAWER_TIMEOUT_MS,
+    });
+  }
+
+  // ---------- node card actions ----------
+
+  /** The action rail is hover-only, so every node action starts with a hover. */
+  async hoverNode(type) {
+    await this.page.locator(this.nodeFor(type)).first().hover({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.nodeActionsFor(type)).first().waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async toggleNodeDisabled(type) {
+    await this.hoverNode(type);
+    // The rail is painted only while the pointer is on the node, and moving to the button
+    // re-runs that check — dispatch the click instead of chasing the hover.
+    await this.page.locator(this.nodeDisableToggle).first().dispatchEvent('click');
+  }
+
+  /** Both the hover-delete and the drawer's Delete funnel through one ConfirmDialog. */
+  async deleteNode(type) {
+    await this.hoverNode(type);
+    await this.page.locator(this.nodeDeleteBtnFor(type)).first().click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.drawerPrimary).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectNodeDisabledBadge(type) {
+    await expect(this.page.locator(this.nodeDisabledBadgeFor(type))).toBeVisible();
+  }
+
+  async expectNoIncompleteBadge(type) {
+    await expect(this.page.locator(this.nodeIncompleteBadgeFor(type))).toHaveCount(0);
+  }
+
+  async expectNoDisabledBadge(type) {
+    await expect(this.page.locator(this.nodeDisabledBadgeFor(type))).toHaveCount(0);
+  }
+
+  async closeTestDrawer() {
+    await this.page.locator(this.drawerClose).first().click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.testDrawer).waitFor({ state: 'detached', timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
+  }
+
+  async expectNodeIncompleteBadge(type) {
+    await expect(this.page.locator(this.nodeIncompleteBadgeFor(type))).toBeVisible();
+  }
+
+  async nodeCount(type) {
+    return this.page.locator(this.nodeFor(type)).count();
+  }
+
+  /** Rename and comment are drawer fields, not card affordances. */
+  async renameOpenNode(name) {
+    await this.page.locator(this.nodeRenameTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    const field = this.page.locator(this.nodeRenameField);
+    await field.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await field.fill(name);
+    await field.press('Enter');
+  }
+
+  async commentOpenNode(text) {
+    await this.page.locator(this.nodeCommentField).fill(text);
+  }
+
+  async expectCommentIndicator() {
+    await expect(this.page.locator(this.nodeCommentIndicator).first()).toBeVisible();
+  }
+
+  /** A renamed node keeps its type selector but renders the custom name on the card. */
+  async expectNodeShowsText(type, text) {
+    await expect(this.page.locator(this.nodeFor(type)).first()).toContainText(text, {
+      timeout: DRAWER_TIMEOUT_MS,
+    });
+  }
+
+  /** The NDV always offers step navigation, which is how a long graph is walked. */
+  async expectNdvStepNavigation() {
+    await expect(this.page.locator(this.ndvPrevStep).first()).toBeVisible();
+    await expect(this.page.locator(this.ndvNextStep).first()).toBeVisible();
+  }
+
+  async clickCanvasUndo() {
+    await this.page.locator(this.canvasUndo).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async clickCanvasTidy() {
+    await this.page.locator(this.canvasTidy).click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  // ---------- test drawer ----------
+
+  /** Open the Test drawer without running — the controls are the subject, not the run. */
+  async openTestDrawer() {
+    await this.closeOpenDrawer();
+    await this.page.locator(this.testBtn).first().evaluate((el) => el.click());
+    await this.page.locator(this.testDrawer).waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectTestControl(selector) {
+    await expect(this.page.locator(selector).first()).toBeVisible();
+  }
+
+  /**
+   * Destinations are suppressed by default so a rehearsal cannot post to production.
+   * Turning that off is what surfaces the dispatch warning.
+   */
+  async setSuppressDestinations(on) {
+    const toggle = this.page.locator(this.testSuppressDestinationsBtn).first();
+    const state = await toggle.getAttribute('aria-checked');
+    if (String(on) !== state) await toggle.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectSuppressDestinations(on) {
+    const toggle = this.page.locator(this.testSuppressDestinationsBtn).first();
+    await expect(toggle).toHaveAttribute('aria-checked', String(on), { timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  async expectDispatchWarning() {
+    await expect(this.page.locator(this.testDispatchWarning)).toBeVisible();
+  }
+
+  async expectNoDispatchWarning() {
+    await expect(this.page.locator(this.testDispatchWarning)).toHaveCount(0);
+  }
+
+  // ---------- branch summary ----------
+
+  async branchSummaryPathCount() {
+    return this.page.locator(this.configSummaryBranchPaths).count();
+  }
+
+  /** The else arm renders after every case row, whatever the path count. */
+  async expectElseArmLast() {
+    const rows = this.page.locator(`${this.branchCaseRows}, ${this.branchElse}`);
+    await expect(rows.last()).toHaveAttribute('data-test', 'workflow-branch-else');
+  }
+
+  async expectElseArmVisible() {
+    await expect(this.page.locator(this.branchElse)).toBeVisible();
+  }
+
+  /** Non-deletable rows omit the control entirely — assert absence, not a disabled state. */
+  async expectElseArmNotRemovable() {
+    await expect(this.page.locator(this.branchElseRemove)).toHaveCount(0);
+  }
+
+  async expectBranchCaseNotRemovable(handle) {
+    await expect(this.page.locator(this.branchRemoveFor(handle))).toHaveCount(0);
+  }
+
+  async expectBranchUnwiredBadge() {
+    await expect(this.page.locator(this.branchUnwiredBadge)).toBeVisible();
+  }
+
+  /** Choose an already-saved destination by name (the picker's list is searchable). */
+  async pickExistingDestination(name) {
+    await this.page.locator(this.destPickerSelectTrigger).click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.destPickerSelectSearch).fill(name);
+    const option = this.page.locator(this.destPickerSelectOption).first();
+    await option.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await option.click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
+  /**
+   * Arm names as rendered on the connectors — the assertion that catches a silent reroute.
+   * vue-flow paints the label layer a tick after the edge itself, so poll until `expected`
+   * non-blank labels exist rather than reading once.
+   */
+  async edgeLabelTexts(expected = 1) {
+    const kids = this.page.locator(`${this.edgeLabelLayer} > *`);
+    const read = async () => (await kids.allTextContents()).map((t) => t.trim()).filter(Boolean);
+    await expect
+      .poll(async () => (await read()).length, { timeout: DRAWER_TIMEOUT_MS })
+      .toBeGreaterThanOrEqual(expected);
+    return read();
   }
 
   /**
@@ -778,6 +1220,15 @@ class WorkflowsPage {
 
   /** Delete via row action (in the more-options menu). Returns any error toast (delete-protected
    *  when linked to an alert). */
+  /** Like deleteByName but surfaces a miss instead of swallowing it — for assertions. */
+  async deleteByNameStrict(name) {
+    await this.page.locator(this.listRowActionFor(name, 'more-options')).first().click({ timeout: LIST_TIMEOUT_MS });
+    const item = this.page.locator(this.listRowActionFor(name, 'delete')).first();
+    await item.waitFor({ state: 'visible', timeout: DRAWER_TIMEOUT_MS });
+    await item.click({ timeout: DRAWER_TIMEOUT_MS });
+    await this.page.locator(this.drawerPrimary).first().click({ timeout: DRAWER_TIMEOUT_MS });
+  }
+
   async deleteByName(name) {
     await this.page.locator(this.listRowActionFor(name, 'more-options')).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});
     await this.page.locator(this.listRowActionFor(name, 'delete')).first().click({ timeout: DRAWER_TIMEOUT_MS }).catch(() => {});

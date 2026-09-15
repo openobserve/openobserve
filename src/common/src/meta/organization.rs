@@ -184,8 +184,8 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
-    /// Separate allowances from the AI pool, in a different unit. Browser and
-    /// protocol hold independent grants — a browser step costs ~52x a protocol one.
+    /// Separate allowances from the AI pool, in a different unit: browser and protocol hold
+    /// independent one-time grants.
     #[cfg(feature = "cloud")]
     pub browser_steps_used: u64,
     #[cfg(feature = "cloud")]
@@ -371,6 +371,8 @@ pub struct OrgIngestionToken {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -383,11 +385,26 @@ pub struct CreateOrgIngestionTokenRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Also mint a Splunk HEC token for this credential.
+    #[serde(default)]
+    pub splunk_token: bool,
 }
 
+/// Requested change to a Splunk HEC token.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SplunkTokenAction {
+    Generate,
+    Revoke,
+}
+
+/// At least one of the two fields must be present.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgIngestionTokenEnableRequest {
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub splunk_token: Option<SplunkTokenAction>,
 }
 
 #[derive(Serialize, ToSchema)]

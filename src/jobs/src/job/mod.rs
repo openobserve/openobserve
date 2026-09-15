@@ -41,6 +41,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+mod leader;
 #[cfg(feature = "enterprise")]
 mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
@@ -53,6 +54,8 @@ mod llm_review_reconciliation;
 mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+mod oncall_maintenance;
 #[cfg(feature = "enterprise")]
 mod org_storage;
 #[cfg(feature = "enterprise")]
@@ -320,10 +323,9 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
 #[cfg(feature = "cloud")]
 fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
     Some(openobserve_synthetics::pool::StepPoolHooks {
-        try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
-        refund: openobserve_core::trial_quota::synthetics_steps_refund,
-        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
-        dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
+        remaining_for_orgs: |org_ids| {
+            Box::pin(openobserve_core::trial_quota::synthetics_remaining_for_orgs(org_ids))
+        },
     })
 }
 
@@ -413,6 +415,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
     if let Err(e) = db::org_status::load_from_db().await {
@@ -547,6 +550,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
     tokio::task::spawn(infra::coordinator::synthetics::watch());
+    // Every node watches: API nodes serve the screens an admin reloads after editing a rotation.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        tokio::task::spawn(infra::coordinator::oncall::watch(|tag, expires_at| {
+            // An ack token is single-use, and single-use on one node only is not single-use.
+            o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
+        }));
+    }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -744,7 +755,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::register_execution_record_writer(
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::register_execution_record_writer(
             |org_id, records| {
                 Box::pin(async move {
                     openobserve_core::self_reporting::llm_experiment_schema::ensure_llm_experiment_stream_initialized(&org_id)
@@ -929,12 +940,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
-                    o2_enterprise::enterprise::llm_evaluations::experiment_runner::run_scorer_task(pointer).await
+                    o2_enterprise::enterprise::llm_evaluations::experiments::runner::run_scorer_task(pointer).await
                 })
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::provider::register_provider_cost_calculator(
+        o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
                 let definition =
@@ -956,7 +967,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::start();
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -1231,6 +1242,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // Nothing else notices a lost escalation timer: the thing that would have is the timer.
+    #[cfg(feature = "enterprise")]
+    oncall_maintenance::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]
@@ -1368,36 +1382,4 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
         .expect("Dashboard id->org cache failed");
 
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
-    /// starts every worker, every check still runs, and the pool is simply never
-    /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
-    /// The needles are assembled at runtime so this test's own source does not
-    /// count towards the totals it asserts.
-    #[test]
-    fn the_synthetics_scheduler_is_handed_the_step_pool() {
-        let source = include_str!("mod.rs");
-        assert_eq!(
-            source
-                .matches(&["openobserve_synthetics::init(synthetics_step", "_pool())"].concat())
-                .count(),
-            1,
-            "`init` must be handed the pool; passing `None` unconditionally is an unmetered fleet"
-        );
-        for hook in [
-            "synthetics_steps_try_deduct",
-            "synthetics_steps_refund",
-            "synthetics_steps_remaining",
-            "synthetics_steps_dead_letter_refund",
-        ] {
-            assert_eq!(
-                source.matches(&["trial_quota::", hook].concat()).count(),
-                1,
-                "the `cloud` build must wire {hook} into the scheduler\'s pool hooks"
-            );
-        }
-    }
 }

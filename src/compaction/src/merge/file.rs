@@ -26,7 +26,6 @@ use config::{
 use hashbrown::{HashMap, HashSet};
 use infra::{
     cache::file_data,
-    file_list as infra_file_list,
     runtime::DATAFUSION_RUNTIME,
     schema::{
         SchemaCache, get_stream_setting_bloom_filter_fields, get_stream_setting_fts_fields,
@@ -43,18 +42,7 @@ use search::datafusion::{
 use tantivy_utils::index_builder::{TantivyIndexOptions, create_tantivy_index};
 use tokio::sync::Semaphore;
 
-// merge small files into big file, upload to storage, returns the big file key and merged files
-// params:
-// - thread_id: the id of the thread
-// - org_id: the id of the organization
-// - stream_type: the type of the stream
-// - stream_name: the name of the stream
-// - prefix: the prefix of the files
-// - files_with_size: the files to merge
-// - mode: what the merge produces (decided by the scheduler)
-// returns:
-// - new_files: the files that are merged
-// - retain_file_list: the files that are not merged
+/// Returns the new files and the files to retire: the merged inputs plus those whose blob is gone.
 pub async fn merge_files(
     thread_id: usize,
     org_id: &str,
@@ -100,21 +88,19 @@ pub async fn merge_files(
         return Ok((Vec::new(), Vec::new()));
     }
 
-    let retain_file_list = new_file_list.clone();
-
     // cache parquet files
-    let deleted_files = cache_remote_files(&new_file_list).await?;
+    let planned = new_file_list.len();
+    let gone_files = cache_remote_files(&mut new_file_list).await?;
     log::info!(
-        "[COMPACTOR:WORKER:{thread_id}] download {} parquet files, took: {} ms",
-        new_file_list.len(),
+        "[COMPACTOR:WORKER:{thread_id}] download {planned} parquet files, took: {} ms",
         start.elapsed().as_millis()
     );
-    if !deleted_files.is_empty() {
-        new_file_list.retain(|f| !deleted_files.contains(&f.key));
+    // survivors of a merge that produced no output stay; gone rows are still deleted
+    if new_file_list.is_empty() || (new_file_list.len() <= 1 && !merge_whole_batch) {
+        return Ok((Vec::new(), gone_files));
     }
-    if new_file_list.len() <= 1 && !merge_whole_batch {
-        return Ok((Vec::new(), retain_file_list));
-    }
+    // only files that passed the storage check feed the output
+    let merged_files = new_file_list.clone();
 
     // get time range and stats for these files in a single iteration
     let (min_ts, max_ts, total_records, new_file_size) = new_file_list.iter().fold(
@@ -288,17 +274,17 @@ pub async fn merge_files(
     };
 
     let MergeResult {
-        files: merged_files,
+        files: outputs,
         file_format,
     } = buf;
     // an empty result would delete the source files without a replacement
-    if merged_files.is_empty() {
+    if outputs.is_empty() {
         return Err(anyhow::anyhow!(
             "merge_parquet_files error: produced no files"
         ));
     }
-    let mut new_files = Vec::with_capacity(merged_files.len());
-    for file in merged_files {
+    let mut new_files = Vec::with_capacity(outputs.len());
+    for file in outputs {
         let id = ider::generate_file_name();
         let new_file_key = format!("{prefix}/{}", file.file_name(&id, file_format));
         let (data, mut new_file_meta, metrics_index_path) = file.into_upload_parts().await?;
@@ -349,7 +335,7 @@ pub async fn merge_files(
                 &new_file_key,
                 &full_text_search_fields,
                 &index_fields,
-                &retain_file_list,
+                &merged_files,
                 &mut new_file_meta,
                 latest_schema.clone(),
                 buf,
@@ -361,7 +347,7 @@ pub async fn merge_files(
     }
     log::info!(
         "[COMPACTOR:WORKER:{thread_id}] merged {} files into {} new file(s): {:?}, original_size: {}, compressed_size: {}, took: {} ms",
-        retain_file_list.len(),
+        merged_files.len(),
         new_files.len(),
         new_files.iter().map(|f| f.key.as_str()).collect::<Vec<_>>(),
         new_files.iter().map(|f| f.meta.original_size).sum::<i64>(),
@@ -372,7 +358,9 @@ pub async fn merge_files(
         start.elapsed().as_millis(),
     );
 
-    Ok((new_files, retain_file_list))
+    let mut retire_files = merged_files;
+    retire_files.extend(gone_files);
+    Ok((new_files, retire_files))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -381,7 +369,7 @@ async fn generate_inverted_index(
     new_file_key: &str,
     fts_fields: &[String],
     index_fields: &[String],
-    retain_file_list: &[FileKey],
+    merged_files: &[FileKey],
     new_file_meta: &mut FileMeta,
     latest_schema: Arc<Schema>,
     buf: Bytes,
@@ -402,7 +390,7 @@ async fn generate_inverted_index(
     .await
     .map_err(|e| {
         anyhow::anyhow!(
-            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {retain_file_list:?}",
+            "create_tantivy_index_on_compactor for file: {new_file_key}, error: {e}, need delete files: {merged_files:?}",
         )
     })?;
     new_file_meta.index_size = index_size as i64;
@@ -410,7 +398,8 @@ async fn generate_inverted_index(
     Ok(())
 }
 
-async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Error> {
+/// Refreshes sizes in place, drops gone and skipped files, and returns the gone ones.
+async fn cache_remote_files(files: &mut Vec<FileKey>) -> Result<Vec<FileKey>, anyhow::Error> {
     let cfg = get_config();
     let scan_size = files.iter().map(|f| f.meta.compressed_size).sum::<i64>();
     if is_local_disk_storage()
@@ -427,67 +416,181 @@ async fn cache_remote_files(files: &[FileKey]) -> Result<Vec<String>, anyhow::Er
         let file_name = file.key.to_string();
         let file_size = file.meta.compressed_size as usize;
         let permit = semaphore.clone().acquire_owned().await.unwrap();
-        let task: tokio::task::JoinHandle<Option<String>> = tokio::task::spawn(async move {
-            let ret = if !file_data::disk::exist(&file_name).await {
-                file_data::disk::download(&file_account, &file_name, Some(file_size)).await
-            } else {
-                Ok(0)
-            };
-            // In case where the parquet file is not found or has no data, we assume that it
-            // must have been deleted by some external entity, and hence we
-            // should remove the entry from file_list table.
-            let file_name = match ret {
-                Ok(data_len) => {
-                    if data_len > 0 && data_len != file_size {
-                        log::warn!(
-                            "[COMPACT] download file {file_name} found size mismatch, expected: {file_size}, actual: {data_len}, will skip it",
-                        );
-                        // skip this file for compact
-                        Some(file_name)
-                    } else {
-                        None
-                    }
-                }
-                Err(e) => {
-                    if e.to_string().to_lowercase().contains("not found")
-                        || e.to_string().to_lowercase().contains("data size is zero")
-                    {
-                        // delete file from file list
-                        log::error!("[COMPACT] found invalid file: {file_name}, will delete it");
-                        if let Err(e) =
-                            infra_file_list::delete_parquet_file(&file_account, &file_name, true)
-                                .await
-                        {
-                            log::error!("[COMPACT] delete from file_list err: {e}");
-                        }
-                        Some(file_name)
-                    } else {
-                        log::error!("[COMPACT] download file to cache err: {e}");
-                        // remove downloaded file
-                        let _ = file_data::disk::remove(&file_name).await;
-                        None
-                    }
-                }
-            };
-            drop(permit);
-            file_name
-        });
+        let task: tokio::task::JoinHandle<(String, Result<usize, anyhow::Error>)> =
+            tokio::task::spawn(async move {
+                let ret = if !file_data::disk::exist(&file_name).await {
+                    file_data::disk::download(&file_account, &file_name, Some(file_size)).await
+                } else {
+                    Ok(0)
+                };
+                drop(permit);
+                (file_name, ret)
+            });
         tasks.push(task);
     }
 
-    let mut delete_files = Vec::new();
+    let mut gone_files = Vec::new();
     for task in tasks {
-        match task.await {
-            Ok(file) => {
-                if let Some(file) = file {
-                    delete_files.push(file);
-                }
-            }
+        let (key, ret) = match task.await {
+            Ok(v) => v,
             Err(e) => {
                 log::error!("[COMPACTOR] load file task err: {e}");
+                continue;
             }
+        };
+        // a failed download may have left a partial entry in the disk cache
+        if ret.is_err() {
+            let _ = file_data::disk::remove(&key).await;
+        }
+        if let Some(gone) = settle_download(files, &key, ret) {
+            gone_files.push(gone);
         }
     }
 
-    Ok(delete_files)
+    Ok(gone_files)
+}
+
+/// Applies one download result to the merge inputs; returns the file when its blob is gone.
+fn settle_download(
+    files: &mut Vec<FileKey>,
+    key: &str,
+    ret: Result<usize, anyhow::Error>,
+) -> Option<FileKey> {
+    let pos = files.iter().position(|f| f.key == key)?;
+    let e = match ret {
+        Ok(data_len) => {
+            let planned = files[pos].meta.compressed_size;
+            // file_list was corrected by the downloader; DataFusion reads the footer at this size
+            if data_len > 0 && data_len as i64 != planned {
+                log::warn!(
+                    "[COMPACT] download file {key} found size mismatch, expected: {planned}, actual: {data_len}, using actual size"
+                );
+                files[pos].meta.compressed_size = data_len as i64;
+            }
+            return None;
+        }
+        Err(e) => e,
+    };
+    let msg = e.to_string().to_lowercase();
+    if msg.contains("not found")
+        || msg.contains("data size is zero")
+        || msg.contains("is corrupted")
+    {
+        log::error!("[COMPACT] found invalid file: {key}, will delete it, err: {e}");
+        Some(files.remove(pos))
+    } else {
+        log::warn!("[COMPACT] download file to cache err: {e}, skip file: {key}");
+        files.remove(pos);
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    const PLANNED_SIZE: usize = 1024;
+
+    fn planned_file(key: &str) -> FileKey {
+        FileKey::new(
+            0,
+            "default".to_string(),
+            key.to_string(),
+            FileMeta {
+                compressed_size: PLANNED_SIZE as i64,
+                ..Default::default()
+            },
+            false,
+        )
+    }
+
+    fn planned_files() -> Vec<FileKey> {
+        vec![planned_file("a.parquet"), planned_file("b.parquet")]
+    }
+
+    fn keys(files: &[FileKey]) -> Vec<&str> {
+        files.iter().map(|f| f.key.as_str()).collect()
+    }
+
+    #[test]
+    fn settle_download_refreshes_size_on_ok() {
+        let mut files = planned_files();
+        let gone = settle_download(&mut files, "a.parquet", Ok(PLANNED_SIZE + 1));
+        assert!(gone.is_none());
+        let sizes: Vec<i64> = files.iter().map(|f| f.meta.compressed_size).collect();
+        assert_eq!(sizes, vec![PLANNED_SIZE as i64 + 1, PLANNED_SIZE as i64]);
+    }
+
+    #[test]
+    fn settle_download_keeps_planned_size_on_matching_ok() {
+        let mut files = planned_files();
+        let gone = settle_download(&mut files, "a.parquet", Ok(PLANNED_SIZE));
+        assert!(gone.is_none());
+        assert_eq!(keys(&files), vec!["a.parquet", "b.parquet"]);
+        assert!(
+            files
+                .iter()
+                .all(|f| f.meta.compressed_size == PLANNED_SIZE as i64)
+        );
+    }
+
+    #[test]
+    fn settle_download_keeps_planned_size_on_cache_hit() {
+        let mut files = planned_files();
+        let gone = settle_download(&mut files, "a.parquet", Ok(0));
+        assert!(gone.is_none());
+        assert_eq!(keys(&files), vec!["a.parquet", "b.parquet"]);
+        assert!(
+            files
+                .iter()
+                .all(|f| f.meta.compressed_size == PLANNED_SIZE as i64)
+        );
+    }
+
+    #[test]
+    fn settle_download_removes_and_returns_not_found() {
+        let mut files = planned_files();
+        let ret = Err(anyhow::anyhow!("file a.parquet Not Found"));
+        let gone = settle_download(&mut files, "a.parquet", ret);
+        assert_eq!(gone.map(|f| f.key), Some("a.parquet".to_string()));
+        assert_eq!(keys(&files), vec!["b.parquet"]);
+    }
+
+    #[test]
+    fn settle_download_removes_and_returns_zero_size() {
+        let mut files = planned_files();
+        let ret = Err(anyhow::anyhow!("file b.parquet data size is zero"));
+        let gone = settle_download(&mut files, "b.parquet", ret);
+        assert_eq!(gone.map(|f| f.key), Some("b.parquet".to_string()));
+        assert_eq!(keys(&files), vec!["a.parquet"]);
+    }
+
+    #[test]
+    fn settle_download_removes_and_returns_corrupted() {
+        let mut files = planned_files();
+        let ret = Err(anyhow::anyhow!("file b.parquet is corrupted in blob store"));
+        let gone = settle_download(&mut files, "b.parquet", ret);
+        assert_eq!(gone.map(|f| f.key), Some("b.parquet".to_string()));
+        assert_eq!(keys(&files), vec!["a.parquet"]);
+    }
+
+    #[test]
+    fn settle_download_skips_unrelated_error_without_retiring() {
+        let mut files = planned_files();
+        let ret = Err(anyhow::anyhow!("connection reset by peer"));
+        let gone = settle_download(&mut files, "a.parquet", ret);
+        assert!(gone.is_none());
+        assert_eq!(keys(&files), vec!["b.parquet"]);
+    }
+
+    #[test]
+    fn settle_download_ignores_unknown_key() {
+        let mut files = planned_files();
+        let ret = Err(anyhow::anyhow!("file c.parquet Not Found"));
+        let gone = settle_download(&mut files, "c.parquet", ret);
+        assert!(gone.is_none());
+        assert_eq!(files.len(), 2);
+    }
 }
