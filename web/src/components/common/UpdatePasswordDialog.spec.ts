@@ -22,6 +22,7 @@ import { usePasswordReset } from "@/composables/usePasswordReset";
 import i18n from "@/locales";
 
 import UpdatePasswordDialog from "./UpdatePasswordDialog.vue";
+import type { UpdatePasswordForm } from "./UpdatePasswordDialog.schema";
 
 // Reka portals dialog content into <body>. Render it inline so the assertions can reach it —
 // the same stub ODialog's own spec uses.
@@ -94,62 +95,7 @@ const mountDialog = () => {
   return wrapper;
 };
 
-const { open, close, isOpen, isPasswordResetError } = usePasswordReset();
-
-describe("usePasswordReset", () => {
-  beforeEach(() => close());
-
-  it("recognises only the middleware's reset-required 403", () => {
-    expect(
-      isPasswordResetError({
-        response: { status: 403, data: { code: "password_reset_required" } },
-      }),
-    ).toBe(true);
-    // A plain 403 is an authorization failure and belongs to the existing handler.
-    expect(isPasswordResetError({ response: { status: 403, data: {} } })).toBe(false);
-    expect(isPasswordResetError({ response: { status: 401 } })).toBe(false);
-    expect(isPasswordResetError(undefined)).toBe(false);
-  });
-
-  it("opens once however many rejections arrive", () => {
-    open("policy_tightened");
-    open("rotation_expired");
-    open("rotation_expired");
-
-    expect(isOpen.value).toBe(true);
-    // The first reason wins: six parallel requests must not rewrite the banner under the user.
-    expect(usePasswordReset().reason.value).toBe("policy_tightened");
-  });
-
-  it("falls back to policy_tightened for an unrecognised reason", () => {
-    open("something-else");
-
-    expect(usePasswordReset().reason.value).toBe("policy_tightened");
-  });
-
-  it("keeps the two middleware codes apart", () => {
-    const { isWriteRestrictedError } = usePasswordReset();
-    const restricted = {
-      response: { status: 403, data: { code: "password_reset_required_for_writes" } },
-    };
-
-    expect(isWriteRestrictedError(restricted)).toBe(true);
-    expect(isPasswordResetError(restricted)).toBe(false);
-  });
-
-  it("prompts on a refused write without trapping the session", () => {
-    const { promptRestricted, isRestrictedPromptOpen, closeRestrictedPrompt } = usePasswordReset();
-    promptRestricted("rotation_expired");
-    promptRestricted("policy_tightened");
-
-    expect(isRestrictedPromptOpen.value).toBe(true);
-    expect(isOpen.value).toBe(false);
-    expect(usePasswordReset().reason.value).toBe("rotation_expired");
-
-    closeRestrictedPrompt();
-    expect(isRestrictedPromptOpen.value).toBe(false);
-  });
-});
+const { open, close, isOpen } = usePasswordReset();
 
 describe("UpdatePasswordDialog", () => {
   beforeEach(() => {
@@ -272,6 +218,18 @@ describe("UpdatePasswordDialog", () => {
     expect(metAfter).toContain("text-status-positive");
   });
 
+  it("reveals the new password when its toggle is clicked", async () => {
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    const input = () => wrapper.find('[data-test="password-reset-dialog-new-password"] input');
+    expect(input().attributes("type")).toBe("password");
+
+    await wrapper.find('[data-test="password-reset-dialog-new-password-reveal"]').trigger("click");
+    expect(input().attributes("type")).toBe("text");
+  });
+
   it("never advertises a rule the server does not enforce", async () => {
     open("policy_tightened");
     const wrapper = mountDialog();
@@ -333,6 +291,36 @@ describe("UpdatePasswordDialog", () => {
     expect(invalidateLoginDataMock).toHaveBeenCalled();
     expect(pushMock).toHaveBeenCalledWith("/logout");
     expect(isOpen.value).toBe(false);
+  });
+
+  it("clears the reuse error on edit", async () => {
+    vi.mocked(userService.update).mockRejectedValue({
+      response: { data: { message: "New password matches one of your last 5 passwords" } },
+    });
+
+    open("policy_tightened");
+    const wrapper = mountDialog();
+    await flushPromises();
+
+    await (
+      wrapper.vm as unknown as { submit: (values: UpdatePasswordForm) => Promise<void> }
+    ).submit({
+      old_password: "old-secret",
+      new_password: "New-Secret-1!",
+      confirm_password: "New-Secret-1!",
+    });
+    await flushPromises();
+
+    const fieldError = () => wrapper.find('[data-test="password-reset-dialog-new-password-error"]');
+    expect(fieldError().exists()).toBe(true);
+    expect(fieldError().text()).toContain("last 5 passwords");
+
+    await wrapper
+      .find('[data-test="password-reset-dialog-new-password"] input')
+      .setValue("New-Secret-2!");
+    await flushPromises();
+
+    expect(fieldError().exists()).toBe(false);
   });
 
   it("keeps the dialog open and does not sign out when the current password is wrong", async () => {

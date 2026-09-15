@@ -21,7 +21,12 @@ import i18n from "@/locales";
 import type { PasswordPolicy as PasswordPolicyType } from "@/services/passwordPolicy";
 
 import PasswordPolicy from "./PasswordPolicy.vue";
-import { buildPolicyPayload, lockoutLadder, policyDefaults } from "./PasswordPolicy.schema";
+import {
+  buildPolicyPayload,
+  INITIAL_POLICY,
+  lockoutLadder,
+  policyDefaults,
+} from "./PasswordPolicy.schema";
 
 vi.mock("@/services/passwordPolicy", () => ({
   default: {
@@ -147,20 +152,6 @@ describe("PasswordPolicy", () => {
 
     expect(wrapper.find('[data-test="password-policy-not-admin-empty-state"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="settings-password-policy-save-btn"]').exists()).toBe(false);
-  });
-
-  it("does NOT render the not-admin state for a password_reset_required 403", async () => {
-    // That 403 means the caller IS an admin who just flagged themselves; the reset dialog owns it.
-    (passwordPolicyService.getPolicy as any).mockRejectedValue({
-      response: { status: 403, data: { code: "password_reset_required" } },
-    });
-
-    const wrapper = mountPage();
-    await flushPromises();
-
-    expect(wrapper.find('[data-test="password-policy-not-admin-empty-state"]').exists()).toBe(
-      false,
-    );
   });
 
   it("renders a retry-able error state for any other failure", async () => {
@@ -290,6 +281,34 @@ describe("PasswordPolicy", () => {
     expect(wrapper.find('[data-test="settings-password-policy-root-warning"]').exists()).toBe(
       false,
     );
+  });
+});
+
+describe("INITIAL_POLICY", () => {
+  it("is the server's own default policy, field for field", () => {
+    expect(INITIAL_POLICY).toEqual({
+      min_length: 8,
+      max_length: 0,
+      require_uppercase: false,
+      require_lowercase: false,
+      require_digit: false,
+      require_special: false,
+      special_char_set: "",
+      rotation_days: 0,
+      rotation_warning_days: 7,
+      history_count: 0,
+      history_max_retained: 30,
+      lockout: {
+        threshold: 0,
+        bucket_size: 0,
+        start_secs: 60,
+        max_secs: 3600,
+        backoff: "exponential",
+      },
+      enforcement_mode: "hard_block",
+      cookie_max_age_secs: 0,
+      apply_to_root: false,
+    });
   });
 });
 

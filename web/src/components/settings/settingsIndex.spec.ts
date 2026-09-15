@@ -5,6 +5,7 @@ import { nextTick } from "vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import enLocale from "@/locales/languages/en-US.json";
+import config from "@/aws-exports";
 import SettingsIndex from "./index.vue";
 
 // Mock composables and config with factory functions
@@ -447,9 +448,11 @@ describe("SettingsIndex.vue", () => {
 
     afterEach(() => {
       isMetaOrgRef.value = false;
+      config.isEnterprise = "false";
     });
 
-    it("is offered in the meta org", () => {
+    it("is offered in the meta org of an enterprise build", () => {
+      config.isEnterprise = "true";
       isMetaOrgRef.value = true;
       wrapper = createWrapper();
 
@@ -457,20 +460,20 @@ describe("SettingsIndex.vue", () => {
     });
 
     it("is hidden outside the meta org", () => {
+      config.isEnterprise = "true";
       isMetaOrgRef.value = false;
       wrapper = createWrapper();
 
       expect(findEntry(wrapper)?.visible).toBe(false);
     });
 
-    it("does NOT depend on the enterprise build flag", () => {
-      // The API lives in the OSS route block — native email/password auth is not an
-      // enterprise feature, so gating this on isEnterprise would hide a working page.
+    it("is hidden in an OSS build even in the meta org", () => {
+      // The API only exists behind the enterprise feature, so the entry would lead nowhere.
+      config.isEnterprise = "false";
       isMetaOrgRef.value = true;
       wrapper = createWrapper();
 
-      expect(wrapper.vm.config.isEnterprise).toBe("false");
-      expect(findEntry(wrapper)?.visible).toBe(true);
+      expect(findEntry(wrapper)?.visible).toBe(false);
     });
 
     it("renders in the centered reading column, like the other form sections", () => {

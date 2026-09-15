@@ -132,4 +132,25 @@ describe("OFormInput", () => {
       .form;
     expect(form.state.values.threshold).toBe(95);
   });
+
+  it("forwards revealable so a password field gets its show/hide toggle", async () => {
+    wrapper = mount(OForm, {
+      props: { defaultValues: { secret: "hunter2" } },
+      slots: {
+        default: () =>
+          h(OFormInput, {
+            name: "secret",
+            type: "password",
+            revealable: true,
+            "data-test": "secret",
+          }),
+      },
+      global: { components: { OFormInput } },
+    });
+    const toggle = wrapper.find('[data-test="secret-reveal"]');
+    expect(toggle.exists()).toBe(true);
+
+    await toggle.trigger("click");
+    expect(wrapper.find("input").attributes("type")).toBe("text");
+  });
 });
