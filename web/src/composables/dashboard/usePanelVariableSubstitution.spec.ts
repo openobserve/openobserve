@@ -312,6 +312,26 @@ describe("replaceQueryValue", () => {
     expect(query).toContain("'staging'");
   });
 
+  // `=~"$host_name"` is a regex alternation, so a comma join would match nothing —
+  // this is what keeps the host_metrics dashboard working for 2+ selected hosts.
+  it("pipe-joins a multi-select variable for promql regex matching", () => {
+    const inst = makeInstWithVar("host_name", ["web-01", "web-02"], true);
+    const { query } = inst.replaceQueryValue(
+      'system_cpu_time{host_name=~"$host_name"}',
+      0,
+      300_000_000,
+      "promql",
+    );
+    expect(query).toBe('system_cpu_time{host_name=~"web-01|web-02"}');
+  });
+
+  it("pipe-joins the ${var} and :pipe spellings identically for promql", () => {
+    const inst = makeInstWithVar("host_name", ["web-01", "web-02"], true);
+    const run = (q: string) => inst.replaceQueryValue(q, 0, 300_000_000, "promql").query;
+    expect(run('x{h=~"${host_name}"}')).toBe('x{h=~"web-01|web-02"}');
+    expect(run('x{h=~"${host_name:pipe}"}')).toBe('x{h=~"web-01|web-02"}');
+  });
+
   it("uses SELECT_ALL_VALUE (*) for null scalar variable value", () => {
     const varValues = [
       {

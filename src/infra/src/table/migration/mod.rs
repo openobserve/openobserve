@@ -186,6 +186,7 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 
@@ -457,6 +458,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260901_000001_reset_anomaly_detection_retries::Migration),
             Box::new(m20260903_000001_add_anomaly_last_failed_at::Migration),
             Box::new(m20260906_000001_add_anomaly_last_alert_fired_at::Migration),
+            Box::new(m20260911_000001_add_splunk_token_to_org_ingestion_tokens::Migration),
             Box::new(m20260912_000001_add_anomaly_alert_budget::Migration),
             Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
         ]
@@ -488,7 +490,8 @@ mod tests {
     const VERSION_COVERAGE: &[(u64, &str)] = &[
         (78, "m20260827_000001_drop_table_action_scripts"),
         (79, "m20260831_000001_add_exhausted_at_to_oncall_responses"),
-        (80, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
+        (80, "m20260911_000001_add_splunk_token_to_org_ingestion_tokens"),
+        (81, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
     ];
 
     #[test]
