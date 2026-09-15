@@ -10,68 +10,17 @@ const buildRows = (severities) =>
     job: 'e2e_histogram_breakdown',
     message: `histogram breakdown seed ${i}`,
   }));
-async function captureHistogramFrames(page) {
-  await page.addInitScript(() => {
-    const w = /** @type {any} */ (window);
-    w.__histFrames = [];
-    const origFetch = w.fetch;
-    w.fetch = async (...args) => {
-      const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-      const res = await origFetch(...args);
-      if (!/is_ui_histogram=true/.test(url) || !res.body) return res;
-      const [mine, theirs] = res.body.tee();
-      (async () => {
-        const reader = mine.getReader();
-        const decoder = new TextDecoder();
-        let buf = '';
-        try {
-          for (;;) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            buf += decoder.decode(value, { stream: true });
-            let nl;
-            while ((nl = buf.indexOf('\n')) >= 0) {
-              const line = buf.slice(0, nl);
-              buf = buf.slice(nl + 1);
-              if (!line.startsWith('data:')) continue;
-              try {
-                w.__histFrames.push(JSON.parse(line.slice(5).trim()));
-              } catch {
-                // progress/keepalive frames that are not JSON payloads
-              }
-            }
-          }
-        } catch {
-          // stream aborted by a newer query; whatever was read still counts
-        }
-      })();
-      return new Response(theirs, {
-        status: res.status,
-        statusText: res.statusText,
-        headers: res.headers,
-      });
-    };
-  });
-}
-const readMetadata = async (page) =>
-  await page.evaluate(() =>
-    (/** @type {any} */ (window).__histFrames || []).map((f) => f.results).filter(Boolean),
-  );
-
-const readFrames = async (page) =>
-  await page.evaluate(() => /** @type {any} */ (window).__histFrames || []);
-
 test.describe("Logs histogram severity breakdown", () => {
-  // Ingest->searchable latency plus two full query runs; environmental, not product.
-  test.describe.configure({ mode: 'serial', timeout: 360_000 });
+  test.describe.configure({ mode: 'serial' });
   let pm;
   const seededStreams = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
-    await captureHistogramFrames(page);
-    await navigateToBase(page);
     pm = new PageManager(page);
+    // Must precede navigation: addInitScript only applies to subsequent loads.
+    await pm.logsPage.captureHistogramFrames();
+    await navigateToBase(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Histogram severity setup completed');
   });
@@ -100,11 +49,11 @@ test.describe("Logs histogram severity breakdown", () => {
     await pm.logsPage.clickRefresh();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    await expect.poll(async () => (await readMetadata(page)).length, {
+    await expect.poll(async () => (await pm.logsPage.getHistogramMetadata()).length, {
       timeout: 60000, intervals: [1000, 2000, 3000],
     }).toBeGreaterThan(0);
 
-    const meta = await readMetadata(page);
+    const meta = await pm.logsPage.getHistogramMetadata();
     const withBreakdown = meta.filter((m) => m.histogram_breakdown_field);
     testLogger.info(
       `metadata frames: ${meta.length}, with breakdown field: ${withBreakdown.length}, ` +
@@ -148,11 +97,11 @@ test.describe("Logs histogram severity breakdown", () => {
     await pm.logsPage.clickRefresh();
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    await expect.poll(async () => (await readMetadata(page)).length, {
+    await expect.poll(async () => (await pm.logsPage.getHistogramMetadata()).length, {
       timeout: 60000, intervals: [1000, 2000, 3000],
     }).toBeGreaterThan(0);
 
-    const meta = await readMetadata(page);
+    const meta = await pm.logsPage.getHistogramMetadata();
     testLogger.info(
       `metadata frames: ${meta.length}, ` +
       `eligible: ${JSON.stringify([...new Set(meta.map((m) => m.is_histogram_eligible))])}, ` +
@@ -164,7 +113,7 @@ test.describe("Logs histogram severity breakdown", () => {
       'Bug #11441: a numeric severity must leave the query histogram-eligible'
     ).toBe(true);
 
-    const errored = (await readFrames(page)).filter((f) => f.error || f.error_detail || f.code >= 400);
+    const errored = (await pm.logsPage.getHistogramFrames()).filter((f) => f.error || f.error_detail || f.code >= 400);
     expect(errored,
       `Bug #11441: no histogram frame may error on a numeric severity — got ${JSON.stringify(errored.slice(0, 1))}`
     ).toHaveLength(0);

@@ -6,8 +6,7 @@ const { ingestTraces } = require('../../utils/trace-ingestion.js');
 const TRACE_STREAM = 'default';
 
 test.describe("Traces shared URL", () => {
-  // Trace ingest->searchable latency alone runs ~2 min on a loaded shared env.
-  test.describe.configure({ mode: 'serial', timeout: 360_000 });
+  test.describe.configure({ mode: 'serial' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -30,7 +29,7 @@ test.describe("Traces shared URL", () => {
     await pm.tracesPage.selectTraceStream(TRACE_STREAM);
 
     // Toggled rather than typed, so the shared state is built the way a user produces it.
-    const badgeAppeared = await pm.tracesPage.waitForErrorBadgeAfterSearch();
+    const badgeAppeared = await pm.tracesPage.waitForErrorBadgeAfterSearch(4);
     expect(badgeAppeared,
       'Precondition: seeded error traces must produce the error-count badge'
     ).toBe(true);

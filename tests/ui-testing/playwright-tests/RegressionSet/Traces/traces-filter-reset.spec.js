@@ -6,8 +6,7 @@ const { ingestTraces } = require('../../utils/trace-ingestion.js');
 const TRACE_STREAM = 'default';
 
 test.describe("Traces filter reset", () => {
-  // Trace ingest->searchable latency alone runs ~2 min on a loaded shared env.
-  test.describe.configure({ mode: 'serial', timeout: 360_000 });
+  test.describe.configure({ mode: 'serial' });
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
@@ -29,7 +28,7 @@ test.describe("Traces filter reset", () => {
     await pm.tracesPage.selectTraceStream(TRACE_STREAM);
 
     // Re-searches until the badge appears: the ingest ack lands before the spans are searchable.
-    const badgeAppeared = await pm.tracesPage.waitForErrorBadgeAfterSearch();
+    const badgeAppeared = await pm.tracesPage.waitForErrorBadgeAfterSearch(4);
     expect(badgeAppeared,
       'Precondition: seeded error traces must produce the error-count badge'
     ).toBe(true);

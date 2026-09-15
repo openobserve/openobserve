@@ -38,12 +38,9 @@ in **both** repos automatically — no more hand-syncing two workflow files.
   - a whole new ENT-only shard → add an object to `"shards": [ … ]`.
 - **A new shard:** add a new object to `ci_matrix.json` with `testfolder`,
   `actual_folder`, `browser`, `run_files`.
-- **Splitting a hot folder:** several shards may share one `actual_folder` with
-  disjoint `run_files` — that is how `Dashboards` spreads over 10 shards and
-  `Logs` over 5 in the PR gate. Balance by *measured* job duration, not by spec
-  count, and keep the original `testfolder` on one of the halves: an ENT
-  overlay `append` key that no longer names a base shard is a hard build
-  failure, so renaming both halves breaks the enterprise run.
+- **Splitting a hot folder:** shards may share one `actual_folder` with disjoint
+  `run_files`. Keep the original `testfolder` on one half — an ENT overlay
+  `append` key that no longer names a base shard fails the build.
 
 ## Fields
 
