@@ -697,6 +697,7 @@ pub async fn update_config(
     let mut retryable_change = false;
 
     validated_intervals(&req, &existing).map_err(validation_error)?;
+    validated_detection_window(&req, &existing).map_err(validation_error)?;
     validated_denominator(&req, &existing).map_err(validation_error)?;
     validated_budget_update(
         req.percentile,
@@ -1615,6 +1616,7 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
 
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
+    validate_detection_window(&req.schedule_interval, req.detection_window_seconds)?;
 
     // G4 reads the COMBINED form, which is what the row stores and what update sees.
     validate_denominator(
@@ -1759,6 +1761,27 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
     Ok(())
 }
 
+/// The look-back caps the cursor (`detect_start = max(cursor, now - detection_window)`), so a
+/// window shorter than the gap between runs drops every bucket in between, permanently.
+fn validate_detection_window(schedule_interval: &str, detection_window_seconds: i64) -> Result<()> {
+    let schedule_secs = parse_interval(schedule_interval)?;
+    if detection_window_seconds <= 0 {
+        anyhow::bail!(
+            "detection_window_seconds ({}) must be positive",
+            detection_window_seconds
+        );
+    }
+    if detection_window_seconds < schedule_secs {
+        anyhow::bail!(
+            "detection_window_seconds ({}) must not be shorter than schedule_interval ({}): the \
+             look-back caps the cursor, so buckets between runs would never be scored",
+            detection_window_seconds,
+            schedule_interval
+        );
+    }
+    Ok(())
+}
+
 /// The pair a partial update lands on: a submitted field wins, an absent one keeps the row's.
 fn merged_interval_pair(
     req: &UpdateAnomalyConfigRequest,
@@ -1803,6 +1826,32 @@ fn validated_intervals(
         return Ok(());
     }
     validate_interval_pair(&schedule, &histogram)
+}
+
+/// Same grandfathering as `validated_intervals`: a stored row that already violates the rule
+/// stays editable, and only an edit that touches either field is held to it.
+fn validated_detection_window(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let schedule = req
+        .schedule_interval
+        .clone()
+        .unwrap_or_else(|| existing.schedule_interval.clone());
+    let window = req
+        .detection_window_seconds
+        .unwrap_or(existing.detection_window_seconds);
+    if req
+        .schedule_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .detection_window_seconds
+            .is_none_or(|v| v == existing.detection_window_seconds)
+    {
+        return Ok(());
+    }
+    validate_detection_window(&schedule, window)
 }
 
 /// G4. True for the aggregations that grow with population size and carry no normalizer.
@@ -3173,6 +3222,35 @@ mod tests {
         assert!(validate_config_request(&req).is_err());
     }
 
+    // A window shorter than the schedule silently drops every bucket between two runs,
+    // because the look-back caps the cursor rather than extending it.
+    #[test]
+    fn test_detection_window_shorter_than_schedule_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.detection_window_seconds = 900;
+        let err = validate_config_request(&req).expect_err("15m window under a 1h schedule");
+        assert!(
+            err.to_string().contains("never be scored"),
+            "unexpected message: {err}"
+        );
+    }
+
+    #[test]
+    fn test_detection_window_equal_to_schedule_is_accepted() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.detection_window_seconds = 3600;
+        assert!(validate_config_request(&req).is_ok());
+    }
+
+    #[test]
+    fn test_non_positive_detection_window_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.detection_window_seconds = 0;
+        assert!(validate_config_request(&req).is_err());
+    }
+
     // ── model_to_api_json ───────────────────────────────────────────────────
 
     #[test]
@@ -3999,6 +4077,32 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_intervals(&req, &stored_config()).is_ok());
+        }
+
+        /// The grandfathering rule: a stored row already violating the bound stays
+        /// editable so long as the edit leaves both fields alone.
+        #[test]
+        fn an_edit_elsewhere_leaves_a_violating_stored_window_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.detection_window_seconds = 900;
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_ok());
+        }
+
+        #[test]
+        fn shortening_the_window_below_the_schedule_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.detection_window_seconds = 3600;
+            let req = UpdateAnomalyConfigRequest {
+                detection_window_seconds: Some(900),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_err());
         }
     }
 
