@@ -32,7 +32,6 @@ use openobserve_core::{
     alerts::alert as alert_service, authz::list_objects_for_user, dashboards as dashboard_service,
     pipeline as pipeline_service,
 };
-use stream as stream_service;
 
 use super::matching::{Permit, is_candidate};
 use crate::models::resources::{ResourceHit, ResourceType};
@@ -51,22 +50,23 @@ pub struct SourceContext<'a> {
     pub limit: u64,
 }
 
-/// Dispatches to the source for `kind`, returning its unranked candidate hits (the caller ranks).
+/// Dispatches to the source for `kind`; the bool reports the source hit its fetch cap, so more may
+/// exist beyond what it returned (only the SQL-paginated sources can, since RBAC runs after LIMIT).
 pub async fn fetch(
     ctx: &SourceContext<'_>,
     kind: ResourceType,
-) -> anyhow::Result<Vec<ResourceHit>> {
-    match kind {
-        ResourceType::Dashboard => dashboards(ctx).await,
-        ResourceType::Alert => alerts(ctx).await,
-        ResourceType::Stream => streams(ctx).await,
-        ResourceType::SavedView => saved_views(ctx).await,
-        ResourceType::Function => functions(ctx).await,
-        ResourceType::Pipeline => pipelines(ctx).await,
-        ResourceType::User => users(ctx).await,
-        ResourceType::ServiceAccount => service_accounts(ctx).await,
-        ResourceType::Synthetic => synthetics(ctx).await,
-    }
+) -> anyhow::Result<(Vec<ResourceHit>, bool)> {
+    Ok(match kind {
+        ResourceType::Dashboard => dashboards(ctx).await?,
+        ResourceType::Alert => alerts(ctx).await?,
+        ResourceType::Stream => (streams(ctx).await?, false),
+        ResourceType::SavedView => (saved_views(ctx).await?, false),
+        ResourceType::Function => (functions(ctx).await?, false),
+        ResourceType::Pipeline => (pipelines(ctx).await?, false),
+        ResourceType::User => (users(ctx).await?, false),
+        ResourceType::ServiceAccount => (service_accounts(ctx).await?, false),
+        ResourceType::Synthetic => (synthetics(ctx).await?, false),
+    })
 }
 
 fn fetch_size(limit: u64) -> u64 {
@@ -106,7 +106,7 @@ async fn permit_for(ctx: &SourceContext<'_>, resource: &str) -> anyhow::Result<P
 
 /// Same core list the Dashboards page uses, so folder and per-dashboard permissions apply
 /// unchanged.
-async fn dashboards(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
+async fn dashboards(ctx: &SourceContext<'_>) -> anyhow::Result<(Vec<ResourceHit>, bool)> {
     let mut params = ListDashboardsParams::new(ctx.org_id).paginate(fetch_size(ctx.limit), 0);
     if !ctx.q.is_empty() {
         params = params.where_title_contains(ctx.q);
@@ -114,24 +114,27 @@ async fn dashboards(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>>
     let rows = dashboard_service::list_dashboards(ctx.user_id, params)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(rows
-        .into_iter()
-        .filter_map(|(folder, dashboard)| {
-            let id = dashboard.dashboard_id()?;
-            let mut hit = ResourceHit::new(
-                ResourceType::Dashboard,
-                id,
-                dashboard.title().unwrap_or_default(),
-            );
-            hit.folder_id = Some(folder.folder_id);
-            hit.folder_name = Some(folder.name);
-            hit.description = dashboard.description().and_then(non_empty);
-            Some(hit)
-        })
-        .collect())
+    let capped = rows.len() as u64 >= fetch_size(ctx.limit);
+    Ok((
+        rows.into_iter()
+            .filter_map(|(folder, dashboard)| {
+                let id = dashboard.dashboard_id()?;
+                let mut hit = ResourceHit::new(
+                    ResourceType::Dashboard,
+                    id,
+                    dashboard.title().unwrap_or_default(),
+                );
+                hit.folder_id = Some(folder.folder_id);
+                hit.folder_name = Some(folder.name);
+                hit.description = dashboard.description().and_then(non_empty);
+                Some(hit)
+            })
+            .collect(),
+        capped,
+    ))
 }
 
-async fn alerts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
+async fn alerts(ctx: &SourceContext<'_>) -> anyhow::Result<(Vec<ResourceHit>, bool)> {
     let params = ListAlertsParams {
         org_id: ctx.org_id.to_owned(),
         folder_id: None,
@@ -151,37 +154,34 @@ async fn alerts(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
     let rows = alert_service::list_v2(conn, Some(ctx.user_id), params)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    Ok(rows
-        .into_iter()
-        .filter_map(|(folder, alert)| {
-            let id = alert.id?.to_string();
-            let mut hit = ResourceHit::new(ResourceType::Alert, id, alert.name);
-            hit.folder_id = Some(folder.folder_id);
-            hit.folder_name = Some(folder.name);
-            hit.enabled = Some(alert.enabled);
-            hit.description = non_empty(&alert.description);
-            Some(hit)
-        })
-        .collect())
+    let capped = rows.len() as u64 >= fetch_size(ctx.limit);
+    Ok((
+        rows.into_iter()
+            .filter_map(|(folder, alert)| {
+                let id = alert.id?.to_string();
+                let mut hit = ResourceHit::new(ResourceType::Alert, id, alert.name);
+                hit.folder_id = Some(folder.folder_id);
+                hit.folder_name = Some(folder.name);
+                hit.enabled = Some(alert.enabled);
+                hit.description = non_empty(&alert.description);
+                Some(hit)
+            })
+            .collect(),
+        capped,
+    ))
 }
 
-/// Per type, because the stream permission filter only applies when a type is given.
+/// Names only from the schema cache, per type — avoids get_streams' per-stream stats work.
 async fn streams(ctx: &SourceContext<'_>) -> anyhow::Result<Vec<ResourceHit>> {
     let mut hits = Vec::new();
     for stream_type in SEARCHABLE_STREAM_TYPES {
         let key = stream_type.as_str();
-        let permitted = permitted_objects(ctx, ofga_key(key)).await?;
-        let rows =
-            stream_service::get_streams(ctx.org_id, Some(stream_type), false, permitted).await;
-        for row in rows {
-            if !is_candidate(&row.name, "", "", ctx.q) {
+        let permit = permit_for(ctx, key).await?;
+        for name in db::schema::list_streams_from_cache(ctx.org_id, stream_type).await {
+            if !permit.allows(&name) || !is_candidate(&name, "", "", ctx.q) {
                 continue;
             }
-            let mut hit = ResourceHit::new(
-                ResourceType::Stream,
-                format!("{key}/{}", row.name),
-                row.name,
-            );
+            let mut hit = ResourceHit::new(ResourceType::Stream, format!("{key}/{name}"), name);
             hit.stream_type = Some(key.to_owned());
             hits.push(hit);
         }

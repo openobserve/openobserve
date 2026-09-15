@@ -108,15 +108,15 @@ pub async fn search(
     let mut truncated = Vec::new();
     for (kind, result) in results {
         // One failing source must not hide the others; the palette degrades per type.
-        let rows = match result {
-            Ok(rows) => rows,
+        let (rows, capped) = match result {
+            Ok(v) => v,
             Err(e) => {
                 log::warn!("[RESOURCES] {kind:?} search failed for org {org_id}: {e}");
                 continue;
             }
         };
         let (ranked, cut) = matching::rank(rows, &q, limit as usize);
-        if cut {
+        if cut || capped {
             truncated.push(kind);
         }
         hits.extend(ranked);
