@@ -46,6 +46,7 @@
             @click="addMembers"
           >
             {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
+            <OTooltip v-if="!pendingEmails.length" :content="t('oncall.addPeopleDisabledHint')" />
           </OButton>
 
           <span
@@ -275,6 +276,7 @@ import type {
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
