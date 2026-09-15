@@ -1009,6 +1009,8 @@ async function fetchResponse() {
     });
     response.value = res.data.response;
     events.value = res.data.events ?? [];
+    // Flip before the awaits below so the card skeletons instead of reading an empty roster as "nobody on call".
+    onCallPositionsLoading.value = true;
     await fetchTeamName();
     await fetchSubjectAlert();
     await fetchHandoffTargets();
