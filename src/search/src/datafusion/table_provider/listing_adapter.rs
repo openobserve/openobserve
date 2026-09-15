@@ -19,13 +19,13 @@ use arrow_schema::SchemaRef;
 use config::{TIMESTAMP_COL_NAME, get_config};
 use datafusion::{
     catalog::{Session, TableProvider},
-    common::Result,
+    common::{Result, exec_datafusion_err, plan_err},
     datasource::{
         TableType,
         listing::{ListingTable, ListingTableConfig},
         physical_plan::{FileGroup, FileScanConfig},
     },
-    execution::cache::cache_manager::FileStatisticsCache,
+    execution::{SessionState, cache::cache_manager::FileStatisticsCache},
     logical_expr::TableProviderFilterPushDown,
     physical_plan::ExecutionPlan,
     prelude::Expr,
@@ -54,6 +54,7 @@ pub struct ListingTableAdapter {
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
+    target_partitions: usize,
 }
 
 impl ListingTableAdapter {
@@ -64,7 +65,11 @@ impl ListingTableAdapter {
         index_condition: Option<IndexCondition>,
         fst_fields: Vec<String>,
         timestamp_filter: Option<(i64, i64)>,
+        target_partitions: usize,
     ) -> Result<Self> {
+        if target_partitions == 0 {
+            return plan_err!("ListingTableAdapter requires target_partitions greater than zero");
+        }
         let listing_table = ListingTable::try_new(config)?;
         Ok(Self {
             listing_table,
@@ -73,10 +78,11 @@ impl ListingTableAdapter {
             index_condition,
             fst_fields,
             timestamp_filter,
+            target_partitions,
         })
     }
 
-    pub fn with_cache(mut self, cache: Option<Arc<dyn FileStatisticsCache>>) -> Self {
+    pub fn with_cache(mut self, cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.listing_table = self.listing_table.with_cache(cache);
         self
     }
@@ -99,6 +105,19 @@ impl TableProvider for ListingTableAdapter {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
+        // Each table keeps its scan budget without changing the shared query session.
+        let mut scan_state = state
+            .as_any()
+            .downcast_ref::<SessionState>()
+            .ok_or_else(|| exec_datafusion_err!("ListingTableAdapter requires a SessionState"))?
+            .clone();
+        scan_state
+            .config_mut()
+            .options_mut()
+            .execution
+            .target_partitions = self.target_partitions;
+        let state: &dyn Session = &scan_state;
+
         let (parquet_projection, filter_projection) =
             if self.index_condition.is_some() || self.timestamp_filter.is_some() {
                 // get the projection for the filter
@@ -141,7 +160,7 @@ impl TableProvider for ListingTableAdapter {
             .scan(state, parquet_projection, filters, limit)
             .await?;
 
-        let target_partitions = self.listing_table.options().target_partitions;
+        let target_partitions = self.target_partitions;
         let parquet_exec = match hash_interval(filters) {
             Some(hash_range) if self.sort_order.is_sorted() => handler_metrics_scan(
                 &self.trace_id,
@@ -282,13 +301,8 @@ mod tests {
     };
     use parquet::arrow::ArrowWriter;
     use vortex::{
-        VortexSessionDefault,
-        array::ArrayRef,
-        arrow::{FromArrowArray, FromArrowType},
-        dtype::DType,
-        file::VortexWriteOptions,
-        io::session::RuntimeSessionExt,
-        session::VortexSession,
+        VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+        io::session::RuntimeSessionExt, session::VortexSession,
     };
     use vortex_datafusion::VortexFormat;
 
@@ -336,8 +350,6 @@ mod tests {
             .await
             .unwrap();
         let listing_options = ListingOptions::new(Arc::new(ParquetFormat::default()))
-            .with_target_partitions(2)
-            .with_collect_stat(true)
             .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
@@ -350,6 +362,7 @@ mod tests {
             None,
             vec![],
             None,
+            2,
         )
         .unwrap();
         ctx.register_table("t", Arc::new(table)).unwrap();
@@ -415,9 +428,14 @@ mod tests {
             FileFormat::Vortex => {
                 let session = VortexSession::default().with_tokio();
                 let mut buf = Vec::new();
-                let mut writer = VortexWriteOptions::new(session)
-                    .writer(&mut buf, DType::from_arrow(schema.as_ref()));
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                let mut writer = VortexWriteOptions::new(session.clone()).writer(
+                    &mut buf,
+                    session.arrow().from_arrow_schema(schema.as_ref()).unwrap(),
+                );
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch, schema.as_ref())
+                    .unwrap();
                 writer.push(array).await.unwrap();
                 writer.finish().await.unwrap();
                 std::fs::write(dir.join(name), buf).unwrap();
@@ -474,8 +492,6 @@ mod tests {
             }
         };
         let listing_options = ListingOptions::new(datafusion_file_format)
-            .with_target_partitions(2)
-            .with_collect_stat(true)
             .with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
@@ -488,6 +504,7 @@ mod tests {
             None,
             vec![],
             None,
+            2,
         )
         .unwrap();
         ctx.register_table("t", Arc::new(table)).unwrap();
@@ -575,14 +592,29 @@ mod tests {
 
         let session = VortexSession::default().with_tokio();
         let mut buf = Vec::new();
-        let mut writer = VortexWriteOptions::new(session.clone())
-            .writer(&mut buf, DType::from_arrow(file_schema.as_ref()));
+        let mut writer = VortexWriteOptions::new(session.clone()).writer(
+            &mut buf,
+            session
+                .arrow()
+                .from_arrow_schema(file_schema.as_ref())
+                .unwrap(),
+        );
         writer
-            .push(ArrayRef::from_arrow(batch1, false).unwrap())
+            .push(
+                session
+                    .arrow()
+                    .from_arrow_record_batch(batch1, file_schema.as_ref())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         writer
-            .push(ArrayRef::from_arrow(batch2, false).unwrap())
+            .push(
+                session
+                    .arrow()
+                    .from_arrow_record_batch(batch2, file_schema.as_ref())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         writer.finish().await.unwrap();
@@ -601,9 +633,7 @@ mod tests {
             .unwrap();
         let format: Arc<dyn DataFusionFileFormat> =
             Arc::new(VortexFormat::new(VortexSession::default().with_tokio()));
-        let listing_options = ListingOptions::new(format)
-            .with_target_partitions(2)
-            .with_collect_stat(true);
+        let listing_options = ListingOptions::new(format);
         let url = ListingTableUrl::parse(format!("file://{}/", dir.path().display())).unwrap();
         let config = ListingTableConfig::new(url)
             .with_listing_options(listing_options)
@@ -615,6 +645,7 @@ mod tests {
             None,
             vec![],
             None,
+            2,
         )
         .unwrap();
         ctx.register_table("t", Arc::new(table)).unwrap();
@@ -636,5 +667,87 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(counts, vec![3]);
+    }
+
+    #[tokio::test]
+    async fn test_table_scan_partitions_are_independent_of_session() {
+        use datafusion::{
+            physical_plan::ExecutionPlanProperties,
+            prelude::{SessionConfig, SessionContext},
+        };
+
+        use crate::datafusion::table_provider::uniontable::NewUnionTable;
+
+        let ctx = SessionContext::new_with_config(
+            SessionConfig::new()
+                .with_target_partitions(2)
+                .with_repartition_file_scans(false),
+        );
+        let state = ctx.state();
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let dir = tempfile::tempdir().unwrap();
+            for index in 0..8 {
+                write_hash_sorted_file(
+                    dir.path(),
+                    &format!("{index}{}", format.extension()),
+                    &[(index, 10), (index, 20)],
+                    format,
+                )
+                .await;
+            }
+            for sort_order in [FileSortOrder::None, FileSortOrder::HashTimestampAsc] {
+                let mut tables: Vec<Arc<dyn TableProvider>> = Vec::new();
+                for target in [1, 8] {
+                    let file_format: Arc<dyn DataFusionFileFormat> = match format {
+                        FileFormat::Parquet => Arc::new(ParquetFormat::default()),
+                        FileFormat::Vortex => {
+                            Arc::new(VortexFormat::new(VortexSession::default().with_tokio()))
+                        }
+                    };
+                    let mut options =
+                        ListingOptions::new(file_format).with_file_extension(format.extension());
+                    if sort_order.is_sorted() {
+                        options =
+                            options.with_file_sort_order(vec![sort_order.logical_sort_exprs()]);
+                    }
+                    let config = ListingTableConfig::new(
+                        ListingTableUrl::parse(dir.path().to_str().unwrap()).unwrap(),
+                    )
+                    .with_listing_options(options)
+                    .with_schema(hash_sorted_schema());
+                    let table = Arc::new(
+                        ListingTableAdapter::try_new(
+                            config,
+                            "scan-budget".to_string(),
+                            sort_order,
+                            None,
+                            vec![],
+                            None,
+                            target,
+                        )
+                        .unwrap(),
+                    );
+                    let scan = table.scan(&state, None, &[], None).await.unwrap();
+                    assert_eq!(
+                        scan.output_partitioning().partition_count(),
+                        target,
+                        "format={format:?}, sort_order={sort_order:?}"
+                    );
+                    if sort_order.is_sorted() {
+                        assert!(scan.properties().output_ordering().is_some());
+                    }
+                    let batches = collect(scan, ctx.task_ctx()).await.unwrap();
+                    assert_eq!(batches.iter().map(RecordBatch::num_rows).sum::<usize>(), 16);
+                    assert_eq!(state.config().target_partitions(), 2);
+                    tables.push(table);
+                }
+                let union = NewUnionTable::new(hash_sorted_schema(), tables);
+                let scan = union.scan(&state, None, &[], None).await.unwrap();
+                assert_eq!(scan.output_partitioning().partition_count(), 9);
+                let batches = collect(scan, ctx.task_ctx()).await.unwrap();
+                assert_eq!(batches.iter().map(RecordBatch::num_rows).sum::<usize>(), 32);
+                assert_eq!(ctx.state().config().target_partitions(), 2);
+            }
+        }
     }
 }

@@ -396,6 +396,8 @@ pub async fn ingest(
                 code: http::StatusCode::TOO_MANY_REQUESTS.into(),
                 status: vec![],
                 error: Some(e.to_string()),
+                write_failed: false,
+                stream_skipped: false,
             });
         } else {
             log::error!("Metrics ingestion error: {e}");
@@ -403,6 +405,8 @@ pub async fn ingest(
                 code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
                 status: vec![],
                 error: Some(e.to_string()),
+                write_failed: false,
+                stream_skipped: false,
             });
         }
     }
