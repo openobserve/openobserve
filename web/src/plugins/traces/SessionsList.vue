@@ -828,11 +828,11 @@ function onPaginationChange({ page, size }: { page: number; size: number }) {
 }
 
 function onSortChange({ column, order }: { column: string; order: SessionSortOrder }) {
-  // OTable's third state clears the column. This list is always ordered, so
-  // fold that state back to ascending on the same field and expose a simple
-  // ascending/descending toggle.
-  if (column) sortBy.value = column as SessionSortField;
-  sortOrder.value = column ? order : "asc";
+  // OTable's third click clears the column (column === ""). This list is
+  // always ordered, so that state resets to the default sort instead of
+  // leaving the previous field's icon stuck showing a stale order.
+  sortBy.value = (column || "end_time") as SessionSortField;
+  sortOrder.value = column ? order : "desc";
   currentPage.value = 1;
   loadSessions(undefined, undefined, true);
 }

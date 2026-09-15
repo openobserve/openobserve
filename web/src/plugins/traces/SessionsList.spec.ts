@@ -420,7 +420,7 @@ describe("SessionsList — sessions table", () => {
     expect(mockFetchPage).toHaveBeenCalledWith("test-stream", 1000, 2000, 0, 20, "", undefined);
   });
 
-  it("cycles a descending server sort back to ascending instead of clearing it", async () => {
+  it("clearing a server sort resets to the default sort instead of sticking on the old field", async () => {
     mockRouteQuery = { type: "stream" };
     mockSortBy.value = "gen_ai_usage_cost";
     mockSortOrder.value = "desc";
@@ -431,8 +431,8 @@ describe("SessionsList — sessions table", () => {
     table.vm.$emit("sort-change", { column: "", order: "asc" });
     await flushPromises();
 
-    expect(mockSortBy.value).toBe("gen_ai_usage_cost");
-    expect(mockSortOrder.value).toBe("asc");
+    expect(mockSortBy.value).toBe("end_time");
+    expect(mockSortOrder.value).toBe("desc");
     expect(mockFetchPage).toHaveBeenCalledTimes(1);
   });
 
