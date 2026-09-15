@@ -13,17 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use infra::{
-    dist_lock,
-    errors::{DbError, Error},
-};
+use infra::dist_lock;
 
 use crate as db;
 
 const V4_STARTED_AT_KEY: &str = "/service_graph/v4/started_at";
 const V1_STOPPED_KEY: &str = "/service_graph/v1/stopped";
-const V1_DRAINED_KEY: &str = "/service_graph/v1/drained";
-const AGENT_SIGNALS_HANDOFF_KEY: &str = "/service_graph/agent_signals/handoff";
 
 fn mk_key() -> String {
     "/service_graph/node/offsets".to_string()
@@ -31,10 +26,6 @@ fn mk_key() -> String {
 
 pub fn v4_offset_key(org_id: &str, stream_name: &str) -> String {
     format!("/service_graph/v4/offsets/{org_id}/{stream_name}")
-}
-
-pub fn agent_signals_offset_key(org_id: &str, stream_name: &str) -> String {
-    format!("/service_graph/v4/agent_signals/{org_id}/{stream_name}")
 }
 
 pub async fn get_offset() -> (i64, String) {
@@ -118,44 +109,6 @@ pub async fn set_v1_stopped_if_absent() -> Result<(), anyhow::Error> {
     put_once(V1_STOPPED_KEY, "true".to_string()).await
 }
 
-/// The ack carries v1's final offset so the handoff boundary is never read separately from it.
-pub async fn get_v1_drained() -> Option<i64> {
-    get_i64(V1_DRAINED_KEY).await
-}
-
-pub async fn set_v1_drained_if_absent(final_offset: i64) -> Result<(), anyhow::Error> {
-    put_once(V1_DRAINED_KEY, final_offset.to_string()).await
-}
-
-pub async fn get_agent_signals_handoff() -> Option<i64> {
-    get_i64(AGENT_SIGNALS_HANDOFF_KEY).await
-}
-
-pub async fn set_agent_signals_handoff_if_absent(boundary: i64) -> Result<(), anyhow::Error> {
-    put_once(AGENT_SIGNALS_HANDOFF_KEY, boundary.to_string()).await
-}
-
-/// Value `<done>` or `<from>;<to>` (in flight); missing key → `Ok(None)`, read failure → `Err`.
-pub async fn get_agent_signals_progress(
-    org_id: &str,
-    stream_name: &str,
-) -> Result<Option<String>, anyhow::Error> {
-    match db::get(&agent_signals_offset_key(org_id, stream_name)).await {
-        Ok(ret) => Ok(Some(String::from_utf8_lossy(&ret).to_string())),
-        Err(Error::DbError(DbError::KeyNotExists(_))) => Ok(None),
-        Err(e) => Err(e.into()),
-    }
-}
-
-pub async fn set_agent_signals_progress(
-    org_id: &str,
-    stream_name: &str,
-    value: &str,
-) -> Result<(), anyhow::Error> {
-    let key = agent_signals_offset_key(org_id, stream_name);
-    Ok(db::put(&key, value.to_string().into(), db::NO_NEED_WATCH, None).await?)
-}
-
 async fn get_i64(key: &str) -> Option<i64> {
     let ret = db::get(key).await.ok()?;
     String::from_utf8_lossy(&ret).trim().parse::<i64>().ok()
@@ -200,17 +153,8 @@ mod tests {
             v4_offset_key("default", "traces"),
             "/service_graph/v4/offsets/default/traces"
         );
-        assert_eq!(
-            agent_signals_offset_key("default", "traces"),
-            "/service_graph/v4/agent_signals/default/traces"
-        );
         assert_eq!(V4_STARTED_AT_KEY, "/service_graph/v4/started_at");
         assert_eq!(V1_STOPPED_KEY, "/service_graph/v1/stopped");
-        assert_eq!(V1_DRAINED_KEY, "/service_graph/v1/drained");
-        assert_eq!(
-            AGENT_SIGNALS_HANDOFF_KEY,
-            "/service_graph/agent_signals/handoff"
-        );
     }
 
     #[test]

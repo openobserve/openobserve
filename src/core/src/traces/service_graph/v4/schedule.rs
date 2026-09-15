@@ -30,7 +30,6 @@ use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, MICROS, ORG_RETAINED,
     ORG_TABLES, PROCESSED_TIMESTAMP_STREAM, RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN,
     STREAM_STATES, Settings, TableRef, V1_STOP_AFTER_MICROS,
-    handoff::{AgentProgress, handoff_boundary, load_progress},
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{SeriesKey, Staging},
     sql::{
@@ -42,10 +41,8 @@ use super::{
 };
 use crate::{
     db::service_graph::{
-        get_agent_signals_handoff, get_agent_signals_progress, get_started_at, get_v1_drained,
-        get_v4_offset, is_v1_stopped, set_agent_signals_handoff_if_absent,
-        set_agent_signals_progress, set_started_at_if_absent, set_v1_stopped_if_absent,
-        set_v4_offset, v4_offset_key,
+        get_started_at, get_v4_offset, is_v1_stopped, set_started_at_if_absent,
+        set_v1_stopped_if_absent, set_v4_offset, v4_offset_key,
     },
     traces::service_graph::run_graph_search,
 };
@@ -130,17 +127,11 @@ pub fn settle_ql_trigger(table: &mut ResolutionTable, need_ql: bool, ql_ok: bool
 
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
-    let v1_stopped = is_v1_stopped().await;
     let discovered = discover().await;
     let orgs: Vec<String> = discovered.iter().map(|(org, _)| org.clone()).collect();
-    if !v1_stopped {
+    if !is_v1_stopped().await {
         maybe_stop_v1(&orgs, now).await;
     }
-    let handoff = if v1_stopped {
-        agent_signals_handoff(now).await
-    } else {
-        None
-    };
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
@@ -174,7 +165,7 @@ pub async fn run_tick(settings: &Settings) {
     let settings = *settings;
     futures::stream::iter(jobs)
         .for_each_concurrent(stream_concurrency(), |job| async move {
-            process_stream(job, &settings, now, handoff).await;
+            process_stream(job, &settings, now).await;
         })
         .await;
 }
@@ -301,25 +292,6 @@ async fn maybe_stop_v1(orgs: &[String], now: i64) {
         Ok(()) => log::info!("[ServiceGraph] v4 has 7 days of data, v1 job stopped"),
         Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
     }
-}
-
-/// Written once after v1 drained; the v1 offset is read only after no run can still be in flight.
-async fn agent_signals_handoff(now: i64) -> Option<i64> {
-    if let Some(boundary) = get_agent_signals_handoff().await {
-        return Some(boundary);
-    }
-    let ack = get_v1_drained().await;
-    let (v1_offset, holder) = crate::db::service_graph::get_offset().await;
-    let alive = !holder.is_empty() && get_node_by_uuid(&holder).await.is_some();
-    let v1_offset_after_drain = || v1_offset;
-    let boundary = handoff_boundary(ack, &holder, alive, v1_offset_after_drain, now)?;
-    if let Err(e) = set_agent_signals_handoff_if_absent(boundary).await {
-        log::warn!("[ServiceGraph] failed to record agent-signals handoff: {e}");
-        return None;
-    }
-    let boundary = get_agent_signals_handoff().await;
-    log::info!("[ServiceGraph] v1 drained, v4 owns agent signals from {boundary:?}");
-    boundary
 }
 
 async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now: i64) -> TableRef {
@@ -469,7 +441,7 @@ async fn snapshot_if_due(org: &str, table: &TableRef, now: i64) {
     }
 }
 
-async fn process_stream(job: StreamJob, settings: &Settings, now: i64, handoff: Option<i64>) {
+async fn process_stream(job: StreamJob, settings: &Settings, now: i64) {
     let (org, stream) = (job.org.as_str(), job.stream.as_str());
     let state_arc = STREAM_STATES
         .entry((job.org.clone(), job.stream.clone()))
@@ -513,86 +485,13 @@ async fn process_stream(job: StreamJob, settings: &Settings, now: i64, handoff: 
         );
         return;
     }
-    let mut progress = match handoff {
-        Some(_) => {
-            let read = get_agent_signals_progress(org, stream).await;
-            if let Err(e) = &read {
-                log::warn!(
-                    "[AgentSignals] {org}/{stream}: progress read failed, skipped this tick: {e}"
-                );
-            }
-            load_progress(read)
-        }
-        None => None,
-    };
     for end in window_ends(offset, horizon, flush, MAX_WINDOWS_PER_TICK) {
         let start = end - flush;
         if let Err(e) = process_window(&job, &cols, (start, end), now, settings, &mut state).await {
             log::error!("[ServiceGraph] {org}/{stream}: window [{start}, {end}) stopped: {e}");
             break;
         }
-        if let Some(progress) = progress.as_mut() {
-            advance_agent_signals(org, stream, handoff, progress, end).await;
-        }
     }
-}
-
-/// The pending range is durable before ingestion and retried as is until its end is durable.
-async fn advance_agent_signals(
-    org: &str,
-    stream: &str,
-    handoff: Option<i64>,
-    progress: &mut AgentProgress,
-    end: i64,
-) {
-    loop {
-        let had_pending = progress.pending.is_some();
-        let Some((from, to)) = progress.begin(handoff, end) else {
-            return;
-        };
-        if !had_pending && !persist_progress(org, stream, progress).await {
-            progress.pending = None;
-            return;
-        }
-        if progress.needs_ingest() {
-            if !run_agent_signals(org, stream, from, to).await {
-                return;
-            }
-            progress.mark_delivered();
-        }
-        let mut durable = progress.clone();
-        durable.mark_durable();
-        if !persist_progress(org, stream, &durable).await {
-            return;
-        }
-        *progress = durable;
-        if to >= end {
-            return;
-        }
-    }
-}
-
-async fn persist_progress(org: &str, stream: &str, progress: &AgentProgress) -> bool {
-    match set_agent_signals_progress(org, stream, &progress.encode()).await {
-        Ok(()) => true,
-        Err(e) => {
-            log::warn!("[AgentSignals] {org}/{stream}: progress write failed: {e}");
-            false
-        }
-    }
-}
-
-async fn run_agent_signals(org: &str, stream: &str, start: i64, end: i64) -> bool {
-    #[cfg(feature = "enterprise")]
-    if let Err(e) =
-        crate::traces::agent_signals::process_agent_signals_stream(org, stream, start, end).await
-    {
-        log::error!("[AgentSignals] Failed for stream {org}/{stream} [{start}, {end}): {e}");
-        return false;
-    }
-    #[cfg(not(feature = "enterprise"))]
-    let _ = (org, stream, start, end);
-    true
 }
 
 async fn apply_staging(

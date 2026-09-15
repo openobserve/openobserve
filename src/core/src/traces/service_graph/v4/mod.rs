@@ -15,7 +15,6 @@
 
 //! Service graph v4: per-window rollup of trace streams into `traces_service_graph_*` metrics.
 
-pub mod handoff;
 pub mod resolution;
 pub mod resolve;
 pub mod schedule;

@@ -37,9 +37,10 @@ struct RecentIngestedTraceStream {
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
-    if crate::db::service_graph::is_v1_stopped().await {
-        ack_v1_drained().await;
-        return Ok(());
+    // once v4 owns the graph, v1 keeps its offset and the agent-signals rollup only
+    let stopped = crate::db::service_graph::is_v1_stopped().await;
+    if stopped {
+        log::info!("[ServiceGraph] v1 stopped: service-graph edges are no longer computed");
     }
     // get last offset
     let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
@@ -170,8 +171,9 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
 
-        if let Err(e) =
-            process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
+        if !stopped
+            && let Err(e) =
+                process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
         {
             log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
             continue; // Don't fail entire job if one stream fails
@@ -193,23 +195,8 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
 
     // update last updated at
     crate::db::service_graph::set_offset(next_updated_at, Some(&LOCAL_NODE.uuid.clone())).await?;
-    if crate::db::service_graph::is_v1_stopped().await {
-        ack_v1_drained().await;
-    }
 
     Ok(())
-}
-
-/// Only the v1 holder can still be mid-run, so only it may confirm v1's last window is durable.
-#[cfg(feature = "enterprise")]
-async fn ack_v1_drained() {
-    let (final_offset, node) = crate::db::service_graph::get_offset().await;
-    if !node.is_empty() && LOCAL_NODE.uuid.ne(&node) {
-        return;
-    }
-    if let Err(e) = crate::db::service_graph::set_v1_drained_if_absent(final_offset).await {
-        log::warn!("[ServiceGraph] failed to acknowledge v1 drain: {e}");
-    }
 }
 
 /// Build the
