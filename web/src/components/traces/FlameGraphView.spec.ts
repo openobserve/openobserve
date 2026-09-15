@@ -480,6 +480,10 @@ describe("FlameGraphView", () => {
       expect(normalSpan.itemStyle.borderWidth).toBe(1);
     });
 
+    // Regression guard for issue #11463 (spans with smaller durations are not
+    // visible in the Flame Graph). It lives here rather than in e2e because the
+    // graph draws to an ECharts canvas, so no per-span DOM geometry exists to
+    // assert against.
     it("should include spans with tiny duration using minimum 0.1% width", async () => {
       const tinySpan = [
         createMockSpan({
