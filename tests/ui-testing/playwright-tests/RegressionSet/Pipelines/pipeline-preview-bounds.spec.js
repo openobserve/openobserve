@@ -14,7 +14,8 @@
  * `pages/pipelinesPages/pipelinesPage.js` already carried `hoverPipelineRow`
  * and `getPreviewBoundingBox` for this bug, but no test ever called them — the
  * locators there are deliberately loose (`[class*="preview"]`), so this spec
- * targets the tooltip bubble's own `o-tooltip-content` instead.
+ * uses `hoverViewAndGetPreviewBox`, which targets the tooltip bubble's own
+ * `o-tooltip-content`.
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -23,7 +24,6 @@ const PageManager = require('../../../pages/page-manager.js');
 const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 const SOURCE_STREAM = 'e2e_automate';
-const TOOLTIP = '[data-test="o-tooltip-content"]';
 
 /**
  * Minimal single-condition group. The pipeline's logic is irrelevant here — the
@@ -91,15 +91,7 @@ test.describe("Pipeline list preview bounds", () => {
     await pm.pipelinesPage.openPipelineMenu();
     await pm.pipelinesPage.searchPipeline(pipelineName);
 
-    const viewBtn = page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
-    await expect(viewBtn, 'Precondition: the row View action must be present').toBeVisible({ timeout: 20000 });
-
-    await viewBtn.hover();
-
-    const tooltip = page.locator(TOOLTIP).first();
-    await expect(tooltip, 'Hovering View must open the graph preview').toBeVisible({ timeout: 10000 });
-
-    const box = await tooltip.boundingBox();
+    const box = await pm.pipelinesPage.hoverViewAndGetPreviewBox(pipelineName);
     expect(box, 'Preview must have a measurable box').not.toBeNull();
 
     const viewport = page.viewportSize();

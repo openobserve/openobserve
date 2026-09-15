@@ -89,24 +89,14 @@ test.describe("Pipeline bulk export", () => {
     // Both rows must be in the filtered list before Select All, or the export
     // silently covers whatever subset had rendered.
     for (const name of names) {
-      await expect(page.locator(`[data-test="pipeline-list-${name}-update-pipeline"]`),
-        `Precondition: ${name} must be in the filtered list`
-      ).toBeVisible({ timeout: 20000 });
+      await pm.pipelinesPage.expectPipelineInList(name);
     }
 
-    const exportBtn = page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
-    await expect(exportBtn,
-      'Bug #7030: the bulk export button must stay hidden while nothing is selected'
-    ).toBeHidden();
-
-    await page.locator('[data-test="o2-table-select-all"]').click();
-
-    await expect(exportBtn,
-      'Bug #7030: selecting pipelines must reveal a bulk export action'
-    ).toBeVisible({ timeout: 10000 });
+    await pm.pipelinesPage.expectBulkExportHidden();
+    await pm.pipelinesPage.selectAllRowsAndExpectBulkExport();
 
     const downloadPromise = page.waitForEvent('download', { timeout: 20000 });
-    await exportBtn.click();
+    await pm.pipelinesPage.getBulkExportButton().click();
     const download = await downloadPromise;
 
     expect(download.suggestedFilename(),
