@@ -21,8 +21,28 @@ import { z } from "zod";
 
 import type { LockoutPolicy, PasswordPolicy } from "@/services/passwordPolicy";
 import type { TranslateFn } from "@/types/i18n";
+import { DEFAULT_COMPLEXITY } from "@/utils/passwordComplexity";
 
 const nonNegativeInt = z.coerce.number().int().min(0);
+
+/** The server's default policy, shown until the real one loads. */
+export const INITIAL_POLICY: PasswordPolicy = {
+  ...DEFAULT_COMPLEXITY,
+  rotation_days: 0,
+  rotation_warning_days: 7,
+  history_count: 0,
+  history_max_retained: 30,
+  lockout: {
+    threshold: 0,
+    bucket_size: 0,
+    start_secs: 60,
+    max_secs: 3600,
+    backoff: "exponential",
+  },
+  enforcement_mode: "hard_block",
+  cookie_max_age_secs: 0,
+  apply_to_root: false,
+};
 
 export const policyBaseSchema = z.object({
   min_length: z.coerce.number().int().min(1),

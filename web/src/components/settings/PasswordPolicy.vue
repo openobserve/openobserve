@@ -356,6 +356,7 @@ import { durationFormatter } from "@/utils/formatters";
 
 import {
   buildPolicyPayload,
+  INITIAL_POLICY,
   lockoutLadder,
   makePolicySchema,
   policyDefaults,
@@ -378,31 +379,7 @@ const rootDialogOpen = ref(false);
 const rootAcknowledged = ref(false);
 
 const schema = makePolicySchema(t);
-const formDefaults = ref<PolicyForm>(
-  policyDefaults({
-    min_length: 8,
-    max_length: 0,
-    require_uppercase: false,
-    require_lowercase: false,
-    require_digit: false,
-    require_special: false,
-    special_char_set: "",
-    rotation_days: 0,
-    rotation_warning_days: 7,
-    history_count: 0,
-    history_max_retained: 30,
-    lockout: {
-      threshold: 0,
-      bucket_size: 0,
-      start_secs: 60,
-      max_secs: 3600,
-      backoff: "exponential",
-    },
-    enforcement_mode: "hard_block",
-    cookie_max_age_secs: 0,
-    apply_to_root: false,
-  }),
-);
+const formDefaults = ref<PolicyForm>(policyDefaults(INITIAL_POLICY));
 
 const form = useOForm<PolicyForm>({
   defaultValues: formDefaults.value,
