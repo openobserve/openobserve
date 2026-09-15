@@ -54,6 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
+        <OTag
+          v-if="curatedBadge"
+          variant="amber-soft"
+          size="sm"
+          data-test="dashboard-panel-curated-badge"
+          :title="t('infra.curated.staleBadgeTooltip')"
+        >
+          {{ t(curatedBadge.key, curatedBadgeParams) }}
+          <OTooltip :content="t('infra.curated.staleBadgeTooltip')" side="bottom" />
+        </OTag>
         <div class="flex-1" />
 
         <!-- HOVER-REVEALED CONTROLS (this button through the fullscreen one).
@@ -329,7 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="min-h-0 flex-1">
+    <div
+      class="relative min-h-0 flex-1"
+      :class="curatedBadge ? 'opacity-60' : undefined"
+      data-test="dashboard-panel-body"
+      :data-curated-stale="curatedBadge ? 'true' : 'false'"
+    >
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
@@ -372,7 +387,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :allowAlertCreation="allowAlertCreation"
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
+        @series-data-update="onCuratedSeriesData"
       ></PanelSchemaRenderer>
+
+      <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
+           blank tile is read as a zero — so it refuses to imply a number. -->
+      <div
+        v-if="curatedNoData && !curatedTableOwnsEmpty"
+        class="absolute inset-0 flex items-center justify-center text-sm"
+        :class="curatedAllClear ? 'text-status-success-text gap-1' : 'text-text-muted italic'"
+        data-test="dashboard-panel-curated-no-data"
+      >
+        <OIcon
+          v-if="curatedAllClear"
+          name="check"
+          size="sm"
+          data-test="dashboard-panel-curated-all-clear-icon"
+        />
+        <span>{{
+          curatedAllClear ? t("infra.curated.tileAllClear") : t("infra.curated.tileNoData")
+        }}</span>
+      </div>
     </div>
 
     <QueryInspector
@@ -431,6 +466,7 @@ import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vu
 import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -443,6 +479,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
+import { durationParts } from "@/views/Infrastructure/curated/resolve";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -490,6 +527,7 @@ export default defineComponent({
     "showLegendsButton",
   ],
   components: {
+    OTag,
     PanelSchemaRenderer,
     PanelBar,
     QueryInspector,
@@ -511,6 +549,70 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    // Curated pages stamp this; stored dashboards never carry it, so the badge
+    // and the body dimming are both invisible outside them (§6.3).
+    const curatedBadge = computed(
+      () =>
+        props.data?.config?.curated_badge as
+          | {
+              key: string;
+              date: string;
+              lastSeenUs?: number;
+              duration: { key: string; count: number };
+            }
+          | undefined,
+    );
+    // The duration is recomputed HERE, from lastSeenUs, against the same clock
+    // the page banner uses. Rendering the build-time count instead froze the
+    // badge while the banner beside it kept counting, so the two disagreed.
+    const curatedBadgeParams = computed(() => {
+      const badge = curatedBadge.value;
+      if (!badge) return {};
+      const parts =
+        badge.lastSeenUs != null
+          ? durationParts(badge.lastSeenUs, Date.now() * 1000)
+          : badge.duration;
+      const duration = parts
+        ? t(`infra.curated.${parts.key}` as never, { count: parts.count })
+        : "";
+      return { duration, date: badge.date };
+    });
+    // need PanleSchemaRendererRef for table download as a csv
+    const PanleSchemaRendererRef: any = ref(null);
+
+    // Counting `options.series` cannot answer this: for a `metric` panel — the very type the
+    // curated tiles use — convertPromQLData emits exactly ONE synthetic rendering series whether
+    // the result is empty or not (`_metricText: "0.00"` vs `"5.00"`), so a length test reads every
+    // empty metric tile as populated. The renderer already owns the type-aware, loading-aware
+    // verdict (PanelSchemaRenderer.vue:1448-1480) and exposes it; this reuses it, exactly as the
+    // legends button above already does.
+    const curatedSeriesEmpty = ref<boolean | null>(null);
+    const onCuratedSeriesData = () => {
+      if (!props.data?.config?.curated_no_data_eligible) return;
+      // Read AFTER the renderer's own conversion settled — the emit is that signal.
+      const verdict = PanleSchemaRendererRef.value?.noData;
+      if (verdict === undefined) return;
+      curatedSeriesEmpty.value = verdict === "No Data";
+    };
+    /** Only ever claimed after a load actually settled — never while pending. */
+    /**
+     * A triage section reports an empty result as GOOD news. Ownership is per panel
+     * type, because the layer underneath differs: PanelSchemaRenderer's OEmptyState
+     * covers charts and tiles (suppressed there for these panels, so this overlay is
+     * the sole owner), while a promql TABLE is excluded from it and gets its wording
+     * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
+     * words twice, once from each layer.
+     */
+    const curatedAllClear = computed(
+      () =>
+        props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
+    );
+    /** Every table renders its own empty state through TableRenderer's #empty default, so the overlay would stack a second one on top. */
+    const curatedTableOwnsEmpty = computed(() => props.data?.type === "table");
+    const curatedNoData = computed(
+      () =>
+        props.data?.config?.curated_no_data_eligible === true && curatedSeriesEmpty.value === true,
+    );
     const metaData = ref();
     const showViewPanel = ref(false);
     const showLegendsDialog = ref(false);
@@ -556,9 +658,6 @@ export default defineComponent({
     };
 
     const showText = ref(false);
-
-    // need PanleSchemaRendererRef for table download as a csv
-    const PanleSchemaRendererRef: any = ref(null);
 
     //check if dependent adhoc variable exists
     const dependentAdHocVariable = computed(() => {
@@ -965,6 +1064,12 @@ export default defineComponent({
 
     return {
       props,
+      curatedBadge,
+      curatedBadgeParams,
+      curatedNoData,
+      curatedAllClear,
+      curatedTableOwnsEmpty,
+      onCuratedSeriesData,
       alertDisabledReason,
       onEditPanel,
       onLogPanel,

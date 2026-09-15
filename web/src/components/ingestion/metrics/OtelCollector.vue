@@ -1,6 +1,13 @@
 <template>
   <IngestionContent>
     <div class="flex flex-col gap-2">
+      <div class="text-base font-semibold">{{ t("ingestion.hostMetricsReceiver") }}</div>
+      <ContentCopy :content="raw(getHostMetricsConfig)" />
+      <div class="text-text-secondary text-xs">
+        {{ t("ingestion.hostMetricsReceiverNote", { attr: raw("host.name") }) }}
+      </div>
+    </div>
+    <div class="flex flex-col gap-2">
       <div class="text-base font-semibold">{{ t("ingestion.otlpHttp") }}</div>
       <ContentCopy :content="raw(getOtelHttpConfig)" />
     </div>
@@ -40,6 +47,39 @@ const endpoint: any = ref({
 
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
+
+// Scrapers stay in lockstep with what the bundled Host Metrics dashboard queries.
+const getHostMetricsConfig = computed(() => {
+  return `receivers:
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+      memory:
+      disk:
+      filesystem:
+      load:
+      network:
+
+processors:
+  resourcedetection/system:
+    detectors: [system]
+    system:
+      hostname_sources: [os]
+
+exporters:
+  otlphttp/openobserve:
+    endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}
+    headers:
+      Authorization: Basic [BASIC_PASSCODE]
+
+service:
+  pipelines:
+    metrics/hostmetrics:
+      receivers: [hostmetrics]
+      processors: [resourcedetection/system]
+      exporters: [otlphttp/openobserve]`;
+});
 
 const getOtelGrpcConfig = computed(() => {
   return `exporters:
