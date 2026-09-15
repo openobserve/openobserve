@@ -1031,7 +1031,8 @@ test.describe('Anomaly Detection', () => {
     test('saving a budget config persists alert_budget_per_day', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async ({ page }) => {
-      const name = await ownConfig(page, 'persist', 4);
+      // Seeded at 1 so the save must change it — a no-op save leaves 1 and fails.
+      const name = await ownConfig(page, 'persist', 1);
       await pm.anomalyDetectionPage.openEdit(name);
       await pm.anomalyDetectionPage.openConfigTab();
 
