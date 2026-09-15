@@ -72,7 +72,7 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn organizations(
@@ -172,6 +172,9 @@ pub async fn organizations(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
@@ -531,7 +534,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_org(
