@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+};
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
@@ -29,7 +32,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamStats, StreamType},
     },
     utils::{
-        flatten::format_label_name_owned,
+        flatten::format_label_name_cow,
         json,
         schema::format_stream_name,
         time::{now_micros, parse_i64_to_timestamp_micros},
@@ -44,7 +47,6 @@ use infra::{
 };
 use ingestion_common::IngestUser;
 use promql_parser::{label::MatchOp, parser};
-use prost::Message;
 use proto::prometheus_rpc;
 use schema::stream_schema_exists;
 use search_service;
@@ -52,6 +54,7 @@ use search_service;
 use super::{
     columnar, ingest,
     native_histogram::{CLASSIC_HISTOGRAM_SUFFIXES, expand_native_histogram},
+    prom_decode,
 };
 use crate::{
     common::{
@@ -130,8 +133,8 @@ pub async fn remote_write(
     let decoded = snap::raw::Decoder::new()
         .decompress_vec(&body)
         .map_err(|e| anyhow::anyhow!("Invalid snappy compressed data: {e}"))?;
-    let request = prometheus_rpc::WriteRequest::decode(bytes::Bytes::from(decoded))
-        .map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
+    let request =
+        prom_decode::decode(&decoded).map_err(|e| anyhow::anyhow!("Invalid protobuf: {e}"))?;
 
     // records buffer
     let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
@@ -190,12 +193,12 @@ pub async fn remote_write(
     // a request carries far more series than distinct metric names, so each is formatted once
     let mut formatted_names: HashMap<String, String> = HashMap::new();
     for event in &request.timeseries {
-        if let Some(name_label) = event.labels.iter().find(|l| l.name == NAME_LABEL) {
-            let metric_name = match formatted_names.get(&name_label.value) {
+        if let Some((_, raw_name)) = event.labels.iter().find(|(name, _)| *name == NAME_LABEL) {
+            let metric_name = match formatted_names.get(*raw_name) {
                 Some(name) => name.clone(),
                 None => {
-                    let name = format_stream_name(name_label.value.clone());
-                    formatted_names.insert(name_label.value.clone(), name.clone());
+                    let name = format_stream_name(raw_name.to_string());
+                    formatted_names.insert(raw_name.to_string(), name.clone());
                     unique_metrics.insert(name.clone());
                     name
                 }
@@ -300,42 +303,46 @@ pub async fn remote_write(
         pipeline_inputs: &mut stream_pipeline_inputs,
         json_data_by_stream: &mut json_data_by_stream,
     };
-    for mut event in request.timeseries {
+    for event in request.timeseries {
         event_count += 1;
         // get labels
-        let mut replica_label = String::new();
+        let mut replica_label = "";
 
-        let mut label_pairs: Vec<(String, String)> = Vec::with_capacity(event.labels.len());
+        // a label spelled correctly on the wire is borrowed; only the JSON path copies labels
+        let mut label_pairs: Vec<(Cow<'_, str>, Cow<'_, str>)> =
+            Vec::with_capacity(event.labels.len());
         // allocated only for a series wide enough that `push_label`'s scan would go quadratic
         let mut label_index: HashMap<String, usize> = HashMap::new();
-        for label in event.labels.drain(..) {
-            if label.name == cfg.prom.ha_replica_label {
-                replica_label = label.value;
+        for (name, value) in event.labels {
+            if name == cfg.prom.ha_replica_label {
+                replica_label = value;
                 continue;
             }
-            if label.name == cfg.prom.ha_cluster_label {
+            if name == cfg.prom.ha_cluster_label {
                 if cluster_name.is_empty() {
-                    cluster_name = format!("{}/{}", org_id, label.value);
+                    cluster_name = format!("{}/{}", org_id, value);
                 }
                 continue;
             }
             columnar::push_label(
                 &mut label_pairs,
                 &mut label_index,
-                format_label_name_owned(label.name),
-                label.value,
+                (format_label_name_cow(name), Cow::Borrowed(value)),
             );
         }
 
-        let metric_name = match label_pairs.iter_mut().find(|(name, _)| name == NAME_LABEL) {
+        let metric_name = match label_pairs
+            .iter_mut()
+            .find(|(name, _)| name.as_ref() == NAME_LABEL)
+        {
             // `__name__` must equal the stream name or `{__name__="..."}` can never match
             Some((_, v)) => {
-                let name = match formatted_names.get(v.as_str()) {
+                let name = match formatted_names.get(v.as_ref()) {
                     Some(name) => name.clone(),
-                    None => format_stream_name(std::mem::take(v)),
+                    None => format_stream_name(v.to_string()),
                 };
-                if v.as_str() != name.as_str() {
-                    v.clone_from(&name);
+                if v.as_ref() != name.as_str() {
+                    *v = Cow::Owned(name.clone());
                 }
                 name
             }
@@ -369,7 +376,7 @@ pub async fn remote_write(
             first_line: &mut first_line,
             armed: dedup_enabled && !cluster_name.is_empty(),
             cluster_name: &cluster_name,
-            replica_label: &replica_label,
+            replica_label,
             interval: election_interval,
         };
 
@@ -403,7 +410,7 @@ pub async fn remote_write(
         let mut labels: json::Map<String, json::Value> =
             json::Map::with_capacity(label_pairs.len() + 3);
         for (name, value) in label_pairs {
-            labels.insert(name, json::Value::String(value));
+            labels.insert(name.into_owned(), json::Value::String(value.into_owned()));
         }
         // a pipeline rewrites the labels the identity derives from, UDS trimming drops some of them
         let known_hash = (!stream_executable_pipelines
@@ -1248,6 +1255,7 @@ async fn prom_ha_handler(
 
 #[cfg(test)]
 mod tests {
+    use config::utils::flatten::format_label_name_owned;
     use promql_parser::{
         label::{MatchOp, Matcher, Matchers},
         parser::VectorSelector,
@@ -1523,8 +1531,7 @@ mod tests {
             columnar::push_label(
                 &mut label_pairs,
                 &mut label_index,
-                format_label_name_owned(name.to_string()),
-                value.to_string(),
+                (format_label_name_owned(name.to_string()), value.to_string()),
             );
         }
 

@@ -37,12 +37,37 @@ mod native_histogram;
 pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
+mod prom_decode;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
 /// OTLP writes a per-sample `start_time`, which the shared hash-excluded set does not cover.
 const TRIGGER_DEDUP_EXTRA_EXCLUDED_LABELS: &[&str] = &["start_time"];
+
+/// A label as (name, value), whatever owns the strings.
+pub trait LabelPair {
+    fn name(&self) -> &str;
+    fn value(&self) -> &str;
+}
+
+impl LabelPair for (String, String) {
+    fn name(&self) -> &str {
+        &self.0
+    }
+    fn value(&self) -> &str {
+        &self.1
+    }
+}
+
+impl LabelPair for (std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>) {
+    fn name(&self) -> &str {
+        &self.0
+    }
+    fn value(&self) -> &str {
+        &self.1
+    }
+}
 
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
@@ -101,24 +126,23 @@ pub fn signature_without_labels(
 }
 
 /// `signature_without_labels` for a record whose labels are all strings, without the record map.
-pub fn signature_of_label_pairs(labels: &[(String, String)], exclude_names: &[&str]) -> u64 {
+pub fn signature_of_label_pairs<L: LabelPair>(labels: &[L], exclude_names: &[&str]) -> u64 {
     signature_of_pairs(
-        labels
-            .iter()
-            .map(|(key, value)| (key.as_str(), value.as_str())),
+        labels.iter().map(|label| (label.name(), label.value())),
         exclude_names,
     )
 }
 
 /// `signature_without_labels(record, &[VALUE_LABEL])` for a series, without the record map.
-pub fn signature_of_series_labels(labels: &[(String, String)]) -> u64 {
+pub fn signature_of_series_labels<L: LabelPair>(labels: &[L]) -> u64 {
     let mut pairs: Vec<(&str, &str)> = Vec::with_capacity(labels.len() + 1);
     pairs.push((TIMESTAMP_COL_NAME, ""));
-    for (key, value) in labels {
+    for label in labels {
+        let (key, value) = (label.name(), label.value());
         if key == VALUE_LABEL || key == TIMESTAMP_COL_NAME {
             continue;
         }
-        pairs.push((key.as_str(), value.as_str()));
+        pairs.push((key, value));
     }
     pairs.sort_by(|a, b| a.0.cmp(b.0));
     hash_label_pairs(&pairs)

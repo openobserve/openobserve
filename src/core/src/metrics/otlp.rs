@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    borrow::Borrow,
+    borrow::{Borrow, Cow},
     collections::{HashMap, HashSet},
     io::Error,
 };
@@ -35,7 +35,7 @@ use config::{
         stream::{StreamParams, StreamPartition, StreamType},
     },
     utils::{
-        flatten::{self, format_label_name},
+        flatten::{self, format_label_name, format_label_name_cow},
         json,
         schema::format_stream_name,
     },
@@ -48,7 +48,7 @@ use opentelemetry_proto::tonic::{
     collector::metrics::v1::{
         ExportMetricsPartialSuccess, ExportMetricsServiceRequest, ExportMetricsServiceResponse,
     },
-    common::v1::KeyValue,
+    common::v1::{KeyValue, any_value::Value as AnyValueKind},
     metrics::v1::{metric::Data, *},
 };
 use prost::Message;
@@ -69,7 +69,9 @@ use crate::{
 
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
+    /// Slots past `len` are spare; their strings keep their capacity for the next point.
     labels: Vec<(String, String)>,
+    len: usize,
     index: HashMap<String, usize>,
     /// Set when a point's label replaced a base label, which the next point must restore.
     base_overwritten: bool,
@@ -78,18 +80,38 @@ struct PointLabels {
 impl PointLabels {
     fn reset(&mut self, base_labels: &[(String, String)]) {
         if self.base_overwritten {
-            self.labels.clear();
-            self.labels.extend(base_labels.iter().cloned());
+            for (slot, (name, value)) in self.labels.iter_mut().zip(base_labels) {
+                fill(slot, name, value);
+            }
             self.base_overwritten = false;
-        } else {
-            self.labels.truncate(base_labels.len());
         }
+        self.len = base_labels.len();
         self.index.clear();
     }
 
-    fn push(&mut self, base_len: usize, name: String, value: String) {
-        let replaced = columnar::push_label(&mut self.labels, &mut self.index, name, value);
-        self.base_overwritten |= replaced.is_some_and(|idx| idx < base_len);
+    fn push(&mut self, base_len: usize, name: &str, value: &str) {
+        match columnar::find_label(&self.labels[..self.len], &mut self.index, name) {
+            Some(idx) => {
+                let slot = &mut self.labels[idx];
+                slot.1.clear();
+                slot.1.push_str(value);
+                self.base_overwritten |= idx < base_len;
+            }
+            None => {
+                if !self.index.is_empty() || self.len >= columnar::LABEL_INDEX_THRESHOLD {
+                    self.index.insert(name.to_string(), self.len);
+                }
+                match self.labels.get_mut(self.len) {
+                    Some(slot) => fill(slot, name, value),
+                    None => self.labels.push((name.to_string(), value.to_string())),
+                }
+                self.len += 1;
+            }
+        }
+    }
+
+    fn labels(&self) -> &[(String, String)] {
+        &self.labels[..self.len]
     }
 }
 
@@ -725,6 +747,7 @@ fn append_number_points(
     };
     let mut scratch = PointLabels {
         labels: base_labels.clone(),
+        len: base_labels.len(),
         index: HashMap::new(),
         base_overwritten: false,
     };
@@ -766,29 +789,30 @@ fn append_number_point(
 
     scratch.reset(base_labels);
     for attr in &data_point.attributes {
-        let name = format_label_name(&attr.key);
+        let name = format_label_name_cow(&attr.key);
         // `__name__` would move the record to another stream and `exemplars` is dropped from it
         if !name.is_ascii() || name == NAME_LABEL || name == EXEMPLARS_LABEL {
             return false;
         }
-        // flattening turns a nested value into other columns, and an unset one hashes as empty
-        let json::Value::String(label) = get_val(&attr.value.as_ref()) else {
-            return false;
+        let value = match attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+            Some(AnyValueKind::StringValue(s)) => Cow::Borrowed(s.as_str()),
+            // flattening turns a nested value into other columns, an unset one hashes as empty
+            _ => match get_val(&attr.value.as_ref()) {
+                json::Value::String(s) => Cow::Owned(s),
+                _ => return false,
+            },
         };
-        scratch.push(base_labels.len(), name, label);
+        scratch.push(base_labels.len(), &name, &value);
     }
+    let mut start_time = itoa::Buffer::new();
     scratch.push(
         base_labels.len(),
-        "start_time".to_string(),
-        data_point.start_time_unix_nano.to_string(),
+        "start_time",
+        start_time.format(data_point.start_time_unix_nano),
     );
-    scratch.push(
-        base_labels.len(),
-        "flag".to_string(),
-        data_point_flag(data_point.flags).to_string(),
-    );
+    scratch.push(base_labels.len(), "flag", data_point_flag(data_point.flags));
 
-    let labels = &scratch.labels;
+    let labels = scratch.labels();
     let Some(label_bytes) = columnar.resolve_columns(labels) else {
         return false;
     };
@@ -1100,6 +1124,14 @@ fn insert_attributes(rec: &mut json::Value, attributes: &[KeyValue]) {
         // `rec[name]` would copy the already-owned formatted name once more
         map.insert(format_label_name(&attr.key), get_val(&attr.value.as_ref()));
     }
+}
+
+/// Rewrites a label slot in place, keeping the strings' capacity.
+fn fill(slot: &mut (String, String), name: &str, value: &str) {
+    slot.0.clear();
+    slot.0.push_str(name);
+    slot.1.clear();
+    slot.1.push_str(value);
 }
 
 fn data_point_flag(flags: u32) -> &'static str {

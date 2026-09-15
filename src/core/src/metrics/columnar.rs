@@ -44,12 +44,13 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 
+use super::LabelPair;
 use crate::pipeline::batch_execution::ExecutablePipeline;
 
 const BUILDER_START_ROWS: usize = 16;
 
 /// Past this many labels the scan in `push_label` costs more than hashing every name.
-const LABEL_INDEX_THRESHOLD: usize = 64;
+pub(super) const LABEL_INDEX_THRESHOLD: usize = 64;
 
 /// `value`, `_timestamp` and `__hash__`, the columns a record carries beyond its labels.
 const IDENTITY_COLUMNS: usize = 3;
@@ -157,7 +158,7 @@ impl ColumnarStream {
     }
 
     /// `None` sends the series down the JSON path; `Some` is its share of the record's json size.
-    pub(super) fn resolve_columns(&mut self, labels: &[(String, String)]) -> Option<usize> {
+    pub(super) fn resolve_columns<L: LabelPair>(&mut self, labels: &[L]) -> Option<usize> {
         // over the column limit the JSON path has to reject it, so it cannot be taken here
         if labels.len() > self.max_labels {
             return None;
@@ -165,8 +166,8 @@ impl ColumnarStream {
         self.label_cols.clear();
         // two label names can format to one column, and a label can be named `value`
         self.present.fill(false);
-        for (name, _) in labels {
-            let &idx = self.col_index.get(name)?;
+        for label in labels {
+            let &idx = self.col_index.get(label.name())?;
             if !matches!(self.columns[idx], MetricColumn::Label) || self.present[idx] {
                 return None;
             }
@@ -177,9 +178,9 @@ impl ColumnarStream {
     }
 
     /// `resolve_columns` must have accepted these labels first, and returned `label_bytes`.
-    pub(super) fn append(
+    pub(super) fn append<L: LabelPair>(
         &mut self,
-        labels: &[(String, String)],
+        labels: &[L],
         label_bytes: usize,
         value: f64,
         timestamp: i64,
@@ -201,8 +202,8 @@ impl ColumnarStream {
             .entry(hour)
             .or_insert_with(|| ColumnarBucket::for_hour(schema, schema_key, timestamp));
         present.fill(false);
-        for (col, (_, label)) in label_cols.iter().zip(labels) {
-            string_builder(&mut bucket.builders[*col]).append_value(label);
+        for (col, label) in label_cols.iter().zip(labels) {
+            string_builder(&mut bucket.builders[*col]).append_value(label.value());
             present[*col] = true;
         }
         for (col, column) in columns.iter().enumerate() {
@@ -323,24 +324,34 @@ pub(super) fn columnar_stream_for(
 }
 
 /// Replaces an earlier label of the same formatted name in place, returning its position.
-pub(super) fn push_label(
-    label_pairs: &mut Vec<(String, String)>,
+pub(super) fn push_label<L: LabelPair>(
+    label_pairs: &mut Vec<L>,
     index: &mut HashMap<String, usize>,
-    name: String,
-    value: String,
+    label: L,
+) -> Option<usize> {
+    match find_label(label_pairs, index, label.name()) {
+        Some(idx) => {
+            label_pairs[idx] = label;
+            Some(idx)
+        }
+        None => {
+            if !index.is_empty() || label_pairs.len() >= LABEL_INDEX_THRESHOLD {
+                index.insert(label.name().to_string(), label_pairs.len());
+            }
+            label_pairs.push(label);
+            None
+        }
+    }
+}
+
+/// The position of `name` among `label_pairs`, scanning while they are few and hashing after.
+pub(super) fn find_label<L: LabelPair>(
+    label_pairs: &[L],
+    index: &mut HashMap<String, usize>,
+    name: &str,
 ) -> Option<usize> {
     if label_pairs.len() < LABEL_INDEX_THRESHOLD {
-        match label_pairs
-            .iter()
-            .position(|(existing, _)| *existing == name)
-        {
-            Some(idx) => {
-                label_pairs[idx].1 = value;
-                return Some(idx);
-            }
-            None => label_pairs.push((name, value)),
-        }
-        return None;
+        return label_pairs.iter().position(|label| label.name() == name);
     }
     // a seeded index holds every label, so empty past the threshold means not seeded yet
     if index.is_empty() {
@@ -348,28 +359,18 @@ pub(super) fn push_label(
             label_pairs
                 .iter()
                 .enumerate()
-                .map(|(idx, (existing, _))| (existing.clone(), idx)),
+                .map(|(idx, label)| (label.name().to_string(), idx)),
         );
     }
-    match index.get(&name) {
-        Some(&idx) => {
-            label_pairs[idx].1 = value;
-            Some(idx)
-        }
-        None => {
-            index.insert(name.clone(), label_pairs.len());
-            label_pairs.push((name, value));
-            None
-        }
-    }
+    index.get(name).copied()
 }
 
 /// The label half of what `estimate_json_bytes` counts, shared by every sample of a series.
-fn estimated_label_bytes(labels: &[(String, String)]) -> usize {
+fn estimated_label_bytes<L: LabelPair>(labels: &[L]) -> usize {
     labels
         .iter()
-        .filter(|(name, _)| !is_size_excluded_column(name))
-        .map(|(name, label)| estimate_json_entry_bytes(name, label.json_bytes()))
+        .filter(|label| !is_size_excluded_column(label.name()))
+        .map(|label| estimate_json_entry_bytes(label.name(), label.value().json_bytes()))
         .sum()
 }
 
@@ -487,8 +488,7 @@ mod tests {
             push_label(
                 &mut label_pairs,
                 &mut label_index,
-                format!("label_{i}"),
-                format!("v{i}"),
+                (format!("label_{i}"), format!("v{i}")),
             );
         }
         let seeded_before = format!("label_{}", LABEL_INDEX_THRESHOLD - 4);
@@ -497,8 +497,7 @@ mod tests {
             push_label(
                 &mut label_pairs,
                 &mut label_index,
-                name.clone(),
-                "last".to_string(),
+                (name.clone(), "last".to_string()),
             );
         }
 
