@@ -447,10 +447,6 @@ const loadPolicy = async () => {
     formDefaults.value = policyDefaults(response.data);
     form.reset(formDefaults.value);
   } catch (error: any) {
-    // Two different 403s reach this page. The middleware's carries a code and means "you are an
-    // admin, you just flagged yourself" — the reset dialog is already opening for it, so telling
-    // this user they are not an administrator would be wrong and confusing.
-    if (error?.response?.data?.code === "password_reset_required") return;
     if (error?.response?.status === 403) forbidden.value = true;
     else loadError.value = true;
   } finally {
