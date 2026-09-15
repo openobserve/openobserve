@@ -9613,7 +9613,14 @@
       "agent": "Agent",
       "noAgentsTitle": "Brak agentów w tym zakresie",
       "noAgentsDescription": "Nie wykryto żadnych agentów GenAI w wybranym przedziale czasowym. Spróbuj rozszerzyć zakres lub przełącz się na widok strumienia.",
-      "viewByStream": "Widok według strumienia"
+      "viewByStream": "Widok według strumienia",
+      "search": {
+        "placeholder": "Szukaj według użytkownika lub wiadomości",
+        "title": "Dopasuj sesje, których identyfikator użytkownika lub tekst rozmowy zawiera szukany tekst",
+        "noResultsTitle": "Brak sesji pasujących do wyszukiwania",
+        "noResultsDescription": "Spróbuj innego hasła, innego pola lub szerszego zakresu czasu.",
+        "clear": "Wyczyść wyszukiwanie"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

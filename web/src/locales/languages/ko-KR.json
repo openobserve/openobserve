@@ -9613,7 +9613,14 @@
       "agent": "에이전트",
       "noAgentsTitle": "이 범위에 에이전트 없음",
       "noAgentsDescription": "선택한 시간 범위에서 GenAI 에이전트가 감지되지 않았습니다. 더 넓은 범위를 시도하거나 스트림 보기로 전환하세요.",
-      "viewByStream": "스트림별 보기"
+      "viewByStream": "스트림별 보기",
+      "search": {
+        "placeholder": "사용자 또는 메시지로 검색",
+        "title": "사용자 ID 또는 대화 텍스트에 해당 텍스트가 포함된 세션 찾기",
+        "noResultsTitle": "검색과 일치하는 세션이 없습니다",
+        "noResultsDescription": "다른 검색어, 다른 필드 또는 더 넓은 시간 범위를 시도하세요.",
+        "clear": "검색 지우기"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",
