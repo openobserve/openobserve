@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Seleziona un campo o usa una variabile come $fieldVariable. Se stream utilizza una variabile, l'elenco dei campi sarà vuoto: digita il nome del campo manualmente.",
     "filterInfoTooltip": "Nei filtri, puoi utilizzare il valore di un'altra variabile per filtrare il valore della variabile corrente. Questo può essere fatto usando il nome dell'altra variabile. Ad esempio:",
     "defaultSelectAll": "Predefinito: seleziona tutto",
-    "escapeSingleQuotesTooltip": "Se abilitato, nella query verranno eliminate le virgolette singole. Ad esempio, un valore come `O'Reilly` verrà sostituito come `O\"Reilly`.",
+    "escapeSingleQuotesTooltip": "Gli apici singoli vengono sempre sottoposti a escape nella query. Ad esempio, un valore come `O'Reilly` viene sostituito con `O''Reilly`.",
     "byDefaultSelect": "Per impostazione predefinita, seleziona:",
     "firstValue": "Primo valore",
     "allValues": "Tutti i valori",
@@ -9619,7 +9619,14 @@
       "agent": "Agente",
       "noAgentsTitle": "Nessun agente in questo intervallo",
       "noAgentsDescription": "Nessun agente GenAI rilevato per l'intervallo di tempo selezionato. Prova un intervallo più ampio o torna alla vista flusso.",
-      "viewByStream": "Visualizza per flusso"
+      "viewByStream": "Visualizza per flusso",
+      "search": {
+        "placeholder": "Cerca per utente o messaggio",
+        "title": "Trova le sessioni il cui ID utente o testo della conversazione contiene il testo",
+        "noResultsTitle": "Nessuna sessione corrisponde alla ricerca",
+        "noResultsDescription": "Prova un altro termine, un altro campo o un intervallo di tempo più ampio.",
+        "clear": "Cancella ricerca"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

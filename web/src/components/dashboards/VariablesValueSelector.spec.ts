@@ -2722,4 +2722,71 @@ describe("VariablesValueSelector", () => {
       expect(dynamicQueryVar.query_data.field).toBe("$fieldVar");
     });
   });
+
+  describe("Variable filters sharing a name prefix", () => {
+    afterEach(async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation((query: string) => Promise.resolve(query));
+    });
+
+    it("resolves each filter placeholder to its own variable", async () => {
+      const { addLabelsToSQlQuery } = await import("@/utils/query/sqlUtils");
+      vi.mocked(addLabelsToSQlQuery).mockImplementation(
+        async (query: string, labels: any[]) =>
+          `${query} WHERE ${labels.map((l: any) => `${l.name} = '${l.value}'`).join(" AND ")}`,
+      );
+
+      wrapper = createWrapper({
+        variablesConfig: {
+          list: [
+            { name: "traceid", type: "constant", label: "traceid", value: "abc123" },
+            { name: "traceid_sql", type: "constant", label: "traceid_sql", value: "xyz789" },
+            { name: "svc", type: "constant", label: "svc", value: "api" },
+            {
+              name: "spans",
+              type: "query_values",
+              label: "spans",
+              multiSelect: false,
+              query_data: {
+                field: "span_id",
+                stream: "default",
+                stream_type: "logs",
+                max_record_size: 10,
+                filter: [
+                  { name: "a", operator: "=", value: "$traceid_sql" },
+                  { name: "b", operator: "=", value: "${traceid}" },
+                  { name: "c", operator: "=", value: "$svc" },
+                ],
+              },
+            },
+          ],
+        },
+        initialVariableValues: { value: {} },
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const byName = (name: string) => vm.variablesData.values.find((v: any) => v.name === name);
+      ["traceid", "traceid_sql", "svc"].forEach((name) => {
+        byName(name).isVariablePartialLoaded = true;
+      });
+      byName("svc").value = ["api", "web"];
+
+      let capturedSql = "";
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          capturedSql = atob(payload.queryReq.sql);
+          handlers.complete(payload, { type: "end" });
+        },
+      );
+
+      const spans = byName("spans");
+      spans.isLoading = false;
+      spans.isVariablePartialLoaded = true;
+      spans.isVariableLoadingPending = false;
+      await vm.loadVariableOptions(spans);
+
+      expect(capturedSql).toContain("WHERE a = 'xyz789' AND b = 'abc123' AND c = 'api', 'web'");
+    });
+  });
 });

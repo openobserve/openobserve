@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "選擇一個欄位，或使用如 $fieldVariable 的變數。若串流使用變數，欄位清單將為空 — 請手動輸入欄位名稱。",
     "filterInfoTooltip": "在篩選條件中，您可以使用另一個變數的值來篩選目前變數的值。可透過使用另一個變數的名稱來達成。例如：",
     "defaultSelectAll": "預設 - 全選",
-    "escapeSingleQuotesTooltip": "若啟用，查詢中的單引號將被跳脫。例如，`O'Reilly` 這樣的值將被替換為 `O''Reilly`。",
+    "escapeSingleQuotesTooltip": "單引號在查詢中一律會被跳脫。例如，像 `O'Reilly` 這樣的值會被替換為 `O''Reilly`。",
     "byDefaultSelect": "預設選擇：",
     "firstValue": "第一個值",
     "allValues": "所有值",
@@ -9614,7 +9614,14 @@
       "agent": "代理",
       "noAgentsTitle": "此範圍內無代理",
       "noAgentsDescription": "在所選時間範圍內未偵測到 GenAI 代理。請嘗試更廣的範圍或切回串流檢視。",
-      "viewByStream": "依串流檢視"
+      "viewByStream": "依串流檢視",
+      "search": {
+        "placeholder": "依使用者或訊息搜尋",
+        "title": "比對使用者 ID 或對話文字包含該文字的 session",
+        "noResultsTitle": "沒有符合搜尋的工作階段",
+        "noResultsDescription": "請嘗試其他關鍵字、其他欄位或更大的時間範圍。",
+        "clear": "清除搜尋"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

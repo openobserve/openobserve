@@ -1287,7 +1287,37 @@
     "databases": "Databases",
     "hosts": "Hosts",
     "kubernetes": "Kubernetes",
-    "topQueries": "Top Queries"
+    "topQueries": "Top Queries",
+    "profiles": "Profiles"
+  },
+  "profiles": {
+    "title": "Profiles",
+    "stream": "Stream",
+    "dataSource": "Data source",
+    "service": "Service",
+    "profileType": "Profile type",
+    "tagKey": "Tag key",
+    "tagValue": "Tag value",
+    "addFilter": "Add filter",
+    "runQuery": "Run query",
+    "timeSeriesTitle": "Profile values over time",
+    "resultTitle": "Profile result",
+    "viewTop": "Top table",
+    "viewFlame": "Flame graph",
+    "viewTree": "Stack tree",
+    "self": "Self",
+    "total": "Total",
+    "cpuDuration": "CPU duration",
+    "percent": "%",
+    "noStreams": "No profile streams available",
+    "noSeries": "No time-series data in this range",
+    "noResults": "No profile result in this range",
+    "filters": "Filters",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "errors": {
+      "loadFailed": "Failed to load profile data"
+    }
   },
   "rum": {
     "noSessionReplay": "No session replay available",
@@ -2564,6 +2594,7 @@
     "labelLogs": "Logs",
     "labelMetrics": "Metrics",
     "labelTraces": "Traces",
+    "labelProfiles": "Profiles",
     "labelMetadata": "Metadata",
     "add": "New stream",
     "dataRetention": "Data Retention (in days)",
@@ -3633,6 +3664,7 @@
     "customLabel": "Custom",
     "logsLabel": "Logs",
     "metricsLabel": "Metrics",
+    "profilesLabel": "Profiles",
     "tracesLabel": "Traces",
     "redirectionIngestionMsg": "Note: In order to access pages other than IAM, data ingestion must be initiated within the current organization.",
     "databaseLabel": "Databases",
@@ -4573,7 +4605,7 @@
     "fieldSelectTooltip": "Select a field or use a variable like $fieldVariable. If stream uses a variable, field list will be empty - type field name manually.",
     "filterInfoTooltip": "In filters, you can use the value of another variable to filter the current variable's value. This can be done by using the other variable's name. For example:",
     "defaultSelectAll": "Default - Select All",
-    "escapeSingleQuotesTooltip": "If enabled, single quotes will be escaped in the query. For example, a value like `O'Reilly` will be replaced as `O''Reilly`.",
+    "escapeSingleQuotesTooltip": "Single quotes are always escaped in the query. For example, a value like `O'Reilly` is replaced with `O''Reilly`.",
     "byDefaultSelect": "By Default Select:",
     "firstValue": "First value",
     "allValues": "All values",
@@ -5936,7 +5968,8 @@
       "or": "Or:",
       "aws": "AWS / CloudWatch",
       "aiIntegrations": "AI integrations",
-      "shippers": "Log shippers"
+      "shippers": "Log shippers",
+      "profiles": "Profiles"
     },
     "indexSizeLbl": "Index Size",
     "docsCountLbl": "Events",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "Found in Logs",
       "foundInTraces": "Found in Traces",
       "foundInMetrics": "Found in Metrics",
+      "foundInProfiles": "Found in Profiles",
       "distinguishByLabel": "Distinguish Services By",
       "distinguishByHelp": "Choose fields that define where your services run. For example, cluster + namespace + deployment together create a unique identity for each service. Up to 5 fields.",
       "serviceOptionalLabel": "Correlate without service attribute",
@@ -9619,7 +9653,14 @@
       "agent": "Agent",
       "noAgentsTitle": "No Agents In This Range",
       "noAgentsDescription": "No GenAI agents were detected for the selected time window. Try a wider range or switch back to stream view.",
-      "viewByStream": "View by Stream"
+      "viewByStream": "View by Stream",
+      "search": {
+        "placeholder": "Search by user or message",
+        "title": "Match sessions whose user ID or conversation text contains the text",
+        "noResultsTitle": "No sessions match your search",
+        "noResultsDescription": "Try a different term, or a wider time range.",
+        "clear": "Clear search"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

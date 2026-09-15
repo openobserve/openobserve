@@ -1287,7 +1287,37 @@
     "databases": "数据库",
     "hosts": "主机",
     "kubernetes": "Kubernetes",
-    "topQueries": "热门查询"
+    "topQueries": "热门查询",
+    "profiles": "性能分析"
+  },
+  "profiles": {
+    "title": "性能分析",
+    "stream": "数据流",
+    "dataSource": "数据源",
+    "service": "服务",
+    "profileType": "分析类型",
+    "tagKey": "标签键",
+    "tagValue": "标签值",
+    "addFilter": "添加过滤条件",
+    "runQuery": "运行查询",
+    "timeSeriesTitle": "性能值时间序列",
+    "resultTitle": "分析结果",
+    "viewTop": "Top 表",
+    "viewFlame": "火焰图",
+    "viewTree": "调用栈树",
+    "self": "自身",
+    "total": "总量",
+    "cpuDuration": "CPU 时长",
+    "percent": "%",
+    "noStreams": "暂无性能分析数据流",
+    "noSeries": "当前时间范围内无时间序列数据",
+    "noResults": "当前时间范围内无分析结果",
+    "filters": "过滤条件",
+    "expand": "展开",
+    "collapse": "收起",
+    "errors": {
+      "loadFailed": "加载性能分析数据失败"
+    }
   },
   "rum": {
     "noSessionReplay": "没有可用的会话回放",
@@ -2564,6 +2594,7 @@
     "labelLogs": "日志",
     "labelMetrics": "指标",
     "labelTraces": "追踪",
+    "labelProfiles": "性能分析",
     "labelMetadata": "元数据",
     "add": "添加数据流",
     "dataRetention": "数据保留（以天为单位）",
@@ -3633,6 +3664,7 @@
     "customLabel": "自定义",
     "logsLabel": "日志",
     "metricsLabel": "指标",
+    "profilesLabel": "性能分析",
     "tracesLabel": "追踪",
     "redirectionIngestionMsg": "注意：要访问除 IAM 以外的页面，必须在当前组织内启动数据采集。",
     "databaseLabel": "数据库",
@@ -4573,7 +4605,7 @@
     "fieldSelectTooltip": "选择一个字段或使用像 $fieldVariable 这样的变量。如果 stream 使用变量，则字段列表将为空——手动键入字段名称。",
     "filterInfoTooltip": "在过滤器中，您可以使用另一个变量的值来筛选当前变量的值。这可以通过使用另一个变量的名称来完成。例如：",
     "defaultSelectAll": "默认-全选",
-    "escapeSingleQuotesTooltip": "如果启用，将在查询中对单引号进行转义。例如，像 `O'Reilly` 这样的值将被替换为 `O \"Reilly`。",
+    "escapeSingleQuotesTooltip": "查询中始终会转义单引号。例如，像 `O'Reilly` 这样的值会被替换为 `O''Reilly`。",
     "byDefaultSelect": "默认情况下选择：",
     "firstValue": "第一个值",
     "allValues": "所有值",
@@ -5936,7 +5968,8 @@
       "or": "或者：",
       "aws": "AWS/CloudWatch",
       "aiIntegrations": "AI集成",
-      "shippers": "Shippers"
+      "shippers": "Shippers",
+      "profiles": "性能分析"
     },
     "indexSizeLbl": "索引大小",
     "docsCountLbl": "事件",
@@ -8925,6 +8958,7 @@
       "foundInLogs": "在日志中找到",
       "foundInTraces": "在追踪中找到",
       "foundInMetrics": "在指标中找到",
+      "foundInProfiles": "在性能分析中找到",
       "distinguishByLabel": "区分服务依据",
       "distinguishByHelp": "选择用于定义服务运行位置的字段。例如，cluster + namespace + deployment 共同为每个服务创建唯一标识。最多 5 个字段。",
       "serviceOptionalLabel": "在没有服务属性的情况下进行关联",
@@ -9619,7 +9653,14 @@
       "agent": "智能体",
       "noAgentsTitle": "此范围内无智能体",
       "noAgentsDescription": "在选定的时间窗口内未检测到 GenAI 智能体。尝试更宽的范围或切换回流视图。",
-      "viewByStream": "按流查看"
+      "viewByStream": "按流查看",
+      "search": {
+        "placeholder": "按用户或消息搜索",
+        "title": "匹配用户 ID 或会话文本包含该文本的会话",
+        "noResultsTitle": "没有与搜索匹配的会话",
+        "noResultsDescription": "请尝试其他关键词、其他字段或更大的时间范围。",
+        "clear": "清除搜索"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

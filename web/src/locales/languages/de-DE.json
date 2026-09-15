@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Wählen Sie ein Feld aus oder verwenden Sie eine Variable wie $FieldVariable. Wenn der Stream eine Variable verwendet, ist die Feldliste leer. Geben Sie den Feldnamen manuell ein.",
     "filterInfoTooltip": "In Filtern können Sie den Wert einer anderen Variablen verwenden, um den Wert der aktuellen Variablen zu filtern. Dies kann mithilfe des Namens der anderen Variablen geschehen. Zum Beispiel:",
     "defaultSelectAll": "Standard — Alles auswählen",
-    "escapeSingleQuotesTooltip": "Wenn diese Option aktiviert ist, werden einfache Anführungszeichen in der Abfrage maskiert. Zum Beispiel wird ein Wert wie `O'Reilly` durch `O\"Reilly` ersetzt.",
+    "escapeSingleQuotesTooltip": "Einfache Anführungszeichen werden in der Abfrage immer maskiert. Zum Beispiel wird ein Wert wie `O'Reilly` durch `O''Reilly` ersetzt.",
     "byDefaultSelect": "Standardmäßig wählen Sie:",
     "firstValue": "Erster Wert",
     "allValues": "Alle Werte",
@@ -9619,7 +9619,14 @@
       "agent": "Agent",
       "noAgentsTitle": "Keine Agenten in diesem Bereich",
       "noAgentsDescription": "Es wurden keine GenAI-Agenten für das ausgewählte Zeitfenster erkannt. Versuchen Sie einen größeren Bereich oder wechseln Sie zurück zur Stream-Ansicht.",
-      "viewByStream": "Nach Stream anzeigen"
+      "viewByStream": "Nach Stream anzeigen",
+      "search": {
+        "placeholder": "Nach Benutzer oder Nachricht suchen",
+        "title": "Sitzungen finden, deren Benutzer-ID oder Konversationstext den Text enthält",
+        "noResultsTitle": "Keine Sitzungen entsprechen Ihrer Suche",
+        "noResultsDescription": "Versuchen Sie einen anderen Begriff, ein anderes Feld oder einen größeren Zeitraum.",
+        "clear": "Suche löschen"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

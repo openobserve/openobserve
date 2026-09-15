@@ -4573,7 +4573,7 @@
     "fieldSelectTooltip": "Sélectionnez un champ ou utilisez une variable telle que $FieldVariable. Si stream utilise une variable, la liste des champs sera vide. Tapez le nom du champ manuellement.",
     "filterInfoTooltip": "Dans les filtres, vous pouvez utiliser la valeur d'une autre variable pour filtrer la valeur de la variable actuelle. Cela peut être fait en utilisant le nom de l'autre variable. Par exemple :",
     "defaultSelectAll": "Par défaut - Tout sélectionner",
-    "escapeSingleQuotesTooltip": "Si cette option est activée, les guillemets simples seront ignorés dans la requête. Par exemple, une valeur telle que « O'Reilly » sera remplacée par « O » Reilly.",
+    "escapeSingleQuotesTooltip": "Les guillemets simples sont toujours échappés dans la requête. Par exemple, une valeur comme `O'Reilly` est remplacée par `O''Reilly`.",
     "byDefaultSelect": "Par défaut, sélectionnez :",
     "firstValue": "Première valeur",
     "allValues": "Toutes les valeurs",
@@ -9619,7 +9619,14 @@
       "agent": "Agent",
       "noAgentsTitle": "Aucun agent dans cette plage",
       "noAgentsDescription": "Aucun agent GenAI détecté pour la fenêtre temporelle sélectionnée. Essayez une plage plus large ou revenez à la vue flux.",
-      "viewByStream": "Voir par flux"
+      "viewByStream": "Voir par flux",
+      "search": {
+        "placeholder": "Rechercher par utilisateur ou message",
+        "title": "Correspond aux sessions dont l'ID utilisateur ou le texte de conversation contient le texte",
+        "noResultsTitle": "Aucune session ne correspond à votre recherche",
+        "noResultsDescription": "Essayez un autre terme, un autre champ ou une plage de temps plus large.",
+        "clear": "Effacer la recherche"
+      }
     },
     "sessionDetail": {
       "currencySymbol": "$",

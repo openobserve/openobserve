@@ -69,6 +69,11 @@ impl Engine {
             .stream_fused_agg(&scan, modifier, func.clone(), op, range)
             .await?;
         if let Some(value) = streamed {
+            log::info!(
+                "[trace_id: {}] [PromQL] agg path: streaming fused, op {op:?}, func {}",
+                self.trace_id,
+                func.name()
+            );
             if self.result_type.is_none() {
                 self.result_type = Some("matrix".to_string());
             }
@@ -76,6 +81,11 @@ impl Engine {
         }
 
         // the layout cannot stream: materialize on the contexts already created
+        log::info!(
+            "[trace_id: {}] [PromQL] agg path: materialized fused (layout cannot stream), op {op:?}, func {}",
+            self.trace_id,
+            func.name()
+        );
         let matrix = self
             .eval_matrix_selector(&scan.selector, range, Some(scan.ctxs))
             .await?;

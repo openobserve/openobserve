@@ -2242,6 +2242,7 @@ export default defineComponent({
               logs: streamType === "logs" ? [streamInfo] : [],
               metrics: streamType === "metrics" ? [streamInfo] : [],
               traces: streamType === "traces" ? [streamInfo] : [],
+              profiles: [],
             },
             // Extra marker consumed downstream; not part of CorrelationResponse.
             correlation_method: "frontend-fallback",
