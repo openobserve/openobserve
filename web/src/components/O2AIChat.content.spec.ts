@@ -15,7 +15,10 @@
 
 import { describe, expect, it } from "vitest";
 
+import { raw, type TranslateFn } from "@/types/i18n";
+
 import {
+  chatErrorMessage,
   createPreview,
   filterMarkdownHeaders,
   formatLogEntryContent,
@@ -175,6 +178,39 @@ describe("getLanguageDisplay", () => {
 
   it("upper-cases anything unmapped", () => {
     expect(getLanguageDisplay("rust")).toBe("RUST");
+  });
+});
+
+describe("chatErrorMessage", () => {
+  const t = ((key: string) => raw(`t:${key}`)) as unknown as TranslateFn;
+  const err = (message: string | undefined, status?: number) =>
+    Object.assign(new Error(message), status === undefined ? {} : { status });
+
+  it("maps status 403 to the unauthorized key, even when a message is present", () => {
+    expect(chatErrorMessage(err("forbidden body"), t)).toBe("forbidden body");
+    expect(chatErrorMessage(err("forbidden body", 403), t)).toBe("t:common.unauthorizedAccess");
+    expect(chatErrorMessage({ status: 403 }, t)).toBe("t:common.unauthorizedAccess");
+  });
+
+  it("does not treat a string status of 403 as unauthorized", () => {
+    expect(chatErrorMessage({ status: "403", message: "m" }, t)).toBe("m");
+  });
+
+  it("uses any other message verbatim, whatever the status", () => {
+    expect(chatErrorMessage(err("Server error 500", 500), t)).toBe("Server error 500");
+  });
+
+  it("falls back to the generic key for the no-body sentinel or an empty message", () => {
+    expect(chatErrorMessage(err("No response body"), t)).toBe(
+      "t:aiAssistant.aiChat.serverResponseError",
+    );
+    expect(chatErrorMessage(err(""), t)).toBe("t:aiAssistant.aiChat.serverResponseError");
+    expect(chatErrorMessage({}, t)).toBe("t:aiAssistant.aiChat.serverResponseError");
+  });
+
+  it("throws on a nullish error, as the inline catch did", () => {
+    expect(() => chatErrorMessage(undefined, t)).toThrow(TypeError);
+    expect(() => chatErrorMessage(null, t)).toThrow(TypeError);
   });
 });
 

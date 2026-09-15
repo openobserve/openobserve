@@ -17,6 +17,9 @@ import DOMPurify from "dompurify";
 import hljs from "highlight.js";
 import { marked, type MarkedOptions } from "marked";
 
+import type { TranslateFn } from "@/types/i18n";
+import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
+
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
 
@@ -251,6 +254,17 @@ export function parseLogEntries(content: string) {
 
 export function getLanguageDisplay(lang: string): string {
   return LANGUAGE_DISPLAY_NAMES[lang.toLowerCase()] || lang.toUpperCase();
+}
+
+/** Display text for a failed chat turn; a 403 status wins over any message. */
+export function chatErrorMessage(error: any, t: TranslateFn): string {
+  if (error.status === 403) {
+    return t(UNAUTHORIZED_MESSAGE_KEY);
+  } else if (error.message && error.message !== "No response body") {
+    return error.message;
+  } else {
+    return t("aiAssistant.aiChat.serverResponseError");
+  }
 }
 
 export function processHtmlBlock(content: string): string {
