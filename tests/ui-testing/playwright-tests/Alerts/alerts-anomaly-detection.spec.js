@@ -553,7 +553,7 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getToastLocator(/detection|triggered/i)).toBeVisible();
       });
 
-      test('detection can be triggered via the API and lands in history', {
+      test('triggering detection on an untrained config returns a meaningful error', {
         tag: ['@anomaly', '@P2', '@api', '@all'],
       }, async ({ page }) => {
         const name = anomalyName('apitrigger');
@@ -577,6 +577,7 @@ test.describe('Anomaly Detection', () => {
           });
         }
 
+        // The history endpoint stays well-formed even when nothing has run.
         // getAnomalyHistory returns the raw {status, data} envelope and the
         // endpoint serialises a bare array, verified against a live response.
         // (The DetectionHistoryResponse {history: [...]} utoipa annotation on
@@ -584,6 +585,58 @@ test.describe('Anomaly Detection', () => {
         const history = await getAnomalyHistory(page, id);
         expect(history.status).toBe(200);
         expect(Array.isArray(history.data)).toBe(true);
+      });
+
+      test.fixme('a completed detection run lands in history (history endpoint is a stub — src/core/src/anomaly_detection.rs:1494)', {
+        tag: ['@anomaly', '@P2', '@api', '@all'],
+      }, async ({ page }) => {
+        test.slow();
+
+        // The per-config history endpoint is a placeholder that always returns
+        // an empty array (core get_detection_history has a TODO and returns
+        // Ok(Vec::new())), so even a successful detection never lands there.
+        // Un-fixme once it queries the _anomalies stream; the assertions below
+        // then prove a completed run actually appears in this config's history.
+
+        // A successful detection needs a trained model, and a model needs
+        // backdated history — the shared e2e_automate stream is all stamped
+        // "now" and cannot train.
+        const seededStream = `anomaly_history_${randomValue}`;
+        const seed = await seedAnomalyStream(page, seededStream, {
+          hours: 4,
+          bucketSeconds: 60,
+          baseline: 10,
+          spikeValue: 120,
+          spikeBuckets: 4,
+          spikeOffset: 70,
+        });
+        expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
+        await waitForStream(page, seededStream);
+
+        const name = anomalyName('apihistory');
+        const id = await createAnomalyViaApi(page, name, {
+          streamName: seededStream,
+          histogramInterval: '1m',
+        });
+
+        const trainStarted = await triggerAnomalyTraining(page, id);
+        expect([200, 202]).toContain(trainStarted.status);
+        const trained = await waitForAnomalyTrained(page, id);
+        expect(trained.is_trained).toBe(true);
+
+        const detected = await triggerAnomalyDetection(page, id);
+        expect(detected.status).toBe(200);
+
+        // The assertion the title promises: the completed run must be visible
+        // in this config's history. The endpoint is scoped to `id`, so a
+        // non-empty array is a row for this config.
+        const history = await getAnomalyHistory(page, id);
+        expect(history.status).toBe(200);
+        expect(Array.isArray(history.data)).toBe(true);
+        expect(
+          history.data.length,
+          'a completed detection must leave a history entry',
+        ).toBeGreaterThan(0);
       });
 
       test('deletes an anomaly', {
@@ -620,12 +673,17 @@ test.describe('Anomaly Detection', () => {
         await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
 
         // One picker for all three: separate pickers would let the panels
-        // silently disagree about which window they are showing.
-        for (const range of ['1h', '6h', '24h']) {
+        // silently disagree about which window they are showing. Starting at
+        // 6h (not the 1h default) so every selection is a genuine change.
+        for (const range of ['6h', '24h', '1h']) {
+          // Resolves only once every panel has re-queried the new window — the
+          // picker's own state would still pass if the panels ignored it.
+          const panelQueries = pm.anomalyDetectionPage.waitForPanelQueries(range);
           await pm.anomalyDetectionPage.selectChartRange(range);
           await expect(
             pm.anomalyDetectionPage.getChartRangeItemLocator(range),
           ).toHaveAttribute('data-state', 'on');
+          await panelQueries;
         }
       });
 

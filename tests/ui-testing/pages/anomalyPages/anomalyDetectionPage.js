@@ -809,6 +809,55 @@ class AnomalyDetectionPage {
         await this.page.locator(this.selectors.chartRangeItem(value)).click();
     }
 
+    /**
+     * Prove the shared range picker drove a fresh query on every panel.
+     *
+     * Each of the three panels is its own `_search` over `_anomalies`, told
+     * apart by its projection. Call BEFORE selecting a range; it resolves once
+     * all three have re-queried with a time window matching `range`. A panel
+     * that kept its own (stale) picker would never re-query and leave this
+     * pending — which is exactly the disagreement the shared picker exists to
+     * prevent.
+     *
+     * @param {'1h'|'6h'|'24h'} range
+     */
+    async waitForPanelQueries(range) {
+        const rangeMs = { '1h': 3_600_000, '6h': 6 * 3_600_000, '24h': 24 * 3_600_000 }[range];
+        const expectedUs = rangeMs * 1000;
+        const projections = [
+            ['metric', 'actual_value'],
+            ['score', 'threshold_value'],
+            ['deviation', 'deviation_percent'],
+        ];
+        return Promise.all(
+            projections.map(([key, token]) =>
+                this.page
+                    .waitForRequest(
+                        (req) => {
+                            if (!req.url().includes('/_search') || req.method() !== 'POST') return false;
+                            const raw = req.postData() || '';
+                            if (!raw.includes(token)) return false;
+                            let data;
+                            try {
+                                data = JSON.parse(raw);
+                            } catch {
+                                return false;
+                            }
+                            const sql = data?.query?.sql ?? '';
+                            const start = Number(data?.query?.start_time);
+                            const end = Number(data?.query?.end_time);
+                            if (!sql.includes('_anomalies') || !Number.isFinite(start) || !Number.isFinite(end)) {
+                                return false;
+                            }
+                            return Math.abs(end - start - expectedUs) <= expectedUs * 0.05;
+                        },
+                        { timeout: 30000 },
+                    )
+                    .then(() => key),
+            ),
+        );
+    }
+
     // Cleanup
 
     /**
