@@ -1,0 +1,9 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/splunkHec.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/ingestionTokens.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the Splunk HEC documentation page (SplunkHec.vue), the Splunk-specific token lifecycle (create-with-splunk-checkbox, generate/revoke GUID, revealed GUID), or the /services/collector + /services/collector/health backend contract. ingestionTokens.spec.js covers only generic token CRUD (render, create, validation, copy, toggle, manage-tokens nav) and explicitly does not exercise the Splunk paths. The feature is a distinct area (new Ingestion > Logs > Splunk HEC tab plus a root-mounted collector endpoint) with its own spec_path from run-context. Needs registration in ci_matrix.json under GeneralTests run_files."
+}

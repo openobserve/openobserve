@@ -1,0 +1,42 @@
+[
+  {
+    "title": "Splunk HEC documentation page renders all sections and banners",
+    "action": "new",
+    "verifies": "the Splunk HEC documentation page renders its six sections and two warning banners, and the endpoint copy block is root-mounted and org-free"
+  },
+  {
+    "title": "Splunk HEC page links to the org-scoped Ingestion Tokens page",
+    "action": "new",
+    "verifies": "the auth-section link routes to /web/iam/ingestionTokens with the org query param and the tokens page title renders"
+  },
+  {
+    "title": "End-to-end HEC ingestion via collector returns code 0 and health returns code 17",
+    "action": "new",
+    "verifies": "a freshly minted Splunk GUID ingests via POST /services/collector (code 0) and the unauthenticated health check returns code 17"
+  },
+  {
+    "title": "Create token with Splunk HEC token via UI reveals GUID and HEC URL",
+    "action": "new",
+    "verifies": "the create dialog's Splunk checkbox mints a lowercase GUID and HEC URL surfaced in the revealed dialog"
+  },
+  {
+    "title": "Generate a Splunk GUID for an existing token via the per-row action",
+    "action": "new",
+    "verifies": "the per-row generate action mints a GUID on a token created without one, changing the Splunk cell from \"Not enabled\" to a GUID"
+  },
+  {
+    "title": "Revoking a Splunk GUID makes the collector reject it with 403",
+    "action": "new",
+    "verifies": "after revoking the GUID, POST /services/collector returns 403 with code 1 or 4"
+  },
+  {
+    "title": "Disabled backing token rejects the collector with 403 code 1",
+    "action": "new",
+    "verifies": "after disabling the backing token, POST /services/collector returns 403 code 1"
+  },
+  {
+    "title": "Copy snippets write to clipboard and show a toast",
+    "action": "new",
+    "verifies": "the example copy button writes the curl snippet to the clipboard and fires the copied success toast"
+  }
+]
