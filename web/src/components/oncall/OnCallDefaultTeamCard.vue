@@ -29,12 +29,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        itself names the current answer. -->
   <template v-if="dialog">
     <OButton
-      :variant="defaultTeamId ? 'outline' : 'warning'"
+      :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
       size="sm-action"
+      class="max-w-64"
+      :title="triggerLabel"
+      :loading="loadingRoutingConfig"
       data-test="oncall-default-team-open"
       @click="openDialog"
     >
-      {{ triggerLabel }}
+      <span class="min-w-0 truncate">{{ triggerLabel }}</span>
     </OButton>
 
     <ODialog
@@ -66,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="defaultTeamOptions"
           :placeholder="t('oncall.defaultTeamPlaceholder')"
           data-test="oncall-default-team-select"
-          @update:model-value="(v: unknown) => (draftDefaultTeam = String(v))"
+          @update:model-value="(v: unknown) => (draftDefaultTeam = v === null ? null : String(v))"
         />
       </div>
     </ODialog>
@@ -97,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :options="defaultTeamOptions"
           :placeholder="t('oncall.defaultTeamPlaceholder')"
           data-test="oncall-default-team-select"
-          @update:model-value="(v: unknown) => (draftDefaultTeam = String(v))"
+          @update:model-value="(v: unknown) => (draftDefaultTeam = v === null ? null : String(v))"
         />
       </span>
       <OButton
@@ -147,16 +150,15 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const {
   config: routingConfig,
+  loading: loadingRoutingConfig,
   load: loadRoutingConfig,
   refresh: refreshRoutingConfig,
 } = useOnCallRoutingConfig();
-/// `""` means "none" in the picker; the wire value is null. One vocabulary
-/// per layer, converted at the save.
-const draftDefaultTeam = ref("");
+const draftDefaultTeam = ref<string | null>(null);
 const savingDefault = ref(false);
 const open = ref(false);
 
-const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
+const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? null);
 
 /// The trigger is the readout: which team catches everything, or that nothing
 /// does. A renamed or deleted team falls back to the id the wire gave.
@@ -174,12 +176,12 @@ function openDialog() {
 }
 
 const defaultTeamOptions = computed(() => [
-  { label: t("oncall.defaultTeamNone"), value: "" },
+  { label: t("oncall.defaultTeamNone"), value: null },
   ...props.teams.map((team) => ({ label: raw(team.name), value: team.id })),
 ]);
 
 const defaultTeamDirty = computed(
-  () => draftDefaultTeam.value !== (routingConfig.value?.default_team_id ?? ""),
+  () => draftDefaultTeam.value !== (routingConfig.value?.default_team_id ?? null),
 );
 
 /// Always 200 — an org that never nominated answers with nulls. A failure
@@ -191,7 +193,7 @@ const defaultTeamDirty = computed(
 /// the moment one of them wrote.
 async function fetchRoutingConfig() {
   await loadRoutingConfig(orgId.value);
-  draftDefaultTeam.value = routingConfig.value?.default_team_id ?? "";
+  draftDefaultTeam.value = routingConfig.value?.default_team_id ?? null;
 }
 
 /// Nominating a team is the one moment "nobody is on call" is still
@@ -227,12 +229,12 @@ async function saveDefaultTeam() {
   try {
     await oncallService.setRoutingConfig({
       org_identifier: orgId.value,
-      data: { default_team_id: draftDefaultTeam.value || null },
+      data: { default_team_id: draftDefaultTeam.value },
     });
     // Re-read rather than patching: the value is shared, so a local assignment
     // would leave the other readers on this screen showing the old catch-all.
     await refreshRoutingConfig(orgId.value);
-    draftDefaultTeam.value = routingConfig.value?.default_team_id ?? "";
+    draftDefaultTeam.value = routingConfig.value?.default_team_id ?? null;
     open.value = false;
     toast({
       variant: "success",
