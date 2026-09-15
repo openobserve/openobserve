@@ -6,13 +6,13 @@ const { ingestTestData } = require('../../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 
 const STREAM = 'e2e_automate';
-// Odd and small so it cannot coincide with a partition boundary, which is where
-// the pre-fix truncation over-counted.
+// Odd and small so it cannot coincide with a partition boundary, where the pre-fix truncation over-counted.
 const SQL_LIMIT = 7;
 
 test.describe("Logs v0.40.0 regressions", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
+  let seededStream;
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -25,6 +25,16 @@ test.describe("Logs v0.40.0 regressions", () => {
     await pm.logsPage.clickDateTimeButton();
     await pm.logsPage.clickRelative1HourOrFallback();
     testLogger.info('Logs v0.40.0 regression setup completed');
+  });
+
+  // Without this the seeded stream accumulates in the org on every nightly run.
+  test.afterEach(async () => {
+    if (seededStream) {
+      await pm.logsPage.deleteStream(seededStream).catch((e) =>
+        testLogger.warn(`Failed to delete stream ${seededStream}: ${e.message}`)
+      );
+      seededStream = undefined;
+    }
   });
 
   test("a SQL LIMIT must be exact on the first search, not just on a re-run", {
@@ -68,5 +78,31 @@ test.describe("Logs v0.40.0 regressions", () => {
     }
 
     testLogger.info('PASSED: stream list top rows survive a scroll (Bug #10602)');
+  });
+
+  test("the stream select must only show its tooltip once more than one stream is picked", {
+    tag: ['@bug-10602', '@P2', '@regression', '@logsRegression', '@logsRegressionStreamList']
+  }, async () => {
+    const singleSelection = await pm.logsPage.getStreamSelectTooltipText();
+    testLogger.info(`Tooltip with one stream selected: "${singleSelection}"`);
+
+    expect(singleSelection,
+      'Bug #10602: a single selected stream needs no tooltip — the trigger already shows its name'
+    ).toBe('');
+
+    const [second] = await pm.logsPage.seedLogStreams(`e2e_10602_${Math.random().toString(36).substring(2, 7)}_`, 1);
+    seededStream = second;
+    await pm.logsPage.waitForStreamAvailable(second, 90000, 3000);
+    await pm.logsPage.addStreamToSelection(second);
+
+    // The control side: without it, a build that never renders the tooltip would pass.
+    const multiSelection = await pm.logsPage.getStreamSelectTooltipText();
+    testLogger.info(`Tooltip with two streams selected: "${multiSelection}"`);
+
+    expect(multiSelection,
+      'a multi-stream selection must spell out the names the trigger truncates'
+    ).toContain(second);
+
+    testLogger.info('PASSED: stream tooltip gated on a multi-stream selection (Bug #10602)');
   });
 });

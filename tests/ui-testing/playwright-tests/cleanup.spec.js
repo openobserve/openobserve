@@ -290,6 +290,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
+        /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
