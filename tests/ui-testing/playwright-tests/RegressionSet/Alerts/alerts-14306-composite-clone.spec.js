@@ -81,12 +81,13 @@ test.describe('Clone Composite Alerts testcases', {
   test('should hide stream selects and clone a composite alert into the same folder', {
     tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P0'],
   }, async ({ page }) => {
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const source = await createCompositeFixture(page, [child]);
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
 
     await openCompositeList(page);
     await expect(pm.compositeAlertsPage.listBadge(source.id)).toBeVisible();
-    await expect(pm.compositeAlertsPage.listChildCount(source.id)).toContainText('1');
+    await expect(pm.compositeAlertsPage.listChildCount(source.id)).toContainText('2');
 
     await pm.compositeAlertsPage.clickCloneButton(source.name);
     await pm.compositeAlertsPage.expectCloneDialogVisible();
@@ -102,15 +103,16 @@ test.describe('Clone Composite Alerts testcases', {
     expect(newId, 'cloned composite must exist in the same folder').toBeTruthy();
     created.push({ id: newId, folderId: 'default' });
     await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
-    await expect(pm.compositeAlertsPage.listChildCount(newId)).toContainText('1');
+    await expect(pm.compositeAlertsPage.listChildCount(newId)).toContainText('2');
     testLogger.info('Composite cloned into the same folder with a preserved child count');
   });
 
   test('should preserve composite identity when cloned (not flattened to simple)', {
     tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P1'],
   }, async ({ page }) => {
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const source = await createCompositeFixture(page, [child]);
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
     const sourceAlert = await getAlert(page, source.id);
     expect(sourceAlert, 'GET must return the source composite').toBeTruthy();
     expect(sourceAlert.alert_type).toBe('composite');
@@ -135,7 +137,8 @@ test.describe('Clone Composite Alerts testcases', {
     expect(clone.alert_type).toBe('composite');
     expect(clone.composite_condition, 'clone must keep its composite_condition').toBeTruthy();
     expect(clone.composite_condition.expression).toBe(sourceAlert.composite_condition.expression);
-    expect(clone.composite_condition.expression).toContain(`{${child.id}}`);
+    expect(clone.composite_condition.expression).toContain(`{${childA.id}}`);
+    expect(clone.composite_condition.expression).toContain(`{${childB.id}}`);
     await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
     testLogger.info('Cloned composite preserved its type and child-referencing expression');
   });
@@ -145,8 +148,9 @@ test.describe('Clone Composite Alerts testcases', {
   }, async ({ page }) => {
     const targetFolderId = await createAlertFolder(page, uniq('clone_target'));
     createdFolders.push(targetFolderId);
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const source = await createCompositeFixture(page, [child]);
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
 
     await openCompositeList(page);
     await pm.compositeAlertsPage.clickCloneButton(source.name);
@@ -169,8 +173,9 @@ test.describe('Clone Composite Alerts testcases', {
   test('should cancel the clone dialog without creating an alert', {
     tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P1'],
   }, async ({ page }) => {
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const source = await createCompositeFixture(page, [child]);
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
 
     await openCompositeList(page);
     await pm.compositeAlertsPage.clickCloneButton(source.name);
@@ -188,7 +193,8 @@ test.describe('Clone Composite Alerts testcases', {
     tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
   }, async ({ page }) => {
     const child = await createChild(page, uniq('composite_clone_child'));
-    const source = await createCompositeFixture(page, [child]);
+    const survivingChild = await createChild(page, uniq('composite_clone_child_survivor'));
+    const source = await createCompositeFixture(page, [child, survivingChild]);
 
     // Clone is id-based and copies the stored expression; a deleted child must
     // not block it. Remove the child from the tracked cleanup set first.
