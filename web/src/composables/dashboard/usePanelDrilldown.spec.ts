@@ -182,6 +182,46 @@ describe("usePanelDrilldown", () => {
     expect(deps.drilldownPopUpRef.value.style.left).toContain("px");
   });
 
+  it("resolves variables sharing a name prefix in a custom Logs drilldown query", async () => {
+    const deps = makeDeps();
+    deps.panelSchema.value.config.drilldown = [
+      {
+        name: "Logs",
+        type: "logs",
+        targetBlank: false,
+        data: {
+          logsMode: "custom",
+          logsQuery: `SELECT * FROM "default" WHERE a = '$traceid_sql' AND b = '$traceid'`,
+        },
+      } as any,
+    ];
+    deps.variablesData.value.values = [
+      { name: "traceid", type: "textbox", value: "abc123" },
+      { name: "traceid_sql", type: "textbox", value: "xyz789" },
+    ] as any;
+    const api = usePanelDrilldown(deps as any);
+
+    await api.onChartClick({
+      componentType: "series",
+      event: { offsetX: 40, offsetY: 50 },
+      dataIndex: 0,
+      seriesName: "series-a",
+      value: ["x", 1],
+    });
+    await api.openDrilldown(0);
+
+    await vi.waitFor(() =>
+      expect(deps.router.push).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            query: `b64(SELECT * FROM "default" WHERE a = 'xyz789' AND b = 'abc123')`,
+          }),
+        }),
+      ),
+    );
+  });
+
   it("fetches cross-links lazily on the first drilldown interaction, not on panel render", async () => {
     const deps = makeDeps();
     const api = usePanelDrilldown(deps as any);
