@@ -29,6 +29,7 @@ const { ingestTestData } = require('../../utils/data-ingestion.js');
 test.describe("Logs multi-stream share URL", () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
+  const seededStreams = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -37,6 +38,17 @@ test.describe("Logs multi-stream share URL", () => {
     await ingestTestData(page);
     await page.waitForLoadState('domcontentloaded');
     testLogger.info('Multi-stream share URL setup completed');
+  });
+
+  // seedLogStreams creates real streams; without this they accumulate in the
+  // org on every nightly run, and cleanup.spec.js has no pattern for them.
+  test.afterEach(async () => {
+    while (seededStreams.length) {
+      const name = seededStreams.pop();
+      await pm.logsPage.deleteStream(name).catch((e) =>
+        testLogger.warn(`Failed to delete stream ${name}: ${e.message}`)
+      );
+    }
   });
 
   // ==========================================================================
@@ -50,6 +62,7 @@ test.describe("Logs multi-stream share URL", () => {
 
     const prefix = `e2e_ms7332_${Math.random().toString(36).substring(2, 7)}_`;
     const streams = await pm.logsPage.seedLogStreams(prefix, 2);
+    seededStreams.push(...streams);
     testLogger.info(`Seeded streams: ${streams.join(', ')}`);
 
     await pm.logsPage.navigateToLogs();

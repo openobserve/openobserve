@@ -92,29 +92,17 @@ test.describe("Data Sources Regression Bug Fixes", () => {
 
     const CATEGORIES = ['frameworks', 'model-providers', 'gateways', 'no-code', 'analytics', 'tools'];
     for (const slug of CATEGORIES) {
-      await expect(page.locator(`[data-test="ai-integrations-category-${slug}"]`).first(),
-        `Feature #11534: the "${slug}" AI category tab must be present`
-      ).toBeVisible({ timeout: 15000 });
+      await pm.dataPage.expectAiCategoryVisible(slug);
     }
     testLogger.info(`All ${CATEGORIES.length} AI categories present`);
 
     // Frameworks is the category the issue asked for, so it carries the
     // does-it-actually-work assertions rather than just existing.
-    await page.locator('[data-test="ai-integrations-category-frameworks"]').first().click();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-
-    const items = page.locator('[data-test^="ai-integrations-item-"]');
-    await expect(items.first(),
-      'Feature #11534: the Frameworks category must list integrations'
-    ).toBeVisible({ timeout: 15000 });
-
-    const itemCount = await items.count();
+    await pm.dataPage.openAiCategory('frameworks');
+    const itemCount = await pm.dataPage.expectAiIntegrationsListed(1);
     testLogger.info(`Frameworks lists ${itemCount} integrations`);
-    expect(itemCount,
-      'Feature #11534: Frameworks must list more than one agent framework'
-    ).toBeGreaterThan(1);
 
-    await items.first().click();
+    await pm.dataPage.getAiIntegrationItems().first().click();
     const docs = await pm.dataPage.verifyAIDetailRendered();
     testLogger.info(`Framework doc pane rendered ${docs.length} chars`);
 

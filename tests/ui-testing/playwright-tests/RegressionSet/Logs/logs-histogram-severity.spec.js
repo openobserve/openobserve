@@ -114,6 +114,7 @@ test.describe("Logs histogram severity breakdown", () => {
   // environmental; 6 min keeps a slow shared env from reading as a failure.
   test.describe.configure({ mode: 'serial', timeout: 360_000 });
   let pm;
+  const seededStreams = [];
 
   test.beforeEach(async ({ page }, testInfo) => {
     testLogger.testStart(testInfo.title, testInfo.file);
@@ -122,6 +123,17 @@ test.describe("Logs histogram severity breakdown", () => {
     pm = new PageManager(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Histogram severity setup completed');
+  });
+
+  // Each test seeds its own stream; without this they accumulate in the org on
+  // every nightly run, and cleanup.spec.js has no pattern for these prefixes.
+  test.afterEach(async () => {
+    while (seededStreams.length) {
+      const name = seededStreams.pop();
+      await pm.logsPage.deleteStream(name).catch((e) =>
+        testLogger.warn(`Failed to delete stream ${name}: ${e.message}`)
+      );
+    }
   });
 
   // ==========================================================================
@@ -134,6 +146,7 @@ test.describe("Logs histogram severity breakdown", () => {
     testLogger.info('Test: severity drives a stacked histogram (Feature #11353)');
 
     const stream = `e2e_sev_str_${Math.random().toString(36).substring(2, 7)}`;
+    seededStreams.push(stream);
     await pm.logsPage.ingestData(stream, buildRows(STRING_SEVERITIES));
 
     await pm.logsPage.navigateToLogs();
@@ -188,6 +201,7 @@ test.describe("Logs histogram severity breakdown", () => {
     testLogger.info('Test: numeric severity still renders the histogram (Bug #11441)');
 
     const stream = `e2e_sev_num_${Math.random().toString(36).substring(2, 7)}`;
+    seededStreams.push(stream);
     await pm.logsPage.ingestData(stream, buildRows(NUMERIC_SEVERITIES));
 
     await pm.logsPage.navigateToLogs();
