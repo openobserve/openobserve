@@ -2656,6 +2656,13 @@
     "edit": "Edit",
     "view": "View",
     "delete": "Delete",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
     "deleteTitle": "Delete Workflow",
     "deleteMessage": "Are you sure you want to delete this workflow?",
     "deleteSuccess": "Workflow deleted successfully",
@@ -2690,12 +2697,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert Fired",
+        "tab": "Alerts",
         "node": "Alert Trigger",
         "desc": "Run when an alert fires",
         "intro": "When a linked alert fires, every downstream step receives this payload."
       },
       "incidentEvent": {
         "label": "Incident Event",
+        "tab": "Incidents",
         "node": "Incident Trigger",
         "desc": "Run on an incident lifecycle event",
         "intro": "When an incident event occurs, every downstream step receives this payload."

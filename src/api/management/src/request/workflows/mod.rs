@@ -25,6 +25,7 @@ use common::utils::sql::escape_like;
 use config::{
     ider,
     meta::{
+        folder::DEFAULT_FOLDER,
         search::{Query as SearchQuery, Request as SearchRequest},
         self_reporting::{error::NodeErrors, usage::TRIGGERS_STREAM},
         stream::StreamType,
@@ -37,14 +38,23 @@ use infra::table::workflows::{
 };
 use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::check_permissions;
 use search_service::{self as SearchService, query_range::get_settings_max_query_range};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use utoipa::ToSchema;
 
 use crate::{
     common::{meta::http::HttpResponse as MetaHttpResponse, utils::http::get_or_create_trace_id},
-    service::workflows::{self, InputMap},
+    service::{
+        auth::check_folder_write_permissions,
+        workflows::{self, InputMap},
+    },
 };
+
+/// Bounded because a move runs one OpenFGA check per id before authorizing anything.
+const MAX_MOVE_WORKFLOWS: usize = 100;
 
 #[derive(Deserialize)]
 pub struct WorkflowTestInput {
@@ -114,6 +124,10 @@ pub struct WorkflowListItem {
     #[serde(flatten)]
     workflow: Workflow,
     is_draft: bool,
+    /// Display name of the owning folder. The row stores the primary key, which
+    /// is meaningless to a client, so the name is resolved here.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    folder_name: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -158,6 +172,8 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder. Ignored when `draft=true`."),
+        ("draft" = Option<bool>, Query, description = "Save to the drafts table, skipping graph validation"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
     responses(
@@ -178,7 +194,7 @@ pub async fn save_workflow(
     workflow.name = workflow.name.trim().to_lowercase();
     workflow.org_id = org_id.clone();
     workflow.id = ider::generate();
-    workflow.created_by = user_email.user_id;
+    workflow.created_by = user_email.user_id.clone();
 
     let id = workflow.id.to_string();
     let name = workflow.name.clone();
@@ -190,8 +206,20 @@ pub async fn save_workflow(
 
     let is_draft: bool = is_draft.parse().unwrap_or(true);
 
+    // The query parameter is authoritative so one request cannot name two
+    // different destinations. Normalized so the slug authorized below is the one
+    // the save resolves to.
+    let folder = workflows::normalize_folder_slug(query.get("folder").map(|s| s.as_str()));
+
     if !is_draft {
-        match workflows::save_workflow(workflow).await {
+        // Restates the route's own workflow_folder POST check, which lives in the
+        // enterprise route table and is invisible from here.
+        if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+        match workflows::save_workflow(workflow, Some(folder)).await {
             Ok(()) => {
                 if payload.trigger_type == WorkflowTriggerType::IncidentEvent
                     && let Err(e) = db::workflows::associate_workflow(
@@ -246,6 +274,9 @@ pub async fn save_workflow(
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
+        ("folder" = Option<String>, Query, description = "Folder ID to list within. The default folder is used when absent."),
+        ("all_folders" = Option<bool>, Query, description = "List across every folder the caller may see. Overrides `folder`."),
+        ("search_substring" = Option<String>, Query, description = "Case-insensitive substring the workflow name or description must contain."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -257,6 +288,7 @@ pub async fn save_workflow(
 pub async fn list_workflows(
     Path(org_id): Path<String>,
     Headers(_user_email): Headers<UserEmail>,
+    Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     // Get List of allowed objects
     use o2_openfga::meta::mapping::OFGA_MODELS;
@@ -278,12 +310,37 @@ pub async fn list_workflows(
     };
     // Get List of allowed objects ends
 
-    let workflows = match workflows::list_workflows(&org_id, permitted.clone()).await {
-        Ok(workflows) => workflows,
-        Err(e) => return MetaHttpResponse::internal_error(e),
+    // `all_folders=true` lists across every folder. A `folder=all` sentinel
+    // would instead be authorized against a folder that does not exist; rows
+    // still pass the per-item permission filter below either way.
+    let across_folders = query
+        .get("all_folders")
+        .is_some_and(|v| v.eq_ignore_ascii_case("true"));
+    let folder = if across_folders {
+        None
+    } else {
+        Some(
+            query
+                .get("folder")
+                .map(|s| s.as_str())
+                .unwrap_or(DEFAULT_FOLDER),
+        )
     };
 
+    // Matched in the database rather than in the browser, so a cross-folder
+    // search does not depend on every workflow having been fetched first.
+    let search_substring = query.get("search_substring").map(|s| s.as_str());
+
+    let workflows =
+        match workflows::list_workflows(&org_id, permitted.clone(), folder, search_substring).await
+        {
+            Ok(workflows) => workflows,
+            Err(e) => return MetaHttpResponse::internal_error(e),
+        };
+
     let mut ret = Vec::with_capacity(workflows.len());
+    // Resolved once per distinct folder rather than per row.
+    let mut folder_names: HashMap<String, Option<String>> = HashMap::new();
 
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
@@ -297,10 +354,24 @@ pub async fn list_workflows(
             }
         };
 
+        let folder_name = match folder_names.get(&w.folder_id) {
+            Some(name) => name.clone(),
+            None => {
+                let name = infra::table::folders::get_name_and_display_name_by_pk(&w.folder_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|(_slug, display)| display);
+                folder_names.insert(w.folder_id.clone(), name.clone());
+                name
+            }
+        };
+
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
             is_draft: false,
+            folder_name,
         });
     }
 
@@ -309,18 +380,125 @@ pub async fn list_workflows(
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
+    // Drafts sit outside the folder tree but must still honour the term: the
+    // browser stops filtering locally once the search is server-side.
+    let needle = search_substring
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_lowercase);
     for draft in drafts {
+        if let Some(needle) = needle.as_deref()
+            && !draft.name.to_lowercase().contains(needle)
+            && !draft.description.to_lowercase().contains(needle)
+        {
+            continue;
+        }
         ret.push(WorkflowListItem {
             workflow: draft,
             associations: vec![],
             is_draft: true,
+            folder_name: None,
         });
     }
 
     MetaHttpResponse::json(ret)
 }
 
-/// DeleteWorkflows
+/// MoveWorkflows
+
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct MoveWorkflowsRequestBody {
+    /// IDs of the workflows to move.
+    pub workflow_ids: Vec<String>,
+    /// Destination folder id.
+    pub dst_folder_id: String,
+}
+
+#[utoipa::path(
+    patch,
+    path = "/v2/{org_id}/workflows/move",
+    context_path = "/api",
+    tag = "Workflows",
+    operation_id = "MoveWorkflows",
+    summary = "Move workflows to a different folder",
+    security(
+        ("Authorization"= [])
+    ),
+    params(
+        ("org_id" = String, Path, description = "Organization id"),
+    ),
+    request_body(content = MoveWorkflowsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Moved"),
+        (status = 403, description = "Forbidden"),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+    extensions(
+        ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "update"})),
+    )
+)]
+pub async fn move_workflows(
+    Path(org_id): Path<String>,
+    Headers(user_email): Headers<UserEmail>,
+    Json(body): Json<MoveWorkflowsRequestBody>,
+) -> Response {
+    if body.workflow_ids.is_empty() {
+        return MetaHttpResponse::bad_request("workflow_ids cannot be empty");
+    }
+    if body.workflow_ids.len() > MAX_MOVE_WORKFLOWS {
+        return MetaHttpResponse::bad_request(format!(
+            "workflow_ids cannot exceed {MAX_MOVE_WORKFLOWS} entries"
+        ));
+    }
+    if body.dst_folder_id.trim().is_empty() {
+        return MetaHttpResponse::bad_request("dst_folder_id cannot be empty");
+    }
+
+    // This route is bypass:true in the permission table, so the writes are
+    // authorized here: PUT on every workflow being moved, plus write access to
+    // the destination folder. Without both, a list+delete role could relocate
+    // workflows between folders it cannot write.
+    // Gated because the OSS `check_permissions` stub denies unconditionally, which
+    // would 403 every caller instead of skipping RBAC.
+    #[cfg(feature = "enterprise")]
+    {
+        let checks = body.workflow_ids.iter().map(|id| {
+            check_permissions(
+                id,
+                &org_id,
+                &user_email.user_id,
+                "workflows",
+                "PUT",
+                None,
+                false,
+                true,
+                false,
+            )
+        });
+        if !futures::future::join_all(checks).await.iter().all(|ok| *ok) {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "workflow_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
+    match workflows::move_workflows(&org_id, &body.workflow_ids, &body.dst_folder_id).await {
+        Ok(()) => MetaHttpResponse::ok("workflows moved"),
+        Err(e) => {
+            log::error!("[workflows] move_workflows: {e}");
+            MetaHttpResponse::internal_error(e)
+        }
+    }
+}
 
 #[utoipa::path(
     delete,
@@ -981,6 +1159,7 @@ pub async fn get_workflow_history(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
+        ("folder" = Option<String>, Query, description = "Folder to publish into. The default folder is used when absent."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -991,6 +1170,7 @@ pub async fn get_workflow_history(
 )]
 pub async fn promote_draft(
     Path((org_id, id)): Path<(String, String)>,
+    Headers(user_email): Headers<UserEmail>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
     let trigger_type = match query.get("trigger_type") {
@@ -999,6 +1179,18 @@ pub async fn promote_draft(
     };
 
     let trigger_type: WorkflowTriggerType = trigger_type.into();
+
+    // Drafts store no folder, so the destination comes from the request; absent,
+    // the workflow is published into the default folder.
+    let folder = workflows::normalize_folder_slug(query.get("folder").map(|s| s.as_str()));
+
+    // Publishing is a create into `folder`, so authorize it like one — ahead of the
+    // lookup, so a denied caller cannot probe which draft ids exist.
+    if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
 
     let draft = match workflows::get_draft_by_id(&org_id, &id).await {
         Err(e) => {
@@ -1011,7 +1203,7 @@ pub async fn promote_draft(
         Ok(Some(v)) => v,
     };
 
-    if let Err(e) = workflows::promote_draft(&org_id, draft).await {
+    if let Err(e) = workflows::promote_draft(&org_id, draft, Some(folder)).await {
         return MetaHttpResponse::bad_request(format!(
             "error in promoting draft to workflow : {e}"
         ));
