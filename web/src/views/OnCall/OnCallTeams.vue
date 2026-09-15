@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :loading="loading"
       pagination="client"
+      show-index
       table-id="oncall-teams-list"
       :persist-columns="true"
       :show-global-filter="false"
