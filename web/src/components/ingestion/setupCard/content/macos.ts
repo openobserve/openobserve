@@ -34,6 +34,7 @@ import {
   AGENTS_REPO,
   agentCode,
   agentUninstall,
+  dashboardReadyStep,
   hostMetricsDetect,
   sharedAgentTroubleshooting,
 } from "./osAgent";
@@ -81,6 +82,7 @@ export default function macosCard(subs: CardSubstitutions, t: TranslateFn): Rich
           t("common.network"),
         ],
       },
+      dashboardReadyStep(t),
     ],
     detect: hostMetricsDetect,
     extras: {

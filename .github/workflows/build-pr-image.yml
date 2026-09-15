@@ -171,7 +171,7 @@ jobs:
           mv target/x86_64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -278,7 +278,7 @@ jobs:
           mv target/aarch64-unknown-linux-gnu/release-profiling/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -323,7 +323,7 @@ jobs:
       packages: write
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
@@ -342,7 +342,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: int128/docker-manifest-create-action@5e40f15c10aaa54f5d2bc91864e2708e11ad629f # v2.27.0
+      - uses: int128/docker-manifest-create-action@6edb43463bd4878b8cee224ca274378a3635d78f # v2.28.0
         with:
           tags: |
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
@@ -350,7 +350,7 @@ jobs:
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
             public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
 
-      - uses: int128/docker-manifest-create-action@5e40f15c10aaa54f5d2bc91864e2708e11ad629f # v2.27.0
+      - uses: int128/docker-manifest-create-action@6edb43463bd4878b8cee224ca274378a3635d78f # v2.28.0
         with:
           tags: |
             ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
