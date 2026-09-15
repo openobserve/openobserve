@@ -61,7 +61,7 @@ const { t } = useI18nTyped();
 </template>
 
 <style scoped>
-/* Deliberate copy of the shell's rule: the shell's standalone loading box shares this class. */
+/* keep(keyframes): scoped compiler renames @keyframes with its animation; deliberate copy, the shell's loading box shares this class. */
 .tool-call-indicator {
   animation: fadeIn 0.3s ease;
 }
