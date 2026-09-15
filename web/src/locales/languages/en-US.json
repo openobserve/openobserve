@@ -18263,7 +18263,7 @@
     "memberEmailFallbackHint": "Could not load the user list. Enter one or more emails of existing organization users, separated by commas.",
     "addPeople": "Add people",
     "addPeopleCta": "Add | Add {count} | Add {count}",
-    "addPeopleDisabledHint": "Select a person to add",
+    "addPeopleDisabledHint": "Select a team member to add",
     "addEveryoneCta": "Add everyone in the org ({count})",
     "teamCreateSecondary": "Also create a Secondary rotation",
     "teamCreateSecondaryHint": "Same people, one shift behind, so the secondary is never the person already on call. It is an ordinary rotation — nothing links the two, so editing one roster and not the other lets them drift, and you get a warning rather than a silent fix.",
