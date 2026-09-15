@@ -1,24 +1,3 @@
-/**
- * Pipeline bulk export — #7030.
- *
- * #7030 asked for three things: bulk export, an error on an empty pipeline
- * name, and the function definition travelling with the export. The
- * empty-name validation is already covered by
- * `Pipelines/pipelines.spec.js` (`confirmPipelineNameRequired`), so this spec
- * covers only the export half and does not duplicate it.
- *
- * The assertion reads the downloaded file rather than trusting the success
- * toast: `exportBulkPipelines` builds a Blob and clicks a synthetic link
- * (components/pipeline/PipelinesList.vue), so a toast can fire while the
- * payload is empty or missing the node graph — which is exactly the
- * "function definition is not in the export" half of the report.
- *
- * The list is filtered to this run's own prefix before Select All, so the
- * export contains only pipelines this test created. Without that, Select All
- * on a shared environment sweeps in unrelated pipelines and the count
- * assertion becomes meaningless.
- */
-
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
@@ -65,11 +44,6 @@ test.describe("Pipeline bulk export", () => {
       );
     }
   });
-
-  // ==========================================================================
-  // Bug #7030: pipeline improvements — bulk export
-  // https://github.com/openobserve/openobserve/issues/7030
-  // ==========================================================================
   test("selecting pipelines should offer a bulk export carrying their full definition", {
     tag: ['@bug-7030', '@P2', '@regression', '@pipelinesRegression', '@pipelinesRegressionExport']
   }, async ({ page }) => {
@@ -86,8 +60,7 @@ test.describe("Pipeline bulk export", () => {
     await pm.pipelinesPage.openPipelineMenu();
     await pm.pipelinesPage.searchPipeline(prefix);
 
-    // Both rows must be in the filtered list before Select All, or the export
-    // silently covers whatever subset had rendered.
+    // Both rows must be listed before Select All, or the export covers a partial subset.
     for (const name of names) {
       await pm.pipelinesPage.expectPipelineInList(name);
     }
@@ -117,8 +90,7 @@ test.describe("Pipeline bulk export", () => {
       'Bug #7030: the export must contain exactly the selected pipelines'
     ).toEqual([...names].sort());
 
-    // The "function definition at the time of export" half of the report: the
-    // export has to carry the node graph, not just the pipeline's metadata.
+    // The export must carry the node graph, not just metadata — the report's second half.
     for (const p of payload) {
       expect(Array.isArray(p.nodes) && p.nodes.length > 0,
         `Bug #7030: exported pipeline ${p.name} must carry its node definitions`

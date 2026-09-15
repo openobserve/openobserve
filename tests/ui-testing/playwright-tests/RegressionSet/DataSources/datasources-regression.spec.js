@@ -75,14 +75,7 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     testLogger.info('PASSED: AI Integration content persists on re-click');
   });
 
-  // ==========================================================================
-  // Feature #11534: AI Frameworks & Agent datasources
-  // https://github.com/openobserve/openobserve/issues/11534
-  // ==========================================================================
-  // The category list is asserted against the slugs in
-  // components/ingestion/ai/data.ts rather than against tab labels, because the
-  // labels run through i18n and would break this test in a non-English locale
-  // while the slugs are part of the route.
+  // Asserts category slugs, not tab labels: labels go through i18n, slugs are in the route.
   test("AI datasources should expose every integration category with browsable docs", {
     tag: ['@bug-11534', '@P2', '@regression', '@datasourcesRegression']
   }, async ({ page }) => {
@@ -96,8 +89,7 @@ test.describe("Data Sources Regression Bug Fixes", () => {
     }
     testLogger.info(`All ${CATEGORIES.length} AI categories present`);
 
-    // Frameworks is the category the issue asked for, so it carries the
-    // does-it-actually-work assertions rather than just existing.
+    // Frameworks is the category the issue asked for, so it gets the real assertions.
     await pm.dataPage.openAiCategory('frameworks');
     const itemCount = await pm.dataPage.expectAiIntegrationsListed(1);
     testLogger.info(`Frameworks lists ${itemCount} integrations`);

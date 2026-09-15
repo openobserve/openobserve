@@ -1,40 +1,7 @@
-/**
- * Logs histogram severity breakdown — #11353, #11441.
- *
- * The two bugs are the same code path from opposite ends. #11353 asked for the
- * histogram to become a stacked bar chart automatically when the stream carries
- * a categorical severity-like field; #11441 reported that the histogram stopped
- * rendering at all when that field held NUMERIC values.
- *
- * Where the assertions have to land, and why:
- *
- * - The breakdown field is chosen by the BACKEND. The histogram arrives over
- *   `POST /_search_stream?...&is_ui_histogram=true` as Server-Sent Events, and
- *   the `search_response_metadata` frame carries
- *   `histogram_breakdown_field` plus a `converted_histogram_query` that
- *   projects it as `zo_sql_breakdown` (consumed by
- *   composables/useLogs/useHistogram.ts, which only takes the stacked path when
- *   both are present). Nothing in the front-end unit suite covers that
- *   detection, so the stream is the only place this half can be checked.
- * - The stacked chart itself is already unit-tested
- *   (`convertLogData.spec.ts` → `convertStackedLogData`: legend, semantic
- *   colours, tooltip escaping), and it renders to an ECharts CANVAS, so the
- *   series are not in the DOM. This spec therefore asserts the response shape
- *   plus "the chart actually rendered", and deliberately does not try to count
- *   series through the DOM.
- *
- * Numeric severities are ingested as real numbers, not numeric strings:
- * `statusParser.ts` coerces numeric strings itself, so a string would exercise
- * the coercion path rather than the one #11441 was filed against.
- */
-
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
-
-/** Distinct values so the backend has something to group into >1 series. */
 const STRING_SEVERITIES = ['error', 'warn', 'info', 'error', 'info', 'debug'];
-/** OTEL/syslog range 0-7, which is what `NUMERIC_SEVERITY_TO_SEMANTIC` maps. */
 const NUMERIC_SEVERITIES = [3, 4, 6, 3, 6, 7];
 
 const buildRows = (severities) =>
@@ -43,19 +10,6 @@ const buildRows = (severities) =>
     job: 'e2e_histogram_breakdown',
     message: `histogram breakdown seed ${i}`,
   }));
-
-/**
- * Tee the UI-histogram SSE stream inside the page and stash the decoded frames
- * on `window`.
- *
- * Reading the body from Playwright's `response` event does NOT work here:
- * `_search_stream` is a streamed response, and Chrome releases its body as soon
- * as the app has consumed it, so `response.text()` intermittently fails with
- * "No data found for resource". That shows up as a test which passes alone and
- * fails in a suite. Patching `fetch` and `tee()`-ing the stream captures the
- * frames deterministically, and hands the untouched branch back to the app so
- * its progressive rendering is unaffected.
- */
 async function captureHistogramFrames(page) {
   await page.addInitScript(() => {
     const w = /** @type {any} */ (window);
@@ -99,8 +53,6 @@ async function captureHistogramFrames(page) {
     };
   });
 }
-
-/** The metadata frames, which are where the histogram decisions live. */
 const readMetadata = async (page) =>
   await page.evaluate(() =>
     (/** @type {any} */ (window).__histFrames || []).map((f) => f.results).filter(Boolean),
@@ -110,8 +62,7 @@ const readFrames = async (page) =>
   await page.evaluate(() => /** @type {any} */ (window).__histFrames || []);
 
 test.describe("Logs histogram severity breakdown", () => {
-  // The gate is ingest->searchable latency plus two full query runs, which is
-  // environmental; 6 min keeps a slow shared env from reading as a failure.
+  // Ingest->searchable latency plus two full query runs; environmental, not product.
   test.describe.configure({ mode: 'serial', timeout: 360_000 });
   let pm;
   const seededStreams = [];
@@ -125,8 +76,7 @@ test.describe("Logs histogram severity breakdown", () => {
     testLogger.info('Histogram severity setup completed');
   });
 
-  // Each test seeds its own stream; without this they accumulate in the org on
-  // every nightly run, and cleanup.spec.js has no pattern for these prefixes.
+  // Without this the seeded streams accumulate in the org on every nightly run.
   test.afterEach(async () => {
     while (seededStreams.length) {
       const name = seededStreams.pop();
@@ -135,11 +85,6 @@ test.describe("Logs histogram severity breakdown", () => {
       );
     }
   });
-
-  // ==========================================================================
-  // Feature #11353: automatic stacked breakdown histogram from stream fields
-  // https://github.com/openobserve/openobserve/issues/11353
-  // ==========================================================================
   test("a stream with a categorical severity field should drive a stacked histogram", {
     tag: ['@bug-11353', '@P2', '@regression', '@logsRegression', '@logsRegressionHistogram']
   }, async ({ page }) => {
@@ -174,9 +119,7 @@ test.describe("Logs histogram severity breakdown", () => {
       'Feature #11353: severity is the highest-priority breakdown field, so it must be the one chosen'
     ).toBe('severity');
 
-    // The projection is what actually makes the chart stackable: without
-    // `zo_sql_breakdown` in the rewritten query the UI falls back to a flat
-    // single series even though a breakdown field was named.
+    // Without zo_sql_breakdown in the rewritten query the UI falls back to a flat series.
     const q = withBreakdown[0].converted_histogram_query || '';
     testLogger.info(`converted histogram query: ${q}`);
     expect(q,
@@ -190,11 +133,6 @@ test.describe("Logs histogram severity breakdown", () => {
 
     testLogger.info('✓ PASSED: severity drove a stacked histogram (Feature #11353)');
   });
-
-  // ==========================================================================
-  // Bug #11441: no histogram when severity holds numeric values
-  // https://github.com/openobserve/openobserve/issues/11441
-  // ==========================================================================
   test("a numeric severity field should still render the histogram", {
     tag: ['@bug-11441', '@P0', '@regression', '@logsRegression', '@logsRegressionHistogram']
   }, async ({ page }) => {
@@ -221,9 +159,7 @@ test.describe("Logs histogram severity breakdown", () => {
       `fields: ${JSON.stringify([...new Set(meta.map((m) => m.histogram_breakdown_field ?? null))])}`
     );
 
-    // The regression was the histogram disappearing outright on a numeric
-    // severity. `is_histogram_eligible` is the backend's own verdict on whether
-    // it will produce one, so a false here reproduces the bug at its source.
+    // is_histogram_eligible is the backend's own verdict, so false here reproduces the bug.
     expect(meta.some((m) => m.is_histogram_eligible === true),
       'Bug #11441: a numeric severity must leave the query histogram-eligible'
     ).toBe(true);

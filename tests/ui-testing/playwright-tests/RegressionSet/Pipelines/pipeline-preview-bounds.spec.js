@@ -1,23 +1,3 @@
-/**
- * Pipeline list preview stays inside the viewport — #12647 (and its earlier
- * duplicate #9498).
- *
- * Hovering a pipeline row's View (eye) action shows a floating graph preview.
- * It used to be anchored so that it ran off the right edge of the window and
- * got clipped; the fix anchors the OTooltip to `side="left"` with
- * `max-width="none"` (components/pipeline/PipelinesList.vue).
- *
- * The assertion is pure geometry against the viewport rather than a screenshot
- * or a class check, because "clipped off the right edge" is exactly a
- * bounding-box claim and nothing else expresses it without being brittle.
- *
- * `pages/pipelinesPages/pipelinesPage.js` already carried `hoverPipelineRow`
- * and `getPreviewBoundingBox` for this bug, but no test ever called them — the
- * locators there are deliberately loose (`[class*="preview"]`), so this spec
- * uses `hoverViewAndGetPreviewBox`, which targets the tooltip bubble's own
- * `o-tooltip-content`.
- */
-
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
@@ -25,11 +5,7 @@ const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 const SOURCE_STREAM = 'e2e_automate';
 
-/**
- * Minimal single-condition group. The pipeline's logic is irrelevant here — the
- * test only needs a row in the list with a View action — so this is the
- * smallest payload `createPipeline` will accept rather than anything meaningful.
- */
+// Smallest payload createPipeline accepts; the pipeline's logic is irrelevant to this test.
 const minimalCondition = () => ({
   filterType: 'group',
   logicalOperator: 'AND',
@@ -70,19 +46,10 @@ test.describe("Pipeline list preview bounds", () => {
     }
   });
 
-  // ==========================================================================
-  // Bug #12647 (dup #9498): preview popup on View hover overflows the viewport
-  // https://github.com/openobserve/openobserve/issues/12647
-  // ==========================================================================
   test("the row View preview should render fully inside the viewport", {
     tag: ['@bug-12647', '@bug-9498', '@P2', '@regression', '@pipelinesRegression', '@pipelinesRegressionPreview']
   }, async ({ page }) => {
-    testLogger.info('Test: pipeline preview stays within viewport (Bug #12647)');
-
-    // Created through the API rather than the canvas: the drag-and-drop editor
-    // needs an input→condition→output wiring pass that has nothing to do with
-    // this bug, and every second of it is a flake surface for a test whose
-    // whole subject is one hover.
+    // Created via API: the canvas editor's node-wiring pass is pure flake surface for a hover test.
     const destName = `e2e_12647_dest_${Math.random().toString(36).substring(7)}`;
     pipelineName = `e2e-12647-${Math.random().toString(36).substring(7)}`;
     await pm.pipelinesPage.createPipeline(pipelineName, SOURCE_STREAM, destName, minimalCondition());
@@ -97,9 +64,7 @@ test.describe("Pipeline list preview bounds", () => {
     const viewport = page.viewportSize();
     testLogger.info(`Preview box: ${JSON.stringify(box)} viewport: ${JSON.stringify(viewport)}`);
 
-    // Sub-pixel rounding in the popper transform can land a hair over the edge
-    // on a fractional device scale, so allow 1px rather than asserting exact
-    // containment and inviting a flake that says nothing about the bug.
+    // 1px: sub-pixel popper rounding on a fractional device scale would otherwise flake.
     const TOLERANCE = 1;
 
     expect(box.x,
@@ -112,6 +77,6 @@ test.describe("Pipeline list preview bounds", () => {
 
     expect(box.width, 'Preview must actually render content').toBeGreaterThan(0);
 
-    testLogger.info('✓ PASSED: pipeline preview contained in viewport (Bug #12647)');
+    testLogger.info('PASSED: pipeline preview contained in viewport (Bug #12647)');
   });
 });

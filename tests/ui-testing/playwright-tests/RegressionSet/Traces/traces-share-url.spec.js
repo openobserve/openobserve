@@ -1,25 +1,3 @@
-/**
- * Shared Traces URL applies its parameters on arrival — #11392.
- *
- * This is the second attempt. The first asserted on the ADDRESS BAR and was
- * withdrawn: on a locally-built server the traces URL comes back with
- * `query=` EMPTY even with a filter applied and the index list showing it
- * (four CI attempts, all empty), while o2latestmain writes the base64 query.
- * So the address bar is not a portable place to assert shared state.
- *
- * It goes through the short link instead, the same route #7332 uses for Logs
- * and the one the issue's own closing verification cites (`/web/short/…`).
- * State is held server-side against that link, so the assertion is on the
- * RESTORED APP STATE after following it — never on the URL's query string.
- *
- * Consequence: this needs a deployment with `web_url` set, because ShareButton
- * is disabled without it. The regression workflow sets `ZO_WEB_URL`, so it runs
- * in CI and cannot run against a dev env that leaves `web_url` empty.
- *
- * Nothing here presses Refresh after following the link — "the data loaded" is
- * only meaningful if the arrival did it unprompted, which is the whole bug.
- */
-
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
 const testLogger = require('../../utils/test-logger.js');
 const PageManager = require('../../../pages/page-manager.js');
@@ -28,8 +6,7 @@ const { ingestTraces } = require('../../utils/trace-ingestion.js');
 const TRACE_STREAM = 'default';
 
 test.describe("Traces shared URL", () => {
-  // 6 min: the gate is trace ingest->searchable latency before the error badge
-  // can render, which is environmental and runs ~2 min on a loaded shared env.
+  // Trace ingest->searchable latency alone runs ~2 min on a loaded shared env.
   test.describe.configure({ mode: 'serial', timeout: 360_000 });
   let pm;
 
@@ -39,17 +16,11 @@ test.describe("Traces shared URL", () => {
     pm = new PageManager(page);
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // forceScenario so the error badge is guaranteed: it renders only when
-    // errorCount > 0, and a random scenario mix can legitimately produce none.
+    // forceScenario: the badge renders only when errorCount > 0, and a random draw can yield none.
     await ingestTraces(page, 6, { forceScenario: 'error' });
     await page.waitForLoadState('domcontentloaded');
     testLogger.info('Traces share URL setup completed');
   });
-
-  // ==========================================================================
-  // Bug #11392: share URL does not work as expected in traces explore
-  // https://github.com/openobserve/openobserve/issues/11392
-  // ==========================================================================
   test("a shared Traces link should restore its filter and load data on arrival", {
     tag: ['@bug-11392', '@P1', '@regression', '@tracesRegression', '@tracesRegressionShareUrl']
   }, async ({ page, context }) => {
@@ -58,8 +29,7 @@ test.describe("Traces shared URL", () => {
     await pm.tracesPage.navigateToTraces();
     await pm.tracesPage.selectTraceStream(TRACE_STREAM);
 
-    // Applied through the error-only toggle rather than typed, so the shared
-    // state is built the way a user would actually produce it.
+    // Toggled rather than typed, so the shared state is built the way a user produces it.
     const badgeAppeared = await pm.tracesPage.waitForErrorBadgeAfterSearch();
     expect(badgeAppeared,
       'Precondition: seeded error traces must produce the error-count badge'
