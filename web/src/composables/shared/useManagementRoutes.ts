@@ -13,6 +13,7 @@ const useManagementRoutes = () => {
         keepAlive: true,
         titleKey: "menu.settings",
       },
+      redirect: (to: any) => ({ name: "general", query: to.query }),
       beforeEnter(to: any, from: any, next: any) {
         routeGuard(to, from, next);
       },
@@ -22,6 +23,7 @@ const useManagementRoutes = () => {
           name: "general",
           meta: {
             titleKey: "settings.groupGeneral",
+            allowOnEmptyData: true,
           },
           component: () => import("@/components/settings/General.vue"),
           beforeEnter(to: any, from: any, next: any) {
