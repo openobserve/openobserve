@@ -29,7 +29,6 @@ use tokio::sync::{Mutex, RwLock};
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, ORG_RETAINED, ORG_TABLES,
     RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings, TableRef,
-    V1_STOP_AFTER_MICROS, V1_STOPPED_SEEN,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
     resolve::{SeriesKey, Staging},
     sql::{
@@ -41,10 +40,7 @@ use super::{
     stream_concurrency, writer,
 };
 use crate::{
-    db::service_graph::{
-        get_started_at, get_v4_offset, is_v1_stopped, set_started_at_if_absent,
-        set_v1_stopped_if_absent, set_v4_offset, v4_offset_key,
-    },
+    db::service_graph::{get_v4_offset, set_started_at_if_absent, set_v4_offset, v4_offset_key},
     traces::service_graph::run_graph_search,
 };
 
@@ -131,7 +127,6 @@ pub fn settle_ql_trigger(
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    maybe_stop_v1(now).await;
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
@@ -265,30 +260,6 @@ async fn claim_under_lock(org: &str, stream: &str) -> Option<i64> {
         log::warn!("[ServiceGraph] {org}/{stream}: claim unlock failed: {e}");
     }
     claimed
-}
-
-/// Write-once switch: v4 has been writing for 7 days; no per-org data check (user ruling).
-async fn maybe_stop_v1(now: i64) {
-    if V1_STOPPED_SEEN.load(Ordering::Relaxed) {
-        return;
-    }
-    if is_v1_stopped().await {
-        V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
-        return;
-    }
-    let Some(started_at) = get_started_at().await else {
-        return;
-    };
-    if now - started_at < V1_STOP_AFTER_MICROS {
-        return;
-    }
-    match set_v1_stopped_if_absent().await {
-        Ok(()) => {
-            V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
-            log::info!("[ServiceGraph] v4 has run for 7 days, v1 job stopped");
-        }
-        Err(e) => log::warn!("[ServiceGraph] failed to write v1 stopped flag: {e}"),
-    }
 }
 
 async fn org_table(org: &str, claimed_offsets: &[i64], settings: &Settings, now: i64) -> TableRef {
