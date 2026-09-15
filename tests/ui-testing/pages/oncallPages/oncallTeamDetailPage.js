@@ -257,10 +257,20 @@ export class OnCallTeamDetailPage {
     await expect(this.page.locator(this.locators.timeline)).toBeVisible({ timeout: 30000 });
   }
 
-  /** "Add rotation" from the timeline — the editor opens as a DRAWER, not a page. */
+  /**
+   * "Add rotation" from the timeline — the editor opens as a DRAWER, not a page.
+   *
+   * WAIT ON THE DRAWER, NOT ON `oncall-schedule-editor`. The team detail mounts
+   * OnCallScheduleEditor with `drawer-only`, which suppresses the rotations
+   * table and the no-members line and leaves the component's root div rendered
+   * but empty — so `oncall-schedule-editor` RESOLVES and stays `hidden` forever,
+   * which reads as "the editor never opened" when the drawer is wide open on
+   * screen. `oncall-rotation-drawer` is the surface that actually appears, and
+   * it is the one `closeRotationEditor()` already waits to go away.
+   */
   async openRotationEditor() {
     await this.page.locator(this.locators.timelineAdd).click();
-    await expect(this.page.locator(this.locators.scheduleEditor)).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.locators.rotationDrawer)).toBeVisible({ timeout: 20000 });
   }
 
   /** Edit an existing lane. `rotationId` is the id the rotation was created with. */
@@ -268,7 +278,7 @@ export class OnCallTeamDetailPage {
     const edit = this.page.locator(this.laneEdit(rotationId));
     await edit.waitFor({ state: 'visible', timeout: 20000 });
     await edit.click();
-    await expect(this.page.locator(this.locators.scheduleEditor)).toBeVisible({ timeout: 20000 });
+    await expect(this.page.locator(this.locators.rotationDrawer)).toBeVisible({ timeout: 20000 });
   }
 
   async fillRotationName(name) {
@@ -477,6 +487,65 @@ export class OnCallTeamDetailPage {
     const confirm = this.page.locator(this.locators.confirmOk);
     if (await confirm.count()) await confirm.click();
   }
+
+  /**
+   * Stage one person for adding.
+   *
+   * The picker is a MULTI-select over org users, not a dialog: the Add button
+   * is the submit and stays disabled until something is staged. When the user
+   * lookup fails the component swaps the picker for a free-text email input,
+   * so both shapes are handled — the fallback is the only path that can add a
+   * NON-org address, which is the one the server must refuse.
+   */
+  async pickMemberToAdd(email) {
+    const picker = this.page.locator(this.locators.membersUserSelect);
+    if (await picker.count()) {
+      const trigger = this.page.locator(part(this.locators.membersUserSelect, 'trigger')).first();
+      await trigger.waitFor({ state: 'visible', timeout: 20000 });
+      await trigger.click();
+      const option = this.page
+        .locator(`${part(this.locators.membersUserSelect, 'option')}[data-test-value="${email}"]`).first();
+      await option.waitFor({ state: 'visible', timeout: 20000 });
+      await option.click();
+      await this.page.keyboard.press('Escape');
+      return;
+    }
+    await this.page.locator(part(this.locators.membersEmailInput, 'field')).first().fill(email);
+  }
+
+  async submitAddMembers() {
+    await this.page.locator(this.locators.membersAddButton).click();
+  }
+
+  /** "N of M org members" — the screen's own answer to who is on this team. */
+  async readMembersCoverage() {
+    const node = this.page.locator(this.locators.membersCoverage);
+    if ((await node.count()) === 0) return null;
+    return ((await node.first().innerText()) ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+
+
+  /**
+   * The config-risk count riding the title.
+   *
+   * It is a COUNT, not a list — the risk texts live on
+   * `GET /teams/{id}/config-risks` and are derived on read, so a spec asserting
+   * that a risk cleared reads the endpoint and asserts the tag disappeared.
+   * Returns null when the tag is absent, which is what "no risks" looks like.
+   */
+  async readConfigRiskCount() {
+    const tag = this.page.locator(this.locators.configRisks);
+    if ((await tag.count()) === 0) return null;
+    const text = ((await tag.first().innerText()) ?? '').trim();
+    const m = /(\d+)/.exec(text);
+    return m ? Number(m[1]) : text;
+  }
+
+  async expectConfigRiskTagVisible() {
+    await expect(this.page.locator(this.locators.configRisks)).toBeVisible({ timeout: 30000 });
+  }
+
 
   // ---------------------------------------------------------------- reading
 

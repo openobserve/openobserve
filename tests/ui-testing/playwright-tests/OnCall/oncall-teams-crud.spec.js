@@ -109,7 +109,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const team = await createTeam(page, { name, description: 'before' });
 
     await pm.oncallTeamsPage.goto(ORG);
-    await pm.oncallTeamsPage.openEditDrawer(team.id);
+    await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
 
     const nameField = page.locator('[data-test="oncall-team-form-name-field"]').first();
     await expect(nameField, 'the drawer must open on the stored name').toHaveValue(name);
@@ -141,7 +141,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const team = await createTeam(page, { name });
 
     await pm.oncallTeamsPage.goto(ORG);
-    await pm.oncallTeamsPage.openEditDrawer(team.id);
+    await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
 
     const manage = page.locator('[data-test="oncall-team-form-manage-link"]');
     await expect(manage, 'the edit drawer must offer a way on to the team').toBeVisible();
@@ -175,7 +175,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     await expect(page.locator('[data-test="oncall-team-form-members"]')).toBeVisible();
     await pm.oncallTeamsPage.cancelDrawer();
 
-    await pm.oncallTeamsPage.openEditDrawer(team.id);
+    await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
     await expect(
       page.locator('[data-test="oncall-team-form-members"]'),
       'the edit drawer must not duplicate the members screen',
@@ -191,10 +191,18 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const otherTeam = await createTeam(page, { name: other });
 
     await pm.oncallTeamsPage.goto(ORG);
-    await pm.oncallTeamsPage.expectRowVisible(keptTeam.id);
+
+    // Asserting both rows are on screen BEFORE filtering only works while the
+    // whole org fits on one page; past that the baseline fails for a reason the
+    // filter has nothing to do with. Searching each name in turn proves the same
+    // thing without depending on how many teams the org happens to hold.
     await pm.oncallTeamsPage.search(kept);
     await pm.oncallTeamsPage.expectRowVisible(keptTeam.id);
     await pm.oncallTeamsPage.expectRowAbsent(otherTeam.id);
+
+    await pm.oncallTeamsPage.search(other);
+    await pm.oncallTeamsPage.expectRowVisible(otherTeam.id);
+    await pm.oncallTeamsPage.expectRowAbsent(keptTeam.id);
   });
 
   /**
@@ -211,7 +219,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
     const team = await createTeam(page, { name });
 
     await pm.oncallTeamsPage.goto(ORG);
-    await pm.oncallTeamsPage.openDeleteDialog(team.id);
+    await pm.oncallTeamsPage.openDeleteDialog(team.id, { name });
     await expect(page.locator('[data-test="confirm-dialog"]')).toContainText(name);
 
     await page.locator(pm.oncallTeamsPage.locators.confirmOk).click();

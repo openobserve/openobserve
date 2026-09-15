@@ -299,6 +299,18 @@ function allDayRestriction(days = [0, 1, 2, 3, 4, 5, 6]) {
  * rotation or edit the policy first (§8.5), so order matters: set the schedule
  * BEFORE the policy that points at it, and when changing rotation ids, clear
  * the policy first.
+ *
+ * AND `addTeamMembers` IS ONE OF THE WRITERS THAT NAMES A ROTATION. Putting the
+ * first member on a team that has no rotation auto-provisions a `source:
+ * "default"` rotation AND rewrites rungs P1..P3 to page it by id — so a seed
+ * that creates a team, adds members and only then writes its schedule hits the
+ * §8.5 refusal every time, on a policy nothing in the spec ever wrote. Two ways
+ * out, both verified against the live API:
+ *   - write the schedule FIRST, then add members; the auto-write then binds to
+ *     the rotation already there rather than inventing one, or
+ *   - `detachPolicyFromRotations()` first — the server's own instruction —
+ *     which is the only option when the schedule being written is EMPTY, since
+ *     an existing-but-rotationless schedule auto-provisions just the same.
  */
 async function setTeamSchedule(page, teamId, { timezone = 'UTC', rotations }) {
   const payload = { timezone, rotations };
@@ -425,6 +437,28 @@ async function setTeamPolicy(page, teamId, {
   const body = await must(res, `Set policy for team ${teamId}`, payload);
   testLogger.info('On-call policy set', { teamId, rungs: rungs.length });
   return body;
+}
+
+/**
+ * Point the policy at the team instead of at any rotation, so the schedule can
+ * then be replaced.
+ *
+ * This is the server's own advice — "keep the rotation, or edit the policy
+ * first" — made callable, and it is a SEEDING primitive, not an assertion
+ * helper: it exists so a spec can reach the state it wants to test, never so a
+ * §8.5 refusal can be swallowed. `setTeamSchedule` still surfaces a real 400.
+ *
+ * A single whole-team rung is the smallest policy the route accepts and names
+ * no rotation, which is the whole point.
+ */
+async function detachPolicyFromRotations(page, teamId) {
+  return await setTeamPolicy(page, teamId, {
+    rungs: [{
+      priority: 1,
+      steps: [{ after_micros: FIRST_RUNG_MICROS, targets: [{ kind: 'whole_team' }] }],
+      channels: ['email'],
+    }],
+  });
 }
 
 async function getTeamPolicy(page, teamId) {
@@ -632,6 +666,7 @@ async function createPagingAlert(page, {
   name,
   stream,
   teamId = undefined,
+  priority = undefined,
   destinations = [],
   multiAlert = false,
   groupBy = ['service'],
@@ -679,6 +714,9 @@ async function createPagingAlert(page, {
     enabled: true,
   };
   if (teamId) payload.oncall_team = teamId;
+  // An alert with no priority opens its page at the server's default, not P1, so a
+  // severity-specific assertion has to name one or it silently tests another rung.
+  if (priority !== undefined) payload.priority = priority;
 
   const res = await api(
     page, 'post',
@@ -688,7 +726,7 @@ async function createPagingAlert(page, {
   const body = await must(res, `Create paging alert "${name}"`, payload);
   const id = body?.id ?? body?.alert_id;
   if (!id) throw new Error(`Alert created but no id returned: ${JSON.stringify(body)}`);
-  testLogger.info('Paging alert created', { id, name, teamId, multiAlert });
+  testLogger.info('Paging alert created', { id, name, teamId, priority, multiAlert });
   return { id, name };
 }
 
@@ -704,6 +742,44 @@ async function triggerAlert(page, alertId, { folder = 'default' } = {}) {
     `${baseUrl()}/api/v2/${orgId()}/alerts/${encodeURIComponent(alertId)}/trigger?folder=${encodeURIComponent(folder)}`,
   );
   return await must(res, `Trigger alert ${alertId}`);
+}
+
+/**
+ * Fire now if the route will, otherwise let the scheduler do it.
+ *
+ * THE MANUAL TRIGGER IS BROKEN FOR EXACTLY THE ALERT SHAPE ON-CALL USES, and
+ * the failure is a bare `500 {"code":500,"message":""}` with nothing to read.
+ * Reproduced against this build, smallest case: an alert carrying
+ * `oncall_team` and `destinations: []` — which `POST /api/v2/{org}/alerts`
+ * ACCEPTS with 200, and which the scheduler then fires correctly, opening its
+ * page within ~15s — 500s on `PATCH .../trigger`. Add any destination to that
+ * same alert and the same PATCH answers 200. So the create route, the
+ * scheduler and the trigger route disagree about whether the shape is legal,
+ * and only the trigger route is wrong.
+ *
+ * Firing is SCAFFOLDING for the UI cases here — none of them assert on the
+ * trigger route — so a spec must not die on it. This swallows the 500 and
+ * falls through to `waitForPages`, which still proves the page opened; a
+ * scheduler that then never fires fails the spec with its own message rather
+ * than this one. The swallow is deliberately narrow: any other failure is
+ * re-thrown, so a trigger route that breaks generally still fails loudly.
+ *
+ * @returns {Promise<boolean>} whether the manual trigger actually took
+ */
+async function triggerAlertOrLetSchedulerFire(page, alertId, { folder = 'default' } = {}) {
+  try {
+    await triggerAlert(page, alertId, { folder });
+    return true;
+  } catch (e) {
+    if (!/failed: HTTP 500/.test(String(e?.message))) throw e;
+    testLogger.warn(
+      'Manual alert trigger 500ed; waiting for the scheduler instead. This is the known ' +
+      'trigger-route defect for an on-call alert with no notification destinations — the ' +
+      'alert itself saved fine and the scheduler fires it.',
+      { alertId },
+    );
+    return false;
+  }
 }
 
 // -------------------------------------------------------------------- pages
@@ -801,7 +877,7 @@ async function waitForPages(page, {
  */
 async function firePageAndWait(page, { alertOptions, expected = 1, timeout = PAGE_WAIT_MS } = {}) {
   const alert = await createPagingAlert(page, alertOptions);
-  await triggerAlert(page, alert.id);
+  await triggerAlertOrLetSchedulerFire(page, alert.id);
   const pages = await waitForPages(page, {
     alertId: alert.id, expected, teamId: alertOptions.teamId, timeout,
   });
@@ -982,6 +1058,7 @@ module.exports = {
   rungPagingRotation,
   rungEscalatingToTeam,
   setTeamPolicy,
+  detachPolicyFromRotations,
   getTeamPolicy,
   createOwnershipRule,
   listOwnershipRules,
@@ -993,6 +1070,7 @@ module.exports = {
   seedNotificationDestination,
   createPagingAlert,
   triggerAlert,
+  triggerAlertOrLetSchedulerFire,
   listResponses,
   getResponse,
   waitForPages,

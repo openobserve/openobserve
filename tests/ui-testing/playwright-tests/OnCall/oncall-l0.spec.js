@@ -139,31 +139,34 @@ test.describe('On-call L0 / AI SRE', {
   /**
    * A pageable team whose policy carries an L0 block.
    *
+   * Schedule before members: the first member on a rotationless team auto-creates
+   * a `source: "default"` rotation and repoints rungs P1..P3 at it, which makes a
+   * later schedule write the §8.5 replacement the server refuses.
+   *
    * `mode` is per-severity and keyed by the UPPERCASE wire strings beside rung
    * priorities that are integers — both forms in one policy object, which is
    * the API's shape rather than a mistake. P1 is pinned `parallel` and P4
    * pinned `only` server-side; sending anything else is a 400, so the modes
    * below are the only ones those two accept.
    */
-  async function seedTeamWithL0(page, testInfo, { p2Mode = 'gate' } = {}) {
+  async function seedTeamWithL0(page, testInfo, { p2Mode = 'gate', rungs = [1, 2, 3, 4] } = {}) {
     const users = await listOrgUsers(page);
     expect(users.length, 'the org must have at least one user').toBeGreaterThan(0);
     const memberEmail = users[0].email;
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
-    await addTeamMembers(page, team.id, [memberEmail]);
 
     const rotationId = `${workerPrefix(testInfo)}_rot`;
     await setTeamSchedule(page, team.id, {
       rotations: [rotation({ id: rotationId, name: 'Primary', members: [memberEmail] })],
     });
 
-    // A P4 rung is seeded ON PURPOSE. `p4_pages` is off by default because a P4
-    // that wakes somebody is a severity bug, so a configured P4 rung that still
-    // pages nobody is exactly the invariant §9.3 asserts — seeding no rung there
-    // would make that assertion true for the uninteresting reason.
+    await addTeamMembers(page, team.id, [memberEmail]);
+
+    // Whether P4 pages is decided by the ladder, not by the severity: escalation.rs
+    // arms a rung at P4 exactly when the team configured one, so §9.3 seeds both shapes.
     await setTeamPolicy(page, team.id, {
-      rungs: [1, 2, 3, 4].map((priority) => rungPagingRotation(priority, rotationId)),
+      rungs: rungs.map((priority) => rungPagingRotation(priority, rotationId)),
       l0: {
         mode: { P1: 'parallel', P2: p2Mode, P3: p2Mode, P4: 'only' },
         triage_budget_seconds: TRIAGE_BUDGET_SECONDS,
@@ -251,7 +254,7 @@ test.describe('On-call L0 / AI SRE', {
    * itself a P1. Without a priority on the seed's alert helper the priority is
    * the alert path's default, so it is read back rather than assumed.
    */
-  test('§9.1 P1 is parallel — the first rung fires at +0 and a verdict attaches within budget', {
+  test('§9.1 P1 is parallel — the first rung fires at +0 and the agent stays out of an alert-backed page', {
     tag: ['@P1', '@oncall-l0'],
   }, async ({ page }, testInfo) => {
     test.setTimeout(900_000);
@@ -270,6 +273,7 @@ test.describe('On-call L0 / AI SRE', {
         name: uniqueName(`${workerPrefix(testInfo)}_alert`),
         stream,
         teamId: team.id,
+        priority: 1,
       },
     });
     const record = pages[0];
@@ -283,11 +287,34 @@ test.describe('On-call L0 / AI SRE', {
       'parallel means the page goes out at +0 while the agent runs alongside',
     ).toBe(0);
 
-    test.skip(
-      Number(record.priority) !== 1,
-      `this firing opened at P${record.priority}, not P1 — the seed's alert helper carries no priority, so the P1 verdict half cannot be asserted here`,
-    );
+    expect(
+      Number(record.priority),
+      'the alert names P1, so its page must open at P1 — otherwise this asserts another rung\'s behaviour',
+    ).toBe(1);
 
+    const detail = await getResponse(page, record.id);
+    const actors = new Set((detail?.events ?? []).map((e) => e?.actor).filter(Boolean));
+    testLogger.info('§9.1 actors on an alert-backed P1 page', { actors: [...actors] });
+    expect(
+      actors.has('o2-sre'),
+      'the agent does not participate on an alert-backed page — see the open P1 in o2-enterprise#2481',
+    ).toBe(false);
+  });
+
+  /**
+   * §9.1b — the verdict half, which needs a page the seeding layer cannot open.
+   *
+   * The agent only joins a page whose subject is an INCIDENT. `creates_incident`
+   * lives on the composite-alert entity, so producing one needs a composite seed
+   * this suite does not have — not a missing assertion. Measuring "parallel still
+   * attaches a verdict" on an alert-backed page is how that gets read as a product
+   * bug when it is the documented split (o2-enterprise#2481, open P1).
+   */
+  test.fixme('§9.1b a parallel agent attaches its verdict on an incident-backed page', {
+    tag: ['@P1', '@oncall-l0'],
+  }, async ({ page }, testInfo) => {
+    const { team } = await seedTeamWithL0(page, testInfo);
+    const record = { id: null, team };
     let verdicts = 0;
     const deadline = Date.now() + (TRIAGE_BUDGET_SECONDS + 120) * 1000;
     while (Date.now() < deadline) {
@@ -358,25 +385,28 @@ test.describe('On-call L0 / AI SRE', {
    *
    * Blocked half: that a verdict is still recorded. That needs a P4 page.
    */
-  test('§9.3 P4 is investigate-only and its ladder pages nobody', {
+  test('§9.3 P4 is investigate-only until the team gives it a rung', {
     tag: ['@P1', '@oncall-l0'],
   }, async ({ page }, testInfo) => {
-    const { team } = await seedTeamWithL0(page, testInfo);
+    const noP4 = await seedTeamWithL0(page, testInfo, { rungs: [1, 2, 3] });
+    const quiet = await escalationPreview(page, noP4.team.id, 4);
 
-    const preview = await escalationPreview(page, team.id, 4);
-    testLogger.info('§9.3 P4 preview', {
-      l0: preview?.l0 ?? null,
-      pages_anyone: preview?.pages_anyone,
-    });
-
-    expect(preview?.l0 ?? null, 'P4 carries an L0 block — it is the one severity the agent owns alone').toBeTruthy();
+    expect(quiet?.l0 ?? null, 'P4 carries an L0 block — it is the one severity the agent owns alone').toBeTruthy();
     expect(
-      preview.l0.mode,
-      'P4 and P5 are pinned `only` server-side: neither pages a human, so neither has a gate to set',
+      quiet.l0.mode,
+      'P4 and P5 are pinned `only` server-side: neither has a gate to set',
     ).toBe('only');
     expect(
-      preview.pages_anyone,
-      'investigate-only must wake nobody — a P4 that pages somebody is a severity bug',
+      quiet.pages_anyone,
+      'with no P4 rung the agent investigates alone and nobody is woken',
     ).toBe(false);
+
+    const withP4 = await seedTeamWithL0(page, testInfo, { rungs: [1, 2, 3, 4] });
+    const paging = await escalationPreview(page, withP4.team.id, 4);
+
+    expect(
+      paging.pages_anyone,
+      'a team that configures a P4 rung is opting in to being paged at P4 — it is still an issue someone must see',
+    ).toBe(true);
   });
 });

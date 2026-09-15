@@ -125,11 +125,13 @@ test.describe('On-call configuration controls and permission', {
   test('§10.5 a role that may configure is offered the create and row controls', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
+    const name = uniqueName(workerPrefix(testInfo));
+    const team = await createTeam(page, { name });
 
     await pm.oncallTeamsPage.goto(ORG);
     await pm.oncallTeamsPage.expectAvailable();
     await pm.oncallTeamsPage.expectCreateControlVisible();
+    await pm.oncallTeamsPage.revealTeam(team.id, name);
     await expect(page.locator(pm.oncallTeamsPage.editButton(team.id))).toBeVisible({ timeout: 30000 });
     await expect(page.locator(pm.oncallTeamsPage.deleteButton(team.id))).toBeVisible({ timeout: 30000 });
 
@@ -163,7 +165,7 @@ test.describe('On-call configuration controls and permission', {
     // Only from here on: the fixture above had to be created for real.
     await refuseOnCallWrites(page);
 
-    await pm.oncallTeamsPage.openEditDrawer(team.id);
+    await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
     await pm.oncallTeamsPage.fillTeamDescription('after');
     await pm.oncallTeamsPage.saveDrawer();
 
@@ -176,7 +178,7 @@ test.describe('On-call configuration controls and permission', {
       page.locator(pm.oncallTeamsPage.locators.addButton),
       'once a write has been refused the create control must stop being offered',
     ).toHaveCount(0, { timeout: 20000 });
-    await pm.oncallTeamsPage.expectRowActionsHidden(team.id);
+    await pm.oncallTeamsPage.expectRowActionsHidden(team.id, { name });
 
     // The refusal must be real: nothing may have been written.
     const stored = await getTeam(page, team.id);
@@ -203,7 +205,7 @@ test.describe('On-call configuration controls and permission', {
     await pm.oncallTeamsPage.expectCreateControlVisible();
     await refuseOnCallWrites(page);
 
-    await pm.oncallTeamsPage.openEditDrawer(team.id);
+    await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
     await pm.oncallTeamsPage.fillTeamDescription('after');
     await pm.oncallTeamsPage.saveDrawer();
     await expect(page.getByText(DENIED_WORDING).first()).toBeVisible({ timeout: 20000 });

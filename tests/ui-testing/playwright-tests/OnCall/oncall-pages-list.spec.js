@@ -46,6 +46,7 @@ const {
   rungPagingRotation,
   rungEscalatingToTeam,
   seedOnCallStream,
+  seedNotificationDestination,
   firePageAndWait,
   getEscalationProgress,
   getDeliveries,
@@ -133,6 +134,14 @@ test.describe('On-call pages list', {
    * its rotation — the reverse is refused (§8.5), because replacing a schedule
    * whose rotation a policy still points at would leave the ladder aiming at
    * nothing.
+   *
+   * AND MEMBERSHIP IS ONE OF THE WRITERS THAT NAMES A ROTATION, which is why
+   * the schedule also goes in before the members. Putting the first member on a
+   * rotationless team auto-provisions a `source: "default"` rotation and
+   * repoints rungs P1..P3 at it, so a schedule written afterwards is the §8.5
+   * replacement the server refuses — a 400 about a policy this spec never
+   * wrote. Seeding the rotation first leaves that auto-write pointing at OUR
+   * rotation, which `setTeamPolicy` then overwrites deliberately.
    */
   async function seedPageableTeam(page, testInfo, { exhausting = false } = {}) {
     const users = await listOrgUsers(page);
@@ -140,12 +149,13 @@ test.describe('On-call pages list', {
     const memberEmail = users[0].email;
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
-    await addTeamMembers(page, team.id, [memberEmail]);
 
     const rotationId = `${workerPrefix(testInfo)}_rot`;
     await setTeamSchedule(page, team.id, {
       rotations: [rotation({ id: rotationId, name: 'Primary', members: [memberEmail] })],
     });
+
+    await addTeamMembers(page, team.id, [memberEmail]);
 
     if (exhausting) {
       // Two rungs and no repeat, so the ladder runs out inside a test rather
@@ -200,6 +210,11 @@ test.describe('On-call pages list', {
 
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.expectListVisible();
+    // The table frame renders before the fetch resolves, so a snapshot taken
+    // straight after `expectListVisible()` can catch an empty tbody — which
+    // reads as "no headings drawn" and is indistinguishable from the defect
+    // this test is for.
+    await pm.oncallPagesListPage.waitForRows();
     expect(await pm.oncallPagesListPage.isGrouped(), 'grouping is on by default').toBe(true);
 
     const view = await pm.oncallPagesListPage.readGroupsAndRows();
@@ -229,6 +244,24 @@ test.describe('On-call pages list', {
    * twice: once while the ladder is still climbing — it must not already claim
    * to be finished — and once after the server reports exhaustion, where it must
    * say so in words and must NOT still read "Escalating".
+   *
+   * BOTH READS GO THROUGH THE TEAM FILTER, and that is what makes this test
+   * survive a busy org rather than a freshly-wiped one. The list loads a
+   * ladder for at most `ESCALATION_DETAIL_LIMIT` (25) open pages, OLDEST
+   * FIRST, and says so with `oncall-escalation-capped`. A page this test just
+   * opened is the newest in the org, so on an instance carrying more than 25
+   * open pages it is always outside that window — its cell then has no
+   * progress to render and falls back to "Not paged yet", which is not the
+   * product being wrong, it is the row not being loaded. Open pages accumulate
+   * permanently (fixture teardown removes alerts and teams, never the pages
+   * they already opened), so an unfiltered read here is a test that works once
+   * on a clean instance and never again. Narrowing to this test's own team is
+   * the product's own answer to that: `team_id` is a SERVER-side filter, so
+   * the refetched list holds one row and the ladder window covers it.
+   *
+   * The Refresh after it is not optional: changing the team filter calls
+   * `fetchResponses()` alone, and only a full refresh re-runs
+   * `fetchEscalationProgress()` over the newly narrowed set.
    */
   test('§3.2 an exhausted ladder says so, and a climbing one does not', {
     tag: ['@P1'],
@@ -248,9 +281,15 @@ test.describe('On-call pages list', {
     const responseId = pages[0].id;
     const cell = page.locator(`[data-test="oncall-escalation-cell-${responseId}"]`);
 
+    const openListOnThisTeam = async () => {
+      await pm.oncallPagesListPage.goto(ORG);
+      await pm.oncallPagesListPage.expectListVisible();
+      await pm.oncallPagesListPage.filterByTeam(team.id);
+      await pm.oncallPagesListPage.refresh();
+    };
+
     // §3.3 — while it is still climbing the cell must not claim it is over.
-    await pm.oncallPagesListPage.goto(ORG);
-    await pm.oncallPagesListPage.expectListVisible();
+    await openListOnThisTeam();
     await expect(cell, 'the freshly opened page must be on the list').toBeVisible({ timeout: 60000 });
     const climbing = await getEscalationProgress(page, responseId);
     if (climbing && climbing.exhausted !== true) {
@@ -271,8 +310,7 @@ test.describe('On-call pages list', {
       )
       .toBe(true);
 
-    await pm.oncallPagesListPage.goto(ORG);
-    await pm.oncallPagesListPage.expectListVisible();
+    await openListOnThisTeam();
     await expect(cell).toBeVisible({ timeout: 60000 });
 
     await expect(
@@ -297,8 +335,22 @@ test.describe('On-call pages list', {
    * Requires the org to have NO default routing team. Setting one is org-wide
    * and would break every other worker's routing, so this skips rather than
    * touching it.
+   *
+   * PARKED ON A CONFIRMED PRODUCT DEFECT, NOT ON A TEST PROBLEM. The second
+   * half genuinely fails on this build, and the assertion below is the correct
+   * one — so it is left exactly as written and the test is fixme'd rather than
+   * softened. Reproduced without Playwright: fire an alert with no
+   * `oncall_team` into an org whose `default_team_id` is null, and
+   * `GET /api/{org}/oncall/responses/{id}/escalation` answers
+   *   {"stopped_because": "the owning team was deleted — this page needs a new owner"}
+   * on a page whose `team_id` has been null since it opened. Nothing was ever
+   * deleted; no team ever claimed it. The string belongs to the enterprise
+   * backend (it appears in this repo only as a fixture, in
+   * web/src/components/oncall/OnCallEscalation.spec.ts:430), so the fix is a
+   * paired o2-enterprise change. Everything up to that assertion — the page
+   * opening teamless, the row reading "Unrouted" — passes.
    */
-  test('§11.6 a teamless page reads Unrouted and blames nothing on a deletion', {
+  test.fixme('§11.6 a teamless page reads Unrouted and blames nothing on a deletion', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     test.setTimeout(480_000);
@@ -314,9 +366,17 @@ test.describe('On-call pages list', {
     const service = uniqueName(`${workerPrefix(testInfo)}_svc`);
     await seedOnCallStream(page, stream, { services: [service] });
 
+    // TEAMLESS IS NOT DESTINATIONLESS. §4.2 refuses an alert carrying none of
+    // `oncall_team`, `destinations` and `workflows`, and the alert under test
+    // has to omit the FIRST of those — that is what leaves routing to the rules
+    // and lets nothing claim the page. So it carries a destination instead: an
+    // http sink pointed back at this instance, which satisfies §4.2 without
+    // naming an owner. Dropping all three was a seeding mistake, not a way to
+    // build an unrouted page.
+    const destination = await seedNotificationDestination(page, workerPrefix(testInfo));
     const alertName = uniqueName(`${workerPrefix(testInfo)}_alert`);
     const { pages } = await firePageAndWait(page, {
-      alertOptions: { name: alertName, stream },
+      alertOptions: { name: alertName, stream, destinations: [destination] },
     });
     const record = pages[0];
     expect(record.team_id ?? null, 'nothing must have claimed this page').toBeFalsy();

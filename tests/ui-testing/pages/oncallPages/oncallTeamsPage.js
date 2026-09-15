@@ -18,6 +18,11 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier: orgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
+function baseUrl() {
+  return (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/+$/, '');
+}
 
 /**
  * `[data-test="x"]` + `field` -> `[data-test="x-field"]`.
@@ -99,6 +104,7 @@ export class OnCallTeamsPage {
    *   being off, which is why nothing in these page objects accepts a name.
    */
   async goto(orgId) {
+    this.orgId = orgId;
     await this.page.goto(`/web/oncall/teams?org_identifier=${orgId}`);
     await expect(this.page.locator(this.locators.root)).toBeVisible({ timeout: 30000 });
     testLogger.navigation('On-call teams');
@@ -128,7 +134,22 @@ export class OnCallTeamsPage {
     await expect(this.getFormDrawer()).toBeVisible({ timeout: 20000 });
   }
 
-  async openEditDrawer(teamId) {
+  /**
+   * Bring a team's row into view before acting on it.
+   *
+   * The list paginates, so a row is missing from the DOM whenever the org holds
+   * more teams than one page shows — which reads as "the team was never created".
+   * Search spans the whole list rather than the rendered page, so it reaches a
+   * row on any page. A no-op when the row is already there.
+   */
+  async revealTeam(teamId, name) {
+    if (await this.page.locator(this.editButton(teamId)).count()) return;
+    if (!name) return;
+    await this.search(name);
+  }
+
+  async openEditDrawer(teamId, { name } = {}) {
+    await this.revealTeam(teamId, name);
     await this.page.locator(this.editButton(teamId)).click();
     await expect(this.getFormDrawer()).toBeVisible({ timeout: 20000 });
   }
@@ -168,6 +189,26 @@ export class OnCallTeamsPage {
     await this.selectOption(this.locators.formTimezone, timezone);
   }
 
+  /**
+   * Stage people on the CREATE drawer.
+   *
+   * The picker only exists while creating (`v-if="!isEdit"`) — once the team
+   * exists, membership has a screen of its own — and the order picked is the
+   * order the default rotation puts people in, so it is load-bearing.
+   */
+  async pickFormMembers(emails) {
+    const trigger = this.page.locator(part(this.locators.formMembers, 'trigger')).first();
+    await trigger.waitFor({ state: 'visible', timeout: 20000 });
+    await trigger.click();
+    for (const email of emails) {
+      const option = this.page
+        .locator(`${part(this.locators.formMembers, 'option')}[data-test-value="${email}"]`).first();
+      await option.waitFor({ state: 'visible', timeout: 20000 });
+      await option.click();
+    }
+    await this.page.keyboard.press('Escape');
+  }
+
   /** Creation only — once the team exists, membership has a screen of its own. */
   async addEveryone() {
     await this.page.locator(this.locators.formAddEveryone).click();
@@ -201,7 +242,8 @@ export class OnCallTeamsPage {
   }
 
   /** Open the confirmation without confirming it — the message names the team. */
-  async openDeleteDialog(teamId) {
+  async openDeleteDialog(teamId, { name } = {}) {
+    await this.revealTeam(teamId, name);
     await this.page.locator(this.deleteButton(teamId)).click();
     await expect(this.page.locator(this.locators.confirmDialog)).toBeVisible({ timeout: 20000 });
   }
@@ -213,8 +255,8 @@ export class OnCallTeamsPage {
    * a drawer — so `o-dialog-primary-btn` is the right control, scoped to the
    * dialog's own panel so a second dialog on screen cannot win the match.
    */
-  async deleteTeam(teamId) {
-    await this.openDeleteDialog(teamId);
+  async deleteTeam(teamId, { name } = {}) {
+    await this.openDeleteDialog(teamId, { name });
     await this.page.locator(this.locators.confirmOk).click();
     await expect(this.page.locator(this.locators.confirmDialog)).toHaveCount(0, { timeout: 20000 });
     testLogger.info('On-call team deleted via UI', { teamId });
@@ -232,7 +274,8 @@ export class OnCallTeamsPage {
     await expect(this.page.locator(this.locators.table)).toBeVisible({ timeout: 30000 });
   }
 
-  async expectRowVisible(teamId) {
+  async expectRowVisible(teamId, { name } = {}) {
+    await this.revealTeam(teamId, name);
     await expect(this.page.locator(this.editButton(teamId))).toBeVisible({ timeout: 30000 });
   }
 
@@ -244,20 +287,25 @@ export class OnCallTeamsPage {
   /**
    * Gone from the SERVER, not merely from the rendered list.
    *
-   * Re-reads between checks rather than trusting the asynchronous client-side
-   * refresh that follows a delete; racing that refresh makes a correctly-deleted
-   * team look like it survived. Safe only when no filter is applied.
+   * The server is asked directly. An absent row is NOT evidence of deletion: the
+   * list paginates, so a team that still exists on page 2 renders zero rows here
+   * and a DOM-only check passes while the delete silently did nothing.
    */
   async expectRowDeleted(teamId, { timeout = 30000 } = {}) {
-    const selector = this.editButton(teamId);
     const deadline = Date.now() + timeout;
+    let last = null;
     while (Date.now() < deadline) {
-      if ((await this.page.locator(selector).count()) === 0) return;
-      await this.page.reload();
-      await this.page.waitForLoadState('domcontentloaded');
-      await this.page.locator(this.locators.table).waitFor({ state: 'visible', timeout: 20000 });
+      const res = await this.page.request.get(
+        `${baseUrl()}/api/${this.orgId ?? orgIdentifier()}/oncall/teams/${teamId}`,
+        { headers: getAuthHeaders() },
+      );
+      last = res.status();
+      if (last === 404) return;
+      await this.page.waitForTimeout(1000);
     }
-    await expect(this.page.locator(selector)).toHaveCount(0, { timeout: 5000 });
+    throw new Error(
+      `team ${teamId} still exists on the server after ${timeout}ms — GET returned ${last}, not 404`,
+    );
   }
 
   /**
@@ -267,11 +315,22 @@ export class OnCallTeamsPage {
    * cell with the secondary — a staffed secondary used to fill the shared cell
    * and hide it entirely.
    */
-  async expectPrimaryGap(teamId) {
+  async expectPrimaryGap(teamId, { name } = {}) {
+    await this.revealTeam(teamId, name);
     await expect(this.page.locator(this.primaryGapTag(teamId))).toBeVisible({ timeout: 30000 });
   }
 
-  async expectNoPrimaryGap(teamId) {
+  /**
+   * Somebody covers the primary pool — read as the ABSENCE of the gap tag.
+   *
+   * Anchored on the row, because a team on another page also renders no gap tag
+   * and would otherwise read as covered. Pass `name` wherever it is known.
+   */
+  async expectNoPrimaryGap(teamId, { name } = {}) {
+    await this.revealTeam(teamId, name);
+    if (name) {
+      await expect(this.page.getByText(name, { exact: true }).first()).toBeVisible({ timeout: 20000 });
+    }
     await expect(this.page.locator(this.primaryGapTag(teamId))).toHaveCount(0, { timeout: 30000 });
   }
 
@@ -290,7 +349,20 @@ export class OnCallTeamsPage {
     await expect(this.page.locator(this.locators.addButton)).toBeVisible({ timeout: 20000 });
   }
 
-  async expectRowActionsHidden(teamId) {
+  /**
+   * The row is on screen and its actions are not.
+   *
+   * Pass `name` wherever it is known: absent action buttons are also what a row
+   * on another page looks like, so without anchoring on the row itself this
+   * passes for a team that simply was not rendered.
+   */
+  async expectRowActionsHidden(teamId, { name } = {}) {
+    if (name) {
+      await expect(
+        this.page.getByText(name, { exact: true }).first(),
+        'the row must be on screen, or hidden actions prove nothing',
+      ).toBeVisible({ timeout: 20000 });
+    }
     await expect(this.page.locator(this.editButton(teamId))).toHaveCount(0, { timeout: 20000 });
     await expect(this.page.locator(this.deleteButton(teamId))).toHaveCount(0, { timeout: 20000 });
   }

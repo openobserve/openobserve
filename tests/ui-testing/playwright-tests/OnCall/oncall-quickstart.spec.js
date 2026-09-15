@@ -39,6 +39,7 @@ const {
   isOnCallAvailable,
   createTeam,
   addTeamMembers,
+  detachPolicyFromRotations,
   setTeamSchedule,
   getTeamSchedule,
   baseUrl,
@@ -102,6 +103,14 @@ test.describe('On-call Quick start', {
    * Members are needed for the preset's people picker to have options at all;
    * the empty rotation list is what keeps the replace confirmation out of the
    * way of the validation under test.
+   *
+   * THE POLICY HAS TO BE DETACHED BETWEEN THE TWO. Putting the first member on
+   * a rotationless team auto-provisions a `source: "default"` rotation and
+   * repoints rungs P1..P3 at it, so clearing the rotations afterwards is the
+   * §8.5 replacement the server refuses. The schedule-first order the other
+   * specs use is no help here — the rotations being written are EMPTY, and an
+   * existing-but-rotationless schedule auto-provisions just the same — so this
+   * takes the other limb of the server's own advice and edits the policy first.
    */
   async function seedEmptyScheduleTeam(page, testInfo) {
     const users = await listOrgUsers(page);
@@ -109,6 +118,7 @@ test.describe('On-call Quick start', {
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
     await addTeamMembers(page, team.id, [users[0].email]);
+    await detachPolicyFromRotations(page, team.id);
     await setTeamSchedule(page, team.id, { rotations: [] });
     return { team, members: users };
   }
@@ -194,16 +204,24 @@ test.describe('On-call Quick start', {
   /**
    * The second limb, pinned precisely.
    *
-   * With the region NAMED and still unstaffed there is exactly one invalid
-   * field, and `apply()` takes the single-field branch — the one that names it.
-   * Worth its own test because the multi-field branch says only "fix the
-   * highlighted fields", which would pass an assertion about naming without
-   * naming anything.
+   * With EXACTLY ONE field still blank, `apply()` takes the single-field branch
+   * — the one that names it. Worth its own test because the multi-field branch
+   * says only "fix the highlighted fields", which would pass an assertion about
+   * naming without naming anything.
+   *
+   * REACHING THAT BRANCH MEANS FILLING BOTH REGIONS BAR ONE FIELD. The
+   * catalogue declares `groups` with `min: 2`, so the shape opens at TWO region
+   * rows and each wants a name and a roster: naming only `groups-0` leaves
+   * three fields blank and lands on the summary instead. So this fills
+   * `groups-1` completely, names `groups-0`, and leaves that one roster empty —
+   * the single gap the message then has to name. The catch-all is not in the
+   * count: it is optional and its controls stay off screen until overridden,
+   * and `invalidFields()` skips a row whose controls are not visible.
    */
   test('§11.2 a named but unstaffed region gets a message naming the gap', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const { team } = await seedEmptyScheduleTeam(page, testInfo);
+    const { team, members } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
     const regions = page.locator(pm.oncallTeamDetailPage.presetTab(REGIONS_PRESET));
@@ -213,12 +231,21 @@ test.describe('On-call Quick start', {
     );
 
     await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
-    // Row keys for a repeated group are `<field>-<index>`; the first region is
-    // always present because a group_list opens at its declared minimum.
+    // Row keys for a repeated group are `<field>-<index>`, and a group_list
+    // opens at its declared minimum — two, for this shape.
     await expect(
       page.locator(pm.oncallTeamDetailPage.presetRow('groups-0')),
     ).toBeVisible({ timeout: 20000 });
+    await expect(
+      page.locator(pm.oncallTeamDetailPage.presetRow('groups-1')),
+      'follow_the_sun declares min: 2 regions, so the second row opens with the shape',
+    ).toBeVisible({ timeout: 20000 });
+
     await pm.oncallTeamDetailPage.fillQuickStartRegionName('groups-0', 'APAC');
+    await pm.oncallTeamDetailPage.fillQuickStartRegionName('groups-1', 'EMEA');
+    // The member picker offers the TEAM's roster, and the team was staffed with
+    // the first org user, so that is the one address certain to be on offer.
+    await pm.oncallTeamDetailPage.setQuickStartRegionMembers('groups-1', [members[0].email]);
 
     const outcome = await pm.oncallTeamDetailPage.attemptQuickStartSave();
     testLogger.info('§11.2 named-but-unstaffed outcome', outcome);

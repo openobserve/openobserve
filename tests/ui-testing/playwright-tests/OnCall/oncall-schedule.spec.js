@@ -109,11 +109,17 @@ test.describe('On-call schedules and rotations', {
    * The schedule is a FULL REPLACE and must be written before any policy names
    * the rotation, which is why nothing here sets a policy: §8.5 refuses a
    * replacement whose rotation an escalation policy still points at.
+   *
+   * THE SCHEDULE GOES IN BEFORE THE MEMBERS, and that order is load-bearing
+   * rather than stylistic. Putting the first member on a rotationless team
+   * auto-provisions a `source: "default"` rotation and repoints rungs P1..P3 at
+   * it, so a schedule written afterwards is the §8.5 replacement the server
+   * refuses — a 400 about a policy this spec never wrote. Seeding the rotation
+   * first leaves that auto-write pointing at OUR rotation instead.
    */
   async function seedAllDayTeam(page, testInfo, { memberEmail }) {
     const name = uniqueName(workerPrefix(testInfo));
     const team = await createTeam(page, { name });
-    await addTeamMembers(page, team.id, [memberEmail]);
 
     const rotationId = `${workerPrefix(testInfo)}_rot`;
     await setTeamSchedule(page, team.id, {
@@ -124,6 +130,8 @@ test.describe('On-call schedules and rotations', {
         restrictions: [allDayRestriction()],
       })],
     });
+
+    await addTeamMembers(page, team.id, [memberEmail]);
     return { team, rotationId };
   }
 

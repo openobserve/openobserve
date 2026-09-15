@@ -81,6 +81,10 @@ export class OnCallRoutingPage {
       ruleEditor: '[data-test="oncall-rule-editor"]',
       ruleEditorTeam: '[data-test="oncall-rule-editor-team"]',
       ruleEditorScope: '[data-test="oncall-rule-editor-scope"]',
+      // The scope picker the editor opens on, and its way out to the
+      // dimension-by-dimension builder.
+      scopePicker: '[data-test="oncall-scope-picker"]',
+      scopeModeAdvanced: '[data-test="oncall-scope-mode-advanced"]',
       ruleEditorSentence: '[data-test="oncall-rule-editor-sentence"]',
       ruleEditorConditions: '[data-test="oncall-rule-editor-conditions"]',
       ruleEditorAddCondition: '[data-test="oncall-rule-editor-add-condition"]',
@@ -105,6 +109,43 @@ export class OnCallRoutingPage {
       unroutedShowDismissed: '[data-test="oncall-unrouted-show-dismissed"]',
       unroutedError: '[data-test="oncall-unrouted-error"]',
 
+      // The unrouted queue (OnCallUnroutedQueue) — a DIFFERENT component from the
+      // `oncall-routing-signal-*` rows above, rendered on the signals tab with
+      // `show-header=false`. Its rows are keyed by the SIGNAL id.
+      unrouted: '[data-test="oncall-unrouted"]',
+      unroutedTable: '[data-test="oncall-unrouted-table"]',
+      unroutedHeader: '[data-test="oncall-unrouted-header"]',
+      unroutedEmpty: '[data-test="oncall-unrouted-empty"]',
+      unroutedClaimAll: '[data-test="oncall-unrouted-claim-all"]',
+
+      // The dry-run simulator, which lives in the tester drawer.
+      simulator: '[data-test="oncall-routing-simulator"]',
+      simulatorEmpty: '[data-test="oncall-simulator-empty"]',
+      simulatorAddDimension: '[data-test="oncall-simulator-add-dimension"]',
+      simulatorAdder: '[data-test="oncall-simulator-adder"]',
+      simulatorDimensionName: '[data-test="oncall-simulator-dimension-name"]',
+      simulatorDimensionValue: '[data-test="oncall-simulator-dimension-value"]',
+      simulatorDimensionConfirm: '[data-test="oncall-simulator-dimension-confirm"]',
+      simulatorPriority: '[data-test="oncall-simulator-priority"]',
+      simulatorPriorityChip: '[data-test="oncall-simulator-chip-priority"]',
+      simulatorRun: '[data-test="oncall-simulator-run"]',
+      simulatorResult: '[data-test="oncall-simulator-result"]',
+      simulatorSpecificity: '[data-test="oncall-simulator-specificity"]',
+      simulatorTeam: '[data-test="oncall-simulator-team"]',
+      simulatorLadder: '[data-test="oncall-simulator-ladder"]',
+      simulatorResponder: '[data-test="oncall-simulator-responder"]',
+      simulatorSendTest: '[data-test="oncall-simulator-send-test"]',
+
+      // The org's catch-all nomination (OnCallDefaultTeamCard). NOTHING
+      // auto-creates it: until a human nominates a team there is no default,
+      // and an unmatched signal reaches the unrouted queue instead.
+      defaultTeamCard: '[data-test="oncall-default-team-card"]',
+      defaultTeamOpen: '[data-test="oncall-default-team-open"]',
+      defaultTeamDialog: '[data-test="oncall-default-team-dialog"]',
+      defaultTeamSelect: '[data-test="oncall-default-team-select"]',
+      defaultTeamSave: '[data-test="oncall-default-team-save"]',
+      defaultTeamUnset: '[data-test="oncall-default-team-unset"]',
+
       confirmDialog: '[data-test="confirm-dialog"]',
       confirmOk: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
     };
@@ -122,6 +163,15 @@ export class OnCallRoutingPage {
   ruleTeam(ruleId) { return `[data-test="oncall-rule-team-${ruleId}"]`; }
   ownershipEdit(ruleId) { return `[data-test="oncall-ownership-edit-${ruleId}"]`; }
   ownershipDelete(ruleId) { return `[data-test="oncall-ownership-delete-${ruleId}"]`; }
+
+  unroutedPath(signalId) { return `[data-test="oncall-unrouted-path-${signalId}"]`; }
+  unroutedNobody(signalId) { return `[data-test="oncall-unrouted-nobody-${signalId}"]`; }
+  unroutedDefaulted(signalId) { return `[data-test="oncall-unrouted-defaulted-${signalId}"]`; }
+  unroutedClaim(signalId) { return `[data-test="oncall-unrouted-claim-${signalId}"]`; }
+  unroutedDismiss(signalId) { return `[data-test="oncall-unrouted-dismiss-${signalId}"]`; }
+  unroutedDismissed(signalId) { return `[data-test="oncall-unrouted-dismissed-${signalId}"]`; }
+  simulatorChip(name) { return `[data-test="oncall-simulator-chip-${name}"]`; }
+  simulatorAlso(ruleId) { return `[data-test="oncall-simulator-also-${ruleId}"]`; }
 
   signalRow(signalId) { return `[data-test="oncall-routing-signal-${signalId}"]`; }
   signalClaim(signalId) { return `[data-test="oncall-routing-claim-${signalId}"]`; }
@@ -182,17 +232,60 @@ export class OnCallRoutingPage {
    * By `data-test-value`, not by label: options are virtualized and the label is
    * translated, so a label match breaks on both counts.
    */
-  async selectOption(fieldSelector, value) {
+  async selectOption(fieldSelector, value, searchTerm = null) {
     const trigger = this.page.locator(part(fieldSelector, 'trigger')).first();
     await trigger.waitFor({ state: 'visible', timeout: 20000 });
     await trigger.click();
+
+    // OSelect virtualises past 50 options, so on an org carrying fixture teams
+    // from earlier runs the wanted row is simply not in the DOM until the list
+    // is narrowed. The popover's search box matches the LABEL, never the value.
+    if (searchTerm) {
+      const search = this.page.locator(part(fieldSelector, 'search')).first();
+      await search.waitFor({ state: 'visible', timeout: 20000 });
+      await search.fill(searchTerm);
+    }
+
     const option = this.page.locator(`${part(fieldSelector, 'option')}[data-test-value="${value}"]`).first();
     await option.waitFor({ state: 'visible', timeout: 20000 });
     await option.click();
+
+    // The popover is rendered over the rest of the drawer, so the next control
+    // is unclickable until it has actually gone — a single-select closes on
+    // pick, but not synchronously.
+    await expect(this.page.locator(part(fieldSelector, 'popover'))).toBeHidden({ timeout: 20000 });
   }
 
-  async chooseRuleTeam(teamId) {
-    await this.selectOption(this.locators.ruleEditorTeam, teamId);
+  /**
+   * @param {string} teamId the option's VALUE.
+   * @param {string} [teamName] the option's LABEL, used to narrow a long list.
+   */
+  async chooseRuleTeam(teamId, teamName = null) {
+    await this.selectOption(this.locators.ruleEditorTeam, teamId, teamName);
+  }
+
+  /**
+   * Leave the scope picker for the dimension-by-dimension builder.
+   *
+   * THE EDITOR DOES NOT OPEN ON THE BUILDER. It opens on `OnCallScopePicker`,
+   * which offers the three claims almost every rule is — "this cluster", "this
+   * namespace", "this service wherever it runs" — built from dimensions the org
+   * has actually SEEN. A freshly-seeded service is not in that catalogue, so a
+   * spec claiming one has to take the picker's own way out
+   * (`oncall-scope-mode-advanced`) before `oncall-rule-editor-add-condition`
+   * exists at all: it renders under `v-else-if="!scoped"`.
+   */
+  async useAdvancedRuleScope() {
+    const advanced = this.page.locator(this.locators.scopeModeAdvanced);
+    if (await advanced.count()) {
+      await advanced.first().click();
+    }
+    // Leaving the picker opens the builder with its first pair already being
+    // entered, so what proves the switch took is the dimension field itself —
+    // `oncall-rule-editor-add-condition` is the button for the NEXT pair and
+    // does not exist while one is in progress.
+    await expect(this.page.locator(this.locators.ruleEditorDimensionName))
+      .toBeVisible({ timeout: 20000 });
   }
 
   /**
@@ -203,15 +296,25 @@ export class OnCallRoutingPage {
    * team is woken when two rules match (§5.5).
    */
   async addCondition(name, value) {
-    await this.page.locator(this.locators.ruleEditorAddCondition).click();
-    await this.selectOption(this.locators.ruleEditorDimensionName, name);
-    const valueField = this.page
-      .locator(part(this.locators.ruleEditorDimensionValue, 'field')).first();
-    if (await valueField.count()) {
-      await valueField.fill(value);
-    } else {
-      await this.selectOption(this.locators.ruleEditorDimensionValue, value);
+    // Two states, one method: the editor shows the draft pair's fields as soon
+    // as it enters the builder, and shows "Add condition" only once no pair is
+    // in progress. Clicking the button when the fields are already open would
+    // time out; skipping it when they are not would type into nothing.
+    const adder = this.page.locator(this.locators.ruleEditorDimensionName);
+    if ((await adder.count()) === 0) {
+      await this.page.locator(this.locators.ruleEditorAddCondition).click();
     }
+    await this.selectOption(this.locators.ruleEditorDimensionName, name);
+
+    // The VALUE is an OCombobox, not an OSelect — deliberately: the dimension
+    // name is a closed vocabulary, but the value is data and a rule may claim a
+    // service the org has not emitted yet. Its editable part is `-input`, and it
+    // has no `-trigger` and no `-field`.
+    const valueInput = this.page
+      .locator(part(this.locators.ruleEditorDimensionValue, 'input')).first();
+    await valueInput.waitFor({ state: 'visible', timeout: 20000 });
+    await valueInput.fill(value);
+
     await this.page.locator(this.locators.ruleEditorConfirmCondition).click();
   }
 
@@ -359,6 +462,25 @@ export class OnCallRoutingPage {
     await expect(this.page.locator(this.ruleRow(ruleId))).toHaveCount(0, { timeout: 30000 });
   }
 
+  /**
+   * The ORG routing screen draws `OnCallOwnershipRules` — the stats table, keyed
+   * `oncall-rule-team-{id}` / `oncall-rule-health-{id}`. `oncall-routing-row-{id}`
+   * belongs to `OnCallRoutingList`, which is what the TEAM's routing tab renders.
+   * The two are different components over the same rules, so a spec must ask the
+   * one that is actually on screen.
+   */
+  async expectOrgRuleRowVisible(ruleId) {
+    await expect(this.page.locator(this.ruleTeam(ruleId))).toBeVisible({ timeout: 30000 });
+  }
+
+  async expectOrgRuleRowAbsent(ruleId) {
+    await expect(this.page.locator(this.ruleTeam(ruleId))).toHaveCount(0, { timeout: 30000 });
+  }
+
+  async expectOrgRuleNamesTeam(ruleId, teamName) {
+    await expect(this.page.locator(this.ruleTeam(ruleId))).toContainText(teamName, { timeout: 30000 });
+  }
+
   /** A rule repointed at another team says so, rather than claiming it pages us. */
   async expectRulePagesElsewhere(ruleId) {
     await expect(this.page.locator(this.ruleElsewhere(ruleId))).toBeVisible({ timeout: 30000 });
@@ -378,6 +500,134 @@ export class OnCallRoutingPage {
   async expectRuleControlsHidden() {
     await expect(this.page.locator(this.locators.addRule)).toHaveCount(0, { timeout: 20000 });
   }
+
+  // ------------------------------------------------------------- the simulator
+
+  /**
+   * Add one dimension pair to the hypothetical signal.
+   *
+   * The name is a SEMANTIC GROUP ID and the picker is closed vocabulary —
+   * `service`, `k8s-namespace`, `environment` — while the rows a rule matches
+   * against carry the underlying column (`service`, `namespace`). The group
+   * definition is what joins the two, which is why a typo here would produce a
+   * confident "nothing matches" for a dimension nothing ever emits.
+   */
+  async addSimulatorDimension(name, value) {
+    await this.page.locator(this.locators.simulatorAddDimension).click();
+    await expect(this.page.locator(this.locators.simulatorAdder)).toBeVisible({ timeout: 20000 });
+    await this.selectOption(this.locators.simulatorDimensionName, name);
+    await this.page.locator(part(this.locators.simulatorDimensionValue, 'field')).first().fill(value);
+    await this.page.locator(this.locators.simulatorDimensionConfirm).click();
+    await expect(this.page.locator(this.simulatorChip(name))).toBeVisible({ timeout: 20000 });
+  }
+
+
+  async runSimulator() {
+    await this.page.locator(this.locators.simulatorRun).click();
+    await expect(this.page.locator(this.locators.simulatorResult)).toBeVisible({ timeout: 30000 });
+  }
+
+  /** Every field of the rendered verdict, as one object a spec can compare. */
+  async readSimulatorResult() {
+    const textOf = async (selector) => {
+      const node = this.page.locator(selector);
+      if ((await node.count()) === 0) return null;
+      return ((await node.first().innerText()) ?? '').replace(/\s+/g, ' ').trim();
+    };
+    return {
+      matched: await textOf(this.locators.simulatorResult),
+      specificity: await textOf(this.locators.simulatorSpecificity),
+      team: await textOf(this.locators.simulatorTeam),
+      ladder: await textOf(this.locators.simulatorLadder),
+      responder: await textOf(this.locators.simulatorResponder),
+    };
+  }
+
+
+  /** The simulator names the team it would page, by NAME rather than by id. */
+  async expectSimulatorTeamNames(teamName) {
+    await expect(this.page.locator(this.locators.simulatorTeam)).toContainText(teamName, { timeout: 30000 });
+  }
+
+
+
+
+  // -------------------------------------------------------- the default team
+
+  /**
+   * THE ORG ROUTING SCREEN RENDERS THIS COMPONENT IN `dialog` MODE, and the two
+   * modes draw different DOM. In dialog mode there is NO
+   * `oncall-default-team-card` and NO `oncall-default-team-save`: the trigger is
+   * `oncall-default-team-open`, whose own LABEL names the current answer, and
+   * the save is the ODialog's primary button. `oncall-default-team-card` and
+   * `-save` only exist in the inline (card) mode used elsewhere.
+   *
+   * And `oncall-default-team-unset` is NOT a control. It is the warning
+   * PARAGRAPH the dialog shows while no default is nominated — clicking it does
+   * nothing. Nor is there another: the dialog's "none" entry carries an EMPTY
+   * value, which OSelect does not stamp as `data-test-value=""`, so a nominated
+   * default cannot be un-nominated from this screen at all.
+   */
+  async expectDefaultTeamControlVisible() {
+    await expect(this.page.locator(this.locators.defaultTeamOpen)).toBeVisible({ timeout: 30000 });
+  }
+
+
+  async openDefaultTeamDialog() {
+    await this.page.locator(this.locators.defaultTeamOpen).click();
+    await expect(this.page.locator(this.locators.defaultTeamDialog)).toBeVisible({ timeout: 20000 });
+  }
+
+  /** The dialog's own primary button — the component renders no Save of its own here. */
+  async saveDefaultTeamDialog() {
+    await this.page
+      .locator(`${this.locators.defaultTeamDialog} [data-test="o-dialog-primary-btn"]`)
+      .click();
+    await expect(this.page.locator(this.locators.defaultTeamDialog)).toBeHidden({ timeout: 20000 });
+  }
+
+  /**
+   * @param {string} teamId the option's VALUE.
+   * @param {string} [teamName] the option's LABEL, used to narrow a long list.
+   */
+  async nominateDefaultTeam(teamId, teamName = null) {
+    await this.openDefaultTeamDialog();
+    await this.selectOption(this.locators.defaultTeamSelect, teamId, teamName);
+    await this.saveDefaultTeamDialog();
+  }
+
+
+  /** The dialog's standing warning that the org has nominated nobody. */
+  async expectDefaultTeamUnsetWarning() {
+    await this.openDefaultTeamDialog();
+    await expect(this.page.locator(this.locators.defaultTeamUnset)).toBeVisible({ timeout: 20000 });
+  }
+
+  async expectDefaultTeamLabelNames(teamName) {
+    await expect(this.page.locator(this.locators.defaultTeamOpen)).toContainText(teamName, { timeout: 30000 });
+  }
+
+  // ------------------------------------------------------ the unrouted queue
+
+
+
+  /** The full identity path of one unrouted signal — WHY nothing matched. */
+  async readUnroutedPath(signalId) {
+    const node = this.page.locator(this.unroutedPath(signalId));
+    await node.waitFor({ state: 'visible', timeout: 30000 });
+    return ((await node.innerText()) ?? '').replace(/\s+/g, ' ').trim();
+  }
+
+  async expectUnroutedRowVisible(signalId) {
+    await expect(this.page.locator(this.unroutedPath(signalId))).toBeVisible({ timeout: 30000 });
+  }
+
+  /** "Nobody was paged" — the queue's harsher of two landings. */
+  async expectUnroutedReachedNobody(signalId) {
+    await expect(this.page.locator(this.unroutedNobody(signalId))).toBeVisible({ timeout: 30000 });
+  }
+
+
 
   // ------------------------------------------------------- enterprise gating
 

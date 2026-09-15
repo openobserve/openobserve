@@ -66,6 +66,8 @@ export class OnCallPagesListPage {
       unavailable: '[data-test="oncall-responses-unavailable"]',
       truncated: '[data-test="oncall-responses-truncated"]',
       escalationCapped: '[data-test="oncall-escalation-capped"]',
+      responderNobody: '[data-test="oncall-responder-nobody"]',
+      onCallNowGap: '[data-test="oncall-oncallnow-gap"]',
 
       // Bulk bar, which only exists once something is selected.
       bulkCount: '[data-test="oncall-bulk-count"]',
@@ -160,13 +162,32 @@ export class OnCallPagesListPage {
    * Team and cause are SERVER-side filters — they refetch — while priority is
    * client-side. Options carry the raw value on `data-test-value`, so matching
    * on the label would break under translation and on virtualized rows.
+   *
+   * OSelect IS ALWAYS VIRTUALIZED — `useVirtualizer` with no row-count
+   * threshold — so an option past the first screenful is not in the DOM at all
+   * until the popover is scrolled to it, and `waitFor({state:'visible'})` on it
+   * times out looking for something that was never rendered. An org that has
+   * accumulated a couple of dozen teams is already past that line, which is
+   * why this scrolls rather than assuming. Scrolling the popover rather than
+   * the page: the virtualizer watches the listbox's own scroll element.
    */
   async _selectFilter(fieldSelector, value) {
     const trigger = this.page.locator(part(fieldSelector, 'trigger')).first();
     await trigger.waitFor({ state: 'visible', timeout: 20000 });
     await trigger.click();
+
     const option = this.page.locator(`${part(fieldSelector, 'option')}[data-test-value="${value}"]`).first();
+    const popover = this.page.locator(part(fieldSelector, 'popover')).first();
+    await popover.waitFor({ state: 'visible', timeout: 20000 });
+
+    for (let pass = 0; pass < 40 && (await option.count()) === 0; pass++) {
+      await popover.hover();
+      await this.page.mouse.wheel(0, 200);
+      await this.page.waitForTimeout(100);
+    }
+
     await option.waitFor({ state: 'visible', timeout: 20000 });
+    await option.scrollIntoViewIfNeeded();
     await option.click();
     await this.page.waitForTimeout(500);
   }
@@ -438,6 +459,27 @@ export class OnCallPagesListPage {
     await expect(this.page.locator(this.locators.table)).toBeVisible({ timeout: 30000 });
   }
 
+  /**
+   * Block until the table has actually drawn its rows.
+   *
+   * `expectListVisible()` only proves the SHELL is up: the root and the table
+   * frame render before `refreshAll()` resolves, so a read taken straight after
+   * it can snapshot an empty `<tbody>` — no rows, and with grouping on, no
+   * section headings either. That reads as "the list drew no headings", which
+   * is indistinguishable from the §11.3 defect and just as red, except
+   * intermittently. Anything asserting on what the table CONTAINS waits here
+   * first; anything asserting the empty state must not.
+   */
+  async waitForRows({ timeout = 60000 } = {}) {
+    await expect
+      .poll(async () => await this.countRowsOnPage(), {
+        timeout,
+        intervals: [500],
+        message: 'the pages table never drew a row — the list fetch may still be in flight',
+      })
+      .toBeGreaterThan(0);
+  }
+
   async expectRowVisible(rowKey) {
     await expect(this.page.locator(this.rowTeam(rowKey))).toBeVisible({ timeout: 30000 });
   }
@@ -471,6 +513,45 @@ export class OnCallPagesListPage {
     const cell = this.page.locator(this.rowTeam(rowKey));
     await cell.waitFor({ state: 'visible', timeout: 30000 });
     return ((await cell.textContent()) ?? '').trim();
+  }
+
+  /**
+   * The section keys the list actually drew, with the count each one claims.
+   *
+   * The count is the assertion: a section heading saying 3 over 2 rows is the
+   * bug this reads for, and only reading BOTH off the same render can catch it.
+   */
+  async readSectionCounts() {
+    const headers = this.page.locator('[data-test^="oncall-section-header-"]');
+    const total = await headers.count();
+    const out = {};
+    for (let i = 0; i < total; i++) {
+      const attr = await headers.nth(i).getAttribute('data-test');
+      if (!attr) continue;
+      const key = attr.replace('oncall-section-header-', '');
+      const countNode = this.page.locator(this.sectionCount(key));
+      const text = (await countNode.count()) ? ((await countNode.first().innerText()) ?? '').trim() : '';
+      const m = /(\d+)/.exec(text);
+      out[key] = m ? Number(m[1]) : null;
+    }
+    return out;
+  }
+
+  /**
+   * A rung that reached NOBODY renders as such rather than as a blank cell.
+   *
+   * An empty responder cell and "this rung reached nobody" look identical to a
+   * scanner and mean opposite things, which is why this is its own element and
+   * its own assertion.
+   */
+  async expectResponderNobodyVisible() {
+    await expect(this.page.locator(this.locators.responderNobody).first()).toBeVisible({ timeout: 30000 });
+  }
+
+
+  /** The cause filter exists on the list, not only on the record — §TS-15.06. */
+  async expectCauseFilterVisible() {
+    await expect(this.page.locator(this.locators.causeFilter)).toBeVisible({ timeout: 30000 });
   }
 
   /** The list hit its fetch cap. The loaded length is never the total — §G.5. */
