@@ -626,19 +626,6 @@ const formatTimestamp = (timestamp: number) => formatToolCallTimestamp(timestamp
   background: color-mix(in srgb, var(--color-status-negative) 22%, transparent);
 }
 
-.tool-call-item.timeout {
-  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
-}
-.dark .tool-call-item.timeout {
-  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
-}
-.tool-call-item.timeout.has-details:hover {
-  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
-}
-.dark .tool-call-item.timeout.has-details:hover {
-  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
-}
-
 .tool-call-item.pending-confirmation {
   cursor: default;
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
