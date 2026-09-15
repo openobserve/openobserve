@@ -9,6 +9,19 @@ Keep this file updated as rows move. The label on the issue is the source of
 truth for "done"; this file is the working queue and the reasoning behind the
 calls that are **not** going to be automated.
 
+## What counts as covered
+
+**A Playwright test under `tests/ui-testing/playwright-tests/`.** Vitest unit
+coverage under `web/src/**.spec.ts` does NOT clear an issue off this queue, no
+matter how thorough it is — an issue is only `Automation-Complete` when there is
+a Playwright test for it.
+
+Unit coverage is still worth recording, because it tells you what the E2E test
+does *not* need to re-prove (field-by-field parsing, colour maps, chart option
+shapes) and lets the E2E test aim at the seam the unit tests cannot reach —
+usually the backend contract or the rendered page. But it is never the answer to
+"is this automated".
+
 ## Conventions this queue assumes
 
 - One spec per **theme** (2–5 related issues), not one per issue and not
@@ -35,9 +48,11 @@ calls that are **not** going to be automated.
 
 #9498 and #12647 are the same bug filed twice.
 
-## Already covered — LABELS SWITCHED 2026-09-15 (20)
+## Already covered — LABELS SWITCHED 2026-09-15 (19)
 
-All 20 moved `Needs-Automation` → `Automation-Complete` on 2026-09-15. The two
+19 moved `Needs-Automation` → `Automation-Complete` on 2026-09-15. A 20th
+(#11463) was switched and then **reverted**: its only coverage is a Vitest unit
+test, which does not count (see above). The two
 labels are mutually exclusive by convention — 0 of the 96 pre-existing
 `Automation-Complete` issues carried both — so the switch removes one and adds
 the other. Closed `Needs-Automation` went 85 → 65.
@@ -73,7 +88,6 @@ the next sweep finds them (`--grep @bug-NNNN` resolves for all four):
 | #14038 | `Alerts/alerts-priority-tags.spec.js:186`, `:211` | issue cited only in a comment | on both frequency tests |
 | #13224 | `Dashboards/dashboard-favorites.spec.js` (9 tests) | spec never cited the issue at all | on the `describe` — the tests carry no tag arrays |
 | #4483  | `RegressionSet/Logs/logs-bugs.spec.js:1853` | duplicate of #5277, which is what the test was tagged with | `@bug-4483` alongside `@bug-5277` |
-| #11463 | `web/src/components/traces/FlameGraphView.spec.ts:482` | unit test, and correctly so — the flame graph is a canvas | comment reference (Vitest has no tag mechanism) |
 
 ### Partially covered (2)
 
@@ -82,12 +96,10 @@ the next sweep finds them (`--grep @bug-NNNN` resolves for all four):
 | #7030  | `Pipelines/pipelines.spec.js:78` covers the empty-name error | bulk export — **added on this branch** |
 | #10270 | `Logs/logspage.spec.js:498` drives the exact repro (`limit` + Search Around) | asserts only that something rendered; the bug is the **count** |
 
-### Further label-flip candidates found while picking the next batch (2)
+### Previously mis-filed as label-flip candidates (now queue items)
 
-| Issue | Existing coverage |
-|---|---|
-| #9875 | `web/src/components/alerts/AddAlert.schema.spec.ts:87` — tests `name: "bad name"` (a space) plus `:`/`#`/`%`, which is exactly the PR #11366 fix |
-| #7280 | `web/src/components/reports/ReportList.spec.ts:574` — "should remove the report from lists after successful delete" |
+#9875 and #7280 were briefly listed here on the strength of unit coverage. Both
+are now in the Playwright queue above — see the table.
 
 ### Looked covered, is not (1)
 
@@ -123,14 +135,20 @@ so it runs in CI; it is the one spec in this batch not verified locally.
 Anyone writing a share-URL test: assert on restored **app state** (the index
 list), never on the shared URL's query string.
 
-## Better as a unit test, not E2E (2)
+## Unit-covered but still owed a Playwright test (4)
 
-| Issue | Why |
-|---|---|
-| #11463 | The flame graph is an ECharts **canvas** (`renderItem` → `fillRect`), so no per-span DOM geometry exists to assert. Already covered: `FlameGraphView.spec.ts` — "should include spans with tiny duration using minimum 0.1% width", plus zero-duration and all-tiny cases. **No E2E needed.** |
-| #11615 | Needs a click on a canvas-drawn span. `TraceDetails.spec.ts` already exercises `updateSelectedSpan` but never asserts `activeTab` is unchanged — a two-line unit assertion there is deterministic where a coordinate click is not. |
+These have solid Vitest coverage, which is why they were previously (wrongly)
+treated as done. They are queue items. The unit test tells you what the E2E
+test can skip.
 
-## Remaining UI queue (19)
+| Issue | Unit coverage that exists | What the Playwright test still has to prove |
+|---|---|---|
+| #11463 | `FlameGraphView.spec.ts:482` — tiny/zero/all-tiny spans get the 0.1% floor | that a short span is actually rendered in a real trace. The flame graph is an ECharts **canvas**, so assert the chart's series in-page (patch/read the instance) rather than through the DOM — the same technique `logs-histogram-severity.spec.js` uses for SSE |
+| #11615 | `TraceDetails.spec.ts` exercises `updateSelectedSpan` but never asserts `activeTab` | that clicking a span from the Flame Graph tab keeps you on that tab. Needs a canvas-coordinate click |
+| #9875  | `AddAlert.schema.spec.ts:87` — the `/[:#?\s'"%&]+/` rule rejects `"bad name"` | that the rule is actually wired to the form: a name with a space blocks Save and surfaces `alerts.nameNoSpecialChars` in the UI |
+| #7280  | `ReportList.spec.ts:574` — the row leaves the list model after delete | that the rendered list updates without a reload, through a real create→delete→create cycle |
+
+## Remaining UI queue (19, plus the 4 unit-covered above = 23)
 
 Ordered roughly by value over setup cost. `ENT` = service-graph / SLO /
 Incidents surface, ships in `ci_matrix*.ent.json`, so it needs a paired
