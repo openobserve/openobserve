@@ -25,7 +25,11 @@ use super::{
 };
 
 /// Route an MCP request to the appropriate handler
-pub async fn route_request(request: MCPRequest, auth_token: Option<String>) -> Result<MCPResponse> {
+pub async fn route_request(
+    org_id: &str,
+    request: MCPRequest,
+    auth_token: Option<String>,
+) -> Result<MCPResponse> {
     // Validate JSON-RPC version
     if request.jsonrpc != JSONRPC_VERSION {
         return Ok(MCPResponse::error(
@@ -73,7 +77,7 @@ pub async fn route_request(request: MCPRequest, auth_token: Option<String>) -> R
         MCPMethod::Initialize => handle_initialize(request.params),
         MCPMethod::Ping => handle_ping(),
         MCPMethod::ToolsList => handle_tools_list(),
-        MCPMethod::ToolsCall => handle_tools_call(request.params, auth_token).await,
+        MCPMethod::ToolsCall => handle_tools_call(org_id, request.params, auth_token).await,
         MCPMethod::ServerDiscover => handle_server_discover(),
         // Notifications are one-way; no response body required (HTTP layer returns 202)
         MCPMethod::NotificationsInitialized => Ok(Value::Null),
@@ -284,6 +288,7 @@ fn handle_tool_search(query: &str, limit: Option<usize>) -> Result<Value> {
 
 /// Handle tools_call - execute a tool directly by name
 async fn handle_direct_call(
+    org_id: &str,
     tool_name: &str,
     args: Value,
     detail: &DetailLevel,
@@ -294,14 +299,18 @@ async fn handle_direct_call(
         get_tool_metadata(tool_name).ok_or_else(|| anyhow!("Tool '{}' not found", tool_name))?;
 
     // Execute the tool using shared HTTP client
-    let result = execute_tool(&tool_metadata, args, detail, auth_token).await?;
+    let result = execute_tool(org_id, &tool_metadata, args, detail, auth_token).await?;
 
     Ok(serde_json::to_value(result)?)
 }
 
 /// Handle tools/call request
 /// Routes to tool_search or tools_call
-async fn handle_tools_call(params: Value, auth_token: Option<String>) -> Result<Value> {
+async fn handle_tools_call(
+    org_id: &str,
+    params: Value,
+    auth_token: Option<String>,
+) -> Result<Value> {
     // Parse parameters
     let call_params: ToolsCallParams = serde_json::from_value(params)
         .map_err(|e| anyhow!("Invalid tools/call parameters: {e}"))?;
@@ -318,12 +327,13 @@ async fn handle_tools_call(params: Value, auth_token: Option<String>) -> Result<
         "tools_call" => {
             let args: ToolsCallSimpleArgs = serde_json::from_value(call_params.arguments)
                 .map_err(|e| anyhow!("Invalid arguments for tools_call: {}", e))?;
-            handle_direct_call(&args.tool, args.args, &args.detail, auth_token).await
+            handle_direct_call(org_id, &args.tool, args.args, &args.detail, auth_token).await
         }
         // Pinned tools are exposed directly in tools/list and called by name.
         // Route them straight to execution with their arguments.
         name => {
             handle_direct_call(
+                org_id,
                 name,
                 call_params.arguments,
                 &DetailLevel::default(),
@@ -401,8 +411,20 @@ fn normalize_request_body_fields(schema: &Value, arguments: &mut Value) {
     }
 }
 
+/// Bind path-scoped tool calls to the organization selected by the MCP endpoint URL.
+fn bind_organization(http_path: &str, arguments: &mut Value, org_id: &str) {
+    if !http_path.contains("{org_id}") {
+        return;
+    }
+    let Some(arguments) = arguments.as_object_mut() else {
+        return;
+    };
+    arguments.insert("org_id".to_string(), Value::String(org_id.to_string()));
+}
+
 /// Execute a tool using the shared HTTP client
 async fn execute_tool(
+    org_id: &str,
     metadata: &rmcp_openapi::ToolMetadata,
     mut arguments: Value,
     detail: &DetailLevel,
@@ -415,6 +437,7 @@ async fn execute_tool(
     // adapter — relocate such fields into `request_body` before validation —
     // so the underlying HTTP API contract stays untouched.
     normalize_request_body_fields(&metadata.parameters, &mut arguments);
+    bind_organization(&metadata.path, &mut arguments, org_id);
 
     // Get the shared HTTP client
     let shared_client = get_shared_http_client();
@@ -549,6 +572,26 @@ mod tests {
         assert!(args.get("request_body").is_none());
     }
 
+    #[test]
+    fn organization_path_argument_is_injected_and_overwritten() {
+        for (arguments, expected) in [
+            (json!({}), json!({"org_id": "acme"})),
+            (json!({"org_id": "acme"}), json!({"org_id": "acme"})),
+            (json!({"org_id": "other"}), json!({"org_id": "acme"})),
+        ] {
+            let mut arguments = arguments;
+            bind_organization("/api/{org_id}/streams", &mut arguments, "acme");
+            assert_eq!(arguments, expected);
+        }
+    }
+
+    #[test]
+    fn organization_is_not_injected_without_path_parameter() {
+        let mut arguments = json!({"request_body": {"org_id": "body-org"}});
+        bind_organization("/api/organizations", &mut arguments, "acme");
+        assert_eq!(arguments, json!({"request_body": {"org_id": "body-org"}}));
+    }
+
     #[tokio::test]
     async fn test_handle_initialize() {
         let result = handle_initialize(Value::Null);
@@ -582,7 +625,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32600);
     }
@@ -596,7 +639,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32601);
     }
@@ -610,7 +653,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
     }
@@ -626,7 +669,7 @@ mod tests {
             }),
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.error.is_none());
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
@@ -653,7 +696,7 @@ mod tests {
             }),
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         let error = response.error.unwrap();
         assert_eq!(error.code, -32022);
         let data = error.data.unwrap();
@@ -679,7 +722,7 @@ mod tests {
             }),
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         let result = response.result.unwrap();
         assert_eq!(result["resultType"], json!("complete"));
         assert!(result["ttlMs"].is_u64());
@@ -699,7 +742,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         let result = response.result.unwrap();
         let obj = result.as_object().unwrap();
         assert!(!obj.contains_key("resultType"));
@@ -717,7 +760,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.result.is_some());
         assert!(response.error.is_none());
         assert_eq!(response.id, Some(Value::from(2)));
@@ -762,7 +805,7 @@ mod tests {
             params: Value::Null,
         };
 
-        let list_response = route_request(list_request, None).await.unwrap();
+        let list_response = route_request("default", list_request, None).await.unwrap();
         assert!(list_response.result.is_some());
 
         let tools_list = list_response.result.unwrap();
@@ -793,7 +836,9 @@ mod tests {
             }),
         };
 
-        let search_response = route_request(search_request, None).await.unwrap();
+        let search_response = route_request("default", search_request, None)
+            .await
+            .unwrap();
         assert!(search_response.result.is_some());
         assert!(search_response.error.is_none());
     }
@@ -827,7 +872,7 @@ mod tests {
             }),
         };
 
-        let response = route_request(request, None).await.unwrap();
+        let response = route_request("default", request, None).await.unwrap();
         assert!(response.error.is_some());
         assert_eq!(response.error.unwrap().code, -32603); // InternalError
     }
