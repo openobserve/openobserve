@@ -546,6 +546,7 @@ fn composite_list_item(
         groups_firing_is_lower_bound: None,
         child_count: None,
         referenced_by_composite_count: None,
+        expression_summary: None,
     })
 }
 
@@ -2794,6 +2795,34 @@ async fn permitted_alert_visibility(
     Some((is_all_permitted, permitted.into_iter().collect()))
 }
 
+/// Render a stored `{id}` expression with child IDs replaced by names; `None`
+/// when any operand is missing from `names`.
+fn name_resolved_expression(
+    expression: &str,
+    names: &hashbrown::HashMap<String, String>,
+) -> Option<String> {
+    let mut out = String::with_capacity(expression.len());
+    let mut rest = expression;
+    while let Some(open) = rest.find('{') {
+        let close = rest[open..].find('}')? + open;
+        out.push_str(&rest[..open]);
+        out.push_str(names.get(&rest[open + 1..close])?);
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+
+    // Match the operator wording the detail page already renders, so the two
+    // views read the same for the same composite.
+    // `!` takes a TRAILING space only, exactly as the front-end helper does:
+    // a leading one turns `(!x)` into `( NOT x)`, which the detail page never
+    // renders, and the two views must read identically for one composite.
+    let spaced = out
+        .replace("&&", " AND ")
+        .replace("||", " OR ")
+        .replace('!', "NOT ");
+    Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
 fn visible_alert(
     visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     id: &str,
@@ -2855,6 +2884,58 @@ async fn enrich_with_composite_metadata(
     .await
     .unwrap_or_default();
 
+    // Two more bulk resolutions for the expression summary: the composites'
+    // own definitions (for the stored `{id}` expression), then every operand
+    // those expressions mention, for the names. Operands come from the
+    // expression itself rather than a children query, so this needs no
+    // per-composite round trip.
+    let mut composite_expressions: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    let mut operand_ids: Vec<String> = Vec::new();
+    if !composite_ids.is_empty() {
+        let definitions = infra::table::alert_composites::resolve_many(db, org_id, &composite_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in definitions {
+            if let infra::table::alert_composites::Resolution::Composite(composite) = resolution {
+                operand_ids.extend(
+                    composite
+                        .expression
+                        .split(['{', '}'])
+                        .skip(1)
+                        .step_by(2)
+                        .map(str::to_string),
+                );
+                composite_expressions.insert(id, composite.expression.clone());
+            }
+        }
+        operand_ids.sort_unstable();
+        operand_ids.dedup();
+    }
+
+    let mut visible_child_names: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    if !operand_ids.is_empty() {
+        let operands = infra::table::alert_composites::resolve_many(db, org_id, &operand_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in operands {
+            let (name, folder_id) = match resolution {
+                infra::table::alert_composites::Resolution::Alert(alert) => {
+                    (alert.name.clone(), alert.folder_id.clone())
+                }
+                infra::table::alert_composites::Resolution::Composite(composite) => {
+                    (composite.name.clone(), composite.folder_id.clone())
+                }
+                _ => continue,
+            };
+            // Same gate as the reference counts above: a child the caller
+            // cannot read is left out, which drops the whole summary for any
+            // composite that mentions it.
+            if visible_alert(visibility, &id, &folder_id, &name) {
+                visible_child_names.insert(id, name);
+            }
+        }
+    }
+
     for item in list.iter_mut() {
         if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
             continue;
@@ -2864,6 +2945,9 @@ async fn enrich_with_composite_metadata(
             // Every listed composite exists; a composite with no child rows
             // still reports zero, matching the old per-row `children.len()`.
             item.child_count = Some(child_counts.get(&id).copied().unwrap_or(0));
+            item.expression_summary = composite_expressions
+                .get(&id)
+                .and_then(|expression| name_resolved_expression(expression, &visible_child_names));
         }
         let parents = if item.alert_type == "composite" {
             &parents_for_composites
@@ -4061,6 +4145,70 @@ mod tests {
                 "rejected for the wrong reason"
             );
             assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
+    }
+
+    mod name_resolved_expression {
+        use super::super::name_resolved_expression;
+
+        fn names(pairs: &[(&str, &str)]) -> hashbrown::HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(id, name)| (id.to_string(), name.to_string()))
+                .collect()
+        }
+
+        #[test]
+        fn resolves_operands_and_spells_out_operators() {
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && {b2})", &map).unwrap(),
+                // Parens stay tight against the operand, matching the
+                // front-end's nameResolvedExpression for the same input.
+                "(checkout_errors AND db_latency)"
+            );
+            assert_eq!(
+                name_resolved_expression("{a1} || !{b2}", &map).unwrap(),
+                "checkout_errors OR NOT db_latency"
+            );
+        }
+
+        #[test]
+        fn a_negated_operand_inside_a_group_reads_cleanly() {
+            // The backend canonicalises `a && !b` into a nested form, so this
+            // shape is what the list actually renders, not a synthetic case.
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && (!{b2}))", &map).unwrap(),
+                "(checkout_errors AND (NOT db_latency))"
+            );
+        }
+
+        #[test]
+        fn drops_the_summary_when_any_child_is_not_readable() {
+            // The whole string is withheld rather than partially rendered: a
+            // summary naming one of two children is worse than none, and a
+            // placeholder would still confirm the hidden alert exists.
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1} && {b2}", &map).is_none());
+        }
+
+        #[test]
+        fn leaves_a_malformed_expression_alone_instead_of_panicking() {
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1", &map).is_none());
+        }
+
+        #[test]
+        fn a_name_containing_braces_cannot_break_the_next_operand() {
+            // Substitution walks the source once and never re-scans what it
+            // wrote, so a brace inside a name is inert rather than being
+            // treated as the start of another operand.
+            let map = names(&[("a1", "weird{b2}name"), ("b2", "second")]);
+            assert_eq!(
+                name_resolved_expression("{a1} && {b2}", &map).unwrap(),
+                "weird{b2}name AND second"
+            );
         }
     }
 }
