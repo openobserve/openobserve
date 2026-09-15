@@ -74,6 +74,8 @@ const loadMonaco = async () => {
     // X depends on UNKNOWN service" errors that silently degrade intellisense.
     monaco = await import("monaco-editor/esm/vs/editor/editor.api");
     await import("monaco-editor/esm/vs/editor/editor.all.js");
+    // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
+    document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
   }
   return monaco;
 };
@@ -461,6 +463,9 @@ export default defineComponent({
 
       // One provider set per language, shared by every editor of that language.
       registerLanguageProviders(props.language);
+
+      // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
+      await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
 
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;

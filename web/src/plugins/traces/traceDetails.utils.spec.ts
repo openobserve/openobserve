@@ -4,7 +4,7 @@
 // session ID to display in the trace-details header.
 
 import { describe, it, expect } from "vitest";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 
 describe("resolveSessionId", () => {
   // Empty / null / undefined inputs → "" so the header template hides
@@ -79,5 +79,43 @@ describe("resolveSessionId", () => {
   it("treats empty-string IDs as missing", () => {
     const spans = [{ session_id: "" }, { session_id: "real" }];
     expect(resolveSessionId(spans)).toBe("real");
+  });
+});
+
+describe("resolveUrlTimeRange", () => {
+  // 0/0 is the endpoint's "no caller range", so an absent window lets the
+  // trace time index derive it from the trace itself.
+  it.each([
+    [undefined, undefined],
+    ["", ""],
+    ["abc", "def"],
+  ])("collapses unusable bounds %j / %j to 0/0", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  // Half a window is its own 400 ("must be provided together" / "must both be
+  // zero or non-zero"), so one good bound must never survive on its own.
+  it.each([
+    ["1752490492843", undefined],
+    [undefined, "1752490493164"],
+    ["1752490492843", "0"],
+    ["0", "1752490493164"],
+  ])("collapses both bounds when only one is usable: %j / %j", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  // Inverted and non-positive pairs are 400s too.
+  it.each([
+    ["1752490493164", "1752490492843"],
+    ["-2", "-1"],
+  ])("collapses inverted or non-positive bounds %j / %j", (from, to) => {
+    expect(resolveUrlTimeRange(from, to)).toEqual({ from: 0, to: 0 });
+  });
+
+  it("passes a sane window through unchanged", () => {
+    expect(resolveUrlTimeRange("1752490492843", "1752490493164")).toEqual({
+      from: 1752490492843,
+      to: 1752490493164,
+    });
   });
 });

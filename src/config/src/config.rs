@@ -74,7 +74,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // per migration written (they were revised in place before the feature
 // shipped anywhere; `init_db` compares for equality and never orders these,
 // so no path can tell an intermediate value ever existed).
-pub const DB_SCHEMA_VERSION: u64 = 79;
+// 80: add splunk_token to org_ingestion_tokens.
+pub const DB_SCHEMA_VERSION: u64 = 80;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -1612,6 +1613,12 @@ pub struct Search {
         help = "Enable broadcast join"
     )]
     pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHARED_CTE_ENABLED",
+        default = true,
+        help = "Execute a CTE or subquery that is referenced several times only once on the leader; the result may use half of the query memory pool before it spills to disk"
+    )]
+    pub feature_shared_cte_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
         default = 0,
