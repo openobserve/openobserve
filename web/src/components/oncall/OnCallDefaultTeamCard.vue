@@ -29,10 +29,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
        itself names the current answer. -->
   <template v-if="dialog">
     <OButton
-      :variant="defaultTeamId ? 'outline' : 'warning'"
+      :variant="loadingRoutingConfig || defaultTeamId ? 'outline' : 'warning'"
       size="sm-action"
       class="max-w-64"
       :title="triggerLabel"
+      :loading="loadingRoutingConfig"
       data-test="oncall-default-team-open"
       @click="openDialog"
     >
@@ -149,6 +150,7 @@ const orgId = computed(() => store.state.selectedOrganization.identifier);
 
 const {
   config: routingConfig,
+  loading: loadingRoutingConfig,
   load: loadRoutingConfig,
   refresh: refreshRoutingConfig,
 } = useOnCallRoutingConfig();
