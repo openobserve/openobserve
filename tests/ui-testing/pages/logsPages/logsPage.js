@@ -8441,17 +8441,8 @@ export class LogsPage {
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
      */
-    // The VRL/function editor toggle lives inside the utilities ("More")
-    // dropdown, not on the toolbar. This used to target
-    // `logs-search-bar-vrl-toggle-btn`, which exists nowhere in web/src, so
-    // every call threw — and because both callers swallowed it, the editor
-    // silently never opened. Delegates to toggleQueryModeEditor, which opens
-    // the dropdown, retries through reka-ui's focus-outside races and waits for
-    // the editor to actually appear.
-    // Idempotent: opens the VRL/function editor only if it is not already
-    // showing. Restoring a saved view that carried a function re-opens the
-    // editor on its own (SearchBar.vue keys showTransformEditor off the saved
-    // state), so a blind toggle there CLOSES it instead.
+    // The toggle lives in the utilities ("More") dropdown, not the toolbar.
+    // Idempotent: restoring a saved view re-opens the editor, so a blind toggle closes it.
     async ensureVrlEditorOpen() {
         const editor = this.page.locator(this.fnEditor).first();
         if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
@@ -8460,6 +8451,63 @@ export class LogsPage {
         }
         await this.toggleQueryModeEditor();
         testLogger.info('Opened the VRL/function editor');
+    }
+
+    // Tees the UI-histogram SSE stream in-page: Chrome frees a streamed body once
+    // the app consumes it, so Playwright's response event reads it only sometimes.
+    async captureHistogramFrames() {
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__histFrames = [];
+            const origFetch = w.fetch;
+            w.fetch = async (...args) => {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const res = await origFetch(...args);
+                if (!/is_ui_histogram=true/.test(url) || !res.body) return res;
+                const [mine, theirs] = res.body.tee();
+                (async () => {
+                    const reader = mine.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = '';
+                    try {
+                        for (;;) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            buf += decoder.decode(value, { stream: true });
+                            let nl;
+                            while ((nl = buf.indexOf('\n')) >= 0) {
+                                const line = buf.slice(0, nl);
+                                buf = buf.slice(nl + 1);
+                                if (!line.startsWith('data:')) continue;
+                                try {
+                                    w.__histFrames.push(JSON.parse(line.slice(5).trim()));
+                                } catch {
+                                    // keepalive/progress frames are not JSON payloads
+                                }
+                            }
+                        }
+                    } catch {
+                        // stream aborted by a newer query; what was read still counts
+                    }
+                })();
+                return new Response(theirs, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    headers: res.headers,
+                });
+            };
+        });
+    }
+
+    async getHistogramFrames() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__histFrames || []);
+    }
+
+    /** The search_response_metadata payloads, where the histogram decisions live. */
+    async getHistogramMetadata() {
+        return await this.page.evaluate(() =>
+            (/** @type {any} */ (window).__histFrames || []).map((f) => f.results).filter(Boolean),
+        );
     }
 
     async clickVrlToggleButton() {
@@ -8471,10 +8519,7 @@ export class LogsPage {
      * Get the VRL editor locator
      * @returns {import('@playwright/test').Locator} VRL editor locator
      */
-    // Scoped to the function-editor container on purpose. The old selector
-    // listed a bare `.monaco-editor` alternative, which also matches the SQL
-    // query editor — so with the VRL editor closed this returned the SQL box
-    // and "VRL editor is visible" assertions passed against the wrong element.
+    // Scoped to the container: a bare `.monaco-editor` also matches the SQL editor.
     getVrlEditor() {
         return this.page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
     }

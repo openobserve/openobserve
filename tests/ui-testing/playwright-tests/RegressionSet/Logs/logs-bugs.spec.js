@@ -822,10 +822,6 @@ test.describe("Logs Regression Bug Fixes", () => {
   // https://github.com/openobserve/openobserve/issues/9690
   // ==========================================================================
   test("should load VRL function correctly when opening saved view @bug-9690 @P1 @savedViews @vrl @regression", async ({ page }) => {
-    // 6 min: this creates a function, saves a view, reloads and re-selects it.
-    // It previously fit the default only because the VRL toggle silently
-    // no-opped and most of the work never happened.
-    test.setTimeout(360_000);
     testLogger.info('Test: Verify VRL function loads correctly in saved views (Bug #9690)');
 
     const uniqueSuffix = Date.now();
