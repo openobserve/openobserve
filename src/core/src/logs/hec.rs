@@ -13,10 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 use axum::body::Bytes;
-#[cfg(not(feature = "enterprise"))]
-use config::meta::self_reporting::usage::is_enterprise_only_usage_stream;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     get_config,
     meta::{
@@ -311,19 +307,6 @@ pub async fn parse_body(
 fn stream_rejection(stream: &str, user: &IngestUser) -> Option<String> {
     if stream.is_empty() {
         return Some("Stream name is empty".to_string());
-    }
-    // `need_usage_report` is always true on a HEC write, so the guard always applies.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream) {
-        return Some(format!(
-            "stream '{stream}' is reserved and cannot be ingested into"
-        ));
-    }
-    #[cfg(not(feature = "enterprise"))]
-    if is_enterprise_only_usage_stream(stream) {
-        return Some(format!(
-            "stream '{stream}' is reserved for enterprise usage reporting"
-        ));
     }
     // `is_derived` is always false on a HEC write, so the exemption never applies.
     if is_internal_rollup_stream(stream) && matches!(user, IngestUser::User(_)) {

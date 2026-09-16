@@ -4,12 +4,22 @@
     "actual_folder": "RegressionSet/Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-bugs.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Regression-Core",
+    "actual_folder": "RegressionSet/Logs",
+    "browser": "chrome",
+    "run_files": [
       "logs-regression.spec.js",
-      "logs-bugs.spec.js",
       "logs-9754.spec.js",
       "logs-9044-7354.spec.js",
       "logs-multistream-matchall-pagination.spec.js",
-      "logs-14303-streaming-render.spec.js"
+      "logs-14303-streaming-render.spec.js",
+      "logs-multistream-share-url.spec.js",
+      "logs-histogram-severity.spec.js"
     ],
     "disabled": []
   },
@@ -48,7 +58,10 @@
     "browser": "chrome",
     "run_files": [
       "enrichment-regression.spec.js",
-      "pipeline-regression.spec.js"
+      "pipeline-regression.spec.js",
+      "enrichment-lifecycle.spec.js",
+      "pipeline-preview-bounds.spec.js",
+      "pipeline-export.spec.js"
     ],
     "disabled": []
   },
@@ -58,7 +71,9 @@
     "browser": "chrome",
     "run_files": [
       "traces-regression.spec.js",
-      "traces-bugs.spec.js"
+      "traces-bugs.spec.js",
+      "traces-filter-reset.spec.js",
+      "traces-share-url.spec.js"
     ],
     "disabled": []
   },
