@@ -66,7 +66,7 @@ pub mod otlp;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 /// A log record ready to write, with the byte estimate its handler already took.
 pub struct LogRecord {

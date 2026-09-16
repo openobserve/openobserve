@@ -75,7 +75,7 @@ use crate::{
         TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
         write_file,
     },
-    logs::O2IngestJsonData,
+    logs::IngestJsonData,
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
 };
 
@@ -1176,7 +1176,7 @@ fn finalize_and_buffer_trace_span(
     traces_stream_name: &str,
     gen_ai_agent_mapping_config: &GenAiAgentMappingConfig,
     partial_success: &mut ExportTracePartialSuccess,
-    json_data_by_stream: &mut HashMap<String, O2IngestJsonData>,
+    json_data_by_stream: &mut HashMap<String, IngestJsonData>,
     agent_observations: &mut AgentObservationBuffer,
 ) -> bool {
     value = match flatten::flatten(value) {
@@ -1575,7 +1575,7 @@ fn format_response(
 async fn write_traces_by_stream(
     org_id: &str,
     time_stats: (i64, &Instant),
-    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    json_data_by_stream: HashMap<String, IngestJsonData>,
     user_email: &str,
 ) -> Result<(), Error> {
     for (traces_stream_name, (json_data, fn_num)) in json_data_by_stream {
@@ -2737,7 +2737,7 @@ mod tests {
             ])),
         );
         let mut partial = super::ExportTracePartialSuccess::default();
-        let mut out: HashMap<String, super::O2IngestJsonData> = HashMap::new();
+        let mut out: HashMap<String, super::IngestJsonData> = HashMap::new();
         let mut observations: super::AgentObservationBuffer = Default::default();
 
         let ok = super::finalize_and_buffer_trace_span(
@@ -3086,7 +3086,7 @@ mod tests {
             ])),
         );
         let mut partial = super::ExportTracePartialSuccess::default();
-        let mut out: HashMap<String, super::O2IngestJsonData> = HashMap::new();
+        let mut out: HashMap<String, super::IngestJsonData> = HashMap::new();
         let mut observations: super::AgentObservationBuffer = Default::default();
 
         let ok = super::finalize_and_buffer_trace_span(
