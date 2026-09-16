@@ -15,48 +15,73 @@
 
 import { computed, type ComputedRef } from "vue";
 import { useStore } from "vuex";
+
 import config from "@/aws-exports";
+
+import { GATE_PREDICATES } from "./navGroups";
 import type { NavGateContext } from "./ONavbar.types";
 
-/** The slice of Vuex state the nav gates read; typed loosely because the store is untyped. */
-export interface NavGateState {
-  zoConfig?: Record<string, any> | null;
-  organizationData?: { organizationSettings?: Record<string, any> | null } | null;
-  selectedOrganization?: { identifier?: string } | null;
-}
-
-export interface NavGateBuildFlags {
-  isEnterprise: boolean;
-  isCloud: boolean;
-}
-
-/** Pure builder so the rail, flyouts and command palette gate from one definition. */
-export function buildNavGateContext(state: NavGateState, build: NavGateBuildFlags): NavGateContext {
-  const z = state.zoConfig ?? {};
-  const orgSettings = state.organizationData?.organizationSettings ?? {};
-  return {
-    isEnterprise: build.isEnterprise,
-    isCloud: build.isCloud,
-    // useIsMetaOrg's logic, made null-safe for early renders.
-    isMeta: state.selectedOrganization?.identifier === z.meta_org,
-    rbac: !!z.rbac_enabled,
-    serviceAccount: z.service_account_enabled ?? true,
-    orgStorage: orgSettings.org_storage_enabled === true,
-    modelPricing: !!z.model_pricing_enabled,
-    serviceStreams: z.service_streams_enabled !== false,
-    onlineEvals: !!z.online_evals_enabled,
-    databaseMonitoring: !!z.database_monitoring_enabled,
-    // Raw split (no trim) to match how pages test custom_hide_menus.
-    hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
-  };
-}
+/**
+ * The flags every subnav `gate` predicate reads, mirroring EXACTLY what the
+ * target pages compute — that is what guarantees the flyout never offers a
+ * section the page itself would hide.
+ *
+ * Shared by `ONavbar` (which needs it to decide whether a group is worth
+ * collapsing at all) and `ONavGroup` (which needs it to decide what the flyout
+ * lists). One reader would leave the two disagreeing: a group whose only
+ * surviving child is gated off would render as an empty flyout.
+ */
+/**
+ * The context a storeless mount evaluates against: EVERY gate open.
+ *
+ * `lib/core` must render without app state, and the safe direction is the same
+ * one `isGateOpen` already takes for an unknown gate — open. A missing store
+ * then can only ever ADD entries, never silently delete one, so it cannot
+ * disguise a real integration failure as a smaller nav.
+ */
+const ALL_GATES_OPEN: NavGateContext = {
+  isEnterprise: true,
+  isCloud: true,
+  isMeta: true,
+  rbac: true,
+  serviceAccount: true,
+  orgStorage: true,
+  modelPricing: true,
+  serviceStreams: true,
+  onlineEvals: true,
+  oncallEnabled: true,
+  databaseMonitoring: true,
+  hiddenMenus: new Set<string>(),
+};
 
 export function useNavGateContext(): ComputedRef<NavGateContext> {
-  const store = useStore();
-  return computed(() =>
-    buildNavGateContext(store.state, {
+  // `useStore()` is an inject() — it returns undefined outside the app shell.
+  const store = useStore() as { state?: Record<string, any> } | undefined;
+  return computed<NavGateContext>(() => {
+    if (!store?.state) return ALL_GATES_OPEN;
+    const z = store.state.zoConfig ?? {};
+    const orgSettings = store.state.organizationData?.organizationSettings ?? {};
+    return {
       isEnterprise: config.isEnterprise == "true",
       isCloud: config.isCloud == "true",
-    }),
-  );
+      // useIsMetaOrg's logic, made null-safe for early renders.
+      isMeta: store.state.selectedOrganization?.identifier === z.meta_org,
+      rbac: !!z.rbac_enabled,
+      serviceAccount: z.service_account_enabled ?? true,
+      orgStorage: orgSettings.org_storage_enabled === true,
+      modelPricing: !!z.model_pricing_enabled,
+      serviceStreams: z.service_streams_enabled !== false,
+      onlineEvals: !!z.online_evals_enabled,
+      oncallEnabled: z.oncall_enabled !== false,
+      databaseMonitoring: !!z.database_monitoring_enabled,
+      // Raw split (no trim) to match how pages test custom_hide_menus.
+      hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
+    };
+  });
+}
+
+/** An unknown gate key opens: a typo must not silently delete a nav entry. */
+export function isGateOpen(context: NavGateContext, gate: string): boolean {
+  const predicate = GATE_PREDICATES[gate];
+  return predicate ? predicate(context) : true;
 }

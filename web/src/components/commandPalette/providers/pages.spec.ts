@@ -15,8 +15,28 @@
 
 import { describe, it, expect } from "vitest";
 import { raw } from "@/types/i18n";
-import { buildNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
-import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
+import type { NavGateContext, NavItem } from "@/lib/core/Navbar/ONavbar.types";
+
+function buildNavGateContext(
+  state: { zoConfig?: Record<string, any> },
+  build: { isEnterprise: boolean; isCloud: boolean },
+): NavGateContext {
+  const z = state.zoConfig ?? {};
+  return {
+    isEnterprise: build.isEnterprise,
+    isCloud: build.isCloud,
+    isMeta: false,
+    rbac: !!z.rbac_enabled,
+    serviceAccount: z.service_account_enabled ?? true,
+    orgStorage: false,
+    modelPricing: !!z.model_pricing_enabled,
+    serviceStreams: z.service_streams_enabled !== false,
+    onlineEvals: !!z.online_evals_enabled,
+    oncallEnabled: !!z.oncall_enabled,
+    databaseMonitoring: !!z.database_monitoring_enabled,
+    hiddenMenus: new Set((z.custom_hide_menus ?? "").split(",")),
+  };
+}
 import { buildPageItems, type PageRouter } from "./pages";
 
 const ROUTES: Record<string, string> = {

@@ -14,7 +14,10 @@
 -->
 
 <template>
-  <div data-test="dashboard-join-pop-up" class="flex max-h-[54vh] w-156 flex-col overflow-hidden">
+  <div
+    data-test="dashboard-join-pop-up"
+    class="flex max-h-[54vh] w-156 flex-col overflow-hidden max-lg:w-[calc(100vw-1.5rem)]"
+  >
     <div class="flex min-h-0 flex-1 flex-col p-3">
       <div class="mb-2 flex items-start justify-between gap-4">
         <div class="flex min-w-0 flex-1 flex-col gap-1">

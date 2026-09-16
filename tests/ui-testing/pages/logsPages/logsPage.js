@@ -190,7 +190,6 @@ export class LogsPage {
         this.searchResultTitle = '[data-test="logs-search-result-title"]';
         this.liveModeToggleBtn = '[data-test="logs-search-bar-refresh-interval-btn"]';
         this.liveMode5SecBtn = '[data-test="logs-search-bar-refresh-time-5"]';
-        this.vrlToggleBtn = '[data-test="logs-search-bar-vrl-toggle-btn"]';
         this.vrlToggleButton = '[data-test="logs-search-bar-show-query-toggle-btn"]';
         this.vrlEditor = '[data-test="logs-vrl-function-editor"]';
         this.relative6DaysBtn = '[data-test="date-time-relative-6-d-btn"]';
@@ -499,6 +498,10 @@ export class LogsPage {
 
         // ===== V0.40 REGRESSION TEST LOCATORS =====
         this.logsSearchResultTableRows = '[data-test="logs-search-result-logs-table"] tbody tr[data-test^="o2-table-row-"]';
+        this.resultsSkeleton = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-skeleton-body"]';
+        this.resultsLoadingBanner = '[data-test="logs-search-result-logs-table"] [data-test="o2-table-loading-banner"]';
+        this.noResultsFoundText = '[data-test="logs-search-no-events-found-text"]';
+        this.resultsProgressBar = '[data-test="logs-results-progress"]';
         this.tableRowExpandMenu = '[data-test^="o2-table-expand-"]';
         this.logDetailsIncludeExcludeBtn = '[data-test="log-details-include-exclude-field-btn"]';
         this.timestampCells = '[data-test="o2-table-cell-_timestamp"]';
@@ -2235,46 +2238,55 @@ export class LogsPage {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
         await this.waitForEditorValue(`FROM "${streamA}"`);
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLimit() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
-        // waitForEditorValue only confirms searchObj.data.query has flushed — it says
-        // nothing about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect
-        // (SearchBar.vue's onQueryEditorUpdate) that can still be mid-flight. A LIMIT
-        // clause is invalid outside SQL mode, so callers that skip an explicit SQL-mode
-        // step (e.g. Streams/streaming.spec.js) would race the backend into rejecting it
-        // with "LIMIT is not supported without SQL mode". Force the real flag here so this
-        // query is deterministically SQL-mode regardless of caller or auto-detect timing.
-        if (!(await this._isSqlModeEnabledViaVue())) {
-            await this._setSqlModeViaVue(true);
-        }
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameJoinLike() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameLeftJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the LEFT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('LEFT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameRightJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
     }
 
     async kubernetesContainerNameFullJoin() {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
+        await this._ensureSqlModeAfterJoinQuery();
+    }
+
+    // waitForEditorValue only confirms searchObj.data.query has flushed — it says nothing
+    // about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect (SearchBar.vue's
+    // onQueryEditorUpdate) that can still be mid-flight. A join query built this way is
+    // invalid outside SQL mode (e.g. a LIMIT clause), so callers that skip an explicit
+    // SQL-mode step (e.g. Streams/streaming.spec.js) race the backend into rejecting it.
+    // Force the real flag here so every kubernetesContainerName*Join* helper is
+    // deterministically SQL-mode regardless of caller or auto-detect timing.
+    async _ensureSqlModeAfterJoinQuery() {
+        if (!(await this._isSqlModeEnabledViaVue())) {
+            await this._setSqlModeViaVue(true);
+        }
     }
 
     /**
@@ -8429,19 +8441,87 @@ export class LogsPage {
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
      */
+    // The toggle lives in the utilities ("More") dropdown, not the toolbar.
+    // Idempotent: restoring a saved view re-opens the editor, so a blind toggle closes it.
+    async ensureVrlEditorOpen() {
+        const editor = this.page.locator(this.fnEditor).first();
+        if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
+            testLogger.info('VRL editor already open');
+            return;
+        }
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
+    }
+
+    // Tees the UI-histogram SSE stream in-page: Chrome frees a streamed body once
+    // the app consumes it, so Playwright's response event reads it only sometimes.
+    async captureHistogramFrames() {
+        await this.page.addInitScript(() => {
+            const w = /** @type {any} */ (window);
+            w.__histFrames = [];
+            const origFetch = w.fetch;
+            w.fetch = async (...args) => {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const res = await origFetch(...args);
+                if (!/is_ui_histogram=true/.test(url) || !res.body) return res;
+                const [mine, theirs] = res.body.tee();
+                (async () => {
+                    const reader = mine.getReader();
+                    const decoder = new TextDecoder();
+                    let buf = '';
+                    try {
+                        for (;;) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            buf += decoder.decode(value, { stream: true });
+                            let nl;
+                            while ((nl = buf.indexOf('\n')) >= 0) {
+                                const line = buf.slice(0, nl);
+                                buf = buf.slice(nl + 1);
+                                if (!line.startsWith('data:')) continue;
+                                try {
+                                    w.__histFrames.push(JSON.parse(line.slice(5).trim()));
+                                } catch {
+                                    // keepalive/progress frames are not JSON payloads
+                                }
+                            }
+                        }
+                    } catch {
+                        // stream aborted by a newer query; what was read still counts
+                    }
+                })();
+                return new Response(theirs, {
+                    status: res.status,
+                    statusText: res.statusText,
+                    headers: res.headers,
+                });
+            };
+        });
+    }
+
+    async getHistogramFrames() {
+        return await this.page.evaluate(() => /** @type {any} */ (window).__histFrames || []);
+    }
+
+    /** The search_response_metadata payloads, where the histogram decisions live. */
+    async getHistogramMetadata() {
+        return await this.page.evaluate(() =>
+            (/** @type {any} */ (window).__histFrames || []).map((f) => f.results).filter(Boolean),
+        );
+    }
+
     async clickVrlToggleButton() {
-        const vrlToggle = this.page.locator('[data-test="logs-search-bar-vrl-toggle-btn"]');
-        await vrlToggle.waitFor({ state: 'visible', timeout: 10000 });
-        await vrlToggle.click();
-        testLogger.info('Clicked VRL toggle button');
+        await this.toggleQueryModeEditor();
+        testLogger.info('Opened the VRL/function editor');
     }
 
     /**
      * Get the VRL editor locator
      * @returns {import('@playwright/test').Locator} VRL editor locator
      */
+    // Scoped to the container: a bare `.monaco-editor` also matches the SQL editor.
     getVrlEditor() {
-        return this.page.locator('[data-test="logs-vrl-function-editor"], #fnEditor, .monaco-editor');
+        return this.page.locator('[data-test="logs-vrl-function-editor"]').locator('.monaco-editor');
     }
 
     /**
@@ -10762,6 +10842,21 @@ export class LogsPage {
         testLogger.info('Logs table is visible');
     }
 
+    /** Assert the settled results grid shows real rows, not the skeleton or a banner. */
+    async expectResultsGridSettledWithRows() {
+        await expect(this.page.locator(this.logsSearchResultTableRows).first()).toBeVisible({ timeout: 30000 });
+        await expect(this.page.locator(this.resultsSkeleton)).toHaveCount(0);
+        await expect(this.page.locator(this.resultsLoadingBanner)).toHaveCount(0);
+        testLogger.info('Results grid settled with rows, no skeleton or loading banner');
+    }
+
+    /** Assert the results progress bar has faded out once the search settled. */
+    async expectResultsProgressBarFadedOut() {
+        // The bar stays mounted to run its own fade, so absence is opacity-0, not detachment.
+        await expect(this.page.locator(this.resultsProgressBar)).toHaveClass(/opacity-0/);
+        testLogger.info('Results progress bar faded out after the search settled');
+    }
+
     // ============================================================================
     // V0.40 REGRESSION TEST METHODS
     // VRL fields, Query Inspector, Sorting, and Highlight tests
@@ -11421,6 +11516,58 @@ export class LogsPage {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
+     * Run Query button. Works on both the Logs tab and the Visualize tab —
+     * both render the same trigger data-test (GH #14488 requires their
+     * dropdown to be visibility-consistent).
+     */
+    async openRefreshCacheDropdown() {
+        const trigger = this.page.locator(
+            '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]'
+        );
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+    }
+
+    /**
+     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getRefreshCacheAndRunQueryMenuItem() {
+        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
+    }
+
+    /**
+     * Locator for the Live Mode toggle item inside the open dropdown (Logs tab only).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLiveModeMenuItem() {
+        return this.page.locator('[data-test="logs-search-bar-live-mode-toggle-btn"]');
+    }
+
+    /**
+     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
+     * resulting search request — which must be issued with clear_cache=true,
+     * bypassing the result cache, matching the backend's meta::search::Request
+     * contract (src/config/src/meta/search.rs).
+     * @returns {Promise<URL>} the URL of the matching /_search request
+     */
+    async clickRefreshCacheAndRunQuery() {
+        await this.openRefreshCacheDropdown();
+        const item = this.getRefreshCacheAndRunQueryMenuItem();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+
+        const [request] = await Promise.all([
+            this.page.waitForRequest(
+                (req) => req.url().includes('/_search') && req.url().includes('clear_cache=true'),
+                { timeout: 30000 }
+            ),
+            item.click(),
+        ]);
+        return new URL(request.url());
     }
 
     /**

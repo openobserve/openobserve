@@ -55,8 +55,8 @@ WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
 
 const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
 SET status = $1, retries = $2, next_run_at = $3,
-    is_realtime = $4, is_silenced = $5, data = $6
-WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
+    is_realtime = $4, is_silenced = $5, end_time = $6, data = $7
+WHERE id = $8 AND claim_epoch = $9 AND status = $10;"#;
 
 pub struct SqliteScheduler {}
 
@@ -424,6 +424,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(trigger.next_run_at)
             .bind(trigger.is_realtime)
             .bind(trigger.is_silenced)
+            .bind(trigger.end_time)
             .bind(&trigger.data)
             .bind(trigger.id)
             .bind(trigger.claim_epoch)

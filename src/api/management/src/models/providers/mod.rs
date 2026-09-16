@@ -61,7 +61,10 @@ pub struct ProviderResponseBody {
     pub org_id: String,
     pub name: String,
     pub provider_type: String,
+    /// Null for a provider on the built-in default, so the form field stays empty.
     pub endpoint: Option<String>,
+    /// The URL actually called, with the default filled in when `endpoint` is null.
+    pub resolved_endpoint: String,
     pub default_model: String,
     pub available_models: Vec<String>,
     /// API key / auth config is masked in responses.
@@ -101,12 +104,14 @@ impl From<ProviderRequestBody> for infra::table::providers::Provider {
 
 impl From<infra::table::providers::Provider> for ProviderResponseBody {
     fn from(value: infra::table::providers::Provider) -> Self {
+        let resolved_endpoint = resolved_endpoint_of(&value);
         Self {
             id: value.id,
             org_id: value.org_id,
             name: value.name,
             provider_type: value.provider_type,
             endpoint: value.endpoint,
+            resolved_endpoint,
             default_model: value.default_model,
             available_models: value.available_models,
             auth_config_masked: true,
@@ -124,6 +129,21 @@ impl From<Vec<infra::table::providers::Provider>> for ListProvidersResponseBody 
             list: value.into_iter().map(ProviderResponseBody::from).collect(),
         }
     }
+}
+
+/// Falls back to the stored value for an unresolvable type: a response must not fail on a bad row.
+#[cfg(feature = "enterprise")]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    o2_enterprise::enterprise::llm_evaluations::providers::resolve_endpoint_for_type(
+        &provider.provider_type,
+        provider.endpoint.as_deref(),
+    )
+    .unwrap_or_else(|_| provider.endpoint.clone().unwrap_or_default())
+}
+
+#[cfg(not(feature = "enterprise"))]
+fn resolved_endpoint_of(provider: &infra::table::providers::Provider) -> String {
+    provider.endpoint.clone().unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -149,6 +169,54 @@ mod tests {
         let resp = ProviderResponseBody::from(provider);
         assert!(resp.auth_config_masked);
         assert_eq!(resp.name, "OpenAI");
+    }
+
+    #[test]
+    fn test_provider_response_keeps_a_legacy_full_url() {
+        let legacy = "https://api.openai.com/v1/chat/completions";
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: Some(legacy.to_string()),
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert_eq!(resp.endpoint.as_deref(), Some(legacy));
+        assert_eq!(resp.resolved_endpoint, legacy);
+    }
+
+    #[test]
+    fn test_provider_response_fills_in_the_default_endpoint() {
+        // `endpoint` stays null to track the default; the response still names the URL called.
+        let provider = infra::table::providers::Provider {
+            id: "abc".to_string(),
+            org_id: "org1".to_string(),
+            name: "OpenAI".to_string(),
+            provider_type: "openai".to_string(),
+            endpoint: None,
+            default_model: "gpt-4o".to_string(),
+            available_models: vec!["gpt-4o".to_string()],
+            auth_config: serde_json::json!({"api_key": "secret"}),
+            rate_limits: None,
+            is_default: false,
+            created_at: 1000,
+            updated_at: 2000,
+        };
+        let resp = ProviderResponseBody::from(provider);
+        assert!(resp.endpoint.is_none());
+        #[cfg(feature = "enterprise")]
+        assert_eq!(
+            resp.resolved_endpoint,
+            "https://api.openai.com/v1/chat/completions"
+        );
     }
 
     #[test]

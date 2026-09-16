@@ -321,7 +321,7 @@ export default defineComponent({
 
     const copyText = (text: string | undefined) => {
       if (!text) return;
-      copyToClipboard(text, t, { silent: true });
+      copyToClipboard(text, t);
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

@@ -26,6 +26,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useScrollShadow } from "@/lib/overlay/useScrollShadow";
 import { FORM_SUBMIT_STATE_KEY } from "@/lib/forms/Form/OForm.types";
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const { t } = useI18nTyped();
 
@@ -56,6 +57,8 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   neutralButtonLoading: false,
   lazy: true,
   portalTarget: undefined,
+  anchor: undefined,
+  anchorEdge: "top",
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -194,12 +197,49 @@ const sizeClasses = computed(() => {
 const isContained = computed(() => !!props.portalTarget);
 
 // Explicit width override — vw when full-viewport, % when container-scoped
+const { isMobile } = useBreakpoint();
+
+// Measured, not CSS: the drawer is portaled to <body>, away from its anchor row.
+const anchorTop = ref(0);
+function measureAnchor() {
+  const a = props.anchor;
+  const el = typeof a === "string" ? document.querySelector<HTMLElement>(a) : a;
+  const rect = el?.getBoundingClientRect();
+  anchorTop.value = rect
+    ? Math.max(0, Math.round(props.anchorEdge === "bottom" ? rect.bottom : rect.top))
+    : 0;
+}
+watchEffect(
+  (cleanup) => {
+    if (!internalOpen.value || !props.anchor) {
+      anchorTop.value = 0;
+      return;
+    }
+    measureAnchor();
+    window.addEventListener("resize", measureAnchor);
+    cleanup(() => window.removeEventListener("resize", measureAnchor));
+  },
+  // The anchor can be swapped in the same tick, so measure only once it is in the DOM.
+  { flush: "post" },
+);
+const anchorStyle = computed(() => {
+  const style: Record<string, string> = {};
+  if (anchorTop.value > 0) {
+    style.top = `${anchorTop.value}px`;
+    style.height = `calc(100% - ${anchorTop.value}px)`;
+  }
+  return style;
+});
+const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
+    ...anchorStyle.value,
   };
   if (props.width != null) {
-    style.width = isContained.value ? `${props.width}%` : `${props.width}vw`;
+    const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
+    style.width = isContained.value ? `${w}%` : `${w}vw`;
   }
   return style;
 });
@@ -324,7 +364,7 @@ watch(internalOpen, (open) => {
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-120 data-[state=open]:duration-120',
         ]"
-        :style="{ zIndex: overlayZIndex }"
+        :style="overlayStyle"
       />
 
       <!-- Drawer panel -->

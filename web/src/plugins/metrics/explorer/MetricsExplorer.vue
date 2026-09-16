@@ -31,14 +31,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- `p-1.5`, the SAME padding the Logs and Traces toolbars use
          (SearchBar.vue:23 / traces SearchBar.vue:19), so the toolbars share geometry. -->
     <div
-      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5"
+      class="border-border-default flex shrink-0 items-center gap-2 border-b p-1.5 max-md:flex-wrap max-md:gap-x-1 max-md:gap-y-1"
       data-test="metrics-explorer-filter-bar"
     >
       <!-- Page mode toggle at the start of the toolbar — Explore (browse grid)
            vs Visualize (query workspace). Same OToggleGroup + icon-left pattern
            the Logs (Search/Visualize) and Traces toolbars use, so the mode
            switch reads identically across the observability pages. -->
+      <ODropdown v-if="isMobile" side="bottom" align="start">
+        <template #trigger>
+          <OButton
+            data-test="metrics-explorer-mode-dropdown-btn"
+            size="sm-toolbar"
+            variant="outline"
+            icon-right="arrow-drop-down"
+          >
+            <OIcon :name="currentModeOption.icon" size="sm" class="shrink-0" />
+            {{ currentModeOption.label }}
+          </OButton>
+        </template>
+        <ODropdownItem
+          v-for="opt in modeOptions"
+          :key="opt.value"
+          :data-test="`metrics-explorer-mode-${opt.value}-item`"
+          @select="setMode(opt.value)"
+        >
+          <template #icon-left><OIcon :name="opt.icon" size="sm" /></template>
+          {{ opt.label }}
+        </ODropdownItem>
+      </ODropdown>
       <OToggleGroup
+        v-else
         :model-value="mode"
         type="single"
         class="shrink-0"
@@ -73,15 +96,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- The filter control has its own row below (see `metrics-explorer-
            filter-row`). This spacer is what pins the time cluster right. -->
-      <div class="flex-1" />
+      <div class="flex-1 max-md:hidden" />
 
-      <div class="flex shrink-0 items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 max-md:ms-auto max-md:gap-1">
         <DateTimePickerDashboard
           ref="dateTimePickerRef"
           v-model="selectedDate"
           @on:date-change="onDateChange"
         />
-        <AutoRefreshInterval v-model="refreshInterval" trigger @trigger="onRefreshTick" />
+        <AutoRefreshInterval
+          v-model="refreshInterval"
+          trigger
+          :is-compact="isMobile"
+          @trigger="onRefreshTick"
+        />
         <!-- Labeled Refresh button. In Visualize it re-runs the chart's query;
              in Explore/Workspace it refreshes the grid — so its
              disabled/loading state follows the grid only there. -->
@@ -94,7 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-explorer-refresh"
           @click="() => onRefresh()"
         >
-          {{ t("metrics.explorer.refresh") }}
+          <span class="max-md:hidden">{{ t("metrics.explorer.refresh") }}</span>
           <OTooltip :content="t('metrics.explorer.refresh')" shortcut-id="metricsRefresh" />
         </OButton>
         <ShareButton
@@ -142,13 +170,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- EXPLORE + FAVOURITES — the same browse grid. Favourites is that grid
          narrowed to the metrics you ♥'d, so the body is identical bar the facet
          panel (Explore only): the right column is the search row + grid. -->
-    <div v-if="isGridMode" class="flex min-h-0 flex-1">
+    <div v-if="isGridMode" class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Facet panel — EXPLORE only. It is an editing control (filter by
            prefix/suffix/type); Workspace is a read-only lens viewer, so it shows
            just the grid (with the Views rail), no facets. -->
       <aside
         v-if="isExplore"
-        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-e"
+        class="border-border-default flex min-h-0 w-60 flex-none flex-col border-e max-md:h-52 max-md:w-full max-md:border-e-0 max-md:border-b"
         :aria-label="t('metrics.explorer.railsAriaLabel')"
       >
         <!-- Panel header: the facet selector, stretched to fill the column.
@@ -284,7 +312,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the cards (not the full page), and the facet panel to its left runs
            the full height alongside it. -->
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div class="border-border-default flex items-center gap-2 border-b px-3 py-2">
+        <div
+          class="border-border-default flex items-center gap-2 border-b px-3 py-2 max-md:flex-wrap max-md:gap-y-1"
+        >
           <!-- The scope toggle lives INSIDE the field, the way the dashboard
                list's folder scope does: it is a property of the search — which
                metrics you are looking through — not another control beside it. -->
@@ -295,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :debounce="200"
             :placeholder="t('metrics.explorer.searchPlaceholder')"
             data-test="metrics-explorer-search"
-            class="min-w-0 flex-1"
+            class="min-w-0 flex-1 max-md:basis-full"
           >
             <template #icon-right>
               <OToggleGroup
@@ -387,7 +417,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="metrics-explorer-scroll"
         >
           <div
-            v-if="grid.loading.value"
+            v-if="showLoading"
             class="flex h-3/5 flex-col items-center justify-center gap-2.5 opacity-80"
           >
             <OSpinner size="lg" />
@@ -569,6 +599,9 @@ import type { EmptyStateAction } from "@/lib/core/EmptyState/presets";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 import ShareButton from "@/components/common/ShareButton.vue";
 import MetricCard from "./MetricCard.vue";
@@ -642,6 +675,8 @@ export default defineComponent({
     OTooltip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
     ShareButton,
     MetricCard,
     MetricsVisualize,
@@ -675,13 +710,17 @@ export default defineComponent({
     // prefix of the full sorted set, so colours stay stable as pages are added.
     const visibleCards = computed(() => grid.pagedCards.value);
 
+    const refreshing = ref(false);
+    // Swapping the grid for the spinner during a refresh's stream reload unmounts every card, emptying `onScreen` before the re-query runs.
+    const showLoading = computed(() => grid.loading.value && !refreshing.value);
+
     // Whether the body is rendering the virtualized grid vs a state placeholder
     // (loading / error / empty). The grid must stay top-aligned for the
     // virtualizer; every placeholder is centered in the scroll area instead.
     // `visibleCards.length > 0` implies not-loading, not-errored, and — in
     // Workspace — that favorites matched, so it's exactly the grid's own branch.
     const gridVisible = computed(
-      () => !grid.loading.value && !grid.loadError.value && visibleCards.value.length > 0,
+      () => !showLoading.value && !grid.loadError.value && visibleCards.value.length > 0,
     );
 
     // Just the count. It used to append "· N no-data hidden", but the checkbox
@@ -771,6 +810,19 @@ export default defineComponent({
       grid.paused.value = v === "visualize";
       mode.value = v;
     };
+
+    const { isMobile } = useBreakpoint();
+    const modeOptions = computed(
+      () =>
+        [
+          { value: "explore", icon: "search", label: t("metrics.explorer.modeExplore") },
+          { value: "visualize", icon: "build", label: t("metrics.explorer.modeVisualize") },
+          { value: "workspace", icon: "star-outline", label: t("metrics.explorer.modeWorkspace") },
+        ] as const,
+    );
+    const currentModeOption = computed(
+      () => modeOptions.value.find((o) => o.value === mode.value) ?? modeOptions.value[0],
+    );
 
     // The Favourites tab = only the metrics you ♥'d. So it forces the
     // favourites-only narrowing; Explore browses everything. `showFavoritesOnly`
@@ -1489,8 +1541,8 @@ export default defineComponent({
       // accurate — but a filter change can also drop a card from the result set
       // without unmounting it in the same tick. Intersecting with what is
       // actually rendered keeps a refresh from re-querying metrics nobody can see.
-      const rendered = new Set(visibleCards.value.map((c) => c.name));
-      const live = [...onScreen.values()].filter((c) => rendered.has(c.name));
+      // The rendered objects, not the ones `onScreen` captured: a refresh's stream reload rebuilds every card.
+      const live = visibleCards.value.filter((c) => onScreen.has(c.name));
       return Promise.all(live.map((card) => grid.requestPreview(card, opts)));
     };
 
@@ -1499,8 +1551,6 @@ export default defineComponent({
       if (!consumable) return;
       grid.setTimeRange({ start_time: consumable.startTime, end_time: consumable.endTime }, opts);
     };
-
-    const refreshing = ref(false);
 
     const onDateChange = async () => {
       // `dateTimePickerRef.refresh()` re-emits a date change, so a manual
@@ -1783,6 +1833,7 @@ export default defineComponent({
       onDataScope,
       visibleCards,
       gridVisible,
+      showLoading,
       resultCountLabel,
       rails,
       selectRail,
@@ -1808,6 +1859,9 @@ export default defineComponent({
       isWorkspace,
       isGridMode,
       setMode,
+      isMobile,
+      modeOptions,
+      currentModeOption,
       noDataHiddenLabel,
       noMatchDescription,
       noMatchActions,

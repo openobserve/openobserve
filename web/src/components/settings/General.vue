@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Settings shell; this component renders only the form content. -->
     <!-- platform settings section. The page gutter is owned by the Settings
          shell's ConstrainedPage; this block adds none of its own. -->
-    <div>
+    <div v-if="!trialExpired">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="flex w-full flex-col">
         <OForm
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- scape interval section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.scrapintervalLabel") }}
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Max Series Per Query section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.maxSeriesPerQueryLabel") }}
@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Manage Theme section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ms-15 flex items-center gap-2">
+            <div class="-ms-15 flex items-center gap-2 max-lg:ms-0 max-lg:flex-wrap">
               <!-- Light Mode Theme -->
               <div
                 class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       id="enterpriseFeature"
       v-if="
+        !trialExpired &&
         config.isEnterprise == 'true' &&
         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
       "
@@ -183,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div
-          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
@@ -240,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Light Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
@@ -309,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dark Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
@@ -379,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Authoring banners needs far more room than a settings row, so the
              row is just the entry point into a drawer. -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("announcements.settings.label") }}
@@ -603,7 +604,7 @@ import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
-import { useLocalOrganization } from "@/utils/zincutils";
+import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -767,6 +768,10 @@ export default defineComponent({
     );
     const deleteConfirmMatches = computed(
       () => deleteConfirmInput.value.trim() === deleteOrgName.value,
+    );
+
+    const trialExpired = computed(() =>
+      isTrialExpired(store.state?.organizationData?.organizationSettings?.free_trial_expiry),
     );
 
     // Only cloud builds expose self-service org deletion. Backend enforces the
@@ -1385,6 +1390,7 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      trialExpired,
       // Delete organization (Danger Zone)
       canDeleteOrg,
       confirmDeleteOrg,

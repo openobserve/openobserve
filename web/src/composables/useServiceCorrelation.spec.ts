@@ -87,6 +87,7 @@ const MOCK_CORRELATION_RESPONSE = {
     logs: [{ stream_name: "default", filters: {} }],
     traces: [{ stream_name: "traces", filters: {} }],
     metrics: [],
+    profiles: [],
   },
 };
 

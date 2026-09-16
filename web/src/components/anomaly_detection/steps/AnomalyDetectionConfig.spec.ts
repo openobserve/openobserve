@@ -535,7 +535,7 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
       expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe("88");
-      expect(sensitivityHintText(wrapper)).toContain("12%");
+      expect(sensitivityHintText(wrapper)).toContain("p88");
     });
 
     it("typing a tier value lights that tier up", async () => {
@@ -580,7 +580,8 @@ describe("AnomalyDetectionConfig", () => {
       expect(typeof form.state.values.threshold).toBe("number");
     });
 
-    it("hint states the anomaly rate and the flagged buckets per day", async () => {
+    it("hint names the training-score percentile and promises no alert rate", async () => {
+      // The percentile indexes training scores, so any "about N per day" arithmetic is measured fiction.
       wrapper = mountConfig({
         threshold: 97,
         histogram_interval_value: 5,
@@ -590,55 +591,40 @@ describe("AnomalyDetectionConfig", () => {
 
       const hint = sensitivityHintText(wrapper);
       expect(hint).toBeDefined();
-      expect(hint).toContain("3%");
-      expect(hint).toContain("9 per day");
-      // Without this an implementation that drops `resolution` from the named
-      // params renders "... at  resolution." and still passes.
-      expect(hint).toContain("5m");
+      expect(hint).toContain("p97");
+      expect(hint).toContain("training");
+      for (const promise of ["per day", "per week", "about", "3%", "resolution"]) {
+        expect(hint).not.toContain(promise);
+      }
     });
 
-    it("hint rounds before branching — 0.96/day is 'per day', not 'one every 1 days'", async () => {
-      wrapper = mountConfig({
-        threshold: 99,
-        histogram_interval_value: 15,
-        histogram_interval_unit: "m",
-      });
-      await flushPromises();
-
-      const hint = sensitivityHintText(wrapper);
-      expect(hint).toBeDefined();
-      expect(hint).toContain("1 per day");
-      expect(hint).not.toContain("every");
-      expect(hint).toContain("15m");
-    });
-
-    it("hint switches to 'one every N days' below one flagged bucket a day", async () => {
-      wrapper = mountConfig({
-        threshold: 99,
-        histogram_interval_value: 1,
-        histogram_interval_unit: "h",
-      });
-      await flushPromises();
-
-      const hint = sensitivityHintText(wrapper);
-      expect(hint).toBeDefined();
-      expect(hint).toContain("every 4");
-      expect(hint).toContain("1h");
-    });
-
-    it("hint is suppressed when the detection resolution is empty", async () => {
+    it("hint no longer varies with the detection resolution", async () => {
+      // The per-day arithmetic read the resolution; the honest hint has no
+      // rate to derive from it.
       wrapper = mountConfig({
         threshold: 97,
         histogram_interval_value: 5,
         histogram_interval_unit: "m",
       });
+      await flushPromises();
+      const before = sensitivityHintText(wrapper);
+      expect(before).toBeDefined();
+
+      getForm(wrapper).setFieldValue("histogram_interval_value", 60);
+      await flushPromises();
+      await nextTick();
+      expect(sensitivityHintText(wrapper)).toBe(before);
+    });
+
+    it("hint is suppressed while the percentile is out of range", async () => {
+      wrapper = mountConfig({ threshold: 97 });
       await flushPromises();
       // Sanity first: without it, "absent" would also be satisfied by the whole
       // row failing to render.
       expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
 
-      for (const bad of ["", 0, -5]) {
-        getForm(wrapper).setFieldValue("histogram_interval_value", bad);
+      for (const bad of ["", 40, 99.5]) {
+        getForm(wrapper).setFieldValue("threshold", bad);
         await flushPromises();
         await nextTick();
         expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
@@ -775,6 +761,129 @@ describe("AnomalyDetectionConfig", () => {
 
     it("the schema default threshold is 97 when the config carries none", () => {
       expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
+    });
+  });
+
+  // Wire contract: `alert_budget_per_day` absent/invalid = percentile mode; while set, `threshold` is API-derived and must never render or be written.
+  describe("sensitivity — budget mode", () => {
+    it("a config with no budget renders the percentile controls only", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-budget-count"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-budget-tiers"]').exists()).toBe(false);
+    });
+
+    it("a stored budget replaces the percentile control with the budget control", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-budget-count"] input').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').exists()).toBe(false);
+      expect(
+        (wrapper.find('[data-test="anomaly-budget-count"] input').element as HTMLInputElement)
+          .value,
+      ).toBe("2");
+    });
+
+    it("a sub-daily budget is surfaced as alerts per week", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 1 / 7 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+    });
+
+    it("the budget tiers map to 1/week, 1/day and 4/day", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-budget-tier-1_week"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+
+      await wrapper.find('[data-test="anomaly-budget-tier-4_day"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(4);
+      expect(form.state.values.budget_period).toBe("day");
+    });
+
+    it("writes the budget back as a per-day number and never touches threshold", async () => {
+      const { wrapper: w, config } = mountReturning({
+        alert_budget_per_day: 2,
+        threshold: 96.4,
+      });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 3);
+      form.setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(config.alert_budget_per_day).toBeCloseTo(3 / 7, 10);
+      // Controller-derived display value — the UI must not write it back.
+      expect(config.threshold).toBe(96.4);
+    });
+
+    it("an invalid count blocks submit and does not clobber the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 0);
+      await flushPromises();
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "budget_count")).toBe("Enter a number greater than 0");
+      // Writing undefined here would silently flip the config to percentile mode.
+      expect(config.alert_budget_per_day).toBe(2);
+    });
+
+    it("a fractional controller-written percentile does not block a budget-mode submit", async () => {
+      // In budget mode `threshold` carries the controller's derived display
+      // percentile, which may be fractional; the percentile-mode integer rule
+      // must not judge it.
+      wrapper = mountConfig({ alert_budget_per_day: 1, threshold: 96.4 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("budget-mode hint states the ceiling, never a ranking or a promise of importance", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("2");
+      expect(hint).toContain("per day");
+      for (const claim of ["most important", "most unusual", "highest", "top", "rank"]) {
+        expect(hint!.toLowerCase()).not.toContain(claim);
+      }
+    });
+
+    it("switching the period to week switches the hint", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(sensitivityHintText(wrapper)).toContain("per week");
     });
   });
 

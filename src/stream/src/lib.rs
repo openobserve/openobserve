@@ -23,10 +23,6 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
-// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
-// these streams for billing); OSS / self-hosted must not block user streams.
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -238,19 +234,6 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-created — doing so would
-    // corrupt billing/usage accounting. The internal self-reporting job creates
-    // its schema directly (not via create_stream), so blocking here is safe.
-    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream name '{stream_name}' is reserved and cannot be created"),
-        ));
-    }
-
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -757,18 +740,6 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-deleted — retention/
-    // compaction uses a separate internal path, so blocking this user-facing
-    // delete is safe and preserves billing/usage accounting. Cloud-only.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream '{stream_name}' is reserved and cannot be deleted"),
-        ));
-    }
-
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();
@@ -1025,6 +996,22 @@ async fn transform_stats(
     }
 }
 
+async fn find_reserved_field<'a>(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    mut field_names: impl Iterator<Item = &'a str>,
+) -> Option<String> {
+    let settings = infra::schema::get_settings(org_id, stream_name, stream_type).await;
+    let reserved_columns = match settings.as_deref() {
+        Some(settings) => settings.uds_internal_columns(),
+        None => StreamSettings::default().uds_internal_columns(),
+    };
+    field_names
+        .find(|name| reserved_columns.iter().any(|r| r == name))
+        .map(String::from)
+}
+
 pub async fn delete_fields(
     org_id: &str,
     stream_name: &str,
@@ -1034,13 +1021,20 @@ pub async fn delete_fields(
     if fields.is_empty() {
         return Ok(());
     }
-    db::schema::delete_fields(
+    let stream_type = stream_type.unwrap_or_default();
+    if let Some(reserved) = find_reserved_field(
         org_id,
         stream_name,
-        stream_type.unwrap_or_default(),
-        fields.to_vec(),
+        stream_type,
+        fields.iter().map(String::as_str),
     )
-    .await?;
+    .await
+    {
+        return Err(anyhow::anyhow!(
+            "field [{reserved}] is reserved and cannot be deleted"
+        ));
+    }
+    db::schema::delete_fields(org_id, stream_name, stream_type, fields.to_vec()).await?;
     Ok(())
 }
 
@@ -1065,6 +1059,19 @@ pub async fn update_fields_type(
 ) -> Result<(), anyhow::Error> {
     if field_updates.is_empty() {
         return Ok(());
+    }
+    let stream_type = stream_type.unwrap_or_default();
+    if let Some(reserved) = find_reserved_field(
+        org_id,
+        stream_name,
+        stream_type,
+        field_updates.iter().map(|f| f.name.as_str()),
+    )
+    .await
+    {
+        return Err(anyhow::anyhow!(
+            "field [{reserved}] is reserved and cannot be updated"
+        ));
     }
 
     // Build HashMap of field_name -> (DataType, nullable)
@@ -1095,7 +1102,7 @@ pub async fn update_fields_type(
     schema::handle_diff_schema(
         org_id,
         stream_name,
-        stream_type.unwrap_or_default(),
+        stream_type,
         false,
         &new_schema,
         min_ts,
@@ -1319,6 +1326,77 @@ mod tests {
     async fn test_delete_fields_empty() {
         let result = delete_fields("org1", "stream1", Some(StreamType::Logs), &[]).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_rejects_always_reserved_columns() {
+        // no persisted settings, so falls back to StreamSettings::default()
+        let reserved_fields = [
+            TIMESTAMP_COL_NAME.to_string(),
+            get_config().common.column_all.clone(),
+        ];
+        for reserved in reserved_fields {
+            let result = delete_fields(
+                "org1",
+                "stream1",
+                Some(StreamType::Logs),
+                std::slice::from_ref(&reserved),
+            )
+            .await;
+            assert!(result.is_err(), "expected {reserved} to be rejected");
+            let err = result.unwrap_err().to_string();
+            assert!(err.contains(&reserved), "reserved={reserved:?} err={err:?}");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_allows_uds_columns_when_feature_disabled() {
+        // _original is only reserved when store_original_data/index_original_data is set
+        let result = delete_fields(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[config::ORIGINAL_DATA_COL_NAME.to_string()],
+        )
+        .await;
+        if let Err(e) = result {
+            assert!(
+                !e.to_string().contains("is reserved"),
+                "expected _original not to be rejected as reserved, got: {e}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_delete_fields_rejects_reserved_among_others() {
+        let result = delete_fields(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[
+                "a".to_string(),
+                TIMESTAMP_COL_NAME.to_string(),
+                "b".to_string(),
+            ],
+        )
+        .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_fields_type_rejects_reserved_columns() {
+        let result = update_fields_type(
+            "org1",
+            "stream1",
+            Some(StreamType::Logs),
+            &[FieldUpdate {
+                name: TIMESTAMP_COL_NAME.to_string(),
+                data_type: "int64".to_string(),
+                nullable: None,
+            }],
+        )
+        .await;
+        assert!(result.is_err());
     }
 
     #[test]

@@ -18,6 +18,42 @@ pub use serde_json::{
     Error, Map, Number, Value, from_slice, from_str, from_value, json, to_string, to_value, to_vec,
 };
 
+/// Bytes this value occupies in a JSON document, counted as `estimate_json_bytes` counts it.
+pub trait JsonBytesExt {
+    fn json_bytes(&self) -> usize;
+}
+
+impl JsonBytesExt for i64 {
+    fn json_bytes(&self) -> usize {
+        itoa::Buffer::new().format(*self).len()
+    }
+}
+
+impl JsonBytesExt for u64 {
+    fn json_bytes(&self) -> usize {
+        itoa::Buffer::new().format(*self).len()
+    }
+}
+
+impl JsonBytesExt for f64 {
+    fn json_bytes(&self) -> usize {
+        // serde_json has no non-finite float; it renders one as null
+        if !self.is_finite() {
+            return 4;
+        }
+        let mut buffer = ryu::Buffer::new();
+        let rendered = buffer.format(*self);
+        // serde_json writes a positive exponent with an explicit '+', ryu does not
+        rendered.len() + usize::from(rendered.contains('e') && !rendered.contains("e-"))
+    }
+}
+
+impl JsonBytesExt for str {
+    fn json_bytes(&self) -> usize {
+        json_string_bytes(self)
+    }
+}
+
 pub fn get_float_value(val: &Value) -> f64 {
     match val {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
@@ -90,6 +126,17 @@ pub fn pickup_string_value(val: Value) -> String {
     }
 }
 
+/// Columns `estimate_json_bytes` leaves out of the size it reports.
+pub fn is_size_excluded_column(key: &str) -> bool {
+    key == crate::ORIGINAL_DATA_COL_NAME || key == crate::ALL_VALUES_COL_NAME
+}
+
+/// Bytes `estimate_json_bytes` counts for one `"key":value,` entry of an object.
+pub fn estimate_json_entry_bytes(key: &str, value_bytes: usize) -> usize {
+    // "key":?, extra 4 bytes
+    key.len() + value_bytes + 4
+}
+
 pub fn estimate_json_bytes(val: &Value) -> usize {
     let mut size = 0;
     match val {
@@ -97,11 +144,10 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             // {?} extra 2
             size += 2;
             for (k, v) in map {
-                if k == crate::ORIGINAL_DATA_COL_NAME || k == crate::ALL_VALUES_COL_NAME {
+                if is_size_excluded_column(k) {
                     continue;
                 }
-                // "key":?, extra 4 bytes
-                size += k.len() + estimate_json_bytes(v) + 4;
+                size += estimate_json_entry_bytes(k, estimate_json_bytes(v));
             }
             // remove ',' for last item
             if !map.is_empty() {
@@ -116,22 +162,16 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             }
         }
         Value::String(s) => {
-            // count quotes and backslashes in one pass; these add an extra byte when escaped
-            // also we use bytes() here as sometimes compiler can optimize it faster with sse
-            // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
-            let (quote_count, slash_count) =
-                s.bytes()
-                    .fold((0usize, 0usize), |(quote_count, slash_count), b| {
-                        (
-                            quote_count + usize::from(b == b'"'),
-                            slash_count + usize::from(b == b'\\'),
-                        )
-                    });
-            // "?"=>2
-            size += s.len() + 2 + quote_count + slash_count;
+            size += json_string_bytes(s);
         }
         Value::Number(n) => {
-            size += n.to_string().len();
+            size += if let Some(i) = n.as_i64() {
+                i.json_bytes()
+            } else if let Some(u) = n.as_u64() {
+                u.json_bytes()
+            } else {
+                n.as_f64().map_or(4, |f| f.json_bytes())
+            };
         }
         Value::Bool(b) => {
             // true for 4 bytes, false for 5 bytes
@@ -186,10 +226,81 @@ pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
     }
 }
 
+fn json_string_bytes(s: &str) -> usize {
+    let (quote_count, slash_count) =
+        s.bytes()
+            .fold((0usize, 0usize), |(quote_count, slash_count), b| {
+                (
+                    quote_count + usize::from(b == b'"'),
+                    slash_count + usize::from(b == b'\\'),
+                )
+            });
+    // "?"=>2
+    s.len() + 2 + quote_count + slash_count
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_estimate_json_bytes_number_matches_display() {
+        for v in [
+            json!(0),
+            json!(-1),
+            json!(i64::MIN),
+            json!(i64::MAX),
+            json!(u64::MAX),
+            json!(0.5),
+            json!(-12.5),
+            json!(1e16),
+            json!(1e300),
+            json!(1e-300),
+        ] {
+            assert_eq!(estimate_json_bytes(&v), v.to_string().len(), "{v}");
+        }
+    }
+
+    #[test]
+    fn test_json_bytes_agrees_with_estimate_json_bytes() {
+        // the trait's whole contract is that it predicts what estimate_json_bytes would count
+        for v in [0i64, -1, i64::MIN, i64::MAX, 1_700_000_000_000_000] {
+            assert_eq!(v.json_bytes(), estimate_json_bytes(&json!(v)), "i64 {v}");
+        }
+        for v in [0u64, 1, u64::MAX, 14_023_729_877_748_445_519] {
+            assert_eq!(v.json_bytes(), estimate_json_bytes(&json!(v)), "u64 {v}");
+        }
+        for v in [
+            0.5f64,
+            -12.5,
+            1.0,
+            1e15,
+            1e16,
+            1e300,
+            -1e300,
+            1e-300,
+            f64::MAX,
+            f64::MIN,
+        ] {
+            assert_eq!(v.json_bytes(), estimate_json_bytes(&json!(v)), "f64 {v}");
+        }
+        for v in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            assert_eq!(
+                v.json_bytes(),
+                estimate_json_bytes(&json!(v)),
+                "non-finite {v}"
+            );
+        }
+        for s in [
+            "",
+            "plain",
+            "with \"quote\"",
+            "back\\slash",
+            "\u{4e2d}\u{6587}",
+        ] {
+            assert_eq!(s.json_bytes(), estimate_json_bytes(&json!(s)), "str {s:?}");
+        }
+    }
     #[test]
     fn test_get_path_simple() {
         // simple extraction with .

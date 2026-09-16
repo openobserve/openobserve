@@ -1,4 +1,4 @@
-﻿<!-- Copyright 2026 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="date-time-container justify-between">
+  <div
+    icon="info"
+    class="date-time-container inline-flex items-stretch"
+    :class="{
+      'rounded-default border-button-outline-border min-h-7.5 border': !hideRangeShift,
+    }"
+  >
+    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
+      <OButton
+        data-test="date-time-prev-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-e-none! border-e!"
+        icon-left="chevron-left"
+        :aria-label="t('common.previous')"
+        :disabled="disable"
+        @click.prevent.stop="shiftTimeRange('prev')"
+      />
+    </OTooltip>
     <OPopover
       v-model:open="menuOpen"
       side="bottom"
@@ -35,13 +53,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="{
             [selectedType + 'type']: !disableRelative,
             hideRelative: disableRelative,
-            'min-w-71.5': !disableRelative && selectedType === 'absolute',
+            'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
+            'h-auto! rounded-none! border-0!': !hideRangeShift,
           }"
+          class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
           icon-left="schedule"
         >
-          <span class="date-time-label flex-1 text-left font-semibold">{{ triggerLabel }}</span>
+          <span
+            class="date-time-label flex-1 text-left font-semibold max-md:min-w-0 max-md:truncate"
+            >{{ triggerLabel }}</span
+          >
           <template #icon-right
             ><OIcon
               name="arrow-drop-down"
@@ -103,19 +126,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTabPanels v-model="selectedType" animated>
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
+                <div class="border-border-default border-b px-3 py-2">
+                  <OSearchInput
+                    v-model="relativeSearchTerm"
+                    data-test="date-time-relative-search"
+                  />
+                </div>
+                <div
+                  v-if="filteredRelativePeriods.length === 0"
+                  class="text-text-secondary px-3 py-4 text-center text-sm"
+                >
+                  {{ t("common.noMatchingRelativePresets") }}
+                </div>
                 <div
                   class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
-                  v-for="(period, index) in relativePeriods"
+                  v-for="(period, index) in filteredRelativePeriods"
                   :key="'date_' + index"
                 >
                   <div class="min-w-18.75 text-sm font-semibold">
                     {{ period.label }}
                   </div>
-                  <div v-for="(item, item_index) in relativeDates[period.value]" :key="item">
+                  <div v-for="(item, item_index) in visibleRelativeItems(period)" :key="item">
                     <OButton
                       :disabled="
-                        relativeDatesInHour[period.value][item_index] >
-                          queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
+                        relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
+                        queryRangeRestrictionInHour > 0
                       "
                       :data-test="`date-time-relative-${item}-${period.value}-btn`"
                       class="h-8! w-8! font-bold! disabled:opacity-35"
@@ -134,8 +169,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       {{ item }}
                       <OTooltip
                         v-if="
-                          relativeDatesInHour[period.value][item_index] >
-                            queryRangeRestrictionInHour && queryRangeRestrictionInHour > 0
+                          relativeItemHours(period.value, item) > queryRangeRestrictionInHour &&
+                          queryRangeRestrictionInHour > 0
                         "
                         side="right"
                         align="center"
@@ -283,6 +318,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPopover>
+    <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
+      <OButton
+        data-test="date-time-next-btn"
+        variant="ghost"
+        size="icon-xs-sq"
+        class="border-button-outline-border h-auto! rounded-s-none! border-s!"
+        icon-left="chevron-right"
+        :aria-label="t('common.next')"
+        :disabled="disable"
+        @click.prevent.stop="shiftTimeRange('next')"
+      />
+    </OTooltip>
   </div>
 </template>
 
@@ -293,6 +340,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import ODateRangeCalendar from "@/lib/forms/DateTimeRange/ODateRangeCalendar.vue";
@@ -316,6 +364,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nKey } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
 interface ConsumableDateTime {
@@ -337,6 +386,7 @@ export default defineComponent({
     OIcon,
     OTooltip,
     OInput,
+    OSearchInput,
     OSelect,
     OTime,
     ODateRangeCalendar,
@@ -389,6 +439,10 @@ export default defineComponent({
       default: false,
     },
     hideRelativeTimezone: {
+      type: Boolean,
+      default: false,
+    },
+    hideRangeShift: {
       type: Boolean,
       default: false,
     },
@@ -518,6 +572,26 @@ export default defineComponent({
       w: 0,
       M: 0,
     });
+
+    // Filters the relative-preset grid so the picker matches every other
+    // searchable list in the app, rather than only the nested unit/timezone
+    // selects. A period row stays visible either its label matches or one of
+    // its preset values does; only the matching values render within it.
+    const relativeSearchTerm = ref("");
+
+    const visibleRelativeItems = (period: { label: string; value: string }) => {
+      const items = relativeDates[period.value] || [];
+      const query = relativeSearchTerm.value.trim().toLowerCase();
+      if (!query || period.label.toLowerCase().includes(query)) return items;
+      return items.filter((item) => String(item).includes(query));
+    };
+
+    const filteredRelativePeriods = computed(() =>
+      relativePeriods.filter((period) => visibleRelativeItems(period).length > 0),
+    );
+
+    const relativeItemHours = (periodValue: string, item: number) =>
+      relativeDatesInHour[periodValue][relativeDates[periodValue].indexOf(item)];
 
     const periodUnits = ["s", "m", "h", "d", "w", "M"];
 
@@ -966,6 +1040,30 @@ export default defineComponent({
       markApplied();
     };
 
+    const { isMobile } = useBreakpoint();
+
+    const compactRangeLabel = (label: string) => {
+      const REL_UNIT: Record<string, string> = {
+        second: "s",
+        minute: "m",
+        hour: "h",
+        day: "d",
+        week: "w",
+        month: "M",
+      };
+      const rel = label.match(/^Past (\d+) ([A-Za-z]+?)s?$/);
+      if (rel) return `Past ${rel[1]}${REL_UNIT[rel[2].toLowerCase()] ?? ` ${rel[2]}`}`;
+      const abs = label.match(
+        /^(\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})? - (\d{4})\/(\d{2}\/\d{2}) (\d{2}:\d{2})(?::\d{2})?$/,
+      );
+      // The year is only dropped when both ends share it, or a cross-year range would read as same-day.
+      if (!abs || abs[1] !== abs[4]) return label.replace(/\b(\d{2}:\d{2}):\d{2}\b/g, "$1");
+      const [, , fromDay, fromTime, , toDay, toTime] = abs;
+      return fromDay === toDay
+        ? `${fromDay} ${fromTime} - ${toTime}`
+        : `${fromDay} ${fromTime} - ${toDay} ${toTime}`;
+    };
+
     /**
      * What the trigger button renders.
      *
@@ -976,11 +1074,13 @@ export default defineComponent({
      * back to what's actually applied; see `appliedDisplayValue`.
      * The `||` fallback covers the first paint, before the mount-time apply.
      */
-    const triggerLabel = computed(() =>
-      props.autoApply || menuOpen.value
-        ? getDisplayValue.value
-        : appliedDisplayValue.value || getDisplayValue.value,
-    );
+    const triggerLabel = computed(() => {
+      const label =
+        props.autoApply || menuOpen.value
+          ? getDisplayValue.value
+          : appliedDisplayValue.value || getDisplayValue.value;
+      return isMobile.value ? compactRangeLabel(label) : label;
+    });
 
     const getDisplayValue = computed(() => {
       if (!props.disableRelative && selectedType.value === "relative") {
@@ -1126,6 +1226,39 @@ export default defineComponent({
       selectedType.value = type;
       // displayValue.value = getDisplayValue();
       if (props.autoApply) saveDate(type === "absolute" ? "absolute" : "relative-custom");
+    };
+
+    /**
+     * Shift the applied time window backward (`prev`) or forward (`next`) by its
+     * own duration, then promote the picker to an absolute range and emit the
+     * change so the page re-runs its query. Works from both relative and
+     * absolute modes: `getConsumableDateTime` resolves the current window to
+     * concrete microsecond timestamps first, so shifting across midnight/day
+     * boundaries stays exact and a relative picker is switched to absolute.
+     *
+     * Deliberately does NOT call `markProgrammaticDateChange()`: the change is
+     * user-driven, so `userChangedValue` stays `true` and consumers (e.g.
+     * traces live-mode) re-run their query just like a manual Apply. With
+     * `autoApply` the deep `selectedDate`/`selectedTime` watcher saves the new
+     * range; otherwise we save and emit directly.
+     */
+    const shiftTimeRange = (direction: "prev" | "next") => {
+      const { startTime, endTime } = getConsumableDateTime();
+      const duration = endTime - startTime;
+      if (!(duration > 0)) return;
+
+      const delta = (direction === "prev" ? -1 : 1) * duration;
+      const startDateTime = convertUnixTime(startTime + delta);
+      const endDateTime = convertUnixTime(endTime + delta);
+
+      selectedDate.value.from = startDateTime.date;
+      selectedDate.value.to = endDateTime.date;
+      selectedTime.value.startTime = startDateTime.time;
+      selectedTime.value.endTime = endDateTime.time;
+      selectedType.value = "absolute";
+
+      menuOpen.value = false;
+      if (!props.autoApply) saveDate("absolute");
     };
 
     // Arrow-key navigation for the picker panel: Left/Right switch the
@@ -1329,6 +1462,10 @@ export default defineComponent({
       setRelativeDate,
       relativePeriods,
       relativeDates,
+      relativeSearchTerm,
+      visibleRelativeItems,
+      filteredRelativePeriods,
+      relativeItemHours,
       saveDate,
       onBeforeShow,
       selectedType,
@@ -1352,6 +1489,7 @@ export default defineComponent({
       setSavedDate,
       optionsFn,
       setDateType,
+      shiftTimeRange,
       onPickerKeydown,
       getConsumableDateTime,
       relativeDatesInHour,

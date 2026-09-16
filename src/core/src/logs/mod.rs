@@ -21,7 +21,7 @@ use std::{
 
 #[cfg(feature = "cloud")]
 use ::stream::get_stream;
-use arrow_schema::{DataType, Field};
+use arrow_schema::{DataType, Field, FieldRef, Schema};
 use bulk::SCHEMA_CONFORMANCE_FAILED;
 use chrono::Utc;
 use config::{
@@ -45,13 +45,17 @@ use infra::{
 };
 use ingestion_common::IngestionStatus;
 use schema::{
-    check_for_schema, get_future_discard_error, get_upto_discard_error, stream_schema_exists,
+    check_for_schema, check_request_columns_limit, get_future_discard_error,
+    get_upto_discard_error, stream_schema_exists,
 };
 
 use crate::{
     alerts::alert::AlertExt,
-    common::meta::stream::SchemaRecords,
-    ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+    common::meta::stream::{SchemaEvolution, SchemaRecords},
+    ingestion::{
+        PartitionMemo, TriggerAlertData, column_accepts, evaluate_trigger, inferred_column_type,
+        write_file,
+    },
 };
 
 pub mod bulk;
@@ -62,7 +66,7 @@ pub mod otlp;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
@@ -188,6 +192,11 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+/// Write each stream's prepared records, returning whether any stream was
+/// skipped because it started deleting after admission.
+///
+/// A skip loses those records silently, so the flag is the only way a caller
+/// that must not acknowledge lost data can tell it from a clean write.
 #[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
@@ -196,15 +205,17 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    json_data_by_stream: HashMap<String, IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
-) -> Result<()> {
+) -> Result<bool> {
+    let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
+            stream_skipped = true;
             continue; // skip
         }
 
@@ -295,7 +306,7 @@ async fn write_logs_by_stream(
             .await;
         }
     }
-    Ok(())
+    Ok(stream_skipped)
 }
 
 async fn write_logs(
@@ -327,6 +338,7 @@ async fn write_logs(
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+    let has_uds = !stream_settings.defined_schema_fields.is_empty();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Logs);
@@ -334,32 +346,10 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
-    // DBM read-path pruning: a stream receiving server-vantage DBM records gets
-    // `o2_dbm_kind` seeded as a SECONDARY INDEX (`index_fields`, a raw-tokenized
-    // tantivy column — explicitly not full-text search), so a DBM read filtering
-    // on one kind prunes rows via the index instead of scanning the stream. The
-    // reasoning, the selectivity risk, the migration case and the
-    // `time_index.rs` precedent this follows are all documented on
-    // `ensure_server_stream_index_field`.
-    //
-    // Placed here rather than in the rollup job because the settings must exist
-    // on the node about to write parquet (the index is built per-file at the
-    // WAL→parquet move), and because only the ingest path knows which stream the
-    // recipes actually export to (every DBM read endpoint takes a `stream`
-    // override; the seed is data-driven, not name-driven).
-    //
-    // Gated on the batch actually carrying a canonicalized DBM record, so the
-    // overwhelming majority of log ingests — which carry none — pay one
-    // short-circuiting scan and nothing else. `apply_to_record` has already run
-    // by this point (it is called per record on the way in), so the kind stamp
-    // is present to be seen.
-    //
-    // No settings re-read follows, unlike the partition-key implementation this
-    // replaces: partition keys had to be read back because THIS function
-    // computes the write path from them, whereas the secondary index is
-    // consumed later, by the parquet writer reading stream settings for itself.
     if config::get_config().db_monitoring.enabled
-        && crate::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(
+            json_data.iter().map(|(_, record)| record),
+        )
     {
         crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
             .await;
@@ -384,15 +374,15 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (schema_evolution, infer_schema) = check_for_schema(
+    let min_timestamp = json_data.iter().map(|(ts, _)| *ts).min().unwrap();
+    let (schema_evolution, infer_schema) = resolve_batch_schema(
         org_id,
         stream_name,
-        StreamType::Logs,
         &mut stream_schema_map,
-        json_data.iter().map(|(_, v)| v).collect(),
-        *min_timestamp,
-        is_derived, // is_derived is true if the stream is derived
+        &json_data,
+        min_timestamp,
+        is_derived,
+        has_uds,
     )
     .await?;
 
@@ -414,6 +404,7 @@ async fn write_logs(
     };
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
     for (timestamp, mut record_val) in json_data {
         let doc_id = record_val
@@ -520,25 +511,18 @@ async fn write_logs(
         }
         // end check for alert triggers
 
-        // get hour key
-        let hour_key = get_write_partition_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            &record_val,
-            Some(&schema_key),
-        );
-
-        let hour_buf = write_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema_key: schema_key.clone(),
-            schema: rec_schema.clone(),
-            records: vec![],
-            records_size: 0,
-        });
+        let hour_buf =
+            partition_memo.buffer(timestamp, &record_val, &schema_key, &mut write_buf, || {
+                SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: rec_schema.clone(),
+                    records: vec![],
+                    records_size: 0,
+                }
+            });
         let record_val = Value::Object(record_val);
-        let record_size = estimate_json_bytes(&record_val);
+        hour_buf.records_size += estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
-        hour_buf.records_size += record_size;
 
         // update status(success)
         match status {
@@ -577,6 +561,113 @@ async fn write_logs(
     }
 
     Ok(req_stats)
+}
+
+/// One schema check per batch, over only the records that can still change the schema.
+async fn resolve_batch_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &[(i64, Map<String, Value>)],
+    min_timestamp: i64,
+    is_derived: bool,
+    has_uds: bool,
+) -> Result<(SchemaEvolution, Option<Schema>)> {
+    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
+    if has_uds {
+        return Ok(check_for_schema(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            stream_schema_map,
+            records.iter().map(|(_, record)| record).collect(),
+            min_timestamp,
+            is_derived,
+        )
+        .await?);
+    }
+    // probed once per field of every record, so it takes foldhash rather than SipHash
+    let schema_fields: hashbrown::HashMap<&str, &DataType> = stream_schema_map
+        .get(stream_name)
+        .map(|schema| {
+            schema
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| (f.name().as_str(), f.data_type()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let schema_columns = schema_fields.len();
+    let mut seen: hashbrown::HashSet<&str> = hashbrown::HashSet::default();
+    let mut evolving: Vec<&Map<String, Value>> = Vec::new();
+    for (_, record) in records {
+        let mut evolves = false;
+        for (key, value) in record.iter() {
+            let Some(inferred) = inferred_column_type(key, value) else {
+                continue;
+            };
+            seen.insert(key.as_str());
+            evolves |= !schema_fields
+                .get(key.as_str())
+                .is_some_and(|existing| column_accepts(existing, &inferred));
+        }
+        if evolves {
+            evolving.push(record);
+        }
+    }
+    drop(schema_fields);
+    // check_for_schema skips the limit only when the batch carries exactly the stream schema
+    if !(evolving.is_empty() && seen.len() == schema_columns) {
+        check_request_columns_limit(org_id, StreamType::Logs, stream_name, seen.len())?;
+    }
+    let (evolution, inferred) = if evolving.is_empty() {
+        (
+            SchemaEvolution {
+                is_schema_changed: false,
+                types_delta: None,
+            },
+            None,
+        )
+    } else {
+        let (evolution, inferred) = check_for_schema(
+            org_id,
+            stream_name,
+            StreamType::Logs,
+            stream_schema_map,
+            evolving,
+            min_timestamp,
+            is_derived,
+        )
+        .await?;
+        // the whole stream schema already covers every record in the batch
+        if inferred.is_none() {
+            return Ok((evolution, None));
+        }
+        (evolution, inferred)
+    };
+    // batch schema = the evolving records' inferred fields plus every other seen field
+    let inferred_names: hashbrown::HashSet<&str> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter())
+        .map(|f| f.name().as_str())
+        .collect();
+    let latest = stream_schema_map.get(stream_name).unwrap().schema();
+    let mut fields: Vec<FieldRef> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter().cloned())
+        .collect();
+    fields.extend(
+        latest
+            .fields()
+            .iter()
+            .filter(|f| {
+                seen.contains(f.name().as_str()) && !inferred_names.contains(f.name().as_str())
+            })
+            .cloned(),
+    );
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    Ok((evolution, Some(Schema::new(fields))))
 }
 
 async fn ingestion_log_enabled() -> bool {
@@ -764,5 +855,80 @@ mod tests {
         assert!(ts >= before && ts <= after);
         // field should be inserted
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
+    }
+
+    fn log_record(value: Value) -> (i64, Map<String, Value>) {
+        let Value::Object(value) = value else {
+            unreachable!()
+        };
+        (1, value)
+    }
+
+    fn cached_schema<S: Into<String>>(fields: Vec<(S, DataType)>) -> HashMap<String, SchemaCache> {
+        let fields = fields
+            .into_iter()
+            .map(|(name, ty)| Field::new(name, ty, true))
+            .collect::<Vec<_>>();
+        HashMap::from([("s".to_string(), SchemaCache::new(Schema::new(fields)))])
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_known_columns_skip_the_schema_check() {
+        let mut map = cached_schema(vec![
+            (TIMESTAMP_COL_NAME, DataType::Int64),
+            ("a", DataType::Utf8),
+            ("b", DataType::Float64),
+            ("c", DataType::Boolean),
+        ]);
+        let records = vec![
+            log_record(json!({"_timestamp": 1, "a": "x", "b": 2})),
+            log_record(json!({"_timestamp": 2, "a": "y", "c": null})),
+        ];
+        // no DB is reachable here, so a call into check_for_schema would fail
+        let (evolution, batch_schema) =
+            resolve_batch_schema("o", "s", &mut map, &records, 1, false, false)
+                .await
+                .unwrap();
+        assert!(!evolution.is_schema_changed);
+        assert!(evolution.types_delta.is_none());
+        let names = batch_schema
+            .unwrap()
+            .fields()
+            .iter()
+            .map(|f| (f.name().clone(), f.data_type().clone()))
+            .collect::<Vec<_>>();
+        // only the present non-null columns, sorted, typed from the stream schema
+        assert_eq!(
+            names,
+            vec![
+                (TIMESTAMP_COL_NAME.to_string(), DataType::Int64),
+                ("a".to_string(), DataType::Utf8),
+                ("b".to_string(), DataType::Float64),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_over_the_column_limit_is_rejected() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        // one more column than the batch carries, so this is not the exact-schema fast path
+        let mut map = cached_schema(
+            (0..=limit + 1)
+                .map(|i| (format!("f{i}"), DataType::Int64))
+                .collect(),
+        );
+        let mut value = Map::new();
+        for i in 0..limit {
+            value.insert(format!("f{i}"), Value::from(i));
+        }
+        let records = vec![log_record(Value::Object(value.clone())), {
+            value.insert(format!("f{limit}"), Value::from(1));
+            log_record(Value::Object(value))
+        }];
+        let err = resolve_batch_schema("o", "s", &mut map, &records, 1, false, false)
+            .await
+            .err()
+            .expect("over the limit");
+        assert!(err.to_string().contains("columns"), "{err}");
     }
 }

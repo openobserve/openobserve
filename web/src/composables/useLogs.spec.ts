@@ -2498,6 +2498,26 @@ describe("Use Logs Composable", () => {
         "user = 'alice'",
       );
     });
+
+    // Regression: the Logs page's own include/exclude filter builder (distinct
+    // from the sidebar's) must double an embedded single quote too.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "include"),
+      ).toBe("op = 'notificationHandling''s'");
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper.vm.searchObj.meta.sqlMode = false;
+      setupStreamSchema("op", "Utf8");
+
+      expect(
+        wrapper.vm.getFilterExpressionByFieldType("op", "notificationHandling's", "exclude"),
+      ).toBe("op != 'notificationHandling''s'");
+    });
   });
 
   describe.skip("Utility Helper Functions", () => {

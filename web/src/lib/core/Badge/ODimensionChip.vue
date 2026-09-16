@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { raw } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 // Copyright 2026 OpenObserve Inc.
 //
 // ODimensionChip — the standard key|value dimension chip (k8s-cluster=prod,
@@ -13,12 +14,16 @@ import { raw } from "@/types/i18n";
 //
 //   <ODimensionChip dim-key="service" value="openobserve" />
 //   <ODimensionChip dim-key="k8s-cluster" key-label="cluster" :value="v" />
+//   <ODimensionChip dim-key="service" :value="v" removable @remove="drop(i)" />
 //
 // Single source of truth — do NOT hand-roll the two-segment markup again.
 
 import OTag from "./OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { dimensionVariant } from "./badgeGroups";
+
+const { t } = useI18nTyped();
 
 withDefaults(
   defineProps<{
@@ -30,9 +35,19 @@ withDefaults(
     keyLabel?: string;
     /** Show a `key=value` hover tooltip. Default false. */
     tooltip?: boolean;
+    /**
+     * Render a dismiss affordance inside the chip and emit `remove` on click.
+     * A dismissable condition is the chip itself, not a button parked beside
+     * it — the two read as one control and stay the same height.
+     */
+    removable?: boolean;
+    /** Accessible name for the dismiss affordance. */
+    removeLabel?: I18nText;
   }>(),
-  { tooltip: false },
+  { tooltip: false, removable: false, removeLabel: undefined },
 );
+
+const emit = defineEmits<{ (e: "remove"): void }>();
 </script>
 
 <template>
@@ -42,7 +57,20 @@ withDefaults(
         <span class="shrink-0 bg-current/8 py-1.5 ps-2.5 pe-1 whitespace-nowrap opacity-90">{{
           keyLabel ?? dimKey
         }}</span>
-        <span class="min-w-0 truncate py-1.5 ps-1 pe-2.5 font-semibold">{{ value }}</span>
+        <span
+          class="min-w-0 truncate py-1.5 ps-1 font-semibold"
+          :class="removable ? 'pe-1' : 'pe-2.5'"
+          >{{ value }}</span
+        >
+        <button
+          v-if="removable"
+          type="button"
+          :aria-label="removeLabel ?? t('common.remove')"
+          class="inline-flex shrink-0 cursor-pointer items-center ps-0.5 pe-1.5 hover:opacity-70"
+          @click.stop="emit('remove')"
+        >
+          <OIcon name="close" size="xs" />
+        </button>
       </span>
     </OTag>
     <OTooltip v-if="tooltip" :delay="300" :content="raw(`${dimKey}=${value}`)" />

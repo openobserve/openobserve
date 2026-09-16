@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
             v-model="selectedDate"
             :initialTimezone="initialTimezone"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
           <AutoRefreshInterval
+            v-if="!isMobile"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
@@ -134,7 +135,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               shortcut-id="dashboardRefresh"
             />
           </OButton>
+        </template>
 
+        <template #actions-overflow>
+          <AutoRefreshInterval
+            v-if="isMobile"
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
           <ExportDashboard
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
@@ -322,6 +334,7 @@ import { useRouter } from "vue-router";
 import { getDashboard, movePanelToAnotherTab, getFoldersList } from "../../utils/commons.ts";
 import { parseDuration, generateDurationLabel, getConsumableRelativeTime } from "../../utils/date";
 import { useRoute } from "vue-router";
+import { useListBackNavigation } from "@/composables/useListBackNavigation";
 import { deletePanel } from "../../utils/commons";
 import {
   getPanelTimeFromURL,
@@ -350,6 +363,7 @@ import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -383,6 +397,7 @@ export default defineComponent({
   },
   setup() {
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -923,6 +938,11 @@ export default defineComponent({
       );
     };
 
+    const spanOf = (time: any) =>
+      time?.start_time && time?.end_time
+        ? time.end_time.getTime() - time.start_time.getTime()
+        : null;
+
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
@@ -935,10 +955,13 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
-      // This prevents unnecessary refreshes of panels that depend on global time
+      // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const globalTimeChanged = isRelativeGlobal
+        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        : !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1189,36 +1212,19 @@ export default defineComponent({
 
     // [END] date picker related variables
 
-    // back button → the dashboards list the user actually came from.
-    //
-    // Prefer real history: a dashboard opened from the Favorites pseudo-folder
-    // carries the folder it *lives in* in the URL, so rebuilding the list route
-    // from route.query.folder would drop the user into that folder instead of
-    // Favorites. Going back restores whichever list view they left.
-    //
-    // Only honour history when the previous entry is the dashboards list itself
-    // (deep links have no previous entry; arriving via add_panel or another
-    // module would send the "Dashboards" button somewhere it doesn't name), and
-    // fall back to the folder-scoped push otherwise. In-view URL syncs use
-    // router.replace, so tab/time-range changes never bury the list entry.
-    const goBackToDashboardList = () => {
-      const back = (router.options?.history?.state as any)?.back;
-      if (typeof back === "string") {
-        // endsWith rather than === so a deployment served under a base path
-        // (getPath() can be "/web/") still matches if the base ever leaks in.
-        const path = back.split(/[?#]/)[0].replace(/\/$/, "");
-        if (path === "/dashboards" || path.endsWith("/dashboards")) {
-          return router.back();
-        }
-      }
-      return router.push({
+    // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
+    const goBackToDashboardList = useListBackNavigation({
+      // The Infrastructure pages push into a dashboard the same way the listing does, so back belongs there rather than on a listing the user never saw.
+      isListPath: (path) =>
+        path === "/dashboards" || path.endsWith("/dashboards") || path.startsWith("/infra/"),
+      fallback: () => ({
         path: "/dashboards",
         query: {
           folder: route.query.folder ?? "default",
           org_identifier: store.state.selectedOrganization.identifier,
         },
-      });
-    };
+      }),
+    });
 
     //add panel
     const addPanelData = () => {
@@ -1787,6 +1793,7 @@ export default defineComponent({
     ]);
 
     return {
+      isMobile,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,

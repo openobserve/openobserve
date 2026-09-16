@@ -820,6 +820,34 @@ describe("AddAlert (OForm owner)", () => {
       expect(payload.stream_name).toBe("_rundata");
       expect(payload.anomaly_config).toBeTruthy();
       expect(payload.anomaly_config.query_mode).toBe("filters");
+      // Percentile mode: threshold on the wire, and never the budget key.
+      expect(payload.anomaly_config.threshold).toBe(97);
+      expect(payload.anomaly_config).not.toHaveProperty("alert_budget_per_day");
+    });
+
+    it("budget mode sends alert_budget_per_day and omits threshold — the API rejects both", async () => {
+      // While a budget is set, `threshold` is controller-derived state; a
+      // payload carrying both is rejected server-side.
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+      wrapper.vm.anomalyConfig.alert_enabled = false;
+      wrapper.vm.anomalyConfig.query_mode = "filters";
+      wrapper.vm.anomalyConfig.alert_budget_per_day = 2;
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      const [, payload] = (anomalyDetectionService.create as any).mock.calls[0];
+      expect(payload.anomaly_config.alert_budget_per_day).toBe(2);
+      expect(payload.anomaly_config).not.toHaveProperty("threshold");
     });
 
     it("blocks anomaly save when the anomaly name is empty", async () => {
