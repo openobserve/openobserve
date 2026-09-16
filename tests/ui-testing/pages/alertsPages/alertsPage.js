@@ -3309,6 +3309,49 @@ export class AlertsPage {
         testLogger.info('Selected stream by name', { stream: streamName });
     }
 
+    // No first-available fallback on purpose: silently picking another stream is a false green.
+    /**
+     * Select a stream by its exact option value, filtering the virtualised list first.
+     * @param {string} streamName
+     */
+    async selectStreamByValue(streamName) {
+        const trigger = this.page.locator(`${this.locators.streamNameDropdown} button[name="stream_name"]`).first();
+        const popover = this.page.locator(this.locators.streamNamePopover);
+        const search = this.page.locator('[data-test="add-alert-stream-name-select-dropdown-search"]');
+        const option = this.page.locator(
+            `${this.locators.streamNameOption}[data-test-value="${streamName}"]`,
+        );
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await trigger.waitFor({ state: 'visible', timeout: 15000 });
+            await trigger.click();
+            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+            if (await search.count() > 0) {
+                await search.fill('');
+                await search.fill(streamName);
+            } else {
+                await this.page.keyboard.type(streamName, { delay: 30 });
+            }
+            // The option list is virtualised, so only the filtered rows ever reach the DOM.
+            const appeared = await option
+                .first()
+                .waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true)
+                .catch(() => false);
+            if (appeared) {
+                await option.first().click();
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                testLogger.info('Selected stream by value', { streamName, attempt });
+                return;
+            }
+            testLogger.warn('Stream option not rendered, retrying', { streamName, attempt });
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.waitForTimeout(1000);
+        }
+        throw new Error(`selectStreamByValue: "${streamName}" never appeared in the alert stream dropdown`);
+    }
+
     /**
      * Select scheduled alert type via v3 dropdown
      */
@@ -4437,7 +4480,16 @@ export class AlertsPage {
             .locator('button[name="query_condition.aggregation.having.column"]:visible')
             .first();
         await trigger.waitFor({ state: 'visible', timeout: 15000 });
-        return (await trigger.getAttribute('data-test-selected-value')) ?? '';
+        // The stream's field list arrives from its own request and the default is applied
+        // after it lands, so a single read can catch the pre-populated empty state.
+        let previous = null;
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const current = (await trigger.getAttribute('data-test-selected-value')) ?? '';
+            if (current !== '' && current === previous) return current;
+            previous = current;
+            await this.page.waitForTimeout(500);
+        }
+        return previous ?? '';
     }
 
     /**

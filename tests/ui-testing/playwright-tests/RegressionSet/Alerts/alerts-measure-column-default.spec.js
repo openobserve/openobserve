@@ -33,8 +33,9 @@ test.describe("Alerts measure-column default", () => {
     await pm.alertsPage.clickAddAlertButton();
     await pm.alertsPage.fillAlertName(`e2e_11619_${Date.now()}`);
 
-    await pm.alertsPage.switchStreamAndReconfirm('metrics', METRICS_STREAM);
-    await pm.alertsPage.selectAggregationFunction('avg');
+    // Metrics arrive aggregation-enabled, so the measure column is already rendered.
+    await pm.alertsPage.selectStreamType('metrics');
+    await pm.alertsPage.selectStreamByValue(METRICS_STREAM);
     const metricsColumn = await pm.alertsPage.getMeasureColumnSelectedValue();
     testLogger.info(`Metrics measure column: "${metricsColumn}"`);
 
@@ -43,7 +44,10 @@ test.describe("Alerts measure-column default", () => {
       'Precondition: metrics must still default the measure column to "value"'
     ).toBe('value');
 
-    await pm.alertsPage.switchStreamAndReconfirm('logs', LOG_STREAM);
+    await pm.alertsPage.selectStreamType('logs');
+    await pm.alertsPage.selectStreamByValue(LOG_STREAM);
+
+    // Logs default to total_events, which renders no column at all — pick a measure so one does.
     await pm.alertsPage.selectAggregationFunction('avg');
     const logsColumn = await pm.alertsPage.getMeasureColumnSelectedValue();
     testLogger.info(`Logs measure column: "${logsColumn}"`);
