@@ -33,7 +33,7 @@ use config::{
     },
     metrics,
     utils::{
-        json::{Map, Value, get_string_value},
+        json::{Map, Value, estimate_json_bytes, get_string_value},
         schema_ext::SchemaExt,
         time::{now_micros, parse_timestamp_micro_from_value},
     },
@@ -67,15 +67,6 @@ pub mod otlp;
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
 pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
-
-/// A log record ready to write, with the byte estimate its handler already took.
-pub struct LogRecord {
-    pub timestamp: i64,
-    pub size: usize,
-    pub value: Map<String, Value>,
-}
-
-pub type IngestLogData = (Vec<LogRecord>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
@@ -214,7 +205,7 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, IngestLogData>,
+    json_data_by_stream: HashMap<String, IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
 ) -> Result<bool> {
@@ -323,7 +314,7 @@ async fn write_logs(
     org_id: &str,
     stream_name: &str,
     status: &mut IngestionStatus,
-    json_data: Vec<LogRecord>,
+    json_data: Vec<(i64, Map<String, Value>)>,
     is_derived: bool,
 ) -> Result<RequestStats> {
     let cfg = get_config();
@@ -357,7 +348,7 @@ async fn write_logs(
 
     if config::get_config().db_monitoring.enabled
         && crate::db_monitoring::server_vantage::batch_has_dbm_records(
-            json_data.iter().map(|r| &r.value),
+            json_data.iter().map(|(_, record)| record),
         )
     {
         crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
@@ -383,7 +374,7 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let min_timestamp = json_data.iter().map(|r| r.timestamp).min().unwrap();
+    let min_timestamp = json_data.iter().map(|(ts, _)| *ts).min().unwrap();
     let (schema_evolution, infer_schema) = resolve_batch_schema(
         org_id,
         stream_name,
@@ -415,12 +406,7 @@ async fn write_logs(
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
     let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
-    for LogRecord {
-        timestamp,
-        size: record_size,
-        value: mut record_val,
-    } in json_data
-    {
+    for (timestamp, mut record_val) in json_data {
         let doc_id = record_val
             .get("_id")
             .map(|v| v.as_str().unwrap().to_string());
@@ -534,8 +520,9 @@ async fn write_logs(
                     records_size: 0,
                 }
             });
-        hour_buf.records.push(Arc::new(Value::Object(record_val)));
-        hour_buf.records_size += record_size;
+        let record_val = Value::Object(record_val);
+        hour_buf.records_size += estimate_json_bytes(&record_val);
+        hour_buf.records.push(Arc::new(record_val));
 
         // update status(success)
         match status {
@@ -581,7 +568,7 @@ async fn resolve_batch_schema(
     org_id: &str,
     stream_name: &str,
     stream_schema_map: &mut HashMap<String, SchemaCache>,
-    records: &[LogRecord],
+    records: &[(i64, Map<String, Value>)],
     min_timestamp: i64,
     is_derived: bool,
     has_uds: bool,
@@ -593,7 +580,7 @@ async fn resolve_batch_schema(
             stream_name,
             StreamType::Logs,
             stream_schema_map,
-            records.iter().map(|r| &r.value).collect(),
+            records.iter().map(|(_, record)| record).collect(),
             min_timestamp,
             is_derived,
         )
@@ -614,9 +601,9 @@ async fn resolve_batch_schema(
     let schema_columns = schema_fields.len();
     let mut seen: hashbrown::HashSet<&str> = hashbrown::HashSet::default();
     let mut evolving: Vec<&Map<String, Value>> = Vec::new();
-    for record in records {
+    for (_, record) in records {
         let mut evolves = false;
-        for (key, value) in record.value.iter() {
+        for (key, value) in record.iter() {
             let Some(inferred) = inferred_column_type(key, value) else {
                 continue;
             };
@@ -626,7 +613,7 @@ async fn resolve_batch_schema(
                 .is_some_and(|existing| column_accepts(existing, &inferred));
         }
         if evolves {
-            evolving.push(&record.value);
+            evolving.push(record);
         }
     }
     drop(schema_fields);
@@ -870,15 +857,11 @@ mod tests {
         assert!(val.get(TIMESTAMP_COL_NAME).is_some());
     }
 
-    fn log_record(value: Value) -> LogRecord {
+    fn log_record(value: Value) -> (i64, Map<String, Value>) {
         let Value::Object(value) = value else {
             unreachable!()
         };
-        LogRecord {
-            timestamp: 1,
-            size: 0,
-            value,
-        }
+        (1, value)
     }
 
     fn cached_schema<S: Into<String>>(fields: Vec<(S, DataType)>) -> HashMap<String, SchemaCache> {
