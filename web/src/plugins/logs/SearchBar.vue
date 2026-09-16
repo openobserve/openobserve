@@ -970,6 +970,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1056,6 +1057,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1139,9 +1141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
-                  store.state.zoConfig.auto_query_enabled
-                    ? 'rounded-s-default! rounded-e-none!'
-                    : 'rounded-default',
+                  'rounded-s-default! rounded-e-none!',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1183,17 +1183,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("search.runQuery")
                 }}
               </OButton>
-              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <OSeparator
-                v-if="store.state.zoConfig.auto_query_enabled"
-                class="h-[1.875rem]! w-px"
-                vertical
-              />
-              <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
+              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
                     variant="ghost"
                     size="icon-xs"
+                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       (searchObj.meta.logsVisualizeToggle === 'patterns' &&
                         patternsState.loading) ||
@@ -1206,9 +1202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
-                      store.state.zoConfig.auto_query_enabled
-                        ? 'rounded-e-default! rounded-s-none!'
-                        : 'rounded-default',
+                      'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -1216,10 +1210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- Normal mode: Refresh + Live Mode items -->
                 <ODropdownItem
-                  v-if="
-                    config.isEnterprise == 'true' &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
+                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
@@ -1230,7 +1221,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownSeparator
                   v-if="
-                    config.isEnterprise == 'true' &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
