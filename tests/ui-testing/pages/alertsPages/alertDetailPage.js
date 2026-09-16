@@ -79,12 +79,21 @@ export class AlertDetailPage {
      * Select a range (1h/6h/24h) in the chart's range toggle and confirm the
      * selection took. Range items carry no data-test; they expose their value
      * via `data-otoggle-value` and their active state via `data-state="on"`.
+     *
+     * Also awaits the chart's async `generate_sql` rebuild round-trip: the old
+     * panel stays attached until the new chartData lands, so without this wait
+     * a caller's panel assertion would pass on the stale pre-rebuild state.
      */
     async selectChartRange(value) {
         const item = this.page.locator(`${this.locators.chart} [data-otoggle-value="${value}"]`);
         await expect(item).toBeVisible({ timeout: 15000 });
+        const rebuilt = this.page.waitForResponse(
+            (response) => response.url().includes('/alerts/generate_sql'),
+            { timeout: 30000 },
+        );
         await item.click();
         await expect(item).toHaveAttribute('data-state', 'on', { timeout: 10000 });
+        await rebuilt;
         testLogger.info('Selected chart range', { value });
     }
 }
