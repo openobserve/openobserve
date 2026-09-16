@@ -893,12 +893,17 @@ export default defineComponent({
     };
 
     const refreshList = () => {
-      // No router.push and no resetStreamType here: pushing the route we are
-      // already on remounts the page, and resetting the stream type drops the
-      // cached list — between them the table had nothing left to show and fell
-      // back to the skeleton. `getLookupTables(true)` already invalidates the
-      // stream query, which is the part that has to reach the server.
+      // A surviving `action` re-opens the form on the next mount, hiding the list.
+      if (router.currentRoute.value.query.action) {
+        router.replace({
+          name: "enrichmentTables",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
       showAddJSTransformDialog.value = false;
+      // Not resetStreamType: it drops the cached list, leaving only the skeleton.
       getLookupTables(true);
     };
 

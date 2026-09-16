@@ -2698,7 +2698,6 @@ export default defineComponent({
       if (!incidentDetails.value) return;
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
         const response = await updateIncidentStatus.mutateAsync({
           id: incidentDetails.value.id,
           status: newStatus,
@@ -2746,7 +2745,8 @@ export default defineComponent({
         persistent: false,
       });
       if (!ok) return;
-      updateStatus("acknowledged");
+      // The caller's promise must cover the update, not just the confirm dialog.
+      return updateStatus("acknowledged");
     };
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
@@ -2771,7 +2771,6 @@ export default defineComponent({
       }
 
       try {
-        const org = store.state.selectedOrganization.identifier;
         const response = await updateIncident.mutateAsync({
           id: incidentDetails.value.id,
           updates: { title: nextTitle },
@@ -2904,7 +2903,6 @@ export default defineComponent({
 
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
         const response = await updateIncidentStatus.mutateAsync({
           id: incidentDetails.value.id,
           status: newStatus,
