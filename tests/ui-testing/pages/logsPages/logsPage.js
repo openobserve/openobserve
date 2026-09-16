@@ -11452,6 +11452,58 @@ export class LogsPage {
     }
 
     /**
+     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
+     * Run Query button. Works on both the Logs tab and the Visualize tab —
+     * both render the same trigger data-test (GH #14488 requires their
+     * dropdown to be visibility-consistent).
+     */
+    async openRefreshCacheDropdown() {
+        const trigger = this.page.locator(
+            '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]'
+        );
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        await trigger.click();
+    }
+
+    /**
+     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getRefreshCacheAndRunQueryMenuItem() {
+        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
+    }
+
+    /**
+     * Locator for the Live Mode toggle item inside the open dropdown (Logs tab only).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getLiveModeMenuItem() {
+        return this.page.locator('[data-test="logs-search-bar-live-mode-toggle-btn"]');
+    }
+
+    /**
+     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
+     * resulting search request — which must be issued with clear_cache=true,
+     * bypassing the result cache, matching the backend's meta::search::Request
+     * contract (src/config/src/meta/search.rs).
+     * @returns {Promise<URL>} the URL of the matching /_search request
+     */
+    async clickRefreshCacheAndRunQuery() {
+        await this.openRefreshCacheDropdown();
+        const item = this.getRefreshCacheAndRunQueryMenuItem();
+        await item.waitFor({ state: 'visible', timeout: 10000 });
+
+        const [request] = await Promise.all([
+            this.page.waitForRequest(
+                (req) => req.url().includes('/_search') && req.url().includes('clear_cache=true'),
+                { timeout: 30000 }
+            ),
+            item.click(),
+        ]);
+        return new URL(request.url());
+    }
+
+    /**
      * Get the current page number from the pagination component.
      * @returns {Promise<string>}
      */

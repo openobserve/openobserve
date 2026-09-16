@@ -755,6 +755,40 @@ impl FileFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum VortexCompression {
+    #[default]
+    O2,
+    Native,
+    Compact,
+}
+
+impl std::fmt::Display for VortexCompression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::O2 => write!(f, "o2"),
+            Self::Native => write!(f, "native"),
+            Self::Compact => write!(f, "compact"),
+        }
+    }
+}
+
+impl std::str::FromStr for VortexCompression {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "o2" => Ok(Self::O2),
+            "native" => Ok(Self::Native),
+            "compact" => Ok(Self::Compact),
+            _ => Err(anyhow::anyhow!(
+                "Invalid vortex compression '{s}': expected o2, native or compact"
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileFormatConfig {
     default: FileFormat,
@@ -1759,11 +1793,12 @@ pub struct Common {
     )]
     pub file_format: FileFormatConfig,
     #[env_config(
-        name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
-        default = false,
-        help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
+        name = "ZO_VORTEX_COMPRESSION",
+        parse,
+        default = "o2",
+        help = "Vortex write compression: o2 (OpenObserve's UTF8/Zstd compressor on top of BtrBlocks), native (Vortex's default BtrBlocks strategy) or compact (BtrBlocks with the Pco and Zstd schemes, smaller files at a higher decode cost)"
     )]
-    pub vortex_use_native_compression: bool,
+    pub vortex_compression: VortexCompression,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -5088,6 +5123,23 @@ mod tests {
         assert_eq!("vortex".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert_eq!("VORTEX".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert!("unknown".parse::<FileFormat>().is_err());
+    }
+
+    #[test]
+    fn test_vortex_compression_from_str() {
+        assert_eq!(VortexCompression::default(), VortexCompression::O2);
+        for (text, expected) in [
+            ("o2", VortexCompression::O2),
+            ("Native", VortexCompression::Native),
+            (" compact ", VortexCompression::Compact),
+        ] {
+            assert_eq!(text.parse::<VortexCompression>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<VortexCompression>().unwrap(),
+                expected
+            );
+        }
+        assert!("true".parse::<VortexCompression>().is_err());
     }
 
     #[test]
