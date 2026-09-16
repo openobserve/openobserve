@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Search only this folder",
     "searchAllFoldersTooltip": "Search across all folders",
     "folder": "Folder",
+    "modeInFolder": "{mode} içinde",
     "deleteTitle": "İş Akışını Sil",
     "deleteMessage": "Bu iş akışını silmek istediğinizden emin misiniz?",
     "deleteSuccess": "İş akışı başarıyla silindi",

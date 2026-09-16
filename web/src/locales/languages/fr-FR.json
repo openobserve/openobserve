@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Rechercher uniquement dans ce dossier",
     "searchAllFoldersTooltip": "Rechercher dans tous les dossiers",
     "folder": "Dossier",
+    "modeInFolder": "{mode} dans",
     "deleteTitle": "Supprimer le workflow",
     "deleteMessage": "Voulez-vous vraiment supprimer ce workflow ?",
     "deleteSuccess": "Workflow supprimé avec succès",

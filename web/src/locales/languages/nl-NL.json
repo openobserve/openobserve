@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Alleen in deze map zoeken",
     "searchAllFoldersTooltip": "In alle mappen zoeken",
     "folder": "Map",
+    "modeInFolder": "{mode} in",
     "deleteTitle": "Workflow verwijderen",
     "deleteMessage": "Weet je zeker dat je deze workflow wilt verwijderen?",
     "deleteSuccess": "Workflow succesvol verwijderd",

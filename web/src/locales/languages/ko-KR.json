@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "이 폴더만 검색",
     "searchAllFoldersTooltip": "모든 폴더에서 검색",
     "folder": "폴더",
+    "modeInFolder": "{mode} 내",
     "deleteTitle": "워크플로 삭제",
     "deleteMessage": "이 워크플로우를 삭제하시겠습니까?",
     "deleteSuccess": "워크플로우가 삭제되었습니다",

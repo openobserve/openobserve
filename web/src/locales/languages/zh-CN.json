@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "仅搜索此文件夹",
     "searchAllFoldersTooltip": "搜索所有文件夹",
     "folder": "文件夹",
+    "modeInFolder": "{mode} 中",
     "deleteTitle": "删除工作流",
     "deleteMessage": "确定要删除此工作流吗？",
     "deleteSuccess": "工作流删除成功",

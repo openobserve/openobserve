@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Szukaj tylko w tym folderze",
     "searchAllFoldersTooltip": "Szukaj we wszystkich folderach",
     "folder": "Folder",
+    "modeInFolder": "{mode} w",
     "deleteTitle": "Usuń przepływ pracy",
     "deleteMessage": "Czy na pewno chcesz usunąć ten przepływ pracy?",
     "deleteSuccess": "Przepływ pracy został usunięty pomyślnie",

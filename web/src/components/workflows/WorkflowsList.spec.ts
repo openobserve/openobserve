@@ -482,13 +482,15 @@ describe("WorkflowsList", () => {
       }
     });
 
-    it("names the folder on published rows and dashes drafts, which have none", async () => {
+    // Drafts are folder-scoped too: a folderless draft used to be appended to
+    // every folder's listing, so its folder is named here like any other row's.
+    it("names the folder on published rows and on drafts", async () => {
       vi.useFakeTimers();
       try {
         listWorkflows.mockResolvedValue({
           data: [
             makeWorkflow(1, { folder_name: "Team A" }),
-            makeWorkflow(2, { is_draft: true, folder_name: undefined }),
+            makeWorkflow(2, { is_draft: true, folder_name: "Team B" }),
           ],
         });
         wrapper = mountList();
@@ -501,7 +503,7 @@ describe("WorkflowsList", () => {
         const cells = wrapper.findAll('[data-test="folder-cell"]');
         expect(cells).toHaveLength(2);
         expect(cells[0].text()).toBe("Team A");
-        expect(cells[1].text()).toBe("—");
+        expect(cells[1].text()).toBe("Team B");
       } finally {
         vi.useRealTimers();
       }
@@ -604,7 +606,7 @@ describe("WorkflowsList", () => {
       wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -628,7 +630,7 @@ describe("WorkflowsList", () => {
       await wrapper.find('[data-test="workflow-list-add-btn"]').trigger("click");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -641,7 +643,12 @@ describe("WorkflowsList", () => {
       expect(mockHydrate.mock.calls[0][0].id).toBe("wf-1");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflowEditor",
-        query: { id: "wf-1", name: "workflow-1", org_identifier: "default" },
+        query: {
+          id: "wf-1",
+          name: "workflow-1",
+          org_identifier: "default",
+          folder: "default",
+        },
       });
     });
 
@@ -956,6 +963,7 @@ describe("WorkflowsList", () => {
           id: "wf-1",
           name: "workflow-1",
           org_identifier: "default",
+          folder: "default",
         },
       });
     });

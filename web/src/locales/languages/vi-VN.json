@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Chỉ tìm kiếm trong thư mục này",
     "searchAllFoldersTooltip": "Tìm kiếm trên tất cả thư mục",
     "folder": "Thư mục",
+    "modeInFolder": "{mode} trong",
     "deleteTitle": "Xóa quy trình",
     "deleteMessage": "Bạn có chắc chắn muốn xóa quy trình làm việc này không?",
     "deleteSuccess": "Đã xóa quy trình làm việc thành công",

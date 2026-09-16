@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "このフォルダのみを検索",
     "searchAllFoldersTooltip": "すべてのフォルダを検索",
     "folder": "フォルダ",
+    "modeInFolder": "{mode} 内",
     "deleteTitle": "ワークフローを削除",
     "deleteMessage": "このワークフローを削除してもよろしいですか？",
     "deleteSuccess": "ワークフローを削除しました",

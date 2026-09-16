@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Искать только в этой папке",
     "searchAllFoldersTooltip": "Искать по всем папкам",
     "folder": "Папка",
+    "modeInFolder": "{mode} в",
     "deleteTitle": "Удалить рабочий процесс",
     "deleteMessage": "Вы уверены, что хотите удалить этот рабочий процесс?",
     "deleteSuccess": "Рабочий процесс успешно удалён",

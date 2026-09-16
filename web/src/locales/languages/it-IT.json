@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Cerca solo in questa cartella",
     "searchAllFoldersTooltip": "Cerca in tutte le cartelle",
     "folder": "Cartella",
+    "modeInFolder": "{mode} in",
     "deleteTitle": "Elimina flusso di lavoro",
     "deleteMessage": "Sei sicuro di voler eliminare questo workflow?",
     "deleteSuccess": "Workflow eliminato con successo",

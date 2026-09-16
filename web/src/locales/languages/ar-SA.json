@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Search only this folder",
     "searchAllFoldersTooltip": "Search across all folders",
     "folder": "Folder",
+    "modeInFolder": "{mode}",
     "deleteTitle": "حذف سير العمل",
     "deleteMessage": "هل أنت متأكد أنك تريد حذف سير العمل هذا؟",
     "deleteSuccess": "تم حذف سير العمل بنجاح",

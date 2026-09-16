@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Pesquisar somente nesta pasta",
     "searchAllFoldersTooltip": "Pesquisar em todas as pastas",
     "folder": "Pasta",
+    "modeInFolder": "{mode} em",
     "deleteTitle": "Excluir Fluxo de Trabalho",
     "deleteMessage": "Tem certeza de que deseja excluir este fluxo de trabalho?",
     "deleteSuccess": "Fluxo de trabalho excluído com sucesso",

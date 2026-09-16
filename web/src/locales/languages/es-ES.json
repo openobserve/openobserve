@@ -2694,6 +2694,7 @@
     "searchThisFolderTooltip": "Buscar solo en esta carpeta",
     "searchAllFoldersTooltip": "Buscar en todas las carpetas",
     "folder": "Carpeta",
+    "modeInFolder": "{mode} en",
     "deleteTitle": "Eliminar flujo de trabajo",
     "deleteMessage": "¿Está seguro de que desea eliminar este flujo de trabajo?",
     "deleteSuccess": "Flujo de trabajo eliminado correctamente",

@@ -177,9 +177,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
 
-            <!-- A draft has no folder until promoted, so it is not claimed by default. -->
             <template #cell-folder_name="{ row }">
-              {{ row.is_draft ? "—" : row.folder_name || t("common.defaultLabel") }}
+              {{ row.folder_name || t("common.defaultLabel") }}
             </template>
 
             <template #cell-updated_at="{ row }">
@@ -619,13 +618,20 @@ const getWorkflows = async (folderId?: string) => {
 };
 
 // --- navigation --------------------------------------------------------------
+// Every child route carries the folder. The list is the PARENT route, so pushing
+// a child replaces the whole query: drop `folder` and the list behind the editor
+// silently snaps back to the default folder, and so does the return trip.
+// A row's own folder wins over the one being browsed, which is what a
+// cross-folder search result needs.
+const folderFor = (row?: any) => row?.folder_id || activeFolderId.value;
+
 // New Workflow -> editor on an EMPTY canvas; the trigger is chosen there (the
 // canvas start node opens the trigger picker), so create carries no trigger
-// kind. The workflow is created on Save.
+// kind. The workflow is created on Save, into the folder in the URL.
 const openCreateEditor = () => {
   router.push({
     name: "createWorkflow",
-    query: { org_identifier: orgId.value },
+    query: { org_identifier: orgId.value, folder: activeFolderId.value },
   });
 };
 
@@ -635,7 +641,12 @@ const editWorkflow = (row: any) => {
   hydrateWorkflow(row);
   router.push({
     name: "workflowEditor",
-    query: { id: row.id, name: row.name, org_identifier: orgId.value },
+    query: {
+      id: row.id,
+      name: row.name,
+      org_identifier: orgId.value,
+      folder: folderFor(row),
+    },
   });
 };
 
@@ -652,7 +663,12 @@ const openRuns = (row: any) => {
   hydrateWorkflow(row);
   router.push({
     name: "workflowRuns",
-    query: { id: row.id, name: row.name, org_identifier: orgId.value },
+    query: {
+      id: row.id,
+      name: row.name,
+      org_identifier: orgId.value,
+      folder: folderFor(row),
+    },
   });
 };
 

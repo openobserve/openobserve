@@ -39,17 +39,24 @@ const workflows = {
   // Save a new workflow. `draft=true` saves to the drafts table WITHOUT the
   // backend graph validation (no terminating node / orphan checks) — a draft can
   // be an incomplete graph. Omit or false for a validated, published workflow.
+  // `folder` is the destination folder's id and applies to drafts too: a draft
+  // without one lands in the default folder rather than the one being viewed.
   createWorkflow: ({
     org_identifier,
     data,
     draft = false,
+    folder,
   }: {
     org_identifier: string;
     data: object;
     draft?: boolean;
+    folder?: string;
   }) => {
-    const url = `/api/${org_identifier}/workflows${draft ? "?draft=true" : ""}`;
-    return http().post(url, data);
+    const params = new URLSearchParams();
+    if (draft) params.set("draft", "true");
+    if (folder) params.set("folder", folder);
+    const qs = params.toString();
+    return http().post(`/api/${org_identifier}/workflows${qs ? `?${qs}` : ""}`, data);
   },
 
   // Update an existing workflow by id. `draft=true` updates the drafts-table row
@@ -87,18 +94,22 @@ const workflows = {
   // the graph and returns 400 if it's still incomplete; on success it moves the
   // row from the drafts table to the workflows table KEEPING the same id.
   // `trigger_type` (AlertFired | IncidentEvent) mirrors the create payload's
-  // trigger_type and drives the incident association.
+  // trigger_type and drives the incident association. Omitting `folder` publishes
+  // the draft into the folder it already sits in.
   promoteWorkflow: ({
     org_identifier,
     id,
     trigger_type,
+    folder,
   }: {
     org_identifier: string;
     id: string;
     trigger_type: string;
+    folder?: string;
   }) => {
-    const url = `/api/${org_identifier}/workflows/promote/${id}?trigger_type=${trigger_type}`;
-    return http().post(url);
+    const params = new URLSearchParams({ trigger_type });
+    if (folder) params.set("folder", folder);
+    return http().post(`/api/${org_identifier}/workflows/promote/${id}?${params.toString()}`);
   },
 
   // Enable/disable (pause/resume) a workflow.
