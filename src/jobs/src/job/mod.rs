@@ -731,6 +731,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::llm_scores_search::register_schema_initializer(
+            |org_id| {
+                Box::pin(async move {
+                    openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+                        &org_id,
+                    )
+                    .await
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
             |org_id, records| {
                 Box::pin(async move {
