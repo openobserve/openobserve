@@ -288,6 +288,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -498,13 +499,15 @@ const getRoleDetails = () => {
       setDefaultPermissions();
 
       filteredResources.value = permissionsState.resources
+        // A nested type is reached by expanding its parent, not as a row of its
+        // own, so offering it here selects something the table never renders.
+        .filter((r) => !r.parent)
         .map((r) => {
           return {
             label: r.display_name,
             value: r.key,
           };
-        })
-        .filter((r) => r.value !== "dashboard");
+        });
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
@@ -848,6 +851,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "workflows") {
+        if (!resourceMapper["workflow_folder"]) {
+          resourceMapper["workflow_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "workflow_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["workflow_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (resourceMapper[resource].parent && !resourceMapper[resourceMapper[resource].parent]) {
@@ -893,6 +914,11 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         // owning folder can't be derived from the entity — load every folder's
         // monitors so the permission can be matched to its row.
         for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
+      } else if (resource === "workflows") {
+        // Plain workflow ids too, so the same sweep applies.
+        for (const folderEntity of resourceMapper["workflow_folder"]?.entities ?? []) {
           await getResourceEntities(folderEntity as Entity);
         }
       } else if (
@@ -1223,6 +1249,10 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1273,6 +1303,10 @@ const updateJsonInTable = () => {
       } else if (resource === "synthetics") {
         // Plain-id entity — locate the folder whose loaded monitors contain it.
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
       } else if (resource === "report") {
@@ -1550,6 +1584,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     rfolder: getReportFolders,
     synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
+    workflow_folder: getWorkflowFolders,
+    workflows: getWorkflows,
     re_patterns: getRePatterns,
     provider: getProviders,
     score_config: getScoreConfigs,
@@ -1726,6 +1762,45 @@ const getSynthetics = async (resource: Entity | Resource) => {
   // `monitors` was renamed `checks` in the synthetics list response.
   const syntheticRows = res.data?.checks ?? res.data?.monitors ?? [];
   updateEntityEntities(resource, ["id"], [...syntheticRows], false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getWorkflowFolders = async () => {
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "workflows",
+  );
+
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "workflow_folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "workflows",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getWorkflows = async (resource: Entity | Resource) => {
+  // Plain workflow ids, no folder prefix — matches the objects set_ownership
+  // writes, same as synthetics.
+  const res: any = await workflowService.listWorkflows(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  const workflowRows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+  updateEntityEntities(resource, ["id"], [...workflowRows], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);
