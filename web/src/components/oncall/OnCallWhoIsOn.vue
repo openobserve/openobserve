@@ -39,7 +39,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- The roster comes from a separate call than the record itself, so an
            empty list is ambiguous mid-fetch — this tells "still loading" apart
            from "resolved to nobody" before either read that as the same row. -->
-      <div v-if="loading && !positions.length" class="flex flex-col gap-2" data-test="oncall-who-is-on-loading">
+      <div
+        v-if="loading && !positions.length"
+        class="flex flex-col gap-2"
+        data-test="oncall-who-is-on-loading"
+      >
         <OSkeleton type="text" class="h-4 w-1/3" />
         <OSkeleton type="text" class="h-4 w-2/3" />
       </div>

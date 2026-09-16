@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
         </OButton>
-        <div v-else-if="canConfigure" class="w-8 h-8 shrink-0" />
+        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0" />
         <OButton
           v-if="canConfigure"
           variant="ghost"

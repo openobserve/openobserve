@@ -27,7 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- The single most-asked question, answered without a hover: this used
          to be a tooltip-only fact, so checking it meant guessing which band
          to point at. -->
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm" data-test="oncall-coverage-now">
+    <div
+      class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm"
+      data-test="oncall-coverage-now"
+    >
       <span class="text-text-secondary text-xs">{{ t("oncall.onCallNow") }}</span>
       <template v-if="current.primary">
         <span data-test="oncall-coverage-now-primary">{{

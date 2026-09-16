@@ -239,7 +239,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="catchAllOptions"
                 :placeholder="t('oncall.defaultTeamPlaceholder')"
                 data-test="oncall-routing-catch-all-select"
-                @update:model-value="(v: unknown) => (catchAllDraft = v === null ? null : String(v))"
+                @update:model-value="
+                  (v: unknown) => (catchAllDraft = v === null ? null : String(v))
+                "
               />
               <span class="flex justify-end gap-2">
                 <OButton variant="outline" size="sm-action" @click="catchAllOpen = false">
