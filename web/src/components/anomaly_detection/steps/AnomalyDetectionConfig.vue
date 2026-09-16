@@ -558,7 +558,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex items-start gap-3">
+            <!-- items-end: only the percentile input carries a visible label, so its
+                 box sits a label-height lower than the bare toggle bar. Both are
+                 2.125rem tall, so seating them on their bottom edge aligns them. -->
+            <div v-else class="flex items-end gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -576,24 +579,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
-              <OFormInput
-                name="threshold"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :label="t('alerts.anomaly.percentile')"
-                class="max-w-21.75 min-w-21.75"
-                data-test="anomaly-sensitivity-percentile"
-              >
-                <template #error />
-                <template #tooltip>
-                  <OTooltip
-                    side="right"
-                    align="center"
-                    max-width="18.75rem"
-                    :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
-                  />
-                </template>
-              </OFormInput>
+              <!-- Label as a sibling span, not OFormInput's `label` prop: the prop
+                   renders it inside the field column, where the narrow numeric box
+                   wraps "Score percentile" onto two lines. -->
+              <div class="flex flex-col gap-1">
+                <span
+                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+                >
+                  {{ t("alerts.anomaly.percentile") }}
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="cursor-help"
+                    data-test="anomaly-sensitivity-percentile-info"
+                  >
+                    <OTooltip
+                      side="right"
+                      align="center"
+                      max-width="18.75rem"
+                      :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
+                    />
+                  </OIcon>
+                </span>
+                <OFormInput
+                  name="threshold"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  :aria-label="t('alerts.anomaly.percentile')"
+                  class="max-w-21.75 min-w-21.75"
+                  data-test="anomaly-sensitivity-percentile"
+                >
+                  <template #error />
+                </OFormInput>
+              </div>
             </div>
             <div
               v-if="sensitivityError"

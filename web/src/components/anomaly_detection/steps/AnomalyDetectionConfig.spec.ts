@@ -764,6 +764,32 @@ describe("AnomalyDetectionConfig", () => {
     });
   });
 
+  describe("sensitivity — percentile row alignment", () => {
+    it("seats the toggle bar and the percentile box on a shared bottom edge", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // Only the input carries a visible label, so items-start would drop its box
+      // a label-height below the bare toggle bar.
+      const row = wrapper
+        .find('[data-test="anomaly-sensitivity-percentile"]')
+        .element.closest("div.flex.items-end");
+      expect(row).not.toBeNull();
+      expect(row?.querySelector('[data-test="anomaly-sensitivity-tier"]')).not.toBeNull();
+    });
+
+    it("keeps the percentile label out of the narrow numeric column", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The label renders as a sibling span, never inside OInput's own field column.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"] label').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-info"]').exists()).toBe(true);
+    });
+  });
+
   // Wire contract: `alert_budget_per_day` absent/invalid = percentile mode; while set, `threshold` is API-derived and must never render or be written.
   describe("sensitivity — budget mode", () => {
     it("a config with no budget renders the percentile controls only", async () => {
