@@ -332,7 +332,7 @@ export default defineComponent({
                 const encodedUserInfo: any = b64EncodeStandard(JSON.stringify(userInfo));
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
-                store.dispatch("setUserInfo", encodedUserInfo);
+                store.dispatch("setUserInfo", userInfo);
 
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
