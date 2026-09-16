@@ -2864,6 +2864,7 @@ export default defineComponent({
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -2984,6 +2985,7 @@ export default defineComponent({
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
+              searchObj.data.filterErrMsg = "";
 
               streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
@@ -3000,16 +3002,19 @@ export default defineComponent({
                 }
               });
 
+              // Distinct from "no stream picked yet" (LogsNoStreamState): the
+              // query names a specific stream, and the frontend already has the
+              // full stream list, so it can tell the user which name is wrong
+              // instead of falling back to the generic "select a stream" empty
+              // state (which reads as if nothing was ever typed).
               if (streamFound == false) {
-                // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // toast({
-                //   message: "Stream not found",
-                //   color: "info",
-                //   position: "bottom-right",
-                //   timeout: 2000,
-                // });
+                if (tableName) {
+                  searchObj.data.filterErrMsg = t("logs.searchBar.streamNotFoundInQuery", {
+                    stream: tableName,
+                  });
+                }
               }
             }
           }
