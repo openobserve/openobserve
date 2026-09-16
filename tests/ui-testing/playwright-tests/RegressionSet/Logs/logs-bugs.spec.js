@@ -977,19 +977,19 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should have timestamp column selected by default for multi stream @bug-5894 @P2 @timestamp @multiStream @regression", async ({ page }) => {
     testLogger.info('Test: Verify timestamp default selected for multi stream (Bug #5894)');
 
+    // The stream select's options are fetched when the logs page loads, so the second
+    // stream must exist before that navigation or it never appears in the dropdown.
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    fieldCacheStreamsToCleanup.push(secondStream);
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await pm.logsPage.waitForStreamAvailable(secondStream, 90000, 3000);
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    // Ingest data into a second stream for multi-stream testing
-    const secondStream = `e2e_multistream_${Date.now()}`;
-    fieldCacheStreamsToCleanup.push(secondStream);
-    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
-    await ingestTestData(page, secondStream);
-    await page.waitForTimeout(2000);
-
-    // Select second stream for multi-stream mode (without page navigation)
     testLogger.info('Selecting second stream for multi-stream mode');
     await pm.logsPage.addStreamToSelection(secondStream);
     await page.waitForTimeout(1000);
@@ -2103,68 +2103,6 @@ test.describe("Logs Regression Bug Fixes", () => {
     }
 
     testLogger.info('✓ PASSED: Non-builder saved view handled correctly (Bug #14228)');
-  });
-
-  // ==========================================================================
-  // Bug #9550: VRL-generated fields should not offer include/exclude (=)
-  // https://github.com/openobserve/openobserve/issues/9550
-  // ==========================================================================
-  // Still skipped, but for a different reason than recorded before — the VRL
-  // editor now opens correctly (that was the dead-selector bug, fixed in
-  // logsPage.clickVrlToggleButton). What remains is that this test's selectors
-  // were never right: the field list uses
-  //   logs-field-list-item-<field>                         (the row)
-  //   log-search-index-list-filter-<field>-field-btn       (the "=" icon #9550 is about)
-  //   log-search-index-list-interesting-<field>-field-btn
-  // whereas getComputedFieldButton/getIncludeExcludeIcon/getEqualsIcon guess at
-  // `[data-test*="computed_field"]` and a `[class*="equal"]` sibling, none of
-  // which exist. Verified against o2latestmain: after applying a VRL transform,
-  // `computed_field` appears nowhere in the field list — the only DOM mention is
-  // the text inside the query editor.
-  //
-  // To re-enable: confirm a VRL transform's derived field actually surfaces
-  // (the issue title says "when added to the table", so the table column may be
-  // the real subject rather than the field list), then rewrite against the
-  // selectors above instead of the invented ones.
-  test.skip("should not display include/exclude icon for VRL-generated fields", {
-    tag: ['@bug-9550', '@P2', '@regression', '@logsRegression', '@logsRegressionVrl']
-  }, async ({ page }) => {
-    test.setTimeout(120000);
-    testLogger.info('Test: Verify VRL fields do not show include/exclude icon (Bug #9550)');
-
-    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`;
-    await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await pm.logsPage.selectStream('e2e_automate');
-    await page.waitForTimeout(1000);
-
-    await pm.logsPage.clickVrlToggleButton();
-
-    const vrlEditor = pm.logsPage.getVrlEditor().first();
-    await expect(vrlEditor, 'Bug #9550: VRL editor must be visible').toBeVisible({ timeout: 5000 });
-
-    await vrlEditor.click();
-    await page.keyboard.type('.computed_field = .kubernetes_pod_name + "_computed"');
-
-    await pm.logsPage.clickSearchBarRefreshButton();
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(2000);
-
-    await pm.logsPage.fillIndexFieldSearchInput('computed_field');
-    await page.waitForTimeout(500);
-
-    const computedFieldBtn = pm.logsPage.getComputedFieldButton().first();
-    await expect(computedFieldBtn, 'Bug #9550: computed_field must appear').toBeVisible({ timeout: 5000 });
-
-    await computedFieldBtn.hover();
-    await page.waitForTimeout(300);
-
-    const hasIncludeExcludeIcon = await pm.logsPage.getIncludeExcludeIcon().isVisible().catch(() => false);
-    const hasEqualsIcon = await pm.logsPage.getEqualsIcon().isVisible().catch(() => false);
-
-    expect(hasIncludeExcludeIcon || hasEqualsIcon,
-      'Bug #9550: VRL fields should not have include/exclude icon').toBe(false);
-    testLogger.info('\u2713 PASSED: VRL field has no include/exclude icon - Bug #9550 is fixed');
   });
 
   test.afterEach(async () => {
