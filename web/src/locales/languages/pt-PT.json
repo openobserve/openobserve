@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Visualização adicionada aos favoritos.",
       "viewRemovedFavorites": "Visualização removida dos favoritos.",
       "selectStreamBeforeSchedule": "Selecione um stream antes de agendar um job",
+      "streamNotFoundInQuery": "O Stream \"{stream}\" não existe",
       "confirmUpdateFunction": "Tem certeza de que deseja atualizar a função?",
       "confirmUpdateSavedViewMsg": "Tem certeza de que deseja atualizar a visualização salva?"
     },
