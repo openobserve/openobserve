@@ -1,6 +1,0 @@
-{
-  "group": "Alerts",
-  "spec_filename": "alerts-chart-error-state.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
