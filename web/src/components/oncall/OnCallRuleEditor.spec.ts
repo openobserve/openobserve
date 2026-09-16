@@ -503,5 +503,14 @@ describe("OnCallRuleEditor", () => {
       await wrapper.vm.$nextTick();
       expect(wrapper.emitted("remove")).toHaveLength(1);
     });
+
+    it("offers no removal when the host's row already has one", async () => {
+      const wrapper = render({
+        rule: { rule_id: "r1", team_id: "team_1", dimensions: { "k8s-cluster": "introspection" } },
+        allowRemove: false,
+      });
+      await flushPromises();
+      expect(dialog(wrapper).props("neutralButtonLabel")).toBeUndefined();
+    });
   });
 });

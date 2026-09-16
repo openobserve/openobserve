@@ -23,19 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     icon="group-work"
   >
     <template #actions>
-      <!-- Every team's ladder side by side. The page existed, was registered,
-           and had no inbound link from anywhere — so the one view that finds a
-           team paging nobody at P1 was reachable only by typing its URL. It
-           belongs beside the team list, which is where somebody comparing
-           teams already is. -->
-      <OButton
-        variant="outline"
-        size="sm"
-        data-test="oncall-teams-policies-btn"
-        @click="openPolicies"
-      >
-        {{ t("oncall.policiesTitle") }}
-      </OButton>
       <OButton
         v-if="canConfigure"
         variant="primary"
@@ -55,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :loading="loading"
       pagination="client"
+      show-index
       table-id="oncall-teams-list"
       :persist-columns="true"
       :show-global-filter="false"
@@ -85,6 +73,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OTooltip side="bottom" :content="t('oncall.refresh')" />
         </OButton>
+      </template>
+
+      <!-- The routing screen is the only place this fact lived, so a reader
+           had to leave the list to learn who catches everything it can't
+           place. -->
+      <template #cell-name="{ row }">
+        <span class="flex items-center gap-2">
+          <span>{{ row.name }}</span>
+          <OTag
+            v-if="row.id === defaultTeamId"
+            variant="primary-soft"
+            size="sm"
+            :data-test="`oncall-team-default-badge-${row.id}`"
+          >
+            {{ t("oncall.defaultTeamBadge") }}
+          </OTag>
+        </span>
       </template>
 
       <!-- The question this page is really asked: if something breaks now, who
@@ -141,6 +146,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the most discoverable one and editing was a whole-row click nothing
            announced. Safe actions first, destructive last. -->
       <template #cell-actions="{ row }">
+        <OButton
+          v-if="canConfigure && row.id !== defaultTeamId"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="star-outline"
+          :loading="settingDefaultTeamId === row.id"
+          :aria-label="t('oncall.setDefaultTeam')"
+          :data-test="`oncall-team-set-default-${row.id}`"
+          @click.stop="setDefaultTeam(row)"
+        >
+          <OTooltip side="bottom" :content="t('oncall.setDefaultTeam')" />
+        </OButton>
+        <div v-else-if="canConfigure" class="h-8 w-8 shrink-0" />
         <OButton
           v-if="canConfigure"
           variant="ghost"
@@ -234,7 +252,9 @@ import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
+import { useOnCallRoutingConfig } from "@/composables/useOnCallRoutingConfig";
 import oncallService from "@/services/oncall";
 import type { OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -246,6 +266,12 @@ const store = useStore();
 const route = useRoute();
 const router = useRouter();
 const { canConfigure, noteConfigurationDenied } = useOnCallPermissions();
+const { confirm } = useConfirmDialog();
+const {
+  config: routingConfig,
+  load: loadRoutingConfig,
+  refresh: refreshRoutingConfig,
+} = useOnCallRoutingConfig();
 
 const teams = ref<OnCallTeam[]>([]);
 const loading = ref(false);
@@ -259,8 +285,11 @@ const teamToDelete = ref<OnCallTeam | null>(null);
 // Undefined = not fetched yet, so a team in flight reads as loading rather
 // than as an empty rotation.
 const onCallByTeam = ref<Record<string, OnCallPosition[]>>({});
+// Which row's default-team save is in flight, for the same reason.
+const settingDefaultTeamId = ref<string | null>(null);
 
 const orgId = computed(() => store.state.selectedOrganization.identifier);
+const defaultTeamId = computed(() => routingConfig.value?.default_team_id ?? "");
 
 /// The first rotation, and everything else.
 ///
@@ -436,8 +465,48 @@ async function deleteTeam() {
   }
 }
 
-function openPolicies() {
-  router.push({ name: "onCallPolicies", query: { org_identifier: orgId.value } });
+// Mirrors the routing screen's own check: nominating a team is the one
+// moment "nobody is on call" is still avoidable, so an unstaffed pick warns
+// before it starts silently swallowing unrouted signals.
+async function isTeamUnstaffed(teamId: string): Promise<boolean> {
+  try {
+    const { data } = await oncallService.coverageGaps({ org_identifier: orgId.value, limit: 200 });
+    return data.teams.some((gap) => gap.id === teamId);
+  } catch {
+    return false;
+  }
+}
+
+async function setDefaultTeam(team: OnCallTeam) {
+  if (await isTeamUnstaffed(team.id)) {
+    const proceed = await confirm({
+      title: t("oncall.defaultTeamUnstaffedTitle"),
+      message: t("oncall.defaultTeamUnstaffedMessage", { team: raw(team.name) }),
+      confirmLabel: t("oncall.defaultTeamUnstaffedConfirm"),
+    });
+    if (!proceed) return;
+  }
+
+  settingDefaultTeamId.value = team.id;
+  try {
+    await oncallService.setRoutingConfig({
+      org_identifier: orgId.value,
+      data: { default_team_id: team.id },
+    });
+    await refreshRoutingConfig(orgId.value);
+    toast({ variant: "success", message: t("oncall.defaultTeamSaved") });
+  } catch (err: any) {
+    noteConfigurationDenied(err);
+    toast({
+      variant: "error",
+      message:
+        err?.response?.status === 403
+          ? t("oncall.configDenied")
+          : raw(err?.response?.data?.message) || t("oncall.defaultTeamSaveFailed"),
+    });
+  } finally {
+    settingDefaultTeamId.value = null;
+  }
 }
 
 function openCreate() {
@@ -494,6 +563,7 @@ watch(() => route.query.action, syncFromRoute);
 
 onMounted(() => {
   fetchTeams();
+  loadRoutingConfig(orgId.value);
   syncFromRoute();
 });
 </script>
