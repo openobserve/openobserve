@@ -1,0 +1,5 @@
+tests/ui-testing/ci-matrix/ci_matrix_regression.json
+tests/ui-testing/pages/alertsPages/compositeAlertsPage.js
+tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-14306-composite-clone.spec.js
+tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-14308-composite-trigger-timestamps.spec.js
+tests/ui-testing/playwright-tests/utils/alerts-api-helpers.js

@@ -59,11 +59,11 @@ test.describe('Clone Composite Alerts testcases', {
     return { id, name };
   }
 
-  async function createCompositeFixture(page, children) {
+  async function createCompositeFixture(page, children, overrides = {}) {
     const name = uniq('composite_clone');
     const response = await createAlert(
       page,
-      compositeAlert(name, children.map((child) => child.id)),
+      compositeAlert(name, children.map((child) => child.id), overrides),
     );
     expect(response.status(), await response.text()).toBe(200);
     const id = await findAlertId(page, name);
@@ -112,11 +112,12 @@ test.describe('Clone Composite Alerts testcases', {
   }, async ({ page }) => {
     const childA = await createChild(page, uniq('composite_clone_child_a'));
     const childB = await createChild(page, uniq('composite_clone_child_b'));
-    const source = await createCompositeFixture(page, [childA, childB]);
+    const source = await createCompositeFixture(page, [childA, childB], { enabled: true });
     const sourceAlert = await getAlert(page, source.id);
     expect(sourceAlert, 'GET must return the source composite').toBeTruthy();
     expect(sourceAlert.alert_type).toBe('composite');
     expect(sourceAlert.composite_condition, 'source composite must store its condition').toBeTruthy();
+    expect(sourceAlert.enabled, 'source composite must be seeded enabled').toBe(true);
 
     await openCompositeList(page);
     await pm.compositeAlertsPage.clickCloneButton(source.name);
@@ -139,6 +140,7 @@ test.describe('Clone Composite Alerts testcases', {
     expect(clone.composite_condition.expression).toBe(sourceAlert.composite_condition.expression);
     expect(clone.composite_condition.expression).toContain(`{${childA.id}}`);
     expect(clone.composite_condition.expression).toContain(`{${childB.id}}`);
+    expect(clone.enabled, 'clone must be created disabled even though the source was enabled').toBe(false);
     await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
     testLogger.info('Cloned composite preserved its type and child-referencing expression');
   });
@@ -189,33 +191,12 @@ test.describe('Clone Composite Alerts testcases', {
     testLogger.info('Cancel dismissed the dialog and created no clone');
   });
 
-  test('should clone a composite whose child alert was deleted', {
-    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
-  }, async ({ page }) => {
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const survivingChild = await createChild(page, uniq('composite_clone_child_survivor'));
-    const source = await createCompositeFixture(page, [child, survivingChild]);
-
-    // Clone is id-based and copies the stored expression; a deleted child must
-    // not block it. Remove the child from the tracked cleanup set first.
-    await deleteAlertInFolder(page, child.id, 'default');
-    created = created.filter((entry) => entry.id !== child.id);
-
-    await openCompositeList(page);
-    await pm.compositeAlertsPage.clickCloneButton(source.name);
-    await pm.compositeAlertsPage.expectCloneDialogVisible();
-    await pm.compositeAlertsPage.expectStreamSelectsHidden();
-
-    const newName = `${source.name} - Copy`;
-    await pm.compositeAlertsPage.fillCloneName(newName);
-    await pm.compositeAlertsPage.submitClone();
-    await pm.compositeAlertsPage.expectCloneSuccessToast();
-
-    const newId = await findAlertId(page, newName);
-    expect(newId, 'clone with a stale child reference must still be created').toBeTruthy();
-    created.push({ id: newId, folderId: 'default' });
-    await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
-    await expect(pm.compositeAlertsPage.listChildCount(newId)).toBeVisible();
-    testLogger.info('Composite cloned despite its child having been deleted');
-  });
+  test.fixme(
+    'should clone a composite whose child alert was deleted — not wired: '
+      + 'delete of a referenced child is refused 409 child_referenced (mod.rs:2157-2168) '
+      + 'and alerts-api-helpers.js:233 swallows the error; a genuinely missing child is '
+      + 'rejected at resolve_children (service.rs:462-466, ChildNotAccessible)',
+    { tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'] },
+    async () => {},
+  );
 });
