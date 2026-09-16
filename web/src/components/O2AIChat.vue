@@ -1094,9 +1094,16 @@
             <div class="tool-call-content flex w-full items-center gap-3">
               <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
               <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
-                <span
-                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
-                  >{{ block.message }}</span
+                <!-- Same formatter as the attached block below, so a finished
+                     step reads "Queried logs · N results" rather than staying
+                     on the call-time label ("Querying logs") it was created
+                     with — `message` is copied at call time and never updated. -->
+                <span class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
+                  >{{ formatToolCallMessage(block).text
+                  }}<strong v-if="formatToolCallMessage(block).highlight">{{
+                    formatToolCallMessage(block).highlight
+                  }}</strong
+                  >{{ formatToolCallMessage(block).suffix }}</span
                 >
               </div>
             </div>
@@ -1931,28 +1938,116 @@ export default defineComponent({
       return 50; // Fixed 50px threshold for all screens
     };
 
+    // scrollTop of the last scroll WE performed. The scroll event fires
+    // asynchronously (next frame), by which time streaming has usually appended
+    // more text, so the handler would see "not at the bottom" for a position we
+    // just pinned there and silently turn auto-scroll off — after which the
+    // answer scrolls out of view for the rest of the turn. Remembering our own
+    // position lets the handler tell "the user scrolled up" apart from "we
+    // pinned to the bottom and the content grew underneath".
+    let lastProgrammaticScrollTop = -1;
+
     const checkIfShouldAutoScroll = () => {
       if (!messagesContainer.value) return;
 
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+      const isOwnScroll = Math.abs(scrollTop - lastProgrammaticScrollTop) <= 2;
 
-      shouldAutoScroll.value = isAtBottom;
+      // Only a real user scroll away from the bottom disengages auto-scroll.
+      if (isAtBottom) {
+        shouldAutoScroll.value = true;
+      } else if (!isOwnScroll) {
+        shouldAutoScroll.value = false;
+      }
 
       // Show scroll to bottom button when user scrolls up significantly
       // Only show if there's enough content to scroll and user is not at bottom
       const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
       const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
 
-      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
+      showScrollToBottom.value = hasScrollableContent && isScrolledUp && !shouldAutoScroll.value;
     };
+
+    /**
+     * Jump the message list to the bottom, recording where we put it so the
+     * scroll handler can recognise the resulting event as ours.
+     * No-op while the instance is hidden (v-show'd sidebar): scrollHeight is 0
+     * there, and writing 0 would fight the real position once it is shown again.
+     */
+    const pinToBottom = () => {
+      const el = messagesContainer.value;
+      if (!el || !el.clientHeight) return;
+      el.scrollTop = el.scrollHeight;
+      lastProgrammaticScrollTop = el.scrollTop;
+      // We are at the bottom by construction; the button's visibility is
+      // otherwise only recomputed on scroll events, which would leave it
+      // stranded on screen after a programmatic jump.
+      showScrollToBottom.value = false;
+    };
+
+    // The message list grows from two independent sources: stream events (which
+    // call scrollToBottom directly) and the typewriter/markdown re-render, which
+    // keeps appending characters for many frames after the last delta arrived
+    // and used to leave the view stranded mid-answer. A DOM observer covers
+    // both, coalesced to one scroll per frame so per-character ticks don't force
+    // a layout each time.
+    let autoScrollFrame: number | null = null;
+    const scheduleAutoScroll = () => {
+      if (!shouldAutoScroll.value || autoScrollFrame !== null) return;
+      autoScrollFrame = requestAnimationFrame(() => {
+        autoScrollFrame = null;
+        if (shouldAutoScroll.value) pinToBottom();
+      });
+    };
+
+    let contentGrowthObserver: MutationObserver | null = null;
+    let containerResizeObserver: ResizeObserver | null = null;
+
+    const startAutoScrollObservers = () => {
+      const el = messagesContainer.value;
+      if (!el || contentGrowthObserver) return;
+      contentGrowthObserver = new MutationObserver(scheduleAutoScroll);
+      contentGrowthObserver.observe(el, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      // Keeps us pinned when the viewport itself changes (panel resize, the
+      // input box growing as the user types, images finishing their load).
+      if (typeof ResizeObserver !== "undefined") {
+        containerResizeObserver = new ResizeObserver(scheduleAutoScroll);
+        containerResizeObserver.observe(el);
+      }
+    };
+
+    const stopAutoScrollObservers = () => {
+      contentGrowthObserver?.disconnect();
+      contentGrowthObserver = null;
+      containerResizeObserver?.disconnect();
+      containerResizeObserver = null;
+      if (autoScrollFrame !== null) {
+        cancelAnimationFrame(autoScrollFrame);
+        autoScrollFrame = null;
+      }
+    };
+
+    // The message list lives behind `v-if="isOpen"`, so it can appear and
+    // disappear well after mount — bind the observers to the element itself
+    // rather than to onMounted.
+    watch(
+      messagesContainer,
+      (el) => {
+        stopAutoScrollObservers();
+        if (el) startAutoScrollObservers();
+      },
+      { flush: "post" },
+    );
 
     const scrollToBottom = async () => {
       await nextTick();
-      if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-      }
+      if (shouldAutoScroll.value) pinToBottom();
     };
 
     const scrollToBottomSmooth = async () => {
@@ -1966,15 +2061,20 @@ export default defineComponent({
         showScrollToBottom.value = false;
         // Reset auto-scroll when user manually scrolls to bottom
         shouldAutoScroll.value = true;
+        // The smooth scroll lands over several frames; treat those intermediate
+        // scroll events as ours so they don't immediately disengage the
+        // auto-scroll we just re-enabled.
+        lastProgrammaticScrollTop = messagesContainer.value.scrollHeight;
       }
     };
 
+    // The loading indicator is the last node in the message list, so pinning to
+    // the bottom brings it into view. (It has no id of its own — and could not
+    // have one, since several O2AIChat instances are mounted at once.)
     const scrollToLoadingIndicator = async () => {
       await nextTick();
-      const loadingElement = document.getElementById("loading-indicator");
-      if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
+      shouldAutoScroll.value = true;
+      pinToBottom();
     };
 
     /**
@@ -3541,6 +3641,26 @@ export default defineComponent({
     const addNewChat = () => {
       detachCurrentStream();
 
+      // detachCurrentStream() early-returns when no request is in flight, so its
+      // cleanup can't be relied on here — and it never cleared pendingToolCalls
+      // anyway. These indicators render OUTSIDE the chatMessages v-for, so
+      // emptying the transcript below does not remove them: a turn that ended
+      // without a `complete` event (idle cut, dropped connection) leaves its
+      // rows stranded on the new chat's empty page.
+      isLoading.value = false;
+      activeToolCall.value = null;
+      pendingToolCalls.value = [];
+      pendingConfirmation.value = null;
+      stopAnalyzingRotation();
+      currentStreamingMessage.value = "";
+      currentTextSegment.value = "";
+      displayedStreamingContent.value = "";
+      streamOwnerUnavailable.value = false;
+      // Keyed positionally ("messageIndex-blockIndex"), so without this the new
+      // chat's first tool block inherits the old chat's expansion state at "0-0".
+      expandedToolCalls.value.clear();
+      expandedLogEntries.value.clear();
+
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
@@ -4282,6 +4402,12 @@ export default defineComponent({
       // session.
       streamOwnerUnavailable.value = false;
 
+      // Hoisted out of the try so the finally below can tell whether this turn
+      // is still the one on screen. Seeded with the array the user message was
+      // just pushed into, so the check still holds on the early-return paths
+      // that never reach the reassignment below.
+      let streamMsgs = chatMessages.value;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
@@ -4376,7 +4502,7 @@ export default defineComponent({
         // Capture the controller, messages ref, and sessionId so we can detect
         // detachment and clean up after processStream
         const streamController = currentAbortController.value;
-        const streamMsgs = chatMessages.value;
+        streamMsgs = chatMessages.value;
 
         await processStream(reader);
 
@@ -4465,24 +4591,59 @@ export default defineComponent({
           content: raw(errorMessage),
         });
         await saveToHistory(); // Save after error
+      } finally {
+        // `finally` rather than straight-line code after the catch: the early
+        // returns above (fetch threw, response.cancelled) used to skip all of
+        // this, stranding the spinner and the session flag forever.
+        //
+        // Only touch the live view if this turn is still the one on screen — a
+        // detached stream finishing must not clear indicators, or the abort
+        // controller, that now belong to a newer turn.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+
+        if (stillOnScreen) {
+          // Steps that finish before the assistant produces any text sit in
+          // pendingToolCalls until a `complete`, `message_delta` or `error`
+          // event attaches them to a message. None of those arrive on an idle
+          // cut or a dropped connection, so drain here as well — otherwise the
+          // steps stay as flat unclickable rows and, because they render
+          // outside the transcript, follow the user into the next chat.
+          if (pendingToolCalls.value.length) {
+            const msgs = streamMsgs;
+            const lastMessage = msgs[msgs.length - 1];
+            if (lastMessage && lastMessage.role === "assistant") {
+              if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+              lastMessage.contentBlocks.push(...pendingToolCalls.value);
+            } else {
+              msgs.push({
+                role: "assistant",
+                content: raw(""),
+                contentBlocks: [...pendingToolCalls.value],
+              });
+            }
+            pendingToolCalls.value = [];
+            await saveToHistory();
+          }
+
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+        }
+
+        // Mark the session's stream as finished in the cross-instance registry so
+        // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+        // its own loading indicator. Runs on all exit paths (success/abort/error).
+        // Uses the id captured before the request, not currentSessionId — by the
+        // time an early failure lands here the user may have switched chats, and
+        // clearing the wrong session leaves the real one flagged as streaming.
+        sessionStreamingState[streamSessionId] = false;
+
+        if (stillOnScreen) {
+          // Clean up AbortController after request completion (success or error)
+          currentAbortController.value = null;
+          await scrollToBottom();
+        }
       }
-
-      isLoading.value = false;
-      activeToolCall.value = null;
-      stopAnalyzingRotation();
-
-      // Mark the session's stream as finished in the cross-instance registry so
-      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
-      // its own loading indicator. Runs on all exit paths (success/abort/error).
-      // Uses the id captured before the request, not currentSessionId — by the
-      // time an early failure lands here the user may have switched chats, and
-      // clearing the wrong session leaves the real one flagged as streaming.
-      sessionStreamingState[streamSessionId] = false;
-
-      // Clean up AbortController after request completion (success or error)
-      currentAbortController.value = null;
-
-      await scrollToBottom();
     };
 
     const selectCapability = (capability: string) => {
@@ -5133,6 +5294,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
+      stopAutoScrollObservers();
       // Mark unmounting FIRST so any reactive watcher that fires during teardown
       // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
       // not re-attach the just-detached stream back to this dying instance.
