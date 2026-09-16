@@ -927,6 +927,7 @@ impl From<ExperimentPreview> for ExperimentPreviewResponseBody {
 pub enum ExperimentStatusBody {
     Pending,
     Running,
+    Retrying,
     Completed,
     Failed,
     Cancelled,
@@ -937,6 +938,7 @@ impl From<ExperimentStatus> for ExperimentStatusBody {
         match value {
             ExperimentStatus::Pending => Self::Pending,
             ExperimentStatus::Running => Self::Running,
+            ExperimentStatus::Retrying => Self::Retrying,
             ExperimentStatus::Completed => Self::Completed,
             ExperimentStatus::Failed => Self::Failed,
             ExperimentStatus::Cancelled => Self::Cancelled,
@@ -1210,6 +1212,7 @@ pub struct ExperimentResultScoreBody {
 #[serde(rename_all = "snake_case")]
 pub enum ExperimentResultTaskStatusBody {
     Pending,
+    Queued,
     InProgress,
     Ok,
     Skipped,
@@ -1348,6 +1351,7 @@ impl From<ExperimentResultTaskStatus> for ExperimentResultTaskStatusBody {
     fn from(value: ExperimentResultTaskStatus) -> Self {
         match value {
             ExperimentResultTaskStatus::Pending => Self::Pending,
+            ExperimentResultTaskStatus::Queued => Self::Queued,
             ExperimentResultTaskStatus::InProgress => Self::InProgress,
             ExperimentResultTaskStatus::Ok => Self::Ok,
             ExperimentResultTaskStatus::Skipped => Self::Skipped,

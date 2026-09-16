@@ -17,7 +17,7 @@ use std::collections::{HashMap, HashSet};
 
 use axum::{
     extract::{Path, Query},
-    response::Response,
+    response::{IntoResponse, Response},
 };
 use db::authz::{remove_ownership, set_ownership};
 use openobserve_api_common::extractors::Headers;
@@ -1337,7 +1337,7 @@ pub async fn retry_experiment(Path((org_id, experiment_id)): Path<(String, Strin
     ),
     request_body(content = RetryExperimentSlotRequestBody, content_type = "application/json"),
     responses(
-        (status = 200, description = "Selected slot retry result"),
+        (status = 202, description = "Selected slot retry queued"),
         (status = 400, description = "Invalid idempotency key"),
         (status = 403, description = "Experiment is not accessible"),
         (status = 404, description = "Experiment, row, or trial not found"),
@@ -1357,7 +1357,7 @@ pub async fn retry_experiment_slot(
         return response;
     }
 
-    match openobserve_core::llm_evaluations::experiments::runner::retry_error_slot(
+    match openobserve_core::llm_evaluations::experiments::runner::queue_error_slot_retry(
         &org_id,
         &experiment_id,
         &row_id,
@@ -1366,7 +1366,7 @@ pub async fn retry_experiment_slot(
     )
     .await
     {
-        Ok(record) => MetaHttpResponse::json(record),
+        Ok(record) => (axum::http::StatusCode::ACCEPTED, axum::Json(record)).into_response(),
         Err(ExperimentSlotRetryError::Experiment(error)) => experiment_error_response(error),
         Err(ExperimentSlotRetryError::InvalidIdempotencyKey) => {
             MetaHttpResponse::bad_request("Invalid slot retry idempotency key")

@@ -127,7 +127,7 @@ export interface ExperimentApplicability {
 }
 
 export type ExperimentExecutionStatus =
-  "pending" | "running" | "completed" | "failed" | "cancelled";
+  "pending" | "running" | "retrying" | "completed" | "failed" | "cancelled";
 
 export type ExperimentStatus =
   ExperimentExecutionStatus | "scoring" | "execution_failed" | "scoring_failed";
@@ -176,7 +176,7 @@ export interface ExperimentExecution {
   itemLogicalId: string;
   rowId: string;
   trialIndex: number;
-  status: "pending" | "ok" | "error" | "skipped";
+  status: "queued" | "pending" | "ok" | "error" | "skipped";
   skipReason?: "no_reference" | "no_trace" | null;
   output: unknown | null;
   errorMessage: string | null;
@@ -284,7 +284,7 @@ export type ExperimentSlotStatus =
 export interface ExperimentResultSlot extends ExperimentSlot {
   /** Single lifecycle rollup of task and score evidence — the list-surface field. */
   status: ExperimentSlotStatus;
-  taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
+  taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
 }
@@ -446,7 +446,14 @@ export interface ExperimentResultQuery {
   resultPageSize?: number;
 }
 
-const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const TASK_RESULT_STATUSES = [
+  "pending",
+  "queued",
+  "in_progress",
+  "ok",
+  "skipped",
+  "error",
+] as const;
 const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
 const SLOT_STATUSES = [
   "pending",
@@ -463,7 +470,7 @@ function deriveSlotStatus(
   taskStatus: ExperimentResultSlot["taskStatus"],
   scores: ExperimentResultScore[],
 ): ExperimentSlotStatus {
-  if (taskStatus === "pending") return "pending";
+  if (taskStatus === "pending" || taskStatus === "queued") return "pending";
   if (taskStatus === "in_progress") return "running";
   if (taskStatus === "error") return "task_failed";
   if (taskStatus === "skipped") return "skipped";
