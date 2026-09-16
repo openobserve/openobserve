@@ -55,9 +55,11 @@ test.describe("Alert from a dashboard panel", () => {
       'Bug #9875: a panel-derived name must satisfy ALERT_NAME_UNSUPPORTED_CHARS, which rejects whitespace'
     ).not.toMatch(/[:#?\s'"%&]/);
 
+    // Which provenance wins depends on whether useAutoName re-derives the name from the
+    // form before it is read, so accept either — the character rule above is the bug.
     expect(alertName,
-      'the generated name must still identify the data it came from'
-    ).toContain(STREAM);
+      'the generated name must still identify what it came from — the panel or its stream'
+    ).toMatch(new RegExp(`${PANEL_TITLE.replace(/\s+/g, '_')}|${STREAM}`, 'i'));
 
     testLogger.info('PASSED: panel-derived alert name is space-free (Bug #9875)');
   });

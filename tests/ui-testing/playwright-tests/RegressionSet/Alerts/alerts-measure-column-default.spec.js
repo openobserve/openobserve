@@ -27,15 +27,18 @@ test.describe("Alerts measure-column default", () => {
     testLogger.info('Measure-column default setup completed');
   });
 
-  test("only metrics may pre-select the value column for a measure function", {
+  // Each leg opens its own form: QueryConfig never clears having.column on a stream-type
+  // switch, so a metrics leg first would leave "value" behind and the logs read would
+  // measure that leftover rather than the logs default.
+  test("metrics must pre-select the value column for a measure function", {
     tag: ['@bug-11619', '@P2', '@regression', '@alertsRegression', '@alertsRegressionMeasureColumn']
   }, async () => {
     await pm.alertsPage.clickAddAlertButton();
-    await pm.alertsPage.fillAlertName(`e2e_11619_${Date.now()}`);
+    await pm.alertsPage.fillAlertName(`e2e_11619_metrics_${Date.now()}`);
 
-    // Metrics arrive aggregation-enabled, so the measure column is already rendered.
     await pm.alertsPage.selectStreamType('metrics');
     await pm.alertsPage.selectStreamByValue(METRICS_STREAM);
+
     const metricsColumn = await pm.alertsPage.getMeasureColumnSelectedValue();
     testLogger.info(`Metrics measure column: "${metricsColumn}"`);
 
@@ -43,6 +46,15 @@ test.describe("Alerts measure-column default", () => {
     expect(metricsColumn,
       'Precondition: metrics must still default the measure column to "value"'
     ).toBe('value');
+
+    testLogger.info('PASSED: metrics defaults the measure column (Bug #11619)');
+  });
+
+  test("logs must not pre-select the value column for a measure function", {
+    tag: ['@bug-11619', '@P2', '@regression', '@alertsRegression', '@alertsRegressionMeasureColumn']
+  }, async () => {
+    await pm.alertsPage.clickAddAlertButton();
+    await pm.alertsPage.fillAlertName(`e2e_11619_logs_${Date.now()}`);
 
     await pm.alertsPage.selectStreamType('logs');
     await pm.alertsPage.selectStreamByValue(LOG_STREAM);
@@ -56,6 +68,6 @@ test.describe("Alerts measure-column default", () => {
       'Bug #11619: logs must leave the measure column unset — "value" is a metrics-only default'
     ).toBe('');
 
-    testLogger.info('PASSED: measure column pre-selected for metrics only (Bug #11619)');
+    testLogger.info('PASSED: logs leaves the measure column unset (Bug #11619)');
   });
 });
