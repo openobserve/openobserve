@@ -192,6 +192,8 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+/// Shared body of the two `folder_id` migrations above; not a migration itself.
+mod workflow_folder_id;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(

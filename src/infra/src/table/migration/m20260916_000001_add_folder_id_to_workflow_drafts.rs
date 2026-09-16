@@ -16,19 +16,26 @@
 //! Adds `workflow_drafts.folder_id`, pointing every existing draft at its org's
 //! default Workflows folder. Without a folder of its own a draft was appended to
 //! every folder's listing.
+//!
+//! The body is shared with the sibling migration that does this for the other
+//! workflow table — see [`super::workflow_folder_id`].
 
+#[cfg(test)]
 use config::meta::folder::DEFAULT_FOLDER;
-use sea_orm::{
-    ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
-    QuerySelect, Statement,
-};
+#[cfg(test)]
+use sea_orm::{ConnectionTrait, EntityTrait, QuerySelect};
 use sea_orm_migration::prelude::*;
-use svix_ksuid::{Ksuid, KsuidLike};
 
-const FK_NAME: &str = "workflow_drafts_folder_fk";
-const NOT_NULL_CHECK_NAME: &str = "workflow_drafts_folder_id_not_null";
-const IDX_NAME: &str = "workflow_drafts_org_folder_idx";
-const WORKFLOWS_FOLDER_TYPE: i16 = 4;
+use super::workflow_folder_id::{self, Spec};
+#[cfg(test)]
+use super::workflow_folder_id::{WORKFLOWS_FOLDER_TYPE, folder_ksuid_from_hash, folders};
+
+const SPEC: Spec = Spec {
+    table: "workflow_drafts",
+    fk: "workflow_drafts_folder_fk",
+    not_null_check: "workflow_drafts_folder_id_not_null",
+    idx: "workflow_drafts_org_folder_idx",
+};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
@@ -36,213 +43,12 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let backend = manager.get_database_backend();
-
-        // Added nullable and tightened below: NOT NULL up front fails on a
-        // populated table, and this one may already hold drafts.
-        if !manager.has_column("workflow_drafts", "folder_id").await? {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(WorkflowDrafts::Table)
-                        .add_column(ColumnDef::new(WorkflowDrafts::FolderId).char_len(27).null())
-                        .to_owned(),
-                )
-                .await?;
-        }
-
-        backfill_default_folders(manager).await?;
-
-        // SQLite cannot add a foreign key to an existing table and is dev-only
-        // here, so it keeps a nullable, unconstrained column.
-        if backend == sea_orm::DbBackend::Postgres {
-            set_folder_id_not_null(manager).await?;
-        }
-
-        if backend == sea_orm::DbBackend::Postgres && !fk_exists(manager).await? {
-            let conn = manager.get_connection();
-            // NOT VALID first: a validated FK holds ACCESS EXCLUSIVE for the
-            // whole scan, which on a large table can outlast the dist_lock.
-            conn.execute_unprepared(&format!(
-                "ALTER TABLE workflow_drafts ADD CONSTRAINT {FK_NAME} \
-                 FOREIGN KEY (folder_id) REFERENCES folders(id) NOT VALID"
-            ))
-            .await?;
-            conn.execute_unprepared(&format!(
-                "ALTER TABLE workflow_drafts VALIDATE CONSTRAINT {FK_NAME}"
-            ))
-            .await?;
-        }
-
-        manager
-            .create_index(
-                Index::create()
-                    .if_not_exists()
-                    .name(IDX_NAME)
-                    .table(WorkflowDrafts::Table)
-                    .col(WorkflowDrafts::OrgId)
-                    .col(WorkflowDrafts::FolderId)
-                    .to_owned(),
-            )
-            .await?;
-
-        Ok(())
+        workflow_folder_id::up(manager, &SPEC).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let backend = manager.get_database_backend();
-
-        manager
-            .drop_index(
-                Index::drop()
-                    .if_exists()
-                    .name(IDX_NAME)
-                    .table(WorkflowDrafts::Table)
-                    .to_owned(),
-            )
-            .await?;
-
-        if backend == sea_orm::DbBackend::Postgres {
-            manager
-                .get_connection()
-                .execute_unprepared(&format!(
-                    "ALTER TABLE workflow_drafts DROP CONSTRAINT IF EXISTS {FK_NAME}"
-                ))
-                .await?;
-        }
-
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(WorkflowDrafts::Table)
-                    .drop_column(WorkflowDrafts::FolderId)
-                    .to_owned(),
-            )
-            .await?;
-
-        Ok(())
+        workflow_folder_id::down(manager, &SPEC).await
     }
-}
-
-/// Points every draft with no folder at its org's default Workflows folder,
-/// creating that folder when the org has none yet.
-async fn backfill_default_folders(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    let conn = manager.get_connection();
-
-    let orgs: Vec<String> = workflow_drafts::Entity::find()
-        .select_only()
-        .column(workflow_drafts::Column::OrgId)
-        .distinct()
-        .filter(unfoldered())
-        .into_tuple()
-        .all(conn)
-        .await?;
-
-    for org in orgs {
-        let existing = folders::Entity::find()
-            .filter(folders::Column::Org.eq(&org))
-            .filter(folders::Column::FolderId.eq(DEFAULT_FOLDER))
-            .filter(folders::Column::Type.eq(WORKFLOWS_FOLDER_TYPE))
-            .one(conn)
-            .await?;
-
-        let folder_pk = match existing {
-            Some(folder) => folder.id,
-            None => {
-                let pk =
-                    folder_ksuid_from_hash(&org, WORKFLOWS_FOLDER_TYPE, DEFAULT_FOLDER).to_string();
-                folders::Entity::insert(folders::ActiveModel {
-                    id: Set(pk.clone()),
-                    org: Set(org.clone()),
-                    folder_id: Set(DEFAULT_FOLDER.to_string()),
-                    name: Set(DEFAULT_FOLDER.to_string()),
-                    description: Set(Some(DEFAULT_FOLDER.to_string())),
-                    r#type: Set(WORKFLOWS_FOLDER_TYPE),
-                })
-                .exec(conn)
-                .await?;
-                pk
-            }
-        };
-
-        workflow_drafts::Entity::update_many()
-            .col_expr(
-                workflow_drafts::Column::FolderId,
-                Expr::value(folder_pk.to_owned()),
-            )
-            .filter(workflow_drafts::Column::OrgId.eq(&org))
-            .filter(unfoldered())
-            .exec(conn)
-            .await?;
-    }
-
-    Ok(())
-}
-
-/// Postgres only. A bare `SET NOT NULL` scans the heap under ACCESS EXCLUSIVE,
-/// which on a large table can outlast the dist_lock; validating a CHECK takes only
-/// SHARE UPDATE EXCLUSIVE and lets PG12+ skip that scan. The CHECK is then redundant.
-async fn set_folder_id_not_null(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    let conn = manager.get_connection();
-    // ADD CONSTRAINT has no IF NOT EXISTS, so a re-run drops the leftover first.
-    for stmt in [
-        format!("ALTER TABLE workflow_drafts DROP CONSTRAINT IF EXISTS {NOT_NULL_CHECK_NAME}"),
-        format!(
-            "ALTER TABLE workflow_drafts ADD CONSTRAINT {NOT_NULL_CHECK_NAME} \
-             CHECK (folder_id IS NOT NULL) NOT VALID"
-        ),
-        format!("ALTER TABLE workflow_drafts VALIDATE CONSTRAINT {NOT_NULL_CHECK_NAME}"),
-        "ALTER TABLE workflow_drafts ALTER COLUMN folder_id SET NOT NULL".to_string(),
-        format!("ALTER TABLE workflow_drafts DROP CONSTRAINT {NOT_NULL_CHECK_NAME}"),
-    ] {
-        conn.execute_unprepared(&stmt).await?;
-    }
-    Ok(())
-}
-
-/// Matches rows the column was just added to, plus any left blank by a re-run.
-fn unfoldered() -> Condition {
-    Condition::any()
-        .add(workflow_drafts::Column::FolderId.is_null())
-        .add(workflow_drafts::Column::FolderId.eq(""))
-}
-
-/// Derives a folder's primary key from its identity so that every node in a
-/// cluster computes the same value and a re-run is a no-op. Must stay identical
-/// to the workflows backfill, or the two mint different default folders.
-fn folder_ksuid_from_hash(org: &str, folder_type: i16, folder_id: &str) -> Ksuid {
-    use sha1::{Digest, Sha1};
-    let mut hasher = Sha1::new();
-    hasher.update(org);
-    hasher.update(folder_type.to_string());
-    hasher.update(folder_id);
-    let hash = hasher.finalize();
-    Ksuid::from_bytes(hash.into())
-}
-
-async fn fk_exists(manager: &SchemaManager<'_>) -> Result<bool, DbErr> {
-    let row = manager
-        .get_connection()
-        .query_one(Statement::from_string(
-            sea_orm::DbBackend::Postgres,
-            format!(
-                "SELECT COUNT(*) AS cnt FROM information_schema.table_constraints \
-                 WHERE constraint_name = '{FK_NAME}' \
-                 AND table_name = 'workflow_drafts' \
-                 AND table_schema = current_schema()"
-            ),
-        ))
-        .await?;
-    Ok(row
-        .map(|r| r.try_get::<i64>("", "cnt").unwrap_or(0) > 0)
-        .unwrap_or(false))
-}
-
-#[derive(DeriveIden)]
-enum WorkflowDrafts {
-    Table,
-    OrgId,
-    FolderId,
 }
 
 // The schemas of tables might change after subsequent migrations. Therefore
@@ -250,30 +56,9 @@ enum WorkflowDrafts {
 // remain unchanged rather than ORM models in the `entity` module that will be
 // updated to reflect the latest changes to table schemas.
 
-/// Representation of the folders table at the time this migration executes.
-mod folders {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
-    #[sea_orm(table_name = "folders")]
-    pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
-        pub id: String,
-        pub org: String,
-        pub folder_id: String,
-        pub name: String,
-        pub description: Option<String>,
-        pub r#type: i16,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
-/// Representation of the workflow_drafts table at the time this migration
-/// executes, with `folder_id` still nullable.
+/// Representation of the workflow_drafts table at the time this migration executes,
+/// with `folder_id` still nullable.
+#[cfg(test)]
 mod workflow_drafts {
     use sea_orm::entity::prelude::*;
 
