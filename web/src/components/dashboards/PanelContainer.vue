@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("panel.goToLogs") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
+            v-if="!simplifiedPanelView"
             data-test="dashboard-refresh-without-cache"
             @select="onPanelModifyClick('Refresh')"
             icon-left="cached"
@@ -473,13 +473,13 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
-import config from "@/aws-exports";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
 import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 import { durationParts } from "@/views/Infrastructure/curated/resolve";
+import { getVariablesReferencedInQueries } from "@/utils/dashboard/variables/variablesUtils";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -907,20 +907,8 @@ export default defineComponent({
         isPanelLoading.value = false;
       }
     };
-    const createVariableRegex = (name: any) =>
-      new RegExp(
-        `(?:\\$\\{?\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
-      );
-
     const getDependentVariablesData = () =>
-      props.variablesData?.values
-        ?.filter((it: any) => it.type != "dynamic_filters") // ad hoc filters are not considered as dependent filters as they are globally applied
-        ?.filter((it: any) => {
-          const regexForVariable = createVariableRegex(it.name);
-          return props.data.queries
-            ?.map((q: any) => regexForVariable.test(q?.query))
-            ?.includes(true);
-        });
+      getVariablesReferencedInQueries(props.variablesData?.values, props.data.queries);
 
     // Check if any dependent variable's value has changed
     const variablesDataUpdated = computed(() => {
@@ -1096,7 +1084,6 @@ export default defineComponent({
       handleSparklineWarningUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
-      config,
       t,
       showLegendsDialog,
       currentPanelData,

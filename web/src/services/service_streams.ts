@@ -25,6 +25,7 @@ export interface ServiceStreams {
   logs: string[];
   traces: string[];
   metrics: string[];
+  profiles: string[];
 }
 
 export interface ServiceMetadata {
@@ -58,6 +59,7 @@ export interface RelatedStreams {
   logs: StreamInfo[];
   traces: StreamInfo[];
   metrics: StreamInfo[];
+  profiles: StreamInfo[];
 }
 
 export interface CorrelationRequest {
@@ -103,6 +105,7 @@ export function buildChipDimensionsFromFilters(
     ...correlationResponse.related_streams.logs,
     ...correlationResponse.related_streams.traces,
     ...correlationResponse.related_streams.metrics,
+    ...correlationResponse.related_streams.profiles,
   ].filter((s) => s.filters && Object.keys(s.filters).length > 0);
 
   if (allStreams.length === 0) {

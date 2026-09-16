@@ -48,25 +48,44 @@ const config = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-describe("generateAnomalySummary — anomaly rate", () => {
-  it("states the rate as the percentile's complement", () => {
-    expect(generateAnomalySummary(config(), [], t)).toContain("3% anomaly rate");
+describe("generateAnomalySummary — sensitivity line", () => {
+  it("states the training-score percentile, never a live anomaly rate", () => {
+    // The percentile indexes TRAINING scores and promises nothing about live buckets.
+    const summary = generateAnomalySummary(config(), [], t);
+    expect(summary).toContain("score bar at p97");
+    expect(summary).not.toContain("anomaly rate");
   });
 
-  it("reports 1% for the most conservative tier", () => {
-    expect(generateAnomalySummary(config({ threshold: 99 }), [], t)).toContain("1% anomaly rate");
+  it("reports the conservative tier as its percentile", () => {
+    expect(generateAnomalySummary(config({ threshold: 99 }), [], t)).toContain("score bar at p99");
+  });
+
+  it("a stored budget replaces the percentile with the enforced cap", () => {
+    const summary = generateAnomalySummary(config({ alert_budget_per_day: 2 }), [], t);
+    expect(summary).toContain("at most 2 alerts/day");
+    expect(summary).not.toContain("score bar");
+  });
+
+  it("a sub-daily budget reads as alerts per week, singular at one", () => {
+    const summary = generateAnomalySummary(config({ alert_budget_per_day: 1 / 7 }), [], t);
+    expect(summary).toContain("at most 1 alert/week");
+  });
+
+  it("a fractional budget keeps the plural", () => {
+    const summary = generateAnomalySummary(config({ alert_budget_per_day: 0.05 }), [], t);
+    expect(summary).toContain("at most 0.35 alerts/week");
   });
 
   // The percentile input can be emptied, and the write-back passes "" through
-  // unchanged. `100 - ""` is 100, which announced "flag every bucket" — the most
-  // alarming value in the range — for a field the user had merely cleared.
+  // unchanged; a blank must not be numberified into a claim.
   it.each([
     ["", "empty string"],
     [null, "null"],
     [undefined, "undefined"],
     ["abc", "non-numeric"],
-  ])("omits the rate entirely for %s (%s) rather than claiming 100%%", (threshold) => {
+  ])("omits the sensitivity line entirely for %s (%s)", (threshold) => {
     const summary = generateAnomalySummary(config({ threshold }), [], t);
+    expect(summary).not.toContain("score bar");
     expect(summary).not.toContain("anomaly rate");
     // The rest of the summary still renders.
     expect(summary).toContain("14 days");

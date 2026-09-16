@@ -724,6 +724,20 @@ describe("ApiDashboard", () => {
       // Assert
       expect(result).toBe("");
     });
+
+    it("escapes an embedded single quote in the variable value", () => {
+      // Arrange
+      wrapper.vm.variablesData = {
+        isVariablesLoading: false,
+        values: [{ name: "service", value: "o'brien", type: "query_values" }],
+      };
+
+      // Act
+      const result = wrapper.vm.getVariablesString();
+
+      // Assert
+      expect(result).toBe(" and service='o''brien'");
+    });
   });
 
   describe("selectedDate watcher triggers resource fetches", () => {

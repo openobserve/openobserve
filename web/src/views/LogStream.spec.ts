@@ -349,6 +349,9 @@ describe("LogStream Component", () => {
       if (typeof wrapper.vm.filterLogStreamByTab === "function") {
         wrapper.vm.filterLogStreamByTab("metrics");
         expect(wrapper.vm.selectedStreamType).toBe("metrics");
+
+        wrapper.vm.filterLogStreamByTab("profiles");
+        expect(wrapper.vm.selectedStreamType).toBe("profiles");
       } else {
         // Fallback: test directly setting the filter
         wrapper.vm.selectedStreamType = "metrics";

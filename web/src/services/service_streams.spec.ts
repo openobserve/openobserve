@@ -279,6 +279,7 @@ describe("service_streams service", () => {
           ],
           traces: [],
           metrics: [],
+          profiles: [],
         },
       };
       const groups: FieldAlias[] = [

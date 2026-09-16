@@ -126,6 +126,11 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     loongcollector: "loongcollector",
   },
 
+  /** ingestion/profiles/Index.vue */
+  ingestProfiles: {
+    profilesOtelCollector: "profilesOtelCollector",
+  },
+
   /** enterprise/components/billings/Billing.vue */
   billings: {
     usage: "usage",
