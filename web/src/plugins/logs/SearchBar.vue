@@ -2874,6 +2874,7 @@ export default defineComponent({
       if (value.trim() !== "" && searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       if (searchObj.meta.quickMode === true) {
