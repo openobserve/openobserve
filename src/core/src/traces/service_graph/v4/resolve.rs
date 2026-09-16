@@ -29,8 +29,16 @@ pub const CLIENT_USER: &str = "user";
 pub const CLIENT_TYPE_USER: &str = "user";
 /// Emitted `client_type` label value of consumer edges (Q3, topic → service).
 pub const CLIENT_TYPE_QUEUE: &str = "queue";
+/// Emitted `client_type` label value when the caller of a tool/model edge is an agent (Q5/Q6).
+pub const CLIENT_TYPE_AGENT: &str = "agent";
 /// Emitted `connection_type` label value of an explicit `peer.service` that is not a known service.
 pub const CONNECTION_EXTERNAL: &str = "external";
+/// Emitted `connection_type` label value of a service → agent edge (Q4).
+pub const CONNECTION_AGENT: &str = "agent";
+/// Emitted `connection_type` label value of an agent/service → tool edge (Q5).
+pub const CONNECTION_TOOL: &str = "tool";
+/// Emitted `connection_type` label value of an agent/service → model edge (Q6).
+pub const CONNECTION_MODEL: &str = "model";
 /// Emitted `reason` label value: the only peer key was a bare IP.
 pub const REASON_IP_ONLY: &str = "ip_only";
 /// Emitted `reason` label value: no peer key at all and no signature hit.
@@ -48,6 +56,8 @@ pub enum SeriesKey {
         client_type: String,
         server: String,
         connection_type: String,
+        /// Empty on every edge except agent/tool/model ones (design §4.5).
+        agent_env: String,
     },
     Node {
         server: String,
@@ -116,6 +126,7 @@ impl SeriesKey {
             client_type: String::new(),
             server: server.to_string(),
             connection_type: connection_type.to_string(),
+            agent_env: String::new(),
         }
     }
 
@@ -125,6 +136,7 @@ impl SeriesKey {
             client_type: CLIENT_TYPE_QUEUE.to_string(),
             server: consumer.to_string(),
             connection_type: String::new(),
+            agent_env: String::new(),
         }
     }
 
@@ -134,6 +146,39 @@ impl SeriesKey {
             client_type: CLIENT_TYPE_USER.to_string(),
             server: service.to_string(),
             connection_type: String::new(),
+            agent_env: String::new(),
+        }
+    }
+
+    /// Q4: the host service calling an agent; the agent node is identified by name only (§4.6).
+    pub fn agent_edge(service: &str, agent: &str, agent_env: &str) -> Self {
+        Self::Edge {
+            client: service.to_string(),
+            client_type: String::new(),
+            server: agent.to_string(),
+            connection_type: CONNECTION_AGENT.to_string(),
+            agent_env: agent_env.to_string(),
+        }
+    }
+
+    /// Q5/Q6: without an owning agent the call is attributed to the host service (§4.2).
+    pub fn agent_call_edge(
+        agent_from: Option<&str>,
+        service: &str,
+        server: &str,
+        connection_type: &str,
+        agent_env: &str,
+    ) -> Self {
+        let (client, client_type) = match agent_from {
+            Some(agent) => (agent, CLIENT_TYPE_AGENT),
+            None => (service, ""),
+        };
+        Self::Edge {
+            client: client.to_string(),
+            client_type: client_type.to_string(),
+            server: server.to_string(),
+            connection_type: connection_type.to_string(),
+            agent_env: agent_env.to_string(),
         }
     }
 
@@ -717,7 +762,8 @@ mod tests {
                 client: "orders".into(),
                 client_type: "queue".into(),
                 server: "fraud".into(),
-                connection_type: String::new()
+                connection_type: String::new(),
+                agent_env: String::new()
             }
         );
         assert_eq!(
@@ -726,11 +772,57 @@ mod tests {
                 client: "user".into(),
                 client_type: "user".into(),
                 server: "frontend".into(),
-                connection_type: String::new()
+                connection_type: String::new(),
+                agent_env: String::new()
             }
         );
         assert!(SeriesKey::entry_edge("x").is_edge());
         assert!(!SeriesKey::node("x").is_edge());
         assert!(!SeriesKey::unresolved("x", REASON_CARDINALITY).is_edge());
+    }
+
+    #[test]
+    fn test_agent_identities() {
+        assert!(matches!(
+            SeriesKey::edge("a", "b", ""),
+            SeriesKey::Edge { agent_env, .. } if agent_env.is_empty()
+        ));
+        assert_eq!(
+            SeriesKey::agent_edge("o2-ai", "sre-rca", "prod"),
+            SeriesKey::Edge {
+                client: "o2-ai".into(),
+                client_type: String::new(),
+                server: "sre-rca".into(),
+                connection_type: CONNECTION_AGENT.into(),
+                agent_env: "prod".into()
+            }
+        );
+        assert_eq!(
+            SeriesKey::agent_call_edge(Some("sre-rca"), "o2-ai", "search", CONNECTION_TOOL, ""),
+            SeriesKey::Edge {
+                client: "sre-rca".into(),
+                client_type: CLIENT_TYPE_AGENT.into(),
+                server: "search".into(),
+                connection_type: CONNECTION_TOOL.into(),
+                agent_env: String::new()
+            }
+        );
+        assert_eq!(
+            SeriesKey::agent_call_edge(None, "o2-ai", "gpt-4o", CONNECTION_MODEL, "dev"),
+            SeriesKey::Edge {
+                client: "o2-ai".into(),
+                client_type: String::new(),
+                server: "gpt-4o".into(),
+                connection_type: CONNECTION_MODEL.into(),
+                agent_env: "dev".into()
+            }
+        );
+        assert_ne!(
+            SeriesKey::agent_edge("svc", "a", "prod"),
+            SeriesKey::agent_edge("svc", "a", "")
+        );
+        assert!(SeriesKey::agent_edge("s", "a", "").is_edge());
+        assert!(SeriesKey::agent_call_edge(None, "s", "t", CONNECTION_TOOL, "").is_edge());
+        assert!(SeriesKey::agent_call_edge(Some("a"), "s", "m", CONNECTION_MODEL, "").is_edge());
     }
 }
