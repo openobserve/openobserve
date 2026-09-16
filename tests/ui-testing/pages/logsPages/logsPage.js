@@ -2805,7 +2805,8 @@ export class LogsPage {
                 if (!host || !window.monaco?.editor?.getEditors) return false;
                 const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
                 if (!ed) return false;
-                return (ed.getValue() || '').includes(expected);
+                const value = ed.getValue() || '';
+                return expected === '' ? value === '' : value.includes(expected);
             },
             { selector: this.queryEditor, expected: substring },
             { timeout }
