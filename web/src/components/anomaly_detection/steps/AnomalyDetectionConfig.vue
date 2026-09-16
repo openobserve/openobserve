@@ -558,10 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <!-- items-end: only the percentile input carries a visible label, so its
-                 box sits a label-height lower than the bare toggle bar. Both are
-                 2.125rem tall, so seating them on their bottom edge aligns them. -->
-            <div v-else class="flex items-end gap-3">
+            <div v-else class="flex items-center gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -579,10 +576,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
-              <!-- Label as a sibling span, not OFormInput's `label` prop: the prop
-                   renders it inside the field column, where the narrow numeric box
-                   wraps "Score percentile" onto two lines. -->
-              <div class="flex flex-col gap-1">
+              <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
+                   whole control row a label-height below the Sensitivity heading. -->
+              <div class="flex items-center gap-2">
                 <span
                   class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
                 >

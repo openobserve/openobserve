@@ -199,7 +199,7 @@ const PINNED_COPY: Record<string, { tooltip: string; budgetTooltip: string; hint
       "Sets the score bar from the model's training scores at this percentile — 97 puts the bar at the top 3% of training scores. Live scores can differ from training, so this is not a share of future buckets and not an alert rate. A lower value lowers the bar and generally sends more alerts; a cooldown spaces out repeats.",
     budgetTooltip:
       "The maximum number of alerts this configuration may deliver, enforced at delivery. Detection still scores every bucket; once the budget is spent, further alerts are suppressed until it refills.",
-    hint: "Buckets are judged against the p{percentile} mark of the model's training scores — how many alerts that yields depends on your data.",
+    hint: "A bucket alerts when it looks more unusual than {percentile}% of what the model saw in training. How many alerts that means depends on your data.",
   },
   "es-ES": {
     tooltip:
@@ -450,33 +450,48 @@ describe("anomaly sensitivity locale parity", () => {
     }
   });
 
-  // "Percentile" names two unrelated things here: a bar on the model's scores
-  // (Sensitivity) and an aggregate over a data field (Detection Function).
-  // Each control's copy has to say which space it lives in, or they read as one.
-  it("en-US names the sensitivity control's percentile as a score percentile", () => {
-    expect(String(at(en, "alerts.anomaly.percentile")).toLowerCase()).toContain("score");
+  // "Percentile" named two unrelated things: the Sensitivity number and the
+  // Detection Function's p50/p95/p99. The label is what a reader sees first, so
+  // it must not reach for the Detection Function's vocabulary to name itself.
+  it("en-US labels the sensitivity number without detection-function vocabulary", () => {
+    const label = String(at(en, "alerts.anomaly.percentile")).toLowerCase();
+    expect(label).not.toContain("percentile");
+    expect(label).not.toMatch(/\bp\d{2}\b/);
+    // Still a label, not a sentence — it sits in a 21.75rem-wide field column.
+    expect(label.split(/\s+/).length).toBeLessThanOrEqual(3);
   });
 
-  // Kept off sensitivityTooltip on purpose: that string is pinned verbatim, and
-  // a "p95" in it would trip the retired-default guard above.
-  it("en-US disowns the detection-function meaning beside the score input", () => {
+  // The collision is only resolved if the tooltip on the number says, in words,
+  // that it is not the Detection Function's percentile.
+  it("en-US disowns the detection-function meaning beside the sensitivity number", () => {
     const tooltip = String(at(en, "alerts.anomaly.sensitivityNotDataPercentile")).toLowerCase();
     expect(tooltip).toContain("detection function");
     expect(tooltip).toContain("unrelated");
-    expect(tooltip).toContain("score");
+    // It has to name what it ranks instead, or "unrelated" tells the reader nothing.
+    expect(tooltip).toMatch(/model's confidence|model's scores/);
   });
 
-  it("en-US disowns the sensitivity meaning in the detection-function tooltip", () => {
+  // The other half of the same collision: the Detection Function's p-levels rank
+  // the FIELD's values, and must never read as an alerting/sensitivity control.
+  it("en-US keeps the detection-function tooltip in data space, not alert space", () => {
     const tooltip = String(at(en, "alerts.anomaly.detectionFunctionTooltip")).toLowerCase();
-    expect(tooltip).toContain("sensitivity");
-    expect(tooltip).toContain("not the sensitivity percentile");
+    expect(tooltip).toMatch(/\bp50\b/);
+    expect(tooltip).toMatch(/\bp95\b/);
+    // Names the thing being measured, so p95 reads as "of a field", not "of scores".
+    expect(tooltip).toMatch(/field/);
+    for (const claim of ["sensitivity", "how unusual", "training score", "alerts when"]) {
+      expect(tooltip, `detectionFunctionTooltip must not contain "${claim}"`).not.toContain(claim);
+    }
   });
 
-  // The bar is in score space and needs a trained model, so it cannot be drawn
-  // over the config-time value-space preview — the caption has to say so.
-  it("en-US tells the preview reader where the anomaly bar actually appears", () => {
+  // Anomalies are marked in score space by a trained model, so they cannot appear
+  // on the config-time value preview. The caption has to send the reader somewhere
+  // REAL — pinned against the rendered label, not a phrase no screen shows.
+  it("en-US points the preview reader at a destination the app actually renders", () => {
     const caption = String(at(en, "alerts.anomaly.previewCaption")).toLowerCase();
     expect(caption).toContain("training");
-    expect(caption).toContain("detection history");
+    const destination = String(at(en, "alerts.anomaly.detectionCharts")).toLowerCase();
+    expect(destination.length).toBeGreaterThan(0);
+    expect(caption).toContain(destination);
   });
 });

@@ -573,8 +573,10 @@ describe("AnomalyDataPreview", () => {
 
       const caption = wrapper.find('[data-test="anomaly-data-preview-caption"]');
       expect(caption.exists()).toBe(true);
-      expect(caption.text()).toContain("trained on");
-      expect(caption.text()).toContain("detection history");
+      // The caption must send the reader somewhere real for anomalies, since none
+      // are drawn here — "Detection results" is the tab that actually shows them.
+      expect(caption.text()).toContain("watch");
+      expect(caption.text()).toContain("Detection results");
     });
 
     it("hides the caption while the empty state is showing", async () => {
