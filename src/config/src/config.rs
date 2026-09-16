@@ -79,7 +79,9 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
 // one bump for the whole anomaly phase, same rationale as 79.
 // 82: add profiles_streams to service_streams.
-pub const DB_SCHEMA_VERSION: u64 = 82;
+// 83: add folder_id to workflows.
+// 84: add folder_id to workflow_drafts.
+pub const DB_SCHEMA_VERSION: u64 = 84;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

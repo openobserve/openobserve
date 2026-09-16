@@ -19,19 +19,32 @@
 
 import { vi } from "vitest";
 
-const { mockRouter, mockToast, mockHydrate } = vi.hoisted(() => ({
+const { mockRouter, mockRoute, mockToast, mockHydrate, mockGetFolders } = vi.hoisted(() => ({
   mockRouter: {
     push: vi.fn(),
     currentRoute: { value: { name: "workflows", query: {} } },
   },
+  mockRoute: { query: {} as Record<string, any> },
   mockToast: vi.fn(),
   mockHydrate: vi.fn(),
+  // Awaited before the first fetch, so it has to settle or no rows ever load.
+  mockGetFolders: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+  // The list scopes itself to ?folder=; without the export it throws in setup.
+  useRoute: () => mockRoute,
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
+}));
+
+// Partial: the rest of commons is pulled in by other modules in this tree.
+vi.mock("@/utils/commons", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  getFoldersListByType: (...a: any[]) => mockGetFolders(...a),
 }));
 
 vi.mock("@/services/workflows", () => ({
@@ -91,6 +104,10 @@ const OTableStub = {
       <template v-for="row in data" :key="row.id">
         <slot name="cell-name" :row="row" />
         <slot name="cell-trigger" :row="row" />
+        <!-- Only in cross-folder mode, same as the real column set. -->
+        <span v-if="columns.some(c => c.id === 'folder_name')" data-test="folder-cell">
+          <slot name="cell-folder_name" :row="row" />
+        </span>
         <slot name="cell-actions" :row="row" />
       </template>
       <slot name="bottom" />
@@ -117,7 +134,7 @@ const globalStubs = {
     template:
       '<span class="o-input-wrap"><slot name="icon-left" />' +
       '<input class="o-input" v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' +
-      "</span>",
+      '<slot name="icon-right" /></span>',
   },
   OTag: {
     name: "OTag",
@@ -152,14 +169,36 @@ const globalStubs = {
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
-  PageLayout: {
-    name: "PageLayout",
-    template: '<div class="page-layout"><slot name="header" /><slot /></div>',
+  OPageLayout: {
+    name: "OPageLayout",
+    props: ["title", "subtitle", "icon", "bleed"],
+    template:
+      '<div class="page-layout"><slot name="title" /><slot name="sidebar" />' +
+      '<slot name="actions" /><slot /></div>',
   },
-  OPageHeader: {
-    name: "OPageHeader",
-    props: ["title", "subtitle", "icon"],
-    template: '<div class="app-page-header"><slot name="title" /><slot name="actions" /></div>',
+  BetaBadge: { name: "BetaBadge", template: '<span class="beta-badge" />' },
+  FolderList: {
+    name: "FolderList",
+    props: ["type"],
+    emits: ["update:activeFolderId"],
+    template: '<div data-test="folder-list-stub" :data-type="type" />',
+  },
+  MoveAcrossFolders: {
+    name: "MoveAcrossFolders",
+    props: ["modelValue", "type", "workflowIds"],
+    emits: ["update:modelValue", "updated"],
+    template: '<div data-test="move-dialog-stub" :data-open="String(modelValue)" />',
+  },
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue", "type", "mobileDropdown"],
+    emits: ["update:model-value"],
+    template: '<div class="o-toggle-group" v-bind="$attrs"><slot /></div>',
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value", "size", "iconLeft", "title"],
+    template: '<button class="o-toggle-group-item" v-bind="$attrs"><slot /></button>',
   },
   // Renders the child-route slot with a fake editor component so the
   // `<component :is="Component" @saved="getWorkflows" />` binding is exercised.
@@ -201,12 +240,18 @@ const mountList = () =>
 const table = (w: any) => w.findComponent(OTableStub);
 const rows = (w: any) => table(w).props("data") as any[];
 
+// The tabs group and the this/all-folders scope group are both OToggleGroups;
+// only the scope one is `type="single"`.
+const scopeGroup = (w: any) =>
+  w.findAllComponents({ name: "OToggleGroup" }).find((g: any) => g.props("type") === "single");
+
 describe("WorkflowsList", () => {
   let wrapper: any = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
+    mockRoute.query = {};
     listWorkflows.mockResolvedValue({
       data: [makeWorkflow(1), makeWorkflow(2, { enabled: false })],
     });
@@ -222,10 +267,11 @@ describe("WorkflowsList", () => {
   // ── loading + row mapping ──────────────────────────────────────────────────
 
   describe("data loading", () => {
-    it("fetches the workflows for the selected org on mount", async () => {
+    it("fetches the workflows for the selected org and folder on mount", async () => {
       wrapper = mountList();
       await flushPromises();
-      expect(listWorkflows).toHaveBeenCalledWith("default");
+      // org, folder from ?folder= (default), not cross-folder, so no search term.
+      expect(listWorkflows).toHaveBeenCalledWith("default", "default", false, undefined);
       expect(rows(wrapper)).toHaveLength(2);
     });
 
@@ -377,6 +423,93 @@ describe("WorkflowsList", () => {
 
   // ── search ─────────────────────────────────────────────────────────────────
 
+  // ── folders ────────────────────────────────────────────────────────────────
+
+  describe("folders", () => {
+    const search = (w: any) => w.find('[data-test="workflow-list-search-input"]');
+
+    it("scopes the fetch to the folder named in the URL", async () => {
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      expect(listWorkflows).toHaveBeenCalledWith("default", "team-a", false, undefined);
+    });
+
+    it("stays in the current folder while the search box is empty", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      listWorkflows.mockClear();
+
+      scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+      await flushPromises();
+      // Cross-folder is a search mode: an empty box must not pull the whole org.
+      expect(listWorkflows).toHaveBeenCalledWith("default", "default", false, undefined);
+    });
+
+    it("hands the term to the backend once a cross-folder search is typed", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+        listWorkflows.mockClear();
+
+        await search(wrapper).setValue("  workflow-2  ");
+        vi.runAllTimers();
+        await flushPromises();
+        expect(listWorkflows).toHaveBeenCalledWith("default", "default", true, "workflow-2");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("leaves cross-folder rows to the backend instead of filtering again", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+
+        await search(wrapper).setValue("workflow-2");
+        vi.runAllTimers();
+        await flushPromises();
+        // Both fixtures survive: the client must not re-apply the term locally.
+        expect(rows(wrapper)).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // Drafts are folder-scoped too: a folderless draft used to be appended to
+    // every folder's listing, so its folder is named here like any other row's.
+    it("names the folder on published rows and on drafts", async () => {
+      vi.useFakeTimers();
+      try {
+        listWorkflows.mockResolvedValue({
+          data: [
+            makeWorkflow(1, { folder_name: "Team A" }),
+            makeWorkflow(2, { is_draft: true, folder_name: "Team B" }),
+          ],
+        });
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await search(wrapper).setValue("workflow");
+        vi.runAllTimers();
+        await flushPromises();
+
+        const cells = wrapper.findAll('[data-test="folder-cell"]');
+        expect(cells).toHaveLength(2);
+        expect(cells[0].text()).toBe("Team A");
+        expect(cells[1].text()).toBe("Team B");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("search", () => {
     const search = (w: any) => w.find('[data-test="workflow-list-search-input"]');
 
@@ -445,6 +578,26 @@ describe("WorkflowsList", () => {
       expect(rows(wrapper)).toHaveLength(2);
     });
 
+    it("resets the folder scope when the empty state clears the filters", async () => {
+      vi.useFakeTimers();
+      try {
+        // Empty, so the empty state (which owns the clear-filters action) renders.
+        listWorkflows.mockResolvedValue({ data: [] });
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+        expect(scopeGroup(wrapper).props("modelValue")).toBe("all");
+
+        wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+        await nextTick();
+        // Left on "all" the toggle stays lit while the list is back to one folder.
+        expect(scopeGroup(wrapper).props("modelValue")).toBe("this");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("opens the create editor from the empty state's primary action", async () => {
       listWorkflows.mockResolvedValue({ data: [] });
       wrapper = mountList();
@@ -453,7 +606,7 @@ describe("WorkflowsList", () => {
       wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -477,7 +630,7 @@ describe("WorkflowsList", () => {
       await wrapper.find('[data-test="workflow-list-add-btn"]').trigger("click");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -490,7 +643,12 @@ describe("WorkflowsList", () => {
       expect(mockHydrate.mock.calls[0][0].id).toBe("wf-1");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflowEditor",
-        query: { id: "wf-1", name: "workflow-1", org_identifier: "default" },
+        query: {
+          id: "wf-1",
+          name: "workflow-1",
+          org_identifier: "default",
+          folder: "default",
+        },
       });
     });
 
@@ -805,6 +963,7 @@ describe("WorkflowsList", () => {
           id: "wf-1",
           name: "workflow-1",
           org_identifier: "default",
+          folder: "default",
         },
       });
     });

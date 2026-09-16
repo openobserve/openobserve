@@ -448,7 +448,9 @@ fn every_logs_ingest_path_applies_canonicalization() {
         (include_str!("../logs/otlp.rs"), 3usize),
     ];
     for (src, expected) in paths {
-        let found = src.matches("server_vantage::apply_to_record").count();
+        let found = src
+            .matches("server_vantage::canonicalize_dbm_record")
+            .count();
         assert_eq!(
             found, expected,
             "logs ingest path must call server_vantage::apply_to_record at every \
@@ -1354,7 +1356,7 @@ fn every_apply_site_restores_the_event_name() {
     let src = include_str!("../logs/otlp.rs");
 
     let sites: Vec<usize> = src
-        .match_indices("server_vantage::apply_to_record")
+        .match_indices("server_vantage::canonicalize_dbm_record")
         .map(|(i, _)| i)
         .collect();
     assert_eq!(
@@ -1480,7 +1482,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // insertion against an unrelated occurrence and assert nothing.
     for landmark in [
         "pipeline_inputs.push(rec)",
-        "let mut rec = json::json!({});",
+        "let mut rec = json::Value::Object(base.clone());",
     ] {
         assert_eq!(
             src.matches(landmark).count(),
@@ -1514,7 +1516,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // is created in the producer loop. This is what makes it the PRODUCER loop
     // rather than one of the three apply_to_record call sites.
     let rec_created = src
-        .find("let mut rec = json::json!({});")
+        .find("let mut rec = json::Value::Object(base.clone());")
         .expect("the producer loop must still build `rec`");
     assert!(
         insert_at > rec_created,
@@ -1525,7 +1527,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // The anti-spoof slot: AFTER the attribute copy, so a receiver attribute
     // literally named o2_event_name cannot beat the trusted value.
     let attrs_copied = src
-        .find("log_record.attributes.iter().for_each")
+        .find("for local_attr in &log_record.attributes")
         .expect("the producer loop must still copy log_record attributes onto rec");
     assert!(
         insert_at > attrs_copied,
@@ -1537,7 +1539,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // After the `_original` snapshot, so _original stays a verbatim copy of the
     // customer's payload.
     let snapshot_at = src
-        .find("let original_data = if rec.is_object()")
+        .find("let original_data = (need_original && rec.is_object())")
         .expect("the producer loop must still snapshot original_data");
     assert!(
         insert_at > snapshot_at,
@@ -5653,7 +5655,7 @@ fn table_stats_inherits_the_master_off_switch() {
         .find("if !config::get_config().db_monitoring.enabled {")
         .expect("apply_to_record must gate on the master switch");
     let dispatch = body
-        .find("canonicalize_record(")
+        .find("canonicalize_dbm_record(")
         .expect("apply_to_record must dispatch");
     assert!(
         guard < dispatch,
