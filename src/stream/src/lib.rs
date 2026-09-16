@@ -23,10 +23,6 @@ use common::meta::{
     http::HttpResponse as MetaHttpResponse,
     stream::{FieldUpdate, Stream, StreamCreate},
 };
-// Reserved self-reporting stream guards are a Cloud-only concern (Cloud manages
-// these streams for billing); OSS / self-hosted must not block user streams.
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME, get_config, is_local_disk_storage,
     meta::{
@@ -238,19 +234,6 @@ pub async fn create_stream(
     stream_type: StreamType,
     mut stream: StreamCreate,
 ) -> Result<HttpResponse, Error> {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-created — doing so would
-    // corrupt billing/usage accounting. The internal self-reporting job creates
-    // its schema directly (not via create_stream), so blocking here is safe.
-    // Cloud-only: OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream name '{stream_name}' is reserved and cannot be created"),
-        ));
-    }
-
     // check if the stream already exists
     let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
         Ok(schema) => schema,
@@ -757,18 +740,6 @@ where
     E: FnOnce(String, String, StreamType) -> EFut,
     EFut: Future<Output = ()>,
 {
-    // Reserved self-reporting streams (usage/stats/triggers/errors/...) are
-    // managed internally by Cloud and must not be user-deleted — retention/
-    // compaction uses a separate internal path, so blocking this user-facing
-    // delete is safe and preserves billing/usage accounting. Cloud-only.
-    #[cfg(feature = "cloud")]
-    if is_reserved_internal_stream(stream_name) {
-        return Ok(MetaHttpResponse::error_with_header(
-            http::StatusCode::BAD_REQUEST,
-            format!("stream '{stream_name}' is reserved and cannot be deleted"),
-        ));
-    }
-
     let schema = infra::schema::get_versions(org_id, stream_name, stream_type, None)
         .await
         .unwrap();

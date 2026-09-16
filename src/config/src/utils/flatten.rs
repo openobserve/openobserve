@@ -56,7 +56,7 @@ pub fn flatten_with_level(to_flatten: Value, max_level: u32) -> Result<Value, an
         }
     };
 
-    let mut flat = Map::<String, Value>::new();
+    let mut flat = Map::<String, Value>::with_capacity(to_flatten.as_object().map_or(0, Map::len));
     flatten_value(to_flatten, "".to_owned(), max_level, 0, &mut flat).map(|_x| Value::Object(flat))
 }
 
@@ -119,7 +119,7 @@ fn flatten_object(
         } else {
             format_key(&mut k);
             if depth > 0 {
-                format!("{parent_key}{KEY_SEPARATOR}{k}")
+                [parent_key, KEY_SEPARATOR, k.as_str()].concat()
             } else {
                 k
             }
@@ -146,7 +146,7 @@ fn flatten_array(
     //     let parent_key = format!("{}{}{}", parent_key, KEY_SEPARATOR, i);
     //     flatten_value(obj, parent_key, depth + 1, flattened)?;
     // }
-    let v = Value::String(Value::Array(current.to_vec()).to_string());
+    let v = Value::String(Value::Array(current).to_string());
     flatten_value(v, parent_key.to_string(), max_level, depth, flattened)?;
     Ok(())
 }
@@ -210,8 +210,16 @@ pub fn format_label_name_cow(label_name: &str) -> Cow<'_, str> {
 }
 
 fn check_key(key: &str) -> bool {
-    key.chars()
-        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+    if key
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+    {
+        return true;
+    }
+    !key.is_ascii()
+        && key
+            .chars()
+            .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
 }
 
 #[cfg(test)]
