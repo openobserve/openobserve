@@ -1,7 +1,7 @@
 <template>
   <div class="flex h-full w-full flex-col gap-3" data-test="oncall-members">
     <OTable
-      :data="rows"
+      :data="filteredRows"
       :columns="columns"
       row-key="id"
       :frame="false"
@@ -16,6 +16,13 @@
            answers "is anyone missing" in the same glance that offers to fix it. -->
       <template #toolbar>
         <div class="flex w-full flex-wrap items-center gap-2">
+          <OSearchInput
+            v-model="memberFilter"
+            class="w-full max-w-xs"
+            :placeholder="t('oncall.memberSearchPlaceholder')"
+            data-test="oncall-members-search"
+          />
+          <OSeparator vertical />
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
@@ -46,6 +53,7 @@
             @click="addMembers"
           >
             {{ t("oncall.addPeopleCta", { count: pendingEmails.length }, pendingEmails.length) }}
+            <OTooltip v-if="!pendingEmails.length" :content="t('oncall.addPeopleDisabledHint')" />
           </OButton>
 
           <span
@@ -151,8 +159,9 @@
         <OEmptyState
           size="hero"
           preset="no-oncall-members"
+          :filtered="!!memberFilter"
           data-test="oncall-members-empty"
-          @action="focusMemberPicker"
+          @action="(id) => (id === 'clear-filters' ? (memberFilter = '') : focusMemberPicker())"
         />
       </template>
     </OTable>
@@ -250,7 +259,9 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODate from "@/lib/forms/Date/ODate.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OTime from "@/lib/forms/Time/OTime.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -275,6 +286,7 @@ import type {
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { formatInZone, rotationMembers } from "@/utils/oncall";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { I18nText } from "@/types/i18n";
 import { raw, useI18nTyped } from "@/types/i18n";
 
@@ -527,6 +539,17 @@ const rows = computed<MemberRow[]>(() => {
   });
   return enriched.sort(
     (a, b) => STATE_RANK[a.state] - STATE_RANK[b.state] || a.name.localeCompare(b.name),
+  );
+});
+
+const memberFilter = ref("");
+
+/// Filters the roster only — pagesMax/heavyLoad below keep reading `rows`.
+const filteredRows = computed(() => {
+  const q = memberFilter.value.trim().toLowerCase();
+  if (!q) return rows.value;
+  return rows.value.filter(
+    (row) => row.name.toLowerCase().includes(q) || row.user_email.toLowerCase().includes(q),
   );
 });
 

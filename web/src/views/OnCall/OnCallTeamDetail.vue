@@ -2,11 +2,22 @@
   <OPageLayout
     bleed
     data-test="oncall-team-detail-page"
-    :title="team ? raw(team.name) : t('oncall.teamDetail')"
     :subtitle="subtitle"
     icon="group-work"
-    :back="{ label: t('oncall.backToTeams'), to: { name: 'onCallTeams' } }"
+    title-overflow="visible"
+    :back="{
+      label: t('oncall.backToTeams'),
+      to: { name: 'onCallTeams', query: { org_identifier: orgId } },
+    }"
   >
+    <!-- Team names are free text and can run long; truncate so it never
+         crowds the actions on the right. -->
+    <template #title>
+      <span class="min-w-0 truncate" data-test="oncall-team-detail-title">{{
+        team ? raw(team.name) : t("oncall.teamDetail")
+      }}</span>
+    </template>
+
     <!-- Whether a page would reach anybody is the team's headline fact, so it
          rides the title instead of sitting in a card below it. -->
     <template #title-trail>

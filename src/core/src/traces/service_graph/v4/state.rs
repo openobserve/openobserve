@@ -59,6 +59,8 @@ pub struct Sample {
 pub struct Batch {
     pub window_end: i64,
     pub samples: Vec<Sample>,
+    /// Q4 instance gauges for retained agent edges; not series, so `mark_clean` ignores them.
+    pub instances: Vec<(SeriesKey, u64)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -239,6 +241,7 @@ impl StreamState {
         Batch {
             window_end,
             samples,
+            instances: vec![],
         }
     }
 
@@ -471,6 +474,7 @@ mod tests {
         assert_eq!(s.t_base, w1 - 1000);
         assert!(s.dirty);
         let batch = st.emit(w1);
+        assert!(batch.instances.is_empty());
         assert_eq!(ts_requests(&batch, &edge(1)), vec![(w1 - 1000, 0), (w1, 5)]);
         st.mark_clean(&batch);
         let s = &st.series[&edge(1)];
@@ -619,6 +623,7 @@ mod tests {
                 .into_iter()
                 .filter(|s| s.key == edge(2))
                 .collect(),
+            instances: vec![],
         });
         let later = NOW + SERIES_TTL_MICROS + SECOND_MICRO_SECS;
         let report = st.merge_window("o", w1 + 60 * SECOND_MICRO_SECS, later, 1, vec![]);
@@ -673,6 +678,7 @@ mod tests {
                 .into_iter()
                 .filter(|s| s.key == edge(0) || s.key == edge(1))
                 .collect(),
+            instances: vec![],
         });
         let w2 = w1 + 60 * SECOND_MICRO_SECS;
         let newcomers: Vec<(SeriesKey, WindowCounts)> =
