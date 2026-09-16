@@ -93,6 +93,31 @@ const maskStringLiterals = (sql: string): string =>
   sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"/g, (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1]);
 
 /**
+ * Blank out everything inside parentheses, nesting-aware, so a keyword used
+ * inside a function call or subquery — e.g. the FROM in EXTRACT(EPOCH FROM
+ * now()) — can't be mistaken for the statement's own FROM/GROUP BY/etc. Run
+ * this after maskStringLiterals so a literal's own parens can't miscount
+ * depth.
+ */
+const maskParens = (sql: string): string => {
+  let depth = 0;
+  let out = "";
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "(") {
+      depth++;
+      out += "x";
+    } else if (ch === ")") {
+      depth--;
+      out += "x";
+    } else {
+      out += depth > 0 ? "x" : ch;
+    }
+  }
+  return out;
+};
+
+/**
  * Turn a COUNT-family alert's generated SQL into a count-over-time query.
  *
  * A count alert has no aggregation: its generated SQL is
@@ -110,7 +135,7 @@ const maskStringLiterals = (sql: string): string =>
  */
 export const buildCountChartQuery = (query: string): string | null => {
   if (!query) return null;
-  const masked = maskStringLiterals(query);
+  const masked = maskParens(maskStringLiterals(query));
   if (!/^\s*SELECT\b/i.test(masked)) return null;
   const fromMatch = masked.match(/\bFROM\b/i);
   if (!fromMatch) return null;
