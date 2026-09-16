@@ -75,7 +75,7 @@ pub struct LogRecord {
     pub value: Map<String, Value>,
 }
 
-pub type O2IngestLogData = (Vec<LogRecord>, Option<usize>);
+pub type IngestLogData = (Vec<LogRecord>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
@@ -214,7 +214,7 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, O2IngestLogData>,
+    json_data_by_stream: HashMap<String, IngestLogData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
 ) -> Result<bool> {

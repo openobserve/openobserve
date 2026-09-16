@@ -61,7 +61,7 @@ use prost::Message;
 use transform::TRANSFORM_FAILED;
 
 use super::{
-    LogRecord, O2IngestLogData, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record,
+    IngestLogData, LogRecord, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record,
 };
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
@@ -75,7 +75,7 @@ const DISCARD_WARN_INTERVAL: Duration = Duration::from_secs(60);
 static DISCARD_WARN_AT: LazyLock<Mutex<HashMap<String, Instant>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-type LogDataByStream = HashMap<String, O2IngestLogData>;
+type LogDataByStream = HashMap<String, IngestLogData>;
 
 struct FinalizeRecordContext<'a> {
     stream_name: &'a str,
