@@ -273,7 +273,7 @@ async fn query(
         search_type: None,
         regions: vec![],
         clusters: vec![],
-        search_event_context: None, // ui search queries do not have special ctx
+        search_event_context: Some(req.search_event_context),
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -614,7 +614,7 @@ async fn query_range(
         search_type: req.search_type,
         regions: req.regions,
         clusters: req.clusters,
-        search_event_context: None, // ui queries do not have special query ctx
+        search_event_context: Some(req.search_event_context),
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming

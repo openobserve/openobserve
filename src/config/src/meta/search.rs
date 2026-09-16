@@ -1139,15 +1139,19 @@ pub struct SearchEventContext {
     pub alert_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub derived_stream_key: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "report_id", default)]
     pub report_key: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dashboard_name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_id", default)]
     pub dashboard_folder_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", rename = "folder_name")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        rename = "folder_name",
+        default
+    )]
     pub dashboard_folder_name: Option<String>,
 }
 

@@ -23,7 +23,7 @@ use config::{
     meta::{
         cluster::{Node, RoleGroup},
         promql::value::*,
-        search::ScanStats,
+        search::{ScanStats, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
@@ -516,6 +516,7 @@ async fn search_in_cluster(
         max_ts: Some(end),
         trace_id: Some(trace_id.to_string()),
         search_event_context: req.search_event_context.map(Into::into),
+        search_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
         ..Default::default()
     };
 
