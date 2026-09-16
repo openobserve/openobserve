@@ -372,8 +372,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </router-link>
       </template>
 
-      <!-- The name plus what the page is about: how often it has fired, and the
-           incident it produced. A woken engineer reads this cell first. -->
+      <!-- Same reasoning as the team cell above: a page that escalated into an
+           incident used to say so only via a chip inside the subject cell, so
+           there was nothing on screen to suggest it was a link at all. -->
+      <template #cell-incident="{ row }">
+        <router-link
+          v-if="row.latest.incident_id"
+          :to="{
+            name: 'incidentDetail',
+            params: { id: row.latest.incident_id },
+            query: { org_identifier: orgId },
+          }"
+          class="text-text-body inline-block max-w-full truncate underline"
+          :data-test="`oncall-row-incident-${row.rowKey}`"
+          @click.stop
+        >
+          {{ raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id) }}
+          <OTooltip
+            :content="raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)"
+          />
+        </router-link>
+      </template>
+
+      <!-- The name plus how often it has fired. A woken engineer reads this
+           cell first. -->
       <template #cell-subject="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-1.5">
@@ -388,43 +410,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Only when there is something to say: with the team moved out to
                its own column most rows carry no chips at all, and an empty row
                of them still took vertical space in every one. -->
-          <span
-            v-if="isImpactedRow(row.latest) || row.latest.incident_id"
-            class="flex flex-wrap items-center gap-1"
-          >
+          <span v-if="isImpactedRow(row.latest)" class="flex flex-wrap items-center gap-1">
             <!-- This row is somebody else's outage reaching this team's
                  service, and the difference decides what the reader does with
                  it: a page you fix, or a blast radius you contain and confirm
                  recovery on. `origin_response_id` is already on every row, so
                  the two were indistinguishable in a list only because nothing
                  read it. -->
-            <OTag
-              v-if="isImpactedRow(row.latest)"
-              variant="info-outline"
-              size="sm"
-              :data-test="`oncall-impacted-${row.latest.id}`"
-            >
+            <OTag variant="info-outline" size="sm" :data-test="`oncall-impacted-${row.latest.id}`">
               {{ t("oncall.liaisonTag") }}
             </OTag>
-            <router-link
-              v-if="row.latest.incident_id"
-              :to="{
-                name: 'incidentDetail',
-                params: { id: row.latest.incident_id },
-                query: { org_identifier: orgId },
-              }"
-              :data-test="`oncall-row-incident-${row.rowKey}`"
-              @click.stop
-            >
-              <ODimensionChip
-                dim-key="incident"
-                :key-label="String(t('oncall.incident'))"
-                :value="incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id"
-              />
-              <OTooltip
-                :content="raw(incidentTitleById[row.latest.incident_id] ?? row.latest.incident_id)"
-              />
-            </router-link>
           </span>
         </span>
       </template>
@@ -593,15 +588,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-actions="{ row }">
         <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
         <span class="flex items-center justify-between" :style="{ width: actionsColumnWidthVar }">
-          <OButton
-            v-if="!row.latest.team_id"
-            variant="outline"
-            size="xs"
-            :data-test="`oncall-row-assign-${row.rowKey}`"
-            @click.stop="goTo('onCallRouting')"
-          >
-            {{ t("oncall.assignTeamShort") }}
-          </OButton>
+          <ODropdown v-if="!row.latest.team_id">
+            <template #trigger>
+              <OButton
+                variant="outline"
+                size="xs"
+                :loading="busyId === row.rowKey"
+                :data-test="`oncall-row-assign-${row.rowKey}`"
+                @click.stop
+              >
+                {{ t("oncall.assignTeamShort") }}
+              </OButton>
+            </template>
+
+            <ODropdownItem
+              v-for="team in teams"
+              :key="team.id"
+              :data-test="`oncall-row-assign-${row.rowKey}-${team.id}`"
+              @select="assignTeamToRow(row, team.id, team.name)"
+            >
+              {{ raw(team.name) }}
+            </ODropdownItem>
+            <ODropdownItem v-if="!teams.length" disabled data-test="oncall-row-assign-no-teams">
+              {{ t("oncall.noTeamsToAssign") }}
+            </ODropdownItem>
+          </ODropdown>
           <template v-else>
             <!-- Primary is `primaryAction(row)`: claiming is loud because it is
                  the one somebody is woken for; closing and reading are ordinary
@@ -766,7 +777,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
-import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -1036,6 +1046,20 @@ const columns = computed<OTableColumnDef<PageRow>[]>(() => [
     size: 160,
     accessorFn: (row: PageRow) =>
       teamNameById.value[row.latest.team_id] ?? row.latest.team_id ?? "",
+    sortable: true,
+    hideable: true,
+  },
+  {
+    // Was a chip inside the subject cell, reachable only if a reader noticed
+    // it looked clickable. Its own column makes "this page has an incident"
+    // scannable down the list instead of discovered by accident.
+    id: "incident",
+    header: t("oncall.incident"),
+    size: 160,
+    accessorFn: (row: PageRow) =>
+      row.latest.incident_id
+        ? (incidentTitleById.value[row.latest.incident_id] ?? row.latest.incident_id)
+        : "",
     sortable: true,
     hideable: true,
   },
@@ -1415,6 +1439,35 @@ async function resolveRow(row: PageRow) {
           }),
         ),
     );
+    await fetchResponses();
+  } finally {
+    busyId.value = "";
+  }
+}
+
+/// Handoff, not a dedicated "assign" endpoint: it sets team_id unconditionally
+/// whether the row currently has none or another team, so it doubles as first
+/// assignment. Applied to every unresolved firing in the group, same as resolve.
+async function assignTeamToRow(row: PageRow, teamId: string, teamName: string) {
+  busyId.value = row.rowKey;
+  try {
+    const results = await Promise.allSettled(
+      row.firings
+        .filter((r) => r.state !== "resolved")
+        .map((r) =>
+          oncallService.handoffResponse({
+            org_identifier: orgId.value,
+            response_id: r.id,
+            to_team_id: teamId,
+          }),
+        ),
+    );
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed) {
+      toast({ variant: "error", message: t("oncall.assignTeamFailed") });
+    } else {
+      toast({ variant: "success", message: t("oncall.assignTeamDone", { team: raw(teamName) }) });
+    }
     await fetchResponses();
   } finally {
     busyId.value = "";
@@ -1814,10 +1867,6 @@ watch(expandedIds, (ids) => {
   if (row) void fetchExpandedEvents(row.latest.id);
   else expandedEvents.value = [];
 });
-
-function goTo(name: string) {
-  router.push({ name, query: { org_identifier: orgId.value } });
-}
 
 /// The setup checklist's first step, which is only ever shown to an org with no
 /// team at all. It lands on the teams screen with the form already open —
