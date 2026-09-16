@@ -1385,37 +1385,20 @@ export class LogsPage {
     }
 
     async clearAndFillQueryEditor(query) {
-        // Wait for query editor to be ready
-        const editor = this.page.locator(this.queryEditor);
-        await editor.waitFor({ state: 'visible', timeout: 10000 });
-
-        // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
-        // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
-        // The .fill() method will replace the selected content
-        const inputArea = editor.locator('.inputarea');
-
-        // Monaco renders each line as a separate node and pads with nbsp, so only the
-        // whitespace-stripped text is comparable across a re-render.
-        const strip = (t) => (t || '').replace(/\s|\u00a0/g, '');
-        const wanted = strip(query);
-
-        // Enabling SQL mode re-populates the editor from the selected stream, and that
-        // write lands asynchronously — a fill that gets in first is silently wiped.
+        // Enabling SQL mode re-populates the editor from the selected stream, and that write
+        // lands asynchronously — content set before it arrives is silently wiped, leaving an
+        // empty editor and a "SQL query is missing or invalid" page with no result title.
         for (let attempt = 1; attempt <= 3; attempt++) {
-            await editor.click();
-            await inputArea.waitFor({ state: 'visible', timeout: 5000 });
-            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-            await inputArea.fill(query);
-
+            try {
+                await this.setQueryEditorContent(query);
+            } catch {
+                continue;
+            }
             await this.page.waitForTimeout(1200);
-            const actual = strip(await editor.locator('.view-lines').first().textContent());
-            if (actual.includes(wanted)) {
+            if ((await this.getQueryEditorText()) === query) {
                 return;
             }
-            testLogger.warn(
-                `Query editor was reset after fill (attempt ${attempt}/3); retrying`,
-                { wanted: query, actual },
-            );
+            testLogger.warn(`Query editor was reset after the write (attempt ${attempt}/3); retrying`);
         }
         throw new Error(`Query editor did not retain "${query}" after 3 attempts`);
     }
