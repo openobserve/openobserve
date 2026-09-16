@@ -26,7 +26,6 @@ const i18n = createI18n({
     en: {
       common: {
         openProviderOnRegistry: "OpenObserve provider on the {registry}",
-        iacProviderCaption: "Terraform provider",
       },
     },
   },
@@ -90,35 +89,38 @@ describe("IacRegistryLinks", () => {
 
   // The affordance gap this component shipped with: the marks carried an
   // aria-label and a tooltip, so nothing was visible until you hovered.
-  it("labels the pair with one visible caption", () => {
+  it("labels each link visibly, without hovering", () => {
     const wrapper = mountLinks("light");
-    const caption = wrapper.find('[data-test="iac-registry-links-caption"]');
+    const text = wrapper.text();
 
-    expect(caption.exists()).toBe(true);
-    expect(caption.text()).toBe("Terraform provider");
+    expect(text).toContain("Terraform");
+    expect(text).toContain("OpenTofu");
   });
 
-  // The caption names the artifact, which is a "Terraform provider" for OpenTofu
-  // too; naming a REGISTRY would mislabel whichever of the two marks it omits.
-  it("captions the artifact, not either registry", () => {
-    const caption = mountLinks("light").find('[data-test="iac-registry-links-caption"]').text();
+  // Secondary, not bare text: these must read as controls beside Import/New alert.
+  it("renders each registry as a secondary button", () => {
+    const wrapper = mountLinks("light");
+    const tf = wrapper.find('[data-test="iac-registry-links-terraform"]');
 
-    expect(caption).not.toMatch(/registry/i);
+    expect(tf.exists()).toBe(true);
+    expect(tf.element.tagName).toBe("A");
+    expect(tf.classes().join(" ")).toContain("bg-button-secondary");
   });
 
-  it("derives the caption data-test from dataTest", () => {
+  it("derives each link's data-test from dataTest", () => {
     const wrapper = mount(IacRegistryLinks, {
       props: { dataTest: "slos-slolist-iac-registries" },
       global: { plugins: [createStore({ state: { theme: "light" } }), i18n] },
     });
 
-    expect(wrapper.find('[data-test="slos-slolist-iac-registries-caption"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slos-slolist-iac-registries-terraform"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slos-slolist-iac-registries-opentofu"]').exists()).toBe(true);
   });
 
-  it("drops the caption when compact, keeping both links", () => {
+  it("drops the button text when compact, keeping both links", () => {
     const wrapper = mountLinks("light", { compact: true });
 
-    expect(wrapper.find('[data-test="iac-registry-links-caption"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("Terraform");
     expect(wrapper.findAll("a")).toHaveLength(2);
   });
 

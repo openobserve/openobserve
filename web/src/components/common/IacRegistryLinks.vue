@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { computed } from "vue";
 
+import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import opentofuLogo from "@/assets/images/common/opentofu.svg";
@@ -38,10 +39,9 @@ import { useTheme } from "@/composables/useTheme";
 import { OPENTOFU_REGISTRY_URL, TERRAFORM_REGISTRY_URL } from "@/utils/terraform/provider";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-// `compact` drops the caption where the caller has no width for it; only the
-// call site knows, because the same pair sits inline on one page and inside the
-// header's "More" dropdown — where the caption is what makes the entry legible —
-// on another.
+// `compact` drops the button text where the caller has no width for it; only the
+// call site knows, since the same pair sits inline on one page and inside the
+// header's "More" dropdown on another.
 const props = withDefaults(defineProps<{ dataTest?: string; compact?: boolean }>(), {
   dataTest: "iac-registry-links",
   compact: false,
@@ -61,13 +61,15 @@ const { isDark } = useTheme();
 const REGISTRIES = computed(() => [
   {
     key: "terraform",
-    name: raw("Terraform Registry"),
+    name: raw("Terraform"),
+    registry: raw("Terraform Registry"),
     icon: `img:${terraformLogo}`,
     url: TERRAFORM_REGISTRY_URL,
   },
   {
     key: "opentofu",
-    name: raw("OpenTofu Registry"),
+    name: raw("OpenTofu"),
+    registry: raw("OpenTofu Registry"),
     icon: `img:${isDark.value ? opentofuLogoDark : opentofuLogo}`,
     url: OPENTOFU_REGISTRY_URL,
   },
@@ -75,29 +77,27 @@ const REGISTRIES = computed(() => [
 </script>
 
 <template>
-  <div class="flex items-center gap-1.5" :data-test="dataTest">
-    <span
-      v-if="!props.compact"
-      class="text-text-secondary text-xs whitespace-nowrap"
-      :data-test="`${dataTest}-caption`"
-      >{{ t("common.iacProviderCaption") }}</span
-    >
-    <a
+  <div class="flex items-center gap-2" :data-test="dataTest">
+    <OButton
       v-for="registry in REGISTRIES"
       :key="registry.key"
+      variant="secondary"
+      size="sm"
+      as="a"
       :href="registry.url"
       target="_blank"
       rel="noopener noreferrer"
-      :aria-label="t('common.openProviderOnRegistry', { registry: registry.name })"
-      class="rounded-default hover:bg-surface-subtle-hover flex items-center p-1 opacity-80 transition-opacity hover:opacity-100"
+      :aria-label="t('common.openProviderOnRegistry', { registry: registry.registry })"
+      :class="props.compact ? 'min-w-0! px-2! py-0!' : ''"
       :data-test="`${dataTest}-${registry.key}`"
     >
-      <OIcon :name="registry.icon" size="md" />
+      <OIcon :name="registry.icon" size="sm" />
+      <span v-if="!props.compact" class="ms-1.5 whitespace-nowrap">{{ registry.name }}</span>
       <OTooltip
-        :content="t('common.openProviderOnRegistry', { registry: registry.name })"
+        :content="t('common.openProviderOnRegistry', { registry: registry.registry })"
         side="bottom"
         align="end"
       />
-    </a>
+    </OButton>
   </div>
 </template>
