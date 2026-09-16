@@ -31,6 +31,7 @@ pub const M_REQUEST_FAILED_TOTAL: &str = "traces_service_graph_request_failed_to
 pub const M_CLIENT_SECONDS: &str = "traces_service_graph_request_client_seconds";
 pub const M_SERVER_SECONDS: &str = "traces_service_graph_request_server_seconds";
 pub const M_UNRESOLVED_TOTAL: &str = "traces_service_graph_unresolved_total";
+pub const M_AGENT_INSTANCES: &str = "traces_service_graph_agent_instances";
 pub const LABEL_TRACE_STREAM: &str = "trace_stream";
 /// Fraction of the gRPC message limit a request may use; the rest is headers and compression slack.
 const REQUEST_FILL_RATIO: f64 = 0.9;
@@ -65,9 +66,21 @@ pub fn max_request_bytes() -> usize {
 }
 
 pub fn render(stream: &str, batch: &Batch) -> Vec<Value> {
-    let mut out = Vec::with_capacity(batch.samples.len() * 22 + 1);
+    let mut out = Vec::with_capacity(batch.samples.len() * 22 + batch.instances.len() + 1);
     for sample in &batch.samples {
         render_sample(stream, sample, &mut out);
+    }
+    for (key, instances) in &batch.instances {
+        if key.is_edge() {
+            let labels = labels_for(stream, key);
+            out.push(record(
+                M_AGENT_INSTANCES,
+                "gauge",
+                batch.window_end,
+                *instances as f64,
+                &labels,
+            ));
+        }
     }
     let mut labels = Map::new();
     labels.insert(LABEL_TRACE_STREAM.into(), stream.into());
@@ -165,23 +178,9 @@ async fn send(org: &str, data: Vec<u8>) -> ReplyClass {
 fn render_sample(stream: &str, sample: &Sample, out: &mut Vec<Value>) {
     let ts = sample.ts;
     let c = &sample.counts;
-    let mut labels = Map::new();
-    labels.insert(LABEL_TRACE_STREAM.into(), stream.into());
+    let labels = labels_for(stream, &sample.key);
     match &sample.key {
-        SeriesKey::Edge {
-            client,
-            client_type,
-            server,
-            connection_type,
-        } => {
-            labels.insert("client".into(), client.as_str().into());
-            labels.insert("server".into(), server.as_str().into());
-            if !client_type.is_empty() {
-                labels.insert("client_type".into(), client_type.as_str().into());
-            }
-            if !connection_type.is_empty() {
-                labels.insert("connection_type".into(), connection_type.as_str().into());
-            }
+        SeriesKey::Edge { client_type, .. } => {
             out.push(record(
                 M_REQUEST_TOTAL,
                 "counter",
@@ -201,22 +200,50 @@ fn render_sample(stream: &str, sample: &Sample, out: &mut Vec<Value>) {
                 histogram(M_CLIENT_SECONDS, ts, c, &labels, out);
             }
         }
+        SeriesKey::Node { .. } => histogram(M_SERVER_SECONDS, ts, c, &labels, out),
+        SeriesKey::Unresolved { .. } => out.push(record(
+            M_UNRESOLVED_TOTAL,
+            "counter",
+            ts,
+            c.requests as f64,
+            &labels,
+        )),
+    }
+}
+
+/// Optional labels are present only when non-empty, so absent and empty read the same in PromQL.
+fn labels_for(stream: &str, key: &SeriesKey) -> Map<String, Value> {
+    let mut labels = Map::new();
+    labels.insert(LABEL_TRACE_STREAM.into(), stream.into());
+    match key {
+        SeriesKey::Edge {
+            client,
+            client_type,
+            server,
+            connection_type,
+            agent_env,
+        } => {
+            labels.insert("client".into(), client.as_str().into());
+            labels.insert("server".into(), server.as_str().into());
+            for (name, value) in [
+                ("client_type", client_type),
+                ("connection_type", connection_type),
+                ("agent_env", agent_env),
+            ] {
+                if !value.is_empty() {
+                    labels.insert(name.into(), value.as_str().into());
+                }
+            }
+        }
         SeriesKey::Node { server } => {
             labels.insert("server".into(), server.as_str().into());
-            histogram(M_SERVER_SECONDS, ts, c, &labels, out);
         }
         SeriesKey::Unresolved { client, reason } => {
             labels.insert("client".into(), client.as_str().into());
             labels.insert("reason".into(), reason.as_str().into());
-            out.push(record(
-                M_UNRESOLVED_TOTAL,
-                "counter",
-                ts,
-                c.requests as f64,
-                &labels,
-            ));
         }
     }
+    labels
 }
 
 /// Classic histogram: cumulative `_bucket{le}` (`+Inf` = requests), `_sum` in seconds, `_count`.
@@ -288,6 +315,7 @@ mod tests {
                 ts: 60 * SECOND_MICRO_SECS,
                 counts: counts(),
             }],
+            instances: vec![],
         }
     }
 
@@ -356,6 +384,83 @@ mod tests {
         assert_eq!(u[0]["client"], "svc");
         assert_eq!(u[0]["reason"], "ip_only");
         assert_eq!(u[0]["value"], 5.0);
+    }
+
+    #[test]
+    fn test_agent_env_label_only_when_present() {
+        let records = render(
+            "t",
+            &batch(SeriesKey::agent_edge("o2-ai", "sre-rca", "prod")),
+        );
+        assert_eq!(records.len(), 22 + 1);
+        let total = named(&records, M_REQUEST_TOTAL);
+        assert_eq!(total[0]["client"], "o2-ai");
+        assert_eq!(total[0]["server"], "sre-rca");
+        assert_eq!(total[0]["connection_type"], "agent");
+        assert_eq!(total[0]["agent_env"], "prod");
+        assert!(total[0].get("client_type").is_none());
+        let buckets = named(&records, &format!("{M_CLIENT_SECONDS}_bucket"));
+        assert_eq!(buckets[0]["agent_env"], "prod");
+        assert!(
+            named(&records, PROCESSED_TIMESTAMP_STREAM)[0]
+                .get("agent_env")
+                .is_none()
+        );
+
+        let key = SeriesKey::agent_call_edge(Some("sre-rca"), "o2-ai", "search", "tool", "");
+        let records = render("t", &batch(key));
+        let total = named(&records, M_REQUEST_TOTAL);
+        assert_eq!(total[0]["client"], "sre-rca");
+        assert_eq!(total[0]["client_type"], "agent");
+        assert_eq!(total[0]["connection_type"], "tool");
+        assert!(total[0].get("agent_env").is_none());
+
+        let key = SeriesKey::agent_call_edge(None, "o2-ai", "gpt-4o", "model", "dev");
+        let records = render("t", &batch(key));
+        let total = named(&records, M_REQUEST_TOTAL);
+        assert_eq!(total[0]["client"], "o2-ai");
+        assert!(total[0].get("client_type").is_none());
+        assert_eq!(total[0]["connection_type"], "model");
+        assert_eq!(total[0]["agent_env"], "dev");
+
+        for key in [
+            SeriesKey::edge("a", "b", "database"),
+            SeriesKey::queue_edge("orders", "fraud"),
+            SeriesKey::entry_edge("frontend"),
+        ] {
+            let records = render("t", &batch(key));
+            assert!(records.iter().all(|r| r.get("agent_env").is_none()));
+        }
+    }
+
+    #[test]
+    fn test_instances_gauge_records() {
+        let mut b = batch(SeriesKey::agent_edge("o2-ai", "sre-rca", "prod"));
+        assert!(named(&render("t", &b), M_AGENT_INSTANCES).is_empty());
+        b.instances = vec![
+            (SeriesKey::agent_edge("o2-ai", "sre-rca", "prod"), 3),
+            (SeriesKey::agent_edge("o2-ai", "planner", ""), 1),
+            (SeriesKey::node("ignored"), 9),
+        ];
+        let records = render("t", &b);
+        assert_eq!(records.len(), 22 + 2 + 1);
+        let gauges = named(&records, M_AGENT_INSTANCES);
+        assert_eq!(gauges.len(), 2);
+        assert_eq!(gauges[0]["__type__"], "gauge");
+        assert_eq!(gauges[0]["_timestamp"], 60 * SECOND_MICRO_SECS);
+        assert_eq!(gauges[0]["value"], 3.0);
+        assert_eq!(gauges[0]["trace_stream"], "t");
+        assert_eq!(gauges[0]["client"], "o2-ai");
+        assert_eq!(gauges[0]["server"], "sre-rca");
+        assert_eq!(gauges[0]["connection_type"], "agent");
+        assert_eq!(gauges[0]["agent_env"], "prod");
+        assert!(gauges[0].get("client_type").is_none());
+        assert!(gauges[0].get("le").is_none());
+        assert_eq!(gauges[1]["server"], "planner");
+        assert_eq!(gauges[1]["value"], 1.0);
+        assert!(gauges[1].get("agent_env").is_none());
+        let total = named(&records, M_REQUEST_TOTAL);
+        assert_eq!(total.len(), 1);
     }
 
     #[test]
