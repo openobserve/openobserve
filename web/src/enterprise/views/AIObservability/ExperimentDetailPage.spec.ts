@@ -697,26 +697,69 @@ describe("ExperimentDetailPage", () => {
     expect(listRows).toHaveBeenCalledTimes(initialListCalls);
     expect(getRow).not.toHaveBeenCalled();
 
-    get.mockResolvedValueOnce(
-      makeExperimentDetail(
-        makeExperiment({
-          id: "exp-1",
-          status: "completed",
-          executionStatus: "completed",
-        }),
-      ),
-    );
-    getRow.mockResolvedValueOnce({
-      ...state.selectedRowDetail,
-      trials: [
-        {
-          ...failedSlot,
-          status: "completed",
-          taskStatus: "ok",
-          execution: { ...queuedExecution, status: "ok" },
-        },
-      ],
-    });
+    const scoringScore = {
+      scorerId: "quality",
+      scorerVersion: 1,
+      status: "in_progress" as const,
+      score: null,
+    };
+    const finalScore = {
+      ...scoringScore,
+      status: "success" as const,
+      score: {
+        value: 0.9,
+        reasoning: "The response is accurate.",
+        evaluatorTraceId: "score-trace-1",
+        timestamp: 123,
+      },
+    };
+    const completedTrial = {
+      ...failedSlot,
+      status: "completed" as const,
+      taskStatus: "ok" as const,
+      execution: { ...queuedExecution, status: "ok" as const },
+    };
+    get
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "completed",
+            executionStatus: "completed",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "scoring",
+            executionStatus: "completed",
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        makeExperimentDetail(
+          makeExperiment({
+            id: "exp-1",
+            status: "completed",
+            executionStatus: "completed",
+          }),
+        ),
+      );
+    getRow
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, status: "scoring", scores: [scoringScore] }],
+      })
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, scores: [finalScore] }],
+      })
+      .mockResolvedValueOnce({
+        ...state.selectedRowDetail,
+        trials: [{ ...completedTrial, scores: [finalScore] }],
+      });
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
@@ -725,11 +768,24 @@ describe("ExperimentDetailPage", () => {
     expect(listRows).toHaveBeenCalledTimes(initialListCalls + 1);
     expect(getRow).toHaveBeenCalledWith("acme", "exp-1", "row-1");
     expect(state.detail?.experiment.executionStatus).toBe("completed");
-    expect(state.selectedRowDetail?.trials[0].taskStatus).toBe("ok");
+    expect(state.selectedRowDetail?.trials[0]).toMatchObject({
+      taskStatus: "ok",
+      scores: [scoringScore],
+    });
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
-    expect(get).toHaveBeenCalledTimes(initialGetCalls + 1);
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
+    expect(state.detail?.experiment.status).toBe("scoring");
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 3);
+    expect(state.selectedRowDetail?.trials[0].scores).toEqual([finalScore]);
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await flushPromises();
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 3);
     wrapper.unmount();
   });
 

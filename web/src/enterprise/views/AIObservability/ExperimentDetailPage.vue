@@ -934,10 +934,16 @@ async function pollSlotRetry(rowId: string, generation: number) {
 
   const rowStillPending =
     selectedRowDetail.value?.rowId === rowId &&
-    selectedRowDetail.value.trials.some((trial) =>
-      ["queued", "pending", "in_progress"].includes(trial.taskStatus),
+    selectedRowDetail.value.trials.some(
+      (trial) =>
+        ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
+        trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
     );
-  if (detail.value?.experiment.executionStatus === "retrying" || rowStillPending) {
+  if (
+    detail.value?.experiment.executionStatus === "retrying" ||
+    detail.value?.experiment.status === "scoring" ||
+    rowStillPending
+  ) {
     scheduleSlotRetryPoll(rowId, generation);
   }
 }
