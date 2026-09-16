@@ -2687,6 +2687,14 @@
     "edit": "Bewerken",
     "view": "Bekijken",
     "delete": "Verwijderen",
+    "moveToFolder": "Verplaats naar map",
+    "tabAll": "Alle",
+    "searchThisFolder": "Deze map",
+    "searchAllFolders": "Alle mappen",
+    "searchThisFolderTooltip": "Alleen in deze map zoeken",
+    "searchAllFoldersTooltip": "In alle mappen zoeken",
+    "folder": "Map",
+    "modeInFolder": "{mode} in",
     "deleteTitle": "Workflow verwijderen",
     "deleteMessage": "Weet je zeker dat je deze workflow wilt verwijderen?",
     "deleteSuccess": "Workflow succesvol verwijderd",
@@ -2721,12 +2729,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alert geactiveerd",
+        "tab": "Alarmen",
         "node": "Alerttrigger",
         "desc": "Uitvoeren wanneer een alert afgaat",
         "intro": "Wanneer een gekoppelde alert afgaat, ontvangt elke downstream-stap deze payload."
       },
       "incidentEvent": {
         "label": "Incident event",
+        "tab": "Incidenten",
         "node": "Incidenttrigger",
         "desc": "Uitvoeren bij een incident lifecycle-gebeurtenis",
         "intro": "Wanneer een incidentgebeurtenis optreedt, ontvangt elke downstream-stap deze payload."
@@ -13319,6 +13329,7 @@
       "viewAddedFavorites": "Weergave toegevoegd aan favorieten.",
       "viewRemovedFavorites": "Weergave verwijderd uit favorieten.",
       "selectStreamBeforeSchedule": "Selecteer een stream voordat u een taak plant",
+      "streamNotFoundInQuery": "Stream \"{stream}\" bestaat niet",
       "confirmUpdateFunction": "Weet u zeker dat u de functie wilt bijwerken?",
       "confirmUpdateSavedViewMsg": "Weet u zeker dat u de opgeslagen weergave wilt bijwerken?"
     },

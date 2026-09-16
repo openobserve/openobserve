@@ -2687,6 +2687,14 @@
     "edit": "Editar",
     "view": "Visualizar",
     "delete": "Excluir",
+    "moveToFolder": "Mover para pasta",
+    "tabAll": "Todos",
+    "searchThisFolder": "Esta pasta",
+    "searchAllFolders": "Todas as pastas",
+    "searchThisFolderTooltip": "Pesquisar somente nesta pasta",
+    "searchAllFoldersTooltip": "Pesquisar em todas as pastas",
+    "folder": "Pasta",
+    "modeInFolder": "{mode} em",
     "deleteTitle": "Excluir Fluxo de Trabalho",
     "deleteMessage": "Tem certeza de que deseja excluir este fluxo de trabalho?",
     "deleteSuccess": "Fluxo de trabalho excluído com sucesso",
@@ -2721,12 +2729,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Alerta disparado",
+        "tab": "Alertas",
         "node": "Gatilho de alerta",
         "desc": "Executar quando um alerta disparar",
         "intro": "Quando um alerta vinculado dispara, cada passo a jusante recebe este payload."
       },
       "incidentEvent": {
         "label": "Evento de incidente",
+        "tab": "Incidentes",
         "node": "Gatilho de incidente",
         "desc": "Executar em um evento de ciclo de vida de incidente",
         "intro": "Quando um evento de incidente ocorre, cada passo a jusante recebe este payload."
@@ -13319,6 +13329,7 @@
       "viewAddedFavorites": "Visualização adicionada aos favoritos.",
       "viewRemovedFavorites": "Visualização removida dos favoritos.",
       "selectStreamBeforeSchedule": "Selecione um stream antes de agendar um job",
+      "streamNotFoundInQuery": "O Stream \"{stream}\" não existe",
       "confirmUpdateFunction": "Tem certeza de que deseja atualizar a função?",
       "confirmUpdateSavedViewMsg": "Tem certeza de que deseja atualizar a visualização salva?"
     },

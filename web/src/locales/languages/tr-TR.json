@@ -2687,6 +2687,14 @@
     "edit": "Düzenle",
     "view": "Görüntüle",
     "delete": "Sil",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
+    "modeInFolder": "{mode} içinde",
     "deleteTitle": "İş Akışını Sil",
     "deleteMessage": "Bu iş akışını silmek istediğinizden emin misiniz?",
     "deleteSuccess": "İş akışı başarıyla silindi",
@@ -2721,12 +2729,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "Uyarı tetiklendi",
+        "tab": "Alerts",
         "node": "Uyarı tetikleyicisi",
         "desc": "Bir uyarı tetiklendiğinde çalıştır",
         "intro": "Bağlı bir uyarı tetiklendiğinde, aşağı akıştaki her adım bu veri yükünü alır."
       },
       "incidentEvent": {
         "label": "Olay etkinliği",
+        "tab": "Incidents",
         "node": "Olay tetikleyicisi",
         "desc": "Bir olay yaşam döngüsü etkinliğinde çalıştır",
         "intro": "Bir olay etkinliği oluştuğunda, aşağı akıştaki her adım bu veri yükünü alır."
@@ -13319,6 +13329,7 @@
       "viewAddedFavorites": "Görünüm favorilere eklendi.",
       "viewRemovedFavorites": "Görünüm favorilerden kaldırıldı.",
       "selectStreamBeforeSchedule": "Bir iş zamanlamadan önce lütfen bir akış seçin",
+      "streamNotFoundInQuery": "\"{stream}\" akışı mevcut değil",
       "confirmUpdateFunction": "İşlevi güncellemek istediğinize emin misiniz?",
       "confirmUpdateSavedViewMsg": "Kaydedilmiş görünümü güncellemek istediğinize emin misiniz?"
     },
