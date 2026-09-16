@@ -328,8 +328,9 @@ function traceResourceAttributes() {
 }
 
 class SerialTraceExporter {
-  constructor(exporter) {
+  constructor(exporter, onResult = () => {}) {
     this.exporter = exporter;
+    this.onResult = onResult;
     this.queue = Promise.resolve();
   }
 
@@ -340,6 +341,7 @@ class SerialTraceExporter {
         try {
           this.exporter.export(spans, result => {
             try {
+              this.onResult(spans, result);
               resultCallback(result);
             } finally {
               resolve();
@@ -347,7 +349,9 @@ class SerialTraceExporter {
           });
         } catch (err) {
           try {
-            resultCallback({ code: 1, error: err });
+            const result = { code: 1, error: err };
+            this.onResult(spans, result);
+            resultCallback(result);
           } finally {
             resolve();
           }
@@ -374,6 +378,8 @@ class TraceRecorder {
   constructor() {
     this.traceId = workflowTraceId();
     this.spanCount = 0;
+    this.exportedSpanCount = 0;
+    this.exportFailures = [];
     this.flushed = false;
     this.enabled = false;
     this.provider = null;
@@ -394,7 +400,17 @@ class TraceRecorder {
         timeoutMillis: timeoutMs,
         concurrencyLimit: 1,
       });
-      spanProcessors.push(new BatchSpanProcessor(new SerialTraceExporter(exporter), {
+      const serialExporter = new SerialTraceExporter(exporter, (spans, result) => {
+        if (result.code === 0) {
+          this.exportedSpanCount += spans.length;
+          return;
+        }
+        this.exportFailures.push({
+          spanNames: spans.map(span => span.name),
+          error: result.error,
+        });
+      });
+      spanProcessors.push(new BatchSpanProcessor(serialExporter, {
         maxQueueSize: 2048,
         maxExportBatchSize: traceExportBatchSize(),
         scheduledDelayMillis: 1_000,
@@ -479,7 +495,14 @@ class TraceRecorder {
     try {
       console.log(`[${isoNow()}] Exporting ${this.spanCount} trace spans to OpenObserve with trace ID ${this.traceId}`);
       await withDeadline("trace forceFlush", this.provider.forceFlush());
-      console.log(`[${isoNow()}] Exported ${this.spanCount} trace spans to OpenObserve`);
+      const rejectedSpanCount = this.exportFailures.reduce((count, failure) => count + failure.spanNames.length, 0);
+      if (rejectedSpanCount > 0) {
+        const details = this.exportFailures
+          .map(failure => `${failure.spanNames.join(",")}: ${formatTraceExportError(failure.error)}`)
+          .join("; ");
+        throw new Error(`trace exporter rejected ${rejectedSpanCount}/${this.spanCount} spans (${details})`);
+      }
+      console.log(`[${isoNow()}] Exported ${this.exportedSpanCount}/${this.spanCount} trace spans to OpenObserve`);
     } catch (err) {
       console.warn(`[${isoNow()}] Trace export failed: ${formatTraceExportError(err)}`);
     } finally {
