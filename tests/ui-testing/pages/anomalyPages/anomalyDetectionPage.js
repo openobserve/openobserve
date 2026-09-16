@@ -72,6 +72,11 @@ class AnomalyDetectionPage {
             sensitivityPercentile: '[data-test="anomaly-sensitivity-percentile"]',
             sensitivityError: '[data-test="anomaly-sensitivity-error"]',
             sensitivityHint: '[data-test="anomaly-sensitivity-hint"]',
+            // Budget mode (edit-only sensitivity): renders when the config
+            // carries alert_budget_per_day, replacing the percentile tier.
+            budgetTiers: '[data-test="anomaly-budget-tiers"]',
+            budgetCount: '[data-test="anomaly-budget-count"]',
+            budgetPeriod: '[data-test="anomaly-budget-period"]',
             sqlPreview: '[data-test="anomaly-sql-preview"]',
 
             // Alerting step
@@ -105,6 +110,7 @@ class AnomalyDetectionPage {
             rowRetrain: (name) => `[data-test="alert-list-${name}-retrain-anomaly"]`,
 
             sensitivityTierItem: (pct) => `[data-test="anomaly-sensitivity-tier-${pct}"]`,
+            budgetTierItem: (value) => `[data-test="anomaly-budget-tier-${value}"]`,
             queryTab: (mode) => `[data-test="anomaly-query-tab-${mode}"]`,
             filterField: (idx) => `[data-test="anomaly-filter-field-${idx}"]`,
             filterOperator: (idx) => `[data-test="anomaly-filter-operator-${idx}"]`,
@@ -464,6 +470,47 @@ class AnomalyDetectionPage {
         return this.page.locator(this.selectors.sensitivityError);
     }
 
+    // Budget mode (edit-only sensitivity)
+
+    /** @param {'1_week'|'1_day'|'4_day'} value */
+    async selectBudgetTier(value) {
+        const tier = this.page.locator(this.selectors.budgetTierItem(value));
+        await tier.click();
+        await expect(tier).toHaveAttribute('data-state', 'on', { timeout: 5000 });
+    }
+
+    /** The active budget preset, or null when no preset matches (an off-tier count). */
+    async getActiveBudgetTier() {
+        const active = this.page.locator(`${this.selectors.budgetTiers} [data-state="on"]`);
+        if ((await active.count()) === 0) return null;
+        const dataTest = await active.first().getAttribute('data-test');
+        return dataTest ? dataTest.replace('anomaly-budget-tier-', '') : null;
+    }
+
+    async getBudgetCount() {
+        return this.getFormInputValue(this.selectors.budgetCount);
+    }
+
+    async setBudgetCount(count) {
+        await this.fillFormInput(this.selectors.budgetCount, count);
+    }
+
+    /** The selected budget period ('day' | 'week'), read from the OSelect value. */
+    async getBudgetPeriod() {
+        const trigger = this.page
+            .locator(`${this.selectors.budgetPeriod} [data-test$="-trigger"]`)
+            .first();
+        return trigger.getAttribute('data-test-selected-value');
+    }
+
+    getBudgetTiersLocator() {
+        return this.page.locator(this.selectors.budgetTiers);
+    }
+
+    getPercentileTierLocator() {
+        return this.page.locator(this.selectors.sensitivityTier);
+    }
+
     // Alerting step
 
     /** @param {1|2|3|4|5} priority */
@@ -760,6 +807,55 @@ class AnomalyDetectionPage {
         const range = this.page.locator(this.selectors.detectionChartsRange);
         await range.waitFor({ state: 'visible', timeout: 15000 });
         await this.page.locator(this.selectors.chartRangeItem(value)).click();
+    }
+
+    /**
+     * Prove the shared range picker drove a fresh query on every panel.
+     *
+     * Each of the three panels is its own `_search` over `_anomalies`, told
+     * apart by its projection. Call BEFORE selecting a range; it resolves once
+     * all three have re-queried with a time window matching `range`. A panel
+     * that kept its own (stale) picker would never re-query and leave this
+     * pending — which is exactly the disagreement the shared picker exists to
+     * prevent.
+     *
+     * @param {'1h'|'6h'|'24h'} range
+     */
+    async waitForPanelQueries(range) {
+        const rangeMs = { '1h': 3_600_000, '6h': 6 * 3_600_000, '24h': 24 * 3_600_000 }[range];
+        const expectedUs = rangeMs * 1000;
+        const projections = [
+            ['metric', 'actual_value'],
+            ['score', 'threshold_value'],
+            ['deviation', 'deviation_percent'],
+        ];
+        return Promise.all(
+            projections.map(([key, token]) =>
+                this.page
+                    .waitForRequest(
+                        (req) => {
+                            if (!req.url().includes('/_search') || req.method() !== 'POST') return false;
+                            const raw = req.postData() || '';
+                            if (!raw.includes(token)) return false;
+                            let data;
+                            try {
+                                data = JSON.parse(raw);
+                            } catch {
+                                return false;
+                            }
+                            const sql = data?.query?.sql ?? '';
+                            const start = Number(data?.query?.start_time);
+                            const end = Number(data?.query?.end_time);
+                            if (!sql.includes('_anomalies') || !Number.isFinite(start) || !Number.isFinite(end)) {
+                                return false;
+                            }
+                            return Math.abs(end - start - expectedUs) <= expectedUs * 0.05;
+                        },
+                        { timeout: 30000 },
+                    )
+                    .then(() => key),
+            ),
+        );
     }
 
     // Cleanup
