@@ -118,10 +118,14 @@ export const cleanAggregationQuery = (query: string): string => {
       const limitMatch = maskForKeywordSearch(cleaned).match(/\bLIMIT\b/i);
       if (orderByMatch && orderByMatch.index !== undefined) {
         const end = orderByMatch.index + orderByMatch[0].length;
-        cleaned = cleaned.slice(0, orderByMatch.index) + "GROUP BY zo_sql_key ORDER BY" + cleaned.slice(end);
+        cleaned =
+          cleaned.slice(0, orderByMatch.index) +
+          "GROUP BY zo_sql_key ORDER BY" +
+          cleaned.slice(end);
       } else if (limitMatch && limitMatch.index !== undefined) {
         const end = limitMatch.index + limitMatch[0].length;
-        cleaned = cleaned.slice(0, limitMatch.index) + "GROUP BY zo_sql_key LIMIT" + cleaned.slice(end);
+        cleaned =
+          cleaned.slice(0, limitMatch.index) + "GROUP BY zo_sql_key LIMIT" + cleaned.slice(end);
       } else {
         cleaned += " GROUP BY zo_sql_key";
       }
@@ -244,7 +248,9 @@ export const withCompositeGroupLabel = (query: string, groupBy: string[]): strin
   const clauseTailMasked = maskForKeywordSearch(out).slice(groupByStart);
   const clauseEndMatch = clauseTailMasked.match(/\b(?:ORDER\s+BY|HAVING|LIMIT)\b/i);
   const groupByEnd =
-    clauseEndMatch && clauseEndMatch.index !== undefined ? groupByStart + clauseEndMatch.index : out.length;
+    clauseEndMatch && clauseEndMatch.index !== undefined
+      ? groupByStart + clauseEndMatch.index
+      : out.length;
 
   let groupByClause = out.slice(groupByStart, groupByEnd);
   for (const c of cols) {
