@@ -62,7 +62,8 @@ test.describe('Alert Chart Error State testcases', {
     const name = uniq('chart_missing');
     const id = await createAlertViaApi(page, name, { ...simpleAlert(name), stream_name: stream });
     created.push(id);
-    await deleteStream(page, stream);
+    const del = await deleteStream(page, stream);
+    expect(del.status(), await del.text()).toBe(200);
 
     await pm.alertDetailPage.open(id);
     await pm.alertDetailPage.expectTitle(name);
