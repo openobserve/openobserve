@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Widok dodany do ulubionych.",
       "viewRemovedFavorites": "Widok usunięty z ulubionych.",
       "selectStreamBeforeSchedule": "Wybierz strumień przed zaplanowaniem zadania",
+      "streamNotFoundInQuery": "Strumień \"{stream}\" nie istnieje",
       "confirmUpdateFunction": "Czy na pewno chcesz zaktualizować funkcję?",
       "confirmUpdateSavedViewMsg": "Czy na pewno chcesz zaktualizować zapisany widok?"
     },

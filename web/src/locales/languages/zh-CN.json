@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "视图已添加到收藏夹。",
       "viewRemovedFavorites": "视图已从收藏夹中移除。",
       "selectStreamBeforeSchedule": "请在安排作业前选择流",
+      "streamNotFoundInQuery": "数据流 \"{stream}\" 不存在",
       "confirmUpdateFunction": "您确定要更新该函数吗？",
       "confirmUpdateSavedViewMsg": "您确定要更新保存的视图吗？"
     },

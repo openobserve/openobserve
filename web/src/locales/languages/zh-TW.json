@@ -13314,6 +13314,7 @@
       "viewAddedFavorites": "檢視已加入我的最愛。",
       "viewRemovedFavorites": "檢視已從我的最愛移除。",
       "selectStreamBeforeSchedule": "請在排程作業前選擇一個串流",
+      "streamNotFoundInQuery": "串流「{stream}」不存在",
       "confirmUpdateFunction": "您確定要更新函數嗎？",
       "confirmUpdateSavedViewMsg": "您確定要更新已儲存的檢視嗎？"
     },

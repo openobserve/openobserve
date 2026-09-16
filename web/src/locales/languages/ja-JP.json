@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "ビューをお気に入りに追加しました。",
       "viewRemovedFavorites": "ビューをお気に入りから削除しました。",
       "selectStreamBeforeSchedule": "ジョブをスケジュールする前にストリームを選択してください",
+      "streamNotFoundInQuery": "ストリーム「{stream}」が存在しません",
       "confirmUpdateFunction": "関数を更新してもよろしいですか？",
       "confirmUpdateSavedViewMsg": "保存されたビューを更新してもよろしいですか？"
     },

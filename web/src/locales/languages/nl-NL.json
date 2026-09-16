@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Weergave toegevoegd aan favorieten.",
       "viewRemovedFavorites": "Weergave verwijderd uit favorieten.",
       "selectStreamBeforeSchedule": "Selecteer een stream voordat u een taak plant",
+      "streamNotFoundInQuery": "Stream \"{stream}\" bestaat niet",
       "confirmUpdateFunction": "Weet u zeker dat u de functie wilt bijwerken?",
       "confirmUpdateSavedViewMsg": "Weet u zeker dat u de opgeslagen weergave wilt bijwerken?"
     },

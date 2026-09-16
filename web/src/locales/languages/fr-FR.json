@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Vue ajoutée aux favoris.",
       "viewRemovedFavorites": "Vue retirée des favoris.",
       "selectStreamBeforeSchedule": "Veuillez sélectionner un flux avant de planifier une tâche",
+      "streamNotFoundInQuery": "Le flux \"{stream}\" n'existe pas",
       "confirmUpdateFunction": "Êtes-vous sûr de vouloir mettre à jour la fonction ?",
       "confirmUpdateSavedViewMsg": "Êtes-vous sûr de vouloir mettre à jour la vue enregistrée ?"
     },

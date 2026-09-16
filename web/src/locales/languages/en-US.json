@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "View added to favorites.",
       "viewRemovedFavorites": "View removed from favorites.",
       "selectStreamBeforeSchedule": "Please select a stream before scheduling a job",
+      "streamNotFoundInQuery": "Stream \"{stream}\" does not exist",
       "confirmUpdateFunction": "Are you sure you want to update the function?",
       "confirmUpdateSavedViewMsg": "Are you sure you want to update the saved view?"
     },
