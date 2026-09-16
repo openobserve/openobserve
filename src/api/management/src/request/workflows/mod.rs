@@ -200,6 +200,7 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 400, description = "Failure", content_type = "application/json", body = ()),
+        (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "create"})),
@@ -444,6 +445,7 @@ pub struct MoveWorkflowsRequestBody {
     request_body(content = MoveWorkflowsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved"),
+        (status = 400, description = "No workflow ids, too many ids, or an empty destination folder", content_type = "application/json", body = ()),
         (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
@@ -1177,6 +1179,8 @@ pub async fn get_workflow_history(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
+        (status = 400, description = "No draft with that id, or the graph is still invalid", content_type = "application/json", body = ()),
+        (status = 403, description = "No write access to the destination folder", content_type = "application/json", body = ()),
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Pipeline", "operation": "post"})),

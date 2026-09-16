@@ -505,6 +505,7 @@ mod tests {
             82,
             "m20260915_000001_add_profiles_streams_to_service_streams",
         ),
+        (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
     ];
 
