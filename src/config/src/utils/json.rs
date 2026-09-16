@@ -165,7 +165,13 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             size += json_string_bytes(s);
         }
         Value::Number(n) => {
-            size += n.to_string().len();
+            size += if let Some(i) = n.as_i64() {
+                i.json_bytes()
+            } else if let Some(u) = n.as_u64() {
+                u.json_bytes()
+            } else {
+                n.as_f64().map_or(4, |f| f.json_bytes())
+            };
         }
         Value::Bool(b) => {
             // true for 4 bytes, false for 5 bytes
@@ -236,6 +242,24 @@ fn json_string_bytes(s: &str) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_estimate_json_bytes_number_matches_display() {
+        for v in [
+            json!(0),
+            json!(-1),
+            json!(i64::MIN),
+            json!(i64::MAX),
+            json!(u64::MAX),
+            json!(0.5),
+            json!(-12.5),
+            json!(1e16),
+            json!(1e300),
+            json!(1e-300),
+        ] {
+            assert_eq!(estimate_json_bytes(&v), v.to_string().len(), "{v}");
+        }
+    }
 
     #[test]
     fn test_json_bytes_agrees_with_estimate_json_bytes() {

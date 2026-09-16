@@ -8011,7 +8011,7 @@ fn idx_seed_leaves_unrelated_read_paths_untouched() {
 /// false positive would index streams that have nothing to do with DBM.
 #[test]
 fn idx_seed_trigger_ignores_a_batch_with_no_dbm_records() {
-    let batch = vec![
+    let batch = [
         (
             1_786_612_398_267_000i64,
             obj(json!({"log": "ordinary line one"})),
@@ -8021,15 +8021,17 @@ fn idx_seed_trigger_ignores_a_batch_with_no_dbm_records() {
             obj(json!({"log": "ordinary line two", "level": "info"})),
         ),
     ];
-    assert!(!server_vantage::batch_has_dbm_records(&batch));
-    assert!(!server_vantage::batch_has_dbm_records(&[]));
+    assert!(!server_vantage::batch_has_dbm_records(
+        batch.iter().map(|(_, r)| r)
+    ));
+    assert!(!server_vantage::batch_has_dbm_records(std::iter::empty()));
 }
 
 /// …and fires on a batch where even one record carries a kind, which is what a
 /// mixed stream (DBM recipes plus the customer's own log lines) looks like.
 #[test]
 fn idx_seed_trigger_fires_on_a_mixed_batch() {
-    let batch = vec![
+    let batch = [
         (
             1_786_612_398_267_000i64,
             obj(json!({"log": "ordinary line"})),
@@ -8040,7 +8042,7 @@ fn idx_seed_trigger_fires_on_a_mixed_batch() {
         ),
     ];
     assert!(
-        server_vantage::batch_has_dbm_records(&batch),
+        server_vantage::batch_has_dbm_records(batch.iter().map(|(_, r)| r)),
         "one DBM record in the batch is enough — the stream carries DBM data"
     );
 }
