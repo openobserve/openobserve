@@ -15,12 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div icon="info" class="date-time-container flex items-center gap-1">
-    <OTooltip :content="t('common.previous')">
+  <div
+    icon="info"
+    class="date-time-container inline-flex items-stretch"
+    :class="{
+      'min-h-7.5 rounded-default border border-button-outline-border': !hideRangeShift,
+    }"
+  >
+    <OTooltip v-if="!hideRangeShift" :content="t('common.previous')">
       <OButton
         data-test="date-time-prev-btn"
         variant="ghost"
         size="icon-xs-sq"
+        class="h-auto! rounded-e-none! border-e! border-button-outline-border"
         icon-left="chevron-left"
         :aria-label="t('common.previous')"
         :disabled="disable"
@@ -48,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             hideRelative: disableRelative,
             'md:min-w-71.5': !disableRelative && selectedType === 'absolute',
             'w-fit': disableRelative,
+            'h-auto! border-0! rounded-none!': !hideRangeShift,
           }"
           class="max-md:max-w-full max-md:min-w-0"
           :disabled="disable"
@@ -310,11 +318,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </OPopover>
-    <OTooltip :content="t('common.next')">
+    <OTooltip v-if="!hideRangeShift" :content="t('common.next')">
       <OButton
         data-test="date-time-next-btn"
         variant="ghost"
         size="icon-xs-sq"
+        class="h-auto! rounded-s-none! border-s! border-button-outline-border"
         icon-left="chevron-right"
         :aria-label="t('common.next')"
         :disabled="disable"
@@ -430,6 +439,10 @@ export default defineComponent({
       default: false,
     },
     hideRelativeTimezone: {
+      type: Boolean,
+      default: false,
+    },
+    hideRangeShift: {
       type: Boolean,
       default: false,
     },
