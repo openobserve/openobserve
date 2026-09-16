@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Chế độ xem đã được thêm vào yêu thích.",
       "viewRemovedFavorites": "Chế độ xem đã bị xóa khỏi yêu thích.",
       "selectStreamBeforeSchedule": "Vui lòng chọn một stream trước khi lên lịch công việc",
+      "streamNotFoundInQuery": "Stream \"{stream}\" không tồn tại",
       "confirmUpdateFunction": "Bạn có chắc chắn muốn cập nhật hàm không?",
       "confirmUpdateSavedViewMsg": "Bạn có chắc chắn muốn cập nhật chế độ xem đã lưu không?"
     },

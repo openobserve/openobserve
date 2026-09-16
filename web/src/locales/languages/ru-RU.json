@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Представление добавлено в избранное.",
       "viewRemovedFavorites": "Представление удалено из избранного.",
       "selectStreamBeforeSchedule": "Пожалуйста, выберите поток перед планированием задания",
+      "streamNotFoundInQuery": "Поток \"{stream}\" не существует",
       "confirmUpdateFunction": "Вы уверены, что хотите обновить функцию?",
       "confirmUpdateSavedViewMsg": "Вы уверены, что хотите обновить сохраненное представление?"
     },
