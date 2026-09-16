@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/profilingUiGating.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/streamsExploreLogsTypePersistence.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsBuildStreamList.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/ingestion-config.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/landingPage.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the profiling flag gating of any entry point. streamsExploreLogsTypePersistence uses the LogStream data-otoggle-value filter (closest sibling selector) but asserts stream-type persistence, not flag gating; ingestion-config covers the Custom tabs but only their copy/onboarding content, never the ingestProfiles tab's presence/absence; landingPage validates nav menus but never the Profiles item. The feature (one flag gating three changed entry points + one pre-existing) needs its own spec in Logs, registered under the Logs-Core shard per run-context playwright_group."
+}

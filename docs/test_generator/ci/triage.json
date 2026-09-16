@@ -1,0 +1,27 @@
+{
+  "feature_slug": "profiling-ui-gating",
+  "feature_title": "Profiling UI Feature-Flag Gating",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "profilingUiGating.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/profilingUiGating.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/components/ingestion/Custom.vue",
+    "web/src/views/HomeNoDataState.vue",
+    "web/src/views/LogStream.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All three changed paths are plain web/src/ frontend files (web/src/components/ingestion/Custom.vue, web/src/views/HomeNoDataState.vue, web/src/views/LogStream.vue). None live under enterprise-owned directories (enterprise/, o2_enterprise/, src/enterprise/) and none match enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management); 'profiling_enabled' is not an enterprise signal. Classified OSS.",
+    "skip": "No skip marker present: the trigger comment is empty, no tests-added label was passed, and the change is user-facing (it toggles the visibility of profiling UI controls). Not a skip.",
+    "e2e": "The diff gates the 'profiles' UI behind store.state.zoConfig.profiling_enabled via v-if in three places: the ingestProfiles tab (Custom.vue), the profiles empty-state button (HomeNoDataState.vue), and the profiles toggle-group item (LogStream.vue). This is a user-exercisable UI behavior change (elements appear/disappear based on config) that warrants E2E verification.",
+    "area": "The bulk of the change centers on the profiles toggle in LogStream.vue, the main log stream view, with the ingestion and home changes being smaller satellite gates. The closest existing spec folder is the Logs area, whose logspage.spec.js already covers the log stream page.",
+    "group": "Logs-Core is the matrix shard whose run_files already exercise the log stream page (logspage.spec.js, shareLink.spec.js, etc.), where the profiles toggle lives; a profiling-gating spec belongs alongside those core log-page specs.",
+    "existing_tests": "No E2E specs in the diff — the only changed files are web/src Vue components/views. No Playwright specs under tests/ui-testing/playwright-tests/ were touched, so there is no existing E2E coverage to enhance."
+  }
+}

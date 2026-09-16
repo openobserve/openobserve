@@ -36,6 +36,12 @@ export class StreamsPage {
         // Locators following alerts pattern - only the ones that were changed
         this.managementMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
         this.streamingToggle = page.locator('[data-test="general-settings-enable-streaming"]');
+
+        // LogStream stream-type filter (profiling flag gating). The Profiles tab
+        // carries no explicit data-test; OToggleGroupItem renders data-otoggle-value.
+        this.streamTypeFilter = page.locator('[data-test="log-stream-type-filter"]');
+        this.profilesFilterTab = page.locator('[data-test="log-stream-type-filter"] [data-otoggle-value="profiles"]');
+        this.profilesFilterTabSelected = page.locator('[data-test="log-stream-type-filter"] [data-otoggle-value="profiles"][data-state="on"]');
     }
 
     // Login methods - delegate to LoginPage
@@ -274,6 +280,36 @@ export class StreamsPage {
     // Methods from legacy streamsPage.js
     async gotoStreamsPage() {
         await this.page.locator('[data-test="menu-link-\\/streams-item"]').click();
+    }
+
+    // Stream-type filter tab for a given value (logs/metrics/traces/metadata/profiles).
+    siblingFilterTab(value) {
+        return this.page.locator(`[data-test="log-stream-type-filter"] [data-otoggle-value="${value}"]`);
+    }
+
+    async expectStreamTypeFilterVisible() {
+        await expect(this.streamTypeFilter).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectProfilesFilterTabHidden() {
+        await expect(this.profilesFilterTab).toHaveCount(0);
+    }
+
+    async expectProfilesFilterTabVisible() {
+        await expect(this.profilesFilterTab).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectSiblingFilterTabVisible(value) {
+        await expect(this.siblingFilterTab(value)).toBeVisible({ timeout: 30000 });
+    }
+
+    async clickProfilesFilterTab() {
+        await expect(this.profilesFilterTab).toBeVisible({ timeout: 30000 });
+        await this.profilesFilterTab.click();
+    }
+
+    async expectProfilesFilterTabSelected() {
+        await expect(this.profilesFilterTabSelected).toBeVisible({ timeout: 10000 });
     }
 
     async streamsPageDefaultOrg() {

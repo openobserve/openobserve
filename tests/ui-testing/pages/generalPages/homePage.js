@@ -16,6 +16,8 @@ export class HomePage {
         this.streamsMenu = page.locator('[data-test="menu-link-\\/streams-item"]');
         this.alertsMenu = page.locator('[data-test="menu-link-\\/alerts-item"]');
         this.iamMenu = page.locator('[data-test="menu-link-\\/iam-item"]');
+        // Profiles left-nav item — gated on profiling_enabled (pre-existing gate).
+        this.profilesMenuItem = page.locator('[data-test="menu-link-/profiles-item"]');
 
         // ===== HEADER SELECTORS (VERIFIED) =====
         this.orgSelector = page.locator('[data-test="navbar-organizations-select"]');
@@ -49,6 +51,12 @@ export class HomePage {
         // ===== HOME PAGE CONTENT SELECTORS =====
         this.mainContent = page.locator('[data-test="main-content"]');
 
+        // Home no-data empty-state chips — Profiles is gated on profiling_enabled
+        // (and the empty org). Only rendered inside UsageTab's no-data branch.
+        this.homeUsageTabNoData = page.locator('[data-test="home-usage-tab-no-data"]');
+        this.homeNoDataProfilesBtn = page.locator('[data-test="home-no-data-profiles-btn"]');
+        this.homeNoDataOtelBtn = page.locator('[data-test="home-no-data-otel-btn"]');
+
         // Logo (data-test attribute in Header.vue)
         this.logo = page.locator('[data-test="header-openobserve-logo"]').first();
 
@@ -79,6 +87,36 @@ export class HomePage {
         await this.homePageMenu.waitFor({ state: 'visible', timeout: 10000 });
         await this.homePageMenu.click();
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    }
+
+    async expectProfilesMenuItemHidden() {
+        await expect(this.profilesMenuItem).toHaveCount(0);
+    }
+
+    async expectProfilesMenuItemVisible() {
+        await expect(this.profilesMenuItem).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectHomeUsageTabNoDataVisible() {
+        await expect(this.homeUsageTabNoData).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectHomeNoDataProfilesBtnVisible() {
+        await expect(this.homeNoDataProfilesBtn).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectHomeNoDataProfilesBtnHidden() {
+        await expect(this.homeNoDataProfilesBtn).toHaveCount(0);
+    }
+
+    async expectHomeNoDataOtelBtnVisible() {
+        await expect(this.homeNoDataOtelBtn).toBeVisible({ timeout: 30000 });
+    }
+
+    async clickHomeNoDataProfilesBtn() {
+        await expect(this.homeNoDataProfilesBtn).toBeVisible({ timeout: 30000 });
+        await this.homeNoDataProfilesBtn.click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     }
 
     async navigateToLogs() {
