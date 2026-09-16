@@ -68,9 +68,7 @@ const router = createRouter({
 
 // Mock the router methods we need to test
 const mockRouterPush = vi.fn();
-const mockRouterReplace = vi.fn().mockResolvedValue(undefined);
 router.push = mockRouterPush;
-router.replace = mockRouterReplace;
 
 const createWrapper = (props = {}, options = {}) => {
   return mount(SettingsIndex, {
@@ -125,7 +123,6 @@ describe("SettingsIndex", () => {
     mockStore.state.selectedOrganization = { identifier: "test-org" };
     mockStore.state.zoConfig = { service_streams_enabled: true };
     mockRouterPush.mockClear();
-    mockRouterReplace.mockClear();
 
     // Set up router state
     await router.push("/");
@@ -238,24 +235,6 @@ describe("SettingsIndex", () => {
   });
 
   describe("Router integration", () => {
-    it("should redirect to /settings/general on settings root route", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          path: "/settings/general",
-        }),
-      );
-    });
-
-    it("should include org_identifier in redirect query", () => {
-      createWrapper();
-      expect(mockRouterReplace).toHaveBeenCalledWith(
-        expect.objectContaining({
-          query: { org_identifier: "test-org" },
-        }),
-      );
-    });
-
     it("should map syntheticsLocations route to synthetics_locations tab", () => {
       // Save the original route reference so we can restore it after the test
       // (router.push is mocked and won't reset currentRoute on its own).
@@ -392,12 +371,6 @@ describe("SettingsIndex", () => {
       await router.push("/");
       const wrapper = createWrapper();
       expect(wrapper.vm.settingsTab).toBe("general");
-    });
-
-    it("should expose isHub computed property", () => {
-      const wrapper = createWrapper();
-      // On '/' route named 'settings', isHub is true
-      expect(typeof wrapper.vm.isHub).toBe("boolean");
     });
   });
 

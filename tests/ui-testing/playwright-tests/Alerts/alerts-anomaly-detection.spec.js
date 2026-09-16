@@ -213,21 +213,20 @@ test.describe('Anomaly Detection', () => {
       expect(await pm.anomalyDetectionPage.getActiveSensitivityTier()).toBeNull();
     });
 
-    test('the hint restates the flag rate at the current resolution', {
+    test('the hint names the percentile the buckets are judged against', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
       await pm.anomalyDetectionPage.selectSensitivityTier(97);
 
-      // 97 flags the most unusual 3% of buckets; at 5m resolution that is
-      // 288 buckets/day * 0.03 ≈ 9 per day.
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
       await expect(hint).toBeVisible();
-      await expect(hint).toContainText('3%');
-      await expect(hint).toContainText('5m');
+      await expect(hint).toContainText('p97');
     });
 
-    test('the hint recomputes when the resolution changes', {
+    // The hint deliberately states no flag rate: the bar is the p-mark of the model's own
+    // training scores, so how many alerts it yields depends on the data, not the resolution.
+    test('the hint does not vary with the resolution', {
       tag: ['@anomaly', '@P1', '@functional', '@all'],
     }, async () => {
       await pm.anomalyDetectionPage.selectSensitivityTier(97);
@@ -235,8 +234,7 @@ test.describe('Anomaly Detection', () => {
       const atFiveMinutes = await pm.anomalyDetectionPage.getSensitivityHintLocator().textContent();
 
       await pm.anomalyDetectionPage.setHistogramInterval(1, 'h');
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).not.toHaveText(atFiveMinutes);
-      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toContainText('1h');
+      await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toHaveText(atFiveMinutes);
     });
 
     for (const [label, value] of [['below the floor', 49], ['above the ceiling', 100], ['fractional', 97.5]]) {
@@ -703,16 +701,24 @@ test.describe('Anomaly Detection', () => {
     }, async ({ page }) => {
       test.slow();
 
-      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike
-      // held back from the newest buckets so it stays inside the 1h detection
-      // window. Four hours because CI drops anything backdated further
+      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike.
+      // Four hours because CI drops anything backdated further
       // (ZO_INGEST_ALLOWED_UPTO), 1-minute because the model needs 100+ points.
+      //
+      // spikeOffset keeps the spike clear of the held-out calibration tail. The
+      // trainer fits the percentile bar on the newest quarter of the training
+      // window (compute_threshold_held_out), so a spike sitting in that tail
+      // raises the very bar it is judged against and can never clear it —
+      // measured: at ~240 windows a 12x spike flags 4/4 at bucket 100 and 0/4
+      // at bucket 200+, where the split falls at 180. 70m back clears the split
+      // by 11 buckets; the detection window below is widened to 2h to match.
       const seed = await seedAnomalyStream(page, seededStream, {
         hours: 4,
         bucketSeconds: 60,
         baseline: 10,
         spikeValue: 120,
         spikeBuckets: 4,
+        spikeOffset: 70,
       });
       expect(seed.status, `seeding ${seededStream} failed: ${JSON.stringify(seed.data)}`).toBe(200);
       await waitForStream(page, seededStream);
@@ -751,7 +757,9 @@ test.describe('Anomaly Detection', () => {
       // collapse and the model sees a fifth of the points.
       await pm.anomalyDetectionPage.setHistogramInterval(1, 'm');
       await pm.anomalyDetectionPage.setScheduleInterval(10, 'm');
-      await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
+      // 2h, not 1h: the spike sits ~70m back to stay out of the calibration tail,
+      // so a 1h look-back would cap the query short of it.
+      await pm.anomalyDetectionPage.setDetectionWindow(2, 'h');
       await pm.anomalyDetectionPage.setTrainingWindow(1);
       await pm.anomalyDetectionPage.selectSensitivityTier(95);
 
