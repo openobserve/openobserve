@@ -3,12 +3,18 @@ import { readFileSync, existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { randomBytes, randomUUID } from "node:crypto";
-import { context, SpanStatusCode, trace } from "@opentelemetry/api";
+import { context, SpanKind, SpanStatusCode, trace } from "@opentelemetry/api";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
 import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
+import {
+  cleanAttributes,
+  genAiRequestAttributes,
+  genAiResponseAttributes,
+  sha256,
+} from "./telemetry.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -28,6 +34,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
 const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
+const GEN_AI_PROVIDER_NAME = process.env.REVIEW_GEN_AI_PROVIDER_NAME
+  || (PROVIDER_ID.toLowerCase().includes("deepseek") ? "deepseek" : PROVIDER_ID);
 // REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
 // posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
@@ -245,23 +253,6 @@ function workflowTraceId() {
   return randomHex(16);
 }
 
-function cleanAttributeValue(value) {
-  if (value === undefined || value === null || value === "") return undefined;
-  if (typeof value === "bigint") return value.toString();
-  if (Array.isArray(value)) return JSON.stringify(value.filter(v => v !== undefined && v !== null && v !== "")).slice(0, 1024);
-  if (typeof value === "object") return JSON.stringify(value).slice(0, 1024);
-  return value;
-}
-
-function cleanAttributes(attributes = {}) {
-  const cleaned = {};
-  for (const [key, rawValue] of Object.entries(attributes)) {
-    const value = cleanAttributeValue(rawValue);
-    if (value !== undefined) cleaned[key] = value;
-  }
-  return cleaned;
-}
-
 function traceEndpoint() {
   const rawUrl = (process.env.O2_TRACE_INGEST_URL || "").trim().replace(/\/+$/, "");
   if (!rawUrl) return "";
@@ -434,9 +425,13 @@ class TraceRecorder {
     this.tracer = this.provider.getTracer(TRACE_SCOPE_NAME, "1.0.0");
   }
 
-  startSpan(name, attributes = {}, parentSpan = null) {
+  startSpan(name, attributes = {}, parentSpan = null, kind = SpanKind.INTERNAL) {
     const parentContext = parentSpan ? trace.setSpan(context.active(), parentSpan) : undefined;
-    return this.tracer.startSpan(name, { attributes: cleanAttributes(attributes) }, parentContext);
+    return this.tracer.startSpan(
+      name,
+      { attributes: cleanAttributes(attributes), kind },
+      parentContext,
+    );
   }
 
   setSpanAttributes(span, attributes = {}) {
@@ -453,6 +448,7 @@ class TraceRecorder {
         "error.type": error.name || "Error",
         "error.message": message,
       }));
+      span.recordException(error);
       span.setStatus({ code: SpanStatusCode.ERROR, message });
     } else {
       span.setStatus({ code: SpanStatusCode.OK });
@@ -693,24 +689,23 @@ function extractText(parts) {
 
 async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGENT_TIMEOUT_MS, traceOptions = {}) {
   const llmSpan = TRACE.startSpan("gen_ai.chat", {
-    "gen_ai.operation.name": traceOptions.operationName || "chat",
-    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.operation.name": "chat",
+    "gen_ai.provider.name": GEN_AI_PROVIDER_NAME,
     "gen_ai.request.model": MODEL_ID,
     "gen_ai.request.reasoning_effort": MODEL_VARIANT || "default",
+    "ai.review.operation.name": traceOptions.operationName || "chat",
     "ai.agent.key": traceOptions.agentKey,
     "ai.agent.name": traceOptions.agentName,
     "gen_ai.agent.name": traceOptions.agentName,
+    "opencode.provider.id": PROVIDER_ID,
     "opencode.agent": agentName,
     "timeout.ms": timeoutMs,
-  }, traceOptions.parentSpan);
+  }, traceOptions.parentSpan, SpanKind.CLIENT);
 
   const truncatedSystem = systemPrompt.slice(0, 100_000);
   const truncatedUser = userPrompt.slice(0, 150_000);
 
-  TRACE.setSpanAttributes(llmSpan, {
-    "gen_ai.prompt.system.content_length": truncatedSystem.length,
-    "gen_ai.prompt.user.content_length": truncatedUser.length,
-  });
+  TRACE.setSpanAttributes(llmSpan, genAiRequestAttributes(truncatedSystem, truncatedUser));
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -759,26 +754,26 @@ async function callOpencode(agentName, systemPrompt, userPrompt, timeoutMs = AGE
       const text = extractText(data.parts);
       const responseId = data.info?.id || "";
 
-      TRACE.setSpanAttributes(llmSpan, {
-        "gen_ai.output.messages": JSON.stringify([{ role: "assistant", content: text }]),
-        "gen_ai.completion.0.role": "assistant",
-        "gen_ai.completion.0.content": text,
-        "gen_ai.completion.0.content_length": text.length,
-        "gen_ai.response.id": responseId,
-        "gen_ai.response.model": MODEL_ID,
-      });
+      const responseAttributes = genAiResponseAttributes(data, text, MODEL_ID);
+      TRACE.setSpanAttributes(llmSpan, responseAttributes);
       TRACE.endSpan(llmSpan, {
         "gen_ai.response.id": responseId,
-        "gen_ai.response.model": MODEL_ID,
-        "gen_ai.response.text_length": text.length,
+        "gen_ai.response.model": responseAttributes["gen_ai.response.model"],
+        "ai.review.output.chars": text.length,
       });
       return { text, responseId };
     } finally {
       fetch(`${baseUrl}/session/${session.id}`, { method: "DELETE" }).catch(() => {});
     }
   } catch (err) {
-    TRACE.endSpan(llmSpan, {}, err);
-    throw err;
+    const timedOut = controller.signal.aborted && err?.name === "AbortError";
+    const traceError = timedOut
+      ? Object.assign(new Error("Opencode request timed out after " + timeoutMs + "ms", { cause: err }), {
+          name: "TimeoutError",
+        })
+      : err;
+    TRACE.endSpan(llmSpan, { "error.timeout": timedOut, "timeout.ms": timeoutMs }, traceError);
+    throw traceError;
   } finally {
     clearTimeout(timer);
   }
@@ -821,7 +816,8 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
     "ai.agent.key": agentKey,
     "ai.agent.name": agentDef.name,
     "gen_ai.agent.name": agentDef.name,
-    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.provider.name": GEN_AI_PROVIDER_NAME,
+    "opencode.provider.id": PROVIDER_ID,
     "gen_ai.request.model": MODEL_ID,
   }, parentSpan);
 
@@ -1030,7 +1026,8 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
     "ai.agent.key": "coordinator",
     "ai.agent.name": "Coordinator",
     "gen_ai.agent.name": "Coordinator",
-    "gen_ai.system": PROVIDER_ID,
+    "gen_ai.provider.name": GEN_AI_PROVIDER_NAME,
+    "opencode.provider.id": PROVIDER_ID,
     "gen_ai.request.model": MODEL_ID,
     "review.risk_tier": tier,
     "review.findings": agentResults.reduce((sum, r) => sum + r.findings.length, 0),
@@ -1050,7 +1047,12 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
       "review.output_length": completion.text.length,
       "gen_ai.response.id": completion.responseId,
     });
-    return { text: completion.text, genAIResponseId: completion.responseId };
+    return {
+      text: completion.text,
+      genAIResponseId: completion.responseId,
+      fallback: false,
+      error: null,
+    };
   } catch (err) {
     console.error(`[${isoNow()}] Coordinator failed: ${err.message}`);
     const fallback = buildFallbackReview(agentResults, tier, failedAgents);
@@ -1058,7 +1060,12 @@ async function runCoordinator(agentResults, prContext, tier, existingReview, par
       "review.fallback": true,
       "review.output_length": fallback.length,
     }, err);
-    return { text: fallback, genAIResponseId: "" };
+    return {
+      text: fallback,
+      genAIResponseId: "",
+      fallback: true,
+      error: err.message,
+    };
   }
 }
 
@@ -1286,6 +1293,7 @@ async function main() {
       "diff.changed_lines": changedLines,
       "diff.filtered_files": filtered.files.length,
       "diff.skipped_files": rawFiles.length - filtered.files.length,
+      "diff.filtered.sha256": sha256(filtered.diff),
     });
     console.log(`[${isoNow()}] Filtered diff: ${changedLines} changed lines across ${filtered.files.length} files`);
     console.log(`[${isoNow()}] Skipped ${rawFiles.length - filtered.files.length} noise files`);
@@ -1318,6 +1326,7 @@ async function main() {
       "review.agents": selectedAgents,
       "diff.changed_lines": changedLines,
       "diff.filtered_files": filtered.files.length,
+      "diff.filtered.sha256": sha256(filtered.diff),
     });
     console.log(`[${isoNow()}] Risk tier: ${tier} → agents: [${selectedAgents.join(", ")}]`);
 
@@ -1325,7 +1334,7 @@ async function main() {
     let prContext = `PR #${prNumber} in ${process.env.GITHUB_REPOSITORY}`;
     const contextSpan = TRACE.startSpan("github.pr.context", { "github.pr.number": prNumber }, rootSpan);
     try {
-      const prData = ghJson(`pr view "${prNumber}" --json title,body,author,files`);
+      const prData = ghJson(`pr view "${prNumber}" --json title,body,author,files,baseRefOid,headRefOid`);
       prContext = [
         `Repository: ${process.env.GITHUB_REPOSITORY}`,
         `PR: #${prNumber}`,
@@ -1338,6 +1347,12 @@ async function main() {
         "github.pr.author": prData.author?.login || "unknown",
         "github.pr.file_count": prData.files?.length || filtered.files.length,
         "github.pr.body_present": Boolean(prData.body),
+        "github.pr.base.sha": prData.baseRefOid,
+        "github.pr.head.sha": prData.headRefOid,
+      });
+      TRACE.setSpanAttributes(rootSpan, {
+        "github.pr.base.sha": prData.baseRefOid,
+        "github.pr.head.sha": prData.headRefOid,
       });
     } catch (err) {
       TRACE.endSpan(contextSpan, { "github.pr.context_fallback": true }, err);
@@ -1373,11 +1388,26 @@ async function main() {
     const results = agentResults.map(r => r.status === "fulfilled" ? r.value : { agentKey: "unknown", agentName: "unknown", findings: [], error: r.reason?.message || "Unknown error", genAIResponseId: "" });
     const totalFindings = results.reduce((sum, r) => sum + r.findings.length, 0);
     const failedAgents = results.filter(r => r.error);
+    const completedAgents = results.filter(r => !r.error);
+    const failedAgentNames = failedAgents.map(r => r.agentName);
+    const failureReasons = Object.fromEntries(
+      failedAgents.map(r => [r.agentName, r.error]),
+    );
+    const coverageRatio = results.length > 0 ? completedAgents.length / results.length : 0;
+    if (failedAgents.length > 0 && failedAgents.length < results.length) {
+      outcome = "partial_success";
+    }
     const reviewerResponseIds = results.map(r => r.genAIResponseId).filter(Boolean);
     TRACE.setSpanAttributes(rootSpan, {
       "review.total_findings": totalFindings,
       "review.failed_agents": failedAgents.length,
-      "review.completed_agents": results.filter(r => !r.error).map(r => r.agentName),
+      "review.failed_agent_names": failedAgentNames,
+      "review.failure_reasons": failureReasons,
+      "review.completed_agents": completedAgents.map(r => r.agentName),
+      "review.completed_agent_count": completedAgents.length,
+      "review.expected_agent_count": results.length,
+      "review.coverage_ratio": coverageRatio,
+      "review.degraded": failedAgents.length > 0,
     });
     console.log(`[${isoNow()}] All reviewers complete. Total findings: ${totalFindings}, Failures: ${failedAgents.length}`);
 
@@ -1422,6 +1452,14 @@ async function main() {
       const coordinatorResult = await runCoordinator(results, prContext, tier, existingReview, rootSpan);
       finalReview = coordinatorResult.text;
       responseIds = [...reviewerResponseIds, coordinatorResult.genAIResponseId].filter(Boolean);
+      if (coordinatorResult.fallback) {
+        outcome = "partial_success";
+        TRACE.setSpanAttributes(rootSpan, {
+          "review.degraded": true,
+          "review.coordinator_failed": true,
+          "review.coordinator_error": coordinatorResult.error,
+        });
+      }
     }
 
     TRACE.setSpanAttributes(rootSpan, {
@@ -1477,6 +1515,8 @@ async function main() {
   } finally {
     TRACE.endSpan(rootSpan, {
       "workflow.outcome": outcome,
+      "review.outcome": outcome,
+      "review.degraded": outcome === "partial_success",
       "process.exit_code": exitCode,
     }, rootError);
     activeRootSpan = null;
