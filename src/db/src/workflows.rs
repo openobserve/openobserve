@@ -122,17 +122,26 @@ pub async fn get_workflow(
     Ok(workflow)
 }
 
-/// Translates a user-facing folder slug into the folder primary key stored on
-/// `workflows.folder_id`, creating the org's default folder on first use.
+/// Canonical form of a user-facing folder slug.
 ///
-/// An empty or absent slug means the default folder, which is what every
-/// pre-folders client sends.
-pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String, anyhow::Error> {
-    let slug = if folder_slug.trim().is_empty() {
+/// Trimmed, because the trimmed and padded spellings have to name the same
+/// folder: the lookup is by exact name, so returning the untrimmed slug here
+/// sends " default " to the database and reports the org's default folder as
+/// missing. An empty or absent slug means the default folder, which is what
+/// every pre-folders client sends.
+pub fn normalize_folder_slug(folder_slug: &str) -> &str {
+    let slug = folder_slug.trim();
+    if slug.is_empty() {
         DEFAULT_FOLDER
     } else {
-        folder_slug
-    };
+        slug
+    }
+}
+
+/// Translates a user-facing folder slug into the folder primary key stored on
+/// `workflows.folder_id`, creating the org's default folder on first use.
+pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String, anyhow::Error> {
+    let slug = normalize_folder_slug(folder_slug);
 
     if slug == DEFAULT_FOLDER {
         crate::folders::ensure_default_folder(org_id, FolderType::Workflows)
@@ -167,10 +176,12 @@ pub async fn move_workflows(
     workflow_ids: &[String],
     dst_folder_slug: &str,
 ) -> Result<(), anyhow::Error> {
-    if !infra::table::folders::exists(org_id, dst_folder_slug, FolderType::Workflows).await? {
+    // Normalized once so the existence check and the pk lookup cannot disagree.
+    let dst_slug = normalize_folder_slug(dst_folder_slug);
+    if !infra::table::folders::exists(org_id, dst_slug, FolderType::Workflows).await? {
         return Err(anyhow::anyhow!("destination folder not found"));
     }
-    let pk = resolve_folder_pk(org_id, dst_folder_slug).await?;
+    let pk = resolve_folder_pk(org_id, dst_slug).await?;
     infra::table::workflows::move_to_folder(org_id, workflow_ids, &pk).await?;
 
     // The cache keys on workflow id and now holds a stale folder, so drop the
@@ -559,6 +570,22 @@ pub async fn watch() -> Result<(), anyhow::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_padded_slug_names_the_same_folder_as_the_trimmed_one() {
+        // The lookup is by exact name, so an untrimmed slug reports a folder that exists as
+        // missing.
+        assert_eq!(normalize_folder_slug(" default "), DEFAULT_FOLDER);
+        assert_eq!(normalize_folder_slug("  incidents  "), "incidents");
+        assert_eq!(normalize_folder_slug("incidents"), "incidents");
+    }
+
+    #[test]
+    fn a_blank_slug_means_the_default_folder() {
+        for blank in ["", "   ", "\t\n"] {
+            assert_eq!(normalize_folder_slug(blank), DEFAULT_FOLDER);
+        }
+    }
 
     #[test]
     fn unknown_trigger_type_does_not_decode_to_a_real_one() {

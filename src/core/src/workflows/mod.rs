@@ -368,8 +368,7 @@ pub async fn save_workflow(
 /// Public so the handlers authorize the same slug they end up writing to.
 pub fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
     folder_slug
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
+        .map(db::workflows::normalize_folder_slug)
         .unwrap_or(DEFAULT_FOLDER)
 }
 
@@ -1312,7 +1311,7 @@ mod tests {
     async fn a_draft_save_rejects_an_unsupported_node_before_any_db_write() {
         // save_draft/update_draft skip validate_workflow, so they need their own guard
         let workflow = workflow_with_unsupported_node();
-        let err = save_draft(workflow.clone()).await.unwrap_err();
+        let err = save_draft(workflow.clone(), None).await.unwrap_err();
         assert!(err.to_string().contains("unsupported node type"), "{err}");
         let err = update_draft(workflow).await.unwrap_err();
         assert!(err.to_string().contains("unsupported node type"), "{err}");
