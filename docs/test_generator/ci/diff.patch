@@ -1,0 +1,507 @@
+===== COMPLETE LIST OF CHANGED FILES (6 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/pages/logsPages/logsPage.js
+tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js
+web/src/components/dashboards/PanelContainer.spec.ts
+web/src/components/dashboards/PanelContainer.vue
+web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts
+web/src/plugins/logs/SearchBar.vue
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/pages/logsPages/logsPage.js b/tests/ui-testing/pages/logsPages/logsPage.js
+index efba0941724..930719274ee 100644
+--- a/tests/ui-testing/pages/logsPages/logsPage.js
++++ b/tests/ui-testing/pages/logsPages/logsPage.js
+@@ -11451,6 +11451,58 @@ export class LogsPage {
+         return false;
+     }
+ 
++    /**
++     * Open the "Refresh Cache & Run Query" / Live Mode dropdown next to the
++     * Run Query button. Works on both the Logs tab and the Visualize tab —
++     * both render the same trigger data-test (GH #14488 requires their
++     * dropdown to be visibility-consistent).
++     */
++    async openRefreshCacheDropdown() {
++        const trigger = this.page.locator(
++            '[data-test="logs-search-bar-refresh-cache-dropdown-trigger"]'
++        );
++        await trigger.waitFor({ state: 'visible', timeout: 15000 });
++        await trigger.click();
++    }
++
++    /**
++     * Locator for the "Refresh Cache & Run Query" item inside the open dropdown.
++     * @returns {import('@playwright/test').Locator}
++     */
++    getRefreshCacheAndRunQueryMenuItem() {
++        return this.page.getByRole('menuitem', { name: 'Refresh Cache & Run Query' });
++    }
++
++    /**
++     * Locator for the Live Mode toggle item inside the open dropdown (Logs tab only).
++     * @returns {import('@playwright/test').Locator}
++     */
++    getLiveModeMenuItem() {
++        return this.page.locator('[data-test="logs-search-bar-live-mode-toggle-btn"]');
++    }
++
++    /**
++     * Open the dropdown and click "Refresh Cache & Run Query", waiting for the
++     * resulting search request — which must be issued with clear_cache=true,
++     * bypassing the result cache, matching the backend's meta::search::Request
++     * contract (src/config/src/meta/search.rs).
++     * @returns {Promise<URL>} the URL of the matching /_search request
++     */
++    async clickRefreshCacheAndRunQuery() {
++        await this.openRefreshCacheDropdown();
++        const item = this.getRefreshCacheAndRunQueryMenuItem();
++        await item.waitFor({ state: 'visible', timeout: 10000 });
++
++        const [request] = await Promise.all([
++            this.page.waitForRequest(
++                (req) => req.url().includes('/_search') && req.url().includes('clear_cache=true'),
++                { timeout: 30000 }
++            ),
++            item.click(),
++        ]);
++        return new URL(request.url());
++    }
++
+     /**
+      * Get the current page number from the pagination component.
+      * @returns {Promise<string>}
+diff --git a/tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js b/tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js
+new file mode 100644
+index 00000000000..e6f3a2070e8
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js
+@@ -0,0 +1,87 @@
++const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
++const testLogger = require('../utils/test-logger.js');
++const PageManager = require('../../pages/page-manager.js');
++const logData = require('../../fixtures/log.json');
++const { ingestTestData: _ingestData } = require('../utils/data-ingestion.js');
++const { getOrgIdentifier } = require('../utils/cloud-auth.js');
++
++// ============================================================================
++// GH #14488 — "Refresh Cache & Run Query" visibility must be consistent
++// between the Logs tab and the Visualize tab, independent of the
++// auto_query_enabled flag (which only gates Live Mode) and independent of
++// enterprise vs OSS build (the backend supports clear_cache in both —
++// src/config/src/meta/search.rs, src/api/search/src/search/mod.rs).
++//
++// Before the fix, the Logs tab hid the whole dropdown unless
++// auto_query_enabled was true, and hid the menu item unless the build was
++// enterprise; the Visualize tab always showed it. These tests run against
++// whatever build/config this shard actually is, so they can't flip those
++// flags — instead they pin down the two things #14488 actually asked for:
++// (1) the item is visible on the Logs tab in this build, matching Visualize,
++// and (2) clicking it issues a request with clear_cache=true, matching the
++// backend's meta::search::Request contract.
++// ============================================================================
++
++async function ingestTestData(page) {
++  await _ingestData(page);
++}
++
++test.describe('Logs — Refresh Cache & Run Query dropdown (GH #14488)', () => {
++  test.describe.configure({ mode: 'parallel' });
++  let pm;
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    await navigateToBase(page);
++    pm = new PageManager(page);
++    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
++    await ingestTestData(page);
++    await page.waitForLoadState('domcontentloaded');
++    await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`);
++    await pm.logsPage.selectStream('e2e_automate');
++    await pm.logsPage.applyQueryAndWaitForSearchResponse();
++    testLogger.info('Test setup completed');
++  });
++
++  test(
++    'shows Refresh Cache & Run Query on the Logs tab and it bypasses the cache',
++    { tag: ['@logs-refresh-cache', '@all', '@logs', '@P0'] },
++    async ({ page }) => {
++      await pm.logsPage.openRefreshCacheDropdown();
++
++      const item = pm.logsPage.getRefreshCacheAndRunQueryMenuItem();
++      await expect(item, 'Refresh Cache & Run Query must be visible on the Logs tab').toBeVisible();
++      await expect(item).toBeEnabled();
++
++      // Close this menu before driving the click through the helper below,
++      // which reopens it — Reka UI dropdowns close on an outside click.
++      await page.keyboard.press('Escape');
++
++      const requestUrl = await pm.logsPage.clickRefreshCacheAndRunQuery();
++      expect(
++        requestUrl.searchParams.get('clear_cache'),
++        'clicking Refresh Cache & Run Query must bypass the cache (clear_cache=true), matching the backend contract'
++      ).toBe('true');
++    }
++  );
++
++  test(
++    'shows the same Refresh Cache & Run Query item on the Visualize tab as on the Logs tab',
++    { tag: ['@logs-refresh-cache', '@all', '@logs', '@P1'] },
++    async ({ page }) => {
++      // Logs tab first.
++      await pm.logsPage.openRefreshCacheDropdown();
++      await expect(pm.logsPage.getRefreshCacheAndRunQueryMenuItem()).toBeVisible();
++      await page.keyboard.press('Escape');
++
++      // Same dropdown, same item, on the Visualize tab — GH #14488's core ask
++      // is that a user sees the same option regardless of which tab they're on.
++      await pm.logsVisualise.openVisualiseTab();
++      await pm.logsPage.openRefreshCacheDropdown();
++      await expect(
++        pm.logsPage.getRefreshCacheAndRunQueryMenuItem(),
++        'Refresh Cache & Run Query must also be visible on the Visualize tab'
++      ).toBeVisible();
++    }
++  );
++});
+diff --git a/web/src/components/dashboards/PanelContainer.spec.ts b/web/src/components/dashboards/PanelContainer.spec.ts
+index d6e65020e42..146989e1855 100644
+--- a/web/src/components/dashboards/PanelContainer.spec.ts
++++ b/web/src/components/dashboards/PanelContainer.spec.ts
+@@ -194,7 +194,7 @@ describe("PanelContainer", () => {
+     }
+   });
+ 
+-  const createWrapper = (props = {}) => {
++  const createWrapper = (props = {}, extraStubs = {}) => {
+     return mount(PanelContainer, {
+       props: {
+         ...defaultProps,
+@@ -291,6 +291,7 @@ describe("PanelContainer", () => {
+               "viewOnly",
+             ],
+           },
++          ...extraStubs,
+         },
+         mocks: {
+           $t: (key: string) => key,
+@@ -1393,17 +1394,56 @@ describe("PanelContainer", () => {
+   });
+ 
+   describe("Refresh Without Cache", () => {
+-    it("should show refresh without cache option in enterprise mode", () => {
+-      // Mock config
++    // Regression coverage for GH #14488: this item must not be gated behind
++    // enterprise, since the backend supports clear_cache in OSS too.
++    const dropdownStubs = {
++      ODropdown: {
++        name: "ODropdown",
++        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
++      },
++      ODropdownItem: {
++        name: "ODropdownItem",
++        template:
++          '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
++        emits: ["select"],
++      },
++    };
++
++    const originalIsEnterprise = config.isEnterprise;
++
++    afterEach(() => {
++      (config as any).isEnterprise = originalIsEnterprise;
++    });
++
++    it.each([
++      ["OSS build", "false"],
++      ["undefined build flag", undefined],
++      ["enterprise build", "true"],
++    ])(
++      "shows the refresh-without-cache item regardless of build type (%s)",
++      (_label, isEnterprise) => {
++        (config as any).isEnterprise = isEnterprise;
++
++        wrapper = createWrapper({ viewOnly: false }, dropdownStubs);
++
++        const item = wrapper
++          .findAllComponents({ name: "ODropdownItem" })
++          .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
++
++        expect(item).toBeTruthy();
++      },
++    );
++
++    it("hides the refresh-without-cache item in simplified panel view, independent of build type", () => {
+       (config as any).isEnterprise = "true";
+ 
+-      wrapper = createWrapper();
++      wrapper = createWrapper({ viewOnly: false, simplifiedPanelView: true }, dropdownStubs);
+ 
+-      // Check config value instead of DOM
+-      expect(config.isEnterprise).toBe("true");
++      const item = wrapper
++        .findAllComponents({ name: "ODropdownItem" })
++        .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
+ 
+-      // Reset
+-      (config as any).isEnterprise = undefined;
++      expect(item).toBeFalsy();
+     });
+ 
+     it("should handle refresh without cache click", async () => {
+diff --git a/web/src/components/dashboards/PanelContainer.vue b/web/src/components/dashboards/PanelContainer.vue
+index e56bebc5dfe..271ece33959 100644
+--- a/web/src/components/dashboards/PanelContainer.vue
++++ b/web/src/components/dashboards/PanelContainer.vue
+@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             {{ t("panel.goToLogs") }}
+           </ODropdownItem>
+           <ODropdownItem
+-            v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
++            v-if="!simplifiedPanelView"
+             data-test="dashboard-refresh-without-cache"
+             @select="onPanelModifyClick('Refresh')"
+             icon-left="cached"
+@@ -473,7 +473,6 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import { isEqual } from "lodash-es";
+ import { b64EncodeUnicode } from "@/utils/zincutils";
+ import shortURL from "@/services/short_url";
+-import config from "@/aws-exports";
+ import { useI18nTyped } from "@/types/i18n";
+ import { toast } from "@/lib/feedback/Toast/useToast";
+ import { isInputFocused } from "@/utils/keyboardShortcuts";
+@@ -1085,7 +1084,6 @@ export default defineComponent({
+       handleSparklineWarningUpdate,
+       isPartialData,
+       handleIsPartialDataUpdate,
+-      config,
+       t,
+       showLegendsDialog,
+       currentPanelData,
+diff --git a/web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts b/web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts
+new file mode 100644
+index 00000000000..078535780d7
+--- /dev/null
++++ b/web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts
+@@ -0,0 +1,137 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, afterEach, vi } from "vitest";
++import { mount, VueWrapper } from "@vue/test-utils";
++import { nextTick } from "vue";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import config from "@/aws-exports";
++import SearchBar from "@/plugins/logs/SearchBar.vue";
++
++/**
++ * Regression coverage for GH #14488: "Refresh Cache & Run Query" must be
++ * visible on the Logs tab independent of auto_query_enabled (which only
++ * gates Live Mode) and independent of enterprise build, matching the
++ * Visualize tab's existing unconditional visibility.
++ */
++describe("SearchBar — Refresh Cache & Run Query dropdown visibility (#14488)", () => {
++  let wrapper: VueWrapper<any> | undefined;
++  const originalIsEnterprise = config.isEnterprise;
++
++  // Real ODropdown/ODropdownItem render their content through a Reka UI
++  // portal that only mounts while open; stubbing renders the slot content
++  // inline so visibility can be asserted without simulating a click.
++  const dropdownStubs = {
++    ODropdown: {
++      name: "ODropdown",
++      template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
++    },
++    ODropdownItem: {
++      name: "ODropdownItem",
++      template:
++        '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot name="icon-left" /><slot /></div>',
++      emits: ["select"],
++    },
++    ODropdownSeparator: {
++      name: "ODropdownSeparator",
++      template: '<div class="o-dropdown-separator-stub" />',
++    },
++  };
++
++  const mountSearchBar = () =>
++    mount(SearchBar, {
++      global: {
++        provide: { store },
++        plugins: [i18n, router],
++        stubs: { QueryEditor: true, ...dropdownStubs },
++      },
++    });
++
++  const dropdownItemByTestId = (testId: string) =>
++    wrapper
++      ?.findAllComponents({ name: "ODropdownItem" })
++      .find((c) => c.attributes("data-test") === testId);
++
++  const refreshItem = () => dropdownItemByTestId("logs-search-bar-refresh-btn");
++  const liveModeItem = () => dropdownItemByTestId("logs-search-bar-live-mode-toggle-btn");
++
++  afterEach(() => {
++    wrapper?.unmount();
++    wrapper = undefined;
++    (config as any).isEnterprise = originalIsEnterprise;
++    store.state.zoConfig.auto_query_enabled = false;
++    vi.clearAllMocks();
++  });
++
++  it.each([
++    ["auto_query_enabled=false, OSS build", false, "false"],
++    ["auto_query_enabled=false, enterprise build", false, "true"],
++    ["auto_query_enabled=true, OSS build", true, "false"],
++    ["auto_query_enabled=true, enterprise build", true, "true"],
++  ])(
++    "shows the Refresh Cache & Run Query dropdown on the Logs tab (%s)",
++    async (_label, autoQueryEnabled, isEnterprise) => {
++      store.state.zoConfig.auto_query_enabled = autoQueryEnabled;
++      (config as any).isEnterprise = isEnterprise;
++      wrapper = mountSearchBar();
++      wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
++      await nextTick();
++
++      expect(wrapper.findComponent({ name: "ODropdown" }).exists()).toBe(true);
++      expect(refreshItem()).toBeTruthy();
++    },
++  );
++
++  it("hides the Live Mode item when auto_query_enabled is false, even in an enterprise build", async () => {
++    store.state.zoConfig.auto_query_enabled = false;
++    (config as any).isEnterprise = "true";
++    wrapper = mountSearchBar();
++    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
++    await nextTick();
++
++    expect(refreshItem()).toBeTruthy();
++    expect(liveModeItem()).toBeFalsy();
++  });
++
++  it("shows the Live Mode item when auto_query_enabled is true, even in an OSS build", async () => {
++    store.state.zoConfig.auto_query_enabled = true;
++    (config as any).isEnterprise = "false";
++    wrapper = mountSearchBar();
++    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
++    await nextTick();
++
++    expect(refreshItem()).toBeTruthy();
++    expect(liveModeItem()).toBeTruthy();
++  });
++
++  it("shows Refresh Cache & Run Query identically on the Logs tab and the Visualize tab", async () => {
++    store.state.zoConfig.auto_query_enabled = false;
++    (config as any).isEnterprise = "false";
++    wrapper = mountSearchBar();
++
++    wrapper.vm.searchObj.meta.logsVisualizeToggle = "logs";
++    await nextTick();
++    const visibleOnLogsTab = !!refreshItem();
++
++    wrapper.vm.searchObj.meta.logsVisualizeToggle = "visualize";
++    await nextTick();
++    const visibleOnVisualizeTab = !!refreshItem();
++
++    expect(visibleOnLogsTab).toBe(true);
++    expect(visibleOnVisualizeTab).toBe(true);
++  });
++});
+diff --git a/web/src/plugins/logs/SearchBar.vue b/web/src/plugins/logs/SearchBar.vue
+index e4f0067c511..9d7a89408d0 100644
+--- a/web/src/plugins/logs/SearchBar.vue
++++ b/web/src/plugins/logs/SearchBar.vue
+@@ -977,6 +977,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     <OButton
+                       variant="ghost"
+                       size="icon-xs"
++                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                       :class="[
+                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                         config.isEnterprise == 'true' &&
+@@ -1063,6 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     <OButton
+                       variant="ghost"
+                       size="icon-xs"
++                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                       :class="[
+                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
+                         config.isEnterprise == 'true' &&
+@@ -1146,9 +1148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
+                     ? 'o2-ai-generate-button'
+                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
+-                  store.state.zoConfig.auto_query_enabled
+-                    ? 'rounded-s-default! rounded-e-none!'
+-                    : 'rounded-default',
++                  'rounded-s-default! rounded-e-none!',
+                 ]"
+                 @click="
+                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
+@@ -1190,17 +1190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                     : t("search.runQuery")
+                 }}
+               </OButton>
+-              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
+-              <OSeparator
+-                v-if="store.state.zoConfig.auto_query_enabled"
+-                class="h-[1.875rem]! w-px"
+-                vertical
+-              />
+-              <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
++              <OSeparator class="h-[1.875rem]! w-px" vertical />
++              <ODropdown align="end" side="bottom">
+                 <template #trigger>
+                   <OButton
+                     variant="ghost"
+                     size="icon-xs"
++                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
+                     :class="[
+                       (searchObj.meta.logsVisualizeToggle === 'patterns' &&
+                         patternsState.loading) ||
+@@ -1213,9 +1209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
+                           : '',
+-                      store.state.zoConfig.auto_query_enabled
+-                        ? 'rounded-e-default! rounded-s-none!'
+-                        : 'rounded-default',
++                      'rounded-e-default! rounded-s-none!',
+                     ]"
+                   >
+                     <OIcon name="arrow-drop-down" size="sm" />
+@@ -1223,10 +1217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 </template>
+                 <!-- Normal mode: Refresh + Live Mode items -->
+                 <ODropdownItem
+-                  v-if="
+-                    config.isEnterprise == 'true' &&
+-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+-                  "
++                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
+                   data-test="logs-search-bar-refresh-btn"
+                   data-cy="search-bar-refresh-button"
+                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
+@@ -1237,7 +1228,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                 </ODropdownItem>
+                 <ODropdownSeparator
+                   v-if="
+-                    config.isEnterprise == 'true' &&
+                     store.state.zoConfig.auto_query_enabled &&
+                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
+                   "

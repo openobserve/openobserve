@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js",
+    "web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts",
+    "web/src/components/dashboards/PanelContainer.spec.ts"
+  ],
+  "needs_registration": true,
+  "rationale": "The dev's diff already introduced a brand-new E2E spec (logsRefreshCacheDropdown.spec.js) that covers the two headline WIRED behaviors — (1) the Refresh Cache & Run Query item is visible/enabled on the Logs tab and clicking it issues a /_search request with clear_cache=true, and (2) the same item is visible on the Visualize tab (GH #14488 parity). The spec is a NEW file and is NOT registered: Logs-Core's run_files in tests/ui-testing/ci-matrix/ci_matrix.json does not list it, so it would never run. Action is 'new' (not 'none'/'append') because the dominant remaining work is registration + verification, not adding scenarios: Live Mode gating is unit-covered by SearchBar.refreshCacheDropdown.spec.ts and depends on a per-shard zoConfig.auto_query_enabled flag the E2E shard cannot flip; the Visualize clear_cache path runs through usePanelSQLExecutor (a different endpoint than the intercepted /_search) and is not in Workflow 2's success criteria; and the dashboard 'Refresh Cache & Reload' analogue is a separate area (Dashboards) already unit-covered by PanelContainer.spec.ts. The Engineer must register the spec in the Logs-Core group and verify the two existing tests, not rewrite them."
+}

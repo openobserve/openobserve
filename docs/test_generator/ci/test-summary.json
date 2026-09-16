@@ -1,0 +1,12 @@
+[
+  {
+    "title": "shows Refresh Cache & Run Query on the Logs tab and it bypasses the cache",
+    "action": "new",
+    "verifies": "the Refresh Cache & Run Query item is visible and enabled on the Logs tab, and selecting it issues a /_search request with clear_cache=true"
+  },
+  {
+    "title": "shows the same Refresh Cache & Run Query item on the Visualize tab as on the Logs tab",
+    "action": "new",
+    "verifies": "the same Refresh Cache & Run Query item is visible on the Visualize tab as on the Logs tab (GH #14488 parity)"
+  }
+]

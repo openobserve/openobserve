@@ -1,0 +1,6 @@
+tests/ui-testing/pages/logsPages/logsPage.js
+tests/ui-testing/playwright-tests/Logs/logsRefreshCacheDropdown.spec.js
+web/src/components/dashboards/PanelContainer.spec.ts
+web/src/components/dashboards/PanelContainer.vue
+web/src/plugins/logs/SearchBar.refreshCacheDropdown.spec.ts
+web/src/plugins/logs/SearchBar.vue
