@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Görünüm favorilere eklendi.",
       "viewRemovedFavorites": "Görünüm favorilerden kaldırıldı.",
       "selectStreamBeforeSchedule": "Bir iş zamanlamadan önce lütfen bir akış seçin",
+      "streamNotFoundInQuery": "\"{stream}\" akışı mevcut değil",
       "confirmUpdateFunction": "İşlevi güncellemek istediğinize emin misiniz?",
       "confirmUpdateSavedViewMsg": "Kaydedilmiş görünümü güncellemek istediğinize emin misiniz?"
     },

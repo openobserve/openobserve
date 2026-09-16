@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "عرض أضيف إلى المفضلات.",
       "viewRemovedFavorites": "تم إزالة العرض من المفضلات.",
       "selectStreamBeforeSchedule": "يرجى اختيار بث قبل تحديد موعد للوظيفة",
+      "streamNotFoundInQuery": "الجدول \"{stream}\" غير موجود",
       "confirmUpdateFunction": "هل أنت متأكد أنك تريد تحديث الوظيفة؟",
       "confirmUpdateSavedViewMsg": "هل أنت متأكد من رغبتك في تحديث العرض المحفوظ؟"
     },

@@ -13319,6 +13319,7 @@
       "viewAddedFavorites": "Vista agregada a favoritos.",
       "viewRemovedFavorites": "Vista eliminada de favoritos.",
       "selectStreamBeforeSchedule": "Seleccione un stream antes de programar un trabajo",
+      "streamNotFoundInQuery": "El stream \"{stream}\" no existe",
       "confirmUpdateFunction": "¿Está seguro de que desea actualizar la función?",
       "confirmUpdateSavedViewMsg": "¿Está seguro de que desea actualizar la vista guardada?"
     },
