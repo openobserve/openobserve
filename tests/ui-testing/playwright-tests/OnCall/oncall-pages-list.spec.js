@@ -57,6 +57,7 @@ const {
   uniqueName,
   deleteOnCallFixturesByPrefix,
 } = require('../utils/oncall-seed.js');
+const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_pages';
 
@@ -144,9 +145,13 @@ test.describe('On-call pages list', {
    * rotation, which `setTeamPolicy` then overwrites deliberately.
    */
   async function seedPageableTeam(page, testInfo, { exhausting = false } = {}) {
-    const users = await listOrgUsers(page);
-    expect(users.length, 'the org must have at least one user').toBeGreaterThan(0);
-    const memberEmail = users[0].email;
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'pl'),
+    });
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
 

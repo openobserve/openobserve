@@ -433,6 +433,13 @@ test.describe('On-call response verbs', {
     const viewerEmail = oncallUserEmail(uniqueName(`${workerPrefix(testInfo)}_v`), 'viewer');
     const viewer = await createOrgUser(page, { email: viewerEmail, role: 'viewer' });
 
+    // MEMBERSHIP, not role, is what the server checks. Working a page as a
+    // non-member is refused for everybody — "being on the team is what carries
+    // the pager" — so a viewer who was never added would be refused for a reason
+    // this case is not about. The point here is that the viewer ROLE takes
+    // nothing away once they are on the team.
+    await addTeamMembers(page, f.team.id, [viewer.email]);
+
     const session = await loginAs(browser, { email: viewer.email, password: viewer.password });
     try {
       const viewerPm = new PageManager(session.page);

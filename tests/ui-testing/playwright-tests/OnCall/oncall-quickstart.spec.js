@@ -47,6 +47,7 @@ const {
   uniqueName,
   deleteOnCallFixturesByPrefix,
 } = require('../utils/oncall-seed.js');
+const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_quickstart';
 
@@ -113,14 +114,20 @@ test.describe('On-call Quick start', {
    * takes the other limb of the server's own advice and edits the policy first.
    */
   async function seedEmptyScheduleTeam(page, testInfo) {
-    const users = await listOrgUsers(page);
-    expect(users.length, 'the org must have at least one user').toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'qs'),
+    });
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
-    await addTeamMembers(page, team.id, [users[0].email]);
+    await addTeamMembers(page, team.id, [memberEmail]);
     await detachPolicyFromRotations(page, team.id);
     await setTeamSchedule(page, team.id, { rotations: [] });
-    return { team, members: users };
+    // ADDRESSES, not user objects — callers pass these straight to the pickers.
+    return { team, members: [memberEmail] };
   }
 
   async function openQuickStartOn(teamId) {
@@ -245,7 +252,7 @@ test.describe('On-call Quick start', {
     await pm.oncallTeamDetailPage.fillQuickStartRegionName('groups-1', 'EMEA');
     // The member picker offers the TEAM's roster, and the team was staffed with
     // the first org user, so that is the one address certain to be on offer.
-    await pm.oncallTeamDetailPage.setQuickStartRegionMembers('groups-1', [members[0].email]);
+    await pm.oncallTeamDetailPage.setQuickStartRegionMembers('groups-1', [members[0]]);
 
     const outcome = await pm.oncallTeamDetailPage.attemptQuickStartSave();
     testLogger.info('§11.2 named-but-unstaffed outcome', outcome);
@@ -266,12 +273,15 @@ test.describe('On-call Quick start', {
   test('Save on a team that already has rotations asks before replacing them', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length).toBeGreaterThan(0);
+    // Seed our OWN member — listOrgUsers()[0] may belong to another worker and be
+    // swept mid-test.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'qs'),
+    });
     // No schedule write: the auto-staffed default rotation is enough to make
     // this a replacement.
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
-    await addTeamMembers(page, team.id, [users[0].email]);
+    await addTeamMembers(page, team.id, [memberEmail]);
 
     const stored = await getTeamSchedule(page, team.id);
     test.skip(

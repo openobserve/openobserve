@@ -164,7 +164,26 @@ async function loginAs(browser, { email, password = SEED_USER_PASSWORD }) {
   await page.locator('[data-test="login-user-id-field"]').fill(email);
   await page.locator('[data-test="login-password-field"]').fill(password);
   await page.locator('[data-test="login-sign-in"]').click();
-  await page.waitForURL(/\/web\//, { timeout: 60000 }).catch(() => {});
+
+  // Landing on a /web/ URL is NOT proof of a sign-in — the sign-in screen is
+  // itself under /web/, so a refused login matches too. Wait for the credential
+  // field to go away, and let the failure throw: swallowing it hands back an
+  // unauthenticated page whose every later assertion fails as "element not
+  // found", miles from the real cause.
+  try {
+    await page.locator('[data-test="login-user-id-field"]')
+      .waitFor({ state: 'detached', timeout: 60000 });
+  } catch {
+    const shown = await page.locator('[data-test="login-error-message"]').first()
+      .textContent().catch(() => null);
+    throw new Error(
+      `signing in as ${email} did not complete: the credential field is still on screen`
+      + (shown ? ` — the app said "${shown.trim()}"` : ''),
+    );
+  }
+  // The SPA picks its org after the redirect. Returning before that lets a
+  // caller's goto() race the bootstrap and get bounced to Home.
+  await page.waitForLoadState('networkidle').catch(() => {});
   testLogger.info('Signed in as a secondary identity', { email });
   return { context, page };
 }

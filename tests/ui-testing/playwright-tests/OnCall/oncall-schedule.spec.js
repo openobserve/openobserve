@@ -44,6 +44,7 @@ const {
   uniqueName,
   deleteOnCallFixturesByPrefix,
 } = require('../utils/oncall-seed.js');
+const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_sched';
 
@@ -140,11 +141,16 @@ test.describe('On-call schedules and rotations', {
   test('the schedule tab draws a lane for each seeded rotation', {
     tag: ['@P0', '@smoke'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length, 'the org must have at least one user to staff a rotation').toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'sch'),
+    });
 
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
-      memberEmail: users[0].email,
+      memberEmail,
     });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
@@ -169,10 +175,15 @@ test.describe('On-call schedules and rotations', {
   test('§8.1 the rotation editor renders an all-day window as 00:00 / 24:00', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length).toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'sch'),
+    });
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
-      memberEmail: users[0].email,
+      memberEmail,
     });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
@@ -200,10 +211,15 @@ test.describe('On-call schedules and rotations', {
   test('§8.1 the timeline lane for an all-day rotation never reads 00:00 / 00:00', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length).toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'sch'),
+    });
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
-      memberEmail: users[0].email,
+      memberEmail,
     });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
@@ -224,10 +240,15 @@ test.describe('On-call schedules and rotations', {
   test('the rotation editor opens on the stored rotation name', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length).toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'sch'),
+    });
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
-      memberEmail: users[0].email,
+      memberEmail,
     });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
@@ -248,10 +269,15 @@ test.describe('On-call schedules and rotations', {
   test('§8.6 a shift rule with nobody in it is called out in the editor', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    expect(users.length).toBeGreaterThan(0);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'sch'),
+    });
     const { team, rotationId } = await seedAllDayTeam(page, testInfo, {
-      memberEmail: users[0].email,
+      memberEmail,
     });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'schedule');
@@ -287,8 +313,14 @@ test.describe('On-call schedules and rotations', {
   test('§11.5 timeline bars carry display names, not raw email addresses', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
-    const users = await listOrgUsers(page);
-    const named = users.find((u) => displayNameOf(u) && u.email);
+    // Seed our OWN member. The org is shared across workers and every suite now
+    // sweeps the accounts it creates, so listOrgUsers()[0] can be another worker's
+    // fixture, deleted mid-test — a 400 on add-members naming an address this spec
+    // never chose.
+    const seed = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'named'),
+    });
+    const named = (await listOrgUsers(page)).find((u) => u.email === seed.email);
     test.skip(
       !named,
       'no account in this org has a first or last name — the timeline correctly falls back to the address, so §11.5 has nothing to assert here',

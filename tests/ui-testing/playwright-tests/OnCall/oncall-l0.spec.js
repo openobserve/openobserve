@@ -59,6 +59,7 @@ const {
   uniqueName,
   deleteOnCallFixturesByPrefix,
 } = require('../utils/oncall-seed.js');
+const { createOrgUser, oncallUserEmail } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_l0';
 
@@ -150,9 +151,14 @@ test.describe('On-call L0 / AI SRE', {
    * below are the only ones those two accept.
    */
   async function seedTeamWithL0(page, testInfo, { p2Mode = 'gate', rungs = [1, 2, 3, 4] } = {}) {
-    const users = await listOrgUsers(page);
-    expect(users.length, 'the org must have at least one user').toBeGreaterThan(0);
-    const memberEmail = users[0].email;
+    // Seed our OWN member rather than borrowing listOrgUsers()[0]. The org is
+    // shared across workers and every suite now sweeps the accounts it creates,
+    // so the first user in the list can be another worker's fixture that is
+    // deleted mid-test — which surfaces as a 400 on add-members, naming an
+    // address this spec never chose.
+    const { email: memberEmail } = await createOrgUser(page, {
+      email: oncallUserEmail(uniqueName(workerPrefix(testInfo)), 'l0'),
+    });
 
     const team = await createTeam(page, { name: uniqueName(workerPrefix(testInfo)) });
 
