@@ -1,3 +1,0 @@
-web/src/components/ingestion/Custom.vue
-web/src/views/HomeNoDataState.vue
-web/src/views/LogStream.vue
