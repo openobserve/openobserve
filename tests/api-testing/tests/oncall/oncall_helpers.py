@@ -35,6 +35,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -164,6 +166,48 @@ def shift_rule(name: str, members: list[str], *, priority: int = 0,
     }
     return rule
 
+
+
+MAILPIT_BASE = os.environ.get("MAILPIT_BASE_URL", "http://127.0.0.1:8025")
+
+
+def mailpit_available() -> bool:
+    """Whether a readable mailbox is reachable. The ack token exists ONLY inside a
+    page email, so without one the acknowledge invariants cannot be exercised."""
+    try:
+        return requests.get(f"{MAILPIT_BASE}/api/v1/info", timeout=5).status_code == 200
+    except requests.RequestException:
+        return False
+
+
+def ack_link_for(recipient_marker: str, *, timeout_s: int = 180) -> str | None:
+    """The acknowledge URL out of the newest page email addressed to a recipient.
+
+    A TEST page deliberately carries no token — its subject is prefixed `[TEST]`
+    and it says "no action needed" — so only a real firing produces one.
+    """
+    pattern = re.compile(r"""https?://[^\s"'<>]*oncall/ack\?[^\s"'<>]+""")
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        try:
+            listing = requests.get(
+                f"{MAILPIT_BASE}/api/v1/messages", params={"limit": 50}, timeout=20,
+            ).json()
+        except requests.RequestException:
+            time.sleep(3)
+            continue
+        for msg in listing.get("messages", []):
+            to = " ".join(a.get("Address", "") for a in (msg.get("To") or []))
+            if recipient_marker not in to:
+                continue
+            body = requests.get(
+                f"{MAILPIT_BASE}/api/v1/message/{msg['ID']}", timeout=20,
+            ).json()
+            found = pattern.search((body.get("Text") or "") + (body.get("HTML") or ""))
+            if found:
+                return found.group(0)
+        time.sleep(4)
+    return None
 
 def rotation(rotation_id: str, name: str, rules: list[dict[str, Any]]) -> dict[str, Any]:
     """A named rotation. `id` is required on write: an escalation level stores

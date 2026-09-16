@@ -424,7 +424,7 @@ test.describe('On-call response verbs', {
    * the book's contract so it flips green if the grants land, and the question
    * is written down in the generation report rather than answered here.
    */
-  test.fixme('a viewer can work a page end to end, with no verb hidden or disabled — not wired: role viewer gets 403 on GET /oncall/responses and /oncall/teams, verified 15 Sep on :5090', {
+  test('a viewer can work a page end to end, with no verb hidden or disabled', {
     tag: ['@P0'],
   }, async ({ browser, page }, testInfo) => {
     const f = await seedOpenPage(page, testInfo, 'viewer', { delaysSeconds: [0, 600] });

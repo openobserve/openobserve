@@ -302,13 +302,23 @@ test.describe('On-call L0 / AI SRE', {
   });
 
   /**
-   * §9.1b — the verdict half, which needs a page the seeding layer cannot open.
+   * §9.1b — the verdict half, which this deployment cannot answer.
    *
-   * The agent only joins a page whose subject is an INCIDENT. `creates_incident`
-   * lives on the composite-alert entity, so producing one needs a composite seed
-   * this suite does not have — not a missing assertion. Measuring "parallel still
-   * attaches a verdict" on an alert-backed page is how that gets read as a product
-   * bug when it is the documented split (o2-enterprise#2481, open P1).
+   * The agent only joins a page whose subject is an INCIDENT. Two things have to
+   * be true and neither is here: `/config` reports `incidents_enabled: false`, so
+   * no incident-backed page can open at all, and `ai_enabled: false` with no model
+   * provider configured, so nothing would attach a verdict even if one did.
+   *
+   * `creates_incident` is NOT the obstacle — it is a field on the ordinary alert
+   * (`entity/alerts.rs`), and a plain alert accepts and stores it. An earlier note
+   * here blamed the composite-alert entity; that was wrong, and it made the gap
+   * look structural when it is only configuration.
+   *
+   * To un-park: run against a deployment with `O2_INCIDENTS_ENABLED=true`,
+   * `O2_AI_ENABLED=true` and a real model provider, seed the alert with
+   * `createsIncident: true`, and assert the verdict as below. Measuring this on an
+   * alert-backed page instead is how the documented split gets misread as a
+   * product bug (o2-enterprise#2481, open P1).
    */
   test.fixme('§9.1b a parallel agent attaches its verdict on an incident-backed page', {
     tag: ['@P1', '@oncall-l0'],

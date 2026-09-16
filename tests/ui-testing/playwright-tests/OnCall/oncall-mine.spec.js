@@ -58,6 +58,7 @@ const {
 } = require('../utils/oncall-seed.js');
 const {
   createOrgUsers,
+  loginAs,
   myDeliveries,
   markDeliveriesRead,
   getPriorCauses,
@@ -249,7 +250,8 @@ test.describe('On-call — my duty, my inbox, my history', {
     await createOwnershipRule(page, { teamId: team.id, dimensions: { service } });
     const destination = await seedNotificationDestination(page, stream);
     await firePageAndWait(page, {
-      alertOptions: { name: `${prefix}_alert`, stream, destinations: [destination] },
+      // P1: the parallel rung. A lower priority walks the ladder one slot at a time.
+      alertOptions: { name: `${prefix}_alert`, stream, destinations: [destination], priority: 1 },
     });
 
     // The inbox is keyed on the caller server-side, so the row arrives without
@@ -310,17 +312,100 @@ test.describe('On-call — my duty, my inbox, my history', {
    * `/oncall/teams` and even `/streams`; role tuples are not being written, so
    * it is the environment, not the product. Verified 16 Sep on :5090.
    */
-  test.fixme('TS-19.03b one responder\'s read markers are invisible to another — not wired: every non-root identity, admin included, gets 403 on /oncall/my/deliveries and on /streams, so no second actor can be driven here, verified 16 Sep on :5090', {
+  /**
+   * TS-19.03b — read markers are per person, and that is the whole point of the
+   * inbox: it answers "what have I not looked at", not "what has anyone looked at".
+   *
+   * PARKED on a seeding gap, not on a missing assertion. What is written below is
+   * correct and runs; what is missing is a way to get one page into two inboxes.
+   *
+   * Measured on :5090 rather than assumed:
+   *   - a rotation is a SEQUENCE, so two members on one rotation yields ONE page
+   *   - adding members to a rotationless team leaves NOBODY on call: the mail that
+   *     goes out is "<team> has nobody on call", not a page, so no delivery row is
+   *     written for anyone. A staffed rotation is required before any of this works
+   *   - with a staffed rotation the inbox is fine — one member, one delivery row
+   *
+   * So the gap is purely the two-recipient seed: a page has to reach two people at
+   * once, and neither one rotation with two members nor an auto-staffed team does
+   * that. Two staffed rotations on one parallel rung is the shape to try next.
+   *
+   * Asserting isolation with ONE actor proves nothing — marking a row read and
+   * reading it back as the same person is true by construction, which is what the
+   * original stub here did.
+   */
+  test.fixme('TS-19.03b one responder\'s read markers are invisible to another — not wired: no seeding shape found that puts ONE page in TWO inboxes, see the note above', {
     tag: ['@P1'],
-  }, async ({ page }) => {
-    const inbox = await myDeliveries(page, { limit: 5 });
-    const eventId = (inbox.deliveries ?? [])[0]?.event_id;
-    await markDeliveriesRead(page, { eventIds: [eventId], read: true });
+  }, async ({ page, browser }, testInfo) => {
+    const prefix = uniqueName(`${workerPrefix(testInfo)}_iso`);
+    // createOrgUsers returns ADDRESSES, not user objects.
+    const [mine, theirs] = await createOrgUsers(page, prefix, 2);
 
-    // Would run as the OTHER person and assert their inbox still shows it unread.
-    const theirs = await myDeliveries(page, { limit: 50 });
-    expect((theirs.deliveries ?? []).find((r) => r.event_id === eventId)?.read,
-      'a colleague reading a page must not mark it read for me').toBeFalsy();
+    // No schedule is written on purpose. A rotation is a SEQUENCE — only one of
+    // its members is on call at a time — so two people on one rotation produces
+    // one page, not two. Adding members to a rotationless team auto-staffs the
+    // primary and secondary slots and builds a P1 rung that pages both in
+    // parallel, which is the only default shape that reaches two inboxes at once.
+    const team = await createTeam(page, { name: `${prefix}_team` });
+    await addTeamMembers(page, team.id, [mine, theirs]);
+
+    const service = `${prefix}_svc`;
+    const stream = prefix.toLowerCase();
+    const seeded = await seedOnCallStream(page, stream, { minutes: 30, services: [service] });
+    await waitForStreamSearchable(page, stream, seeded.records);
+    await createOwnershipRule(page, { teamId: team.id, dimensions: { service } });
+    const destination = await seedNotificationDestination(page, stream);
+    await firePageAndWait(page, {
+      alertOptions: { name: `${prefix}_alert`, stream, destinations: [destination] },
+    });
+
+    const first = await loginAs(browser, { email: mine });
+    const second = await loginAs(browser, { email: theirs });
+    try {
+      const rowFor = async (session) => {
+        let found;
+        await expect.poll(async () => {
+          const box = await myDeliveries(session.page, { limit: 200 });
+          found = (box?.deliveries ?? []).find((d) => String(d.title ?? '').includes(prefix));
+          return Boolean(found);
+        }, {
+          timeout: 120000,
+          intervals: [3000],
+          message: 'both responders on the rotation must receive the page',
+        }).toBe(true);
+        return found;
+      };
+
+      const ourRow = await rowFor(first);
+      const theirRow = await rowFor(second);
+      testLogger.info('TS-19.03b both inboxes hold the page', {
+        ours: ourRow.event_id, theirs: theirRow.event_id,
+      });
+
+      // One person reads it. Their own marker is the only thing that may move.
+      expect((await markDeliveriesRead(first.page, {
+        eventIds: [ourRow.event_id], read: true,
+      })).status).toBe(200);
+
+      await expect.poll(async () => {
+        const box = await myDeliveries(first.page, { limit: 200 });
+        return (box?.deliveries ?? []).find((d) => d.event_id === ourRow.event_id)?.read;
+      }, {
+        timeout: 30000, intervals: [1000],
+        message: 'the reader\'s own marker must actually move',
+      }).toBeTruthy();
+
+      const theirBox = await myDeliveries(second.page, { limit: 200 });
+      const stillTheirs = (theirBox.deliveries ?? []).find((d) => d.event_id === theirRow.event_id);
+      testLogger.info('TS-19.03b the other inbox after the read', { read: stillTheirs?.read });
+      expect(
+        stillTheirs?.read,
+        'a colleague reading a page must not mark it read for me',
+      ).toBeFalsy();
+    } finally {
+      await first.context.close().catch(() => {});
+      await second.context.close().catch(() => {});
+    }
   });
 
   /**

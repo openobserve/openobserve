@@ -61,10 +61,21 @@ reads; status codes, headers and the record's resulting state are the contract.
 import base64
 import json
 import os
+import urllib.parse
 import uuid
 
 import pytest
 import requests
+
+from tests.oncall.oncall_helpers import (
+    MAILPIT_BASE,
+    ack_link_for,
+    mailpit_available,
+    make_user,
+    rotation,
+    shift_rule,
+    uniq,
+)
 
 TOKEN_MINT_UNAVAILABLE = (
     "no acknowledgement token is obtainable: it is minted inside "
@@ -126,14 +137,39 @@ def foreign_org():
 
 
 @pytest.fixture
-def minted_ack_token():
-    """A real token, the response it acks, and its subject — not obtainable.
+def minted_ack_token(oncall):
+    """A real token, the response it acks, and its subject.
 
-    Would have to yield (token, response_id, subject_email) for a page that is
-    open and whose subject IS on the paged team. See TOKEN_MINT_UNAVAILABLE for
-    everything that was checked.
+    The token is minted server-side and leaves only inside the page email, so it
+    is read back out of a mailbox. A TEST page will not do — those are sent with
+    `[TEST]` in the subject and carry no token by design — so this fires a real
+    alert against a STAFFED rotation. An unstaffed team sends "<team> has nobody
+    on call" instead of a page, which is the trap that looks like a missing token.
     """
-    pytest.skip(TOKEN_MINT_UNAVAILABLE)
+    if not mailpit_available():
+        pytest.skip(
+            f"no readable mailbox at {MAILPIT_BASE}; the ack token exists only "
+            "inside a page email. Run Mailpit and point the server's SMTP at it."
+        )
+
+    email, _ = make_user(oncall._c, oncall.org, "admin")
+    marker = email.split("@")[0]
+
+    team_id = oncall.team_id(uniq("oncall_ack_team"))
+    oncall.set_schedule(team_id, [rotation("R1", "Primary", [shift_rule("L1", [email])])])
+    oncall.add_member(team_id, email)
+
+    page = oncall.open_pages_for([team_id], priority=2)[0]
+    link = ack_link_for(marker)
+    if not link:
+        pytest.skip(
+            "a page opened but no acknowledge link reached the mailbox within the "
+            "wait; check the server's SMTP settings and ZO_WEB_URL"
+        )
+
+    token = urllib.parse.parse_qs(urllib.parse.urlparse(link).query).get("token", [None])[0]
+    assert token, f"ack link carried no token: {link}"
+    yield token, page["id"], email
 
 
 # =============================================================================
@@ -438,7 +474,6 @@ def test_the_acting_verb_needs_a_form_body(base_url, org_id):
     assert_did_not_act(resp)
 
 
-@pytest.mark.skip(reason=TOKEN_MINT_UNAVAILABLE)
 def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url, org_id,
                                                        minted_ack_token):
     """12.7 in full: the confirm page renders and the record is untouched."""
@@ -464,7 +499,6 @@ def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url,
 # 12.3, 12.4, 12.6 — blocked on a token that cannot be obtained
 # =============================================================================
 
-@pytest.mark.skip(reason=TOKEN_MINT_UNAVAILABLE)
 def test_a_valid_token_acknowledges_and_redirects_with_the_org(create_session, base_url,
                                                                org_id, minted_ack_token):
     """12.3, and the `org_identifier` invariant with it.
@@ -484,15 +518,16 @@ def test_a_valid_token_acknowledges_and_redirects_with_the_org(create_session, b
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
-    body = record.json()
-    assert body.get("status") == "acknowledged"
+    # The detail route answers {events, response}; the record itself is nested,
+    # and its field is `state` — there is no top-level `status`.
+    body = record.json()["response"]
+    assert body.get("state") == "acknowledged", body
     assert (body.get("acked_by") or "").lower() == subject.lower(), (
         "the acknowledgement must be attributed to the token's subject, not to "
         "whoever happened to open the link"
     )
 
 
-@pytest.mark.skip(reason=TOKEN_MINT_UNAVAILABLE)
 def test_a_replayed_token_redirects_again_and_records_nothing(create_session, base_url,
                                                               org_id, minted_ack_token):
     """12.4, and invariants 1 and 2 together.
@@ -525,7 +560,16 @@ def test_a_replayed_token_redirects_again_and_records_nothing(create_session, ba
     )
 
 
-@pytest.mark.skip(reason=TOKEN_MINT_UNAVAILABLE)
+@pytest.mark.xfail(
+    reason=(
+        "PRODUCT DEFECT, not a test gap: the emailed link still acknowledges after "
+        "its subject is removed from the team. Measured on :5090 — remove the member "
+        "(200, membership empty), POST the link, 303 and the record reads acknowledged, "
+        "attributed to the removed person. The signed-in path refuses the same action "
+        "with NotOnThisTeam. o2-enterprise#2481."
+    ),
+    strict=True,
+)
 def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url, org_id,
                                                         minted_ack_token):
     """12.6, and invariant 3: claims resolve through `service::ack_claims`, so
@@ -539,7 +583,7 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
-    team_id = record.json()["team_id"]
+    team_id = record.json()["response"]["team_id"]
 
     removed = create_session.delete(
         f"{base_url}api/{org_id}/oncall/teams/{team_id}/members",
@@ -552,4 +596,4 @@ def test_a_token_whose_subject_left_the_team_is_refused(create_session, base_url
 
     after = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert after.status_code == 200, after.text
-    assert after.json().get("status") != "acknowledged"
+    assert after.json()["response"].get("state") != "acknowledged"
