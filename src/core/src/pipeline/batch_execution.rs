@@ -4105,6 +4105,7 @@ mod tests {
         Workflow {
             id: "wf-1".to_string(),
             org_id: "org-1".to_string(),
+            folder_id: "folder-1".to_string(),
             created_at: 0,
             updated_at: 0,
             created_by: "tester".to_string(),

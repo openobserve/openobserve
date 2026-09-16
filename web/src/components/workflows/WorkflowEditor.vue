@@ -48,7 +48,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            sideways on every keystroke. -->
       <template #subtitle>
         <span class="flex min-w-0 items-center gap-1 leading-normal">
-          <span class="whitespace-nowrap">{{ headerModeLabel }}</span>
+          <span class="whitespace-nowrap">
+            {{ t("workflow.modeInFolder", { mode: headerModeLabel }) }}
+          </span>
+          <InlineSelectFolderDropdown
+            v-if="!workflowObj.isEditWorkflow"
+            variant="inline"
+            :model-value="activeFolderId"
+            type="workflows"
+            data-test="workflow-editor-folder"
+            @update:model-value="activeFolderId = $event"
+          />
+          <span v-else class="text-text-body min-w-0 truncate font-medium">
+            {{ activeFolderName }}
+          </span>
           <OInlineEdit
             v-if="!workflowObj.isEditWorkflow"
             v-model="workflowObj.currentSelectedWorkflow.description"
@@ -310,6 +323,7 @@ import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import InlineSelectFolderDropdown from "@/components/common/sidebar/InlineSelectFolderDropdown.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
@@ -339,6 +353,19 @@ const emit = defineEmits<{ (e: "saved"): void }>();
 const { t } = useI18nTyped();
 const router = useRouter();
 const store = useStore();
+
+// The destination folder, seeded from the URL the list pushed. On create it is
+// user-editable (the header picker) and is sent with the create/publish call; on
+// edit it is the workflow's own folder and only steers the trip back to the list,
+// which would otherwise land on `default` whatever folder was being browsed.
+const activeFolderId = ref<string>((router.currentRoute.value.query.folder as string) || "default");
+
+const activeFolderName = computed(() => {
+  const folders = store.state.organizationData.foldersByType?.workflows ?? [];
+  return (
+    folders.find((f: any) => f.folderId === activeFolderId.value)?.name ?? activeFolderId.value
+  );
+});
 
 // The name itself is the title now (see #title), so the header's meta line
 // carries the mode — the same shape as the panel, alert and pipeline editors.
@@ -484,9 +511,12 @@ const startNewWorkflow = () => {
 // Deep-link / refresh fallback: no GET /workflows/{id} yet (backend B5), so
 // load via the list and find by id, then hydrate. The normal "Edit from list"
 // path hydrates synchronously from the row, so this only runs on a cold load.
+// Listed across every folder, not just the one in the URL: a bookmarked editor
+// link may carry no folder at all, and a workflow the list cannot see reads to
+// the user as one that no longer exists.
 const loadWorkflow = async (id: string) => {
   try {
-    const res = await workflowService.listWorkflows(orgId());
+    const res = await workflowService.listWorkflows(orgId(), undefined, true);
     const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
     const wf = list.find((w: any) => w.id === id);
     if (!wf) {
@@ -494,6 +524,9 @@ const loadWorkflow = async (id: string) => {
       return;
     }
     hydrateWorkflow(wf);
+    // The row is authoritative about where the workflow lives; the URL may be a
+    // bookmark from before it was moved, or carry no folder at all.
+    if (wf.folder_id) activeFolderId.value = wf.folder_id;
   } catch (e) {
     toast({ message: t("workflow.loadError"), variant: "error" });
   }
@@ -504,7 +537,10 @@ const loadWorkflow = async (id: string) => {
 // changes; resetWorkflowData runs on unmount, so it must NOT run here (it would
 // clear dirtyFlag and slip the guard). A clean editor navigates straight out.
 const goBack = () => {
-  router.push({ name: "workflows", query: { org_identifier: orgId() } });
+  router.push({
+    name: "workflows",
+    query: { org_identifier: orgId(), folder: activeFolderId.value },
+  });
 };
 
 // ── Unsaved-changes guard (T8) ──────────────────────────────────────────────
@@ -701,6 +737,7 @@ const persist = async (): Promise<boolean> => {
       const res = await workflowService.createWorkflow({
         org_identifier: org,
         data,
+        folder: activeFolderId.value,
       });
       const newId = res.data?.id;
       if (newId) {
@@ -791,6 +828,7 @@ const persistDraft = async (): Promise<boolean> => {
         org_identifier: org,
         data,
         draft: true,
+        folder: activeFolderId.value,
       });
       const newId = res.data?.id;
       if (newId) {
@@ -843,6 +881,7 @@ const promoteDraft = async (): Promise<void> => {
       org_identifier: org,
       id: wf.id,
       trigger_type: triggerTypeForKind(currentTriggerKind()),
+      folder: activeFolderId.value,
     });
     wf.isDraft = false;
     workflowObj.dirtyFlag = false;
@@ -895,6 +934,7 @@ const openRuns = () => {
       id: workflowObj.currentSelectedWorkflow.id,
       name: workflowObj.currentSelectedWorkflow.name,
       org_identifier: orgId(),
+      folder: activeFolderId.value,
     },
   });
 };
@@ -907,6 +947,8 @@ onMounted(async () => {
     // Edit-from-list already hydrated the shared state synchronously; only
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
+    else if (!query.folder && workflowObj.currentSelectedWorkflow.folder_id)
+      activeFolderId.value = workflowObj.currentSelectedWorkflow.folder_id;
     // Arrived from a run ("Fix This Step"). Must run AFTER the workflow is
     // hydrated: loadWorkflowRun diffs the run against the current node list to
     // find ghost steps, and resetWorkflowData nulls testRun.result.
