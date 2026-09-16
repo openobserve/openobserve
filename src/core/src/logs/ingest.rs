@@ -16,6 +16,8 @@
 use std::{
     collections::{HashMap, HashSet},
     io::{BufRead, Cursor, Read},
+    sync::{LazyLock, Mutex},
+    time::{Duration, Instant},
 };
 
 use axum::http;
@@ -46,7 +48,7 @@ use infra::{
 use ingestion_common::{
     AWSRecordType, BulkResponse, GCPIngestionResponse, IngestUser, IngestionData,
     IngestionDataIter, IngestionError, IngestionRequest, IngestionResponse, IngestionStatus,
-    IngestionValueType, KinesisFHIngestionResponse, StreamStatus,
+    IngestionValueType, KinesisFHIngestionResponse, RecordStatus, StreamStatus,
 };
 #[cfg(feature = "vectorscan")]
 use o2_enterprise::enterprise::re_patterns::get_pattern_manager;
@@ -65,6 +67,13 @@ use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
     service::get_formatted_stream_name,
 };
+
+/// A misbehaving client can wholly fail thousands of batches a second per stream.
+const DISCARD_WARN_INTERVAL: Duration = Duration::from_secs(60);
+
+/// Last wholly-discarded warn per `org/stream`, so the log stays one line a minute each.
+static DISCARD_WARN_AT: LazyLock<Mutex<HashMap<String, Instant>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 type LogDataByStream = HashMap<String, O2IngestLogData>;
 
@@ -699,6 +708,8 @@ pub async fn ingest(
             .inc();
     }
 
+    warn_if_wholly_discarded(org_id, endpoint, &response_body);
+
     // A write failure used to be visible only in the metric label while the
     // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
     // is a serialized body field on every legacy route sharing this function.
@@ -741,6 +752,41 @@ fn count_timestamp_rejection(status: &mut ingestion_common::RecordStatus, e: &an
         status.policy_dropped += 1;
     }
     status.error = e.to_string();
+}
+
+/// True when a batch stored nothing at all, the case a 200 hides most completely.
+fn is_wholly_discarded(status: &RecordStatus) -> bool {
+    status.failed > 0 && status.successful == 0
+}
+
+/// The 200 stays (non-2xx reads as retryable), so this warn is the only loud total-loss signal.
+fn warn_if_wholly_discarded(org_id: &str, endpoint: &str, status: &StreamStatus) {
+    if !is_wholly_discarded(&status.status) {
+        return;
+    }
+    if !discard_warn_permitted(&format!("{org_id}/{}", status.name), Instant::now()) {
+        return;
+    }
+    log::warn!(
+        "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
+        status.name,
+        status.status.failed,
+        status.status.error
+    );
+}
+
+/// At most one warn per stream per interval; a poisoned lock silences rather than panics.
+fn discard_warn_permitted(key: &str, now: Instant) -> bool {
+    let Ok(mut warned_at) = DISCARD_WARN_AT.lock() else {
+        return false;
+    };
+    match warned_at.get(key) {
+        Some(last) if now.duration_since(*last) < DISCARD_WARN_INTERVAL => false,
+        _ => {
+            warned_at.insert(key.to_string(), now);
+            true
+        }
+    }
 }
 
 /// Finalize a log record (flatten, resolve timestamp, apply UDS, add
@@ -1257,6 +1303,59 @@ mod tests {
     use ingestion_common::{IngestUser, SystemJobType};
 
     use super::*;
+
+    /// A bulk ingest returned 200 while dropping every record as "Too old data", and
+    /// nothing server-side said so. The status code has to stay 200 — clients and
+    /// OpenObserve's own self-reporting retry a non-2xx, and "too old" never becomes
+    /// ingestible — so the total loss must be detected here to be logged.
+    #[test]
+    fn a_batch_that_stored_nothing_is_reported_as_wholly_discarded() {
+        let all_dropped = RecordStatus {
+            successful: 0,
+            failed: 1000,
+            policy_dropped: 1000,
+            error: "Too old data, only last 5 hours data can be ingested".to_string(),
+        };
+        assert!(is_wholly_discarded(&all_dropped));
+    }
+
+    /// A partial failure still stored data, and a clean batch failed nothing: neither is the
+    /// silent total loss, and warning on them would train operators to ignore the line.
+    #[test]
+    fn a_partial_or_clean_batch_is_not_wholly_discarded() {
+        let partial = RecordStatus {
+            successful: 57,
+            failed: 6_567,
+            policy_dropped: 6_567,
+            error: "Too old data".to_string(),
+        };
+        assert!(!is_wholly_discarded(&partial));
+        assert!(!is_wholly_discarded(&RecordStatus::default()));
+        assert!(!is_wholly_discarded(&RecordStatus {
+            successful: 10,
+            failed: 0,
+            policy_dropped: 0,
+            error: String::new(),
+        }));
+    }
+
+    /// The interval throttles per stream, so one bad client cannot drown the log.
+    #[test]
+    fn wholly_discarded_warns_are_rate_limited_per_stream() {
+        let now = Instant::now();
+        assert!(discard_warn_permitted("org_rl/stream_a", now));
+        assert!(!discard_warn_permitted("org_rl/stream_a", now));
+        assert!(!discard_warn_permitted(
+            "org_rl/stream_a",
+            now + DISCARD_WARN_INTERVAL - Duration::from_secs(1)
+        ));
+        assert!(discard_warn_permitted(
+            "org_rl/stream_a",
+            now + DISCARD_WARN_INTERVAL
+        ));
+        // Another stream is its own bucket.
+        assert!(discard_warn_permitted("org_rl/stream_b", now));
+    }
 
     #[test]
     fn a_window_drop_is_counted_as_a_policy_drop_on_both_timestamp_paths() {

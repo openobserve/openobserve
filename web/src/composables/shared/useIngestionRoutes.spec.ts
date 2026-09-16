@@ -143,6 +143,12 @@ describe("useIngestionRoutes", () => {
       expect(Array.isArray(mainRoute.children)).toBe(true);
     });
 
+    // Ingestion is where an empty org gets data, so the empty-data gate must not block it.
+    it("should flag the ingestion route as allowOnEmptyData", () => {
+      const routes = useIngestionRoutes();
+      expect(routes[0].meta?.allowOnEmptyData).toBe(true);
+    });
+
     it("should have all expected main child routes", () => {
       const routes = useIngestionRoutes();
       const mainRoute = routes[0];

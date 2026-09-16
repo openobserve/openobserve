@@ -303,7 +303,7 @@ describe("OrganizationManagement.vue", () => {
     it("should have correct column configuration", () => {
       wrapper = createWrapper();
       const columns = wrapper.vm.columns;
-      expect(columns).toHaveLength(15);
+      expect(columns).toHaveLength(17);
       expect(columns[0].id).toBe("name");
       expect(columns[1].id).toBe("identifier");
       expect(columns[2].id).toBe("subscription_status");
@@ -315,10 +315,12 @@ describe("OrganizationManagement.vue", () => {
       expect(columns[8].id).toBe("browser_steps_total");
       expect(columns[9].id).toBe("protocol_steps_used");
       expect(columns[10].id).toBe("protocol_steps_total");
-      expect(columns[11].id).toBe("created_on");
-      expect(columns[12].id).toBe("trial_expiry");
-      expect(columns[13].id).toBe("contract_end_date");
-      expect(columns[14].id).toBe("actions");
+      expect(columns[11].id).toBe("status_steps_used");
+      expect(columns[12].id).toBe("status_steps_total");
+      expect(columns[13].id).toBe("created_on");
+      expect(columns[14].id).toBe("trial_expiry");
+      expect(columns[15].id).toBe("contract_end_date");
+      expect(columns[16].id).toBe("actions");
     });
 
     it("should have subscription plans mapping", () => {
@@ -468,6 +470,8 @@ describe("OrganizationManagement.vue", () => {
         browser_steps_limit: 0,
         protocol_steps_used: 0,
         protocol_steps_limit: 0,
+        status_steps_used: 0,
+        status_steps_limit: 0,
         created_at: "2023-12-01",
         trial_expires_at: "2023-12-01",
         contract_end_date: 0,
@@ -476,6 +480,42 @@ describe("OrganizationManagement.vue", () => {
         status: "active",
         deleted_at: null,
         grace_period_days: null,
+      });
+    });
+
+    it("should carry every synthetics pool from the response into the row", async () => {
+      mockGetAdminOrg.mockResolvedValue({
+        data: {
+          data: [
+            {
+              id: 1,
+              name: "Test Org",
+              identifier: "test-org",
+              plan: "1",
+              created_at: 1701388800000000,
+              trial_expires_at: 1701388800000000,
+              browser_steps_used: 400,
+              browser_steps_limit: 10000,
+              protocol_steps_used: 900,
+              protocol_steps_limit: 20000,
+              status_steps_used: 12000,
+              status_steps_limit: 43200,
+            },
+          ],
+        },
+      });
+
+      wrapper = createWrapper();
+      await wrapper.vm.getData();
+
+      // A dropped field opens the limit dialog at 0, and saving that wipes the grant.
+      expect(wrapper.vm.tabledata[0]).toMatchObject({
+        browser_steps_used: 400,
+        browser_steps_limit: 10000,
+        protocol_steps_used: 900,
+        protocol_steps_limit: 20000,
+        status_steps_used: 12000,
+        status_steps_limit: 43200,
       });
     });
 
