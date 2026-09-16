@@ -1061,11 +1061,11 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
   if (typeId === "servicenow" && props.destination.url) {
     credentials.instanceUrl = props.destination.url;
   }
-  // For email destinations, recipients are in the emails field.
+  // For email destinations, recipients are in the emails field. The picker holds
+  // a string[], so pass the array through untouched (a legacy string is split by
+  // the credential defaults).
   if (typeId === "email" && props.destination.emails) {
-    credentials.recipients = Array.isArray(props.destination.emails)
-      ? props.destination.emails.join(", ")
-      : props.destination.emails;
+    credentials.recipients = props.destination.emails;
   }
   // PagerDuty: integrationKey from routing_key metadata above; fall back to the
   // X-Routing-Key header for older destinations.
