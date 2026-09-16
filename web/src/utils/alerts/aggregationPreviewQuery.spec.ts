@@ -64,4 +64,15 @@ describe("withCompositeGroupLabel", () => {
     expect(out).toContain("zo_group_label");
     expect(out).toMatch(/GROUP BY zo_sql_key, zo_group_label/i);
   });
+
+  it("does not truncate a WHERE-clause literal that contains 'order by'", () => {
+    const cleaned = cleanAggregationQuery(
+      "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val, service, region FROM \"default\" WHERE name = 'sort order by name' GROUP BY zo_sql_key, service, region HAVING zo_sql_val >= 10",
+    );
+    const out = withCompositeGroupLabel(cleaned, ["service", "region"]);
+    expect((out.match(/'/g) || []).length % 2).toBe(0);
+    expect(out).toContain("'sort order by name'");
+    expect(out).toContain("zo_group_label");
+    expect(out).toMatch(/GROUP BY zo_sql_key, zo_group_label/i);
+  });
 });
