@@ -500,11 +500,9 @@ impl LlmScoreRecord {
         }
     }
 
-    /// Build the reserved Score stream schema from the reflection record.
     pub fn schema_for_reflection() -> anyhow::Result<arrow_schema::Schema> {
         let sample = crate::utils::json::to_value(Self::init_for_reflection())?;
-        // Log ingestion flattens nested values before schema inference. Mirror that
-        // here so optional scalar fields are initialized even when metadata is JSON.
+        // Match log ingestion by flattening before schema inference.
         let sample = crate::utils::flatten::flatten(sample)?;
         let sample = sample
             .as_object()

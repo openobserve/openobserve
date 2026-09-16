@@ -29,9 +29,8 @@ use config::{
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
-/// Single-flight initialization per organization. Successful attempts remain
-/// cached; an error or cancellation leaves the cell empty so the next caller
-/// can retry.
+static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
+
 #[derive(Default)]
 struct InitializationCache {
     orgs: DashMap<String, Arc<OnceCell<()>>>,
@@ -55,8 +54,6 @@ impl InitializationCache {
         initialization.get_or_try_init(initialize).await.map(|_| ())
     }
 }
-
-static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
 
 fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
     LlmScoreRecord::schema_for_reflection()
