@@ -1,6 +1,0 @@
-[
-  { "title": "should show stream-not-found message when SQL query names a missing stream", "action": "new", "verifies": "a SQL query naming a missing stream renders the Stream \"…\" does not exist message and the generic empty state does not shadow it" },
-  { "title": "should clear the message and select the stream when the query names an existing stream", "action": "new", "verifies": "replacing the query with an existing stream clears the message and selects the stream" },
-  { "title": "should dismiss the message when the query is cleared", "action": "new", "verifies": "emptying the editor dismisses the message and restores the generic empty state" },
-  { "title": "should clear the message when a stream is selected in the sidebar", "action": "new", "verifies": "selecting a stream in the sidebar clears the message" }
-]
