@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div :class="tabsBelow ? ROW_CLASS : 'contents'">
       <!-- flex-1 is basis-0, so the min-w floor is what forces the actions to wrap. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
         :class="[
           hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
@@ -110,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              An interactive title (titleOverflow="visible") holds a real name
              that can be long, so it may instead consume the free space in the
              row and only ellipsise once genuinely out of room. -->
+        <!-- The row is sized by its container, not the viewport, so the tab-less title stays shrinkable at every width. -->
         <div
           class="flex min-w-0 flex-col justify-center"
           :class="
@@ -117,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               ? ''
               : hasTabs && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
-                : 'shrink-0 max-lg:shrink md:max-lg:min-w-32'
+                : 'md:max-lg:min-w-32'
           "
         >
           <h1
@@ -163,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
       <div
         v-if="hasActions || hasActionsOverflow"
-        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
+        class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto"
       >
         <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
@@ -264,8 +265,9 @@ const props = withDefaults(
 );
 
 // Fixed h-15 so h-full slot content (inline tabs, dividers) spans the row; < lg it may wrap.
+// The @page half repeats the max-lg half against the page container: a wide viewport whose content column is narrow collapses the same way.
 const ROW_CLASS =
-  "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5";
+  "flex h-15 items-center justify-between gap-4 max-lg:h-auto max-lg:min-h-15 max-lg:flex-wrap max-lg:gap-y-1 max-lg:py-1.5 @max-4xl/page:h-auto @max-4xl/page:min-h-15 @max-4xl/page:flex-wrap @max-4xl/page:gap-y-1 @max-4xl/page:py-1.5";
 
 const router = useRouter();
 const slots = useSlots();
