@@ -565,5 +565,24 @@ describe("AnomalyDataPreview", () => {
       // multiplied by a bucket count, which nothing in the system computes.
       expect((wrapper.vm as any).previewPanelSchema?.config?.mark_line).toEqual([]);
     });
+
+    // A chart with no bar reads as unfinished unless it says what it is showing.
+    it("captions the rendered chart as the training series", async () => {
+      wrapper = mountPreview();
+      await flushPromises();
+
+      const caption = wrapper.find('[data-test="anomaly-data-preview-caption"]');
+      expect(caption.exists()).toBe(true);
+      expect(caption.text()).toContain("trained on");
+      expect(caption.text()).toContain("detection history");
+    });
+
+    it("hides the caption while the empty state is showing", async () => {
+      wrapper = mountPreview({ stream_name: "" });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-data-preview-caption"]').exists()).toBe(false);
+    });
   });
 });

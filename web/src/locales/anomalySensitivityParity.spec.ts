@@ -449,4 +449,34 @@ describe("anomaly sensitivity locale parity", () => {
       }
     }
   });
+
+  // "Percentile" names two unrelated things here: a bar on the model's scores
+  // (Sensitivity) and an aggregate over a data field (Detection Function).
+  // Each control's copy has to say which space it lives in, or they read as one.
+  it("en-US names the sensitivity control's percentile as a score percentile", () => {
+    expect(String(at(en, "alerts.anomaly.percentile")).toLowerCase()).toContain("score");
+  });
+
+  // Kept off sensitivityTooltip on purpose: that string is pinned verbatim, and
+  // a "p95" in it would trip the retired-default guard above.
+  it("en-US disowns the detection-function meaning beside the score input", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityNotDataPercentile")).toLowerCase();
+    expect(tooltip).toContain("detection function");
+    expect(tooltip).toContain("unrelated");
+    expect(tooltip).toContain("score");
+  });
+
+  it("en-US disowns the sensitivity meaning in the detection-function tooltip", () => {
+    const tooltip = String(at(en, "alerts.anomaly.detectionFunctionTooltip")).toLowerCase();
+    expect(tooltip).toContain("sensitivity");
+    expect(tooltip).toContain("not the sensitivity percentile");
+  });
+
+  // The bar is in score space and needs a trained model, so it cannot be drawn
+  // over the config-time value-space preview — the caption has to say so.
+  it("en-US tells the preview reader where the anomaly bar actually appears", () => {
+    const caption = String(at(en, "alerts.anomaly.previewCaption")).toLowerCase();
+    expect(caption).toContain("training");
+    expect(caption).toContain("detection history");
+  });
 });

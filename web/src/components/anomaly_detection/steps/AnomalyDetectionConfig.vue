@@ -186,6 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+                <OTooltip
+                  side="right"
+                  align="center"
+                  max-width="18.75rem"
+                  :content="t('alerts.anomaly.detectionFunctionTooltip')"
+                />
+              </OIcon>
             </div>
             <!-- items-start, not items-center: the field select renders its
                  validation message inside its own column (OSelect's root is
@@ -577,6 +585,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="anomaly-sensitivity-percentile"
               >
                 <template #error />
+                <template #tooltip>
+                  <OTooltip
+                    side="right"
+                    align="center"
+                    max-width="18.75rem"
+                    :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
+                  />
+                </template>
               </OFormInput>
             </div>
             <div
