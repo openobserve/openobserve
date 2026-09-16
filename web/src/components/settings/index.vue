@@ -109,12 +109,6 @@ export default defineComponent({
     );
     const { isMetaOrg } = useIsMetaOrg();
 
-    // /settings (name "settings") with no child → show the hub.
-    const isHub = computed(() => route.name === "settings");
-    const hubRoute = computed(() => ({
-      name: "settings",
-      query: { org_identifier: store.state.selectedOrganization?.identifier },
-    }));
     const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
 
     // Form-style sections render in a centered reading column (ConstrainedPage);
@@ -127,25 +121,8 @@ export default defineComponent({
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
-    // Full-width sections that still want the shell-owned header (their content
-    // fills the whole width instead of a centered reading column).
-    // The rail is always shown, so the Settings root has no standalone landing —
-    // send it to the first section (General). Also guard meta-only sections.
     const handleSettingsRouting = () => {
       const name = router.currentRoute.value.name;
-      if (name === "settings") {
-        // .catch: a rejected navigation (e.g. unit-test router without child
-        // routes) must not surface as an unhandled error.
-        Promise.resolve(
-          router.replace({
-            path: "/settings/general",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          }),
-        ).catch(() => {});
-        return;
-      }
       const toGeneral = () => {
         settingsTab.value = "general";
         router.push({
@@ -417,8 +394,6 @@ export default defineComponent({
       config,
       settingsTab,
       isMetaOrg,
-      isHub,
-      hubRoute,
       activeSection,
       isConstrainedSection,
       activeSectionItem,

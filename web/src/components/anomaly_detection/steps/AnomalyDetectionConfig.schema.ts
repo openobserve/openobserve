@@ -73,12 +73,11 @@ const makeAnomalyDetectionConfigBase = (t: Translator) =>
     training_window_days: z.coerce.number().min(1, t("alerts.validation.minimumOneDay")),
     // Type-only (fixed OSelect options).
     retrain_interval_days: z.coerce.number(),
-    // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
-    threshold: z.coerce
-      .number()
-      .int(t("alerts.anomaly.sensitivityRange"))
-      .min(50, t("alerts.anomaly.sensitivityRange"))
-      .max(99, t("alerts.anomaly.sensitivityRange")),
+    // Sensitivity rules are mode-conditional (superRefine): each mode judges only its own fields.
+    sensitivity_mode: z.enum(["percentile", "budget"]),
+    threshold: z.coerce.number(),
+    budget_count: z.coerce.number(),
+    budget_period: z.enum(["day", "week"]),
   });
 
 export type AnomalyDetectionConfigForm = z.infer<ReturnType<typeof makeAnomalyDetectionConfigBase>>;
@@ -137,7 +136,43 @@ export const createAnomalyDetectionConfigSchema = (
         });
       }
     }
+
+    if (value.sensitivity_mode === "percentile") {
+      // The server clamps to 50–99.9 then truncates with `as i32`, so 99 is the real ceiling.
+      const p = value.threshold;
+      if (!Number.isInteger(p) || p < 50 || p > 99) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["threshold"],
+          message: t("alerts.anomaly.sensitivityRange"),
+        });
+      }
+    } else if (!Number.isFinite(value.budget_count) || value.budget_count <= 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["budget_count"],
+        message: t("alerts.anomaly.budgetRange"),
+      });
+    }
   });
+
+/** The stored per-day budget, or null; absent/invalid = percentile mode — the only wire contract assumed. */
+export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined): number | null => {
+  const budget = Number(cfg?.alert_budget_per_day);
+  return Number.isFinite(budget) && budget > 0 ? budget : null;
+};
+
+/** A stored per-day budget below 1 is surfaced as alerts/week. */
+export const budgetFieldsFromPerDay = (
+  perDay: number | null,
+): { budget_count: number; budget_period: "day" | "week" } => {
+  if (perDay === null) return { budget_count: 1, budget_period: "day" };
+  // Rounds only the DISPLAY decimals float noise introduces (1/7*7 = 0.9999…), never the magnitude.
+  const round = (n: number) => Math.round(n * 1e6) / 1e6;
+  return perDay < 1
+    ? { budget_count: round(perDay * 7), budget_period: "week" }
+    : { budget_count: round(perDay), budget_period: "day" };
+};
 
 /**
  * Typed defaults, projected from the parent-owned config object
@@ -167,5 +202,7 @@ export const anomalyDetectionConfigDefaults = (
   detection_window_unit: cfg?.detection_window_unit ?? "h",
   training_window_days: cfg?.training_window_days ?? 14,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
+  sensitivity_mode: anomalyBudgetPerDay(cfg) !== null ? "budget" : "percentile",
   threshold: cfg?.threshold == null || cfg.threshold === "" ? 97 : Number(cfg.threshold),
+  ...budgetFieldsFromPerDay(anomalyBudgetPerDay(cfg)),
 });

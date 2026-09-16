@@ -465,7 +465,10 @@ sqlparser = { version = "0.62", features = ["serde", "visitor"] }
 vortex = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244", features = [
     "tokio",
 ] }
-vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244" }
+vortex-btrblocks = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244", features = [
+    "pco",
+    "zstd",
+] }
 vortex-datafusion = { git = "https://github.com/openobserve/vortex", rev = "553d6d78ebe372ff6737c7ed17f1aae3b2fc0244" }
 hashbrown = { version = "0.17.1", features = ["serde"] }
 dotenv_config = "0.2"
