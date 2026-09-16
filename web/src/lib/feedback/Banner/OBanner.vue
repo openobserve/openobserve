@@ -159,7 +159,7 @@ const barVariantClass = computed(() => {
 
       <div
         :class="[
-          bar ? 'text-compact' : 'min-w-0 flex-1 text-sm',
+          bar ? 'text-compact' : inlineActions ? 'min-w-0 flex-1 text-sm' : 'flex-1 text-sm',
           preserveWhitespace ? 'min-w-0 wrap-break-word whitespace-pre-wrap' : '',
         ]"
       >

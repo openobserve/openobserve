@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref } from "vue";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -251,5 +251,7 @@ async function saveDefaultTeam() {
   }
 }
 
-onMounted(fetchRoutingConfig);
+// Started directly in setup, not onMounted: the trigger's `loading` prop
+// must read true on the very first render, before any lifecycle hook fires.
+fetchRoutingConfig();
 </script>

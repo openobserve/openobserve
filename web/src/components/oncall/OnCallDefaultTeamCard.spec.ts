@@ -142,7 +142,7 @@ describe("OnCallDefaultTeamCard", () => {
     await flushPromises();
 
     await wrapper.find('[data-test="oncall-default-team-open"]').trigger("click");
-    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe("");
+    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBeNull();
   });
 
   /// The card is still the team-less default: hosts that have room for it are
