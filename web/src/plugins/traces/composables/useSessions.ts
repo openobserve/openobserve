@@ -17,7 +17,7 @@ import { gt, type I18nText } from "@/types/i18n";
 
 import { ref } from "vue";
 import { useStore } from "vuex";
-import sessionsService from "@/services/sessions";
+import sessionsService, { type SessionSortField, type SessionSortOrder } from "@/services/sessions";
 import { type GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
 import { useLLMStreamQuery } from "./useLLMStreamQuery";
 import { compactSql } from "../config/llmInsightsPanels";
@@ -147,7 +147,7 @@ export interface SessionRow {
 // ---------------------------------------------------------------------------
 const sessions = ref<SessionRow[]>([]);
 const total = ref(0);
-const totalIsExact = ref(true);
+const hasMore = ref(false);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const hasLoadedOnce = ref(false);
@@ -160,6 +160,33 @@ const loadedOrg = ref<string | null>(null);
 // unmount/remount cycle and stays in sync with the restored rows.
 const currentPage = ref(1);
 const rowsPerPage = ref(20);
+// Sort state travels with the server-paginated rows. Keeping it module-scoped
+// preserves the exact list when navigating into a session and back.
+const sortBy = ref<SessionSortField>("end_time");
+const sortOrder = ref<SessionSortOrder>("desc");
+// Active list search (the search box on the scope row) — this ref IS the
+// box's v-model directly (live, debounced), no separate draft. Module-scoped
+// like the pagination so a back-navigation from a session detail restores the
+// filtered page together with the term that produced it. Deliberately NOT
+// persisted to localStorage: the scope is remembered across visits, a search
+// is a one-time action. The backend matches it against the user id OR the
+// conversation text (whichever the stream has), so one term searches both.
+export interface SessionSearch {
+  keyword?: string;
+}
+const searchKeyword = ref("");
+/** Hard cap on a search term; longer input is truncated, never rejected. */
+export const SESSION_SEARCH_MAX_LEN = 256;
+/** Trims and caps a raw search term. Empty result = no search. */
+export function normalizeSearchTerm(raw: string): string {
+  return String(raw ?? "")
+    .trim()
+    .slice(0, SESSION_SEARCH_MAX_LEN);
+}
+// Monotonic id of the most recent `fetchPage` call. A response from an older
+// call (Enter pressed again while a search was still in flight) is dropped, so
+// a slow first run can never overwrite the newer result. Last request wins.
+let fetchSeq = 0;
 // Agent-filter list is loaded lazily by `loadSessions` (agent mode only), so it
 // lives here too — otherwise a back-navigation, which skips that load, would
 // reset `agentsLoaded` to false and strand the agent picker on its skeleton.
@@ -210,13 +237,16 @@ export function useSessions() {
     page: number,
     pageSize: number,
     filter = "",
+    search?: SessionSearch,
   ): Promise<void> {
     if (!streamName || !startTime || !endTime) return;
+    const seq = ++fetchSeq;
     loading.value = true;
     error.value = null;
 
     try {
       const orgId = store.state.selectedOrganization?.identifier || "default";
+      const keywordTerm = normalizeSearchTerm(search?.keyword ?? "");
       const res = await sessionsService.list({
         orgId,
         streamName,
@@ -225,7 +255,13 @@ export function useSessions() {
         page,
         pageSize,
         filter,
+        keyword: keywordTerm || undefined,
+        sortBy: sortBy.value,
+        sortOrder: sortOrder.value,
       });
+      // Stale: a newer fetch has started since — its result (or error) owns
+      // the list now, so leave every piece of state to it.
+      if (seq !== fetchSeq) return;
       const body = res.data;
       sessions.value = (body.hits || []).map((h) => {
         const errorCount = Number(h.error_count) || 0;
@@ -254,13 +290,14 @@ export function useSessions() {
         };
       });
       total.value = Number(body.total) || 0;
-      totalIsExact.value = body.total_is_exact ?? true;
+      hasMore.value = body.has_more ?? false;
       hasLoadedOnce.value = true;
       // Stamp when/which-org this page was fetched — used to keep the "last
       // refreshed" label accurate and to invalidate the cache on org switch.
       lastRunAt.value = Date.now();
       loadedOrg.value = orgId;
     } catch (e: any) {
+      if (seq !== fetchSeq) return;
       // axios error shape — surface the server's message if present.
       const serverMsg =
         e?.response?.data?.message ||
@@ -270,7 +307,9 @@ export function useSessions() {
       error.value = serverMsg;
       console.error("Sessions fetch error:", e?.response?.data ?? e);
     } finally {
-      loading.value = false;
+      // Only the latest call releases the skeleton — an older one settling
+      // first must not blank it while the newer request is still running.
+      if (seq === fetchSeq) loading.value = false;
     }
   }
 
@@ -551,7 +590,7 @@ export function useSessions() {
   return {
     sessions,
     total,
-    totalIsExact,
+    hasMore,
     loading,
     error,
     hasLoadedOnce,
@@ -559,6 +598,9 @@ export function useSessions() {
     loadedOrg,
     currentPage,
     rowsPerPage,
+    searchKeyword,
+    sortBy,
+    sortOrder,
     agents,
     agentsLoaded,
     fetchPage,

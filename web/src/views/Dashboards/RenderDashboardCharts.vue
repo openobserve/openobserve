@@ -33,17 +33,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
-      <VariablesValueSelector
-        v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
-        :scope="'global'"
-        :variablesConfig="{ list: globalVariables }"
-        :variablesManager="variablesManager"
-        :selectedTimeDate="currentTimeObj['__global']"
-        :initialVariableValues="initialVariableValues"
-        class="global-variables-selector"
-        data-test="global-variables-selector"
-      />
-
       <!-- Tab List -->
       <TabList
         v-if="showTabs && selectedTabId !== null"
@@ -51,6 +40,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardData="dashboardData"
         :viewOnly="viewOnly"
         @refresh="refreshDashboard"
+      />
+
+      <!-- Below the tabs: these scope the ACTIVE tab, and above them the strip both read as page chrome and shifted the tab bar as its height changed per tab. -->
+      <VariablesValueSelector
+        v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
+        :scope="'global'"
+        :tabId="selectedTabId"
+        :variablesConfig="{ list: globalVariables }"
+        :variablesManager="variablesManager"
+        :selectedTimeDate="currentTimeObj['__global']"
+        :initialVariableValues="initialVariableValues"
+        class="global-variables-selector"
+        data-test="global-variables-selector"
       />
 
       <!-- Tab-scoped Variables (for active tab, if using manager) -->
@@ -516,6 +518,10 @@ export default defineComponent({
     provide("variablesManager", variablesManager);
 
     // Computed properties for filtered variables by scope
+    // Per-tab narrowing of a global variable (`curatedTabs`) is applied by
+    // VariablesValueSelector at RENDER time, not here: this list also decides
+    // whether the selector mounts at all, and a variable that is merely off-tab
+    // must still load, because panels on the tabs that do use it read its value.
     const globalVariables = computed(() => {
       return (
         props.dashboardData?.variables?.list?.filter(
@@ -1814,6 +1820,39 @@ export default defineComponent({
 /* GridStack theme overrides */
 .displayDiv :deep(.grid-stack .grid-stack-item .drag-allow) {
   cursor: move;
+}
+
+/* CSS-only stack: GridStack's oneColumnMode stays off because the change handler would persist it. */
+@media (max-width: 47.99rem) {
+  .displayDiv :deep(.grid-stack) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    height: auto !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item) {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    min-width: 100% !important;
+    height: 20rem !important;
+    min-height: 20rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
+  .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
+    width: calc(50% - 0.25rem) !important;
+    min-width: calc(50% - 0.25rem) !important;
+    height: 8rem !important;
+    min-height: 8rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item.panel-section-header) {
+    height: 2.5rem !important;
+    min-height: 2.5rem !important;
+  }
+  .displayDiv :deep(.grid-stack > .grid-stack-item > .ui-resizable-handle) {
+    display: none !important;
+  }
 }
 
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-draggable-dragging) {

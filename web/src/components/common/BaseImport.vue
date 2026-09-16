@@ -67,8 +67,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="logs-search-splitter h-full min-h-0 w-full"
           v-model="splitterModel"
           :style="splitterStyle"
-          :limits="[30, 60]"
-          :horizontal="false"
+          :limits="[30, stackPanes ? 100 : 60]"
+          :horizontal="stackPanes"
         >
           <template #before>
             <div class="border-border-default flex h-full w-full flex-col border-e">
@@ -218,6 +218,7 @@ import OFile from "@/lib/forms/File/OFile.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 
 export default defineComponent({
   name: "BaseImport",
@@ -325,6 +326,8 @@ export default defineComponent({
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
+    const { lgUp } = useBreakpoint();
+    const stackPanes = computed(() => !lgUp.value);
 
     // State
     const jsonStr = ref<any>("");
@@ -519,6 +522,7 @@ export default defineComponent({
     return {
       raw,
       t,
+      stackPanes,
       jsonStr,
       jsonFiles,
       url,

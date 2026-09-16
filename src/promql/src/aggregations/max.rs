@@ -15,6 +15,7 @@
 
 use crate::aggregations::{AggFunc, extrema::ExtremaAccumulator};
 
+#[derive(Clone, Copy)]
 pub struct Max;
 
 impl AggFunc for Max {
@@ -24,8 +25,8 @@ impl AggFunc for Max {
         "max"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        ExtremaAccumulator::new(slots)
     }
 }
 

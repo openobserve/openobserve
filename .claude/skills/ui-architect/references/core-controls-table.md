@@ -164,6 +164,7 @@ Authoring reference for O2's core control components (Button, Navbar, RefreshBut
 - `disabled` (boolean, default `false`) — disables all items
 - `label` (string) — text label beside the bar; for rich content use the `label` slot
 - `labelPosition` (`"left"` | `"right"` | `"top"`, default `"left"`)
+- `mobileDropdown` (boolean, default `false`) — below md a single-select horizontal group renders as a dropdown whose trigger shows the active item. Use it on every toolbar filter strip so it doesn't claim its own phone row. Data-tests: trigger `<group data-test>-dropdown-btn`, items `<item data-test>-item`. `AppTabs` forwards it. See [responsive § Toolbars](responsive.md#toolbars-one-row-filters-become-a-dropdown).
 **Slots:** `default` (OToggleGroupItem children), `label` (overrides the `label` prop)
 **Emits:** `update:modelValue` (`AcceptableValue | AcceptableValue[]`)
 **Example:**

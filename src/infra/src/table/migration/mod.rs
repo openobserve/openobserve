@@ -160,20 +160,36 @@ mod m20260802_000001_add_template_kind;
 mod m20260803_000001_add_destinations_to_incident_integrations;
 mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
 mod m20260804_000001_create_workflow_drafts_table;
+mod m20260806_000001_create_oncall_tables;
+mod m20260807_000001_create_oncall_ownership;
 mod m20260809_000001_create_alert_eval_intervals_table;
 mod m20260811_000001_create_llm_experiments;
+mod m20260811_000001_create_oncall_unrouted_signals;
 mod m20260812_000001_add_provider_rate_limits;
 mod m20260812_000001_create_composite_alerts;
+mod m20260812_000001_create_oncall_routing_config;
+mod m20260812_000002_create_oncall_overrides;
+mod m20260812_000003_create_oncall_contacts_and_reads;
+mod m20260813_000001_create_oncall_unavailability;
 mod m20260818_000001_create_llm_idempotency_records;
 mod m20260818_000002_create_llm_remote_tasks;
 mod m20260820_000001_add_icon_to_folders;
 mod m20260820_000003_create_llm_secrets;
 mod m20260822_000001_create_status_pages_tables;
+mod m20260824_000001_add_incident_acknowledged_columns;
 mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
 mod m20260827_000001_drop_table_action_scripts;
+mod m20260831_000001_add_exhausted_at_to_oncall_responses;
+mod m20260901_000001_reset_anomaly_detection_retries;
+mod m20260903_000001_add_anomaly_last_failed_at;
+mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
+mod m20260912_000001_add_anomaly_alert_budget;
+mod m20260912_000002_add_anomaly_last_recovery_notified_at;
+mod m20260915_000001_add_profiles_streams_to_service_streams;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -431,6 +447,22 @@ impl MigratorTrait for Migrator {
             Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260806_000001_create_oncall_tables::Migration),
+            Box::new(m20260807_000001_create_oncall_ownership::Migration),
+            Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
+            Box::new(m20260812_000001_create_oncall_routing_config::Migration),
+            Box::new(m20260812_000002_create_oncall_overrides::Migration),
+            Box::new(m20260812_000003_create_oncall_contacts_and_reads::Migration),
+            Box::new(m20260813_000001_create_oncall_unavailability::Migration),
+            Box::new(m20260824_000001_add_incident_acknowledged_columns::Migration),
+            Box::new(m20260831_000001_add_exhausted_at_to_oncall_responses::Migration),
+            Box::new(m20260901_000001_reset_anomaly_detection_retries::Migration),
+            Box::new(m20260903_000001_add_anomaly_last_failed_at::Migration),
+            Box::new(m20260906_000001_add_anomaly_last_alert_fired_at::Migration),
+            Box::new(m20260911_000001_add_splunk_token_to_org_ingestion_tokens::Migration),
+            Box::new(m20260912_000001_add_anomaly_alert_budget::Migration),
+            Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
+            Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
         ]
     }
 }
@@ -456,6 +488,54 @@ mod tests {
         assert_eq!(get_text_type(), "text");
     }
 
+    /// Newest migration per `DB_SCHEMA_VERSION`: `init_db` skips upgrades on version match.
+    const VERSION_COVERAGE: &[(u64, &str)] = &[
+        (78, "m20260827_000001_drop_table_action_scripts"),
+        (79, "m20260831_000001_add_exhausted_at_to_oncall_responses"),
+        (
+            80,
+            "m20260911_000001_add_splunk_token_to_org_ingestion_tokens",
+        ),
+        (81, "m20260912_000002_add_anomaly_last_recovery_notified_at"),
+        (
+            82,
+            "m20260915_000001_add_profiles_streams_to_service_streams",
+        ),
+    ];
+
+    #[test]
+    fn db_schema_version_covers_every_registered_migration() {
+        let newest = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .max()
+            .expect("at least one migration is registered");
+
+        let (required, _) = VERSION_COVERAGE
+            .iter()
+            .find(|(_, name)| *name == newest)
+            .unwrap_or_else(|| {
+                panic!(
+                    "migration `{newest}` is registered but no DB_SCHEMA_VERSION claims to cover \
+                     it.\nYou added a migration: bump DB_SCHEMA_VERSION in \
+                     src/config/src/config.rs to {}, then add ({}, \"{newest}\") to \
+                     VERSION_COVERAGE here.\nWithout the bump `init_db` skips the upgrade on any \
+                     database already stamped at the current version and the new column is never \
+                     created.",
+                    config::DB_SCHEMA_VERSION + 1,
+                    config::DB_SCHEMA_VERSION + 1,
+                )
+            });
+
+        assert!(
+            config::DB_SCHEMA_VERSION >= *required,
+            "DB_SCHEMA_VERSION is {} but migration `{newest}` requires at least {required}.\nBump \
+             DB_SCHEMA_VERSION in src/config/src/config.rs to {required} so `init_db` actually \
+             runs the upgrade on existing databases.",
+            config::DB_SCHEMA_VERSION,
+        );
+    }
+
     #[test]
     fn composite_alert_migration_is_registered_after_existing_migrations() {
         let names: Vec<String> = Migrator::migrations()
@@ -463,15 +543,23 @@ mod tests {
             .map(|migration| migration.name().to_string())
             .collect();
         assert_eq!(
-            names.last().map(String::as_str),
-            Some("m20260825_000001_create_status_page_custom_domains")
-        );
-        assert_eq!(
             names
                 .iter()
                 .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
                 .count(),
             1
+        );
+        // Asserting on the last entry coupled this to whichever migration was newest, so every
+        // feature added after it broke a test about composite alerts.
+        let composite = names
+            .iter()
+            .position(|name| name == "m20260812_000001_create_composite_alerts");
+        let later = names
+            .iter()
+            .position(|name| name == "m20260825_000001_create_status_page_custom_domains");
+        assert!(
+            composite.is_some() && composite < later,
+            "the composite migration must stay registered before the ones that follow it, got {composite:?} and {later:?}"
         );
     }
 }

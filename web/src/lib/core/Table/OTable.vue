@@ -16,17 +16,21 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useTableColumnPersistence } from "./composables/useTableColumnPersistence";
 import OTableColumnToggle from "./sub-components/OTableColumnToggle.vue";
-import { FlexRender } from "@tanstack/vue-table";
+import { FlexRender, type Row } from "@tanstack/vue-table";
 import {
   TABLE_CHECKBOX_COL_SIZE,
   OTableCellActionsKey,
+  ROW_RAIL_TONE_CLASS,
+  ROW_TONE_CLASS,
   type OTableProps,
   type OTableEmits,
   type OTableSlots,
   type OTableColumnDef,
+  type OTableSection,
 } from "./OTable.types";
 
 import { useTableCore } from "./composables/useTableCore";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useTablePagination } from "./composables/useTablePagination";
 import { useTableSorting } from "./composables/useTableSorting";
 import { useTableSelection } from "./composables/useTableSelection";
@@ -93,6 +97,38 @@ const props = withDefaults(defineProps<OTableProps<TData>>(), {
 
 const emit = defineEmits<OTableEmits<TData>>();
 const slots = defineSlots<OTableSlots<TData>>();
+
+/**
+ * `rowRailTone` / `rowTone` / `rowClass` folded into the ONE class function the
+ * body already threads to every render path (plain, virtual, grouped). Both new
+ * props resolve to token-backed utilities, so a call site never injects a colour
+ * or reaches for `!important` to win against a row-state class.
+ */
+const resolvedRowClass = computed(() => {
+  const { rowRailTone, rowTone, rowClass } = props;
+  if (!rowRailTone && !rowTone) return rowClass;
+  return (row: TData): string => {
+    const parts: string[] = [];
+    const rail = rowRailTone?.(row);
+    if (rail) parts.push(ROW_RAIL_TONE_CLASS[rail]);
+    const tone = rowTone?.(row);
+    if (tone) parts.push(ROW_TONE_CLASS[tone]);
+    const base = typeof rowClass === "function" ? rowClass(row) : rowClass;
+    if (base) parts.push(base);
+    return parts.join(" ");
+  };
+});
+
+// < md columns scroll within the table rather than being crushed down to the name column.
+const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
+const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
+
+const showColumnToggle = computed(
+  () =>
+    !!props.persistColumns &&
+    !!props.tableId &&
+    props.columns.some((c) => c.hideable && !c.isAction),
+);
 
 // A row only gets the pointer cursor when it's actually interactive — i.e. the
 // parent listens for @row-click / @row-dblclick, or row-click toggles expansion.
@@ -526,6 +562,53 @@ const displayRows = computed(() => {
   return table.getRowModel().rows;
 });
 
+// ── Body sections ───────────────────────────────────────────────
+/**
+ * Off under virtualisation and row reorder: a virtualised body renders a
+ * window of rows with no stable place to hang a heading, and dragging across a
+ * heading would imply a move the caller has no way to apply.
+ */
+const sectionsEnabled = computed(
+  () => !!props.rowSection && !props.virtualScroll && !props.enableRowReorder,
+);
+
+/**
+ * `displayRows` gathered into contiguous runs. Order inside a run is left
+ * alone, so the active column sort still decides which row comes first — this
+ * only decides which rows sit next to each other.
+ */
+const rowSections = computed<OTableSection<TData>[]>(() => {
+  const key = props.rowSection;
+  if (!sectionsEnabled.value || !key) return [];
+  const buckets = new Map<string, Row<TData>[]>();
+  for (const row of displayRows.value) {
+    const k = key(row.original);
+    if (k === null || k === undefined) continue;
+    const bucket = buckets.get(k);
+    if (bucket) bucket.push(row);
+    else buckets.set(k, [row]);
+  }
+  const named = props.sectionOrder ?? [];
+  const ranked = [...buckets.keys()].sort((a, b) => {
+    // An unlisted key ranks after every listed one, and ties break on
+    // first-seen order so an unnamed section still appears.
+    const ia = named.indexOf(a);
+    const ib = named.indexOf(b);
+    return (ia === -1 ? named.length : ia) - (ib === -1 ? named.length : ib);
+  });
+  return ranked.map((k) => ({ key: k, rows: buckets.get(k) ?? [] }));
+});
+
+/**
+ * What the body renders. Sectioned rows are the concatenation of the runs, so a
+ * row `rowSection` returned null for is dropped from the body as well as from
+ * every heading — otherwise it would render under whichever section happened to
+ * precede it.
+ */
+const bodyRows = computed<Row<TData>[]>(() =>
+  sectionsEnabled.value ? rowSections.value.flatMap((section) => section.rows) : displayRows.value,
+);
+
 // ── Pivot: row-field cell merge (fake rowspan) ──────────────────
 // Consecutive rows sharing the same leading row-field values collapse into one
 // visual cell: the first row shows the value, the rest hide their content and
@@ -809,16 +892,18 @@ provide("o2TableBoundedFill", hasBoundedFill);
 // is still absorbing the leftover the table fits, so a stray 1-2px scrollbar
 // from rounding must stay hidden.
 const allowHorizontalScroll = computed(() => {
-  if (props.horizontalScroll) return true;
+  if (horizontalScrollOn.value) return true;
   if (!hasFillColumn.value) return true;
+  if (containerWidth.value <= 0) return false;
   if (useComputedWidth.value) {
-    if (containerWidth.value <= 0) return false;
     // Frozen → scroll once the resized columns exceed the container.
     if (frozen.value) return realSum() > containerWidth.value + 1;
     // Fill → scroll once the columns can't fit even at their min widths
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
     return fillMinSum() > containerWidth.value + 1;
   }
+  // < lg past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
+  if (!lgUp.value) return fillMinSum() > containerWidth.value + 1;
   return false;
 });
 
@@ -995,6 +1080,13 @@ const computedTableWidth = computed<string | undefined>(() => {
   return `${Math.max(containerWidth.value || 0, realSum())}px`;
 });
 
+// < md the column sizes' sum is the table's floor, so the container scrolls instead of crushing them.
+const mobileMinTableWidth = computed<string | undefined>(() => {
+  if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
+  const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);
+  return sum > 0 ? `${sum}px` : undefined;
+});
+
 // Virtual measureElement callback — wraps the virtualizer's measure.
 // Re-measuring is only needed when row heights actually VARY (expanded rows or
 // wrapped text). For fixed-height rows the virtualizer's size estimate is exact,
@@ -1031,6 +1123,10 @@ useTableRowShortcuts(scrollContainerRef);
 // with a "Loading…" banner over them (that pattern lets consumers'
 // progressive data mutations leak through visually). Consumers that want
 // refetch-without-replacing-content should use the `streaming` prop.
+// Sectioned tables render `bodyRows`, not `displayRows` — a `rowSection` that
+// filters every loaded row to null (every row belongs to a hidden section)
+// left the body blank with neither a row nor the empty state, since the page
+// itself was not empty.
 // A denied fetch and a genuinely empty list are both zero rows; only the caller
 // knows which, so `forbidden` decides and takes precedence over the empty state.
 const showForbidden = computed(
@@ -1042,7 +1138,7 @@ const showEmpty = computed(
     !props.streaming &&
     !props.error &&
     !showForbidden.value &&
-    displayRows.value.length === 0,
+    (sectionsEnabled.value ? bodyRows.value.length === 0 : displayRows.value.length === 0),
 );
 const showError = computed(() => !heldLoading.value && !!props.error);
 const showLoadingOverlay = computed(() => heldLoading.value);
@@ -1142,27 +1238,29 @@ defineExpose({
       <div
         v-if="slots.toolbar || slots['toolbar-trailing']"
         :class="[
-          'px-page-edge flex items-center gap-2 py-2',
+          'px-page-edge flex items-center gap-2 py-2 max-md:flex-wrap max-md:gap-y-1.5',
           props.toolbarBordered ? 'border-table-row-divider border-b' : '',
         ]"
         data-test="o2-table-toolbar"
       >
         <slot name="toolbar" />
-        <OTableColumnToggle
-          v-if="
-            props.persistColumns &&
-            props.tableId &&
-            props.columns.some((c) => c.hideable && !c.isAction)
-          "
-          :columns="props.columns"
-          :column-visibility="internalColumnVisibility"
-          :has-resized-columns="props.enableColumnResize && hasResizedColumns"
-          class="shrink-0"
-          data-test="o2-table-column-toggle"
-          @update:column-visibility="handleColumnVisibilityChange"
-          @reset:column-sizes="handleResetColumnSizes"
-        />
-        <slot name="toolbar-trailing" />
+        <!-- Rendered only with content: an empty flex item still costs the toolbar a gap. -->
+        <div
+          v-if="showColumnToggle || slots['toolbar-trailing']"
+          class="flex shrink-0 items-center gap-2 max-md:ms-auto"
+        >
+          <OTableColumnToggle
+            v-if="showColumnToggle"
+            :columns="props.columns"
+            :column-visibility="internalColumnVisibility"
+            :has-resized-columns="props.enableColumnResize && hasResizedColumns"
+            class="shrink-0"
+            data-test="o2-table-column-toggle"
+            @update:column-visibility="handleColumnVisibilityChange"
+            @reset:column-sizes="handleResetColumnSizes"
+          />
+          <slot name="toolbar-trailing" />
+        </div>
       </div>
       <!-- ── Sub-header slot: custom full-width content between the toolbar and
          the table body (e.g. a summary-stat strip). ── -->
@@ -1287,6 +1385,7 @@ defineExpose({
             ...measuredColumnSizeVars,
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
+            ...(mobileMinTableWidth ? { minWidth: mobileMinTableWidth } : {}),
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`
@@ -1357,7 +1456,8 @@ defineExpose({
           <!-- ── Body ─────────────────────────────────────────── -->
           <OTableBody
             v-else-if="!showEmpty && !showError"
-            :rows="displayRows"
+            :rows="bodyRows"
+            :sections="sectionsEnabled ? rowSections : undefined"
             :table="table"
             :clickable="isRowClickable"
             :selection-enabled="selection.isEnabled.value"
@@ -1375,7 +1475,7 @@ defineExpose({
             :dense="props.dense"
             :bordered="props.bordered"
             :striped="props.striped"
-            :row-class="props.rowClass as any"
+            :row-class="resolvedRowClass as any"
             :row-style-fn="props.getRowStyle"
             :get-status-bar-color="props.getRowStatusColor"
             :enable-cell-copy="props.enableCellCopy"
@@ -1432,6 +1532,11 @@ defineExpose({
             <!-- Expansion slot -->
             <template v-if="slots.expansion" #expansion="expSlotProps">
               <slot name="expansion" :row="expSlotProps.row" />
+            </template>
+
+            <!-- Section heading row -->
+            <template v-if="slots['group-header']" #group-header="ghProps">
+              <slot name="group-header" :section-key="ghProps.sectionKey" :rows="ghProps.rows" />
             </template>
 
             <!-- Tree-mode warning row slot -->

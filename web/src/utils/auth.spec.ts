@@ -53,6 +53,7 @@ import {
   trialPeriodAllowedPath,
   trialPaywallAllowedPath,
   isTrialExpired,
+  isEmptyDataExempt,
   getUserInfo,
   invalidateLoginData,
   getDecodedAccessToken,
@@ -133,7 +134,6 @@ describe("trialPeriodAllowedPath", () => {
     expect(trialPeriodAllowedPath).toHaveLength(4);
   });
 
-  // The empty-data guard reads this list, so "general" must stay out of it.
   it("does not contain general", () => {
     expect(trialPeriodAllowedPath).not.toContain("general");
   });
@@ -152,9 +152,28 @@ describe("trialPeriodAllowedPath", () => {
     trialPeriodAllowedPath.forEach((p) => expect(trialPaywallAllowedPath).toContain(p));
   });
 
-  // The empty-data guard reads this list, so the shell must stay out of it.
-  it("does not contain the settings shell in the empty-data list", () => {
+  it("does not contain the settings shell", () => {
     expect(trialPeriodAllowedPath).not.toContain("settings");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isEmptyDataExempt
+// ---------------------------------------------------------------------------
+
+describe("isEmptyDataExempt", () => {
+  it("is true when the route meta carries allowOnEmptyData: true", () => {
+    expect(isEmptyDataExempt({ meta: { allowOnEmptyData: true } })).toBe(true);
+  });
+
+  // Merged meta is child-over-parent, so a child can re-gate itself with `false`.
+  it.each([
+    ["a route with no meta", {}],
+    ["a route whose meta lacks the flag", { meta: { titleKey: "menu.logs" } }],
+    ["a child override of false", { meta: { allowOnEmptyData: false } }],
+    ["a truthy non-boolean flag", { meta: { allowOnEmptyData: "true" } }],
+  ])("is false for %s", (_label, route) => {
+    expect(isEmptyDataExempt(route)).toBe(false);
   });
 });
 
@@ -406,7 +425,6 @@ describe("routeGuard", () => {
       expect(mockNext).toHaveBeenCalledWith(expect.objectContaining({ name: "plans" }));
     });
 
-    // The nav resolves to name "settings", not "general"; paywalling it hides the feature.
     it("lets the nav settings shell through", async () => {
       (config as any).isCloud = "true";
       mockStore = buildExpiredTrialStore();
@@ -520,7 +538,7 @@ describe("routeGuard", () => {
         },
       });
 
-    // emptyDataAllowedPaths is what exempts /settings/general here, not the name list.
+    // The route's own meta flag is what exempts /settings/general here, not its name.
     it("lets /settings/general through on a no-data org", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
@@ -529,13 +547,18 @@ describe("routeGuard", () => {
       mockStore = buildNoDataStore();
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard({ name: "general", path: "/settings/general" }, {}, mockNext);
+      await routeGuard(
+        { name: "general", path: "/settings/general", meta: { allowOnEmptyData: true } },
+        {},
+        mockNext,
+      );
 
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledWith();
       expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
     });
 
-    // Same name, uncovered path: fails if the name list ever does the exempting.
+    // Same name as the flagged fixture above, no flag: fails if the name ever does the exempting.
     it("does not exempt a general-named route at an uncovered path", async () => {
       (config as any).isCloud = "false";
       vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
@@ -635,7 +658,11 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard({ name: "ingestion", path: "/ingestion" }, {}, mockNext);
+      await routeGuard(
+        { name: "ingestion", path: "/ingestion", meta: { allowOnEmptyData: true } },
+        {},
+        mockNext,
+      );
 
       expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -655,7 +682,11 @@ describe("routeGuard", () => {
       });
       vi.mocked(useStore).mockReturnValue(mockStore as any);
 
-      await routeGuard({ name: "iam", path: "/iam" }, {}, mockNext);
+      await routeGuard(
+        { name: "iam", path: "/iam", meta: { allowOnEmptyData: true } },
+        {},
+        mockNext,
+      );
 
       expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
       expect(mockNext).toHaveBeenCalledTimes(1);
@@ -673,32 +704,7 @@ describe("routeGuard", () => {
         },
       });
 
-    // /settings/general hosts the Danger Zone, and an org with nothing ingested is
-    // the one an admin is most likely to delete — bouncing to /ingestion would
-    // leave no way to. "/settings" is the nav's landing path before it redirects
-    // to general, so it has to survive the guard too.
-    it.each([
-      ["settings landing", "settings", "/settings"],
-      ["general settings", "general", "/settings/general"],
-      ["general settings, trailing slash", "general", "/settings/general/"],
-    ])("calls next() directly for %s", async (_label, name, path) => {
-      (config as any).isCloud = "false";
-      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
-        data: { streams: { num_streams: 0 } },
-      });
-      mockStore = buildEmptyDataStore();
-      vi.mocked(useStore).mockReturnValue(mockStore as any);
-
-      await routeGuard({ name, path }, {}, mockNext);
-
-      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
-      expect(mockNext).toHaveBeenCalledTimes(1);
-      expect(mockNext).not.toHaveBeenCalledWith({ path: "/ingestion" });
-    });
-
-    // The exemption is deliberately only the two paths above — the rest of the
-    // Settings tree shows no ingested data either, but it is not needed to escape
-    // an empty org, so it stays behind the ingestion redirect.
+    // Settings children carry no flag, so they stay gated even though they show no data.
     it.each([
       ["organizationSettings", "/settings/organization"],
       ["license", "/settings/license"],
@@ -713,6 +719,124 @@ describe("routeGuard", () => {
 
       await routeGuard({ name, path }, {}, mockNext);
 
+      expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
+    });
+
+    // Synthetics produces an empty org's first data and on-call is set up before any flows.
+    it.each([
+      ["synthetics", { name: "synthetics", path: "/synthetics", meta: { allowOnEmptyData: true } }],
+      [
+        "synthetic-private-location",
+        {
+          name: "synthetic-private-location",
+          path: "/synthetic/private-locations/abc",
+          meta: { allowOnEmptyData: true },
+        },
+      ],
+      [
+        "onCallTeamDetail",
+        {
+          name: "onCallTeamDetail",
+          path: "/oncall/teams/team_1/schedule",
+          meta: { allowOnEmptyData: true },
+        },
+      ],
+    ])("calls next() directly for the flagged %s route", async (_label, route) => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard(route, {}, mockNext);
+
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith();
+    });
+
+    // The flag exempts a route from the empty-data gate only, never from the paywall.
+    it("still redirects a flagged route to plans when the cloud trial is expired", async () => {
+      (config as any).isCloud = "true";
+      mockStore = buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000,
+            },
+            isDataIngested: false,
+          },
+          selectedOrganization: { identifier: "my-org" },
+          zoConfig: { restricted_routes_on_empty_data: true },
+        },
+      });
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard(
+        { name: "synthetics", path: "/synthetics", meta: { allowOnEmptyData: true } },
+        {},
+        mockNext,
+      );
+
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "plans",
+        query: { org_identifier: "my-org" },
+      });
+    });
+
+    // Paywall runs before the empty-data gate; an empty org must not turn a paywall into a bounce.
+    it("still redirects an unflagged route to plans when the cloud trial is expired on an empty org", async () => {
+      (config as any).isCloud = "true";
+      mockStore = buildMockStore({
+        state: {
+          organizationData: {
+            organizationSettings: {
+              free_trial_expiry: (Date.now() - 30 * 24 * 60 * 60 * 1000) * 1000,
+            },
+            isDataIngested: false,
+          },
+          selectedOrganization: { identifier: "my-org" },
+          zoConfig: { restricted_routes_on_empty_data: true },
+        },
+      });
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard({ name: "logs", path: "/logs" }, {}, mockNext);
+
+      expect(organizationService.get_organization_summary).not.toHaveBeenCalled();
+      expect(mockNext).toHaveBeenCalledTimes(1);
+      expect(mockNext).toHaveBeenCalledWith({
+        name: "plans",
+        query: { org_identifier: "my-org" },
+      });
+    });
+
+    // Only the meta flag exempts; a matching name or path prefix does not.
+    it.each([
+      ["an unflagged general route", { name: "general", path: "/settings/general" }],
+      ["an unflagged route on a synthetics path", { name: "x", path: "/synthetics/foo" }],
+      ["an unflagged near-miss of the on-call path", { name: "oncallish", path: "/oncallish" }],
+      ["a route named users under /iam", { name: "users", path: "/iam/users" }],
+      ["an unflagged route named iam", { name: "iam", path: "/access" }],
+      [
+        "an unflagged route under /ingestion",
+        { name: "curl", path: "/ingestion/custom/logs/curl" },
+      ],
+      ["the unflagged settings shell", { name: "settings", path: "/settings" }],
+    ])("redirects %s to /ingestion", async (_label, route) => {
+      (config as any).isCloud = "false";
+      vi.mocked(organizationService.get_organization_summary).mockResolvedValue({
+        data: { streams: { num_streams: 0 } },
+      });
+      mockStore = buildEmptyDataStore();
+      vi.mocked(useStore).mockReturnValue(mockStore as any);
+
+      await routeGuard(route, {}, mockNext);
+
+      expect(mockNext).toHaveBeenCalledTimes(1);
       expect(mockNext).toHaveBeenCalledWith({ path: "/ingestion" });
     });
   });

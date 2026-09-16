@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250">
+  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250" compact-mode="strip">
     <template #tabs>
       <ORouteTab
         name="ingestLogs"
@@ -39,6 +39,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           },
         }"
         :label="t('ingestion.metricsLabel')"
+      />
+      <ORouteTab
+        name="ingestProfiles"
+        data-test="ingestion-custom-tab-ingestProfiles"
+        :to="{
+          name: 'ingestProfiles',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.profilesLabel')"
       />
       <ORouteTab
         name="ingestTraces"
@@ -102,6 +113,7 @@ export default defineComponent({
       "cloudwatchMetrics",
     ];
     const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
+    const profileRoutes = ["profilesOtelCollector"];
     const rumRoutes = ["frontendMonitoring"];
     const logRoutes = [
       "curl",
@@ -121,16 +133,24 @@ export default defineComponent({
         ? "ingestLogs"
         : metricRoutes.includes(router.currentRoute.value.name as string)
           ? "ingestMetrics"
-          : traceRoutes.includes(router.currentRoute.value.name as string)
-            ? "ingestTraces"
-            : "ingestLogs",
+          : profileRoutes.includes(router.currentRoute.value.name as string)
+            ? "ingestProfiles"
+            : traceRoutes.includes(router.currentRoute.value.name as string)
+              ? "ingestTraces"
+              : "ingestLogs",
     );
 
     onBeforeMount(() => {
       // Parent container routes: navigating to these redirects to their first child.
       // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
       // are intentionally excluded here — they just set the active tab below.
-      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics", "rumMonitoring"];
+      const ingestRoutes = [
+        "ingestLogs",
+        "ingestTraces",
+        "ingestMetrics",
+        "ingestProfiles",
+        "rumMonitoring",
+      ];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -148,6 +168,8 @@ export default defineComponent({
         tabs.value = "ingestMetrics";
       } else if (traceRoutes.includes(router.currentRoute.value.name)) {
         tabs.value = "ingestTraces";
+      } else if (profileRoutes.includes(router.currentRoute.value.name)) {
+        tabs.value = "ingestProfiles";
       } else if (ingestRoutes.includes(router.currentRoute.value.name)) {
         tabs.value = router.currentRoute.value.name;
       } else if (rumRoutes.includes(router.currentRoute.value.name)) {
@@ -206,6 +228,7 @@ export default defineComponent({
       rumRoutes,
       traceRoutes,
       metricRoutes,
+      profileRoutes,
     };
   },
 });

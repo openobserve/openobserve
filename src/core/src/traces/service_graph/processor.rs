@@ -20,6 +20,7 @@
 
 #[cfg(feature = "enterprise")]
 use {
+    super::run_graph_search,
     config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros},
     infra::cluster::get_node_by_uuid,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
@@ -36,6 +37,11 @@ struct RecentIngestedTraceStream {
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
+    // once v4 owns the graph, v1 keeps its offset and the agent-signals rollup only
+    let stopped = crate::db::service_graph::is_v1_stopped().await;
+    if stopped {
+        log::info!("[ServiceGraph] v1 stopped: service-graph edges are no longer computed");
+    }
     // get last offset
     let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
     // other node is processing
@@ -165,8 +171,9 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
     {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
 
-        if let Err(e) =
-            process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
+        if !stopped
+            && let Err(e) =
+                process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
         {
             log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
             continue; // Don't fail entire job if one stream fails
@@ -743,53 +750,6 @@ async fn process_stream(
     // SQL already aggregated everything - just write directly to _o2_service_graph stream
     crate::traces::service_graph::write_sql_aggregated_edges(org_id, stream_name, hits).await?;
     Ok(())
-}
-
-/// Run a pre-aggregated service-graph edge query against a trace stream and return
-/// the raw result hits. Shared by the instrumented self-join query and the
-/// inferred-dependency query.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn run_graph_search(
-    org_id: &str,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 100000,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 300, // 5 minute timeout for large queries
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        clear_cache: false,
-        local_mode: Some(false),
-        agent_options: None,
-    };
-
-    let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
-    Ok(resp.hits)
 }
 
 // Stub implementation for non-enterprise builds

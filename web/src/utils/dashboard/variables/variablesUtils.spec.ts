@@ -20,6 +20,9 @@ import {
   formatRateInterval,
   processVariableContent,
   normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+  getReferencedVariableNames,
+  getVariablesReferencedInQueries,
 } from "./variablesUtils";
 
 describe("Variables Utils", () => {
@@ -212,11 +215,21 @@ describe("Variables Utils", () => {
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
+    // Deliberate: this function only renders HTML/Markdown panel text (its sole callers are
+    // HTMLRenderer.vue and MarkdownRenderer.vue), where a comma list is the readable form.
+    // PromQL/SQL panel queries go through usePanelVariableSubstitution.replaceQueryValue,
+    // which already pipe-joins for promql — do not "fix" this default to `|`.
     it("should handle array values with default comma separation", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
 
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("keeps the comma default for a regex-shaped placeholder in display text", () => {
+      const content = 'up{service=~"$service"}';
+
+      expect(processVariableContent(content, mockVariablesData)).toBe('up{service=~"api,web,db"}');
     });
 
     it("should handle array values with CSV formatting", () => {
@@ -631,6 +644,140 @@ describe("Variables Utils", () => {
       const processed = processVariableContent(query, variablesData);
 
       expect(processed).toBe("rate(requests[1h]) by (service) where service in ('api','web')");
+    });
+  });
+
+  describe("replaceVariablePlaceholders", () => {
+    const values: Record<string, string> = { traceid: "abc123", traceid_sql: "xyz789" };
+    const resolveFrom =
+      (map: Record<string, string>) =>
+      ({ name }: { name: string }) =>
+        map[name];
+
+    it.each([
+      ["$traceid_sql", "xyz789"],
+      ["${traceid_sql}", "xyz789"],
+      ["{{traceid_sql}}", "xyz789"],
+      ["$traceid", "abc123"],
+    ])("resolves %s to the longest matching variable", (placeholder, expected) => {
+      expect(
+        replaceVariablePlaceholders(placeholder, ["traceid", "traceid_sql"], resolveFrom(values)),
+      ).toBe(expected);
+      expect(
+        replaceVariablePlaceholders(placeholder, ["traceid_sql", "traceid"], resolveFrom(values)),
+      ).toBe(expected);
+    });
+
+    it("keeps concatenating a literal suffix onto the longest defined prefix", () => {
+      expect(
+        replaceVariablePlaceholders("'$env-api' $env_west", ["env"], resolveFrom({ env: "prod" })),
+      ).toBe("'prod-api' prod_west");
+    });
+
+    it("leaves unknown placeholders untouched", () => {
+      expect(
+        replaceVariablePlaceholders("$other ${other} {{other}}", ["traceid"], resolveFrom(values)),
+      ).toBe("$other ${other} {{other}}");
+    });
+
+    it("keeps the placeholder when resolve returns undefined instead of using a shorter name", () => {
+      expect(
+        replaceVariablePlaceholders(
+          "$traceid_sql",
+          ["traceid", "traceid_sql"],
+          resolveFrom({ traceid: "abc123" }),
+        ),
+      ).toBe("$traceid_sql");
+    });
+
+    it("does not rescan substituted values", () => {
+      expect(
+        replaceVariablePlaceholders(
+          "$traceid",
+          ["traceid", "traceid_sql"],
+          resolveFrom({ traceid: "$traceid_sql", traceid_sql: "xyz789" }),
+        ),
+      ).toBe("$traceid_sql");
+    });
+
+    it("inserts replacement-pattern characters literally", () => {
+      expect(replaceVariablePlaceholders("$v", ["v"], () => "$& $1 $$")).toBe("$& $1 $$");
+    });
+
+    it("matches names containing regex metacharacters literally", () => {
+      expect(replaceVariablePlaceholders("$a.b $aXb", ["a.b"], () => "hit")).toBe("hit $aXb");
+    });
+
+    it("passes the format of braced and mustache placeholders", () => {
+      const seen: (string | undefined)[] = [];
+      replaceVariablePlaceholders("${v:csv} {{ v : pipe }} $v", ["v"], ({ format }) => {
+        seen.push(format);
+        return "";
+      });
+      expect(seen).toEqual(["csv", "pipe", undefined]);
+    });
+
+    it("leaves unsupported formats untouched", () => {
+      expect(replaceVariablePlaceholders("${v:json} {{v:json}}", ["v"], () => "hit")).toBe(
+        "${v:json} {{v:json}}",
+      );
+    });
+
+    it("flags placeholders wrapped in single quotes", () => {
+      const quoted: boolean[] = [];
+      replaceVariablePlaceholders("'$v' $v '${v}' '$v-x'", ["v"], (p) => {
+        quoted.push(p.quoted);
+        return "";
+      });
+      expect(quoted).toEqual([true, false, true, false]);
+    });
+
+    it("returns the text unchanged when there are no names", () => {
+      expect(replaceVariablePlaceholders("$v", [], () => "hit")).toBe("$v");
+    });
+  });
+
+  describe("getReferencedVariableNames", () => {
+    it("reports only the longest matching name for each placeholder", () => {
+      expect([
+        ...getReferencedVariableNames(
+          ["WHERE a = '$traceid_sql'", undefined, "{{env}}"],
+          ["traceid", "traceid_sql", "env"],
+        ),
+      ]).toEqual(["traceid_sql", "env"]);
+    });
+  });
+
+  describe("getVariablesReferencedInQueries", () => {
+    it("returns referenced non ad hoc variables in definition order", () => {
+      const variables = [
+        { name: "traceid", type: "textbox" },
+        { name: "traceid_sql", type: "textbox" },
+        { name: "env", type: "dynamic_filters" },
+      ];
+      expect(
+        getVariablesReferencedInQueries(variables, [
+          { query: "WHERE a = '$traceid_sql' AND $env" },
+        ])?.map((v) => v.name),
+      ).toEqual(["traceid_sql"]);
+    });
+
+    it("returns undefined without variables", () => {
+      expect(getVariablesReferencedInQueries(undefined, [{ query: "$a" }])).toBeUndefined();
+    });
+  });
+
+  describe("processVariableContent with shared name prefixes", () => {
+    it("resolves each placeholder to its own variable regardless of definition order", () => {
+      const variablesData = {
+        values: [
+          { name: "traceid", value: "abc123" },
+          { name: "traceid_sql", value: "xyz789" },
+        ],
+      };
+      expect(processVariableContent("$traceid | $traceid_sql", variablesData)).toBe(
+        "abc123 | xyz789",
+      );
     });
   });
 });

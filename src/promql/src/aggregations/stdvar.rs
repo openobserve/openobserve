@@ -15,17 +15,18 @@
 
 use super::{AggFunc, dispersion::DispersionAccumulator};
 
+#[derive(Clone, Copy)]
 pub struct Stdvar;
 
 impl AggFunc for Stdvar {
-    type Accumulator = DispersionAccumulator;
+    type Accumulator = DispersionAccumulator<false>;
 
     fn name(&self) -> &'static str {
         "stdvar"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        DispersionAccumulator::new(false)
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        DispersionAccumulator::new(slots)
     }
 
     // Buffered values would be copied again at every parallel reduction level.

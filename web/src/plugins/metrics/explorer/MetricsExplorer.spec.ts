@@ -342,6 +342,46 @@ describe("MetricsExplorer wiring", () => {
 
       expect(grid.sweepSlice).toHaveBeenCalledWith({ skipCache: false });
     });
+
+    it("a MANUAL refresh keeps the grid mounted while the stream list reloads", async () => {
+      const wrapper = mountExplorer();
+      let spinnerDuringReload: boolean | undefined;
+      grid.loadStreams.mockImplementationOnce(async () => {
+        grid.loading.value = true;
+        spinnerDuringReload = (wrapper.vm as any).showLoading;
+        grid.loading.value = false;
+      });
+
+      await (wrapper.vm as any).onRefresh();
+      await flushPromises();
+
+      expect(grid.loadStreams).toHaveBeenCalledWith(true);
+      expect(spinnerDuringReload).toBe(false);
+    });
+
+    it("still shows the loading spinner for a load that is not a refresh", () => {
+      grid.loading.value = true;
+      const wrapper = mountExplorer();
+
+      expect((wrapper.vm as any).showLoading).toBe(true);
+      grid.loading.value = false;
+    });
+
+    it("a MANUAL refresh re-queries the on-screen cards with the cards the reload rebuilt", async () => {
+      const wrapper = mountExplorer();
+      (wrapper.vm as any).onCardVisible(CARD);
+      const rebuilt = { ...CARD, help: "from the reloaded stream list" };
+      grid.loadStreams.mockImplementationOnce(async () => {
+        // In place: the mock is not reactive, so the explorer's `visibleCards` computed keeps this array.
+        grid.pagedCards.value.splice(0, 1, rebuilt);
+      });
+      grid.requestPreview.mockClear();
+
+      await (wrapper.vm as any).onRefresh();
+      await flushPromises();
+
+      expect(grid.requestPreview).toHaveBeenCalledWith(rebuilt, { skipCache: true });
+    });
   });
 
   describe("the facet selector lives on the search row, over an always-open panel", () => {

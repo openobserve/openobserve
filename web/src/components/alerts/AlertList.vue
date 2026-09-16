@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
@@ -37,24 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
-        <IacRegistryLinks data-test="alert-list-iac-registries" />
-        <!-- Import button -->
-        <OButton
-          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
-          variant="outline"
-          size="sm"
-          @click="importAlert"
-          data-test="alert-import"
-          icon-left="upload-file"
-        >
-          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
-          <OTooltip
-            v-if="isCompactToolbar"
-            :content="t('dashboard.import')"
-            side="bottom"
-            shortcut-id="alertsImport"
-          />
-        </OButton>
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -78,15 +61,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1">
+      <template #actions-overflow>
+        <IacRegistryLinks data-test="alert-list-iac-registries" />
+        <!-- Import button -->
+        <OButton
+          :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
+          variant="outline"
+          size="sm"
+          @click="importAlert"
+          data-test="alert-import"
+          icon-left="upload-file"
+        >
+          <template v-if="!isCompactToolbar">{{ t(`dashboard.import`) }}</template>
+          <OTooltip
+            v-if="isCompactToolbar"
+            :content="t('dashboard.import')"
+            side="bottom"
+            shortcut-id="alertsImport"
+          />
+        </OButton>
+      </template>
+
+      <div data-test="alert-list-splitter" class="flex min-h-0 flex-1 max-md:flex-col">
         <!-- Left: FolderList -->
-        <div class="w-rail h-full shrink-0">
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="alerts" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
         <!-- Right: Table -->
-        <div class="h-full min-w-0 flex-1">
+        <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg flex h-full flex-col">
             <!-- Alert List Table (shows all alert types including anomaly detection rows) -->
             <OTable
@@ -139,8 +145,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <!-- Toolbar: alert-type filter + search (inline folder scope) + refresh. -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
+                <div
+                  class="flex w-full items-center gap-2 max-lg:@container/alert-toolbar max-lg:min-w-0 max-lg:flex-1 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+                >
                   <OToggleGroup
+                    mobile-dropdown
                     :model-value="activeTab"
                     data-test="alert-list-tabs"
                     @update:model-value="(v) => onAlertTabChange(v as string)"
@@ -151,12 +161,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :value="tab.value"
                       size="sm"
                       :icon-left="tab.icon"
+                      :title="lgUp ? undefined : tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      {{ tab.label }}
+                      <span class="@max-[34rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
-                  <div class="min-w-0 flex-1">
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
+                  <div class="min-w-0 flex-1 md:max-lg:min-w-80">
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -183,7 +195,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            >{{ t("alerts.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -191,7 +205,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            >{{ t("alerts.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden">{{
+                              t("alerts.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>
@@ -382,6 +398,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span v-else class="text-text-secondary">—</span>
               </template>
 
+              <!-- Which team this alert pages. Only an alert that NAMES a team
+                   can be answered here: every other one is routed from the
+                   identity dimensions of the row that fires, which an alert
+                   definition does not carry, so it is resolved at fire time and
+                   says so rather than guessing. -->
+              <template #cell-oncall_team="{ row }">
+                <OTag
+                  v-if="row.oncall_team"
+                  type="exampleChip"
+                  value="dim"
+                  :label="oncallTeamName(row.oncall_team)"
+                  :data-test="`alert-list-${row.name}-oncall-team`"
+                />
+                <OTooltip v-else :content="t('alerts.oncallTeamFromRules')">
+                  <span class="text-text-secondary text-2xs">
+                    {{ t("alerts.oncallTeamAtFireTime") }}
+                  </span>
+                </OTooltip>
+              </template>
+
               <!-- Tags (PT-6). Three visible + overflow count, so an alert
                    carrying 64 tags cannot blow out the row height. -->
               <template #cell-tags="{ row }">
@@ -476,7 +512,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ms-1 flex items-center justify-center"
+                    class="ms-1 flex items-center justify-center max-md:hidden"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -485,7 +521,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ms-1"
+                    class="ms-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"
@@ -503,6 +539,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     variant="ghost"
                     size="icon-sm"
                     icon-left="edit"
+                    class="max-md:hidden"
                     @click.stop="editAlert(row)"
                   >
                     <OTooltip
@@ -516,7 +553,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                        button receives no pointer events, so a tooltip anchored
                        to it would never open — leaving a greyed-out control
                        with no way to find out why. -->
-                  <span class="inline-flex">
+                  <span class="inline-flex max-md:hidden">
                     <OTooltip
                       v-if="isSloRow(row)"
                       side="bottom"
@@ -569,6 +606,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :data-test="`alert-list-${row.name}-more-options`"
                       />
                     </template>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="!!alertStateLoadingMap[row.uuid]"
+                      :data-test="`alert-list-${row.name}-pause-start-alert-menu`"
+                      @select="toggleAlertState(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon :name="row.enabled ? 'pause' : 'play-arrow'" size="sm" />
+                      </template>
+                      {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :data-test="`alert-list-${row.name}-update-alert-menu`"
+                      @select="editAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="edit" size="sm" />
+                      </template>
+                      {{ t("alerts.edit") }}
+                    </ODropdownItem>
+                    <ODropdownItem
+                      class="md:hidden"
+                      :disabled="isSloRow(row)"
+                      :data-test="`alert-list-${row.name}-clone-alert-menu`"
+                      @select="duplicateAlert(row)"
+                    >
+                      <template #icon-left>
+                        <OIcon name="content-copy" size="sm" />
+                      </template>
+                      {{ t("alerts.clone") }}
+                    </ODropdownItem>
+                    <ODropdownSeparator class="md:hidden" />
                     <ODropdownItem
                       :data-test="`alert-list-${row.name}-move-alert`"
                       @select="moveAlertToAnotherFolder(row)"
@@ -676,7 +746,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >{{ selectedAlerts.length }} {{ t("alerts.conditionOf") }} {{ resultTotal }}
                       {{ t("alerts.selectedLabel") }}</template
                     >
-                    <template v-else>{{ resultTotal }} {{ t("alerts.header") }}</template>
+                    <span v-else class="max-md:hidden"
+                      >{{ resultTotal }} {{ t("alerts.header") }}</span
+                    >
                   </div>
 
                   <OButton
@@ -877,6 +949,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
+import oncallService from "@/services/oncall";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -896,12 +969,14 @@ import { getImageURL, getUUID, verifyOrganizationStatus } from "@/utils/zincutil
 import { copyToClipboard } from "@/utils/clipboard";
 import { useReo } from "@/services/reodotdev_analytics";
 import type { Alert } from "@/ts/interfaces/index";
+import type { OnCallTeam } from "@/ts/interfaces/oncall";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
 import { nextTick } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
@@ -971,6 +1046,30 @@ export default defineComponent({
   setup() {
     const store = useStore();
     const { t } = useI18nTyped();
+    const { lgUp } = useBreakpoint();
+
+    // On-call is separately gated, so the column and its lookup vanish with it
+    // rather than showing a header nothing can ever fill.
+    const oncallEnabled = computed(() => store.state.zoConfig?.oncall_enabled === true);
+    const oncallTeams = ref<OnCallTeam[]>([]);
+
+    /// The alert stores a team id; a woken engineer needs the name. Falls back
+    /// to the id when the team list could not be read, because an opaque id is
+    /// still better than an empty cell that reads as "routed from rules".
+    const oncallTeamName = (teamId: string): I18nText =>
+      raw(oncallTeams.value.find((team) => team.id === teamId)?.name ?? teamId);
+
+    async function fetchOnCallTeams() {
+      if (!oncallEnabled.value) return;
+      try {
+        const res = await oncallService.listTeams({
+          org_identifier: store.state.selectedOrganization.identifier,
+        });
+        oncallTeams.value = res.data ?? [];
+      } catch {
+        oncallTeams.value = [];
+      }
+    }
     const router = useRouter();
     const { track } = useReo();
     const formData: Ref<Alert | {}> = ref({});
@@ -1117,6 +1216,7 @@ export default defineComponent({
 
     onMounted(() => {
       window.addEventListener("resize", onWindowResize);
+      void fetchOnCallTeams();
     });
 
     onBeforeUnmount(() => {
@@ -1511,6 +1611,24 @@ export default defineComponent({
           size: 170,
           meta: { align: "left" },
         },
+        // "oncall_team" — which team this alert would page. Only present on a
+        // build with on-call enabled, and hidden by default: it is an audit
+        // column, not something every alerts list needs open.
+        ...(oncallEnabled.value
+          ? [
+              {
+                id: "oncall_team",
+                accessorKey: "oncall_team",
+                header: t("alerts.oncallTeam"),
+                cell: " ",
+                sortable: true,
+                resizable: true,
+                hideable: true,
+                size: 200,
+                meta: { align: "left" },
+              } as OTableColumnDef,
+            ]
+          : []),
         // "tags" — the selection primitive (PT-6). Not sortable: a tag list has
         // no meaningful order and sorting by it would imply one.
         {
@@ -1704,9 +1822,18 @@ export default defineComponent({
       firing_count: anomaly.firing_count ?? "--",
       status: anomaly.status || "--",
       last_error: anomaly.last_error || null,
+      // Anomaly rows share the alerts table, so they share its On-call team
+      // column. This branch returns before the mapping below, so anything the
+      // column needs has to be listed here as well or the row renders as
+      // unbound whatever the API sent.
+      oncall_team: anomaly.oncall_team ?? null,
       // Built field by field: anything unlisted is invisible to the table.
       last_outcome: anomaly.last_outcome ?? null,
       last_outcome_at: anomaly.last_outcome_at ?? null,
+      // Feature 2 carries these on anomaly configs too, and the API sends them
+      // — `anomaly_priority_tag_tests` pins that. This branch returns before
+      // the mapping that reads them for scheduled alerts, so an anomaly row
+      // showed no priority and no tags however the config was set.
       priority: anomaly.priority ?? null,
       tags: anomaly.tags ?? [],
       selected: false,
@@ -1874,6 +2001,12 @@ export default defineComponent({
             // what the API returns.
             priority: data.priority ?? null,
             tags: data.tags ?? [],
+            // The team this alert names, for the On-call team column. Same
+            // reason as the two above: the column, the name resolver and the
+            // team fetch all existed, and the field was carried by neither the
+            // API nor this mapping — so every alert rendered "From ownership",
+            // including ones deliberately pinned to a team.
+            oncall_team: data.oncall_team ?? null,
             // Severity axis (alerts_2.md Feature 1) — independent of outcome.
             level: data.level ?? null,
             level_since: data.level_since ?? null,
@@ -3418,6 +3551,9 @@ export default defineComponent({
     ]);
 
     return {
+      oncallEnabled,
+      oncallTeamName,
+      lgUp,
       raw,
       t,
       store,

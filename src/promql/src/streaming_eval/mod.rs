@@ -16,14 +16,12 @@
 //! Consumers of a `SeriesStream`: the fused aggregate folds each series into per-group
 //! accumulators as it arrives, `eval_range` keeps every series' range-function output whole.
 
-mod accumulator;
 mod aggregate;
 mod eval_range;
 mod range_expr;
 
 use std::sync::Arc;
 
-pub(crate) use accumulator::FusedAggOp;
 pub(crate) use aggregate::aggregate;
 use datafusion::error::{DataFusionError, Result};
 pub(crate) use eval_range::eval_range;
@@ -202,7 +200,7 @@ pub(crate) mod tests {
                         notify.notify_one();
                     }
                     let series = RangeValue::new(vec![], [Sample::new(0, index as f64)]);
-                    Ok(matrix_streams(vec![series; index + 1], &None, 1)
+                    Ok(matrix_streams(vec![series; index + 1], &None, 1, false)
                         .pop()
                         .unwrap())
                 }
@@ -211,8 +209,10 @@ pub(crate) mod tests {
         let (parts, count) = evaluate_partitions(sources, &eval, |mut stream, _| async move {
             let mut value = 0;
             let mut count = 0;
+            let mut samples = Vec::new();
             while stream.advance().await?.is_some() {
-                value = stream.consume().await?[0].value as usize;
+                stream.consume(&mut samples).await?;
+                value = samples[0].value as usize;
                 count += 1;
             }
             Ok((value, count))

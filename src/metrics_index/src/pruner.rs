@@ -313,5 +313,11 @@ pub(super) fn create_physical_filter(
     let df_schema = DFSchema::try_from(sidecar_schema.clone())?;
     // plain expression planning: no session/registry needed for column
     // comparisons and regexp_like
-    create_physical_expr(&filter, &df_schema, &ExecutionProps::new()).map(Some)
+    create_physical_expr(
+        &filter,
+        &df_schema,
+        &ExecutionProps::new(),
+        &Default::default(),
+    )
+    .map(Some)
 }

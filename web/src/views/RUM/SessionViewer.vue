@@ -153,6 +153,7 @@ import useRum from "@/composables/rum/useRum";
 
 import { formatDate } from "@/utils/date";
 import { getUUID } from "@/utils/zincutils";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 
 const defaultEvent = {
   id: "",
@@ -324,7 +325,7 @@ const getSession = () => {
 
     const req = {
       query: {
-        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where session_id='${getSessionId.value}' order by zo_sql_timestamp`,
+        sql: `select min(${store.state.zoConfig.timestamp_column}) as zo_sql_timestamp, min(start) as start_time, max(end) as end_time, min(user_agent_user_agent_family) as browser, min(user_agent_os_family) as os, min(ip) as ip, min(source) as source, ${geoFields} min(session_id) as session_id from "_sessionreplay" where ${sqlEquals("session_id", getSessionId.value)} order by zo_sql_timestamp`,
         start_time: Number(router.currentRoute.value.query.start_time) - 86400000000,
         end_time: Number(router.currentRoute.value.query.end_time) + 86400000000,
         from: 0,
@@ -389,7 +390,7 @@ const getSessionSegments = () => {
   };
 
   const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_sessionreplay" where session_id='${sessionId.value}' order by start asc`;
+  req.query.sql = `select * from "_sessionreplay" where ${sqlEquals("session_id", sessionId.value)} order by start asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
@@ -449,7 +450,7 @@ const getSessionEvents = () => {
   };
 
   const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_rumdata" where session_id='${sessionId.value}' and (type='error' or type='action' or type='view') order by date asc`;
+  req.query.sql = `select * from "_rumdata" where ${sqlEquals("session_id", sessionId.value)} and (type='error' or type='action' or type='view') order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService
@@ -507,7 +508,7 @@ const getSessionErrorLogs = () => {
   };
 
   const req = buildQueryPayload(queryPayload, t);
-  req.query.sql = `select * from "_rumlog" where session_id='${sessionId.value}' and status='error' order by date asc`;
+  req.query.sql = `select * from "_rumlog" where ${sqlEquals("session_id", sessionId.value)} and status='error' order by date asc`;
   delete req.aggs;
   isLoading.value.push(true);
   searchService

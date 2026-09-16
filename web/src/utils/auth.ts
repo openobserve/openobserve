@@ -2,29 +2,15 @@
 
 import config from "../aws-exports";
 import { useStore } from "vuex";
+import type { RouteMeta } from "vue-router";
 import userService from "@/services/users";
 import organizationService from "@/services/organizations";
 import { b64DecodeUnicode, b64EncodeStandard, b64DecodeStandard } from "@/utils/formatters";
 import { useLocalUserInfo } from "@/utils/storage";
 import { getUUID, getUUIDv7 } from "@/utils/uuid";
 
-// Exact paths that stay reachable when the org has ingested nothing yet. The
-// empty-data redirect exists to push people toward ingestion rather than show
-// them empty data views, and that still applies to most of Settings — but an org
-// with nothing ingested is precisely the one an admin is most likely to want to
-// delete, and the Danger Zone lives on /settings/general. "/settings" is included
-// because the nav's Settings entry lands there before redirecting to general.
-// Matched exactly, not by prefix, so the rest of the Settings tree stays gated.
-export const emptyDataAllowedPaths = ["/settings", "/settings/general"];
-
-// "/settings/general/" and "/settings/general" are the same page; an exact match
-// must not hinge on a trailing slash.
-const normalizePath = (path: string) =>
-  path !== "/" && path.endsWith("/") ? path.slice(0, -1) : path;
-
 export const trialPeriodAllowedPath = ["iam", "users", "organizations", "invitations"];
 
-// Kept out of the empty-data guard; "settings" only redirects on to general.
 export const trialPaywallAllowedPath = [...trialPeriodAllowedPath, "settings", "general"];
 
 export const getUserInfo = (loginString: string) => {
@@ -123,6 +109,10 @@ export const shouldPaywallRoute = (expiry: unknown, routeName: unknown): boolean
   isTrialExpired(expiry) &&
   trialPaywallAllowedPath.indexOf(routeName as string) === -1;
 
+// Org-setup and data-producing surfaces declare their empty-data exemption per route, in meta.
+export const isEmptyDataExempt = (route: { meta?: RouteMeta | Record<string, unknown> }): boolean =>
+  route.meta?.allowOnEmptyData === true;
+
 export const routeGuard = async (to: any, from: any, next: any) => {
   const store = useStore();
   if (
@@ -141,11 +131,7 @@ export const routeGuard = async (to: any, from: any, next: any) => {
   }
 
   if (
-    to.path.indexOf("/ingestion") === -1 &&
-    to.path.indexOf("/iam") === -1 &&
-    to.name !== "iam" &&
-    emptyDataAllowedPaths.indexOf(normalizePath(to.path)) === -1 &&
-    trialPeriodAllowedPath.indexOf(to.name) === -1 &&
+    !isEmptyDataExempt(to) &&
     Object.prototype.hasOwnProperty.call(store.state.zoConfig, "restricted_routes_on_empty_data") &&
     store.state.zoConfig.restricted_routes_on_empty_data === true &&
     store.state.organizationData.isDataIngested === false

@@ -80,8 +80,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            toolbar: both tables below own a toolbar and only one of them is
            mounted at a time, so a control in either would vanish with it.
            One row, above both, serving whichever table is showing. -->
-      <div class="px-page-edge flex shrink-0 items-center gap-2 py-1.5">
-        <div class="w-64 shrink-0">
+      <div class="px-page-edge flex shrink-0 items-center gap-2 py-1.5 max-lg:flex-wrap">
+        <div class="w-64 shrink-0 max-lg:order-last max-lg:w-full">
           <OSearchInput
             :model-value="search"
             :placeholder="t('dbm.queries.searchPlaceholder')"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
         <DbmScopeFilters
-          class="min-w-0 flex-1"
+          class="min-w-0 flex-1 max-lg:flex-none max-lg:basis-auto"
           :filters="dimensionFilters"
           :insight-chip="activeInsightChip"
           @clear="clearScope"

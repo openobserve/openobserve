@@ -13,15 +13,30 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
 use crate::{
-    aggregations::{Accumulate, AggFunc},
+    aggregations::{Accumulate, AggFunc, group_series},
     common::kahan_sum_increment,
 };
 
+#[derive(Clone, Copy)]
 pub struct Sum;
+
+impl AggFunc for Sum {
+    type Accumulator = SumAccumulate;
+
+    fn name(&self) -> &'static str {
+        "sum"
+    }
+
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        SumAccumulate {
+            sums: vec![SumState::default(); slots],
+            present: vec![false; slots],
+        }
+    }
+}
 
 #[derive(Clone, Copy, Default)]
 pub(crate) struct SumState {
@@ -47,42 +62,49 @@ impl SumState {
     }
 }
 
-impl AggFunc for Sum {
-    type Accumulator = SumAccumulate;
-
-    fn name(&self) -> &'static str {
-        "sum"
-    }
-
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
-    }
+pub struct SumAccumulate {
+    sums: Vec<SumState>,
+    present: Vec<bool>,
 }
 
-#[derive(Default)]
-pub struct SumAccumulate {
-    sum: HashMap<i64, SumState>,
+impl SumAccumulate {
+    fn push(&mut self, slot: usize, value: f64) {
+        self.sums[slot].push(value);
+        self.present[slot] = true;
+    }
 }
 
 impl Accumulate for SumAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        self.sum
-            .entry(sample.timestamp)
-            .or_default()
-            .push(sample.value);
-    }
-
-    fn merge(&mut self, other: Self) {
-        for (timestamp, other) in other.sum {
-            self.sum.entry(timestamp).or_default().merge(other);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
         }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.sum
+    fn merge(&mut self, other: Self) {
+        for (slot, other_present) in other.present.into_iter().enumerate() {
+            if !other_present {
+                continue;
+            }
+            self.sums[slot].merge(other.sums[slot]);
+            self.present[slot] = true;
+        }
+    }
+
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .sums
             .into_iter()
-            .map(|(timestamp, sum)| Sample::new(timestamp, sum.value()))
-            .collect()
+            .zip(self.present)
+            .enumerate()
+            .filter(|(_, (_, present))| *present)
+            .map(|(slot, (sum, _))| Sample::new(timestamps[slot], sum.value()))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
