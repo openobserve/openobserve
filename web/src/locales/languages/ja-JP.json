@@ -2687,6 +2687,14 @@
     "edit": "編集",
     "view": "表示",
     "delete": "削除",
+    "moveToFolder": "フォルダに移動",
+    "tabAll": "すべて",
+    "searchThisFolder": "このフォルダ",
+    "searchAllFolders": "すべてのフォルダ",
+    "searchThisFolderTooltip": "このフォルダのみを検索",
+    "searchAllFoldersTooltip": "すべてのフォルダを検索",
+    "folder": "フォルダ",
+    "modeInFolder": "{mode} 内",
     "deleteTitle": "ワークフローを削除",
     "deleteMessage": "このワークフローを削除してもよろしいですか？",
     "deleteSuccess": "ワークフローを削除しました",
@@ -2721,12 +2729,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "アラート発火",
+        "tab": "アラート",
         "node": "アラートトリガー",
         "desc": "アラート発火時に実行",
         "intro": "リンクされたアラートが発火すると、後続の各ステップがこのペイロードを受け取ります。"
       },
       "incidentEvent": {
         "label": "インシデントイベント",
+        "tab": "インシデント",
         "node": "インシデントトリガー",
         "desc": "インシデントライフサイクルイベントで実行",
         "intro": "インシデントイベントが発生すると、後続の各ステップがこのペイロードを受け取ります。"
@@ -13319,6 +13329,7 @@
       "viewAddedFavorites": "ビューをお気に入りに追加しました。",
       "viewRemovedFavorites": "ビューをお気に入りから削除しました。",
       "selectStreamBeforeSchedule": "ジョブをスケジュールする前にストリームを選択してください",
+      "streamNotFoundInQuery": "ストリーム「{stream}」が存在しません",
       "confirmUpdateFunction": "関数を更新してもよろしいですか？",
       "confirmUpdateSavedViewMsg": "保存されたビューを更新してもよろしいですか？"
     },

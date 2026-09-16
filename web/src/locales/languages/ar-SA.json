@@ -2687,6 +2687,14 @@
     "edit": "تعديل",
     "view": "منظر",
     "delete": "حذف",
+    "moveToFolder": "Move to folder",
+    "tabAll": "All",
+    "searchThisFolder": "This folder",
+    "searchAllFolders": "All folders",
+    "searchThisFolderTooltip": "Search only this folder",
+    "searchAllFoldersTooltip": "Search across all folders",
+    "folder": "Folder",
+    "modeInFolder": "{mode}",
     "deleteTitle": "حذف سير العمل",
     "deleteMessage": "هل أنت متأكد أنك تريد حذف سير العمل هذا؟",
     "deleteSuccess": "تم حذف سير العمل بنجاح",
@@ -2721,12 +2729,14 @@
     "triggerKind": {
       "alertFired": {
         "label": "تم إطلاق الإنذار",
+        "tab": "Alerts",
         "node": "تفعيل التنبيه",
         "desc": "اهرب عندما يطلق تنبيه",
         "intro": "عندما يطلق تنبيه مرتبط، تستقبل كل خطوة لاحقة هذه الحمولة."
       },
       "incidentEvent": {
         "label": "حدث الحادث",
+        "tab": "Incidents",
         "node": "محفز الحادث",
         "desc": "تشغيل حدث دورة حياة الحادث",
         "intro": "عندما يحدث حدث حادث، تستقبل كل خطوة انتقالية هذه الحمولة."
@@ -13319,6 +13329,7 @@
       "viewAddedFavorites": "عرض أضيف إلى المفضلات.",
       "viewRemovedFavorites": "تم إزالة العرض من المفضلات.",
       "selectStreamBeforeSchedule": "يرجى اختيار بث قبل تحديد موعد للوظيفة",
+      "streamNotFoundInQuery": "الجدول \"{stream}\" غير موجود",
       "confirmUpdateFunction": "هل أنت متأكد أنك تريد تحديث الوظيفة؟",
       "confirmUpdateSavedViewMsg": "هل أنت متأكد من رغبتك في تحديث العرض المحفوظ؟"
     },

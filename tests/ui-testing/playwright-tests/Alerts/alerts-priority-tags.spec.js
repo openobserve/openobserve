@@ -184,7 +184,7 @@ test.describe('Alerts — priority, tags & additional variables', {
     // Frequency ("Check every") cadence cell + column conditional (issue #14038)
     // ─────────────────────────────────────────────────────────────────────────
     test('frequency cell renders the cadence for cron, minute-interval and real-time alerts', {
-        tag: ['@alert-list-frequency-retries', '@all', '@alerts', '@P0'],
+        tag: ['@bug-14038', '@alert-list-frequency-retries', '@all', '@alerts', '@P0'],
     }, async ({ page }) => {
         const suffix = Math.random().toString(36).substring(2, 8);
         const cronName = 'auto_freq_cron_' + suffix;
@@ -209,7 +209,7 @@ test.describe('Alerts — priority, tags & additional variables', {
     });
 
     test('Check every column is present on scheduled and absent on the realTime tab', {
-        tag: ['@alert-list-frequency-retries', '@all', '@alerts', '@P0'],
+        tag: ['@bug-14038', '@alert-list-frequency-retries', '@all', '@alerts', '@P0'],
     }, async ({ page }) => {
         const suffix = Math.random().toString(36).substring(2, 8);
         const schedName = 'auto_tab_sched_' + suffix;
