@@ -472,6 +472,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         SyntheticsReloadClass::Hot,
     ),
+    (
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        SyntheticsReloadClass::Hot,
+    ),
 ];
 
 /// The warning an operator sees when they change a key a reload cannot carry.
@@ -504,6 +508,7 @@ pub(crate) fn synthetics_restart_required_changes(
         max_check_budget_secs: _,
         job_lease_secs: _,
         max_net_timeout_ms: _,
+        browser_max_steps: _,
         browsers: _,
         devices: _,
         scheduler_jitter_enabled: _,
@@ -1107,6 +1112,14 @@ pub struct Synthetics {
         help = "Ceiling for one attempt of a non-browser check, in milliseconds."
     )]
     pub max_net_timeout_ms: u32,
+    /// How many steps one browser journey may hold. The 256KB `config` payload
+    /// cap still binds above roughly 200, whatever this says.
+    #[env_config(
+        name = "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        default = 50,
+        help = "How many steps one browser journey may hold."
+    )]
+    pub browser_max_steps: usize,
     /// Comma-separated list of enabled browser engine names.
     /// Probe must have the corresponding Lambda function deployed.
     /// firefox temporarily disabled by default — re-add once ready.
@@ -4775,6 +4788,7 @@ mod tests {
         "ZO_SYNTHETICS_JOB_LEASE_SECS",
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         "ZO_SYNTHETICS_BROWSERS",
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
@@ -4797,8 +4811,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            14,
-            "Synthetics has 14 keys; every one needs a reload class"
+            15,
+            "Synthetics has 15 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4824,6 +4838,7 @@ mod tests {
                 "ZO_SYNTHETICS_AGENT_STALE_SECS",
                 "ZO_SYNTHETICS_API_ENDPOINT",
                 "ZO_SYNTHETICS_BROWSERS",
+                "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
                 "ZO_SYNTHETICS_DEVICES",
                 "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
@@ -4885,6 +4900,7 @@ mod tests {
         cfg.max_check_budget_secs += 1;
         cfg.job_lease_secs += 1;
         cfg.max_net_timeout_ms += 1;
+        cfg.browser_max_steps += 1;
         cfg.browsers = "chromium,firefox".to_string();
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
