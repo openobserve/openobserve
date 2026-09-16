@@ -147,9 +147,7 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
-        // Stream-not-found (filter) error branch — frontend pre-run detection of a
-        // missing stream name in a SQL query. Distinct from logs-search-error-state,
-        // which is the post-run backend error (code 20002) path.
+        // Stream-not-found (filter) error branch: pre-run detection of a missing stream name in a SQL query — distinct from the post-run logs-search-error-state (code 20002).
         this.filterErrorMessage = '[data-test="logs-search-filter-error-message"]';
         // Generic error indicator (class/role based) used when no data-test error hook exists.
         this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
