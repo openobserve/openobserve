@@ -1,5 +1,0 @@
-[
-  { "title": "the chart shows the backend error when the alert references a missing stream", "action": "new", "verifies": "the alert detail chart renders the backend error sentence instead of a panel when generate_sql 400s for a missing stream" },
-  { "title": "the chart renders the panel for a valid alert", "action": "new", "verifies": "a valid scheduled alert's evaluation chart renders its panel with no error state" },
-  { "title": "changing the chart range re-runs the build without erroring", "action": "new", "verifies": "selecting the 6h and 24h ranges re-runs the chart build and keeps the panel attached with no error" }
-]

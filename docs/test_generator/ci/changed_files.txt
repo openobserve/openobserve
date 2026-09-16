@@ -1,3 +1,0 @@
-web/src/components/alerts/AlertGroupChart.spec.ts
-web/src/components/alerts/AlertGroupChart.vue
-web/src/utils/alerts/aggregationPreviewQuery.ts
