@@ -90,7 +90,10 @@ export default cleanAggregationQuery;
  * projected string that happens to contain words like "from" or "group by".
  */
 const maskStringLiterals = (sql: string): string =>
-  sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"/g, (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1]);
+  sql.replace(
+    /'(?:[^']|'')*'|"(?:[^"]|"")*"/g,
+    (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1],
+  );
 
 /**
  * Blank out everything inside parentheses, nesting-aware, so a keyword used
