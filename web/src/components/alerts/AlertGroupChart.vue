@@ -69,6 +69,14 @@
         data-test="alerts-alertgroupchart-panel"
       />
       <div
+        v-else-if="chartError"
+        class="flex h-full flex-col items-center justify-center gap-2"
+        data-test="alerts-alertgroupchart-error"
+      >
+        <OIcon size="md" name="warning" />
+        <span class="text-text-secondary text-sm">{{ chartError }}</span>
+      </div>
+      <div
         v-else
         class="flex h-full items-center justify-center"
         data-test="alerts-alertgroupchart-empty"
@@ -87,6 +95,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
@@ -99,6 +108,7 @@ import {
   withCompositeGroupLabel,
 } from "@/utils/alerts/aggregationPreviewQuery";
 import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
+import { parseSearchError } from "@/utils/query/searchError";
 
 const props = defineProps<{ alert: any }>();
 
@@ -106,6 +116,7 @@ const { t } = useI18nTyped();
 const store = useStore();
 
 const chartData = ref<any>(null);
+const chartError = ref<string | null>(null);
 const selectedTimeObj = ref<any>(null);
 const range = ref<string>("1h");
 
@@ -133,6 +144,7 @@ const onRangeChange = (value: unknown) => {
 const build = async () => {
   const agg = aggregation.value;
   const orgId = store.state.selectedOrganization?.identifier;
+  chartError.value = null;
   if (!orgId || !props.alert?.stream_name) {
     chartData.value = null;
     return;
@@ -190,8 +202,12 @@ const build = async () => {
       query_condition: queryCondition.value,
     });
     sql = res.data?.sql || res.data?.query || "";
-  } catch {
+  } catch (error) {
+    // Covers a stream deleted after this alert was created — generate_sql
+    // validates the stream up front and 400s with e.g. "Stream 'foo' of
+    // type 'logs' does not exist" rather than templating a doomed query.
     chartData.value = null;
+    chartError.value = parseSearchError(error).message;
     return;
   }
   if (!sql) {
