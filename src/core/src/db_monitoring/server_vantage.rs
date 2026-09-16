@@ -1226,6 +1226,11 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    canonicalize_dbm_record(local_val);
+}
+
+/// `apply_to_record` without the config read, for callers that already hold the DBM flag.
+pub(crate) fn canonicalize_dbm_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83

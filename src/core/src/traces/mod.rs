@@ -50,7 +50,7 @@ use opentelemetry_proto::tonic::{
     trace::v1::{Status, status::StatusCode},
 };
 use prost::Message;
-use schema::{check_for_schema, stream_schema_exists};
+use schema::stream_schema_exists;
 use serde_json::Map;
 
 pub mod agent_signals;
@@ -69,11 +69,11 @@ use crate::{
     common::meta::{
         http::{ERROR_HEADER, HttpResponse as MetaHttpResponse, error_header_value},
         stream::SchemaRecords,
-        traces::{Event, Span, SpanLink, SpanLinkContext, SpanRefType},
+        traces::{Event, Span, SpanLink, SpanLinkContext},
     },
     ingestion::{
-        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id, grpc::get_val,
-        write_file,
+        PartitionMemo, TriggerAlertData, check_batch_schema, check_ingestion_allowed,
+        evaluate_trigger, get_thread_id, grpc::get_val, write_file,
     },
     logs::IngestJsonData,
     traces::otel::{OtelIngestionProcessor, is_llm_trace},
@@ -408,18 +408,18 @@ fn normalize_span_kind(record_val: &mut Map<String, json::Value>) -> i32 {
     span_kind
 }
 
-fn normalized_trace_key(key: &str) -> String {
-    let mut key = key.to_string();
-    flatten::format_key(&mut key);
-    key
+/// The resource attribute keys as flatten will spell them, computed once per resource.
+fn normalized_resource_keys(service_att_map: &HashMap<String, json::Value>) -> HashSet<String> {
+    service_att_map
+        .keys()
+        .map(|key| flatten::format_label_name_cow(key).into_owned())
+        .collect()
 }
 
-fn span_attribute_key(raw_key: String, service_att_map: &HashMap<String, json::Value>) -> String {
-    let normalized_key = normalized_trace_key(&raw_key);
-    let collides_with_reserved = RESERVED_SPAN_FIELDS.contains(&normalized_key.as_str());
-    let collides_with_resource = service_att_map
-        .keys()
-        .any(|service_key| normalized_trace_key(service_key) == normalized_key);
+fn span_attribute_key(raw_key: String, normalized_resource_keys: &HashSet<String>) -> String {
+    let normalized_key = flatten::format_label_name_cow(&raw_key);
+    let collides_with_reserved = RESERVED_SPAN_FIELDS.contains(&normalized_key.as_ref());
+    let collides_with_resource = normalized_resource_keys.contains(normalized_key.as_ref());
 
     if collides_with_reserved || collides_with_resource {
         format!("attr_{raw_key}")
@@ -430,9 +430,9 @@ fn span_attribute_key(raw_key: String, service_att_map: &HashMap<String, json::V
 
 fn resource_attribute_key(raw_key: String) -> String {
     let service_key = format!("{SERVICE}_{raw_key}");
-    let normalized_key = normalized_trace_key(&service_key);
+    let normalized_key = flatten::format_label_name_cow(&service_key);
 
-    if RESERVED_SPAN_FIELDS.contains(&normalized_key.as_str()) {
+    if RESERVED_SPAN_FIELDS.contains(&normalized_key.as_ref()) {
         format!("{SERVICE}_attr_{raw_key}")
     } else {
         service_key
@@ -649,6 +649,7 @@ pub async fn handle_otlp_request(
                 }
             }
         }
+        let mut resource_keys = normalized_resource_keys(&service_att_map);
         let inst_resources = res_span.scope_spans;
         for inst_span in inst_resources {
             let spans = inst_span.spans;
@@ -678,13 +679,13 @@ pub async fn handle_otlp_request(
                         PARENT_SPAN_ID.to_string(),
                         SpanId::from_bytes(span.parent_span_id.try_into().unwrap()).to_string(),
                     );
-                    span_ref.insert(REF_TYPE.to_string(), format!("{:?}", SpanRefType::ChildOf));
+                    span_ref.insert(REF_TYPE.to_string(), "ChildOf".to_string());
                 }
                 let start_time: u64 = span.start_time_unix_nano;
                 let end_time: u64 = span.end_time_unix_nano;
                 let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
                 for span_att in span.attributes {
-                    let key = span_attribute_key(span_att.key, &service_att_map);
+                    let key = span_attribute_key(span_att.key, &resource_keys);
                     span_att_map.insert(key, get_val(&span_att.value.as_ref()));
                 }
 
@@ -699,6 +700,7 @@ pub async fn handle_otlp_request(
                 {
                     service_name = val.clone();
                     service_att_map.insert(SERVICE_NAME.to_string(), json::json!(val));
+                    resource_keys.insert(SERVICE_NAME.to_string());
                     service_name_explicitly_set = true;
                 }
 
@@ -850,20 +852,28 @@ pub async fn handle_otlp_request(
 
                 let local_val = Span {
                     trace_id: trace_id.clone(),
-                    span_id: span_id.clone(),
+                    span_id,
                     span_kind: span.kind.to_string(),
-                    span_status: get_span_status(span.status.clone()),
-                    operation_name: span.name.clone(),
+                    span_status: get_span_status(span.status),
+                    operation_name: span.name,
                     start_time,
                     end_time,
                     duration: span_duration_micros(start_time, end_time),
-                    reference: span_ref.clone(),
+                    reference: span_ref,
                     service_name: service_name.clone(),
-                    attributes: span_att_map.clone(),
+                    attributes: span_att_map,
                     service: service_att_map.clone(),
                     flags: 1, // TODO add appropriate value
-                    events: json::to_string(&events).unwrap(),
-                    links: json::to_string(&links).unwrap(),
+                    events: if events.is_empty() {
+                        "[]".to_string()
+                    } else {
+                        json::to_string(&events).unwrap()
+                    },
+                    links: if links.is_empty() {
+                        "[]".to_string()
+                    } else {
+                        json::to_string(&links).unwrap()
+                    },
                 };
 
                 // Service graph processing is handled by periodic daemon
@@ -1676,15 +1686,18 @@ async fn write_traces(
     // End get stream alert
 
     // Start check for schema
-    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (_schema_evolution, _infer_schema) = check_for_schema(
+    let has_uds = infra::schema::get_settings(org_id, stream_name, StreamType::Traces)
+        .await
+        .is_some_and(|settings| !settings.defined_schema_fields.is_empty());
+    // traces write every batch with the whole stream schema, so the batch subset is not needed
+    check_batch_schema(
         org_id,
         stream_name,
         StreamType::Traces,
         &mut traces_schema_map,
-        json_data.iter().map(|(_, v)| v).collect(),
-        *min_timestamp,
-        false, // is_derived is false for traces
+        &json_data,
+        false,
+        has_uds,
     )
     .await
     .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e.to_string()))?;
@@ -1706,8 +1719,8 @@ async fn write_traces(
     }
 
     let mut data_buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
-    // Start write data
     for (timestamp, record_val) in json_data {
         // Start check for alert trigger
         if let Some(alerts) = cur_stream_alerts
@@ -1740,20 +1753,15 @@ async fn write_traces(
         // End check for alert trigger
 
         // get hour key
-        let hour_key = super::ingestion::get_write_partition_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            &record_val,
-            Some(&schema_key),
-        );
-
-        let hour_buf = data_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema_key: schema_key.clone(),
-            schema: record_schema.clone(),
-            records: vec![],
-            records_size: 0,
-        });
+        let hour_buf =
+            partition_memo.buffer(timestamp, &record_val, &schema_key, &mut data_buf, || {
+                SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: record_schema.clone(),
+                    records: vec![],
+                    records_size: 0,
+                }
+            });
         let record_val = json::Value::Object(record_val);
         let record_size = json::estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
@@ -1821,6 +1829,16 @@ fn detect_llm_stream(contains_key: impl Fn(&str) -> bool) -> bool {
 mod tests {
     use config::utils::json::json;
     use opentelemetry_proto::tonic::trace::v1::{Status, status::StatusCode};
+
+    fn attr_key(
+        raw: &str,
+        service_att_map: &std::collections::HashMap<String, config::utils::json::Value>,
+    ) -> String {
+        super::span_attribute_key(
+            raw.to_string(),
+            &super::normalized_resource_keys(service_att_map),
+        )
+    }
 
     use super::span_duration_micros;
     use crate::ingestion::grpc::get_val_for_attr;
@@ -2598,7 +2616,7 @@ mod tests {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         service_att_map.insert(super::SERVICE_NAME.to_string(), json!("serviceA"));
 
-        let key = super::span_attribute_key("service_name".to_string(), &service_att_map);
+        let key = attr_key("service_name", &service_att_map);
 
         assert_eq!(key, "attr_service_name");
     }
@@ -2612,7 +2630,7 @@ mod tests {
         let mut service_att_map: HashMap<String, json::Value> = HashMap::new();
         service_att_map.insert("service.version".to_string(), json!("1.0.0"));
 
-        let key = super::span_attribute_key("service_version".to_string(), &service_att_map);
+        let key = attr_key("service_version", &service_att_map);
 
         assert_eq!(key, "attr_service_version");
     }
@@ -2621,7 +2639,7 @@ mod tests {
     fn test_span_attribute_key_allows_non_colliding_attributes() {
         let service_att_map = std::collections::HashMap::new();
 
-        let key = super::span_attribute_key("http.method".to_string(), &service_att_map);
+        let key = attr_key("http.method", &service_att_map);
 
         assert_eq!(key, "http.method");
     }
@@ -2634,12 +2652,12 @@ mod tests {
         for field in crate::db_monitoring::ALL_DB_FIELDS {
             let dotted = field.replace('_', ".");
             assert_eq!(
-                super::span_attribute_key(dotted.clone(), &service_att_map),
+                attr_key(&dotted, &service_att_map),
                 format!("attr_{dotted}"),
                 "dotted form of {field} must be attr_-prefixed"
             );
             assert_eq!(
-                super::span_attribute_key(field.to_string(), &service_att_map),
+                attr_key(field, &service_att_map),
                 format!("attr_{field}"),
                 "literal {field} must be attr_-prefixed"
             );
@@ -2825,7 +2843,7 @@ mod tests {
 
         let mut span_att_map: HashMap<String, json::Value> = HashMap::new();
         span_att_map.insert(
-            super::span_attribute_key("service_name".to_string(), &service_att_map),
+            attr_key("service_name", &service_att_map),
             json!("my.service3"),
         );
 
@@ -3043,12 +3061,12 @@ mod tests {
         for field in super::inferred::ALL_INFER_FIELDS {
             let dotted = field.replace('_', ".");
             assert_eq!(
-                super::span_attribute_key(dotted.clone(), &service_att_map),
+                attr_key(&dotted, &service_att_map),
                 format!("attr_{dotted}"),
                 "dotted form of {field} must be attr_-prefixed"
             );
             assert_eq!(
-                super::span_attribute_key(field.to_string(), &service_att_map),
+                attr_key(field, &service_att_map),
                 format!("attr_{field}"),
                 "literal {field} must be attr_-prefixed"
             );

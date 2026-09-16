@@ -35,8 +35,12 @@ use infra::{errors::Result, schema::get_flatten_level};
 use ingestion_common::{IngestionStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
-use opentelemetry_proto::tonic::collector::logs::v1::{
-    ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+use opentelemetry_proto::tonic::{
+    collector::logs::v1::{
+        ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+    },
+    common::v1::InstrumentationScope,
+    logs::v1::LogRecord,
 };
 use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
@@ -51,6 +55,84 @@ use crate::{
         grpc::{get_val, get_val_with_type_retained},
     },
 };
+
+/// The resource map with flatten's key spelling, or `None` when two wire keys would share a name.
+fn normalized_resource_map(
+    service_att_map: &json::Map<String, json::Value>,
+) -> Option<json::Map<String, json::Value>> {
+    let mut normalized = json::Map::with_capacity(service_att_map.len());
+    for (key, value) in service_att_map {
+        let key = flatten::format_label_name_cow(key).into_owned();
+        if normalized.insert(key, value.clone()).is_some() {
+            return None;
+        }
+    }
+    Some(normalized)
+}
+
+/// One OTLP log record as a JSON object, keys normalized up front when that is provably exact.
+fn otlp_log_record(
+    service_att_map: &json::Map<String, json::Value>,
+    normalized_resource: Option<&json::Map<String, json::Value>>,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> json::Value {
+    if let Some(base) = normalized_resource
+        && let Some(rec) = build_otlp_log_record(base, true, scope, log_record, timestamp)
+    {
+        return rec;
+    }
+    build_otlp_log_record(service_att_map, false, scope, log_record, timestamp)
+        .expect("raw keys never collide")
+}
+
+/// `None` when a normalized attribute key lands on an existing entry: only the wire spelling
+/// decides that.
+fn build_otlp_log_record(
+    base: &json::Map<String, json::Value>,
+    normalize: bool,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> Option<json::Value> {
+    let mut rec = json::Value::Object(base.clone());
+
+    if let Some(lib) = scope {
+        let library_name = lib.name.to_owned();
+        if !library_name.is_empty() {
+            rec["instrumentation_library_name"] = serde_json::Value::String(library_name);
+        }
+        let lib_version = lib.version.to_owned();
+        if !lib_version.is_empty() {
+            rec["instrumentation_library_version"] = serde_json::Value::String(lib_version);
+        }
+    }
+
+    rec["severity"] = if !log_record.severity_text.is_empty() {
+        log_record.severity_text.to_owned().into()
+    } else {
+        log_record.severity_number.into()
+    };
+
+    rec["body"] = get_val(&log_record.body.as_ref());
+    rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+
+    let rec_map = rec.as_object_mut().unwrap();
+    for local_attr in &log_record.attributes {
+        let key = if normalize {
+            flatten::format_label_name_cow(&local_attr.key).into_owned()
+        } else {
+            local_attr.key.clone()
+        };
+        let value = get_val_with_type_retained(&local_attr.value.as_ref());
+        if rec_map.insert(key, value).is_some() && normalize {
+            return None;
+        }
+    }
+    rec[TIMESTAMP_COL_NAME] = timestamp.into();
+    Some(rec)
+}
 
 pub async fn handle_request(
     thread_id: usize,
@@ -107,13 +189,32 @@ pub async fn handle_request(
     .await;
 
     // with pipeline, we need to store original if any of the destinations requires original
-    let store_original_when_pipeline_exists =
-        !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
+    // with a pipeline the destinations are unknown, so any destination wanting `_original` keeps it
+    let need_original = if executable_pipelines.is_empty() {
+        streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+    } else {
+        streams_need_original_map.values().any(|val| *val)
+    };
+    let need_all_values = streams_need_all_values_map
+        .get(&stream_name)
+        .is_some_and(|v| *v);
+    let uds_fields = user_defined_schema_map
+        .get(&stream_name)
+        .and_then(|fields| fields.as_ref());
+    // only a plain write pre-normalizes keys: pipelines and `_original` see the wire spelling
+    let normalize_keys = executable_pipelines.is_empty() && !need_original;
+    let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+    let dbm_enabled = cfg.db_monitoring.enabled;
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
+    // the request writes one stream, so its records and size are collected without map probes
+    let mut stream_records: Vec<(i64, json::Map<String, json::Value>)> = Vec::new();
+    let mut stream_size = 0usize;
     let mut derived_streams = HashSet::new();
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -127,11 +228,16 @@ pub async fn handle_request(
         if let Some(resource) = resource_log.resource {
             for res_attr in resource.attributes {
                 service_att_map.insert(
-                    res_attr.key.to_string(),
+                    res_attr.key,
                     get_val_with_type_retained(&res_attr.value.as_ref()),
                 );
             }
         }
+        let normalized_resource = if normalize_keys {
+            normalized_resource_map(&service_att_map)
+        } else {
+            None
+        };
 
         for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
@@ -166,36 +272,13 @@ pub async fn handle_request(
                     continue;
                 }
 
-                let mut rec = json::json!({});
-                rec.as_object_mut().unwrap().extend(service_att_map.clone());
-
-                if let Some(lib) = &instrumentation_logs.scope {
-                    let library_name = lib.name.to_owned();
-                    if !library_name.is_empty() {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(library_name);
-                    }
-                    let lib_version = lib.version.to_owned();
-                    if !lib_version.is_empty() {
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib_version);
-                    }
-                }
-
-                rec["severity"] = if !log_record.severity_text.is_empty() {
-                    log_record.severity_text.to_owned().into()
-                } else {
-                    log_record.severity_number.into()
-                };
-
-                rec["body"] = get_val(&log_record.body.as_ref());
-                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
-
-                log_record.attributes.iter().for_each(|local_attr| {
-                    rec[local_attr.key.as_str()] =
-                        get_val_with_type_retained(&local_attr.value.as_ref());
-                });
-                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
+                let mut rec = otlp_log_record(
+                    &service_att_map,
+                    normalized_resource.as_ref(),
+                    instrumentation_logs.scope.as_ref(),
+                    log_record,
+                    timestamp,
+                );
 
                 match TraceId::from_bytes(
                     log_record
@@ -222,23 +305,7 @@ pub async fn handle_request(
 
                 // store a copy of original data before it's modified, when
                 // 1. original data is an object
-                let original_data = if rec.is_object() {
-                    // 2. current stream does not have pipeline
-                    if executable_pipelines.is_empty() {
-                        // current stream requires original
-                        streams_need_original_map
-                            .get(&stream_name)
-                            .is_some_and(|v| *v)
-                            .then(|| rec.to_string())
-                    } else {
-                        // 3. with pipeline, storing original as long as streams_need_original_set
-                        //    is not empty
-                        // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then(|| rec.to_string())
-                    }
-                } else {
-                    None // `item` won't be flattened, no need to store original
-                };
+                let original_data = (need_original && rec.is_object()).then(|| rec.to_string());
 
                 // Surface the OTLP LogRecord `EventName` as `o2_event_name`.
                 //
@@ -273,11 +340,7 @@ pub async fn handle_request(
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
                 } else {
-                    let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += json::estimate_json_bytes(&rec);
-                    // JSON Flattening - use per-stream flatten level
-                    let flatten_level =
-                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    stream_size += json::estimate_json_bytes(&rec);
                     rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
@@ -288,7 +351,11 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                    if dbm_enabled {
+                        crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                            &mut local_val,
+                        );
+                    }
 
                     // Re-insert the trusted event name AFTER canonicalization.
                     //
@@ -306,16 +373,12 @@ pub async fn handle_request(
                         );
                     }
 
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    if let Some(fields) = uds_fields {
                         local_val = crate::ingestion::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
-                    if streams_need_original_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                        && let Some(original_data) = original_data
-                    {
+                    if need_original && let Some(original_data) = original_data {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
                         let record_id = crate::ingestion::generate_record_id(
@@ -328,10 +391,7 @@ pub async fn handle_request(
                     }
 
                     // add `_all_values` if required by StreamSettings
-                    if streams_need_all_values_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                    {
+                    if need_all_values {
                         let values = local_val
                             .iter()
                             .filter(|(k, v)| {
@@ -352,14 +412,15 @@ pub async fn handle_request(
                             .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
                     }
 
-                    let (ts_data, fn_num) = json_data_by_stream
-                        .entry(stream_name.clone())
-                        .or_insert((Vec::new(), None));
-                    ts_data.push((timestamp, local_val));
-                    *fn_num = Some(0); // no pl -> no func
+                    stream_records.push((timestamp, local_val));
                 }
             }
         }
+    }
+
+    if !stream_records.is_empty() {
+        size_by_stream.insert(stream_name.clone(), stream_size);
+        json_data_by_stream.insert(stream_name.clone(), (stream_records, Some(0)));
     }
 
     // batch process records through pipeline
@@ -454,7 +515,11 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                            if dbm_enabled {
+                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                                    &mut local_val,
+                                );
+                            }
 
                             if let Some(event_name) = trusted_event_name {
                                 local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -557,7 +622,6 @@ pub async fn handle_request(
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *size += json::estimate_json_bytes(&res);
 
-                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                 res = flatten::flatten_with_level(res, flatten_level)?;
 
                 let mut local_val = match res.take() {
@@ -575,7 +639,9 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                if dbm_enabled {
+                    crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+                }
 
                 if let Some(event_name) = trusted_event_name {
                     local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -732,7 +798,10 @@ pub async fn handle_request(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::otlp::OtlpRequestType;
+    use config::{
+        meta::otlp::OtlpRequestType,
+        utils::{flatten, json},
+    };
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{
@@ -741,6 +810,96 @@ mod tests {
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
+
+    use super::{normalized_resource_map, otlp_log_record};
+
+    fn kv(key: &str, value: opentelemetry_proto::tonic::common::v1::any_value::Value) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue { value: Some(value) }),
+            ..Default::default()
+        }
+    }
+
+    fn kvlist(pairs: &[(&str, i64)]) -> opentelemetry_proto::tonic::common::v1::any_value::Value {
+        use opentelemetry_proto::tonic::common::v1::{KeyValueList, any_value::Value};
+        Value::KvlistValue(KeyValueList {
+            values: pairs
+                .iter()
+                .map(|(k, v)| kv(k, Value::IntValue(*v)))
+                .collect(),
+        })
+    }
+
+    /// The pre-normalized build must flatten to exactly what the raw build flattens to.
+    fn assert_normalized_build_matches_raw(
+        resource: json::Map<String, json::Value>,
+        attributes: Vec<KeyValue>,
+    ) -> json::Map<String, json::Value> {
+        let record = LogRecord {
+            attributes,
+            severity_text: "INFO".to_string(),
+            ..Default::default()
+        };
+        let normalized = normalized_resource_map(&resource);
+        let fast = otlp_log_record(&resource, normalized.as_ref(), None, &record, 1);
+        let raw = otlp_log_record(&resource, None, None, &record, 1);
+        let fast = flatten::flatten_with_level(fast, 0).unwrap();
+        let raw = flatten::flatten_with_level(raw, 0).unwrap();
+        assert_eq!(fast, raw);
+        fast.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn test_object_valued_attributes_colliding_after_normalization_keep_both() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let rec = assert_normalized_build_matches_raw(
+            json::Map::new(),
+            vec![
+                kv("a.b", kvlist(&[("x", 1)])),
+                kv("a_b", kvlist(&[("y", 2)])),
+                kv("plain", Value::StringValue("v".to_string())),
+            ],
+        );
+        assert_eq!(rec["a_b_x"], json::json!(1));
+        assert_eq!(rec["a_b_y"], json::json!(2));
+    }
+
+    #[test]
+    fn test_scalar_collision_across_resource_and_record_keeps_flatten_precedence() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("a.b".to_string(), json::json!(1));
+        resource.insert("a_b".to_string(), json::json!(2));
+        let rec =
+            assert_normalized_build_matches_raw(resource, vec![kv("a.b", Value::IntValue(3))]);
+        // flatten keeps the first key's position and the last key's value
+        assert_eq!(rec["a_b"], json::json!(2));
+    }
+
+    #[test]
+    fn test_collision_free_record_is_pre_normalized() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("k8s.pod.name".to_string(), json::json!("p"));
+        let normalized = normalized_resource_map(&resource).unwrap();
+        let record = LogRecord {
+            attributes: vec![kv("http.method", Value::StringValue("GET".to_string()))],
+            ..Default::default()
+        };
+        let rec = otlp_log_record(&resource, Some(&normalized), None, &record, 1);
+        let keys: Vec<&String> = rec.as_object().unwrap().keys().collect();
+        assert!(keys.iter().all(|k| !k.contains('.')), "{keys:?}");
+        assert!(
+            normalized_resource_map(&{
+                let mut r = json::Map::new();
+                r.insert("a.b".to_string(), json::json!(1));
+                r.insert("a_b".to_string(), json::json!(2));
+                r
+            })
+            .is_none()
+        );
+    }
 
     use crate::logs::otlp::handle_request;
 
