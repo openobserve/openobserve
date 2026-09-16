@@ -1482,7 +1482,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // insertion against an unrelated occurrence and assert nothing.
     for landmark in [
         "pipeline_inputs.push(rec)",
-        "let mut rec = json::Value::Object(service_att_map.clone());",
+        "let mut rec = json::Value::Object(base.clone());",
     ] {
         assert_eq!(
             src.matches(landmark).count(),
@@ -1516,7 +1516,7 @@ fn otlp_producer_loop_surfaces_the_event_name() {
     // is created in the producer loop. This is what makes it the PRODUCER loop
     // rather than one of the three apply_to_record call sites.
     let rec_created = src
-        .find("let mut rec = json::Value::Object(service_att_map.clone());")
+        .find("let mut rec = json::Value::Object(base.clone());")
         .expect("the producer loop must still build `rec`");
     assert!(
         insert_at > rec_created,

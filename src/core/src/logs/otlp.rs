@@ -35,8 +35,12 @@ use infra::{errors::Result, schema::get_flatten_level};
 use ingestion_common::{IngestionStatus, StreamStatus};
 use itertools::Itertools;
 use opentelemetry::trace::{SpanId, TraceId};
-use opentelemetry_proto::tonic::collector::logs::v1::{
-    ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+use opentelemetry_proto::tonic::{
+    collector::logs::v1::{
+        ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+    },
+    common::v1::InstrumentationScope,
+    logs::v1::LogRecord,
 };
 use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
@@ -51,6 +55,84 @@ use crate::{
         grpc::{get_val, get_val_with_type_retained},
     },
 };
+
+/// The resource map with flatten's key spelling, or `None` when two wire keys would share a name.
+fn normalized_resource_map(
+    service_att_map: &json::Map<String, json::Value>,
+) -> Option<json::Map<String, json::Value>> {
+    let mut normalized = json::Map::with_capacity(service_att_map.len());
+    for (key, value) in service_att_map {
+        let key = flatten::format_label_name_cow(key).into_owned();
+        if normalized.insert(key, value.clone()).is_some() {
+            return None;
+        }
+    }
+    Some(normalized)
+}
+
+/// One OTLP log record as a JSON object, keys normalized up front when that is provably exact.
+fn otlp_log_record(
+    service_att_map: &json::Map<String, json::Value>,
+    normalized_resource: Option<&json::Map<String, json::Value>>,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> json::Value {
+    if let Some(base) = normalized_resource
+        && let Some(rec) = build_otlp_log_record(base, true, scope, log_record, timestamp)
+    {
+        return rec;
+    }
+    build_otlp_log_record(service_att_map, false, scope, log_record, timestamp)
+        .expect("raw keys never collide")
+}
+
+/// `None` when a normalized attribute key lands on an existing entry: only the wire spelling
+/// decides that.
+fn build_otlp_log_record(
+    base: &json::Map<String, json::Value>,
+    normalize: bool,
+    scope: Option<&InstrumentationScope>,
+    log_record: &LogRecord,
+    timestamp: i64,
+) -> Option<json::Value> {
+    let mut rec = json::Value::Object(base.clone());
+
+    if let Some(lib) = scope {
+        let library_name = lib.name.to_owned();
+        if !library_name.is_empty() {
+            rec["instrumentation_library_name"] = serde_json::Value::String(library_name);
+        }
+        let lib_version = lib.version.to_owned();
+        if !lib_version.is_empty() {
+            rec["instrumentation_library_version"] = serde_json::Value::String(lib_version);
+        }
+    }
+
+    rec["severity"] = if !log_record.severity_text.is_empty() {
+        log_record.severity_text.to_owned().into()
+    } else {
+        log_record.severity_number.into()
+    };
+
+    rec["body"] = get_val(&log_record.body.as_ref());
+    rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
+
+    let rec_map = rec.as_object_mut().unwrap();
+    for local_attr in &log_record.attributes {
+        let key = if normalize {
+            flatten::format_label_name_cow(&local_attr.key).into_owned()
+        } else {
+            local_attr.key.clone()
+        };
+        let value = get_val_with_type_retained(&local_attr.value.as_ref());
+        if rec_map.insert(key, value).is_some() && normalize {
+            return None;
+        }
+    }
+    rec[TIMESTAMP_COL_NAME] = timestamp.into();
+    Some(rec)
+}
 
 pub async fn handle_request(
     thread_id: usize,
@@ -145,14 +227,17 @@ pub async fn handle_request(
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
         if let Some(resource) = resource_log.resource {
             for res_attr in resource.attributes {
-                let key = if normalize_keys {
-                    flatten::format_label_name_owned(res_attr.key)
-                } else {
-                    res_attr.key
-                };
-                service_att_map.insert(key, get_val_with_type_retained(&res_attr.value.as_ref()));
+                service_att_map.insert(
+                    res_attr.key,
+                    get_val_with_type_retained(&res_attr.value.as_ref()),
+                );
             }
         }
+        let normalized_resource = if normalize_keys {
+            normalized_resource_map(&service_att_map)
+        } else {
+            None
+        };
 
         for instrumentation_logs in &resource_log.scope_logs {
             for log_record in &instrumentation_logs.log_records {
@@ -187,40 +272,13 @@ pub async fn handle_request(
                     continue;
                 }
 
-                let mut rec = json::Value::Object(service_att_map.clone());
-
-                if let Some(lib) = &instrumentation_logs.scope {
-                    let library_name = lib.name.to_owned();
-                    if !library_name.is_empty() {
-                        rec["instrumentation_library_name"] =
-                            serde_json::Value::String(library_name);
-                    }
-                    let lib_version = lib.version.to_owned();
-                    if !lib_version.is_empty() {
-                        rec["instrumentation_library_version"] =
-                            serde_json::Value::String(lib_version);
-                    }
-                }
-
-                rec["severity"] = if !log_record.severity_text.is_empty() {
-                    log_record.severity_text.to_owned().into()
-                } else {
-                    log_record.severity_number.into()
-                };
-
-                rec["body"] = get_val(&log_record.body.as_ref());
-                rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
-
-                let rec_map = rec.as_object_mut().unwrap();
-                for local_attr in &log_record.attributes {
-                    let key = if normalize_keys {
-                        flatten::format_label_name_cow(&local_attr.key).into_owned()
-                    } else {
-                        local_attr.key.clone()
-                    };
-                    rec_map.insert(key, get_val_with_type_retained(&local_attr.value.as_ref()));
-                }
-                rec[TIMESTAMP_COL_NAME] = timestamp.into();
+                let mut rec = otlp_log_record(
+                    &service_att_map,
+                    normalized_resource.as_ref(),
+                    instrumentation_logs.scope.as_ref(),
+                    log_record,
+                    timestamp,
+                );
 
                 match TraceId::from_bytes(
                     log_record
@@ -740,7 +798,10 @@ pub async fn handle_request(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::otlp::OtlpRequestType;
+    use config::{
+        meta::otlp::OtlpRequestType,
+        utils::{flatten, json},
+    };
     use opentelemetry_proto::tonic::{
         collector::logs::v1::ExportLogsServiceRequest,
         common::v1::{
@@ -749,6 +810,96 @@ mod tests {
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
+
+    use super::{normalized_resource_map, otlp_log_record};
+
+    fn kv(key: &str, value: opentelemetry_proto::tonic::common::v1::any_value::Value) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue { value: Some(value) }),
+            ..Default::default()
+        }
+    }
+
+    fn kvlist(pairs: &[(&str, i64)]) -> opentelemetry_proto::tonic::common::v1::any_value::Value {
+        use opentelemetry_proto::tonic::common::v1::{KeyValueList, any_value::Value};
+        Value::KvlistValue(KeyValueList {
+            values: pairs
+                .iter()
+                .map(|(k, v)| kv(k, Value::IntValue(*v)))
+                .collect(),
+        })
+    }
+
+    /// The pre-normalized build must flatten to exactly what the raw build flattens to.
+    fn assert_normalized_build_matches_raw(
+        resource: json::Map<String, json::Value>,
+        attributes: Vec<KeyValue>,
+    ) -> json::Map<String, json::Value> {
+        let record = LogRecord {
+            attributes,
+            severity_text: "INFO".to_string(),
+            ..Default::default()
+        };
+        let normalized = normalized_resource_map(&resource);
+        let fast = otlp_log_record(&resource, normalized.as_ref(), None, &record, 1);
+        let raw = otlp_log_record(&resource, None, None, &record, 1);
+        let fast = flatten::flatten_with_level(fast, 0).unwrap();
+        let raw = flatten::flatten_with_level(raw, 0).unwrap();
+        assert_eq!(fast, raw);
+        fast.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn test_object_valued_attributes_colliding_after_normalization_keep_both() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let rec = assert_normalized_build_matches_raw(
+            json::Map::new(),
+            vec![
+                kv("a.b", kvlist(&[("x", 1)])),
+                kv("a_b", kvlist(&[("y", 2)])),
+                kv("plain", Value::StringValue("v".to_string())),
+            ],
+        );
+        assert_eq!(rec["a_b_x"], json::json!(1));
+        assert_eq!(rec["a_b_y"], json::json!(2));
+    }
+
+    #[test]
+    fn test_scalar_collision_across_resource_and_record_keeps_flatten_precedence() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("a.b".to_string(), json::json!(1));
+        resource.insert("a_b".to_string(), json::json!(2));
+        let rec =
+            assert_normalized_build_matches_raw(resource, vec![kv("a.b", Value::IntValue(3))]);
+        // flatten keeps the first key's position and the last key's value
+        assert_eq!(rec["a_b"], json::json!(2));
+    }
+
+    #[test]
+    fn test_collision_free_record_is_pre_normalized() {
+        use opentelemetry_proto::tonic::common::v1::any_value::Value;
+        let mut resource = json::Map::new();
+        resource.insert("k8s.pod.name".to_string(), json::json!("p"));
+        let normalized = normalized_resource_map(&resource).unwrap();
+        let record = LogRecord {
+            attributes: vec![kv("http.method", Value::StringValue("GET".to_string()))],
+            ..Default::default()
+        };
+        let rec = otlp_log_record(&resource, Some(&normalized), None, &record, 1);
+        let keys: Vec<&String> = rec.as_object().unwrap().keys().collect();
+        assert!(keys.iter().all(|k| !k.contains('.')), "{keys:?}");
+        assert!(
+            normalized_resource_map(&{
+                let mut r = json::Map::new();
+                r.insert("a.b".to_string(), json::json!(1));
+                r.insert("a_b".to_string(), json::json!(2));
+                r
+            })
+            .is_none()
+        );
+    }
 
     use crate::logs::otlp::handle_request;
 
