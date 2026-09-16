@@ -35,7 +35,7 @@
     <template #actions>
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
-      <IacRegistryLinks data-test="slos-slolist-iac-registries" />
+      <IacRegistryLinks data-test="slos-slolist-iac-registries" :compact="isMobile" />
       <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
         {{ t("slos.new") }}
       </OButton>
@@ -491,6 +491,7 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import sloService from "@/services/slos";
+import useBreakpoint from "@/composables/useBreakpoint";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
 import { slosToTerraform } from "@/utils/slos/sloTerraform";
@@ -509,6 +510,7 @@ import {
 } from "@/composables/useSloFormat";
 
 const { t } = useI18nTyped();
+const { isMobile } = useBreakpoint();
 const router = useRouter();
 const route = useRoute();
 const store = useStore();

@@ -19,6 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   OpenObserve provider on that registry. Two separate logos rather than one
   combined badge: they are two distinct destinations, and the pair is also what
   tells a reader the exported configuration applies to either tool.
+
+  ONE caption labels the pair rather than one label per mark: two logos beside a
+  primary CTA have to stay quieter than it, and naming each one doubles the width
+  of a secondary affordance while saying the same thing twice. It names the
+  ARTIFACT ("Terraform provider" — what OpenTofu consumes too), never a registry,
+  since a registry name would mislabel whichever of the two marks it omits.
 -->
 <script setup lang="ts">
 import { computed } from "vue";
@@ -32,7 +38,14 @@ import { useTheme } from "@/composables/useTheme";
 import { OPENTOFU_REGISTRY_URL, TERRAFORM_REGISTRY_URL } from "@/utils/terraform/provider";
 import { raw, useI18nTyped } from "@/types/i18n";
 
-withDefaults(defineProps<{ dataTest?: string }>(), { dataTest: "iac-registry-links" });
+// `compact` drops the caption where the caller has no width for it; only the
+// call site knows, because the same pair sits inline on one page and inside the
+// header's "More" dropdown — where the caption is what makes the entry legible —
+// on another.
+const props = withDefaults(defineProps<{ dataTest?: string; compact?: boolean }>(), {
+  dataTest: "iac-registry-links",
+  compact: false,
+});
 
 const { t } = useI18nTyped();
 const { isDark } = useTheme();
@@ -62,7 +75,13 @@ const REGISTRIES = computed(() => [
 </script>
 
 <template>
-  <div class="flex items-center gap-2" :data-test="dataTest">
+  <div class="flex items-center gap-1.5" :data-test="dataTest">
+    <span
+      v-if="!props.compact"
+      class="text-text-secondary text-xs whitespace-nowrap"
+      :data-test="`${dataTest}-caption`"
+      >{{ t("common.iacProviderCaption") }}</span
+    >
     <a
       v-for="registry in REGISTRIES"
       :key="registry.key"

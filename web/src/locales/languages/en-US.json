@@ -682,6 +682,7 @@
     "export": "Export",
     "download": "Download",
     "openProviderOnRegistry": "OpenObserve provider on the {registry}",
+    "iacProviderCaption": "Terraform provider",
     "exportTerraformTabTooltip": "The same configuration applies with Terraform or OpenTofu.",
     "exportTerraformEmpty": "No Terraform resource exists for this selection. Export it as JSON instead.",
     "exportTerraformSkipped": "Not included: {names}. The OpenObserve Terraform provider has no resource for these.",

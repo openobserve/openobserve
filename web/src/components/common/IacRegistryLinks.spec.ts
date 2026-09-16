@@ -23,12 +23,18 @@ import IacRegistryLinks from "./IacRegistryLinks.vue";
 const i18n = createI18n({
   locale: "en",
   messages: {
-    en: { common: { openProviderOnRegistry: "OpenObserve provider on the {registry}" } },
+    en: {
+      common: {
+        openProviderOnRegistry: "OpenObserve provider on the {registry}",
+        iacProviderCaption: "Terraform provider",
+      },
+    },
   },
 });
 
-function mountLinks(theme: "light" | "dark") {
+function mountLinks(theme: "light" | "dark", props: { compact?: boolean } = {}) {
   return mount(IacRegistryLinks, {
+    props,
     global: { plugins: [createStore({ state: { theme } }), i18n] },
   });
 }
@@ -80,5 +86,50 @@ describe("IacRegistryLinks", () => {
 
     expect(src("light")).toContain("%234040b2");
     expect(src("dark")).toBe(src("light"));
+  });
+
+  // The affordance gap this component shipped with: the marks carried an
+  // aria-label and a tooltip, so nothing was visible until you hovered.
+  it("labels the pair with one visible caption", () => {
+    const wrapper = mountLinks("light");
+    const caption = wrapper.find('[data-test="iac-registry-links-caption"]');
+
+    expect(caption.exists()).toBe(true);
+    expect(caption.text()).toBe("Terraform provider");
+  });
+
+  // The caption names the artifact, which is a "Terraform provider" for OpenTofu
+  // too; naming a REGISTRY would mislabel whichever of the two marks it omits.
+  it("captions the artifact, not either registry", () => {
+    const caption = mountLinks("light").find('[data-test="iac-registry-links-caption"]').text();
+
+    expect(caption).not.toMatch(/registry/i);
+  });
+
+  it("derives the caption data-test from dataTest", () => {
+    const wrapper = mount(IacRegistryLinks, {
+      props: { dataTest: "slos-slolist-iac-registries" },
+      global: { plugins: [createStore({ state: { theme: "light" } }), i18n] },
+    });
+
+    expect(wrapper.find('[data-test="slos-slolist-iac-registries-caption"]').exists()).toBe(true);
+  });
+
+  it("drops the caption when compact, keeping both links", () => {
+    const wrapper = mountLinks("light", { compact: true });
+
+    expect(wrapper.find('[data-test="iac-registry-links-caption"]').exists()).toBe(false);
+    expect(wrapper.findAll("a")).toHaveLength(2);
+  });
+
+  // The caption is an addition, never a replacement: hover-free labelling must
+  // not cost the per-destination name each link already carried.
+  it("keeps each link's per-registry aria-label alongside the caption", () => {
+    const links = mountLinks("light").findAll("a");
+
+    expect(links[0].attributes("aria-label")).toBe(
+      "OpenObserve provider on the Terraform Registry",
+    );
+    expect(links[1].attributes("aria-label")).toBe("OpenObserve provider on the OpenTofu Registry");
   });
 });
