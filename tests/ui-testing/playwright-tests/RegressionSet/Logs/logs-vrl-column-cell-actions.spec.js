@@ -33,7 +33,9 @@ test.describe("Logs VRL column cell actions", () => {
     await pm.logsPage.runQueryAndWaitForResults();
     await pm.logsPage.expectResultsGridSettledWithRows();
 
-    await pm.logsPage.clickAddFieldToTableButton(VRL_FIELD);
+    // Per #9550's own steps the VRL field is added "from the results" — it is absent
+    // from the sidebar list, which only carries the stream's schema fields.
+    await pm.logsPage.addFieldToTableFromLogDetail(VRL_FIELD);
     await pm.logsPage.expectFieldInTableHeader(VRL_FIELD);
 
     await pm.logsPage.clickAddFieldToTableButton(SCHEMA_FIELD);

@@ -12457,6 +12457,27 @@ export class LogsPage {
         return ((await bubble.textContent()) ?? '').trim();
     }
 
+    // A VRL-derived field never reaches the sidebar list, so the JSON preview's own
+    // dropdown is the only place it can be added to the table from.
+    /** Add a field to the results table from an expanded row's JSON detail. */
+    async addFieldToTableFromLogDetail(fieldName) {
+        const detailRow = this.page.locator(`[data-test="log-detail-row-${fieldName}"]`).first();
+        if (!(await detailRow.isVisible({ timeout: 2000 }).catch(() => false))) {
+            const expander = this.page.locator(this.tableRowExpandMenu).first();
+            await expander.waitFor({ state: 'visible', timeout: 15000 });
+            await expander.click();
+            await detailRow.waitFor({ state: 'visible', timeout: 15000 });
+        }
+        await detailRow.locator('[data-test="log-details-include-exclude-field-btn"]').first().click();
+        const addItem = this.page.locator('[data-test="log-details-add-field-btn"]').first();
+        await addItem.waitFor({ state: 'visible', timeout: 10000 });
+        await addItem.click();
+        await this.page
+            .locator(`[data-test="o2-table-th-${fieldName}"]`)
+            .waitFor({ state: 'visible', timeout: 15000 });
+        testLogger.info(`Added ${fieldName} to the table from its log detail`);
+    }
+
     // The buttons are gated on the column being a real schema field, which is the whole of #9550.
     /** Count of include/exclude term buttons in a column's hover actions. */
     async countCellSearchTermActions(columnId, rowIndex = 0) {
