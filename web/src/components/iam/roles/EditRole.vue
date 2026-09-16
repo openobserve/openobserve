@@ -288,6 +288,7 @@ import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
 import commonService from "@/services/common";
 import syntheticsService from "@/services/synthetics";
+import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
@@ -299,6 +300,11 @@ import {
   DBM_VIEWER_STREAMS,
   DBM_VIEWER_TYPE_NODE_PERMS,
 } from "./dbmViewerPreset";
+import {
+  K8S_VIEWER_STREAM_ROW_PERMS,
+  K8S_VIEWER_STREAMS,
+  K8S_VIEWER_TYPE_NODE_PERMS,
+} from "./k8sViewerPreset";
 
 // db_monitoring is checked as a plain GET (never LIST), and has no child
 // entities for a wildcard relation to reach — unlike the `metrics` type node,
@@ -493,13 +499,15 @@ const getRoleDetails = () => {
       setDefaultPermissions();
 
       filteredResources.value = permissionsState.resources
+        // A nested type is reached by expanding its parent, not as a row of its
+        // own, so offering it here selects something the table never renders.
+        .filter((r) => !r.parent)
         .map((r) => {
           return {
             label: r.display_name,
             value: r.key,
           };
-        })
-        .filter((r) => r.value !== "dashboard");
+        });
 
       resourceOptions.value = cloneDeep(filteredResources.value);
 
@@ -515,14 +523,14 @@ const getRoleDetails = () => {
       if (selectedPermissionsHash.value.size === 0) {
         filter.value.permissions = "all";
 
-        // The Add Role dialog's preset seeds read permissions so evaluators get a
-        // safe, non-empty starting point. These land as pending "added"
-        // permissions the user can still tweak before saving.
+        // A preset only stages PENDING "added" permissions, so the user can still tweak them before saving.
         const preset = router.currentRoute.value.query.preset;
         if (preset === "readonly") {
           seedReadonlyPreset();
         } else if (preset === "dbm") {
           await seedDbmViewerPreset();
+        } else if (preset === "k8s") {
+          await seedK8sViewerPreset();
         }
       }
 
@@ -843,6 +851,24 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "workflows") {
+        if (!resourceMapper["workflow_folder"]) {
+          resourceMapper["workflow_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "workflow_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["workflow_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
       if (resourceMapper[resource].parent && !resourceMapper[resourceMapper[resource].parent]) {
@@ -888,6 +914,11 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         // owning folder can't be derived from the entity — load every folder's
         // monitors so the permission can be matched to its row.
         for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
+      } else if (resource === "workflows") {
+        // Plain workflow ids too, so the same sweep applies.
+        for (const folderEntity of resourceMapper["workflow_folder"]?.entities ?? []) {
           await getResourceEntities(folderEntity as Entity);
         }
       } else if (
@@ -946,7 +977,7 @@ const seedReadonlyPreset = () => {
   });
 };
 
-const collectVisibleDbmReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
+const collectVisibleReadGrants = (row: Entity, perms: readonly (keyof Entity["permission"])[]) =>
   perms
     .filter((perm) => {
       const permDetail = row.permission?.[perm];
@@ -964,7 +995,7 @@ const seedDbmViewerPreset = async () => {
 
   const dbMonitoringResource = resourceMapper.value[DBM_MODULE_RESOURCE];
   if (dbMonitoringResource) {
-    changes.push(...collectVisibleDbmReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
+    changes.push(...collectVisibleReadGrants(dbMonitoringResource, DBM_MODULE_PERMS));
   }
 
   const streamResource = resourceMapper.value["stream"];
@@ -985,13 +1016,13 @@ const seedDbmViewerPreset = async () => {
       matched = matchedRows.length;
       changes.push(
         ...matchedRows.flatMap((row: Entity) =>
-          collectVisibleDbmReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
+          collectVisibleReadGrants(row, DBM_VIEWER_STREAM_ROW_PERMS),
         ),
       );
 
       // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
       if (matchedRows.length) {
-        changes.push(...collectVisibleDbmReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
+        changes.push(...collectVisibleReadGrants(metricsEntity, DBM_VIEWER_TYPE_NODE_PERMS));
       }
     }
   }
@@ -1011,6 +1042,51 @@ const reportDbmViewerSeeding = (matched: number, total: number) => {
     matched
       ? { variant: "info", message: t("iam.editRole.dbmPresetSeeded", { matched, total }) }
       : { variant: "warning", message: t("iam.editRole.dbmPresetNoMatch", { total }) },
+  );
+};
+
+// Stream rows are lazily loaded CHILDREN of the `stream` resource, so both the `stream` node and its `metrics` child must be expanded (which fetches the org's streams) before any row exists to tick.
+const seedK8sViewerPreset = async () => {
+  const streamResource = resourceMapper.value["stream"];
+  if (!streamResource) return;
+
+  // expandPermission toggles, so only call it on a node that is still collapsed.
+  if (!streamResource.expand) await expandPermission(streamResource);
+
+  const metricsEntity = streamResource.entities?.find(
+    (entity: Entity) => entity.name === "metrics",
+  );
+  if (!metricsEntity) return;
+
+  if (!metricsEntity.expand) await expandPermission(metricsEntity);
+
+  // `metrics.entities` only ever holds the visible slice, so seeding off it would silently miss streams.
+  const rows = heavyResourceEntities.value["metrics"] ?? [];
+  const curated = new Set(K8S_VIEWER_STREAMS);
+  const matched = rows.filter((row: Entity) => curated.has(row.name));
+  const changes = matched.flatMap((row: Entity) =>
+    collectVisibleReadGrants(row, K8S_VIEWER_STREAM_ROW_PERMS),
+  );
+
+  // GET /{org}/streams is checked against `metrics:_all_<org>`, never the per-stream objects, and FGA's LIST relation does not accept ALLOW_GET; ALLOW_GET here would instead wildcard every metric stream in the org, so the type node is LIST-only.
+  if (matched.length) {
+    changes.push(...collectVisibleReadGrants(metricsEntity, K8S_VIEWER_TYPE_NODE_PERMS));
+  }
+
+  if (changes.length) {
+    handlePermissionBatchChange(changes);
+    // Unlike readonly (which seeds every resource), only a handful of the org's streams are seeded here — "all" would bury them in a 50-row truncated grid.
+    filter.value.permissions = "selected";
+  }
+
+  reportK8sViewerSeeding(matched.length, K8S_VIEWER_STREAMS.length);
+};
+
+const reportK8sViewerSeeding = (matched: number, total: number) => {
+  toast(
+    matched
+      ? { variant: "info", message: t("iam.editRole.k8sPresetSeeded", { matched, total }) }
+      : { variant: "warning", message: t("iam.editRole.k8sPresetNoMatch", { total }) },
   );
 };
 
@@ -1173,6 +1249,10 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1223,6 +1303,10 @@ const updateJsonInTable = () => {
       } else if (resource === "synthetics") {
         // Plain-id entity — locate the folder whose loaded monitors contain it.
         resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
+      } else if (resource === "workflows") {
+        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
           (f.entities ?? []).some((e: Entity) => e.name === entity),
         ) as Entity;
       } else if (resource === "report") {
@@ -1302,7 +1386,8 @@ const updatePermissionVisibility = (
     permission.show =
       filter.value.permissions === "all" ? isResourceFiltered : showResource && isResourceFiltered;
 
-    if (forceShow) permission.show = true;
+    // The type node's own AllowList would otherwise re-show every ungranted stream under "selected".
+    if (forceShow && filter.value.permissions === "all") permission.show = true;
 
     // Recursively update the show property for entities
     if (!permission.entities?.length) return;
@@ -1499,6 +1584,8 @@ const getResourceEntities = (resource: Resource | Entity) => {
     rfolder: getReportFolders,
     synthetic_folder: getSyntheticsFolders,
     synthetics: getSynthetics,
+    workflow_folder: getWorkflowFolders,
+    workflows: getWorkflows,
     re_patterns: getRePatterns,
     provider: getProviders,
     score_config: getScoreConfigs,
@@ -1675,6 +1762,45 @@ const getSynthetics = async (resource: Entity | Resource) => {
   // `monitors` was renamed `checks` in the synthetics list response.
   const syntheticRows = res.data?.checks ?? res.data?.monitors ?? [];
   updateEntityEntities(resource, ["id"], [...syntheticRows], false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getWorkflowFolders = async () => {
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "workflows",
+  );
+
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities(
+    "workflow_folder",
+    ["folderId"],
+    [...folders.data.list],
+    true,
+    "name",
+    "workflows",
+  );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getWorkflows = async (resource: Entity | Resource) => {
+  // Plain workflow ids, no folder prefix — matches the objects set_ownership
+  // writes, same as synthetics.
+  const res: any = await workflowService.listWorkflows(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  const workflowRows = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+  updateEntityEntities(resource, ["id"], [...workflowRows], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);

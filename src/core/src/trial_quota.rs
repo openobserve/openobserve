@@ -22,7 +22,7 @@
 //!
 //! ## Pools
 //!
-//! [`TrialQuotaPool::AiCredits`] and the two synthetics step pools are
+//! [`TrialQuotaPool::AiCredits`] and the three synthetics step pools are
 //! independent: every counter, limit, DB read and HA message is keyed
 //! `(org, pool)`, so spending one grant cannot drain the other, and
 //! [`TrialQuotaFeature::pool`] is the only feature-to-pool mapping. No
@@ -107,8 +107,9 @@ struct FlushRecord {
     cost: i64,
 }
 
-/// A lifetime free grant, and the unit of isolation between features. Every counter, limit and DB
-/// read is keyed per `(org, pool)` via [`scope`]: an org that spends its AI credits must not
+/// A free grant per org, and the unit of isolation between features. Every pool is lifetime except
+/// [`TrialQuotaPool::SyntheticsStatusProtocol`], which resets each month. Every counter, limit and
+/// DB read is keyed per `(org, pool)` via [`scope`]: an org that spends its AI credits must not
 /// thereby lose its synthetics budget.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TrialQuotaPool {
@@ -120,6 +121,9 @@ pub enum TrialQuotaPool {
     /// from the browser grant because a browser step costs ~52x a protocol one,
     /// so a shared pool let the org's mix decide our free-tier cost.
     SyntheticsProtocolSteps,
+    /// Protocol steps of checks attached to a status page. The only pool that
+    /// resets: its row carries the `YYYYMM` its count belongs to.
+    SyntheticsStatusProtocol,
 }
 
 impl TrialQuotaPool {
@@ -128,6 +132,7 @@ impl TrialQuotaPool {
         TrialQuotaPool::AiCredits,
         TrialQuotaPool::SyntheticsBrowserSteps,
         TrialQuotaPool::SyntheticsProtocolSteps,
+        TrialQuotaPool::SyntheticsStatusProtocol,
     ];
 
     /// Stable identifier used in the [`scope`] key and on the HA wire.
@@ -136,6 +141,7 @@ impl TrialQuotaPool {
             TrialQuotaPool::AiCredits => "ai_credits",
             TrialQuotaPool::SyntheticsBrowserSteps => "synthetics_browser_steps",
             TrialQuotaPool::SyntheticsProtocolSteps => "synthetics_protocol_steps",
+            TrialQuotaPool::SyntheticsStatusProtocol => "synthetics_status_protocol",
         }
     }
 
@@ -148,6 +154,7 @@ impl TrialQuotaPool {
             "synthetics_steps" | "synthetics_protocol_steps" => {
                 Some(TrialQuotaPool::SyntheticsProtocolSteps)
             }
+            "synthetics_status_protocol" => Some(TrialQuotaPool::SyntheticsStatusProtocol),
             _ => None,
         }
     }
@@ -164,8 +171,15 @@ impl TrialQuotaPool {
     pub fn is_synthetics(self) -> bool {
         matches!(
             self,
-            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps
+            TrialQuotaPool::SyntheticsBrowserSteps
+                | TrialQuotaPool::SyntheticsProtocolSteps
+                | TrialQuotaPool::SyntheticsStatusProtocol
         )
+    }
+
+    /// The one pool whose count belongs to a month rather than to the lifetime of the org.
+    pub fn is_monthly(self) -> bool {
+        matches!(self, TrialQuotaPool::SyntheticsStatusProtocol)
     }
 
     /// Every `trial_quota_usage.feature` value that spends from this pool; each
@@ -180,6 +194,7 @@ impl TrialQuotaPool {
             TrialQuotaPool::SyntheticsProtocolSteps => {
                 &["synthetics_protocol_steps", "synthetics_steps"]
             }
+            TrialQuotaPool::SyntheticsStatusProtocol => &["synthetics_status_protocol"],
         }
     }
 
@@ -202,6 +217,7 @@ impl TrialQuotaPool {
             TrialQuotaPool::AiCredits => cfg.cloud.ai_free_credit_pool,
             TrialQuotaPool::SyntheticsBrowserSteps => cfg.cloud.synthetics_free_browser_step_pool,
             TrialQuotaPool::SyntheticsProtocolSteps => cfg.cloud.synthetics_free_protocol_step_pool,
+            TrialQuotaPool::SyntheticsStatusProtocol => cfg.cloud.synthetics_free_status_step_pool,
         }
     }
 }
@@ -1234,6 +1250,8 @@ pub struct SyntheticsQuota {
     pub browser_limit: u64,
     pub protocol_used: u64,
     pub protocol_limit: u64,
+    pub status_used: u64,
+    pub status_limit: u64,
 }
 
 /// Every `trial_quota_usage.feature` value that spends from a synthetics pool.
@@ -1257,7 +1275,12 @@ pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<Stri
     let Some(rows) = read_synthetics_rows(&org_ids).await else {
         return HashMap::new();
     };
-    fold_synthetics_remaining(&org_ids, &rows)
+    fold_synthetics_remaining(&org_ids, &rows, current_month())
+}
+
+/// The month the monthly pool is spending right now, UTC.
+fn current_month() -> i32 {
+    config::utils::time::month_of(config::utils::time::now_micros())
 }
 
 /// Each requested org's synthetics spend and grant, for the `_meta` org listing — SPEC §11 #5.
@@ -1267,7 +1290,7 @@ pub async fn synthetics_quota_for_orgs(org_ids: Vec<String>) -> HashMap<String, 
     let Some(rows) = read_synthetics_rows(&org_ids).await else {
         return HashMap::new();
     };
-    fold_synthetics_quota(&org_ids, &rows)
+    fold_synthetics_quota(&org_ids, &rows, current_month())
 }
 
 /// The rows both batched readers fold — `None` when the table cannot be reached.
@@ -1294,8 +1317,9 @@ async fn read_synthetics_rows(
 pub(crate) fn fold_synthetics_remaining(
     org_ids: &[String],
     rows: &[infra::table::entity::trial_quota_usage::Model],
+    month: i32,
 ) -> HashMap<String, StepRemaining> {
-    fold_synthetics_quota(org_ids, rows)
+    fold_synthetics_quota(org_ids, rows, month)
         .into_iter()
         .map(|(org_id, quota)| {
             (
@@ -1304,6 +1328,7 @@ pub(crate) fn fold_synthetics_remaining(
                 StepRemaining {
                     browser: quota.browser_limit.saturating_sub(quota.browser_used),
                     protocol: quota.protocol_limit.saturating_sub(quota.protocol_used),
+                    status: quota.status_limit.saturating_sub(quota.status_used),
                 },
             )
         })
@@ -1315,6 +1340,7 @@ pub(crate) fn fold_synthetics_remaining(
 pub(crate) fn fold_synthetics_quota(
     org_ids: &[String],
     rows: &[infra::table::entity::trial_quota_usage::Model],
+    month: i32,
 ) -> HashMap<String, SyntheticsQuota> {
     let mut used: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
     let mut limits: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
@@ -1329,8 +1355,14 @@ pub(crate) fn fold_synthetics_quota(
                 .and_modify(|current| *current = (*current).max(limit))
                 .or_insert(limit);
         }
+        // A monthly row from a closed month has already been forgiven, so its spend reads as 0.
+        let spent = if pool.is_monthly() && row.period != month {
+            0
+        } else {
+            u64::try_from(row.usage_count).unwrap_or(0)
+        };
         let entry = used.entry((row.org_id.as_str(), pool)).or_default();
-        *entry = entry.saturating_add(u64::try_from(row.usage_count).unwrap_or(0));
+        *entry = entry.saturating_add(spent);
     }
 
     org_ids
@@ -1349,6 +1381,7 @@ pub(crate) fn fold_synthetics_quota(
             };
             let (browser_used, browser_limit) = spent(TrialQuotaPool::SyntheticsBrowserSteps);
             let (protocol_used, protocol_limit) = spent(TrialQuotaPool::SyntheticsProtocolSteps);
+            let (status_used, status_limit) = spent(TrialQuotaPool::SyntheticsStatusProtocol);
             (
                 org_id.clone(),
                 SyntheticsQuota {
@@ -1356,6 +1389,8 @@ pub(crate) fn fold_synthetics_quota(
                     browser_limit,
                     protocol_used,
                     protocol_limit,
+                    status_used,
+                    status_limit,
                 },
             )
         })
@@ -1383,6 +1418,7 @@ mod tests {
             TrialQuotaPool::AiCredits => 0,
             TrialQuotaPool::SyntheticsBrowserSteps => 1,
             TrialQuotaPool::SyntheticsProtocolSteps => 2,
+            TrialQuotaPool::SyntheticsStatusProtocol => 3,
         }
     }
 
@@ -1758,12 +1794,18 @@ mod tests {
             cfg.cloud.synthetics_free_protocol_step_pool,
         );
         assert_eq!(
+            get_limit_for_pool(org_id, TrialQuotaPool::SyntheticsStatusProtocol),
+            cfg.cloud.synthetics_free_status_step_pool,
+        );
+        assert_eq!(
             get_limit_for_pool(org_id, TrialQuotaPool::AiCredits),
             cfg.cloud.ai_free_credit_pool,
         );
         // §6.1: 10,000 browser steps and 20,000 protocol; the AI pool is 1,000 credits.
         assert_eq!(cfg.cloud.synthetics_free_browser_step_pool, 10_000);
         assert_eq!(cfg.cloud.synthetics_free_protocol_step_pool, 20_000);
+        // 43,200 protocol steps a month for status-page checks, and nothing for browser ones.
+        assert_eq!(cfg.cloud.synthetics_free_status_step_pool, 43_200);
         // The three grants must not collapse onto one knob.
         assert_ne!(
             cfg.cloud.synthetics_free_browser_step_pool,
@@ -1785,6 +1827,7 @@ mod tests {
         usage_count: i64,
     ) -> infra::table::entity::trial_quota_usage::Model {
         infra::table::entity::trial_quota_usage::Model {
+            period: 0,
             org_id: org_id.to_string(),
             feature: feature.to_string(),
             usage_count,
@@ -1963,6 +2006,7 @@ mod tests {
             .feature_keys()
             .iter()
             .chain(TrialQuotaPool::SyntheticsProtocolSteps.feature_keys())
+            .chain(TrialQuotaPool::SyntheticsStatusProtocol.feature_keys())
             .copied()
             .collect();
         features.sort_unstable();
@@ -1985,7 +2029,7 @@ mod tests {
         let org_id = steps_org("fold-empty", 700);
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[]);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[], 0);
         let r = remaining
             .get(&org_id)
             .expect("an org with no rows has not used the feature — it is not absent");
@@ -2003,7 +2047,7 @@ mod tests {
             db_row(&org_id, "synthetics_protocol_steps", 11),
         ];
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 0);
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
             r.browser, 0,
@@ -2023,7 +2067,7 @@ mod tests {
             db_row(&org_id, "synthetics_browser_steps", 100),
         ];
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 0);
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
             r.protocol, 500,
@@ -2051,6 +2095,7 @@ mod tests {
         let remaining = fold_synthetics_remaining(
             std::slice::from_ref(&org_id),
             &[browser, protocol, pre_split],
+            0,
         );
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
@@ -2081,7 +2126,7 @@ mod tests {
             protocol,
         ];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 0);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             (q.browser_used, q.browser_limit),
@@ -2110,7 +2155,7 @@ mod tests {
             db_row(&org_id, "synthetics_protocol_steps", 11),
         ];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 0);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             (q.browser_used, q.browser_limit),
@@ -2132,6 +2177,7 @@ mod tests {
         let quota = fold_synthetics_quota(
             std::slice::from_ref(&org_id),
             &[db_row(&other, "synthetics_browser_steps", 4)],
+            0,
         );
 
         assert_eq!(
@@ -2163,7 +2209,7 @@ mod tests {
         pre_split.usage_limit = Some(5_000);
         let rows = vec![browser, protocol, pre_split];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 0);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             q.browser_used, 900,
@@ -2171,7 +2217,7 @@ mod tests {
              they agree on",
         );
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 0);
         let r = remaining.get(&org_id).expect("the org was requested");
         // Every pool here is under its grant, so the two halves must add back up to it.
         assert_eq!(

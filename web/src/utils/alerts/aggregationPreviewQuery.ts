@@ -14,6 +14,50 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
+ * Blank out the contents of quoted string literals, keeping length and quote
+ * characters intact, so a keyword search on the result can't be fooled by a
+ * projected or filtered string that happens to contain words like "from" or
+ * "having".
+ */
+const maskStringLiterals = (sql: string): string =>
+  sql.replace(
+    /'(?:[^']|'')*'|"(?:[^"]|"")*"/g,
+    (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1],
+  );
+
+/**
+ * Blank out everything inside parentheses, nesting-aware, so a keyword used
+ * inside a function call or subquery — e.g. the FROM in EXTRACT(EPOCH FROM
+ * now()) — can't be mistaken for the statement's own FROM/GROUP BY/etc. Run
+ * this after maskStringLiterals so a literal's own parens can't miscount
+ * depth.
+ */
+const maskParens = (sql: string): string => {
+  let depth = 0;
+  let out = "";
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (ch === "(") {
+      depth++;
+      out += "x";
+    } else if (ch === ")") {
+      depth--;
+      out += "x";
+    } else {
+      out += depth > 0 ? "x" : ch;
+    }
+  }
+  return out;
+};
+
+/**
+ * Same-length mask of `sql` (string literals and parenthesised content
+ * blanked out) safe to run clause/column keyword searches against — a match
+ * index on the result lines up with the same offset in the original `sql`.
+ */
+const maskForKeywordSearch = (sql: string): string => maskParens(maskStringLiterals(sql));
+
+/**
  * Turn an alert's generated aggregation SQL into a query a time-series chart
  * can render.
  *
@@ -38,8 +82,14 @@
  */
 export const cleanAggregationQuery = (query: string): string => {
   let cleaned = query;
-  // Remove HAVING clause (and everything after it)
-  cleaned = cleaned.replace(/\s+HAVING\s+[\s\S]*$/gi, "");
+  // Remove HAVING clause (and everything after it). The keyword is located on
+  // a masked copy so a condition value that merely contains the word "having"
+  // (e.g. a filter value of "alerts having errors") can't be mistaken for the
+  // clause and truncate the query mid string-literal.
+  const havingMatch = maskForKeywordSearch(cleaned).match(/\s+HAVING\s+/i);
+  if (havingMatch && havingMatch.index !== undefined) {
+    cleaned = cleaned.slice(0, havingMatch.index);
+  }
   // Remove zo_sql_min_time and zo_sql_max_time from SELECT list
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_min_time/g, "");
   cleaned = cleaned.replace(/,\s*[^,\n]*?\s+[aA][sS]\s+zo_sql_max_time/g, "");
@@ -54,15 +104,28 @@ export const cleanAggregationQuery = (query: string): string => {
   // If zo_sql_key is still absent, inject histogram(_timestamp) AS zo_sql_key
   if (!/\bzo_sql_key\b/i.test(cleaned)) {
     cleaned = cleaned.replace(/\bSELECT\s+/i, "SELECT histogram(_timestamp) AS zo_sql_key, ");
-    if (/\bGROUP\s+BY\s+/i.test(cleaned)) {
+    // Locate GROUP BY / ORDER BY / LIMIT on a masked copy so a WHERE-clause
+    // literal containing one of these phrases can't be mistaken for the
+    // actual clause.
+    const groupByMatch = maskForKeywordSearch(cleaned).match(/\bGROUP\s+BY\s+/i);
+    if (groupByMatch && groupByMatch.index !== undefined) {
       // Existing GROUP BY — prepend zo_sql_key to it
-      cleaned = cleaned.replace(/\bGROUP\s+BY\s+/i, "GROUP BY zo_sql_key, ");
+      const end = groupByMatch.index + groupByMatch[0].length;
+      cleaned = cleaned.slice(0, groupByMatch.index) + "GROUP BY zo_sql_key, " + cleaned.slice(end);
     } else {
       // No GROUP BY at all — append one before ORDER BY / LIMIT or at end
-      if (/\bORDER\s+BY\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bORDER\s+BY\b/i, "GROUP BY zo_sql_key ORDER BY");
-      } else if (/\bLIMIT\b/i.test(cleaned)) {
-        cleaned = cleaned.replace(/\bLIMIT\b/i, "GROUP BY zo_sql_key LIMIT");
+      const orderByMatch = maskForKeywordSearch(cleaned).match(/\bORDER\s+BY\b/i);
+      const limitMatch = maskForKeywordSearch(cleaned).match(/\bLIMIT\b/i);
+      if (orderByMatch && orderByMatch.index !== undefined) {
+        const end = orderByMatch.index + orderByMatch[0].length;
+        cleaned =
+          cleaned.slice(0, orderByMatch.index) +
+          "GROUP BY zo_sql_key ORDER BY" +
+          cleaned.slice(end);
+      } else if (limitMatch && limitMatch.index !== undefined) {
+        const end = limitMatch.index + limitMatch[0].length;
+        cleaned =
+          cleaned.slice(0, limitMatch.index) + "GROUP BY zo_sql_key LIMIT" + cleaned.slice(end);
       } else {
         cleaned += " GROUP BY zo_sql_key";
       }
@@ -102,16 +165,18 @@ export default cleanAggregationQuery;
  */
 export const buildCountChartQuery = (query: string): string | null => {
   if (!query) return null;
-  const fromMatch = query.match(/\bFROM\b/i);
-  if (!fromMatch || !/^\s*SELECT\b/i.test(query)) return null;
+  const masked = maskForKeywordSearch(query);
+  if (!/^\s*SELECT\b/i.test(masked)) return null;
+  const fromMatch = masked.match(/\bFROM\b/i);
+  if (!fromMatch) return null;
+  const fromIndex = fromMatch.index as number;
 
-  // Keep everything from FROM onward, minus the raw-row tail.
-  let tail = query.slice(fromMatch.index as number);
-  tail = tail.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+LIMIT\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+GROUP\s+BY\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+HAVING\s+[\s\S]*$/i, "");
-  tail = tail.trim();
+  // Keep everything from FROM onward, minus the raw-row tail. Cut on the masked
+  // text so a literal containing "order by"/"limit"/etc. can't truncate early.
+  const maskedTail = masked.slice(fromIndex);
+  const cutMatch = maskedTail.match(/\s+(?:ORDER\s+BY|LIMIT|GROUP\s+BY|HAVING)\b/i);
+  const cutIndex = cutMatch ? fromIndex + (cutMatch.index as number) : undefined;
+  const tail = query.slice(fromIndex, cutIndex).trim();
   if (!tail) return null;
 
   return `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ${tail} GROUP BY zo_sql_key`;
@@ -158,23 +223,52 @@ export const withCompositeGroupLabel = (query: string, groupBy: string[]): strin
   if (!projection) return null;
   const cols = groupBy.filter((c) => c && c.trim() !== "");
 
-  let out = query;
+  // Bound the SELECT-list edit to the text before FROM, located on a masked
+  // copy. A WHERE-clause condition can carry a string literal equal to a
+  // group-by column's name (e.g. filtering `service = 'service'`) — matching
+  // against the raw query would strip that literal instead of the projected
+  // column, so the per-column regexes below only ever see the SELECT list.
+  const fromMatch = maskForKeywordSearch(query).match(/\s+FROM\s+/i);
+  if (!fromMatch || fromMatch.index === undefined) return null;
+  let selectList = query.slice(0, fromMatch.index);
+  const afterFrom = query.slice(fromMatch.index + fromMatch[0].length);
   // Drop each raw group column from the SELECT list. They are emitted bare
   // (`SELECT zo_sql_key, zo_sql_num, cost_center, availability_zone FROM …`),
-  // so match them as standalone list entries rather than anywhere in the text.
+  // so match them as standalone list entries.
   for (const c of cols) {
-    out = out.replace(new RegExp(`,\\s*"?${c}"?(?=\\s*(,|\\bFROM\\b))`, "i"), "");
+    selectList = selectList.replace(new RegExp(`,\\s*"?${c}"?(?=\\s*(,|$))`, "i"), "");
   }
   // Add the composite label to the projection, immediately before FROM.
-  out = out.replace(/\s+FROM\s+/i, `, ${projection} FROM `);
-  // Same swap in GROUP BY.
+  let out = `${selectList}, ${projection} FROM ${afterFrom}`;
+
+  // Bound the GROUP BY edit to the clause itself, the same way.
+  const groupByMatch = maskForKeywordSearch(out).match(/\bGROUP\s+BY\s+/i);
+  if (!groupByMatch || groupByMatch.index === undefined) return out.trim();
+  const groupByStart = groupByMatch.index + groupByMatch[0].length;
+  const clauseTailMasked = maskForKeywordSearch(out).slice(groupByStart);
+  const clauseEndMatch = clauseTailMasked.match(/\b(?:ORDER\s+BY|HAVING|LIMIT)\b/i);
+  const groupByEnd =
+    clauseEndMatch && clauseEndMatch.index !== undefined
+      ? groupByStart + clauseEndMatch.index
+      : out.length;
+
+  let groupByClause = out.slice(groupByStart, groupByEnd);
   for (const c of cols) {
-    out = out.replace(new RegExp(`,\\s*"?${c}"?(?=\\s*(,|$|\\bORDER\\b))`, "i"), "");
+    groupByClause = groupByClause.replace(new RegExp(`,\\s*"?${c}"?(?=\\s*(,|$))`, "i"), "");
   }
-  out = out.replace(/\bGROUP\s+BY\s+([^\s,]+)/i, `GROUP BY $1, ${GROUP_LABEL_ALIAS}`);
+  out =
+    out.slice(0, groupByStart) +
+    `${groupByClause.trim()}, ${GROUP_LABEL_ALIAS} ` +
+    out.slice(groupByEnd);
+
   // The severity ORDER BY references the aggregate, which is still present;
-  // but any trailing order on the raw columns is now dangling.
-  out = out.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
+  // but any trailing order on the raw columns is now dangling. Located on a
+  // masked copy so a filter value containing "order by" can't be mistaken
+  // for the clause and truncate the query mid string-literal.
+  const trailingOrderByMatch = maskForKeywordSearch(out).match(/\s+ORDER\s+BY\s+[\s\S]*$/i);
+  if (trailingOrderByMatch && trailingOrderByMatch.index !== undefined) {
+    out = out.slice(0, trailingOrderByMatch.index);
+  }
   return out.trim();
 };
 

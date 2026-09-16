@@ -302,8 +302,12 @@ pub async fn merge_by_stream(
         }
     }
 
-    // update job status
-    if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
+    // the hour settled mid-round: stay Running so check_running_jobs re-arms a whole-hour retry
+    if is_incremental && crate::is_past_hour(offset) {
+        log::warn!(
+            "[COMPACTOR] merge_by_stream [{org_id}/{stream_type}/{stream_name}] hour {date_start} settled during the incremental round, job {job_id} is left for the hour-end retry"
+        );
+    } else if let Err(e) = infra_file_list::set_job_done(&[job_id]).await {
         log::error!("[COMPACTOR] set_job_done failed: {e}");
     }
 

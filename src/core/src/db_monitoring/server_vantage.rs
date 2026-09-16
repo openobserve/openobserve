@@ -1145,10 +1145,12 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
 /// Cheap by construction: it stops at the first hit, and on the overwhelmingly
 /// common case (a stream carrying no DBM data at all) it is one `get` per
 /// record over a map the ingest loop has already built.
-pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
+pub fn batch_has_dbm_records<'a>(
+    records: impl IntoIterator<Item = &'a Map<String, Value>>,
+) -> bool {
     records
-        .iter()
-        .any(|(_, rec)| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
+        .into_iter()
+        .any(|rec| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
 }
 
 /// Seed [`server_stream_index_fields`] as secondary indexes on a stream that is
@@ -1224,6 +1226,11 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    canonicalize_dbm_record(local_val);
+}
+
+/// `apply_to_record` without the config read, for callers that already hold the DBM flag.
+pub(crate) fn canonicalize_dbm_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83

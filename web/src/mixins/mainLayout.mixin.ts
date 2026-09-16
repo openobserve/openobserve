@@ -15,7 +15,12 @@ const MainLayoutOpenSourceMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      linksList.value.splice(5, 0, {
+      if (linksList.value.some((link: any) => link.name === "pipeline")) {
+        return linksList.value;
+      }
+      const dashboardIndex = linksList.value.findIndex((link: any) => link.name === "dashboards");
+      const insertAt = dashboardIndex === -1 ? linksList.value.length : dashboardIndex;
+      linksList.value.splice(insertAt, 0, {
         title: t("menu.pipeline"),
         icon: "graph-2",
         link: "/pipeline",

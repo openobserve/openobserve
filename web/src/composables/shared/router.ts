@@ -38,6 +38,7 @@ const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.v
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
+const AppProfiles = () => import("@/plugins/profiles/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
@@ -366,6 +367,18 @@ const useRoutes = () => {
       },
     },
     {
+      path: "profiles",
+      name: "profiles",
+      component: AppProfiles,
+      meta: {
+        keepAlive: true,
+        titleKey: "menu.profiles",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "traces/service-graph",
       redirect: redirectToTraceTab("service-graph"),
     },
@@ -488,6 +501,22 @@ const useRoutes = () => {
         path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
         query: to.query,
       }),
+    },
+    // Ungated by design (detection changes page state, not route existence) and placed past the splice(13) hazard.
+    {
+      path: "infra/hosts",
+      name: "infraHosts",
+      component: () => import("@/views/Infrastructure/HostsPage.vue"),
+      meta: { titleKey: "menu.hosts" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes",
+      name: "infraKubernetes",
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
+      meta: { titleKey: "menu.kubernetes" },
+      beforeEnter: routeGuard,
     },
     {
       path: "traces/trace-details",

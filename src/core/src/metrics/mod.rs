@@ -30,17 +30,44 @@ use datafusion::arrow::datatypes::Schema;
 
 use crate::ingestion::TriggerAlertData;
 
+mod columnar;
+mod ingest;
 pub mod json;
 mod native_histogram;
 pub mod otlp;
 mod otlp_json_compat;
 pub mod prom;
+mod prom_decode;
 
 /// Distinct label sets one realtime notification carries, matching the scheduled path's sample.
 const TRIGGER_LABEL_LIMIT: usize = PAYLOAD_SAMPLE_ROWS as usize;
 
 /// OTLP writes a per-sample `start_time`, which the shared hash-excluded set does not cover.
 const TRIGGER_DEDUP_EXTRA_EXCLUDED_LABELS: &[&str] = &["start_time"];
+
+/// A label as (name, value), whatever owns the strings.
+pub trait LabelPair {
+    fn name(&self) -> &str;
+    fn value(&self) -> &str;
+}
+
+impl LabelPair for (String, String) {
+    fn name(&self) -> &str {
+        &self.0
+    }
+    fn value(&self) -> &str {
+        &self.1
+    }
+}
+
+impl LabelPair for (std::borrow::Cow<'_, str>, std::borrow::Cow<'_, str>) {
+    fn name(&self) -> &str {
+        &self.0
+    }
+    fn value(&self) -> &str {
+        &self.1
+    }
+}
 
 /// An alert's pending notification for the request being ingested.
 struct TriggerSlot {
@@ -90,25 +117,45 @@ pub fn signature_without_labels(
     labels: &config::utils::json::Map<String, config::utils::json::Value>,
     exclude_names: &[&str],
 ) -> u64 {
-    let mut labels: Vec<(&str, &str)> = labels
-        .iter()
-        .filter(|(key, _value)| !exclude_names.contains(&key.as_str()))
-        .map(|(key, value)| (key.as_str(), value.as_str().unwrap_or("")))
-        .collect();
-    labels.sort_by(|a, b| a.0.cmp(b.0));
-    hash_label_pairs(&labels)
+    signature_of_pairs(
+        labels
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str().unwrap_or(""))),
+        exclude_names,
+    )
+}
+
+/// `signature_without_labels` for a record whose labels are all strings, without the record map.
+pub fn signature_of_label_pairs<L: LabelPair>(labels: &[L], exclude_names: &[&str]) -> u64 {
+    signature_of_pairs(
+        labels.iter().map(|label| (label.name(), label.value())),
+        exclude_names,
+    )
 }
 
 /// `signature_without_labels(record, &[VALUE_LABEL])` for a series, without the record map.
-pub fn signature_of_series_labels(labels: &[(String, String)]) -> u64 {
+pub fn signature_of_series_labels<L: LabelPair>(labels: &[L]) -> u64 {
     let mut pairs: Vec<(&str, &str)> = Vec::with_capacity(labels.len() + 1);
     pairs.push((TIMESTAMP_COL_NAME, ""));
-    for (key, value) in labels {
+    for label in labels {
+        let (key, value) = (label.name(), label.value());
         if key == VALUE_LABEL || key == TIMESTAMP_COL_NAME {
             continue;
         }
-        pairs.push((key.as_str(), value.as_str()));
+        pairs.push((key, value));
     }
+    pairs.sort_by(|a, b| a.0.cmp(b.0));
+    hash_label_pairs(&pairs)
+}
+
+/// The series hash over every pair whose name is not excluded, in name order.
+fn signature_of_pairs<'a>(
+    pairs: impl Iterator<Item = (&'a str, &'a str)>,
+    exclude_names: &[&str],
+) -> u64 {
+    let mut pairs: Vec<(&str, &str)> = pairs
+        .filter(|(key, _)| !exclude_names.contains(key))
+        .collect();
     pairs.sort_by(|a, b| a.0.cmp(b.0));
     hash_label_pairs(&pairs)
 }
@@ -219,6 +266,28 @@ mod tests {
         assert_eq!(
             signature_of_series_labels(&labels),
             signature_without_labels(&record, &[VALUE_LABEL])
+        );
+    }
+
+    #[test]
+    fn test_signature_of_label_pairs_matches_record_hash() {
+        let labels = vec![
+            ("__name__".to_string(), "http_requests".to_string()),
+            ("start_time".to_string(), "1700".to_string()),
+            ("is_monotonic".to_string(), "true".to_string()),
+            ("instance".to_string(), "host-1:9100".to_string()),
+        ];
+
+        let mut record = json::Map::new();
+        for (key, value) in &labels {
+            record.insert(key.clone(), json::Value::String(value.clone()));
+        }
+        record.insert(VALUE_LABEL.to_string(), json::json!(12.5));
+        record.insert(TIMESTAMP_COL_NAME.to_string(), json::json!(1_700_u64));
+
+        assert_eq!(
+            signature_of_label_pairs(&labels, METRICS_HASH_EXCLUDED_LABELS),
+            signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS)
         );
     }
 

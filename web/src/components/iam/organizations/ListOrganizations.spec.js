@@ -647,19 +647,24 @@ describe("ListOrganizations", () => {
       expect(wrapper.vm.toBeUpdatedOrganization.id).toBe("");
     });
 
-    it("renameOrganization sets dialog state before router push", () => {
+    it("renameOrganization opens the edit dialog and updates the route", async () => {
       const row = { name: "Test Org", identifier: "org-rename-1" };
+      await router.push("/organizations");
 
-      // Known bug: the function references props.row.identifier but props
-      // is not defined in setup scope. It throws after the initial statements.
-      expect(() => wrapper.vm.renameOrganization(row)).toThrow();
+      expect(() => wrapper.vm.renameOrganization(row)).not.toThrow();
+      await flushPromises();
 
-      // The synchronous statements before the crash do execute
       expect(wrapper.vm.showAddOrganizationDialog).toBe(true);
       expect(wrapper.vm.toBeUpdatedOrganization).toEqual({
         id: "org-rename-1",
         name: "Test Org",
         identifier: "org-rename-1",
+      });
+      expect(router.currentRoute.value.query).toEqual({
+        action: "update",
+        org_identifier: "test-org",
+        to_be_updated_org_id: "org-rename-1",
+        to_be_updated_org_name: "Test Org",
       });
     });
   });

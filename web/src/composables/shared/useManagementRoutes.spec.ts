@@ -122,6 +122,15 @@ describe("useManagementRoutes", () => {
       const routes = useManagementRoutes();
       expect(routes[0].children.length).toBeGreaterThanOrEqual(4);
     });
+
+    // Bare /settings never lands; the record redirects to general and the query must survive the hop.
+    it("should redirect settings to general, preserving the query", () => {
+      const routes = useManagementRoutes();
+      expect(routes[0].redirect({ query: { org_identifier: "o" } })).toEqual({
+        name: "general",
+        query: { org_identifier: "o" },
+      });
+    });
   });
 
   describe("Base Children Routes", () => {
@@ -135,6 +144,12 @@ describe("useManagementRoutes", () => {
       const generalRoute = routes[0].children.find((child: any) => child.name === "general");
       expect(generalRoute).toBeDefined();
       expect(generalRoute.path).toBe("general");
+    });
+
+    // General hosts the Danger Zone; an admin must reach it to delete an empty org.
+    it("should flag the general route as allowOnEmptyData", () => {
+      const generalRoute = routes[0].children.find((child: any) => child.name === "general");
+      expect(generalRoute.meta?.allowOnEmptyData).toBe(true);
     });
 
     it("should have organizationSettings route", () => {
@@ -398,7 +413,17 @@ describe("useManagementRoutes", () => {
       expect(synthRoute.meta).toEqual({
         keepAlive: true,
         titleKey: "routeTitles.syntheticsLocations",
+        allowOnEmptyData: true,
       });
+    });
+
+    // Locations are a prerequisite of the first check, so the empty-data gate must not block them.
+    it("should flag the syntheticsLocations route as allowOnEmptyData", () => {
+      const routes = useManagementRoutes();
+      const synthRoute = routes[0].children.find(
+        (child: any) => child.name === "syntheticsLocations",
+      );
+      expect(synthRoute.meta?.allowOnEmptyData).toBe(true);
     });
 
     // Synthetics ships in OSS, so the route registers in every build — the

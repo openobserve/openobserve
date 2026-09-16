@@ -23,7 +23,7 @@ use datafusion::{
     config::ConfigOptions,
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        ExecutionPlan,
+        ChildrenPropertiesMode, ExecutionPlan, ReplaceChildrenOptions,
         aggregates::{AggregateExec, AggregateMode},
         projection::ProjectionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
@@ -136,8 +136,10 @@ impl TreeNodeRewriter for AggregateTopkRewriter {
             let agg_plan =
                 AggregateTopkExec::new(input_plan, &self.field, self.descending, self.limit);
 
-            let node =
-                node.with_new_children(vec![Arc::new(agg_plan) as Arc<dyn ExecutionPlan>])?;
+            let node = node.replace_children(
+                vec![Arc::new(agg_plan) as Arc<dyn ExecutionPlan>],
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )?;
             return Ok(Transformed::new(node, true, TreeNodeRecursion::Stop));
         }
         Ok(Transformed::no(node))

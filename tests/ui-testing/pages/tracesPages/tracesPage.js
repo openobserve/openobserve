@@ -1,7 +1,9 @@
 // tracesPage.js
 import { expect } from '@playwright/test';
 
+
 import { dateTimeButtonLocator, relative30SecondsButtonLocator, absoluteTabLocator, Past30SecondsValue } from '../commonActions.js';
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { isCloudEnvironment } = require('../cloudPages/cloud-env.js');
 
 
@@ -1555,6 +1557,53 @@ export class TracesPage {
   /**
    * Click share link button
    */
+  /**
+   * Click Share and return the short URL from the clipboard.
+   *
+   * Deliberately self-contained rather than reusing logsPage's version: that one
+   * is depended on by 10 green share-link tests and is not worth destabilising.
+   * The button is the same shared ShareButton component (it even carries the
+   * logs data-test), so the toast wait and origin re-pointing below mirror it.
+   *
+   * Requires a deployment with `web_url` set — ShareButton is disabled outright
+   * without it (components/common/ShareButton.vue).
+   */
+  async clickShareLinkAndGetUrl() {
+    const shareBtn = this.page.locator(this.shareLinkButton);
+    await expect(shareBtn, 'Share button must be enabled — needs web_url configured').toBeEnabled({ timeout: 10000 });
+    await shareBtn.click();
+
+    // Wait for the copy-success toast specifically: a preceding refresh can
+    // leave an unrelated info toast on screen and trip strict mode.
+    await this.page
+      .locator('[data-test-variant="success"]')
+      .first()
+      .waitFor({ state: 'visible', timeout: 15000 });
+
+    let sharedUrl = await this.page.evaluate(() => navigator.clipboard.readText());
+
+    // Re-point the short URL at the host the tests authenticated against: a
+    // deployed app builds share links from its PUBLIC base URL, and navigating
+    // cross-origin drops the auth cookies. The /short/<id> id resolves the same
+    // on any ingress, so swapping only the origin keeps the session valid.
+    const baseUrl = process.env.ZO_BASE_URL;
+    if (baseUrl && sharedUrl && !sharedUrl.includes('localhost')) {
+      try {
+        const shared = new URL(sharedUrl);
+        const base = new URL(baseUrl);
+        if (shared.origin !== base.origin) {
+          shared.protocol = base.protocol;
+          shared.host = base.host;
+          sharedUrl = shared.toString();
+        }
+      } catch {
+        // leave the URL as-is; the navigation below will surface any problem
+      }
+    }
+    testLogger.info('Traces share URL captured', { url: sharedUrl });
+    return sharedUrl;
+  }
+
   async clickShareLinkButton() {
     await this.page.locator(this.shareLinkButton).click();
     await this.page.waitForTimeout(1000);

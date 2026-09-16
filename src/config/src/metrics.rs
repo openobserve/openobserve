@@ -379,6 +379,76 @@ pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::n
     .expect("Metric created")
 });
 
+/// Service graph v4 edge resolutions by confidence tier; org only, never a stream label.
+pub static O2_SERVICE_GRAPH_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_resolved_total",
+            "Service graph v4 edges resolved, by org and tier.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "tier"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_RETAINED_EDGES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "o2_service_graph_retained_edges",
+            "Service graph v4 edge series retained in memory on this node, by org.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_RETAINED_NODES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "o2_service_graph_retained_nodes",
+            "Service graph v4 node series retained in memory on this node, by org.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_evicted_edges_total",
+            "Service graph v4 series evicted, by org and reason (ttl, cap).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_dropped_requests_total",
+            "Service graph v4 requests dropped without a series, by org and reason.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "reason"],
+    )
+    .expect("Metric created")
+});
+
 /// Usage rows the self-reporting queue REFUSED — SPEC §9B.1 row 8, alerted on
 /// by **A4**. The only observable failure in the emit path: `report_usage`
 /// spawns and returns `()`, so callers cannot see a failure; the enqueue inside
@@ -2500,6 +2570,35 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
+pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_auth_total",
+            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed, org_blocked, store_unavailable)".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result", "organization"],
+    )
+    .expect("Metric created")
+});
+
+// Deliberate: `organization`, not spec §14.1's `org_id`, as for HEC_AUTH_TOTAL.
+pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_requests_total",
+            "Splunk HEC collector requests by response status".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status", "organization"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2515,6 +2614,14 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(GRPC_RESPONSE_TIME.clone()))
+        .expect("Metric registered");
+
+    // splunk hec collector
+    registry
+        .register(Box::new(HEC_AUTH_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -2562,6 +2669,21 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RETAINED_EDGES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RETAINED_NODES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
@@ -3353,6 +3475,12 @@ mod tests {
     }
 
     #[test]
+    fn test_statics_hec() {
+        let _ = HEC_AUTH_TOTAL.clone();
+        let _ = HEC_REQUESTS_TOTAL.clone();
+    }
+
+    #[test]
     fn test_statics_ingest() {
         let _ = INGEST_RECORDS.clone();
         let _ = INGEST_BYTES.clone();
@@ -3364,6 +3492,11 @@ mod tests {
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_RETAINED_EDGES.clone();
+        let _ = O2_SERVICE_GRAPH_RETAINED_NODES.clone();
+        let _ = O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_SEARCHING_FILES.clone();

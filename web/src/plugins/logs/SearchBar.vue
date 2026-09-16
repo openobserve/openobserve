@@ -977,6 +977,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1063,6 +1064,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OButton
                       variant="ghost"
                       size="icon-xs"
+                      data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                       :class="[
                         !(isNaturalLanguageDetected && !searchObj.meta.nlpMode) &&
                         config.isEnterprise == 'true' &&
@@ -1146,9 +1148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
                     ? 'o2-ai-generate-button'
                     : 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 w-[5.875rem]! px-1! text-center leading-4! font-medium! break-words whitespace-normal [transition:box-shadow_0.3s_ease,opacity_0.2s_ease] hover:opacity-90 hover:shadow-md',
-                  store.state.zoConfig.auto_query_enabled
-                    ? 'rounded-s-default! rounded-e-none!'
-                    : 'rounded-default',
+                  'rounded-s-default! rounded-e-none!',
                 ]"
                 @click="
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1190,17 +1190,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     : t("search.runQuery")
                 }}
               </OButton>
-              <!-- Dropdown: shown for enterprise or when live mode feature is enabled -->
-              <OSeparator
-                v-if="store.state.zoConfig.auto_query_enabled"
-                class="h-[1.875rem]! w-px"
-                vertical
-              />
-              <ODropdown v-if="store.state.zoConfig.auto_query_enabled" align="end" side="bottom">
+              <OSeparator class="h-[1.875rem]! w-px" vertical />
+              <ODropdown align="end" side="bottom">
                 <template #trigger>
                   <OButton
                     variant="ghost"
                     size="icon-xs"
+                    data-test="logs-search-bar-refresh-cache-dropdown-trigger"
                     :class="[
                       (searchObj.meta.logsVisualizeToggle === 'patterns' &&
                         patternsState.loading) ||
@@ -1213,9 +1209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         : !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                           ? 'bg-button-primary! text-button-primary-foreground! hover:shadow-button-primary/70 hover:opacity-90 hover:shadow-md'
                           : '',
-                      store.state.zoConfig.auto_query_enabled
-                        ? 'rounded-e-default! rounded-s-none!'
-                        : 'rounded-default',
+                      'rounded-e-default! rounded-s-none!',
                     ]"
                   >
                     <OIcon name="arrow-drop-down" size="sm" />
@@ -1223,10 +1217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <!-- Normal mode: Refresh + Live Mode items -->
                 <ODropdownItem
-                  v-if="
-                    config.isEnterprise == 'true' &&
-                    !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
-                  "
+                  v-if="!(isNaturalLanguageDetected && !searchObj.meta.nlpMode)"
                   data-test="logs-search-bar-refresh-btn"
                   data-cy="search-bar-refresh-button"
                   :disabled="searchObj.loading == true || searchObj.loadingHistogram == true"
@@ -1237,7 +1228,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </ODropdownItem>
                 <ODropdownSeparator
                   v-if="
-                    config.isEnterprise == 'true' &&
                     store.state.zoConfig.auto_query_enabled &&
                     !(isNaturalLanguageDetected && !searchObj.meta.nlpMode)
                   "
@@ -2874,6 +2864,7 @@ export default defineComponent({
       // Turn off SQL mode when query is completely cleared
       if (value.trim() === "" && searchObj.meta.sqlMode === true) {
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       // Turn off SQL mode when the query is no longer a SQL statement (user
@@ -2883,6 +2874,7 @@ export default defineComponent({
       if (value.trim() !== "" && searchObj.meta.sqlMode === true && !isSqlQuery(value)) {
         searchObj.meta.sqlModeEditTransition = true;
         searchObj.meta.sqlMode = false;
+        searchObj.data.filterErrMsg = "";
       }
 
       if (searchObj.meta.quickMode === true) {
@@ -2994,6 +2986,7 @@ export default defineComponent({
             ) {
               let streamFound = false;
               searchObj.data.stream.selectedStream = [];
+              searchObj.data.filterErrMsg = "";
 
               streamName = tableName;
               searchObj.data.streamResults.list.forEach((stream) => {
@@ -3010,16 +3003,19 @@ export default defineComponent({
                 }
               });
 
+              // Distinct from "no stream picked yet" (LogsNoStreamState): the
+              // query names a specific stream, and the frontend already has the
+              // full stream list, so it can tell the user which name is wrong
+              // instead of falling back to the generic "select a stream" empty
+              // state (which reads as if nothing was ever typed).
               if (streamFound == false) {
-                // searchObj.data.stream.selectedStream = { label: "", value: "" };
                 searchObj.data.stream.selectedStream = [];
                 searchObj.data.stream.selectedStreamFields = [];
-                // toast({
-                //   message: "Stream not found",
-                //   color: "info",
-                //   position: "bottom-right",
-                //   timeout: 2000,
-                // });
+                if (tableName) {
+                  searchObj.data.filterErrMsg = t("logs.searchBar.streamNotFoundInQuery", {
+                    stream: tableName,
+                  });
+                }
               }
             }
           }

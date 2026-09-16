@@ -66,6 +66,16 @@ pub fn uuid() -> String {
     Ksuid::new(None, None).to_string()
 }
 
+/// Generate a random hyphenated GUID, for credentials that must be unguessable.
+///
+/// `uuid()` above returns a KSUID and `Uuid::now_v7()` leaks its creation time,
+/// so neither is usable for a secret.
+pub fn random_uuid() -> String {
+    uuid::Builder::from_random_bytes(rand::random::<[u8; 16]>())
+        .into_uuid()
+        .to_string()
+}
+
 /// Generate a unique id like uuid for file name.
 pub fn generate_file_name() -> String {
     let id = generate();

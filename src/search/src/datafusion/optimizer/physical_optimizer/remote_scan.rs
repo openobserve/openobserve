@@ -25,7 +25,8 @@ use datafusion::{
     physical_expr::{LexOrdering, PhysicalExpr, expressions::Column as PhysicalColumn},
     physical_optimizer::PhysicalOptimizerRule,
     physical_plan::{
-        ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ChildrenPropertiesMode, ExecutionPlan, ExecutionPlanProperties, Partitioning,
+        ReplaceChildrenOptions,
         aggregates::{AggregateExec, AggregateMode, PhysicalGroupBy},
         coalesce_partitions::CoalescePartitionsExec,
         repartition::RepartitionExec,
@@ -240,7 +241,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     remote_scan_or_partial_reduce,
                     output_partitioning,
                 )?);
-                let new_node = node.with_new_children(vec![repartition])?;
+                let new_node = node.replace_children(
+                    vec![repartition],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -250,14 +254,19 @@ impl TreeNodeRewriter for RemoteScanRewriter {
             if !visitor.has_remote_scan {
                 let table_name = visitor.table_name.clone().unwrap();
                 let follow_merge_node = node.clone();
-                let new_input =
-                    follow_merge_node.with_new_children(vec![node.children()[0].clone()])?;
+                let new_input = follow_merge_node.replace_children(
+                    vec![node.children()[0].clone()],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
 
                 let remote_scan = Arc::new(RemoteScanExec::new(
                     new_input,
                     self.remote_scan_nodes.get_remote_node(&table_name),
                 )?);
-                let new_node = node.with_new_children(vec![remote_scan])?;
+                let new_node = node.replace_children(
+                    vec![remote_scan],
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -295,7 +304,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                         new_children.push(remote_scan);
                     }
                 }
-                let new_node = node.with_new_children(new_children)?;
+                let new_node = node.replace_children(
+                    new_children,
+                    ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+                )?;
                 self.is_changed = true;
                 return Ok(Transformed::yes(new_node));
             }
@@ -321,7 +333,10 @@ impl TreeNodeRewriter for RemoteScanRewriter {
                     new_children.push(child.clone());
                 }
             }
-            let new_node = node.with_new_children(new_children)?;
+            let new_node = node.replace_children(
+                new_children,
+                ReplaceChildrenOptions::new(ChildrenPropertiesMode::Recompute),
+            )?;
             self.is_changed = true;
             return Ok(Transformed::yes(new_node));
         }
