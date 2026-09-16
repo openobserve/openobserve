@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="w-full justify-start"
               @click="quickSelectStream(stream.value)"
             >
-              <span class="min-w-0 flex-1 truncate">{{ stream.label }}</span>
+              <span class="min-w-0 flex-1 truncate text-left">{{ stream.label }}</span>
               <OTooltip :content="raw(stream.label)" side="right" align="center" />
             </OButton>
             <span
@@ -328,6 +328,7 @@ export default defineComponent({
       } else {
         this.searchObj.data.stream.selectedStream = (value as string[]) ?? [];
       }
+      this.searchObj.data.filterErrMsg = "";
       this.$nextTick(() => {
         const indexListSelectField = this.$refs.streamSelect as any;
         if (indexListSelectField?.updateInputValue) {

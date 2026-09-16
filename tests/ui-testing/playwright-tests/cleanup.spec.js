@@ -83,6 +83,11 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
     await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
 
+    // metrics-14238-stale-nodata.spec.js seeds one METRICS stream per run, named with a
+    // timestamp so parallel runs cannot collide — which also means nothing ever reuses
+    // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
+    await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
+
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
 
@@ -130,6 +135,8 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Pipeline name patterns to match
       [
+        /^e2e-12647-/,                 // pipeline-preview-bounds.spec.js (#12647)
+        /^e2e7030/,                    // pipeline-export.spec.js (#7030)
         /^validation-precedence-\d+$/,
         /^validation-multiple-or-\d+$/,
         /^validation-nested-or-\d+$/,
@@ -219,6 +226,8 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up file-based enrichment tables matching test patterns
     // These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
     await pm.apiCleanup.cleanupFileEnrichmentTables([
+      /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
+      /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
@@ -284,6 +293,11 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
+        /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
+        /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
+        /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
+        /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
+        /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.

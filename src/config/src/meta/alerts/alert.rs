@@ -109,7 +109,11 @@ pub struct Alert {
     ///
     /// **Mutable** configuration — editable on any update, like `name`.
     /// Display + propagation only: it must never influence evaluation,
-    /// silence, delivery or incident severity (PT-5 / D19).
+    /// silence, or delivery (PT-5 / D19). B-29 carved out one exception:
+    /// when set, it takes precedence over the eval_level default for
+    /// incident severity at creation/escalation — see
+    /// `config::meta::alerts::priority` and
+    /// `core::alerts::incidents::create_new_incident`.
     ///
     /// `value_type` is required here because the enum serializes as an
     /// integer via serde `try_from`/`into`; without it the generated OpenAPI
@@ -130,8 +134,58 @@ pub struct Alert {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
 
+    /// On-call team this alert pages, overriding ownership discovery. `None`
+    /// means "work it out from the identity dimensions", which is the normal
+    /// case — an explicit value is for the alert whose owner the dimensions
+    /// cannot express.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
+
+    /// Where the fix for this alert is written down.
+    ///
+    /// Copied onto every on-call response record the alert opens, so the person
+    /// woken is handed the runbook in the page. Validated at save — a malformed
+    /// link is refused rather than stored, because the moment it is read is the
+    /// one moment nobody has the patience to debug a URL.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runbook_url: Option<String>,
+
     #[serde(default)]
     pub pending_period_sec: i64,
+}
+
+/// Accept a runbook link, or say why not.
+///
+/// Deliberately narrow: `http`/`https` with a host. That excludes `file:`,
+/// `javascript:` and the bare `wiki/runbooks/checkout` somebody pastes out of a
+/// browser tab — the last of which is the common case, and the one that looks
+/// like it worked right up until a responder clicks it at 3am.
+pub fn normalize_runbook_url(raw: &str) -> Result<String, String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Err("runbook_url is empty".to_string());
+    }
+    // Long enough for a real deep link, short enough that a paste accident is
+    // not persisted onto every response record the alert ever opens.
+    if trimmed.chars().count() > 2048 {
+        return Err("runbook_url is longer than 2048 characters".to_string());
+    }
+    let Some((scheme, rest)) = trimmed.split_once("://") else {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    };
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return Err("runbook_url must start with http:// or https://".to_string());
+    }
+    // A scheme with nothing after it is not a link, and neither is one whose
+    // authority is blank — `https:///runbooks` resolves to nothing.
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if host.trim().is_empty() {
+        return Err("runbook_url has no host".to_string());
+    }
+    if trimmed.chars().any(char::is_whitespace) {
+        return Err("runbook_url contains whitespace".to_string());
+    }
+    Ok(trimmed.to_string())
 }
 
 impl MemorySize for Alert {
@@ -169,6 +223,8 @@ impl PartialEq for Alert {
 impl Default for Alert {
     fn default() -> Self {
         Self {
+            oncall_team: None,
+            runbook_url: None,
             id: None,
             name: "".to_string(),
             org_id: "".to_string(),
@@ -1021,5 +1077,64 @@ mod tests {
         assert_eq!(alert.name, "old");
         assert_eq!(alert.priority, None);
         assert!(alert.tags.is_empty());
+    }
+
+    /// A runbook link is stored as typed, so a deep link with a query string and
+    /// a fragment survives — those are how wikis address a section, and
+    /// normalizing them away would point somebody at the top of a 40-page doc.
+    #[test]
+    fn test_a_real_runbook_link_is_accepted_unchanged() {
+        for good in [
+            "https://wiki.example.com/runbooks/checkout",
+            "http://internal/runbook",
+            "https://wiki.example.com/rb?id=7#rollback",
+            "https://192.168.1.10:8080/rb",
+            "  https://wiki/rb  ",
+        ] {
+            assert_eq!(
+                normalize_runbook_url(good).unwrap(),
+                good.trim(),
+                "{good:?}"
+            );
+        }
+    }
+
+    /// What is refused is the paste that looks like it worked. `wiki/runbooks`
+    /// out of a browser tab is the common one, and it fails at exactly the
+    /// moment nobody has the patience to debug a URL.
+    #[test]
+    fn test_a_link_that_goes_nowhere_is_refused_at_save() {
+        for bad in [
+            "",
+            "   ",
+            "wiki/runbooks/checkout",
+            "www.example.com/rb",
+            "ftp://example.com/rb",
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "https://",
+            "https:///runbooks",
+            "https://wiki example.com/rb",
+        ] {
+            assert!(
+                normalize_runbook_url(bad).is_err(),
+                "{bad:?} must be refused"
+            );
+        }
+        assert!(
+            normalize_runbook_url(&format!("https://x/{}", "a".repeat(3000))).is_err(),
+            "a paste accident must not be copied onto every response record"
+        );
+    }
+
+    /// Additive, like `priority` and `tags` before it: an alert saved before
+    /// the field existed must still load.
+    #[test]
+    fn test_an_alert_without_a_runbook_still_deserializes() {
+        let legacy = serde_json::json!({ "name": "old", "org_id": "o" });
+        let alert: Alert = serde_json::from_value(legacy).unwrap();
+        assert_eq!(alert.runbook_url, None);
+        let json = serde_json::to_value(&alert).unwrap();
+        assert!(json.get("runbook_url").is_none());
     }
 }

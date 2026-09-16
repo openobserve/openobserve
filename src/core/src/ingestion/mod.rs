@@ -22,6 +22,7 @@ use std::{
     },
 };
 
+use arrow_schema::DataType;
 use chrono::{TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
@@ -29,10 +30,16 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
+        promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
-    utils::{flatten, json::*, schema::format_partition_key},
+    utils::{
+        flatten,
+        json::*,
+        schema::format_partition_key,
+        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
+    },
 };
 use db::{
     self,
@@ -64,6 +71,59 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// Memoizes the write partition per time bucket while no partition key is enabled.
+pub struct PartitionMemo<'a> {
+    partition_keys: &'a Vec<StreamPartition>,
+    time_level: PartitionTimeLevel,
+    keyed_by_time_only: bool,
+    bucket_micros: i64,
+    last: Option<(i64, String)>,
+}
+
+impl<'a> PartitionMemo<'a> {
+    pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
+        let bucket_micros = match time_level {
+            PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+            PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+        };
+        Self {
+            partition_keys,
+            time_level,
+            keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
+            bucket_micros,
+            last: None,
+        }
+    }
+
+    /// The partition buffer for `timestamp`, computing the key only when the time bucket changes.
+    pub fn buffer<'p>(
+        &mut self,
+        timestamp: i64,
+        record: &Map<String, Value>,
+        suffix: &str,
+        partitions: &'p mut HashMap<String, SchemaRecords>,
+        new_partition: impl FnOnce() -> SchemaRecords,
+    ) -> &'p mut SchemaRecords {
+        let bucket = timestamp.div_euclid(self.bucket_micros);
+        if let Some((last_bucket, key)) = &self.last
+            && *last_bucket == bucket
+        {
+            return partitions.get_mut(key).unwrap();
+        }
+        let key = get_write_partition_key(
+            timestamp,
+            self.partition_keys,
+            self.time_level,
+            record,
+            Some(suffix),
+        );
+        if self.keyed_by_time_only {
+            self.last = Some((bucket, key.clone()));
+        }
+        partitions.entry(key).or_insert_with(new_partition)
+    }
+}
 
 /// Get the next thread_id using round-robin distribution.
 /// This replaces the thread-local approach from actix-web with a request-level distribution.
@@ -237,6 +297,37 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 }
 
+/// The column type this value infers to, `None` for a null, which contributes no field at all.
+pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
+    match value {
+        Value::Null => None,
+        Value::String(_) => Some(DataType::Utf8),
+        Value::Bool(_) => Some(DataType::Boolean),
+        Value::Number(n) => Some(match key {
+            // `fix_schema` pins these two whatever the record carries
+            TIMESTAMP_COL_NAME => DataType::Int64,
+            HASH_LABEL => DataType::UInt64,
+            _ if n.is_i64() => DataType::Int64,
+            _ if n.is_u64() => DataType::UInt64,
+            _ if n.is_f64() => DataType::Float64,
+            _ => DataType::Utf8,
+        }),
+        // a nested value cannot be inferred at all, so it must reach check_for_schema
+        _ => Some(DataType::Null),
+    }
+}
+
+/// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.
+pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
+    existing == inferred
+        || matches!(
+            (existing, inferred),
+            (DataType::Float64, DataType::Int64 | DataType::UInt64)
+                | (DataType::UInt64, DataType::Int64)
+                | (DataType::LargeUtf8, DataType::Utf8)
+        )
+}
+
 pub fn get_write_partition_key(
     timestamp: i64,
     partition_keys: &Vec<StreamPartition>,
@@ -285,9 +376,17 @@ pub async fn write_file(
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
 ) -> Result<RequestStats> {
-    let mut req_stats = RequestStats::default();
-    let entries = buf
-        .into_iter()
+    let entries = schema_records_to_entries(org_id, stream_name, buf);
+    write_entries(writer, stream_name, entries, fsync).await
+}
+
+/// One WAL entry per non-empty partition of `buf`.
+pub fn schema_records_to_entries(
+    org_id: &str,
+    stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+) -> Vec<ingester::Entry> {
+    buf.into_iter()
         .filter_map(|(hour_key, entry)| {
             if entry.records.is_empty() {
                 None
@@ -304,10 +403,26 @@ pub async fn write_file(
                 })
             }
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+/// An entry carrying a `batch` counts its rows from the batch, not from `data`.
+pub async fn write_entries(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+) -> Result<RequestStats> {
+    let mut req_stats = RequestStats::default();
     let (entries_records, entries_size) = entries
         .iter()
-        .map(|entry| (entry.data.len(), entry.data_size))
+        .map(|entry| {
+            let rows = entry
+                .batch
+                .as_ref()
+                .map_or(entry.data.len(), |batch| batch.num_rows());
+            (rows, entry.data_size)
+        })
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });
@@ -1089,5 +1204,20 @@ mod tests {
         let data = bytes::Bytes::from("{}");
         let result = create_log_ingestion_req(99, data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_column_accepts_only_no_op_casts() {
+        assert!(column_accepts(&DataType::Utf8, &DataType::Utf8));
+        assert!(column_accepts(&DataType::Float64, &DataType::Int64));
+        assert!(column_accepts(&DataType::UInt64, &DataType::Int64));
+        assert!(column_accepts(&DataType::LargeUtf8, &DataType::Utf8));
+        // widening or a real cast must still reach check_for_schema
+        assert!(!column_accepts(&DataType::Int64, &DataType::UInt64));
+        assert!(!column_accepts(&DataType::Int64, &DataType::Float64));
+        assert!(!column_accepts(&DataType::Utf8, &DataType::Int64));
+        assert!(!column_accepts(&DataType::Boolean, &DataType::Int64));
+        assert!(!column_accepts(&DataType::Int64, &DataType::Boolean));
+        assert!(!column_accepts(&DataType::Utf8, &DataType::Null));
     }
 }

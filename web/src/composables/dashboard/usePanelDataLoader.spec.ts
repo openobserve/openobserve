@@ -70,7 +70,8 @@ vi.mock("@/utils/query/sqlUtils", () => ({
   getStreamFromQuery: vi.fn(() => Promise.resolve("test_stream")),
 }));
 
-vi.mock("@/utils/dashboard/variables/variablesUtils", () => ({
+vi.mock("@/utils/dashboard/variables/variablesUtils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/dashboard/variables/variablesUtils")>()),
   formatInterval: vi.fn(() => ({ value: 5, unit: "m" })),
   formatRateInterval: vi.fn(() => "5m"),
   getTimeInSecondsBasedOnUnit: vi.fn(() => 300),

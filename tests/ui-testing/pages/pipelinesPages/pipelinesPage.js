@@ -3300,6 +3300,52 @@ export class PipelinesPage {
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
+    // ---- row View preview (#12647) and bulk export (#7030) ------------
+    // The preview bubble is OTooltip's own content node, not a pipeline-owned
+    // element, so it is matched by the library's data-test rather than by a
+    // loose class pattern.
+    getPipelineViewButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
+    }
+    getPipelinePreviewTooltip() {
+        return this.page.locator('[data-test="o-tooltip-content"]').first();
+    }
+    getPipelineEditButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+    }
+    getBulkExportButton() {
+        return this.page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
+    }
+    getSelectAllRowsCheckbox() {
+        return this.page.locator('[data-test="o2-table-select-all"]');
+    }
+
+    /** Hover the row's View action and return the preview bubble's box. */
+    async hoverViewAndGetPreviewBox(pipelineName) {
+        const btn = this.getPipelineViewButton(pipelineName);
+        await expect(btn, 'Row View action must be present').toBeVisible({ timeout: 20000 });
+        await btn.hover();
+        const tooltip = this.getPipelinePreviewTooltip();
+        await expect(tooltip, 'Hovering View must open the graph preview').toBeVisible({ timeout: 10000 });
+        return await tooltip.boundingBox();
+    }
+
+    async expectPipelineInList(pipelineName) {
+        await expect(this.getPipelineEditButton(pipelineName),
+            `Pipeline ${pipelineName} must be in the filtered list`).toBeVisible({ timeout: 20000 });
+    }
+
+    async expectBulkExportHidden() {
+        await expect(this.getBulkExportButton(),
+            'Bulk export must stay hidden while nothing is selected').toBeHidden();
+    }
+
+    async selectAllRowsAndExpectBulkExport() {
+        await this.getSelectAllRowsCheckbox().click();
+        await expect(this.getBulkExportButton(),
+            'Selecting pipelines must reveal a bulk export action').toBeVisible({ timeout: 10000 });
+    }
+
     getPipelineRowByName(pipelineName) {
         return this.page
             .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)

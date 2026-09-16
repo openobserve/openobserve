@@ -703,6 +703,21 @@ describe("AddDashboardFromGitHub Component", () => {
 
       expect(wrapper.vm.showFolderSelection).toBe(false);
     });
+
+    it("resolves a pending replace-confirm as declined when the dialog closes", async () => {
+      wrapper = createWrapper({ modelValue: true });
+      await flushPromises();
+
+      // A parked confirm would otherwise never settle and leak `importing` as true.
+      const resolveSpy = vi.fn();
+      wrapper.vm.replaceConfirm = { title: "Host Metrics", resolve: resolveSpy };
+
+      await wrapper.setProps({ modelValue: false });
+      await wrapper.vm.$nextTick();
+
+      expect(resolveSpy).toHaveBeenCalledWith(false);
+      expect(wrapper.vm.replaceConfirm).toBeNull();
+    });
   });
 
   describe("loadFolders Function", () => {
@@ -1003,6 +1018,140 @@ describe("AddDashboardFromGitHub Component", () => {
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.showAddFolderDialog).toBe(false);
+    });
+  });
+
+  // INF.4 (design 4.9/§6): workload pages open the drawer pre-seeded at their templates.
+  describe("initialSearch prop", () => {
+    it("seeds the search box when the drawer opens", async () => {
+      wrapper = createWrapper({ modelValue: true, initialSearch: "kubernetes" });
+      await flushPromises();
+      expect(wrapper.vm.searchQuery).toBe("kubernetes");
+      const input = wrapper.find('[data-test="add-dashboard-github-search"] input');
+      expect((input.element as HTMLInputElement).value).toBe("kubernetes");
+    });
+  });
+
+  // T1.3 (design 4.3/§6): the gallery replace path now requires an explicit user confirm.
+  describe("confirmed replace on import", () => {
+    const seedSelection = async (jsonFiles: string[], jsonByFile: Record<string, any>) => {
+      (store.state as any).githubDashboardGallery = {
+        dashboards: [],
+        lastFetched: null,
+        cacheExpiry: 300000,
+        dashboardJsonCache: Object.fromEntries(
+          jsonFiles.map((f) => [`hostmetrics/${f}`, jsonByFile[f]]),
+        ),
+      };
+      wrapper = createWrapper({ modelValue: true });
+      await flushPromises();
+      wrapper.vm.selectedDashboards = [
+        {
+          name: "hostmetrics",
+          displayName: "Host Metrics",
+          folderPath: "hostmetrics",
+          jsonFiles,
+        },
+      ];
+      wrapper.vm.selectedFolderObj = "default";
+      await wrapper.vm.$nextTick();
+    };
+
+    const replaceDialog = () =>
+      wrapper.findComponent('[data-test="add-dashboard-github-replace-confirm"]');
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("shows a confirm dialog listing the conflicting title instead of deleting silently", async () => {
+      vi.mocked(dashboardsService.list).mockResolvedValue({
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
+      } as any);
+      await seedSelection(["hm.json"], { "hm.json": { title: "Host Metrics", version: 8 } });
+
+      const pending = wrapper.vm.confirmAdd();
+      await flushPromises();
+
+      expect(replaceDialog().exists()).toBe(true);
+      expect(replaceDialog().props("open")).toBe(true);
+      expect(wrapper.text()).toContain("Host Metrics");
+      // Nothing is destroyed before the user answers.
+      expect(dashboardsService.delete).not.toHaveBeenCalled();
+      expect(dashboardsService.create).not.toHaveBeenCalled();
+
+      await replaceDialog().vm.$emit("click:secondary");
+      await pending;
+    });
+
+    it("confirming runs delete → 500ms settle → create", async () => {
+      vi.useFakeTimers();
+      vi.mocked(dashboardsService.list).mockResolvedValue({
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
+      } as any);
+      vi.mocked(dashboardsService.delete).mockResolvedValue({} as any);
+      vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
+      await seedSelection(["hm.json"], { "hm.json": { title: "Host Metrics", version: 8 } });
+
+      const pending = wrapper.vm.confirmAdd();
+      await flushPromises();
+      await replaceDialog().vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(dashboardsService.delete).toHaveBeenCalledWith("default", "d1", "default");
+      // The AWS-tile mechanics: the create waits out the settle window.
+      expect(dashboardsService.create).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(500);
+      await flushPromises();
+      expect(dashboardsService.create).toHaveBeenCalledTimes(1);
+      await pending;
+    });
+
+    it("declining skips the conflicting file while the rest of the batch proceeds", async () => {
+      vi.mocked(dashboardsService.list).mockResolvedValue({
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
+      } as any);
+      vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
+      await seedSelection(["hm.json", "other.json"], {
+        "hm.json": { title: "Host Metrics", version: 8 },
+        "other.json": { title: "Fresh Title", version: 8 },
+      });
+
+      const pending = wrapper.vm.confirmAdd();
+      await flushPromises();
+      await replaceDialog().vm.$emit("click:secondary");
+      await flushPromises();
+      await pending;
+
+      // The conflicting file: no delete, no create. The clean file: created.
+      expect(dashboardsService.delete).not.toHaveBeenCalled();
+      expect(dashboardsService.create).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(dashboardsService.create).mock.calls[0][1]).toEqual(
+        expect.objectContaining({ title: "Fresh Title" }),
+      );
+    });
+
+    it("closing the drawer mid-batch stops further imports and parks no new confirm", async () => {
+      vi.mocked(dashboardsService.list).mockResolvedValue({
+        data: { dashboards: [{ dashboard_id: "d1", title: "Host Metrics" }] },
+      } as any);
+      vi.mocked(dashboardsService.create).mockResolvedValue({ data: {} } as any);
+      // Both files conflict — without the cancel flag the second would park a NEW confirm.
+      await seedSelection(["hm.json", "hm2.json"], {
+        "hm.json": { title: "Host Metrics", version: 8 },
+        "hm2.json": { title: "Host Metrics", version: 8 },
+      });
+
+      const pending = wrapper.vm.confirmAdd();
+      await flushPromises();
+      expect(replaceDialog().props("open")).toBe(true);
+      await wrapper.setProps({ modelValue: false });
+      await flushPromises();
+      await pending;
+
+      expect(wrapper.vm.replaceConfirm).toBeNull();
+      expect(dashboardsService.delete).not.toHaveBeenCalled();
+      expect(dashboardsService.create).not.toHaveBeenCalled();
     });
   });
 });

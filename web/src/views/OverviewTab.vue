@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -525,6 +525,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -1016,7 +1017,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
-  let filter = `service_name = '${svc.label ?? svc.id}'`;
+  let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {

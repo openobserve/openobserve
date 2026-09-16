@@ -20,6 +20,14 @@ use tokio::runtime::Runtime;
 
 const THREAD_STACK_SIZE: usize = 16 * 1024 * 1024;
 
+pub fn create_main_runtime() -> std::io::Result<Runtime> {
+    tokio::runtime::Builder::new_multi_thread()
+        .thread_name("main_runtime")
+        .thread_stack_size(THREAD_STACK_SIZE)
+        .enable_all()
+        .build()
+}
+
 pub fn create_job_runtime() -> std::io::Result<Runtime> {
     let cfg = get_config();
     tokio::runtime::Builder::new_multi_thread()

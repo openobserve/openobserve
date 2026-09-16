@@ -52,6 +52,12 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
+//
+// Bump this with every migration that must reach an existing database:
+// `init_db` returns early when the stored version already matches, *before* it
+// reaches the SeaORM migrator, so an unbumped version means new migrations run
+// on fresh installs only.
+//
 // Bump on every new sea-orm migration: `init_db` returns early when the stored
 // version matches, so an un-bumped migration never runs on an existing
 // deployment. Fresh installs still get it, which hides the omission locally.
@@ -62,8 +68,19 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 76: add steps_configured to synthetics_jobs.
 // 77: create status_pages tables and status_page_custom_domains.
 // 78: alert pending period cols
-// 79: create synthetics shared variables tables; add env to synthetics_jobs.
-pub const DB_SCHEMA_VERSION: u64 = 79;
+// 79: on-call tables, ownership, unrouted signals, routing config, overrides,
+// contacts/reads, unavailability, incident-acknowledged columns, and
+// exhausted_at on oncall_responses — one bump for the whole feature, not one
+// per migration written (they were revised in place before the feature
+// shipped anywhere; `init_db` compares for equality and never orders these,
+// so no path can tell an intermediate value ever existed).
+// 80: add splunk_token to org_ingestion_tokens.
+// 81: anomaly_detection_config retries reset, last_failed_at,
+// last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
+// one bump for the whole anomaly phase, same rationale as 79.
+// 82: add profiles_streams to service_streams.
+// 83: create synthetics shared variables tables; add env to synthetics_jobs.
+pub const DB_SCHEMA_VERSION: u64 = 83;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -735,6 +752,40 @@ impl FileFormat {
             Some(Self::Vortex)
         } else {
             None
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum VortexCompression {
+    #[default]
+    O2,
+    Native,
+    Compact,
+}
+
+impl std::fmt::Display for VortexCompression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::O2 => write!(f, "o2"),
+            Self::Native => write!(f, "native"),
+            Self::Compact => write!(f, "compact"),
+        }
+    }
+}
+
+impl std::str::FromStr for VortexCompression {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "o2" => Ok(Self::O2),
+            "native" => Ok(Self::Native),
+            "compact" => Ok(Self::Compact),
+            _ => Err(anyhow::anyhow!(
+                "Invalid vortex compression '{s}': expected o2, native or compact"
+            )),
         }
     }
 }
@@ -1602,6 +1653,12 @@ pub struct Search {
     )]
     pub feature_broadcast_join_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_SHARED_CTE_ENABLED",
+        default = true,
+        help = "Execute a CTE or subquery that is referenced several times only once on the leader; the result may use half of the query memory pool before it spills to disk"
+    )]
+    pub feature_shared_cte_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
         default = 0,
         help = "Max rows for left side of broadcast join, default to 10_000 rows"
@@ -1737,11 +1794,12 @@ pub struct Common {
     )]
     pub file_format: FileFormatConfig,
     #[env_config(
-        name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
-        default = false,
-        help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
+        name = "ZO_VORTEX_COMPRESSION",
+        parse,
+        default = "o2",
+        help = "Vortex write compression: o2 (OpenObserve's UTF8/Zstd compressor on top of BtrBlocks), native (Vortex's default BtrBlocks strategy) or compact (BtrBlocks with the Pco and Zstd schemes, smaller files at a higher decode cost)"
     )]
-    pub vortex_use_native_compression: bool,
+    pub vortex_compression: VortexCompression,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -2197,6 +2255,12 @@ pub struct Common {
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PROFILING_ENABLED",
+        default = false,
+        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+    )]
+    pub profiling_enabled: bool,
 }
 
 impl Common {
@@ -2478,11 +2542,13 @@ pub struct Limit {
     pub scheduler_watch_interval: i64,
     // Per-module scheduler pullers (Part A / A3+A4). When enabled, each TriggerModule gets its
     // own pull loop, cadence, LIMIT budget, channel and worker pool, so a backlog or slow handler
-    // in one module cannot starve another. Default off → single shared puller (legacy behavior).
+    // in one module cannot starve another. Default off → single shared puller (legacy behavior),
+    // with one exception: on-call escalation always gets its own lane, because a paging timer
+    // queued behind an alert backlog does not fire late, it fires after nobody was woken up.
     #[env_config(
         name = "ZO_SCHEDULER_PER_MODULE_PULLERS",
         default = false,
-        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy)."
+        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy) — except on-call escalation, which always gets its own lane when O2_ONCALL_ENABLED is on."
     )]
     pub scheduler_per_module_pullers: bool,
     // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
@@ -2519,6 +2585,12 @@ pub struct Limit {
         help = "Max SLO backfill jobs pulled per cycle and the SLO backfill worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. Defaults to 1 so a bulk historical scan never crowds out latency-sensitive incremental SLI passes."
     )]
     pub scheduler_slo_backfill_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_CONCURRENCY",
+        default = 0,
+        help = "Max on-call escalation jobs pulled per cycle and the escalation worker-pool size. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 falls back to O2_ONCALL_ESCALATION_CONCURRENCY, then to ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_oncall_concurrency: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY",
         default = 0,
@@ -2565,6 +2637,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the SLO backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_slo_backfill_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the on-call escalation puller. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_oncall_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
         default = 0, // seconds
@@ -5046,6 +5124,23 @@ mod tests {
         assert_eq!("vortex".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert_eq!("VORTEX".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert!("unknown".parse::<FileFormat>().is_err());
+    }
+
+    #[test]
+    fn test_vortex_compression_from_str() {
+        assert_eq!(VortexCompression::default(), VortexCompression::O2);
+        for (text, expected) in [
+            ("o2", VortexCompression::O2),
+            ("Native", VortexCompression::Native),
+            (" compact ", VortexCompression::Compact),
+        ] {
+            assert_eq!(text.parse::<VortexCompression>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<VortexCompression>().unwrap(),
+                expected
+            );
+        }
+        assert!("true".parse::<VortexCompression>().is_err());
     }
 
     #[test]

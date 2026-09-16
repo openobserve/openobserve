@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
+
 use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
@@ -54,7 +56,7 @@ pub fn flatten_with_level(to_flatten: Value, max_level: u32) -> Result<Value, an
         }
     };
 
-    let mut flat = Map::<String, Value>::new();
+    let mut flat = Map::<String, Value>::with_capacity(to_flatten.as_object().map_or(0, Map::len));
     flatten_value(to_flatten, "".to_owned(), max_level, 0, &mut flat).map(|_x| Value::Object(flat))
 }
 
@@ -117,7 +119,7 @@ fn flatten_object(
         } else {
             format_key(&mut k);
             if depth > 0 {
-                format!("{parent_key}{KEY_SEPARATOR}{k}")
+                [parent_key, KEY_SEPARATOR, k.as_str()].concat()
             } else {
                 k
             }
@@ -144,7 +146,7 @@ fn flatten_array(
     //     let parent_key = format!("{}{}{}", parent_key, KEY_SEPARATOR, i);
     //     flatten_value(obj, parent_key, depth + 1, flattened)?;
     // }
-    let v = Value::String(Value::Array(current.to_vec()).to_string());
+    let v = Value::String(Value::Array(current).to_string());
     flatten_value(v, parent_key.to_string(), max_level, depth, flattened)?;
     Ok(())
 }
@@ -189,14 +191,35 @@ pub fn format_key(key: &mut String) {
 }
 
 pub fn format_label_name(label_name: &str) -> String {
-    let mut key = label_name.to_string();
-    format_key(&mut key);
-    key
+    format_label_name_owned(label_name.to_string())
+}
+
+/// `format_label_name` for an owned name, so a name needing no rewrite costs no allocation.
+pub fn format_label_name_owned(mut label_name: String) -> String {
+    format_key(&mut label_name);
+    label_name
+}
+
+/// `format_label_name` that borrows a name needing no rewrite instead of copying it.
+pub fn format_label_name_cow(label_name: &str) -> Cow<'_, str> {
+    if check_key(label_name) {
+        Cow::Borrowed(label_name)
+    } else {
+        Cow::Owned(format_label_name(label_name))
+    }
 }
 
 fn check_key(key: &str) -> bool {
-    key.chars()
-        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+    if key
+        .bytes()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+    {
+        return true;
+    }
+    !key.is_ascii()
+        && key
+            .chars()
+            .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
 }
 
 #[cfg(test)]

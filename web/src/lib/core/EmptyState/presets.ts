@@ -471,6 +471,98 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-oncall-teams": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallTeams.title",
+    descriptionKey: "emptyState.noOncallTeams.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallTeams.action",
+        descriptionKey: "emptyState.noOncallTeams.actionDesc",
+      },
+    ],
+  },
+  "no-oncall-members": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallMembers.title",
+    descriptionKey: "emptyState.noOncallMembers.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallMembers.action",
+        descriptionKey: "emptyState.noOncallMembers.actionDesc",
+      },
+    ],
+  },
+  // Nothing open is the GOOD state here, so this is neutral rather than a
+  // create prompt - a responder should not be nudged to make a page exist.
+  "no-oncall-responses": {
+    illustration: "check",
+    variant: "neutral",
+    titleKey: "emptyState.noOncallResponses.title",
+    descriptionKey: "emptyState.noOncallResponses.description",
+  },
+  // Ownership is claimed by path, so the prompt is about the path rather than
+  // about a list of services somebody has to enumerate.
+  "no-oncall-rules": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noOncallRules.title",
+    descriptionKey: "emptyState.noOncallRules.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noOncallRules.action",
+        descriptionKey: "emptyState.noOncallRules.actionDesc",
+      },
+    ],
+  },
+  // This team has no ownership rules yet. The catch-all row below still
+  // answers "where do alerts go meanwhile" — this preset only owns the
+  // "nothing pages this team" fact and the one way to fix it.
+  "no-team-routing": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noTeamRouting.title",
+    descriptionKey: "emptyState.noTeamRouting.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noTeamRouting.action",
+        descriptionKey: "emptyState.noTeamRouting.actionDesc",
+      },
+    ],
+  },
+  // No lanes on the calendar. A blank rotation and a preset ladder are two
+  // equally valid ways in, so both get a card rather than one being the
+  // button and the other a smaller afterthought beside it.
+  "no-oncall-schedule": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noOncallSchedule.title",
+    descriptionKey: "emptyState.noOncallSchedule.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallSchedule.action",
+        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
+      },
+      {
+        id: "presets",
+        icon: "rocket-launch",
+        titleKey: "emptyState.noOncallSchedule.presetsAction",
+        descriptionKey: "emptyState.noOncallSchedule.presetsActionDesc",
+      },
+    ],
+  },
   "no-groups": {
     illustration: "users",
     variant: "create",

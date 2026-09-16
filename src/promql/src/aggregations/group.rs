@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashSet;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::aggregations::{Accumulate, AggFunc};
+use crate::aggregations::{Accumulate, AggFunc, group_series};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/operators/#aggregation-operators
+#[derive(Clone, Copy)]
 pub struct Group;
 
 impl AggFunc for Group {
@@ -28,31 +28,49 @@ impl AggFunc for Group {
         "group"
     }
 
-    fn build(&self) -> Self::Accumulator {
-        Self::Accumulator::default()
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        GroupAccumulate {
+            present: vec![false; slots],
+        }
     }
 }
 
-#[derive(Default)]
 pub struct GroupAccumulate {
-    // Track which timestamps have been seen (group returns 1 if any series exists)
-    timestamps: HashSet<i64>,
+    present: Vec<bool>,
+}
+
+impl GroupAccumulate {
+    fn push(&mut self, slot: usize, _value: f64) {
+        self.present[slot] = true;
+    }
 }
 
 impl Accumulate for GroupAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        self.timestamps.insert(sample.timestamp);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {
-        self.timestamps.extend(other.timestamps);
+        for (present, other) in self.present.iter_mut().zip(other.present) {
+            *present |= other;
+        }
     }
 
-    fn evaluate(self) -> Vec<Sample> {
-        self.timestamps
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .present
             .into_iter()
-            .map(|timestamp| Sample::new(timestamp, 1.0))
-            .collect()
+            .enumerate()
+            .filter(|(_, present)| *present)
+            .map(|(slot, _)| Sample::new(timestamps[slot], 1.0))
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 
