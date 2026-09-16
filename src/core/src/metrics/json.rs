@@ -16,7 +16,7 @@
 use std::{
     collections::{HashMap, HashSet},
     io::BufReader,
-    sync::Arc,
+    time::Instant,
 };
 
 use anyhow::{Result, anyhow};
@@ -33,31 +33,43 @@ use config::{
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
-    metrics,
     utils::{
         flatten, json,
         schema::{format_stream_name, infer_json_schema},
-        schema_ext::SchemaExt,
         time::{self, now_micros},
     },
 };
 use datafusion::arrow::datatypes::Schema;
-use db;
-use infra::schema::{SchemaCache, get_partition_time_level};
+use db::{self, alerts::alert::cache_stream_key};
+use infra::schema::SchemaCache;
 use ingestion_common::{IngestionResponse, StreamStatus};
-use schema::check_for_schema;
 
+use super::ingest::{self, PipelineFailure, PipelineInputs, RecordsByStream};
 use crate::{
-    alerts::alert::AlertExt,
     common::meta::{authz::Authz, stream::SchemaRecords},
-    ingestion::{
-        TriggerAlertData, check_ingestion_allowed, evaluate_trigger, get_thread_id,
-        get_write_partition_key, write_file,
-    },
+    ingestion::{TriggerAlertData, check_ingestion_allowed},
     pipeline::batch_execution::ExecutablePipeline,
 };
 
 const VALID_METRICS_TYPES: &[&str] = &["counter", "gauge", "histogram", "summary"];
+
+const ENDPOINT: &str = "/api/org/ingest/metrics/_json";
+
+/// A finished row and its timestamp.
+type Row = (json::Map<String, json::Value>, i64);
+
+/// Per-request lookups, each filled the first time a stream is seen.
+#[derive(Default)]
+struct StreamLookups {
+    schemas: HashMap<String, SchemaCache>,
+    pipelines: HashMap<String, Vec<ExecutablePipeline>>,
+    user_defined_schemas: HashMap<String, Option<HashSet<String>>>,
+    need_original: HashMap<String, bool>,
+    need_all_values: HashMap<String, bool>,
+    partitions: HashMap<String, Vec<StreamPartition>>,
+    alerts: HashMap<String, Vec<Alert>>,
+    deleting: HashMap<String, bool>,
+}
 
 /// The value a JSON metric record carries, put through the same policy as every other
 /// ingestion path (`super::metric_value`).
@@ -86,6 +98,290 @@ fn parse_metric_value(value: &json::Value) -> Result<json::Value, anyhow::Error>
     super::metric_value(raw).ok_or_else(|| anyhow!("invalid value, not a number"))
 }
 
+/// Queues a validated record for its pipelines or its write; `false` if its stream is deleting.
+async fn buffer_record(
+    org_id: &str,
+    stream_name: Option<&str>,
+    record: json::Value,
+    lookups: &mut StreamLookups,
+    pipeline_inputs: &mut PipelineInputs<&'static str>,
+    records_by_stream: &mut RecordsByStream<&'static str>,
+) -> Result<bool> {
+    let json::Value::Object(mut record) = flatten::flatten(record)? else {
+        unreachable!("flatten only returns an object")
+    };
+    let stream_name = match stream_name {
+        Some(name) => name.to_string(),
+        None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
+            json::Value::String(s) => format_stream_name(s.to_string()),
+            _ => {
+                return Err(anyhow::anyhow!("invalid __name__, need to be string"));
+            }
+        },
+    };
+    // keep the `__name__` column equal to the stream the record is written to;
+    // otherwise `{__name__="..."}` selectors can never match the rows (same
+    // policy as the OTLP writer)
+    if let Some(v) = record.get_mut(NAME_LABEL) {
+        *v = json::Value::String(stream_name.clone());
+    }
+
+    // check stream if it is deleting
+    let is_deleting = match lookups.deleting.get(&stream_name) {
+        Some(v) => *v,
+        None => {
+            let flag = db::compact::retention::is_deleting_stream(
+                org_id,
+                StreamType::Metrics,
+                &stream_name,
+                None,
+            );
+            lookups.deleting.insert(stream_name.clone(), flag);
+            flag
+        }
+    };
+    if is_deleting {
+        return Ok(false);
+    }
+
+    // default to gauge if __type__ is missing
+    let raw_type = record
+        .get(TYPE_LABEL)
+        .and_then(|v| v.as_str())
+        .unwrap_or("gauge");
+
+    if !lookups.pipelines.contains_key(&stream_name) {
+        let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
+        let pipelines = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
+        lookups.pipelines.insert(stream_name.clone(), pipelines);
+    }
+    if !lookups.user_defined_schemas.contains_key(&stream_name) {
+        crate::ingestion::get_uds_and_original_data_streams(
+            &[StreamParams::new(org_id, &stream_name, StreamType::Metrics)],
+            &mut lookups.user_defined_schemas,
+            &mut lookups.need_original,
+            &mut lookups.need_all_values,
+        )
+        .await;
+    }
+
+    // `MetricType` parses case-insensitively, so the canonical spelling stands in for the input's
+    let Some(metric_type) = VALID_METRICS_TYPES
+        .iter()
+        .copied()
+        .find(|valid| valid.eq_ignore_ascii_case(raw_type))
+    else {
+        return Err(anyhow::anyhow!(
+            "invalid metrics type, need to be one of: {}",
+            VALID_METRICS_TYPES.join(", ")
+        ));
+    };
+
+    if !lookups.schemas.contains_key(&stream_name) {
+        let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
+        if schema == Schema::empty() {
+            let metadata = family_metadata(&stream_name, metric_type);
+            schema = schema.with_metadata(metadata);
+            db::schema::merge(
+                org_id,
+                &stream_name,
+                StreamType::Metrics,
+                &schema,
+                Some(now_micros()),
+            )
+            .await?;
+        }
+        lookups
+            .schemas
+            .insert(stream_name.clone(), SchemaCache::new(schema));
+    }
+
+    let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
+        None => now_micros(),
+        // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
+        // turned into a panic on a request body anyone can send
+        Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
+            s.as_f64()
+                .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
+                as i64,
+        ),
+        Some(_) => {
+            return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
+        }
+    };
+    record.insert(
+        TIMESTAMP_COL_NAME.to_string(),
+        json::Value::Number(timestamp.into()),
+    );
+
+    if lookups
+        .pipelines
+        .get(&stream_name)
+        .is_some_and(|v| !v.is_empty())
+    {
+        pipeline_inputs
+            .entry(stream_name)
+            .or_default()
+            .push((json::Value::Object(record), metric_type));
+    } else {
+        let defined_fields = ingest::defined_schema(&lookups.user_defined_schemas, &stream_name);
+        record = ingest::trim_to_defined_schema(record, defined_fields);
+        records_by_stream
+            .entry(stream_name)
+            .or_default()
+            .push((record, metric_type));
+    }
+    Ok(true)
+}
+
+/// One stream's rows, each with a checked value, `__hash__` and string labels, and its first type.
+fn finish_rows(
+    records: Vec<(json::Map<String, json::Value>, &'static str)>,
+) -> Result<(Vec<Row>, Option<&'static str>)> {
+    let first_type = records.first().map(|(_, metric_type)| *metric_type);
+    let mut rows = Vec::with_capacity(records.len());
+    for (mut record, _) in records {
+        let value = parse_metric_value(record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))?)?;
+        if let Some(existing) = record.get_mut(VALUE_LABEL) {
+            *existing = value;
+        }
+
+        let timestamp = record
+            .get(TIMESTAMP_COL_NAME)
+            .and_then(|ts| ts.as_i64())
+            .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
+
+        record.remove(TYPE_LABEL);
+        // hashed before the labels are stringified, so a numeric label hashes as an empty value
+        let hash = super::signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
+        record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
+
+        for (k, v) in record.iter_mut() {
+            if k == NAME_LABEL
+                || k == TYPE_LABEL
+                || k == VALUE_LABEL
+                || k == TIMESTAMP_COL_NAME
+                || k == HASH_LABEL
+            {
+                continue;
+            }
+            if !v.is_string() {
+                *v = json::Value::String(v.to_string());
+            }
+        }
+        rows.push((record, timestamp));
+    }
+    Ok((rows, first_type))
+}
+
+/// Resolves a stream's schema for its rows and buffers them into write partitions.
+async fn buffer_stream_rows(
+    org_id: &str,
+    stream_name: &str,
+    (rows, first_type): (Vec<Row>, Option<&'static str>),
+    lookups: &mut StreamLookups,
+    partitions: &mut HashMap<String, SchemaRecords>,
+) -> Result<Option<TriggerAlertData>> {
+    if !lookups.partitions.contains_key(stream_name) {
+        let keys =
+            crate::ingestion::get_stream_partition_keys(org_id, &StreamType::Metrics, stream_name)
+                .await;
+        lookups.partitions.insert(stream_name.to_string(), keys);
+    }
+    crate::ingestion::get_stream_alerts(
+        &[StreamParams::new(org_id, stream_name, StreamType::Metrics)],
+        &mut lookups.alerts,
+    )
+    .await;
+
+    // only a pipeline's destination stream can still be unknown here
+    if !lookups.schemas.contains_key(stream_name)
+        && let (Some((first, timestamp)), Some(metric_type)) = (rows.first(), first_type)
+    {
+        let schema =
+            create_stream_schema(org_id, stream_name, first, *timestamp, metric_type).await?;
+        lookups
+            .schemas
+            .insert(stream_name.to_string(), SchemaCache::new(schema));
+    }
+
+    let has_uds = matches!(lookups.user_defined_schemas.get(stream_name), Some(Some(_)));
+    let min_timestamp = rows.iter().map(|(_, ts)| *ts).min().unwrap_or(0);
+    let record_refs: Vec<&json::Map<String, json::Value>> =
+        rows.iter().map(|(record, ..)| record).collect();
+    let (schema, schema_key) = ingest::resolve_batch_schema(
+        org_id,
+        stream_name,
+        &mut lookups.schemas,
+        &record_refs,
+        min_timestamp,
+        has_uds,
+    )
+    .await?;
+    drop(record_refs);
+
+    let alerts = lookups
+        .alerts
+        .get(&cache_stream_key(org_id, StreamType::Metrics, stream_name));
+    let partition_keys = lookups.partitions.get(stream_name);
+    Ok(ingest::buffer_stream_records(
+        org_id,
+        rows,
+        &schema,
+        &schema_key,
+        partition_keys,
+        alerts,
+        partitions,
+    )
+    .await)
+}
+
+/// The schema a new stream starts with, inferred from its first row and carrying family metadata.
+async fn create_stream_schema(
+    org_id: &str,
+    stream_name: &str,
+    first_row: &json::Map<String, json::Value>,
+    timestamp: i64,
+    metric_type: &str,
+) -> Result<Schema> {
+    let mut schema = infra::schema::get(org_id, stream_name, StreamType::Metrics).await?;
+    if !schema.fields().is_empty() {
+        return Ok(schema);
+    }
+    let record_str = json::to_string(first_row).unwrap();
+    let mut schema_reader = BufReader::new(record_str.as_bytes());
+    let inferred_schema = infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
+    schema = inferred_schema.with_metadata(family_metadata(stream_name, metric_type));
+    db::schema::merge(
+        org_id,
+        stream_name,
+        StreamType::Metrics,
+        &schema,
+        Some(timestamp),
+    )
+    .await?;
+    db::authz::set_ownership(
+        org_id,
+        StreamType::Metrics.as_str(),
+        Authz::new(stream_name),
+    )
+    .await;
+    Ok(schema)
+}
+
+fn family_metadata(stream_name: &str, metric_type: &str) -> HashMap<String, String> {
+    let metadata = Metadata {
+        metric_family_name: stream_name.to_string(),
+        metric_type: metric_type.into(),
+        help: stream_name.replace('_', " "),
+        unit: "".to_string(),
+    };
+    HashMap::from([(
+        METADATA_LABEL.to_string(),
+        json::to_string(&metadata).unwrap(),
+    )])
+}
+
 pub async fn ingest(
     org_id: &str,
     stream_name: Option<&str>,
@@ -100,6 +396,8 @@ pub async fn ingest(
                 code: http::StatusCode::TOO_MANY_REQUESTS.into(),
                 status: vec![],
                 error: Some(e.to_string()),
+                write_failed: false,
+                stream_skipped: false,
             });
         } else {
             log::error!("Metrics ingestion error: {e}");
@@ -107,189 +405,34 @@ pub async fn ingest(
                 code: http::StatusCode::SERVICE_UNAVAILABLE.into(),
                 status: vec![],
                 error: Some(e.to_string()),
+                write_failed: false,
+                stream_skipped: false,
             });
         }
     }
 
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let started_at = now_micros();
 
-    let mut stream_schema_map: HashMap<String, SchemaCache> = HashMap::new();
+    let mut lookups = StreamLookups::default();
     let mut stream_status_map: HashMap<String, StreamStatus> = HashMap::new();
-    let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
-    let mut stream_partitioning_map: HashMap<String, Vec<StreamPartition>> = HashMap::new();
-
-    // Start get user defined schema
-    let mut user_defined_schema_map: HashMap<String, Option<HashSet<String>>> = HashMap::new();
-    let mut streams_need_original_map: HashMap<String, bool> = HashMap::new();
-    let mut streams_need_all_values_map: HashMap<String, bool> = HashMap::new();
-    // End get user defined schema
-
-    // associated pipeline
-    let mut stream_executable_pipelines: HashMap<String, Vec<ExecutablePipeline>> = HashMap::new();
-    let mut stream_pipeline_inputs: HashMap<String, Vec<(json::Value, String)>> = HashMap::new();
-
-    // realtime alerts
-    let mut stream_alerts_map: HashMap<String, Vec<Alert>> = HashMap::new();
-    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
-
-    // records buffer
-    let mut json_data_by_stream: HashMap<String, Vec<_>> = HashMap::new();
-
-    // check if stream is deleting from cache
-    let mut stream_delete_status = std::collections::HashMap::new();
+    let mut pipeline_inputs: PipelineInputs<&'static str> = HashMap::new();
+    let mut records_by_stream: RecordsByStream<&'static str> = HashMap::new();
     let mut skipped_records: u32 = 0;
 
     let reader: Vec<json::Value> = json::from_slice(&body)?;
-    for record in reader.into_iter() {
-        // JSON Flattening
-        let mut record = flatten::flatten(record)?;
-        // check data type
-        let record = record.as_object_mut().unwrap();
-        let stream_name = match stream_name {
-            Some(name) => name.to_string(),
-            None => match record.get(NAME_LABEL).ok_or(anyhow!("missing __name__"))? {
-                json::Value::String(s) => format_stream_name(s.to_string()),
-                _ => {
-                    return Err(anyhow::anyhow!("invalid __name__, need to be string"));
-                }
-            },
-        };
-        // keep the `__name__` column equal to the stream the record is written to;
-        // otherwise `{__name__="..."}` selectors can never match the rows (same
-        // policy as the OTLP writer)
-        if let Some(v) = record.get_mut(NAME_LABEL) {
-            *v = json::Value::String(stream_name.clone());
-        }
-
-        // check stream if it is deleting
-        let is_deleting = match stream_delete_status.get(&stream_name) {
-            Some(v) => *v,
-            None => {
-                let flag = db::compact::retention::is_deleting_stream(
-                    org_id,
-                    StreamType::Metrics,
-                    &stream_name,
-                    None,
-                );
-                stream_delete_status.insert(stream_name.clone(), flag);
-                flag
-            }
-        };
-
-        if is_deleting {
-            skipped_records += 1;
-            continue;
-        }
-
-        let metrics_type = record
-            .get(TYPE_LABEL)
-            .and_then(|v| v.as_str())
-            .unwrap_or("gauge") // default to gauge if __type__ is missing
-            .to_string();
-
-        // Start retrieve associated pipeline and initialize ExecutablePipeline
-        let stream_param = StreamParams::new(org_id, &stream_name, StreamType::Metrics);
-        if !stream_executable_pipelines.contains_key(&stream_name) {
-            let pipelines = crate::ingestion::get_stream_executable_pipelines(&stream_param).await;
-            stream_executable_pipelines.insert(stream_name.clone(), pipelines);
-        }
-        // End pipeline params construction
-
-        // get user defined schema
-        crate::ingestion::get_uds_and_original_data_streams(
-            std::slice::from_ref(&stream_param),
-            &mut user_defined_schema_map,
-            &mut streams_need_original_map,
-            &mut streams_need_all_values_map,
+    for record in reader {
+        let buffered = buffer_record(
+            org_id,
+            stream_name,
+            record,
+            &mut lookups,
+            &mut pipeline_inputs,
+            &mut records_by_stream,
         )
-        .await;
-
-        // check metrics type
-        if !VALID_METRICS_TYPES.contains(&metrics_type.to_lowercase().as_str()) {
-            return Err(anyhow::anyhow!(
-                "invalid metrics type, need to be one of: {}",
-                VALID_METRICS_TYPES.join(", ")
-            ));
-        }
-
-        // check schema
-        if !stream_schema_map.contains_key(&stream_name) {
-            let mut schema = infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-            if schema == Schema::empty() {
-                // create the metadata for the stream
-                let metadata = Metadata {
-                    metric_family_name: stream_name.clone(),
-                    metric_type: metrics_type.as_str().into(),
-                    help: stream_name.clone().replace('_', " "),
-                    unit: "".to_string(),
-                };
-                let mut extra_metadata: HashMap<String, String> = HashMap::new();
-                extra_metadata.insert(
-                    METADATA_LABEL.to_string(),
-                    json::to_string(&metadata).unwrap(),
-                );
-                schema = schema.with_metadata(extra_metadata);
-                db::schema::merge(
-                    org_id,
-                    &stream_name,
-                    StreamType::Metrics,
-                    &schema,
-                    Some(now_micros()),
-                )
-                .await?;
-            }
-            stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
-        }
-
-        // check timestamp
-        let timestamp: i64 = match record.get(TIMESTAMP_COL_NAME) {
-            None => now_micros(),
-            // `as_f64` is `None` for a literal out of f64 range (`1e400`), which unwrapping
-            // turned into a panic on a request body anyone can send
-            Some(json::Value::Number(s)) => time::parse_i64_to_timestamp_micros(
-                s.as_f64()
-                    .ok_or_else(|| anyhow::anyhow!("invalid _timestamp, out of range"))?
-                    as i64,
-            ),
-            Some(_) => {
-                return Err(anyhow::anyhow!("invalid _timestamp, need to be number"));
-            }
-        };
-        // reset time
-        record.insert(
-            TIMESTAMP_COL_NAME.to_string(),
-            json::Value::Number(timestamp.into()),
-        );
-
-        let mut value = json::Value::Object(record.to_owned());
-
-        // ready to be buffered for downstream processing
-        if stream_executable_pipelines
-            .get(&stream_name)
-            .is_some_and(|v| !v.is_empty())
-        {
-            // buffer to pipeline for batch processing
-            stream_pipeline_inputs
-                .entry(stream_name.to_owned())
-                .or_default()
-                .push((value, metrics_type));
-        } else {
-            // get json object
-            let mut local_val = match value.take() {
-                json::Value::Object(val) => val,
-                _ => unreachable!(),
-            };
-
-            if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
-                local_val = crate::ingestion::refactor_map(local_val, fields);
-            }
-
-            // buffer to downstream processing directly
-            json_data_by_stream
-                .entry(stream_name.clone())
-                .or_default()
-                .push((local_val, metrics_type));
+        .await?;
+        if !buffered {
+            skipped_records += 1;
         }
     }
 
@@ -298,389 +441,76 @@ pub async fn ingest(
         log::warn!("[METRICS:JSON] Skipped {skipped_records} records due to streams being deleted");
     }
 
-    // process records buffered for pipeline processing
-    for (stream_name, pipelines) in &stream_executable_pipelines {
-        if pipelines.is_empty() {
-            continue;
-        }
-        let Some(pipeline_inputs) = stream_pipeline_inputs.remove(stream_name) else {
-            log::error!(
-                "[Ingestion]: Stream {stream_name} has pipeline, but inputs failed to be buffered. BUG"
-            );
-            continue;
-        };
-        let (records, metric_types): (Vec<json::Value>, Vec<String>) =
-            pipeline_inputs.into_iter().unzip();
-        let count = records.len();
-        let has_user_pipeline = pipelines
-            .iter()
-            .any(|p| p.kind == config::meta::pipeline::PipelineKind::User);
-
-        for exec_pl in pipelines {
-            match exec_pl
-                .process_batch(org_id, records.clone(), Some(stream_name.clone()))
-                .await
-            {
-                Err(e) => {
-                    let err_msg = format!(
-                        "[Ingestion]: Stream {stream_name} pipeline batch processing failed: {e}",
-                    );
-                    log::error!("{err_msg}");
-                    // update status
-                    let stream_status = stream_status_map
-                        .entry(stream_name.clone())
-                        .or_insert_with(|| StreamStatus::new(stream_name));
-                    stream_status.status.failed += count as u32;
-                    stream_status.status.error = err_msg;
-                    continue;
-                }
-                Ok(pl_results) => {
-                    for (stream_params, stream_pl_results) in pl_results {
-                        if stream_params.stream_type != StreamType::Metrics {
-                            continue;
-                        }
-
-                        let destination_stream = stream_params.stream_name.to_string();
-
-                        // add partition keys
-                        if !stream_partitioning_map.contains_key(&destination_stream) {
-                            let partition_det = crate::ingestion::get_stream_partition_keys(
-                                org_id,
-                                &StreamType::Metrics,
-                                &destination_stream,
-                            )
-                            .await;
-                            stream_partitioning_map
-                                .insert(destination_stream.clone(), partition_det.clone());
-                        }
-                        for (idx, mut res) in stream_pl_results {
-                            // get json object
-                            let mut local_val = match res.take() {
-                                json::Value::Object(v) => v,
-                                _ => unreachable!(),
-                            };
-
-                            if let Some(Some(fields)) =
-                                user_defined_schema_map.get(&destination_stream)
-                            {
-                                local_val = crate::ingestion::refactor_map(local_val, fields);
-                            }
-
-                            // buffer to downstream processing directly
-                            json_data_by_stream
-                                .entry(destination_stream.clone())
-                                .or_default()
-                                .push((local_val, metric_types[idx].to_owned()));
-                        }
-                    }
-                }
-            }
-        }
-
-        if !has_user_pipeline && !json_data_by_stream.contains_key(stream_name) {
-            for (mut value, metrics_type) in records.into_iter().zip(metric_types) {
-                let mut local_val = match value.take() {
-                    json::Value::Object(val) => val,
-                    _ => unreachable!(),
-                };
-
-                if let Some(Some(fields)) = user_defined_schema_map.get(stream_name) {
-                    local_val = crate::ingestion::refactor_map(local_val, fields);
-                }
-
-                json_data_by_stream
-                    .entry(stream_name.clone())
-                    .or_default()
-                    .push((local_val, metrics_type));
-            }
-        }
-    }
-
-    for (stream_name, json_data) in json_data_by_stream {
-        if !stream_partitioning_map.contains_key(&stream_name) {
-            let partition_det = crate::ingestion::get_stream_partition_keys(
-                org_id,
-                &StreamType::Metrics,
-                &stream_name,
-            )
-            .await;
-            stream_partitioning_map.insert(stream_name.to_string(), partition_det);
-        }
-        // get partition key
-        let partition_keys = stream_partitioning_map
-            .get(&stream_name)
-            .cloned()
-            .unwrap_or_default();
-        let partition_time_level = get_partition_time_level(StreamType::Metrics);
-
-        // Start get stream alerts
-        if !stream_alerts_map.contains_key(&stream_name) {
-            crate::ingestion::get_stream_alerts(
-                &[StreamParams {
-                    org_id: org_id.to_owned().into(),
-                    stream_name: stream_name.to_owned().into(),
-                    stream_type: StreamType::Metrics,
-                }],
-                &mut stream_alerts_map,
-            )
-            .await;
-        }
-        let cur_stream_alerts = stream_alerts_map.get(&format!(
-            "{}/{}/{}",
-            org_id,
-            StreamType::Metrics,
-            stream_name
-        ));
-        let mut triggers: TriggerAlertData =
-            Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
-        // End get stream alert
-
-        for (mut record, metric_type) in json_data {
-            // check value
-            let value =
-                parse_metric_value(record.get(VALUE_LABEL).ok_or(anyhow!("missing value"))?)?;
-            // reset value
-            record.insert(VALUE_LABEL.to_string(), value);
-
-            let timestamp = record
-                .get(TIMESTAMP_COL_NAME)
-                .and_then(|ts| ts.as_i64())
-                .ok_or_else(|| anyhow::anyhow!("missing timestamp"))?;
-
-            // remove type from labels
-            record.remove(TYPE_LABEL);
-            // add hash
-            let hash = super::signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
-            record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
-
-            // convert every label to string
-            for (k, v) in record.iter_mut() {
-                if k == NAME_LABEL
-                    || k == TYPE_LABEL
-                    || k == VALUE_LABEL
-                    || k == TIMESTAMP_COL_NAME
-                    || k == HASH_LABEL
-                {
-                    continue;
-                }
-                match v {
-                    json::Value::String(_) => {}
-                    _ => {
-                        *v = json::Value::String(v.to_string());
-                    }
-                }
-            }
-            let record_str = json::to_string(&record).unwrap();
-
-            // check schema
-            if !stream_schema_map.contains_key(&stream_name) {
-                let mut schema =
-                    infra::schema::get(org_id, &stream_name, StreamType::Metrics).await?;
-                if schema.fields().is_empty() {
-                    let mut schema_reader = BufReader::new(record_str.as_bytes());
-                    let inferred_schema =
-                        infer_json_schema(&mut schema_reader, None, StreamType::Metrics).unwrap();
-                    let metadata = Metadata {
-                        metric_family_name: stream_name.clone(),
-                        metric_type: metric_type.as_str().into(),
-                        help: stream_name.clone().replace('_', " "),
-                        unit: "".to_string(),
-                    };
-                    let mut extra_metadata: HashMap<String, String> = HashMap::new();
-                    extra_metadata.insert(
-                        METADATA_LABEL.to_string(),
-                        json::to_string(&metadata).unwrap(),
-                    );
-                    schema = inferred_schema.with_metadata(extra_metadata);
-                    db::schema::merge(
-                        org_id,
-                        &stream_name,
-                        StreamType::Metrics,
-                        &schema,
-                        Some(timestamp),
-                    )
-                    .await?;
-                    db::authz::set_ownership(
-                        org_id,
-                        StreamType::Metrics.as_str(),
-                        Authz::new(&stream_name),
-                    )
-                    .await;
-                }
-                stream_schema_map.insert(stream_name.clone(), SchemaCache::new(schema));
-            }
-
-            // check for schema evolution
-            let (_schema_evolution, _infer_schema) = check_for_schema(
-                org_id,
-                &stream_name,
-                StreamType::Metrics,
-                &mut stream_schema_map,
-                vec![&record],
-                timestamp,
-                false, // is_derived is false for metrics
-            )
-            .await?;
-
-            // write into buffer
-            let schema = stream_schema_map
-                .get(&stream_name)
-                .unwrap()
-                .schema()
-                .as_ref()
-                .clone()
-                .with_metadata(HashMap::new());
-            let schema_key = schema.hash_key();
-            let hour_key = get_write_partition_key(
-                timestamp,
-                &partition_keys,
-                partition_time_level,
-                &record,
-                Some(&schema_key),
-            );
-            let stream_buf = stream_data_buf.entry(stream_name.to_string()).or_default();
-            let hour_buf = stream_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-                schema_key,
-                schema: Arc::new(schema),
-                records: vec![],
-                records_size: 0,
-            });
-            hour_buf
-                .records
-                .push(Arc::new(json::Value::Object(record.to_owned())));
-            hour_buf.records_size += record_str.len();
-
-            // update status
+    let (pipeline_outputs, failures) = ingest::run_pipelines(
+        org_id,
+        &lookups.pipelines,
+        pipeline_inputs,
+        &lookups.user_defined_schemas,
+        &mut lookups.partitions,
+    )
+    .await;
+    for failure in failures {
+        if let PipelineFailure::Batch {
+            stream_name,
+            records,
+            message,
+        } = failure
+        {
             let stream_status = stream_status_map
                 .entry(stream_name.clone())
                 .or_insert_with(|| StreamStatus::new(&stream_name));
-            stream_status.status.successful += 1;
-
-            // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts {
-                let end_time = now_micros();
-                let dedup = super::series_signature(&record);
-                for alert in alerts {
-                    let key = format!(
-                        "{}/{}/{}/{}",
-                        org_id,
-                        StreamType::Metrics,
-                        alert.stream_name,
-                        alert.get_unique_key()
-                    );
-                    // One row per label set: a series repeats its labels on every sample.
-                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
-                        continue;
-                    }
-                    match alert.evaluate(Some(&record), (None, end_time), None).await {
-                        Ok(trigger_results) if trigger_results.data.is_some() => {
-                            super::merge_trigger_rows(
-                                &mut triggers,
-                                &mut trigger_slots,
-                                &key,
-                                dedup,
-                                alert,
-                                trigger_results.data.unwrap(),
-                            );
-                        }
-                        Ok(_) => {
-                            // the data doesn't satisfy the alert condition
-                        }
-                        Err(e) => {
-                            log::error!("[METRICS] Error while evaluating realtime alert: {e}");
-                        }
-                    }
-                }
-            }
-            // end check for alert triggers
-        }
-
-        if !triggers.is_empty() {
-            stream_trigger_map.insert(stream_name.clone(), Some(triggers));
+            stream_status.status.failed += records as u32;
+            stream_status.status.error = message;
         }
     }
+    for (stream_name, records) in pipeline_outputs {
+        records_by_stream
+            .entry(stream_name)
+            .or_default()
+            .extend(records);
+    }
 
-    // write data to wal
-    for (stream_name, stream_data) in stream_data_buf {
-        // check if we are allowed to ingest
-        if db::compact::retention::is_deleting_stream(
+    let mut stream_data_buf: HashMap<String, HashMap<String, SchemaRecords>> = HashMap::new();
+    let mut stream_trigger_map: HashMap<String, Option<TriggerAlertData>> = HashMap::new();
+    for (stream_name, records) in records_by_stream {
+        let rows = finish_rows(records)?;
+        let row_count = rows.0.len();
+        let triggers = buffer_stream_rows(
             org_id,
-            StreamType::Metrics,
             &stream_name,
-            None,
-        ) {
-            log::warn!("stream [{stream_name}] is being deleted");
-            continue;
-        }
-
-        let writer = ingester::get_writer(
-            get_thread_id(),
-            org_id,
-            StreamType::Metrics.as_str(),
-            &stream_name,
+            rows,
+            &mut lookups,
+            stream_data_buf.entry(stream_name.clone()).or_default(),
         )
-        .await;
-        // for performance issue, we will flush all when the app shutdown
-        let fsync = false;
-        let mut req_stats = write_file(&writer, org_id, &stream_name, stream_data, fsync).await?;
-
-        let email_str = user.to_email();
-        req_stats.user_email = if email_str.is_empty() {
-            None
-        } else {
-            Some(email_str)
-        };
-        req_stats.response_time = start.elapsed().as_secs_f64();
-        let fns_length: usize = stream_executable_pipelines
-            .get(&stream_name)
-            .map_or(0, |pipelines| {
-                pipelines.iter().map(|exec_pl| exec_pl.num_of_func()).sum()
-            });
-        usage_reporting::report_request_usage_stats(
-            req_stats,
-            org_id,
-            &stream_name,
-            StreamType::Metrics,
-            UsageType::JsonMetrics,
-            fns_length as _,
-            started_at,
-        )
-        .await;
-    }
-
-    let time = start.elapsed().as_secs_f64();
-    metrics::HTTP_RESPONSE_TIME
-        .with_label_values(&[
-            "/api/org/ingest/metrics/_json",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .observe(time);
-    metrics::HTTP_INCOMING_REQUESTS
-        .with_label_values(&[
-            "/api/org/ingest/metrics/_json",
-            "200",
-            org_id,
-            StreamType::Metrics.as_str(),
-            "",
-            "",
-        ])
-        .inc();
-
-    // only one trigger per request; notification/db work must not block ingestion
-    for (_, entry) in stream_trigger_map {
-        if let Some(entry) = entry {
-            tokio::spawn(evaluate_trigger(entry));
+        .await?;
+        if triggers.is_some() {
+            stream_trigger_map.insert(stream_name.clone(), triggers);
         }
+        stream_status_map
+            .entry(stream_name.clone())
+            .or_insert_with(|| StreamStatus::new(&stream_name))
+            .status
+            .successful += row_count as u32;
     }
+
+    let entries_by_stream = ingest::entries_by_stream(org_id, stream_data_buf, std::iter::empty())?;
+    ingest::write_streams(
+        org_id,
+        entries_by_stream,
+        &lookups.pipelines,
+        &user,
+        UsageType::JsonMetrics,
+        &start,
+        started_at,
+    )
+    .await?;
+
+    ingest::observe_request(ENDPOINT, org_id, &start);
+    ingest::spawn_triggers(stream_trigger_map);
 
     Ok(IngestionResponse::new(
         http::StatusCode::OK.into(),
-        stream_status_map.values().map(|v| v.to_owned()).collect(),
+        stream_status_map.into_values().collect(),
     ))
 }
 

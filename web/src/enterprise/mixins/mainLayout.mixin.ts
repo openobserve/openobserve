@@ -27,18 +27,29 @@ const MainLayoutCloudMixin = {
      * @returns linksList.value
      */
     const leftNavigationLinks = (linksList: any, t: any) => {
-      linksList.value.splice(5, 0, {
-        title: t("menu.pipeline"),
-        icon: "graph-2",
-        link: "/pipeline",
-        name: "pipeline",
-      });
+      if (!linksList.value.some((link: any) => link.name === "pipeline")) {
+        const dashboardIndex = linksList.value.findIndex((link: any) => link.name === "dashboards");
+        const insertAt = dashboardIndex === -1 ? linksList.value.length : dashboardIndex;
+        linksList.value.splice(insertAt, 0, {
+          title: t("menu.pipeline"),
+          icon: "graph-2",
+          link: "/pipeline",
+          name: "pipeline",
+        });
+      }
 
-      if (!store.state.zoConfig?.custom_hide_menus?.split(",")?.includes("billings")) {
-        linksList.value.splice(10, 0, {
+      const billingsExists = linksList.value.some((link: any) => link.name === "billings");
+      if (
+        !billingsExists &&
+        !store.state.zoConfig?.custom_hide_menus?.split(",")?.includes("billings")
+      ) {
+        const settingsIndex = linksList.value.findIndex((link: any) => link.name === "settings");
+        const insertAt = settingsIndex === -1 ? linksList.value.length : settingsIndex;
+        linksList.value.splice(insertAt, 0, {
           title: t("menu.billings"),
           icon: "payments",
           link: "/billings",
+          name: "billings",
         });
       }
 

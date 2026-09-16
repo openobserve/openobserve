@@ -29,13 +29,8 @@ use datafusion::{
     error::{DataFusionError, Result},
 };
 use vortex::{
-    VortexSessionDefault,
-    array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
-    dtype::DType,
-    file::VortexWriteOptions,
-    io::session::RuntimeSessionExt,
-    session::VortexSession,
+    VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
+    io::session::RuntimeSessionExt, session::VortexSession,
 };
 
 use crate::datafusion::{
@@ -158,10 +153,10 @@ async fn write_downsampled_vortex(
             let mut last_min_ts = 0;
 
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
 
             // Reuse the strategy across files; write options are recreated for each writer.
-            let strategy = vortex_write_strategy();
+            let strategy = vortex_write_strategy(&session);
 
             let write_options =
                 VortexWriteOptions::new(session.clone()).with_strategy(strategy.clone());
@@ -199,11 +194,14 @@ async fn write_downsampled_vortex(
                 last_min_ts = get_min_timestamp(&batch_result);
 
                 // Write batch to current file (convert to Vortex array)
-                let array: ArrayRef = ArrayRef::from_arrow(batch_result, false).map_err(|e| {
-                    DataFusionError::Execution(format!(
-                        "Failed to convert arrow array to vortex array: {e}"
-                    ))
-                })?;
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch_result, schema.as_ref())
+                    .map_err(|e| {
+                        DataFusionError::Execution(format!(
+                            "Failed to convert arrow array to vortex array: {e}"
+                        ))
+                    })?;
                 writer.push(array).await?;
             }
 

@@ -15,7 +15,7 @@
 
 use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use super::{Accumulate, SeriesKey, group_series};
+use super::{Accumulate, group_series};
 
 pub struct ExtremaAccumulator<const IS_MAX: bool> {
     values: Vec<f64>,
@@ -35,7 +35,7 @@ impl<const IS_MAX: bool> ExtremaAccumulator<IS_MAX> {
         }
     }
 
-    fn observe(&mut self, slot: usize, value: f64) {
+    fn push(&mut self, slot: usize, value: f64) {
         // Strict comparisons preserve the first signed zero and ignore NaN values.
         let replace = if IS_MAX {
             value > self.values[slot]
@@ -50,8 +50,14 @@ impl<const IS_MAX: bool> ExtremaAccumulator<IS_MAX> {
 }
 
 impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
-    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
-        self.observe(slot, value);
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {
@@ -59,7 +65,7 @@ impl<const IS_MAX: bool> Accumulate for ExtremaAccumulator<IS_MAX> {
             if !other_present {
                 continue;
             }
-            self.observe(slot, other.values[slot]);
+            self.push(slot, other.values[slot]);
         }
     }
 

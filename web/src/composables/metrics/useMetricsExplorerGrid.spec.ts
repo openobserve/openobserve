@@ -128,6 +128,15 @@ vi.mock("@/composables/useStreams", () => ({
   default: () => ({ getStreams: getStreamsMock }),
 }));
 
+// Hoisted (unlike a fresh vi.fn() per `cacheFor(card)` call) so a test can both
+// observe what a real query persisted AND inject it back as a stale read —
+// the only way to get an exact `cacheIdentity` match without duplicating the
+// composable's own step/query-string derivation.
+const { getPanelCacheMock, savePanelCacheMock } = vi.hoisted(() => ({
+  getPanelCacheMock: vi.fn().mockResolvedValue(null),
+  savePanelCacheMock: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("@/composables/useStreamingSearch", () => ({
   default: () => ({
     fetchQueryDataWithHttpStream: (payload: any, handlers: any) => {
@@ -149,12 +158,12 @@ vi.mock("@/composables/dashboard/promqlChunkProcessor", () => ({
   }),
 }));
 
-// No IndexedDB in the test env, and the persisted cache is not what is under
-// test — every card starts with nothing cached.
+// No IndexedDB in the test env; every card starts with nothing cached unless a
+// test sets `getPanelCacheMock` itself.
 vi.mock("@/composables/dashboard/usePanelCache", () => ({
   usePanelCache: () => ({
-    getPanelCache: vi.fn().mockResolvedValue(null),
-    savePanelCache: vi.fn().mockResolvedValue(undefined),
+    getPanelCache: getPanelCacheMock,
+    savePanelCache: savePanelCacheMock,
   }),
 }));
 
@@ -220,6 +229,8 @@ describe("useMetricsExplorerGrid", () => {
     // The deferred `fetchSchema=true` load, which the label filters trigger.
     (StreamService.nameList as any).mockResolvedValue({ data: { list: STREAMS } });
     getStreamsMock.mockResolvedValue({ list: STREAMS });
+    getPanelCacheMock.mockReset().mockResolvedValue(null);
+    savePanelCacheMock.mockReset().mockResolvedValue(undefined);
   });
 
   const setup = async () => {
@@ -1521,6 +1532,198 @@ describe("useMetricsExplorerGrid", () => {
 
       const { resolved } = grid.effectiveVariant(card);
       expect(resolved.unit).toBe("celsius"); // ...and so does what the chart uses
+    });
+  });
+
+  describe("a freshly-ingested metric queried before indexing catches up gets one more chance", () => {
+    it("re-queries a settled-EMPTY card on revisit (scroll-back / mode toggle), once", async () => {
+      // Telegraf/remote-write scenario: the card's FIRST query lands milliseconds
+      // after ingestion starts, before the write is searchable yet, so it settles
+      // "done" with NO_SERIES even though the metric is genuinely being written.
+      // The user opens the card's Visualize view (a separate pipeline,
+      // usePanelDataLoader) which queries fresh and shows the data correctly.
+      // Back in Explore, the same window is still active — no setTimeRange, no
+      // skipCache — so a naive settled-cache guard would reuse the stale empty
+      // preview forever. A settled-EMPTY card instead gets exactly one real
+      // re-query on the next revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      expect(grid.previews.value["http_requests_total"].status).toBe("done");
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(false);
+
+      // Simulate: click into the card's Visualize view, then back to Explore.
+      const revisit = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // a real query DID fire
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await revisit;
+
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("does not re-query the SAME card a second time if it is still empty", async () => {
+      // The recheck is bounded: a metric that is genuinely empty must not turn
+      // into a query fired on every single revisit — that is the query storm
+      // the settled-cache guard exists to prevent in the first place.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      await landPreview(grid.requestPreview(card), NO_SERIES); // the one bounded recheck, still empty
+
+      const before = inFlight.length;
+      await grid.requestPreview(card); // a third revisit
+      await flush();
+      expect(inFlight.length).toBe(before); // no new query fired
+    });
+
+    it("does not repaint a stale empty answer straight from the persisted disk cache either", async () => {
+      // The in-memory guard above is not the only place a settled-empty answer
+      // gets served without a query — a full remount (page reload, or however
+      // Explore↔Visualize actually behaves) starts with NO in-memory `previews`
+      // entry at all and paints straight from `restoreFromCache`'s IndexedDB
+      // read instead. That path must get the SAME one-time recheck, or a metric
+      // that raced ingestion on its very first (persisted) query stays "No
+      // Data" across every future page load, not just every revisit.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      // A real query, so `persistToCache` writes a genuine (empty) entry under
+      // the exact identity/step this card's variant actually uses — avoids
+      // having to duplicate that derivation by hand.
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      const [key, , cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      getPanelCacheMock.mockResolvedValue({
+        key,
+        value: { results: [NO_SERIES], sparse: false },
+        cacheTimeRange,
+      });
+
+      // Simulate a fresh mount: no in-memory preview, only the disk entry.
+      delete grid.previews.value["http_requests_total"];
+
+      const revisit = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // a real query DID fire
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await revisit;
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("keeps the recheck available when it is cancelled before answering", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const cancelled = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card); // scrolled out of view before the recheck answered
+      inFlight.length = 0;
+      await cancelled;
+
+      const retry = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0); // the recheck was not spent
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await retry;
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(grid.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("does not let a concurrent disk read paint the stale empty answer over the recheck", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      const [key, , cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      getPanelCacheMock.mockResolvedValue({
+        key,
+        value: { results: [NO_SERIES], sparse: false },
+        cacheTimeRange,
+      });
+
+      const reloaded = await setup();
+      const reloadedCard = cardNamed(reloaded, "http_requests_total");
+      inFlight.length = 0;
+
+      // Two requests both waiting on IndexedDB — a double visibility report, or the hide-no-data pre-fetch.
+      const first = reloaded.requestPreview(reloadedCard);
+      const second = reloaded.requestPreview(reloadedCard);
+      await flush();
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("loading");
+      expect(reloaded.emptyHiddenCount.value).toBe(0); // a hidden card unmounts and cancels the recheck
+
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await Promise.all([first, second]);
+
+      const hasSamplesIn = (results: any[]) => results.some((r) => r.result.length);
+      expect(hasSamplesIn(reloaded.previews.value["http_requests_total"].results)).toBe(true);
+    });
+
+    it("serves a rechecked empty answer from disk after a reload instead of querying again", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+      await landPreview(grid.requestPreview(card), NO_SERIES); // the recheck, still empty
+      const [key, value, cacheTimeRange] = savePanelCacheMock.mock.calls.at(-1)!;
+      expect(value.rechecked).toBe(true);
+
+      // A reload: fresh composable, empty in-memory state, only the disk entry.
+      getPanelCacheMock.mockResolvedValue({ key, value, cacheTimeRange });
+      const reloaded = await setup();
+      inFlight.length = 0;
+      await reloaded.requestPreview(cardNamed(reloaded, "http_requests_total"));
+      await flush();
+
+      expect(inFlight).toHaveLength(0);
+      expect(reloaded.previews.value["http_requests_total"].status).toBe("done");
+    });
+  });
+
+  describe("a refresh cancelled by a card remount still lands", () => {
+    it("re-queries on the remount instead of reusing the pre-refresh preview", async () => {
+      // Hiding a sibling as no-data reflows the grid, which remounts this card mid-refresh and cancels its query.
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), NO_SERIES);
+
+      const refresh = grid.requestPreview(card, { skipCache: true });
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      grid.cancelPreview(card);
+      inFlight.length = 0;
+      await refresh;
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBe(true);
+
+      const remount = grid.requestPreview(card);
+      await flush();
+      expect(inFlight.length).toBeGreaterThan(0);
+      inFlight.splice(0, inFlight.length).forEach((q) => q.complete(SERIES));
+      await remount;
+
+      const preview = grid.previews.value["http_requests_total"];
+      expect(preview.pendingRefresh).toBeUndefined();
+      expect(preview.results.some((r: any) => r.result.length)).toBe(true);
+    });
+
+    it("still reuses a settled preview when no refresh was cancelled", async () => {
+      const grid = await setup();
+      const card = cardNamed(grid, "http_requests_total");
+      await landPreview(grid.requestPreview(card), SERIES);
+
+      await grid.requestPreview(card);
+      await flush();
+      expect(inFlight).toHaveLength(0);
+      expect(grid.previews.value["http_requests_total"].pendingRefresh).toBeUndefined();
     });
   });
 });

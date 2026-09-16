@@ -451,9 +451,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
         distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, org_ingestion_tokens, org_storage_providers, re_pattern, re_pattern_stream_map,
-        reports, search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos,
-        system_settings, templates, timed_annotations,
+        kv_store, org_storage_providers, re_pattern, re_pattern_stream_map, reports, search_queue,
+        short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings, templates,
+        timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -554,7 +554,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     trial_quota_usage::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/trial_quota_usage: {e}"))?;
-    org_ingestion_tokens::delete_by_org(org_id)
+    // Through the db layer, not the table layer: it also evicts the token caches
+    // cluster-wide. Runs here, in delete_db_resources, so the eviction lands before
+    // the later delete_org_record step tears down the org status row and its cache
+    // (after which `is_blocked` falls back to false).
+    crate::db::org_ingestion_tokens::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/org_ingestion_tokens: {e}"))?;
     // Same F6 pattern as the `_reset` handler: the table-layer delete alone leaves

@@ -17,7 +17,7 @@ use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value
 use datafusion::error::Result;
 
 use crate::{
-    aggregations::{Accumulate, AggFunc, SeriesKey, group_series},
+    aggregations::{Accumulate, AggFunc, group_series},
     common::quantile_in_place,
 };
 
@@ -81,9 +81,21 @@ pub struct QuantileAccumulate {
     values: Vec<Vec<f64>>,
 }
 
-impl Accumulate for QuantileAccumulate {
-    fn push(&mut self, slot: usize, value: f64, _series: &SeriesKey<'_>) {
+impl QuantileAccumulate {
+    fn push(&mut self, slot: usize, value: f64) {
         self.values[slot].push(value);
+    }
+}
+
+impl Accumulate for QuantileAccumulate {
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
+        }
     }
 
     fn merge(&mut self, other: Self) {

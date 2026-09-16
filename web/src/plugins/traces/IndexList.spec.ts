@@ -719,6 +719,38 @@ describe("IndexList Component", () => {
     });
   });
 
+  // ─── handleAddSearchTerm / handleAddMultipleSearchTerms quote escaping ────
+
+  describe("handleAddSearchTerm value escaping", () => {
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper.vm.handleAddSearchTerm("service_name", "notificationHandling's", "include");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "service_name='notificationHandling''s'",
+      );
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper.vm.handleAddSearchTerm("service_name", "notificationHandling's", "exclude");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "service_name!='notificationHandling''s'",
+      );
+    });
+
+    it("leaves the numeric comparison untouched for the duration field", () => {
+      wrapper.vm.handleAddSearchTerm("duration", "100", "include");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe("duration>=100");
+    });
+  });
+
+  describe("handleAddMultipleSearchTerms value escaping", () => {
+    it("escapes an embedded single quote in each OR'd include expression", () => {
+      wrapper.vm.handleAddMultipleSearchTerms("service_name", ["o'brien", "plain"], "include");
+      expect(wrapper.vm.searchObj.data.stream.addToFilter).toBe(
+        "(service_name='o''brien' or service_name='plain')",
+      );
+    });
+  });
+
   // ─── onStreamChange side-effects ──────────────────────────────────────────
 
   describe("onStreamChange side-effects", () => {

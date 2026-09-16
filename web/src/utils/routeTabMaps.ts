@@ -122,7 +122,13 @@ const ROUTE_TAB_MAPS: Record<string, Record<string, string>> = {
     ingestLogsFromOtel: "ingestLogsFromOtel",
     logstash: "logstash",
     syslogNg: "syslogNg",
+    splunkHec: "splunkHec",
     loongcollector: "loongcollector",
+  },
+
+  /** ingestion/profiles/Index.vue */
+  ingestProfiles: {
+    profilesOtelCollector: "profilesOtelCollector",
   },
 
   /** enterprise/components/billings/Billing.vue */

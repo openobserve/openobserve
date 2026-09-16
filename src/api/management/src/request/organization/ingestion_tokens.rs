@@ -22,7 +22,7 @@ use crate::common::meta::{
     http::HttpResponse as MetaHttpResponse,
     organization::{
         CreateOrgIngestionTokenRequest, OrgIngestionTokenEnableRequest,
-        OrgIngestionTokenListResponse, OrgIngestionTokenResponse,
+        OrgIngestionTokenListResponse, OrgIngestionTokenResponse, SplunkTokenAction,
     },
 };
 
@@ -131,7 +131,15 @@ pub async fn create_ingestion_token(
     }
 
     let description = body.description.unwrap_or_default();
-    match ingestion_tokens::create_token(&org_id, &body.name, &description, user_id).await {
+    match ingestion_tokens::create_token(
+        &org_id,
+        &body.name,
+        &description,
+        user_id,
+        body.splunk_token,
+    )
+    .await
+    {
         Ok(token) => MetaHttpResponse::json(OrgIngestionTokenResponse { data: token }),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
@@ -189,18 +197,46 @@ pub async fn enable_disable_ingestion_token(
         }
     }
 
-    match ingestion_tokens::set_enabled_token(&org_id, &name, body.enabled).await {
-        Ok(()) => {
-            let state = if body.enabled { "enabled" } else { "disabled" };
-            MetaHttpResponse::ok(json!({"message": format!("Token {state} successfully")}))
+    if body.enabled.is_none() && body.splunk_token.is_none() {
+        return MetaHttpResponse::bad_request(
+            "At least one of 'enabled' or 'splunk_token' is required",
+        );
+    }
+
+    let mut messages: Vec<String> = Vec::new();
+    let mut splunk_token: Option<String> = None;
+
+    if let Some(enabled) = body.enabled {
+        if let Err(e) = ingestion_tokens::set_enabled_token(&org_id, &name, enabled).await {
+            return token_patch_error(e);
         }
-        Err(e) => {
-            let err_msg = e.to_string();
-            if err_msg.contains("not found") {
-                MetaHttpResponse::not_found(e)
-            } else {
-                MetaHttpResponse::bad_request(e)
+        let state = if enabled { "enabled" } else { "disabled" };
+        messages.push(format!("Token {state} successfully"));
+    }
+
+    if let Some(action) = body.splunk_token {
+        let generate = action == SplunkTokenAction::Generate;
+        match ingestion_tokens::set_splunk_token(&org_id, &name, generate).await {
+            Ok(value) => {
+                splunk_token = value;
+                let state = if generate { "generated" } else { "revoked" };
+                messages.push(format!("Splunk token {state} successfully"));
             }
+            Err(e) => return token_patch_error(e),
         }
+    }
+
+    MetaHttpResponse::ok(json!({
+        "message": messages.join("; "),
+        "splunk_token": splunk_token,
+    }))
+}
+
+/// A missing token is a 404; everything else on this route is a bad request.
+fn token_patch_error(e: anyhow::Error) -> Response {
+    if e.to_string().contains("not found") {
+        MetaHttpResponse::not_found(e)
+    } else {
+        MetaHttpResponse::bad_request(e)
     }
 }

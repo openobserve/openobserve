@@ -18,7 +18,10 @@ import type { TranslateFn } from "@/types/i18n";
 import { getAllDashboardsByFolderId, getDashboard, getFoldersList } from "@/utils/commons";
 import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
 import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
-import { normalizeVariableSyntax } from "@/utils/dashboard/variables/variablesUtils";
+import {
+  normalizeVariableSyntax,
+  replaceVariablePlaceholders,
+} from "@/utils/dashboard/variables/variablesUtils";
 import searchService from "@/services/search";
 import { isCrossLinkingEnabledForStream } from "@/utils/crossLinking";
 import { isSafeNavigableUrl } from "@/utils/safeUrl";
@@ -161,7 +164,7 @@ export function usePanelDrilldown({
         let value = obj[key];
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       }
     }
 
@@ -183,7 +186,7 @@ export function usePanelDrilldown({
         }
 
         // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
+        return typeof value === "string" ? `'${escapeSingleQuotes(value)}'` : value;
       },
     );
   };
@@ -258,7 +261,7 @@ export function usePanelDrilldown({
       : "";
 
     if (breakdownColumn && breakdownValue) {
-      const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
+      const breakdownCondition = `${breakdownColumn} = '${escapeSingleQuotes(String(breakdownValue))}'`;
       whereClause += whereClause ? ` AND ${breakdownCondition}` : ` WHERE ${breakdownCondition}`;
     }
 
@@ -377,108 +380,34 @@ export function usePanelDrilldown({
     // Normalize spaces inside variable syntax before replacement
     query = normalizeVariableSyntax(query);
     const queryType = panelSchema?.value?.queryType;
+
+    const variablesByName = new Map<string, any>();
     currentDependentVariablesData?.forEach((variable: any) => {
-      const variableName = `$${variable.name}`;
-      const variableNameWithBrackets = `\${${variable.name}}`;
-
-      let variableValue = "";
-      if (Array.isArray(variable.value)) {
-        const value = variable.value
-          .map(
-            (value: any) => `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
-          )
-          .join(",");
-        const possibleVariablesPlaceHolderTypes = [
-          // Mustache forms
-          {
-            placeHolder: `{{${variable.name}:csv}}`,
-            value: variable.value.join(","),
-          },
-          {
-            placeHolder: `{{${variable.name}:pipe}}`,
-            value: variable.value.join("|"),
-          },
-          {
-            placeHolder: `{{${variable.name}:doublequote}}`,
-            value: variable.value.map((value: any) => `"${value}"`).join(","),
-          },
-          {
-            placeHolder: `{{${variable.name}:singlequote}}`,
-            value: value,
-          },
-          {
-            placeHolder: `{{${variable.name}}}`,
-            value: queryType === "sql" ? value : variable.value.join("|"),
-          },
-          // Dollar-sign forms
-          {
-            placeHolder: `\${${variable.name}:csv}`,
-            value: variable.value.join(","),
-          },
-          {
-            placeHolder: `\${${variable.name}:pipe}`,
-            value: variable.value.join("|"),
-          },
-          {
-            placeHolder: `\${${variable.name}:doublequote}`,
-            value: variable.value.map((value: any) => `"${value}"`).join(","),
-          },
-          {
-            placeHolder: `\${${variable.name}:singlequote}`,
-            value: value,
-          },
-          {
-            placeHolder: `\${${variable.name}}`,
-            value: queryType === "sql" ? value : variable.value.join("|"),
-          },
-          {
-            placeHolder: `$${variable.name}`,
-            value: queryType === "sql" ? value : variable.value.join("|"),
-          },
-        ];
-
-        possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
-          // if (query.includes(placeHolderObj.placeHolder)) {
-          //   metadata.push({
-          //     type: "variable",
-          //     name: variable.name,
-          //     value: placeHolderObj.value,
-          //   });
-          // }
-          query = query.replaceAll(placeHolderObj.placeHolder, placeHolderObj.value);
-        });
-      } else {
-        variableValue =
-          variable.value === null
-            ? ""
-            : `${
-                variable.escapeSingleQuotes ? escapeSingleQuotes(variable.value) : variable.value
-              }`;
-        // if (query.includes(variableName)) {
-        //   metadata.push({
-        //     type: "variable",
-        //     name: variable.name,
-        //     value: variable.value,
-        //   });
-        // }
-
-        // Replace all forms of the variable placeholder in the query,
-        // placeholders can be in the form of {{varName}}, ${varName}, ${varName}, {{varName:csv}}, ${varName:csv} etc.
-        // which will be replaced with the variable value. For csv and pipe forms, if the variable value is an array, it will be joined with comma or pipe respectively.
-        // For doublequote form, the variable value will be wrapped with double quotes.
-        // For singlequote form, the variable value will be wrapped with single quotes.
-        const mustachePlaceholder = `{{${variable.name}}}`;
-        query = query.replaceAll(`{{${variable.name}:csv}}`, variableValue);
-        query = query.replaceAll(`{{${variable.name}:pipe}}`, variableValue);
-        query = query.replaceAll(`{{${variable.name}:doublequote}}`, variableValue);
-        query = query.replaceAll(`{{${variable.name}:singlequote}}`, variableValue);
-        query = query.replaceAll(mustachePlaceholder, variableValue);
-        query = query.replaceAll(variableNameWithBrackets, variableValue);
-        query = query.replaceAll(variableName, variableValue);
-      }
+      if (!variablesByName.has(variable.name)) variablesByName.set(variable.name, variable);
     });
 
-    return query;
+    return replaceVariablePlaceholders(query, variablesByName.keys(), ({ name, format }) => {
+      const variable = variablesByName.get(name);
+      const escape = (value: any) => escapeSingleQuotes(String(value));
+
+      if (!Array.isArray(variable.value)) {
+        return variable.value === null ? "" : `${escape(variable.value)}`;
+      }
+
+      const singleQuoted = variable.value.map((value: any) => `'${escape(value)}'`).join(",");
+      switch (format) {
+        case "csv":
+          return variable.value.join(",");
+        case "pipe":
+          return variable.value.join("|");
+        case "doublequote":
+          return variable.value.map((value: any) => `"${value}"`).join(",");
+        case "singlequote":
+          return singleQuoted;
+        default:
+          return queryType === "sql" ? singleQuoted : variable.value.join("|");
+      }
+    });
   };
 
   const constructLogsUrl = (

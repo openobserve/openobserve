@@ -505,12 +505,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 side="right"
                 align="center"
                 max-width="18.75rem"
-                :content="t('alerts.anomaly.sensitivityTooltip')"
+                :content="sensitivityTooltip"
               />
             </OIcon>
           </div>
           <div class="flex flex-1 flex-col gap-1">
-            <div class="flex items-start gap-3">
+            <!-- In budget mode the budget IS the contract, so the control is the delivered-alert cap. -->
+            <div v-if="budgetMode" class="flex items-start gap-3">
+              <OToggleGroup
+                :model-value="budgetTier"
+                :aria-label="t('alerts.sensitivity')"
+                data-test="anomaly-budget-tiers"
+                @update:model-value="onBudgetTier"
+              >
+                <OToggleGroupItem
+                  v-for="tier in budgetTiers"
+                  :key="tier.value"
+                  :value="tier.value"
+                  size="sm"
+                  :data-test="`anomaly-budget-tier-${tier.value}`"
+                >
+                  {{ tier.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <div class="flex items-center gap-0">
+                <OFormInput
+                  name="budget_count"
+                  type="number"
+                  min="1"
+                  :model-modifiers="{ number: true }"
+                  :aria-label="t('alerts.anomaly.budgetLabel')"
+                  class="alert-v3-input max-w-21.75 min-w-21.75"
+                  data-test="anomaly-budget-count"
+                >
+                  <template #error />
+                </OFormInput>
+                <OFormSelect
+                  name="budget_period"
+                  :options="budgetPeriods"
+                  label-key="label"
+                  value-key="value"
+                  class="alert-v3-select min-w-25"
+                  data-test="anomaly-budget-period"
+                />
+              </div>
+            </div>
+            <div v-else class="flex items-start gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -540,12 +580,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OFormInput>
             </div>
             <div
-              v-if="thresholdError"
+              v-if="sensitivityError"
               class="text-input-error-text pt-1 text-xs"
               data-test="anomaly-sensitivity-error"
               role="alert"
             >
-              {{ thresholdError }}
+              {{ sensitivityError }}
             </div>
             <span
               v-if="sensitivityHint"
@@ -592,6 +632,7 @@ import {
 import QueryEditor from "@/components/QueryEditor.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OFormToggleGroup from "@/lib/core/ToggleGroup/OFormToggleGroup.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -615,6 +656,7 @@ export default defineComponent({
   components: {
     QueryEditor,
     OButton,
+    OToggleGroup,
     OToggleGroupItem,
     OFormToggleGroup,
     OIcon,
@@ -684,6 +726,21 @@ export default defineComponent({
       { value: 97, label: t("alerts.anomaly.sensitivityBalanced") },
       { value: 95, label: t("alerts.anomaly.sensitivityAggressive") },
     ]);
+    // 1/week is the burden gate's median target, 4/day the org-wide on-call ceiling.
+    const budgetTiers = computed(() => [
+      {
+        value: "1_week",
+        count: 1,
+        period: "week",
+        label: t("alerts.anomaly.sensitivityConservative"),
+      },
+      { value: "1_day", count: 1, period: "day", label: t("alerts.anomaly.sensitivityBalanced") },
+      { value: "4_day", count: 4, period: "day", label: t("alerts.anomaly.sensitivityAggressive") },
+    ]);
+    const budgetPeriods = computed(() => [
+      { label: t("alerts.anomaly.budgetPerDay"), value: "day" },
+      { label: t("alerts.anomaly.budgetPerWeek"), value: "week" },
+    ]);
 
     const getTimestampColumn = () => store.state.zoConfig.timestamp_column || "_timestamp";
 
@@ -709,6 +766,9 @@ export default defineComponent({
     const detectionWindowValue = form.useStore((s: any) => s.values.detection_window_value);
     const trainingWindowDays = form.useStore((s: any) => s.values.training_window_days);
     const threshold = form.useStore((s: any) => s.values.threshold);
+    const sensitivityMode = form.useStore((s: any) => s.values.sensitivity_mode);
+    const budgetCount = form.useStore((s: any) => s.values.budget_count);
+    const budgetPeriod = form.useStore((s: any) => s.values.budget_period);
     // Bare-widget errors (Monaco custom_sql + the data-test div) render only
     // after the first submit attempt, same timing as the wrappers.
     const showSqlErrors = form.useStore((s: any) => s.submissionAttempts > 0);
@@ -725,31 +785,47 @@ export default defineComponent({
     const scheduleIntervalError = fieldError("schedule_interval_value");
     const detectionWindowError = fieldError("detection_window_value");
     const thresholdError = fieldError("threshold");
+    const budgetCountError = fieldError("budget_count");
 
-    // Suppressed on bad input: the error message is the feedback there, not a rate quoting it.
-    const sensitivityHint = computed(() => {
-      const pct = Number(threshold.value);
-      const resValue = Number(histogramIntervalValue.value);
-      if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
-      if (!Number.isFinite(resValue) || resValue <= 0) return raw("");
-      const resSeconds = resValue * (histogramIntervalUnit.value === "h" ? 3600 : 60);
-      const perDay = (86400 / resSeconds) * ((100 - pct) / 100);
-      if (!Number.isFinite(perDay) || perDay <= 0) return raw("");
-      const resolution = raw(`${resValue}${histogramIntervalUnit.value}`);
-      const perDayRounded = Math.round(perDay);
-      if (perDayRounded >= 1) {
-        return t(
-          "alerts.anomaly.sensitivityHintPerDay",
-          { rate: 100 - pct, count: perDayRounded, resolution },
-          perDayRounded,
-        );
-      }
-      const days = Math.round(1 / perDay);
-      return t(
-        "alerts.anomaly.sensitivityHintEveryNDays",
-        { rate: 100 - pct, count: days, resolution },
-        days,
+    const budgetMode = computed(() => sensitivityMode.value === "budget");
+
+    const sensitivityError = computed(() =>
+      budgetMode.value ? budgetCountError.value : thresholdError.value,
+    );
+
+    const sensitivityTooltip = computed(() =>
+      budgetMode.value
+        ? t("alerts.anomaly.sensitivityBudgetTooltip")
+        : t("alerts.anomaly.sensitivityTooltip"),
+    );
+
+    // A plain toggle, not a form field: one preset value fans out into two form fields.
+    const budgetTier = computed(() => {
+      const match = budgetTiers.value.find(
+        (tier) => tier.count === Number(budgetCount.value) && tier.period === budgetPeriod.value,
       );
+      return match?.value ?? "";
+    });
+
+    const onBudgetTier = (value: unknown) => {
+      const tier = budgetTiers.value.find((entry) => entry.value === value);
+      if (!tier) return;
+      form.setFieldValue("budget_count", tier.count);
+      form.setFieldValue("budget_period", tier.period as "day" | "week");
+    };
+
+    // Suppressed on bad input (the error is the feedback); never a rate computed from the percentile.
+    const sensitivityHint = computed(() => {
+      if (budgetMode.value) {
+        const count = Number(budgetCount.value);
+        if (!Number.isFinite(count) || count <= 0) return raw("");
+        return budgetPeriod.value === "week"
+          ? t("alerts.anomaly.budgetHintPerWeek", { count })
+          : t("alerts.anomaly.budgetHintPerDay", { count });
+      }
+      const pct = Number(threshold.value);
+      if (!Number.isInteger(pct) || pct < 50 || pct > 99) return raw("");
+      return t("alerts.anomaly.sensitivityHintPercentile", { percentile: pct });
     });
 
     // The save payload, the SQL preview and the chart all read props.config, so the form writes back into it
@@ -782,7 +858,15 @@ export default defineComponent({
         cfg.detection_window_unit = v.detection_window_unit;
         cfg.training_window_days = toModelNumber(v.training_window_days);
         cfg.retrain_interval_days = toModelNumber(v.retrain_interval_days);
-        cfg.threshold = toModelNumber(v.threshold);
+        if (v.sensitivity_mode === "budget") {
+          // threshold is controller-derived here; an invalid count writes nothing, or the config would flip back to percentile mode.
+          const count = Number(v.budget_count);
+          if (Number.isFinite(count) && count > 0) {
+            cfg.alert_budget_per_day = v.budget_period === "week" ? count / 7 : count;
+          }
+        } else {
+          cfg.threshold = toModelNumber(v.threshold);
+        }
       },
       { deep: true },
     );
@@ -1038,6 +1122,13 @@ export default defineComponent({
       thresholdError,
       sensitivityTiers,
       sensitivityHint,
+      budgetMode,
+      budgetTiers,
+      budgetPeriods,
+      budgetTier,
+      onBudgetTier,
+      sensitivityError,
+      sensitivityTooltip,
       onCustomSqlChange,
     };
   },
