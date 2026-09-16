@@ -86,11 +86,10 @@ impl TryFrom<workflows::Model> for Workflow {
 impl TryFrom<workflow_drafts::Model> for Workflow {
     type Error = anyhow::Error;
     fn try_from(value: workflow_drafts::Model) -> Result<Self, Self::Error> {
-        // Drafts store no folder; the caller fills it from the published row.
         let ret = Self {
             id: value.id,
             org_id: value.org_id,
-            folder_id: String::new(),
+            folder_id: value.folder_id,
             created_at: value.created_at,
             updated_at: value.updated_at,
             created_by: value.created_by,
@@ -247,16 +246,22 @@ pub async fn list_by_org_folder(
     Ok(ret)
 }
 
-/// Counts the workflows in a folder. Backs the folder delete guard, so it takes
-/// the folder's primary key.
+/// Counts the workflows in a folder, drafts included. Backs the folder delete
+/// guard, so it takes the folder's primary key — and it must count drafts, or
+/// deleting a drafts-only folder leaves them pointing at a folder that is gone.
 pub async fn count_by_folder(org_id: &str, folder_pk: &str) -> Result<u64, errors::Error> {
     let client = get_orm_client_ro().await;
-    let count = workflows::Entity::find()
+    let published = workflows::Entity::find()
         .filter(workflows::Column::OrgId.eq(org_id))
         .filter(workflows::Column::FolderId.eq(folder_pk))
         .count(client)
         .await?;
-    Ok(count)
+    let drafts = workflow_drafts::Entity::find()
+        .filter(workflow_drafts::Column::OrgId.eq(org_id))
+        .filter(workflow_drafts::Column::FolderId.eq(folder_pk))
+        .count(client)
+        .await?;
+    Ok(published + drafts)
 }
 
 /// Returns `(id, folder primary key)` for each of `workflow_ids` that exists.
@@ -708,12 +713,19 @@ pub async fn delete_association_by_entity(org_id: &str, entity: &str) -> Result<
     Ok(())
 }
 
-pub async fn list_drafts_by_org(org_id: &str) -> Result<Vec<Workflow>, anyhow::Error> {
+/// Lists an org's drafts, optionally restricted to one folder. `folder_pk` is the
+/// folder's primary key, not the slug from the URL.
+pub async fn list_drafts_by_org(
+    org_id: &str,
+    folder_pk: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
     let client = get_orm_client_ro().await;
-    let entities = workflow_drafts::Entity::find()
-        .filter(workflow_drafts::Column::OrgId.eq(org_id))
-        .all(client)
-        .await?;
+    let mut query =
+        workflow_drafts::Entity::find().filter(workflow_drafts::Column::OrgId.eq(org_id));
+    if let Some(pk) = folder_pk {
+        query = query.filter(workflow_drafts::Column::FolderId.eq(pk));
+    }
+    let entities = query.all(client).await?;
     let mut ret = Vec::with_capacity(entities.len());
     for e in entities {
         ret.push(e.try_into()?);
@@ -743,6 +755,7 @@ pub async fn save_draft(draft: Workflow) -> Result<(), anyhow::Error> {
     let model = workflow_drafts::ActiveModel {
         id: Set(draft.id),
         org_id: Set(draft.org_id),
+        folder_id: Set(draft.folder_id),
         created_at: Set(now),
         updated_at: Set(now),
         created_by: Set(draft.created_by),

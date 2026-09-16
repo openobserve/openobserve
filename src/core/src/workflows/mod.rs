@@ -373,10 +373,30 @@ pub fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
         .unwrap_or(DEFAULT_FOLDER)
 }
 
-pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Saves a draft into `folder_slug`, defaulting to the org's default folder.
+///
+/// A draft is folder-scoped like a published workflow: a folderless draft was
+/// appended to every folder's listing, and the folder it is drafted in is the one
+/// it publishes into.
+pub async fn save_draft(
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     reject_unsupported_nodes(&workflow)?;
+    let slug = normalize_folder_slug(folder_slug);
+    workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
+
     db::workflows::save_draft_record(workflow.clone()).await?;
-    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    set_ownership(
+        &workflow.org_id,
+        "workflows",
+        Authz {
+            obj_id: workflow.id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
@@ -395,25 +415,39 @@ pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-/// Publishes a draft as a workflow in `folder_slug`, defaulting to the org's
-/// default folder.
-///
-/// Drafts carry no folder of their own, so one must be resolved here: promoting
-/// with the draft's empty `folder_id` would orphan the workflow in every folder
-/// listing, and violate the folder foreign key on Postgres.
+/// Publishes a draft as a workflow in `folder_slug`, defaulting to the folder the
+/// draft already sits in.
 pub async fn promote_draft(
     org_id: &str,
     mut workflow: Workflow,
     folder_slug: Option<&str>,
 ) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
-    let slug = normalize_folder_slug(folder_slug);
+    // Resolved before the destination overwrites it: a promote into a different
+    // folder has to drop the source folder's tuple, and `remove_ownership` only
+    // matches when it names the OLD parent.
+    let src_slug = draft_folder_slug(&workflow).await;
+    let slug = folder_slug
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .or(src_slug.as_deref())
+        .unwrap_or(DEFAULT_FOLDER);
     workflow.folder_id = db::workflows::resolve_folder_pk(org_id, slug).await?;
 
     let id = workflow.id.clone();
     db::workflows::promote_draft(org_id, workflow.clone()).await?;
-    // The draft's tuple has no folder parent; re-assert ownership so the
-    // published workflow inherits the folder's grants.
+    if let Some(src) = src_slug.as_deref().filter(|src| *src != slug) {
+        remove_ownership(
+            org_id,
+            "workflows",
+            Authz {
+                obj_id: id.clone(),
+                parent_type: "workflow_folder".to_string(),
+                parent: src.to_string(),
+            },
+        )
+        .await;
+    }
     set_ownership(
         org_id,
         "workflows",
@@ -427,6 +461,18 @@ pub async fn promote_draft(
     db::workflows::notify_workflow_upsert(&workflow).await?;
     db::workflows::notify_draft_delete(&id).await?;
     Ok(())
+}
+
+/// The draft's folder as a URL slug. `None` for a draft written before drafts had
+/// folders, whose `folder_id` is still blank.
+async fn draft_folder_slug(draft: &Workflow) -> Option<String> {
+    if draft.folder_id.is_empty() {
+        return None;
+    }
+    infra::table::folders::get_name_by_pk(&draft.folder_id)
+        .await
+        .ok()
+        .flatten()
 }
 
 pub async fn enable_disable_workflow(
@@ -534,11 +580,14 @@ pub async fn move_workflows(
     Ok(())
 }
 
+/// `folder_slug` of `None` lists across every folder in the org rather than
+/// falling back to the default one.
 pub async fn list_drafts(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    folder_slug: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = workflows::list_drafts_by_org(org_id)
+    let ret = db::workflows::list_drafts(org_id, folder_slug)
         .await?
         .into_iter()
         .filter(|draft| is_permitted(&draft.id, org_id, permitted.as_ref()))

@@ -191,6 +191,7 @@ mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
+mod m20260916_000001_add_folder_id_to_workflow_drafts;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -465,6 +466,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260912_000001_add_anomaly_alert_budget::Migration),
             Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
+            Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
         ]
     }
 }
@@ -503,6 +505,7 @@ mod tests {
             82,
             "m20260915_000001_add_profiles_streams_to_service_streams",
         ),
+        (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
     ];
 
     #[test]

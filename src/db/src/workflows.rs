@@ -182,6 +182,21 @@ pub async fn move_workflows(
     Ok(())
 }
 
+/// Lists an org's drafts in one folder, or across the org when `folder_slug` is
+/// `None`.
+pub async fn list_drafts(
+    org_id: &str,
+    folder_slug: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_drafts_by_org(org_id, Some(&pk)).await
+        }
+        None => infra::table::workflows::list_drafts_by_org(org_id, None).await,
+    }
+}
+
 pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
     let draft = infra::table::workflows::get_draft_by_org_draft_id(org_id, id).await?;
     Ok(draft)

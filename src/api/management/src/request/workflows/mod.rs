@@ -124,10 +124,31 @@ pub struct WorkflowListItem {
     #[serde(flatten)]
     workflow: Workflow,
     is_draft: bool,
+    /// The owning folder's URL slug. Overrides the flattened workflow's
+    /// `folder_id`, which is the primary key — the browser puts this in the URL,
+    /// and a primary key there addresses nothing.
+    folder_id: Option<String>,
     /// Display name of the owning folder. The row stores the primary key, which
     /// is meaningless to a client, so the name is resolved here.
     #[serde(skip_serializing_if = "Option::is_none")]
     folder_name: Option<String>,
+}
+
+/// Resolves a folder primary key to its `(slug, display name)`, memoized so a
+/// cross-folder listing hits the folders table once per folder, not once per row.
+async fn resolve_folder(
+    cache: &mut HashMap<String, Option<(String, String)>>,
+    folder_pk: &str,
+) -> Option<(String, String)> {
+    if let Some(hit) = cache.get(folder_pk) {
+        return hit.clone();
+    }
+    let resolved = infra::table::folders::get_name_and_display_name_by_pk(folder_pk)
+        .await
+        .ok()
+        .flatten();
+    cache.insert(folder_pk.to_string(), resolved.clone());
+    resolved
 }
 
 #[derive(Deserialize)]
@@ -172,7 +193,7 @@ fn workflow_delete_outcome(published_exists: bool, draft_exists: bool) -> Workfl
     ),
     params(
         ("org_id" = String, Path, description = "Organization id"),
-        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder. Ignored when `draft=true`."),
+        ("folder" = Option<String>, Query, description = "Destination folder id, defaults to the org's default folder. Applies to drafts too."),
         ("draft" = Option<bool>, Query, description = "Save to the drafts table, skipping graph validation"),
     ),
     request_body(content = inline(Object), description = "Workflow data", content_type = "application/json"),
@@ -211,14 +232,14 @@ pub async fn save_workflow(
     // the save resolves to.
     let folder = workflows::normalize_folder_slug(query.get("folder").map(|s| s.as_str()));
 
+    // Drafts are folder-scoped too, so the same check gates both branches.
+    if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+        .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     if !is_draft {
-        // Restates the route's own workflow_folder POST check, which lives in the
-        // enterprise route table and is invisible from here.
-        if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
-            .await
-        {
-            return MetaHttpResponse::forbidden("Unauthorized Access");
-        }
         match workflows::save_workflow(workflow, Some(folder)).await {
             Ok(()) => {
                 if payload.trigger_type == WorkflowTriggerType::IncidentEvent
@@ -248,7 +269,7 @@ pub async fn save_workflow(
             Err(e) => MetaHttpResponse::bad_request(e),
         }
     } else {
-        match workflows::save_draft(workflow).await {
+        match workflows::save_draft(workflow, Some(folder)).await {
             Ok(()) => MetaHttpResponse::json(
                 MetaHttpResponse::message(StatusCode::OK, "draft saved successfully")
                     .with_id(id)
@@ -340,7 +361,7 @@ pub async fn list_workflows(
 
     let mut ret = Vec::with_capacity(workflows.len());
     // Resolved once per distinct folder rather than per row.
-    let mut folder_names: HashMap<String, Option<String>> = HashMap::new();
+    let mut folders: HashMap<String, Option<(String, String)>> = HashMap::new();
 
     for w in workflows {
         let associations = match workflows::get_workflow_associations(&org_id, &w.id).await {
@@ -354,34 +375,25 @@ pub async fn list_workflows(
             }
         };
 
-        let folder_name = match folder_names.get(&w.folder_id) {
-            Some(name) => name.clone(),
-            None => {
-                let name = infra::table::folders::get_name_and_display_name_by_pk(&w.folder_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|(_slug, display)| display);
-                folder_names.insert(w.folder_id.clone(), name.clone());
-                name
-            }
-        };
+        let folder = resolve_folder(&mut folders, &w.folder_id).await;
 
         ret.push(WorkflowListItem {
             workflow: w,
             associations,
             is_draft: false,
-            folder_name,
+            folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
+            folder_name: folder.map(|(_, display)| display),
         });
     }
 
-    let drafts = match workflows::list_drafts(&org_id, permitted).await {
+    let drafts = match workflows::list_drafts(&org_id, permitted, folder).await {
         Ok(workflows) => workflows,
         Err(e) => return MetaHttpResponse::internal_error(e),
     };
 
-    // Drafts sit outside the folder tree but must still honour the term: the
-    // browser stops filtering locally once the search is server-side.
+    // The draft rows come straight from the table rather than through the same
+    // LIKE as the published ones, so the term is applied here: the browser stops
+    // filtering locally once the search is server-side.
     let needle = search_substring
         .map(str::trim)
         .filter(|s| !s.is_empty())
@@ -393,11 +405,13 @@ pub async fn list_workflows(
         {
             continue;
         }
+        let folder = resolve_folder(&mut folders, &draft.folder_id).await;
         ret.push(WorkflowListItem {
             workflow: draft,
             associations: vec![],
             is_draft: true,
-            folder_name: None,
+            folder_id: folder.as_ref().map(|(slug, _)| slug.clone()),
+            folder_name: folder.map(|(_, display)| display),
         });
     }
 
@@ -1159,7 +1173,7 @@ pub async fn get_workflow_history(
     params(
         ("org_id" = String, Path, description = "Organization id"),
         ("id" = String, Path, description = "Workflow id"),
-        ("folder" = Option<String>, Query, description = "Folder to publish into. The default folder is used when absent."),
+        ("folder" = Option<String>, Query, description = "Folder to publish into. The draft's own folder is used when absent."),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(Object)),
@@ -1180,14 +1194,17 @@ pub async fn promote_draft(
 
     let trigger_type: WorkflowTriggerType = trigger_type.into();
 
-    // Drafts store no folder, so the destination comes from the request; absent,
-    // the workflow is published into the default folder.
-    let folder = workflows::normalize_folder_slug(query.get("folder").map(|s| s.as_str()));
-
-    // Publishing is a create into `folder`, so authorize it like one — ahead of the
-    // lookup, so a denied caller cannot probe which draft ids exist.
-    if !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
-        .await
+    // Publishing is a create into the destination folder, so authorize it like one.
+    // A NAMED destination is checked ahead of the lookup, so a denied caller cannot
+    // probe which draft ids exist; an absent one means "publish in place" and can
+    // only be resolved once the draft is loaded.
+    let folder = query
+        .get("folder")
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    if let Some(folder) = folder
+        && !check_folder_write_permissions(&org_id, &user_email.user_id, "workflow_folder", folder)
+            .await
     {
         return MetaHttpResponse::forbidden("Unauthorized Access");
     }
@@ -1203,7 +1220,26 @@ pub async fn promote_draft(
         Ok(Some(v)) => v,
     };
 
-    if let Err(e) = workflows::promote_draft(&org_id, draft, Some(folder)).await {
+    // Checking the default folder instead would 403 every draft that lives
+    // anywhere else, whatever grants its own folder carries.
+    if folder.is_none() {
+        let own = infra::table::folders::get_name_by_pk(&draft.folder_id)
+            .await
+            .ok()
+            .flatten();
+        if !check_folder_write_permissions(
+            &org_id,
+            &user_email.user_id,
+            "workflow_folder",
+            workflows::normalize_folder_slug(own.as_deref()),
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
+    if let Err(e) = workflows::promote_draft(&org_id, draft, folder).await {
         return MetaHttpResponse::bad_request(format!(
             "error in promoting draft to workflow : {e}"
         ));
