@@ -199,13 +199,15 @@ the Free Software Foundation, either version 3 of the License, or
             :configs-loading="isLoading"
             @update:agent-key="onQualityAgentChange"
             @ready="reloadQuality"
-            @reload-configs="loadAll(orgId, true)"
+            @reload-configs="reloadLists()"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
             :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :scorers="scorers"
             :search="filterQuery"
             :loading="isLoading"
@@ -218,13 +220,15 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
-            @refresh="loadAll(orgId, true)"
+            @refresh="reloadLists()"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
             :forbidden="scorersForbidden"
             :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :jobs="jobs"
             :score-configs="scoreConfigs"
             :providers="providers"
@@ -240,7 +244,7 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
-            @refresh="loadAll(orgId, true)"
+            @refresh="reloadLists()"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
@@ -249,6 +253,8 @@ the Free Software Foundation, either version 3 of the License, or
             :search="filterQuery"
             :loading="isLoading"
             :action-loading="jobsBulkDeleting"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
@@ -258,7 +264,7 @@ the Free Software Foundation, either version 3 of the License, or
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
             @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
-            @refresh="loadAll(orgId, true)"
+            @refresh="reloadLists()"
           />
         </div>
       </section>
@@ -432,6 +438,7 @@ import type { DateWindow } from "./onlineEvals/composables/useQualityData";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
 import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
 import { queryClient } from "@/composables/query/queryClient";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import { downloadFile } from "@/utils/dom";
 import type { I18nKey } from "@/types/i18n";
 import {
@@ -521,6 +528,31 @@ const {
   loadProviders,
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
+
+// The three list tabs load together, so one stamp serves all of them. Read back
+// from the cache, not `Date.now()`: a cached read leaves the rows as old as the
+// fetch that filled them, and the oldest list is what the rows on screen are.
+const listsLastRunAt = ref<number | null>(null);
+// Separate from `isLoading`, which only rises on a cold read: without it the
+// refresh button never spins on a warm reload and a second click fires again.
+const listsRefreshing = ref(false);
+const reloadLists = async (force = true) => {
+  listsRefreshing.value = true;
+  try {
+    await loadAll(orgId.value, force);
+  } finally {
+    listsRefreshing.value = false;
+  }
+  const org = orgId.value;
+  const times = [
+    onlineEvalKeys.scoreConfigs(org),
+    onlineEvalKeys.scorers(org),
+    onlineEvalKeys.jobs(org),
+  ]
+    .map((key) => queryClient.getQueryState(key)?.dataUpdatedAt)
+    .filter((at): at is number => !!at);
+  listsLastRunAt.value = times.length ? Math.min(...times) : Date.now();
+};
 
 const isRefreshingProviders = ref(false);
 
@@ -837,7 +869,7 @@ watch(
 
 onBeforeMount(async () => {
   // Mount reads the cache; only the refresh button and post-write reloads force.
-  await loadAll(orgId.value);
+  await reloadLists(false);
   syncFromRoute();
 });
 
@@ -938,7 +970,7 @@ async function activateJob(row: EvalJob) {
       variant: "success",
       message: t("onlineEvals.actions.activated"),
     });
-    await loadAll(orgId.value, true);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.activateError"));
   } finally {
@@ -955,7 +987,7 @@ async function pauseJob(row: EvalJob) {
       variant: "success",
       message: t("onlineEvals.actions.paused"),
     });
-    await loadAll(orgId.value, true);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.pauseError"));
   } finally {
@@ -984,7 +1016,7 @@ async function handleSaved() {
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   clearRouteAction();
-  await loadAll(orgId.value, true);
+  await reloadLists();
 }
 
 function goToImportScoreConfig() {
@@ -997,7 +1029,7 @@ function closeImport() {
 
 async function handleImportSaved() {
   importingEntity.value = null;
-  await loadAll(orgId.value, true);
+  await reloadLists();
 }
 
 function openScoreConfigLibrary() {
@@ -1016,7 +1048,7 @@ async function triggerScoreConfigLibraryImport() {
 
 async function handleScoreConfigLibraryImported() {
   showScoreConfigLibrary.value = false;
-  await loadAll(orgId.value, true);
+  await reloadLists();
 }
 
 function exportScoreConfigRow(row: ScoreConfig) {
@@ -1058,7 +1090,7 @@ async function triggerScorerLibraryImport() {
 
 async function handleScorerLibraryImported() {
   showScorerLibrary.value = false;
-  await loadAll(orgId.value, true);
+  await reloadLists();
 }
 
 function exportScorerRow(row: Scorer) {
@@ -1234,7 +1266,7 @@ async function performDelete() {
       variant: "success",
       message: t("onlineEvals.deleted", { label: singular }),
     });
-    await loadAll(orgId.value, true);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
@@ -1267,7 +1299,7 @@ async function performBulkJobsDelete() {
         message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
       });
     }
-    await loadAll(orgId.value, true);
+    await reloadLists();
   } finally {
     pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;
