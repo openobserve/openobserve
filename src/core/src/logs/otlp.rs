@@ -107,13 +107,32 @@ pub async fn handle_request(
     .await;
 
     // with pipeline, we need to store original if any of the destinations requires original
-    let store_original_when_pipeline_exists =
-        !executable_pipelines.is_empty() && streams_need_original_map.values().any(|val| *val);
+    // with a pipeline the destinations are unknown, so any destination wanting `_original` keeps it
+    let need_original = if executable_pipelines.is_empty() {
+        streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+    } else {
+        streams_need_original_map.values().any(|val| *val)
+    };
+    let need_all_values = streams_need_all_values_map
+        .get(&stream_name)
+        .is_some_and(|v| *v);
+    let uds_fields = user_defined_schema_map
+        .get(&stream_name)
+        .and_then(|fields| fields.as_ref());
+    // only a plain write pre-normalizes keys: pipelines and `_original` see the wire spelling
+    let normalize_keys = executable_pipelines.is_empty() && !need_original;
+    let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+    let dbm_enabled = cfg.db_monitoring.enabled;
     // End get user defined schema
 
     let mut stream_status = StreamStatus::new(&stream_name);
     let mut json_data_by_stream = HashMap::new();
     let mut size_by_stream = HashMap::new();
+    // the request writes one stream, so its records and size are collected without map probes
+    let mut stream_records: Vec<(i64, json::Map<String, json::Value>)> = Vec::new();
+    let mut stream_size = 0usize;
     let mut derived_streams = HashSet::new();
     let mut res = ExportLogsServiceResponse {
         partial_success: None,
@@ -126,10 +145,12 @@ pub async fn handle_request(
         let mut service_att_map: json::Map<String, json::Value> = json::Map::new();
         if let Some(resource) = resource_log.resource {
             for res_attr in resource.attributes {
-                service_att_map.insert(
-                    res_attr.key.to_string(),
-                    get_val_with_type_retained(&res_attr.value.as_ref()),
-                );
+                let key = if normalize_keys {
+                    flatten::format_label_name_owned(res_attr.key)
+                } else {
+                    res_attr.key
+                };
+                service_att_map.insert(key, get_val_with_type_retained(&res_attr.value.as_ref()));
             }
         }
 
@@ -166,8 +187,7 @@ pub async fn handle_request(
                     continue;
                 }
 
-                let mut rec = json::json!({});
-                rec.as_object_mut().unwrap().extend(service_att_map.clone());
+                let mut rec = json::Value::Object(service_att_map.clone());
 
                 if let Some(lib) = &instrumentation_logs.scope {
                     let library_name = lib.name.to_owned();
@@ -191,11 +211,16 @@ pub async fn handle_request(
                 rec["body"] = get_val(&log_record.body.as_ref());
                 rec["dropped_attributes_count"] = log_record.dropped_attributes_count.into();
 
-                log_record.attributes.iter().for_each(|local_attr| {
-                    rec[local_attr.key.as_str()] =
-                        get_val_with_type_retained(&local_attr.value.as_ref());
-                });
-                rec[TIMESTAMP_COL_NAME.to_string()] = timestamp.into();
+                let rec_map = rec.as_object_mut().unwrap();
+                for local_attr in &log_record.attributes {
+                    let key = if normalize_keys {
+                        flatten::format_label_name_cow(&local_attr.key).into_owned()
+                    } else {
+                        local_attr.key.clone()
+                    };
+                    rec_map.insert(key, get_val_with_type_retained(&local_attr.value.as_ref()));
+                }
+                rec[TIMESTAMP_COL_NAME] = timestamp.into();
 
                 match TraceId::from_bytes(
                     log_record
@@ -222,23 +247,7 @@ pub async fn handle_request(
 
                 // store a copy of original data before it's modified, when
                 // 1. original data is an object
-                let original_data = if rec.is_object() {
-                    // 2. current stream does not have pipeline
-                    if executable_pipelines.is_empty() {
-                        // current stream requires original
-                        streams_need_original_map
-                            .get(&stream_name)
-                            .is_some_and(|v| *v)
-                            .then(|| rec.to_string())
-                    } else {
-                        // 3. with pipeline, storing original as long as streams_need_original_set
-                        //    is not empty
-                        // because not sure the pipeline destinations
-                        store_original_when_pipeline_exists.then(|| rec.to_string())
-                    }
-                } else {
-                    None // `item` won't be flattened, no need to store original
-                };
+                let original_data = (need_original && rec.is_object()).then(|| rec.to_string());
 
                 // Surface the OTLP LogRecord `EventName` as `o2_event_name`.
                 //
@@ -273,11 +282,7 @@ pub async fn handle_request(
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
                 } else {
-                    let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += json::estimate_json_bytes(&rec);
-                    // JSON Flattening - use per-stream flatten level
-                    let flatten_level =
-                        get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
+                    stream_size += json::estimate_json_bytes(&rec);
                     rec = flatten::flatten_with_level(rec, flatten_level)?;
 
                     // get json object
@@ -288,7 +293,11 @@ pub async fn handle_request(
 
                     // DBM server-vantage canonicalization — the shipped collector recipes all
                     // export over OTLP, so this path is the one that matters for them.
-                    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                    if dbm_enabled {
+                        crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                            &mut local_val,
+                        );
+                    }
 
                     // Re-insert the trusted event name AFTER canonicalization.
                     //
@@ -306,16 +315,12 @@ pub async fn handle_request(
                         );
                     }
 
-                    if let Some(Some(fields)) = user_defined_schema_map.get(&stream_name) {
+                    if let Some(fields) = uds_fields {
                         local_val = crate::ingestion::refactor_map(local_val, fields);
                     }
 
                     // add `_original` and '_record_id` if required by StreamSettings
-                    if streams_need_original_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                        && let Some(original_data) = original_data
-                    {
+                    if need_original && let Some(original_data) = original_data {
                         local_val.insert(ORIGINAL_DATA_COL_NAME.to_string(), original_data.into());
 
                         let record_id = crate::ingestion::generate_record_id(
@@ -328,10 +333,7 @@ pub async fn handle_request(
                     }
 
                     // add `_all_values` if required by StreamSettings
-                    if streams_need_all_values_map
-                        .get(&stream_name)
-                        .is_some_and(|v| *v)
-                    {
+                    if need_all_values {
                         let values = local_val
                             .iter()
                             .filter(|(k, v)| {
@@ -352,14 +354,15 @@ pub async fn handle_request(
                             .insert(ALL_VALUES_COL_NAME.to_string(), json::Value::String(values));
                     }
 
-                    let (ts_data, fn_num) = json_data_by_stream
-                        .entry(stream_name.clone())
-                        .or_insert((Vec::new(), None));
-                    ts_data.push((timestamp, local_val));
-                    *fn_num = Some(0); // no pl -> no func
+                    stream_records.push((timestamp, local_val));
                 }
             }
         }
+    }
+
+    if !stream_records.is_empty() {
+        size_by_stream.insert(stream_name.clone(), stream_size);
+        json_data_by_stream.insert(stream_name.clone(), (stream_records, Some(0)));
     }
 
     // batch process records through pipeline
@@ -454,7 +457,11 @@ pub async fn handle_request(
 
                             // Pipeline-routed records are canonicalized too: a VRL transform may
                             // have produced the receiver fields we dispatch on.
-                            crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                            if dbm_enabled {
+                                crate::db_monitoring::server_vantage::canonicalize_dbm_record(
+                                    &mut local_val,
+                                );
+                            }
 
                             if let Some(event_name) = trusted_event_name {
                                 local_val.insert(O2_EVENT_NAME.to_string(), event_name);
@@ -557,7 +564,6 @@ pub async fn handle_request(
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
                 *size += json::estimate_json_bytes(&res);
 
-                let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                 res = flatten::flatten_with_level(res, flatten_level)?;
 
                 let mut local_val = match res.take() {
@@ -575,7 +581,9 @@ pub async fn handle_request(
                 let trusted_event_name = local_val.get(O2_EVENT_NAME).cloned();
 
                 // DBM server-vantage canonicalization (see the note at the first call site).
-                crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+                if dbm_enabled {
+                    crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+                }
 
                 if let Some(event_name) = trusted_event_name {
                     local_val.insert(O2_EVENT_NAME.to_string(), event_name);
