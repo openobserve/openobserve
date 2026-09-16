@@ -993,6 +993,14 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
+/// How many steps one journey may hold.
+pub const DEFAULT_BROWSER_MAX_STEPS: usize = 50;
+
+/// The ceiling an operator cannot raise `ZO_SYNTHETICS_BROWSER_MAX_STEPS` past. A step
+/// serializes to roughly 1.2KB, so beyond this the 256KB `config` cap binds
+/// first and the operator would get a confusing second error instead.
+pub const BROWSER_MAX_STEPS_CEILING: usize = 200;
+
 // ── Deployment-shaped values ─────────────────────────────────────────────────
 //
 // Everything below is derived from `ZO_SYNTHETICS_*` and nothing else — no
@@ -1299,7 +1307,6 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 /// Kinds that describe the page rather than an element, and so need no locator.
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
-const MAX_STEPS: usize = 50;
 /// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
 /// 50-step journey lands near 60KB; the cap is set well clear of that. The
 /// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
@@ -2149,9 +2156,10 @@ fn validate_browser_config(
     if cfg.steps.is_empty() {
         return Err("config.steps: at least one step is required".to_string());
     }
-    if cfg.steps.len() > MAX_STEPS {
+    let browser_max_steps = crate::get_config().synthetics.browser_max_steps;
+    if cfg.steps.len() > browser_max_steps {
         return Err(format!(
-            "config.steps: too many steps ({} > {MAX_STEPS})",
+            "config.steps: too many steps ({} > {browser_max_steps})",
             cfg.steps.len()
         ));
     }
@@ -3964,6 +3972,48 @@ mod tests {
         });
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("at least one step"), "{err}");
+    }
+
+    /// The cap is read through `get_config()` at validation time, which is the
+    /// whole reason `ZO_SYNTHETICS_BROWSER_MAX_STEPS` is hot: a reload has to
+    /// change what the next save accepts, with no restart.
+    #[test]
+    fn the_step_cap_follows_the_configured_value() {
+        let (locs, brs, devs) = allowed();
+        let mut steps = vec![serde_json::json!({
+            "id": "s1", "action": "navigate", "url": "https://example.com"
+        })];
+        for i in 2..=6 {
+            steps.push(serde_json::json!({
+                "id": format!("s{i}"),
+                "action": "click",
+                "name": "Sign in",
+                "locator": { "candidates": [ { "kind": "css", "value": "#login" } ] }
+            }));
+        }
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": steps,
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+
+        let install = |cap: usize| {
+            let mut cfg = crate::Config::init().unwrap();
+            cfg.synthetics.browser_max_steps = cap;
+            crate::CONFIG.store(std::sync::Arc::new(cfg));
+        };
+        let saved = crate::CONFIG.load_full();
+
+        install(5);
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("too many steps (6 > 5)"), "{err}");
+
+        // Second read, no restart in between.
+        install(6);
+        let accepted = s.validate(&locs, &brs, &devs, true);
+
+        crate::CONFIG.store(saved);
+        assert!(accepted.is_ok(), "{accepted:?}");
     }
 
     #[test]
