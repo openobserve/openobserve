@@ -63,6 +63,8 @@ const {
   handoffResponse,
   getResponseDetail,
   getResponseRecord,
+  escalateResponse,
+  promoteResponse,
   eventsOfKind,
   waitForMail,
   loginAs,
@@ -137,9 +139,21 @@ test.describe('On-call response verbs', {
     const f = await seedOpenPage(page, testInfo, 'quiet');
     const id = f.record.id;
 
-    const beforeLedger = await getDeliveries(page, id);
-    expect(beforeLedger.total, 'the first rung must have fired before a snooze means anything')
+    // `firePageAndWait` waits for the RECORD, not for a delivery: `waitForPages`
+    // polls `/oncall/responses` and returns the moment the row exists, while the
+    // first rung's ledger entry is written afterwards by the escalation engine.
+    // Reading the ledger straight after the seed therefore races it — this test
+    // lost that race on a full-shard run and reported total 0. Polled, not
+    // slept: the assertion is unchanged, it is only given time to become true,
+    // and the same file already reads the ledger this way twice below.
+    await expect
+      .poll(async () => (await getDeliveries(page, id))?.total ?? 0, {
+        timeout: 90000,
+        intervals: [1000],
+        message: 'the first rung must have fired before a snooze means anything',
+      })
       .toBeGreaterThan(0);
+    const beforeLedger = await getDeliveries(page, id);
 
     await pm.oncallResponseDetailPage.goto(ORG, id);
     await pm.oncallResponseDetailPage.expectDetailVisible();
@@ -462,4 +476,275 @@ test.describe('On-call response verbs', {
       await session.context.close();
     }
   });
+
+  /**
+   * TS-17.02 — the snooze menu offers round numbers, and each one means what it
+   * says.
+   *
+   * A snooze is chosen by somebody half awake, so the options are deliberately
+   * round and few. The bound that matters is the one on the OTHER side: the
+   * value the button sends must produce an until-time that actually matches the
+   * label, because a "30 min" that quiets the ladder for three hours is how a
+   * page gets lost between shifts.
+   */
+  test('TS-17.02 every offered snooze duration is round, and the one chosen is the one applied', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedOpenPage(page, testInfo, 'snoozeopts');
+    const id = f.record.id;
+
+    await pm.oncallResponseDetailPage.goto(ORG, id);
+    await pm.oncallResponseDetailPage.expectDetailVisible();
+
+    const offered = await pm.oncallResponseDetailPage.readSnoozeOptions();
+    expect(offered.length, 'the menu must offer something to pick').toBeGreaterThan(0);
+    expect(
+      offered.filter((m) => !Number.isInteger(m) || m <= 0),
+      'every offered duration must be a positive whole number of minutes',
+    ).toEqual([]);
+    expect(
+      [...offered].sort((a, b) => a - b),
+      'the options must be offered shortest-first, so the common choice is the nearest one',
+    ).toEqual(offered);
+
+    const chosen = offered[0];
+    const before = Date.now();
+    await pm.oncallResponseDetailPage.snoozeFor(chosen);
+    await pm.oncallResponseDetailPage.expectSnoozedBannerVisible();
+
+    const record = await getResponseRecord(page, id);
+    // "Snoozed" is NOT a state. `ResponseState` is Triggered | Triaged |
+    // Acknowledged | Resolved, and a snooze is derived from `snoozed_until` —
+    // the record stays TRIGGERED because it is quiet, not handled. I asserted
+    // `state === 'snoozed'` first and the source says otherwise, as does the
+    // Tier-1 case above.
+    expect(record.state, 'a snooze quiets the record without claiming or closing it')
+      .toBe('triggered');
+    expect(record.acked_by ?? null, 'and without claiming it on the snoozer\'s behalf')
+      .toBeNull();
+
+    const untilMicros = record.snoozed_until;
+    expect(untilMicros, 'a snoozed record must carry the instant it wakes up').toBeTruthy();
+    const actualMinutes = (untilMicros / 1000 - before) / 60000;
+    expect(
+      actualMinutes,
+      `choosing ${chosen} minutes must quiet it for about ${chosen} minutes, not another figure`,
+    ).toBeGreaterThan(chosen - 2);
+    expect(actualMinutes, `and not materially longer than ${chosen} minutes either`)
+      .toBeLessThan(chosen + 2);
+
+    // The API refuses a duration the menu would never offer, rather than
+    // storing a snooze that never ends.
+    const absurd = await snoozeResponse(page, id, 0);
+    expect(absurd.status, 'a zero-minute snooze is not a snooze and must be refused')
+      .toBeGreaterThanOrEqual(400);
+  });
+
+  /**
+   * TS-17.05 — escalating by hand advances exactly one rung, and five frantic
+   * clicks are still one escalation.
+   *
+   * The debounce exists for a specific human moment: two people in the same
+   * call reaching for the same button, or one double-tapped phone. That must
+   * mean "wake the next rung", never "wake the next two" — skipping a rung
+   * means the person who would have been woken never is.
+   *
+   * `MANUAL_ESCALATION_DEBOUNCE_MICROS` is 30s and is a DE-DUPLICATION of one
+   * intent, not a rate limit: a genuine later press does advance again. Five
+   * clicks inside the window are therefore the test.
+   */
+  test('TS-17.05 manual escalation advances one rung, and five rapid presses still advance only one', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    // A ladder with room to climb, so "one rung" is observable.
+    const f = await seedOpenPage(page, testInfo, 'escal', { delaysSeconds: [0, 600, 1200, 1800] });
+    const id = f.record.id;
+
+    const rungOf = async () => (await getEscalationProgress(page, id))?.reached_rung_micros
+      ?? (await getResponseRecord(page, id))?.reached_rung_micros;
+
+    await expect.poll(async () => (await getDeliveries(page, id))?.total, { timeout: 90000 })
+      .toBeGreaterThan(0);
+    const startRung = await rungOf();
+
+    const first = await escalateResponse(page, id, { note: 'e2e manual escalate' });
+    expect(first.status, 'escalating by hand must be accepted').toBe(200);
+
+    await expect
+      .poll(rungOf, { timeout: 60000, message: 'a manual escalation must advance the ladder' })
+      .toBeGreaterThan(startRung);
+    const afterOne = await rungOf();
+
+    // Four more presses, as fast as they can be issued — inside the 30s window.
+    const rapid = await Promise.all(
+      [1, 2, 3, 4].map(() => escalateResponse(page, id, { note: 'e2e rapid' })),
+    );
+    for (const r of rapid) {
+      expect(r.status,
+        'a debounced press is de-duplicated, not rejected — the responder did nothing wrong')
+        .toBe(200);
+    }
+
+    // Give the engine room to get it wrong before concluding it did not.
+    await page.waitForTimeout(5000);
+    expect(
+      await rungOf(),
+      'five presses inside the debounce window are one intent, and must advance one rung — not five',
+    ).toBe(afterOne);
+  });
+
+  /**
+   * TS-17.06 — promoting is a promotion, not a second copy.
+   *
+   * The failure this guards against is duplication: a promote that opened a
+   * NEW record would leave two live rows for one problem, and everyone who
+   * already acknowledged the first would be paged again by the second — at the
+   * exact moment the problem was judged serious enough to escalate.
+   *
+   * So: the same record id survives, and nobody already reached is re-paged.
+   */
+  test('TS-17.06 promoting a page keeps the same record and does not re-page whoever already had it', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedOpenPage(page, testInfo, 'promote');
+    const id = f.record.id;
+
+    await expect.poll(async () => (await getDeliveries(page, id))?.total, { timeout: 90000 })
+      .toBeGreaterThan(0);
+
+    const beforeCount = (await listResponses(page, { teamId: f.team.id, includeResolved: true })).length;
+    const beforeLedger = await getDeliveries(page, id);
+    const alreadyReached = new Set(
+      (beforeLedger.deliveries ?? beforeLedger.rows ?? []).map((d) => d.recipient),
+    );
+    expect(alreadyReached.size, 'somebody must already have been paged for this to mean anything')
+      .toBeGreaterThan(0);
+
+    const promoted = await promoteResponse(page, id, { title: `${f.prefix} promoted` });
+    test.skip(
+      promoted.status === 404 || promoted.status === 501,
+      `promotion is not available on this deployment — HTTP ${promoted.status}`,
+    );
+    expect(promoted.status, 'promoting an open page must be accepted').toBe(200);
+
+    const after = await listResponses(page, { teamId: f.team.id, includeResolved: true });
+    expect(after.length,
+      'promoting must not open a second record — that is duplication, not promotion')
+      .toBe(beforeCount);
+    expect(after.map((r) => r.id), 'and the original record must still be the one that exists')
+      .toContain(id);
+
+    const record = await getResponseRecord(page, id);
+    expect(record, 'the promoted record must still be readable under its own id').toBeTruthy();
+
+    // Only the delta: whoever was already reached must not be paged again by
+    // the promotion itself.
+    await page.waitForTimeout(5000);
+    const afterLedger = await getDeliveries(page, id);
+    const rows = afterLedger.deliveries ?? afterLedger.rows ?? [];
+    const counts = new Map();
+    for (const d of rows) counts.set(d.recipient, (counts.get(d.recipient) ?? 0) + 1);
+    const beforeCounts = new Map();
+    for (const d of (beforeLedger.deliveries ?? beforeLedger.rows ?? [])) {
+      beforeCounts.set(d.recipient, (beforeCounts.get(d.recipient) ?? 0) + 1);
+    }
+    for (const recipient of alreadyReached) {
+      expect(
+        counts.get(recipient),
+        `${recipient} already had this page; promoting it must not wake them a second time`,
+      ).toBe(beforeCounts.get(recipient));
+    }
+  });
+
+  /**
+   * TS-15.07 — a bulk action is settled, not all-or-nothing.
+   *
+   * Selecting ninety-nine pages and having one of them fail must not abandon
+   * the other ninety-eight, and must not report success either. The
+   * implementation is `Promise.allSettled` with a partial-failure toast, so
+   * both halves are observable: the ones that could be acted on ARE, and the
+   * count that could not is reported.
+   */
+  test('TS-15.07 a bulk action applies to every record it can and reports the ones it could not', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedOpenPage(page, testInfo, 'bulk');
+
+    await pm.oncallPagesListPage.goto(ORG);
+    await pm.oncallPagesListPage.filterByTeam(f.team.id);
+
+    const keys = await pm.oncallPagesListPage.readRowKeys();
+    test.skip(keys.length === 0, 'no rows for this team reached the list to act on in bulk');
+
+    // Select everything on the page and acknowledge it in one go.
+    await pm.oncallPagesListPage.getSelectAll().click();
+    const bulkAck = pm.oncallPagesListPage.getBulkAck();
+    await expect(bulkAck, 'selecting rows must offer a bulk acknowledge').toBeVisible({ timeout: 20000 });
+    await bulkAck.click();
+
+    await expect
+      .poll(async () => {
+        const rows = await listResponses(page, { teamId: f.team.id, includeResolved: true });
+        // `[].every()` is TRUE, and `listResponses` returns `[]` on any non-OK
+        // response — so without the length guard this poll goes green the
+        // instant the API stops answering, having checked nothing at all.
+        return rows.length > 0 && rows.every((r) => r.state !== 'triggered' || r.acked_by);
+      }, {
+        timeout: 60000,
+        message: 'a bulk acknowledge must reach every record it selected, not just the first',
+      })
+      .toBe(true);
+
+    const record = await getResponseRecord(page, f.record.id);
+    expect(record.acked_by, 'the seeded record must carry who acknowledged it').toBeTruthy();
+  });
+
+  /**
+   * The other half of TS-15.07: bulk resolve captures a cause.
+   *
+   * PARKED, because it is a real gap rather than a flaky assertion.
+   *
+   * Resolving ONE page forces a cause: `oncall-resolve-dialog` will not confirm
+   * without one of the eight, and the whole cause-analytics surface
+   * (`/oncall/analytics/causes`, the "this alert, before" card) is built on
+   * them. Resolving FIFTY captures nothing — `bulkResolve` in
+   * views/OnCall/OnCallResponses.vue calls
+   * `oncallService.resolveResponse({ org_identifier, response_id })` with no
+   * `cause` at all, and the server's `ResolveRequest.cause` is
+   * `#[serde(default)] Option<..>`, so the records close with a null cause and
+   * are skipped by `group_causes` forever.
+   *
+   * The bulk path is how a noisy morning gets cleaned up, so it is precisely
+   * the path whose causes would have been most worth having. Left as a failing
+   * expectation: it goes green when bulk resolve asks for a cause the way the
+   * single-record dialog does.
+   */
+  test.fixme('TS-15.07b bulk resolve captures a cause the way resolving one page does — not wired: OnCallResponses.vue bulkResolve calls resolveResponse with no cause, and ResolveRequest.cause is Option<_> with serde(default), so every bulk-resolved record stores a null cause and is dropped from cause analytics, verified 16 Sep on :5090', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const f = await seedOpenPage(page, testInfo, 'bulkcause');
+
+    await pm.oncallPagesListPage.goto(ORG);
+    await pm.oncallPagesListPage.filterByTeam(f.team.id);
+    await pm.oncallPagesListPage.getSelectAll().click();
+    await pm.oncallPagesListPage.getBulkResolve().click();
+    await pm.oncallPagesListPage.getConfirmOk().click();
+
+    await expect
+      .poll(async () => (await getResponseRecord(page, f.record.id))?.cause, { timeout: 60000 })
+      .toBeTruthy();
+  });
+
 });

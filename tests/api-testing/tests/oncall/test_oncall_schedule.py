@@ -97,6 +97,23 @@ def one_rotation(rotation_id: str, members: list[str], **kw) -> list[dict]:
                      [shift_rule("Base rotation", members, **kw)])]
 
 
+def team_with_one_rotation(oncall: OnCallClient, member: str) -> tuple[str, str]:
+    """A staffed team, and the id of the rotation it already has.
+
+    Adding the first member auto-provisions a rotation AND repoints the
+    escalation policy's rungs at it, so a `PUT /schedule` that invents a fresh
+    rotation id drops the one the ladder names and is refused — a refusal about
+    the ladder, which has nothing to do with what §8 is testing. Editing the
+    rotation the team already has is both what the UI does and the only way a
+    restriction assertion is about the restriction.
+    """
+    team = oncall.team_id(uniq("oncall_pt_sched"))
+    assert oncall.add_member(team, member).status_code == 200
+    rotation_id = oncall.primary_rotation_id(team)
+    assert rotation_id, "adding a member must auto-provision a rotation to edit"
+    return team, rotation_id
+
+
 # =============================================================================
 # §8 — schedules, rotations and covers
 # =============================================================================
@@ -108,10 +125,9 @@ def test_an_all_day_restriction_is_accepted(oncall: OnCallClient, rota_member: s
     asserting the refusal without asserting the acceptance would be consistent
     with the server rejecting both.
     """
-    team = oncall.team_id(uniq("oncall_pt_allday"))
-    assert oncall.add_member(team, rota_member).status_code == 200
+    team, rotation_id = team_with_one_rotation(oncall, rota_member)
     rotations = one_rotation(
-        uniq("rot"), [rota_member],
+        rotation_id, [rota_member],
         restrictions=[{"days": ALL_DAYS, "start_minute": 0,
                        "end_minute": MINUTES_PER_DAY}])
     resp = oncall.set_schedule(team, rotations)
@@ -127,13 +143,15 @@ def test_a_restriction_that_applies_at_no_instant_is_refused(
     window ending at minute 0 that STARTED later is a different thing entirely
     — it wraps midnight — and is not asserted here, because it is legal.
     """
-    team = oncall.team_id(uniq("oncall_pt_empty_window"))
-    assert oncall.add_member(team, rota_member).status_code == 200
+    team, rotation_id = team_with_one_rotation(oncall, rota_member)
     rotations = one_rotation(
-        uniq("rot"), [rota_member],
+        rotation_id, [rota_member],
         restrictions=[{"days": ALL_DAYS, "start_minute": 0, "end_minute": 0}])
     resp = oncall.set_schedule(team, rotations)
     assert resp.status_code == 400, f"{resp.status_code} {resp.text}"
+    # A bare 400 would also be earned by an unrelated refusal — an orphaned
+    # ladder, a bad member — so the window has to be named for this to assert it.
+    assert "no instant" in resp.text, resp.text
 
 
 def test_a_shift_rule_with_no_members_is_refused(
@@ -148,6 +166,11 @@ def test_a_shift_rule_with_no_members_is_refused(
     assert oncall.add_member(team, rota_member).status_code == 200
     resp = oncall.set_schedule(team, one_rotation(uniq("rot"), []))
     assert resp.status_code == 400, f"{resp.status_code} {resp.text}"
+    # Named for the same reason as §8.2: this write is also refusable for having
+    # dropped the rotation the ladder points at, and a bare 400 cannot tell the
+    # two apart. Roster validation wins today; the assertion is what keeps it
+    # this test's subject if that order ever changes.
+    assert "at least one member" in resp.text, resp.text
 
 
 def test_a_cover_for_a_member_is_stored_against_a_rotation(

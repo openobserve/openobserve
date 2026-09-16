@@ -51,6 +51,9 @@ const {
   waitForStreamSearchable,
   seedNotificationDestination,
   createOwnershipRule,
+  listTeamMembers,
+  whoIsOnCall,
+  getTeamPolicy,
   firePageAndWait,
   getDeliveries,
   getEscalationProgress,
@@ -64,6 +67,10 @@ const {
   createOrgUser,
   createOrgUsers,
   getConfigRisks,
+  getReachability,
+  getEscalationPreview,
+  getTeamOverview,
+  mailSince,
 } = require('../utils/oncall-seed-ext.js');
 
 const PREFIX = 'e2e_oncall_health';
@@ -303,4 +310,129 @@ test.describe('On-call team health', {
       'the screen draws every ledger row, not a summary of them',
     ).toBe(ledger.total);
   });
+
+  /**
+   * TS-21.01 — reachability is a calculation, not a probe, and it tells the
+   * truth about somebody the ladder will page anyway.
+   *
+   * Both halves matter and they pull in opposite directions:
+   *
+   *   1. Asking "would a page land" must not SEND anything. An endpoint that
+   *      answered by trying would spam a team every time somebody opened the
+   *      screen, and would answer differently at 3am than at noon.
+   *   2. `root@example.com` is on a domain reserved for documentation, so mail
+   *      to it is discarded rather than delivered — and reachability says so.
+   *      But the escalation ladder STILL targets them: the engine does not quietly
+   *      drop an unreachable recipient, because silently paging nobody is worse
+   *      than paging somebody the operator has been told is unreachable.
+   *
+   * Asserting only the first half would let a build ship that hid unreachable
+   * people from the ladder; asserting only the second would let one ship that
+   * called them reachable.
+   */
+  test('TS-21.01 reachability is computed without sending, and names an undeliverable member the ladder still targets', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_reach`);
+    const me = process.env.ZO_ROOT_USER_EMAIL;
+    test.skip(
+      !me || !/@example\.(com|org|net)$/i.test(me),
+      'this case is about a reserved-domain address; the suite is running as a deliverable one',
+    );
+
+    const team = await createTeam(page, { name, timezone: 'UTC' });
+    await setTeamSchedule(page, team.id, {
+      timezone: 'UTC',
+      rotations: [rotation({ id: 'Primary', members: [me] })],
+    });
+    await addTeamMembers(page, team.id, [me]);
+
+    // Half one: nothing is sent. Counted across the call rather than assumed.
+    const before = await mailSince(0);
+    const reach = await getReachability(page, team.id);
+    const after = await mailSince(0);
+    expect(after.length,
+      'asking whether a page would land must not send one — it is a calculation, not a probe')
+      .toBe(before.length);
+
+    expect(reach, 'the reachability endpoint must answer').toBeTruthy();
+    expect(reach.total, 'the fixture has exactly one member').toBe(1);
+    expect(reach.reachable, 'and that member is on a reserved domain, so none are reachable')
+      .toBe(0);
+    expect(reach.unreachable_members, 'the unreachable member must be named, not just counted')
+      .toContain(me);
+
+    const member = reach.members.find((m) => m.user_email === me);
+    expect(member.would_a_page_land, 'a page to a reserved domain does not land').toBe(false);
+    expect(member.why_not,
+      'and the reason must be in plain words, not a code — somebody has to act on it')
+      .toMatch(/reserved|documentation|discarded/i);
+
+    // Half two: the ladder targets them all the same.
+    const preview = await getEscalationPreview(page, team.id, 1);
+    expect(preview.pages_anyone,
+      'an unreachable member must not make the ladder claim it pages nobody').toBe(true);
+
+    const firstRung = preview.rungs[0];
+    expect(firstRung.resolves_to_nobody,
+      'the first rung resolves to a person, unreachable or not').toBe(false);
+    const recipients = firstRung.recipients.map((r) => r.user_email);
+    expect(recipients,
+      'the engine must still dispatch to them rather than silently dropping them')
+      .toContain(me);
+    expect(firstRung.recipients.find((r) => r.user_email === me).would_a_page_land,
+      'while being honest, on the same screen, that it will not land')
+      .toBe(false);
+  });
+
+  /**
+   * TS-21.03 — the overview agrees with every one of its parts.
+   *
+   * The overview is a summary built from four other reads, and a summary that
+   * disagrees with its sources is worse than no summary: it is the screen
+   * somebody checks INSTEAD of the details. So each headline number is
+   * re-derived from the endpoint that owns it and compared.
+   */
+  test('TS-21.03 the team overview agrees with the members, schedule and policy it summarises', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_ovw`);
+    const users = await createOrgUsers(page, name, 3);
+    const team = await createTeam(page, { name, timezone: 'UTC' });
+    await setTeamSchedule(page, team.id, {
+      timezone: 'UTC',
+      rotations: [rotation({ id: 'Primary', members: users })],
+    });
+    await addTeamMembers(page, team.id, users);
+
+    const overview = await getTeamOverview(page, team.id);
+    expect(overview, 'the overview endpoint must answer').toBeTruthy();
+
+    const members = await listTeamMembers(page, team.id);
+    expect(overview.members, 'the headline member count must match the roster it summarises')
+      .toBe((members ?? []).length);
+
+    expect(overview.timezone, 'and the zone must be the team\'s own').toBe('UTC');
+
+    const slots = (await whoIsOnCall(page, team.id)) ?? [];
+    expect([...overview.on_call_now].sort(),
+      'who the overview says is on call must be who the engine says is on call')
+      .toEqual(slots.map((s) => s.user_email).sort());
+    expect(overview.covered_now,
+      'a team with somebody on call is covered, and the summary must agree')
+      .toBe(slots.length > 0);
+
+    const policy = await getTeamPolicy(page, team.id);
+    for (const summary of overview.rungs) {
+      const priority = Number(String(summary.priority).replace(/^P/i, ''));
+      const stored = (policy.rungs ?? []).find((r) => r.priority === priority);
+      expect(summary.rungs,
+        `the overview's P${priority} rung count must match the stored policy`)
+        .toBe((stored?.steps ?? []).length);
+      expect(summary.pages_anyone,
+        `and "pages anyone" for P${priority} must follow from whether it has any step`)
+        .toBe((stored?.steps ?? []).length > 0);
+    }
+  });
+
 });

@@ -279,7 +279,7 @@ test.describe('On-call pages list', {
       },
     });
     const responseId = pages[0].id;
-    const cell = page.locator(`[data-test="oncall-escalation-cell-${responseId}"]`);
+    const cell = pm.oncallPagesListPage.getEscalationCell(responseId);
 
     const openListOnThisTeam = async () => {
       await pm.oncallPagesListPage.goto(ORG);
@@ -387,7 +387,7 @@ test.describe('On-call pages list', {
 
     const indices = await pm.oncallPagesListPage.readRowIndices();
     expect(indices.length, 'the search must have found the teamless page').toBeGreaterThan(0);
-    const row = page.locator(pm.oncallPagesListPage.rowByIndex(indices[0]));
+    const row = pm.oncallPagesListPage.getRowByIndex(indices[0]);
     await expect(
       row,
       'a page no rule claimed reads Unrouted — the team cell is a tag, not a link, so it carries no row-scoped data-test',
@@ -463,9 +463,9 @@ test.describe('On-call pages list', {
     });
 
     await pm.oncallPagesListPage.gotoDetail(ORG, responseId);
-    await expect(page.locator('[data-test="oncall-who-is-on"]')).toBeVisible({ timeout: 30000 });
+    await expect(pm.oncallPagesListPage.getWhoIsOn()).toBeVisible({ timeout: 30000 });
 
-    const badge = page.locator('[data-test="oncall-who-is-on-primary-reach"]');
+    const badge = pm.oncallPagesListPage.getWhoIsOnPrimaryReach();
     if (sends.length === 0) {
       await expect(
         badge,

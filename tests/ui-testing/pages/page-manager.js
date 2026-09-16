@@ -40,6 +40,9 @@ import { OnCallTeamDetailPage } from "./oncallPages/oncallTeamDetailPage.js";
 import { OnCallPagesListPage } from "./oncallPages/oncallPagesListPage.js";
 import { OnCallRoutingPage } from "./oncallPages/oncallRoutingPage.js";
 import { OnCallResponseDetailPage } from "./oncallPages/oncallResponseDetailPage.js";
+import { OnCallCoveragePage } from "./oncallPages/oncallCoveragePage.js";
+import { OnCallPolicyEditorPage } from "./oncallPages/oncallPolicyEditorPage.js";
+import { OnCallMinePage } from "./oncallPages/oncallMinePage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -182,6 +185,9 @@ class PageManager {
     this.oncallPagesListPage = new OnCallPagesListPage(page);
     this.oncallRoutingPage = new OnCallRoutingPage(page);
     this.oncallResponseDetailPage = new OnCallResponseDetailPage(page);
+    this.oncallCoveragePage = new OnCallCoveragePage(page);
+    this.oncallPolicyEditorPage = new OnCallPolicyEditorPage(page);
+    this.oncallMinePage = new OnCallMinePage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

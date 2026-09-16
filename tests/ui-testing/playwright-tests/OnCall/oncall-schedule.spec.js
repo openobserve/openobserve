@@ -182,7 +182,7 @@ test.describe('On-call schedules and rotations', {
 
     // The "When it applies" section is unfolded already for a rule that carries
     // a restriction, so the window is on screen without opening anything.
-    const window = page.locator(pm.oncallTeamDetailPage.ruleRestriction(0, 0));
+    const window = pm.oncallTeamDetailPage.getRuleRestriction(0, 0);
     await expect(window, 'the seeded restriction must be rendered').toBeVisible({ timeout: 20000 });
 
     const text = ((await window.innerText()) ?? '').replace(/\s+/g, ' ');
@@ -192,7 +192,7 @@ test.describe('On-call schedules and rotations', {
     // The zero-length warning is the product's own name for the bug: it fires
     // when start === end, which is exactly what 1440-rendered-as-0 would make.
     await expect(
-      window.getByText('never matches', { exact: false }),
+      pm.oncallTeamDetailPage.getRestrictionNotice(0, 0, 'never matches'),
       'an all-day window must not be read as zero length',
     ).toHaveCount(0);
   });
@@ -210,7 +210,7 @@ test.describe('On-call schedules and rotations', {
     await pm.oncallTeamDetailPage.openScheduleTab();
     await pm.oncallTeamDetailPage.expectLaneVisible(rotationId);
 
-    const cadence = page.locator(pm.oncallTeamDetailPage.laneCadence(rotationId));
+    const cadence = pm.oncallTeamDetailPage.getLaneCadence(rotationId);
     await expect(cadence).toBeVisible({ timeout: 20000 });
     const text = ((await cadence.innerText()) ?? '').replace(/\s+/g, ' ');
 
@@ -235,7 +235,7 @@ test.describe('On-call schedules and rotations', {
     await pm.oncallTeamDetailPage.openRotationEditorFor(rotationId);
 
     await expect(
-      page.locator('[data-test="oncall-schedule-name-field"]').first(),
+      pm.oncallTeamDetailPage.getScheduleNameField(),
     ).toHaveValue('All day cover');
   });
 
@@ -260,7 +260,7 @@ test.describe('On-call schedules and rotations', {
 
     // Rule tabs are indexed by POSITION, so the new rule's index is whatever
     // count the drawer had before it — never a cached selector.
-    const before = await page.locator('[data-test^="oncall-schedule-rule-tab-"]').count();
+    const before = await pm.oncallTeamDetailPage.countShiftRuleTabs();
     await pm.oncallTeamDetailPage.addShiftRule();
     await pm.oncallTeamDetailPage.openShiftRule(before);
     await pm.oncallTeamDetailPage.expectRuleNeedsPeople(before);
@@ -302,10 +302,30 @@ test.describe('On-call schedules and rotations', {
     await pm.oncallTeamDetailPage.openScheduleTab();
     await pm.oncallTeamDetailPage.expectLaneVisible(rotationId);
 
-    const labels = await pm.oncallTeamDetailPage.readTimelineLabels();
-    const chart = labels.join(' | ');
-    expect(chart, 'the chart must have drawn at least one band').not.toBe('');
-    expect(chart, 'the band names the person').toContain(displayNameOf(named));
+    expect(
+      (await pm.oncallTeamDetailPage.readTimelineLabels()).join(' | '),
+      'the chart must have drawn at least one band',
+    ).not.toBe('');
+
+    // The band label is drawn BEFORE the name it needs has arrived.
+    // OnCallScheduleTimeline.vue fetches the org's users in `onMounted`
+    // (line 399) purely to label bands, and `nameOf()` returns the raw email
+    // until that lands — so a single read taken as soon as the lane appears can
+    // catch the fallback rather than the answer, and reports the very defect
+    // this case exists to catch. The bigger the org, the wider that window:
+    // this passed at ~1400 accounts and failed at 1494 in the same day.
+    //
+    // Polled, not slept, and the assertion is unchanged — a band that never
+    // resolves to the name still fails here, which is the real defect.
+    await expect
+      .poll(async () => (await pm.oncallTeamDetailPage.readTimelineLabels()).join(' | '), {
+        timeout: 30000,
+        intervals: [500],
+        message: 'the band names the person',
+      })
+      .toContain(displayNameOf(named));
+
+    const chart = (await pm.oncallTeamDetailPage.readTimelineLabels()).join(' | ');
     expect(chart, 'a raw address on a band is the defect, not a formatting preference')
       .not.toContain(named.email);
   });

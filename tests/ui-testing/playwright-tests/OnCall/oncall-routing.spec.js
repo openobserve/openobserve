@@ -59,6 +59,9 @@ const {
 const {
   createOrgUsers,
   listUnroutedSignals,
+  getOwnershipStats,
+  createOwnershipRuleExpectingStatus,
+  deleteTeamExpectingStatus,
 } = require('../utils/oncall-seed-ext.js');
 const { getAuthHeaders } = require('../utils/cloud-auth.js');
 
@@ -141,8 +144,8 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.expectAvailable();
     await pm.oncallRoutingPage.expectPageVisible();
-    await expect(page.locator(pm.oncallRoutingPage.locators.tabRules)).toBeVisible();
-    await expect(page.locator(pm.oncallRoutingPage.locators.tabSignals)).toBeVisible();
+    await expect(pm.oncallRoutingPage.getTabRules()).toBeVisible();
+    await expect(pm.oncallRoutingPage.getTabSignals()).toBeVisible();
   });
 
   test('a seeded rule appears on the rules tab with the team it pages', {
@@ -155,7 +158,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.goto(ORG);
     await pm.oncallRoutingPage.selectTab('rules');
 
-    const teamCell = page.locator(pm.oncallRoutingPage.ruleTeam(rule.id));
+    const teamCell = pm.oncallRoutingPage.getRuleTeam(rule.id);
     await expect(teamCell, 'the org view names the team a rule pages').toBeVisible({ timeout: 30000 });
     await expect(teamCell).toContainText(team.name);
   });
@@ -185,7 +188,7 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.selectTab('rules');
 
     const ruleId = shadowed.rule_id ?? shadowed.id;
-    const pill = page.locator(pm.oncallRoutingPage.ruleHealth(ruleId));
+    const pill = pm.oncallRoutingPage.getRuleHealth(ruleId);
     await expect(
       pill,
       'the verdict must be legible from the table itself, not only after opening the row',
@@ -233,7 +236,7 @@ test.describe('On-call routing rules', {
     await pm.oncallTeamDetailPage.openRoutingTab();
 
     await expect(
-      page.locator(pm.oncallRoutingPage.ruleRow(ruleId)),
+      pm.oncallRoutingPage.getRuleRow(ruleId),
       'the shadowed rule must be on its own team\'s routing tab',
     ).toBeVisible({ timeout: 30000 });
 
@@ -346,98 +349,6 @@ test.describe('On-call routing rules', {
     await pm.oncallRoutingPage.expectOrgRuleRowAbsent(ruleId);
   });
 
-  /**
-   * TS-14.01 and TS-14.02 in ONE test, deliberately.
-   *
-   * The org's default team is SINGLETON state: nominating one changes where
-   * every unmatched signal in the org lands, for every worker at once. Split
-   * across two parallel tests they would each silently invalidate the other's
-   * precondition — "a default is set" and "no default is set" cannot both hold.
-   * So the nomination case and the unrouted-queue case are driven as one
-   * sequence over the same fixture, which is also how an operator meets them.
-   */
-  test('TS-14.01/TS-14.02 an unmatched signal defaults where a team is nominated, and reaches the queue where none is', {
-    tag: ['@P0'],
-  }, async ({ page }, testInfo) => {
-    const f = await seedPageableFixture(page, testInfo, 'default');
-
-    // Nothing auto-creates a default. Waking a fallback team for a service they
-    // know nothing about trains people to ignore pages, so the absence is the
-    // designed state and is asserted rather than assumed.
-    const before = await getRoutingConfig(page);
-    testLogger.info('TS-14.01 routing config before nomination', before);
-
-    await pm.oncallRoutingPage.goto(ORG);
-    await pm.oncallRoutingPage.expectAvailable();
-    await pm.oncallRoutingPage.expectDefaultTeamControlVisible();
-    await pm.oncallRoutingPage.nominateDefaultTeam(f.team.id, f.team.name);
-
-    await expect.poll(
-      async () => (await getRoutingConfig(page))?.default_team_id,
-      { timeout: 60000, intervals: [1000], message: 'the nomination never reached the org config' },
-    ).toBe(f.team.id);
-
-    // No ownership rule covers this service, so the only thing that can route
-    // it is the default.
-    const defaulted = await firePageAndWait(page, {
-      alertOptions: { name: `${f.prefix}_defaulted`, stream: f.stream, destinations: [f.destination] },
-    });
-    testLogger.info('TS-14.01 defaulted record', { team: defaulted.pages[0].team_id });
-    expect(defaulted.pages[0].team_id, 'with a default set, an unmatched signal is paged rather than lost')
-      .toBe(f.team.id);
-
-    // The nomination is legible without opening anything: the trigger's own
-    // label names the org's current catch-all.
-    await pm.oncallRoutingPage.goto(ORG);
-    await pm.oncallRoutingPage.expectDefaultTeamLabelNames(f.team.name);
-
-    // Un-nominate. Done through the API rather than the dialog, deliberately:
-    // `oncall-default-team-unset` is NOT a control — it is the warning paragraph
-    // shown while nobody is nominated — and the dialog's "none" entry carries an
-    // EMPTY value, which OSelect does not stamp as `data-test-value=""`, so
-    // there is no addressable UI path to un-nominate. Clearing is scaffolding
-    // for the half of the case that IS the subject — what happens to an
-    // unmatched signal when no default exists — so it must not be what the test
-    // dies on. The gap is recorded in the generation report.
-    await setDefaultTeam(page, null);
-    await expect.poll(
-      async () => (await getRoutingConfig(page))?.default_team_id ?? null,
-      { timeout: 60000, intervals: [1000], message: 'the default team was never cleared' },
-    ).toBeNull();
-
-    // With nobody nominated, the screen says so rather than staying silent.
-    await pm.oncallRoutingPage.goto(ORG);
-    await pm.oncallRoutingPage.expectDefaultTeamUnsetWarning();
-
-    const orphanService = `${f.prefix}_orphan`;
-    const orphanStream = `${f.prefix}_orphan`.toLowerCase();
-    const orphanSeeded = await seedOnCallStream(page, orphanStream, { minutes: 30, services: [orphanService] });
-    await waitForStreamSearchable(page, orphanStream, orphanSeeded.records);
-    const orphan = await firePageAndWait(page, {
-      alertOptions: { name: `${f.prefix}_orphan_alert`, stream: orphanStream, destinations: [f.destination] },
-    });
-    testLogger.info('TS-14.02 orphan record', { team: orphan.pages[0].team_id });
-    expect(orphan.pages[0].team_id ?? null, 'with no default, nothing may quietly claim an unmatched signal')
-      .toBeNull();
-
-    // TS-14.02 — the queue must show it, with the full identity path, so a human
-    // can see WHY nothing matched rather than only that nothing did.
-    await expect.poll(
-      async () => (await listUnroutedSignals(page)).some((sig) => String(sig.path ?? '').includes(orphanService)),
-      { timeout: 120000, intervals: [3000], message: 'the unmatched signal never reached the unrouted queue' },
-    ).toBe(true);
-
-    const signal = (await listUnroutedSignals(page))
-      .find((sig) => String(sig.path ?? '').includes(orphanService));
-    await pm.oncallRoutingPage.goto(ORG);
-    await pm.oncallRoutingPage.selectTab('signals');
-    await pm.oncallRoutingPage.expectUnroutedRowVisible(signal.id);
-    const path = await pm.oncallRoutingPage.readUnroutedPath(signal.id);
-    testLogger.info('TS-14.02 rendered identity path', { path });
-    expect(path, 'the row shows the identity nothing matched, not just a title')
-      .toContain(orphanService);
-    await pm.oncallRoutingPage.expectUnroutedReachedNobody(signal.id);
-  });
 
   /**
    * TS-12.10 — W-03, UNWIRED and kept as a fixme with its real assertion intact.
@@ -511,8 +422,418 @@ test.describe('On-call routing rules', {
 
     const ruleId = shadowed.rule_id ?? shadowed.id;
     await expect(
-      page.locator(pm.oncallRoutingPage.ruleHealth(ruleId)),
+      pm.oncallRoutingPage.getRuleHealth(ruleId),
       'the verdict must be on screen with nothing clicked',
     ).toBeVisible({ timeout: 30000 });
+  });
+
+  /**
+   * TS-12.04 — a rule's health and hit count are real, and say which.
+   *
+   * A routing rule is write-once and then invisible: nobody revisits it until
+   * an alert goes to the wrong team. The stats row is the only thing that can
+   * say "this rule has caught nothing in thirty days" — and the distinction
+   * between a rule that is WORKING and one that is DEAD is the whole value, so
+   * a screen that showed a hit count without a verdict, or a verdict without
+   * the count behind it, would be half an answer.
+   *
+   * Asserted across a real firing: the count must MOVE, not merely be present.
+   */
+  test('TS-12.04 a rule\'s hit count and health verdict track a real firing', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedPageableFixture(page, testInfo, 'stats');
+    const rule = await createOwnershipRule(page, {
+      teamId: f.team.id, dimensions: { service: f.service },
+    });
+
+    const statsFor = async (ruleId) => {
+      const all = await getOwnershipStats(page, { days: 30 });
+      return (all?.rules ?? []).find((r) => r.rule_id === ruleId) ?? null;
+    };
+
+    const before = await statsFor(rule.id);
+    expect(before, 'a rule that exists must appear in the stats, even at zero').toBeTruthy();
+    expect(before.path, 'the row must name the path the rule claims, not just its id')
+      .toContain(f.service);
+    expect(before.team_name, 'and the team it pages, by name').toBe(f.team.name);
+    expect(typeof before.pages_caught, 'a hit count must be a number, present at zero')
+      .toBe('number');
+    expect(before.health, 'and every rule must carry a verdict').toBeTruthy();
+    expect(before.health_summary,
+      'stated in words too — a bare enum is not something somebody can act on')
+      .toBeTruthy();
+
+    // Fire something the rule must claim.
+    await firePageAndWait(page, {
+      alertOptions: { name: `${f.prefix}_alert`, stream: f.stream, destinations: [f.destination] },
+    });
+
+    await expect
+      .poll(async () => (await statsFor(rule.id))?.pages_caught, {
+        timeout: 60000,
+        message: 'a rule that just caught a page must say so — a count that never moves is a dead gauge',
+      })
+      .toBeGreaterThan(before.pages_caught);
+
+    const after = await statsFor(rule.id);
+    expect(after.last_matched_at,
+      'and the row must say WHEN it last caught something, not only how often')
+      .toBeTruthy();
+    expect(after.health,
+      'a rule that has just caught a page is active, whatever it was before')
+      .toBe('active');
+
+    // The screen has to show it, not just the API.
+    //
+    // The ORG routing screen draws `OnCallOwnershipRules` (the stats table,
+    // keyed `oncall-rule-team-{id}`). `oncall-routing-row-{id}` belongs to
+    // `OnCallRoutingList`, which only the TEAM's own routing tab renders — so
+    // asking for it here was asking the wrong component for a row it never
+    // draws, on a screen that was otherwise fine.
+    await pm.oncallRoutingPage.goto(ORG);
+    await pm.oncallRoutingPage.expectAvailable();
+    await pm.oncallRoutingPage.expectOrgRuleRowVisible(rule.id);
+    await pm.oncallRoutingPage.expectOrgRuleNamesTeam(rule.id, f.team.name);
+  });
+
+  /**
+   * TS-12.06 — an ownership rule that could never route is refused, and the
+   * refusal says which part is wrong.
+   *
+   * Four ways to write a rule that cannot work, four distinct answers. The one
+   * that matters most is the empty rule: a rule naming no dimension at all
+   * would own EVERY alert in the org, which is not a narrow mistake but a
+   * silent takeover of all routing — so it is refused with that consequence
+   * spelled out rather than with "invalid input".
+   *
+   * Deliberately NOT asserted here: a made-up dimension name. That one is
+   * still accepted (W-03), and it has its own standing fixme in TS-12.10 — so
+   * pinning it as "refused" twice would just produce two red tests for one bug.
+   */
+  test('TS-12.06 an ownership rule that could never route is refused, naming the part that is wrong', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_valid`);
+    const team = await createTeam(page, { name });
+    const unique = () => `${name}_${Math.random().toString(36).slice(2, 8)}`;
+
+    const attempt = async (body) => await createOwnershipRuleExpectingStatus(page, body);
+
+    const empty = await attempt({ team_id: team.id, dimensions: {} });
+    expect(empty.status, 'a rule naming no dimension must be refused').toBe(400);
+    expect(String(empty.body?.message ?? empty.text),
+      'and the refusal must say WHY it is dangerous — it would own every alert in the org')
+      .toMatch(/at least one dimension|every alert/i);
+
+    const blank = await attempt({ team_id: team.id, dimensions: { service: '' } });
+    expect(blank.status, 'a dimension with an empty value matches nothing and must be refused')
+      .toBe(400);
+    expect(String(blank.body?.message ?? blank.text),
+      'the message must name the offending dimension, not just "invalid"')
+      .toMatch(/service/i);
+
+    const ghostTeam = await attempt({
+      team_id: 'NoSuchTeam0000000000000000', dimensions: { service: unique() },
+    });
+    expect(ghostTeam.status, 'a rule pointing at a team that does not exist must be refused')
+      .toBe(404);
+    expect(String(ghostTeam.body?.message ?? ghostTeam.text),
+      'and must name the team it could not find')
+      .toMatch(/team .*not found/i);
+
+    // A legal rule, then the same path again: two teams cannot both own a path
+    // or a signal would have two owners and no tiebreak.
+    const path = unique();
+    const good = await attempt({ team_id: team.id, dimensions: { service: path } });
+    expect(good.status, 'a well-formed rule must be accepted').toBe(200);
+
+    const other = await createTeam(page, { name: `${name}_other` });
+    const clash = await attempt({ team_id: other.id, dimensions: { service: path } });
+    expect(clash.status, 'a second team claiming the same path must be refused').toBe(409);
+    expect(String(clash.body?.message ?? clash.text),
+      'and must say that somebody else already owns it')
+      .toMatch(/already owns/i);
+  });
+
+  /**
+   * The two cases below mutate ORG-WIDE state — the nominated default team —
+   * so they are serialised against each other.
+   *
+   * TS-14.01/02 lives in here too, for the same reason: it nominates and clears
+   * the same org-wide default. Serialising only some of the cases that write a
+   * singleton leaves the race intact, so every default-team case is one group.
+   *
+   * Both cases below capture whatever nomination they found and put it back, so
+   * they are at least good citizens of the org they borrow.
+   */
+  test.describe.serial('org default team', () => {
+    /**
+     * TS-14.01 and TS-14.02 in ONE test, deliberately.
+     *
+     * The org's default team is SINGLETON state: nominating one changes where
+     * every unmatched signal in the org lands, for every worker at once. Split
+     * across two parallel tests they would each silently invalidate the other's
+     * precondition — "a default is set" and "no default is set" cannot both hold.
+     * So the nomination case and the unrouted-queue case are driven as one
+     * sequence over the same fixture, which is also how an operator meets them.
+     */
+    test('TS-14.01/TS-14.02 an unmatched signal defaults where a team is nominated, and reaches the queue where none is', {
+      tag: ['@P0'],
+    }, async ({ page }, testInfo) => {
+      const f = await seedPageableFixture(page, testInfo, 'default');
+
+      // Nothing auto-creates a default. Waking a fallback team for a service they
+      // know nothing about trains people to ignore pages, so the absence is the
+      // designed state and is asserted rather than assumed.
+      const before = await getRoutingConfig(page);
+      testLogger.info('TS-14.01 routing config before nomination', before);
+
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectAvailable();
+      await pm.oncallRoutingPage.expectDefaultTeamControlVisible();
+      await pm.oncallRoutingPage.nominateDefaultTeam(f.team.id, f.team.name);
+
+      await expect.poll(
+        async () => (await getRoutingConfig(page))?.default_team_id,
+        { timeout: 60000, intervals: [1000], message: 'the nomination never reached the org config' },
+      ).toBe(f.team.id);
+
+      // No ownership rule covers this service, so the only thing that can route
+      // it is the default.
+      const defaulted = await firePageAndWait(page, {
+        alertOptions: { name: `${f.prefix}_defaulted`, stream: f.stream, destinations: [f.destination] },
+      });
+      testLogger.info('TS-14.01 defaulted record', { team: defaulted.pages[0].team_id });
+      expect(defaulted.pages[0].team_id, 'with a default set, an unmatched signal is paged rather than lost')
+        .toBe(f.team.id);
+
+      // The nomination is legible without opening anything: the trigger's own
+      // label names the org's current catch-all.
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectDefaultTeamLabelNames(f.team.name);
+
+      // Un-nominate. Done through the API rather than the dialog, deliberately:
+      // `oncall-default-team-unset` is NOT a control — it is the warning paragraph
+      // shown while nobody is nominated — and the dialog's "none" entry carries an
+      // EMPTY value, which OSelect does not stamp as `data-test-value=""`, so
+      // there is no addressable UI path to un-nominate. Clearing is scaffolding
+      // for the half of the case that IS the subject — what happens to an
+      // unmatched signal when no default exists — so it must not be what the test
+      // dies on. The gap is recorded in the generation report.
+      await setDefaultTeam(page, null);
+      await expect.poll(
+        async () => (await getRoutingConfig(page))?.default_team_id ?? null,
+        { timeout: 60000, intervals: [1000], message: 'the default team was never cleared' },
+      ).toBeNull();
+
+      // With nobody nominated, the screen says so rather than staying silent.
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectDefaultTeamUnsetWarning();
+
+      const orphanService = `${f.prefix}_orphan`;
+      const orphanStream = `${f.prefix}_orphan`.toLowerCase();
+      const orphanSeeded = await seedOnCallStream(page, orphanStream, { minutes: 30, services: [orphanService] });
+      await waitForStreamSearchable(page, orphanStream, orphanSeeded.records);
+      const orphan = await firePageAndWait(page, {
+        alertOptions: { name: `${f.prefix}_orphan_alert`, stream: orphanStream, destinations: [f.destination] },
+      });
+      testLogger.info('TS-14.02 orphan record', { team: orphan.pages[0].team_id });
+      expect(orphan.pages[0].team_id ?? null, 'with no default, nothing may quietly claim an unmatched signal')
+        .toBeNull();
+
+      // TS-14.02 — the queue must show it, with the full identity path, so a human
+      // can see WHY nothing matched rather than only that nothing did.
+      await expect.poll(
+        async () => (await listUnroutedSignals(page)).some((sig) => String(sig.path ?? '').includes(orphanService)),
+        { timeout: 120000, intervals: [3000], message: 'the unmatched signal never reached the unrouted queue' },
+      ).toBe(true);
+
+      const signal = (await listUnroutedSignals(page))
+        .find((sig) => String(sig.path ?? '').includes(orphanService));
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.selectTab('signals');
+      await pm.oncallRoutingPage.expectUnroutedRowVisible(signal.id);
+      const path = await pm.oncallRoutingPage.readUnroutedPath(signal.id);
+      testLogger.info('TS-14.02 rendered identity path', { path });
+      expect(path, 'the row shows the identity nothing matched, not just a title')
+        .toContain(orphanService);
+      await pm.oncallRoutingPage.expectUnroutedReachedNobody(signal.id);
+    });
+
+    /**
+     * TS-14.03 — a record that only reached a team because of the default is
+     * distinguishable from one a rule actually claimed.
+     *
+     * It matters because the two demand different follow-up: a properly-owned
+     * page is somebody's job, while a defaulted one is ALSO a routing gap that
+     * will keep happening until a rule is written. A screen that showed them
+     * identically would let the gap accumulate invisibly behind pages that all
+     * looked handled.
+     *
+     * The distinguishing surface is the unrouted queue's `landing`: a signal that
+     * fell through to the default team is recorded with `landing: "default"`,
+     * while one a rule claimed is not recorded there at all.
+     */
+    test('TS-14.03 a signal that only defaulted is recorded as defaulted, and a claimed one is not recorded at all', {
+      tag: ['@P1'],
+    }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(900_000);
+      const f = await seedPageableFixture(page, testInfo, 'owned');
+      await createOwnershipRule(page, { teamId: f.team.id, dimensions: { service: f.service } });
+
+      // Nominate a default so an unmatched signal has somewhere to land,
+      // remembering what was there so the org is handed back as it was found.
+      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+      await setDefaultTeam(page, f.team.id);
+      await expect.poll(async () => (await getRoutingConfig(page))?.default_team_id,
+        { timeout: 60000, intervals: [1000] }).toBe(f.team.id);
+
+      // One firing the rule claims.
+      const owned = await firePageAndWait(page, {
+        alertOptions: { name: `${f.prefix}_owned_alert`, stream: f.stream, destinations: [f.destination] },
+      });
+      expect(owned.pages[0].team_id, 'the claimed signal must land via its rule').toBe(f.team.id);
+
+      // And one nothing claims, on a stream of its own so the services cannot mix.
+      const orphanService = `${f.prefix}_orphan`;
+      const orphanStream = `${f.prefix}_orphan`.toLowerCase();
+      const orphanSeeded = await seedOnCallStream(page, orphanStream, {
+        minutes: 30, services: [orphanService],
+      });
+      await waitForStreamSearchable(page, orphanStream, orphanSeeded.records);
+      await firePageAndWait(page, {
+        alertOptions: {
+          name: `${f.prefix}_orphan_alert`, stream: orphanStream, destinations: [f.destination],
+        },
+      });
+
+      await expect
+        .poll(async () => {
+          const rows = await listUnroutedSignals(page, { landing: 'default' });
+          return rows.some((r) => String(r.path ?? '').includes(orphanService));
+        }, {
+          timeout: 90000,
+          message: 'a signal that only reached a team because of the default must be recorded as defaulted',
+        })
+        .toBe(true);
+
+      const defaulted = await listUnroutedSignals(page, { landing: 'default' });
+      expect(
+        defaulted.some((r) => String(r.path ?? '').includes(f.service)),
+        'a signal a rule genuinely claimed must NOT be recorded as having defaulted',
+      ).toBe(false);
+
+      const orphanRow = defaulted.find((r) => String(r.path ?? '').includes(orphanService));
+      expect(orphanRow.description,
+        'the row must describe the gap in words, so somebody can write the missing rule')
+        .toBeTruthy();
+
+      // The screen separates them with its own filter.
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectAvailable();
+      await pm.oncallRoutingPage.selectTab('signals');
+      await expect(
+        pm.oncallRoutingPage.getUnroutedFilterDefault(),
+        'the screen must offer the defaulted-vs-unowned distinction, not just one undifferentiated queue',
+      ).toBeVisible({ timeout: 30000 });
+
+      await setDefaultTeam(page, priorDefault).catch(() => {});
+    });
+
+    /**
+     * TS-14.04 — the default team is load-bearing, and the product protects it
+     * at both ends.
+     *
+     * Deleting the team every unmatched alert falls through to would send the
+     * whole org's unrouted traffic to nobody, silently, from the next firing
+     * on. So the delete is refused while the nomination stands, and the refusal
+     * names the team — the operator is looking at a list of teams and has to
+     * know which one to un-nominate.
+     *
+     * The quieter half is nominating a team with NOBODY on it: that satisfies
+     * the nomination while paging nobody, which reads as configured and behaves
+     * as unconfigured. It is flagged, but at NOMINATION time and only through
+     * the UI — a confirm dialog that says the team "has nobody on it ... and
+     * reach no one" and makes the operator press "Nominate anyway". I had first
+     * written this against the card's standing text and was wrong: nominating
+     * through the API bypasses the warning entirely, and the card afterwards
+     * says only which team is the default. So this drives the dialog, which is
+     * the only place the warning exists.
+     */
+    test('TS-14.04 nominating an unstaffed default team is warned about, and a nominated team cannot be deleted', {
+      tag: ['@P1'],
+    }, async ({ page }, testInfo) => {
+      const name = uniqueName(`${workerPrefix(testInfo)}_dflt`);
+      const team = await createTeam(page, { name });
+      const priorDefault = (await getRoutingConfig(page))?.default_team_id ?? null;
+
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectAvailable();
+      await pm.oncallRoutingPage.expectDefaultTeamControlVisible();
+      await pm.oncallRoutingPage.openDefaultTeamDialog();
+      await pm.oncallRoutingPage.selectOption(
+        pm.oncallRoutingPage.locators.defaultTeamSelect, team.id, name,
+      );
+      await page
+        .locator(`${pm.oncallRoutingPage.locators.defaultTeamDialog} [data-test="o-dialog-primary-btn"]`)
+        .click();
+
+      // The unstaffed warning: a second dialog, naming the team and what it
+      // will and will not do.
+      //
+      // `confirm-dialog-PROVIDER`, not `confirm-dialog`. This one is raised by
+      // the imperative `confirm()` composable, which renders through the global
+      // `ConfirmDialogProvider` — a different element from the declarative
+      // `ConfirmDialog` component the rest of the suite waits on. Waiting on the
+      // wrong one times out against a dialog that is on screen.
+      const warning = pm.oncallRoutingPage.getConfirmDialogProvider();
+      await expect(
+        warning,
+        'nominating a team with nobody on it must be questioned, not accepted quietly',
+      ).toBeVisible({ timeout: 20000 });
+      await expect(warning, 'and the warning must name the team it is about')
+        .toContainText(name, { timeout: 10000 });
+      await expect(
+        warning,
+        'and say plainly that pages to it will reach nobody',
+      ).toContainText(/nobody|no one/i);
+
+      await warning.locator('[data-test="o-dialog-primary-btn"]').first().click();
+      await expect(warning, 'confirming must close the warning').toBeHidden({ timeout: 20000 });
+
+      await expect
+        .poll(async () => (await getRoutingConfig(page))?.default_team_id, {
+          timeout: 30000,
+          message: 'confirming the warning must actually nominate the team',
+        })
+        .toBe(team.id);
+
+      // Now the other end: it cannot be deleted while it holds the nomination.
+      const refused = await deleteTeamExpectingStatus(page, team.id);
+      expect(refused.status,
+        'deleting the team every unmatched alert falls through to must be refused')
+        .toBe(409);
+      expect(String(refused.body?.message ?? refused.text),
+        'and the refusal must name the team, since the operator is looking at a list of them')
+        .toContain(name);
+
+      // A refused delete must not have half-happened.
+      expect((await getRoutingConfig(page))?.default_team_id,
+        'a refused delete must leave the nomination exactly as it was')
+        .toBe(team.id);
+
+      // And the screen still says which team is the catch-all.
+      await pm.oncallRoutingPage.goto(ORG);
+      await pm.oncallRoutingPage.expectDefaultTeamLabelNames(name);
+
+      // Leave the org as it was found: an org-wide nomination outlives this spec.
+      await setDefaultTeam(page, priorDefault).catch(() => {});
+    });
   });
 });

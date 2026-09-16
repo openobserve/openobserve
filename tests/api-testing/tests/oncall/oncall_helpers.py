@@ -69,10 +69,17 @@ MINUTES_PER_DAY = 1440
 RUNG_NOW = 0
 RUNG_LATER = 30 * 60 * MICROS
 
-# Column names chosen from the shipped semantic field groups: `namespace` reads
-# as the `k8s-namespace` dimension and `service` as `service`. Ownership rules
-# name the hyphenated ALIAS, never the column.
+# Ownership rules name the hyphenated dimension ALIAS; rows and `group_by` name
+# the COLUMN. The two are joined by the org's semantic field groups, and the
+# column has to be one only ONE group claims or the join silently picks the
+# other group: the bare `namespace` is claimed by `service-namespace` (group
+# index 6) and by `k8s-namespace` (index 8), and `SemanticLookup::build` keeps
+# the FIRST occurrence, so `namespace` resolves to `service-namespace` and a
+# rule on `k8s-namespace` never matches it. `k8s_namespace_name` is claimed by
+# `k8s-namespace` alone, so column and alias here cannot disagree.
+COL_NAMESPACE = "k8s_namespace_name"
 DIM_NAMESPACE = "k8s-namespace"
+COL_SERVICE = "service"
 DIM_SERVICE = "service"
 
 # Alert Destinations the paging channel resolves through. The sink points back
@@ -572,17 +579,30 @@ class OnCallClient:
 
     # ---- waiting ------------------------------------------------------------
 
+    def pages_for(self, alert_id: str, **params: Any) -> list[dict[str, Any]]:
+        """Every page this alert opened, in EITHER shape it can open one.
+
+        A collapsed firing files its record under the bare alert id, but a
+        fan-out files one record per woken team under `<alert>:group:<team>`
+        (`escalation.rs`, `format!("{alert_id}:group:{team_id}")`) — so an exact
+        `source_id` filter finds a Simple alert's page and none of a Multi
+        alert's. The product hit this itself: `recover_for_alert` carries a
+        second `open_group_records_for_source` lookup with the note "the
+        `<alert>#` lookup misses `<alert>:group:<team>`".
+
+        `%` because the filter is a LIKE, which makes one query cover both
+        shapes. Still server-side: the org list is capped, so a client-side
+        filter would silently miss a page on a busy instance — and a miss here
+        reads as "the feature did not fan out" rather than as a bad query.
+        """
+        return self.list_responses(subject_type="alert", source_id=f"{alert_id}%",
+                                   include_resolved=True, **params)
+
     def wait_for_pages(self, alert_id: str, *, count: int = 1,
                        timeout: float = PAGE_TIMEOUT) -> list[dict[str, Any]]:
-        """Poll until `count` pages exist for this alert, then return them.
-
-        Filtered server-side on `(subject_type, source_id)`: the org list is
-        capped at 200 rows, so a client-side filter would silently miss a page
-        on a busy instance.
-        """
+        """Poll until `count` pages exist for this alert, then return them."""
         def _pages() -> list[dict[str, Any]] | None:
-            found = self.list_responses(subject_type="alert", source_id=alert_id,
-                                        include_resolved=True)
+            found = self.pages_for(alert_id)
             return found if len(found) >= count else None
 
         return wait_until(_pages, timeout=timeout, interval=PAGE_POLL,

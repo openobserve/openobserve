@@ -327,4 +327,83 @@ test.describe('On-call team staffing', {
     const after = (await listTeamMembers(page, team.id)).map((m) => m.user_email);
     expect(after, 'a refused add must not partially land').toEqual(emails);
   });
+
+  /**
+   * TS-04.03 — taking the current pager holder off the team is a warned act,
+   * and the pager lands on somebody.
+   *
+   * Removing whoever is on call RIGHT NOW is the one member edit that can
+   * silently un-staff a live rotation: every alert routed at this team keeps
+   * firing, and the ladder's first rung resolves to nobody. So two things are
+   * required and both are asserted — the screen warns before it happens, and
+   * afterwards the engine names a DIFFERENT person rather than an empty slot.
+   *
+   * The engine, not the roster, is the oracle: a roster that still lists two
+   * people proves nothing about who a page would reach.
+   */
+  test('TS-04.03 removing the person currently on call warns first, and the pager moves to somebody else', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_holder`);
+    const users = await createOrgUsers(page, name, 3);
+    const team = await createTeam(page, { name, timezone: 'UTC' });
+    await setTeamSchedule(page, team.id, {
+      timezone: 'UTC',
+      rotations: [rotation({ id: 'Primary', members: users })],
+    });
+    await addTeamMembers(page, team.id, users);
+
+    const before = (await whoIsOnCall(page, team.id)) ?? [];
+    expect(before.length, 'somebody must be on call before this test removes them')
+      .toBeGreaterThan(0);
+    const holder = before[0].user_email;
+
+    await pm.oncallTeamDetailPage.goto(ORG, team.id);
+    await pm.oncallTeamDetailPage.openTab('members');
+    await expect(pm.oncallTeamDetailPage.getMembersTable())
+      .toBeVisible({ timeout: 30000 });
+
+    // Member controls key off the ROW id, never the email, so the holder's row
+    // is found by its rendered address and the control taken from inside it.
+    const holderRow = pm.oncallTeamDetailPage.getMemberRowByText(holder);
+    await expect(holderRow, 'the holder must be listed before being removed')
+      .toBeVisible({ timeout: 30000 });
+    const removeBtn = pm.oncallTeamDetailPage.getMemberRemoveIn(holderRow);
+    await expect(removeBtn, 'the holder\'s row must offer a remove control').toBeVisible();
+    await removeBtn.click();
+
+    // The warning is the point: removing the live holder must not be a
+    // one-click act with no statement of what it does.
+    //
+    // NOTE, and it is a gap worth recording rather than failing on: the copy is
+    // the SAME whether or not this person is holding the pager at this instant
+    // ("They will no longer be paged for this team. Any rotation position they
+    // hold goes with them."). Removing the person currently on call reads
+    // exactly like removing somebody on the bench. Asserted here as the
+    // consequence being stated at all; the missing distinction is in the
+    // generation report.
+    const confirm = pm.oncallTeamDetailPage.getConfirmDialog();
+    await expect(confirm, 'removing the person on call must be confirmed, not done silently')
+      .toBeVisible({ timeout: 20000 });
+    await expect(
+      confirm,
+      'and the confirmation must state the consequence, not just ask "are you sure"',
+    ).toContainText(/paged|on call|rotation/i);
+
+    await pm.oncallTeamDetailPage.getConfirmOkIn(confirm).click();
+    await expect(confirm).toBeHidden({ timeout: 30000 });
+
+    await expect
+      .poll(async () => ((await whoIsOnCall(page, team.id)) ?? [])[0]?.user_email, {
+        timeout: 30000,
+        message: 'after removing the holder the pager must land on the next person, never on nobody',
+      })
+      .not.toBe(holder);
+
+    const after = (await whoIsOnCall(page, team.id)) ?? [];
+    expect(after.length, 'the rotation must still put somebody on call').toBeGreaterThan(0);
+    expect(after[0].user_email, 'and that somebody must be a real remaining member')
+      .toBeTruthy();
+  });
+
 });

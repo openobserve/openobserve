@@ -24,6 +24,12 @@ not as gaps to be closed later: the warning covers **aggregating** alerts only,
 and an alert bound to an explicit `oncall_team` is silent because ownership
 rules never get a say on one.
 
+Every §6 test takes `owned_namespace`, and that is a precondition rather than a
+convenience. `paging_warnings` returns early on an org with NO ownership rules
+at all — routing by the catch-all is then deliberate and unwarned — so without a
+rule in place the warned tests see nothing to assert and, worse, the *unwarned*
+tests pass having checked nothing. The fixture is what makes both verdicts real.
+
 These are pure request/response assertions — nothing fires, nothing is waited
 for — which is why they are the cheapest file in this directory.
 """
@@ -34,6 +40,7 @@ import logging
 import pytest
 
 from .oncall_helpers import (
+    COL_NAMESPACE,
     DIM_NAMESPACE,
     SINK_DEST,
     OnCallClient,
@@ -73,7 +80,7 @@ def binding_stream(oncall: OnCallClient) -> str:
     avoidable load on the indexer.
     """
     stream = uniq("oncall_pt_bind")
-    oncall.seed_rows(stream, [{"latency": 900, "namespace": "payments",
+    oncall.seed_rows(stream, [{"latency": 900, COL_NAMESPACE: "payments",
                                UNROUTABLE_COLUMN: "teal"}])
     return stream
 
@@ -150,13 +157,17 @@ def test_an_alert_naming_a_team_that_does_not_exist_is_refused(
 # =============================================================================
 
 def test_an_aggregating_alert_nobody_can_own_is_warned_about(
-        oncall: OnCallClient, binding_stream: str):
+        oncall: OnCallClient, binding_stream: str, owned_namespace: str):
     """§6.1 — grouped on a column no ownership rule can ever match.
 
     The assertion is that the save is warned, not what the sentence says: the
     messages are server-written finished sentences meant to be rendered
     verbatim, and pinning their wording here would make a copy edit a test
     failure.
+
+    `owned_namespace` is taken for its rule, not its value: an org with no
+    ownership rules is not warned about anything, so without it this asserts
+    against a code path that returns before it ever looks at the alert.
     """
     payload = paging_alert(uniq("oncall_pt_warned"), binding_stream,
                            destinations=[SINK_DEST],
@@ -175,17 +186,18 @@ def test_an_aggregating_alert_grouped_on_an_owned_identity_is_not_warned(
     Seeded with the owned namespace so the group key is a value a rule really
     matches, rather than a column that merely maps to the right dimension.
     """
-    oncall.seed_rows(binding_stream, [{"latency": 900, "namespace": owned_namespace}])
+    oncall.seed_rows(binding_stream, [{"latency": 900, COL_NAMESPACE: owned_namespace}])
     payload = paging_alert(uniq("oncall_pt_unwarned"), binding_stream,
                            destinations=[SINK_DEST],
-                           aggregation=group_aggregation(["namespace"],
+                           aggregation=group_aggregation([COL_NAMESPACE],
                                                          multi_alert=True))
     resp = oncall.create_alert(payload)
     assert resp.status_code == 200, resp.text
     assert warnings_of(resp) == [], f"unexpected paging warning: {resp.text}"
 
 
-def test_a_warned_alert_is_still_saved(oncall: OnCallClient, binding_stream: str):
+def test_a_warned_alert_is_still_saved(oncall: OnCallClient, binding_stream: str,
+                                       owned_namespace: str):
     """§6.3 — the whole posture of this section in one assertion.
 
     A warning that blocked the save would be a refusal wearing a different
@@ -206,13 +218,16 @@ def test_a_warned_alert_is_still_saved(oncall: OnCallClient, binding_stream: str
 
 
 def test_an_alert_bound_to_a_team_is_never_warned_about_ownership(
-        oncall: OnCallClient, binding_team: str, binding_stream: str):
+        oncall: OnCallClient, binding_team: str, binding_stream: str,
+        owned_namespace: str):
     """§6 scope limit — ownership rules get no say on an explicitly bound alert,
     so there is nothing for the advisory to be about.
 
     Grouped on the unroutable column on purpose: without the binding this is
     exactly the alert §6.1 warns about, so the binding is the only difference
-    between the two outcomes.
+    between the two outcomes — and `owned_namespace` is what keeps that true:
+    on a rule-less org BOTH alerts come back unwarned and the silence asserted
+    here would prove nothing about the binding.
     """
     payload = paging_alert(uniq("oncall_pt_bound_agg"), binding_stream,
                            oncall_team=binding_team, destinations=[],
@@ -225,8 +240,11 @@ def test_an_alert_bound_to_a_team_is_never_warned_about_ownership(
 
 
 def test_a_non_aggregating_alert_is_outside_the_warning_scope(
-        oncall: OnCallClient, binding_stream: str):
+        oncall: OnCallClient, binding_stream: str, owned_namespace: str):
     """§6 scope limit — the warning covers aggregating alerts only.
+
+    `owned_namespace` for the same reason as the test above: the silence is
+    only evidence of the scope limit if a warning was reachable at all.
 
     A Simple SQL alert whose `GROUP BY` lives only in the query text is NOT
     covered by the feature, and this asserts that documented limit rather than

@@ -25,10 +25,12 @@ there. Fan-out (§5.1–§5.4) is a fact about pages that were really opened, so
 those wait on real firings.
 
 Ownership rules name the hyphenated dimension ALIAS (`k8s-namespace`), while the
-rows and the alert's `group_by` name the underlying COLUMN (`namespace`). The
-two are joined by the org's semantic field groups, not by string equality; the
-column names here (`namespace`, `service`) are the canonical ones from the
-shipped groups.
+rows and the alert's `group_by` name the underlying COLUMN
+(`k8s_namespace_name`). The two are joined by the org's semantic field groups,
+not by string equality, and the column must be one only ONE group claims: the
+bare `namespace` is claimed by `service-namespace` as well, and that group wins,
+so a rule on `k8s-namespace` would never match a row keyed on it. See
+`COL_NAMESPACE` in the helpers.
 """
 from __future__ import annotations
 
@@ -39,6 +41,8 @@ import pytest
 from support.wait import WaitTimeout
 
 from .oncall_helpers import (
+    COL_NAMESPACE,
+    COL_SERVICE,
     DIM_NAMESPACE,
     DIM_SERVICE,
     SINK_DEST,
@@ -55,10 +59,12 @@ logger = logging.getLogger(__name__)
 # in conftest skips it rather than failing when the flag is off.
 pytestmark = pytest.mark.enterprise
 
-# Two owning namespaces and one nobody claims. The unowned value is uniquified
-# so a rule left behind by another worker cannot accidentally claim it.
-NS_A = "payments"
-NS_B = "search"
+# Two owning namespaces and one nobody claims, all three uniquified. The owned
+# pair needs it as much as the unowned one: an ownership path is unique per org,
+# so a fixed value left behind by a run that died before its sweep makes the
+# `owners` fixture answer 409 for every run after it, forever.
+NS_A = uniq("payments")
+NS_B = uniq("search")
 
 
 # =============================================================================
@@ -95,10 +101,10 @@ def fanout(oncall: OnCallClient, owners: dict[str, str]) -> dict[str, object]:
     orphan_stream = uniq("oncall_pt_orphan")
     orphan_ns = uniq("unowned")
     rows = [
-        {"latency": 900, "service": "checkout", "namespace": NS_A},
-        {"latency": 950, "service": "search-api", "namespace": NS_B},
+        {"latency": 900, COL_SERVICE: "checkout", COL_NAMESPACE: NS_A},
+        {"latency": 950, COL_SERVICE: "search-api", COL_NAMESPACE: NS_B},
     ]
-    orphan_rows = [{"latency": 990, "service": "nobody", "namespace": orphan_ns}]
+    orphan_rows = [{"latency": 990, COL_SERVICE: "nobody", COL_NAMESPACE: orphan_ns}]
     oncall.seed_rows(stream, rows)
     oncall.seed_rows(orphan_stream, orphan_rows)
 
@@ -114,7 +120,7 @@ def fanout(oncall: OnCallClient, owners: dict[str, str]) -> dict[str, object]:
         return resp.json()["id"]
 
     multi = _create("oncall_pt_multi",
-                    group_aggregation(["namespace"], multi_alert=True))
+                    group_aggregation([COL_NAMESPACE], multi_alert=True))
     simple = _create("oncall_pt_simple", None)
     twin = _create("oncall_pt_twin", None)
     unrouted = _create("oncall_pt_unrouted", None, on=orphan_stream)
@@ -128,8 +134,7 @@ def fanout(oncall: OnCallClient, owners: dict[str, str]) -> dict[str, object]:
     try:
         multi_pages = oncall.wait_for_pages(multi, count=2)
     except WaitTimeout:
-        multi_pages = oncall.list_responses(subject_type="alert", source_id=multi,
-                                            include_resolved=True)
+        multi_pages = oncall.pages_for(multi)
     return {
         "stream": stream, "orphan_ns": orphan_ns,
         "multi": multi, "multi_pages": multi_pages,
@@ -163,8 +168,7 @@ def test_a_simple_alert_collapses_its_groups_into_one_page(
     by the time this test runs.
     """
     oncall.wait_for_pages(fanout["simple"])
-    pages = oncall.list_responses(subject_type="alert", source_id=fanout["simple"],
-                                  include_resolved=True)
+    pages = oncall.pages_for(fanout["simple"])
     assert len(pages) == 1, f"a collapsed alert opens one page, got {len(pages)}: {pages}"
 
 

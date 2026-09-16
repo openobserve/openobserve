@@ -176,6 +176,24 @@ test.describe('On-call dry runs', {
     // The prediction and the firing have to agree on the team AND on the person.
     expect(pages[0].team_id, 'the real firing must land on the team the preview named')
       .toBe(predicted.team_id);
+    // The resolver is asked until it answers, not once: it reads the schedule
+    // the fixture has just written, and an empty answer immediately after the
+    // firing is it still catching up rather than a team with nobody on it. Read
+    // once, this indexed `onCall[0]` on an empty array and died with
+    // `Cannot read properties of undefined` — which reports a TypeError where
+    // the interesting fact was "the resolver named nobody". The line above
+    // already used `onCall[0]?.`, so the emptiness was known to be possible.
+    //
+    // Bounded, and the comparison below is untouched: a resolver that genuinely
+    // never names anybody still fails here, now saying exactly that.
+    await expect
+      .poll(async () => (await whoIsOnCall(page, f.team.id)).length, {
+        timeout: 60000,
+        intervals: [1000],
+        message: 'the resolver must name somebody on call for a team the preview just staffed',
+      })
+      .toBeGreaterThan(0);
+
     const onCall = await whoIsOnCall(page, f.team.id);
     testLogger.info('TS-13.01 responder', { predictedResponder, actual: onCall[0]?.user_email });
     expect(predictedResponder, 'the preview and the resolver must name the same person')
@@ -340,4 +358,61 @@ test.describe('On-call dry runs', {
     await page.goto(recordLink);
     await pm.oncallResponseDetailPage.expectDetailVisible();
   });
+
+  /**
+   * TS-13.04 (W-09) — the simulator names what is broken, and never renders a
+   * confident answer for a configuration that cannot deliver.
+   *
+   * The whole point of a dry run is that somebody trusts it INSTEAD of firing a
+   * real alert. So the one thing it must never do is look successful when it is
+   * not: an empty "Matched rule" element reads as "matched nothing in
+   * particular, carry on" when the truth is "nothing matched at all".
+   *
+   * W-09 is exactly that — the matched-rule slot renders an empty element
+   * rather than the word "none". Asserted here against a signal deliberately
+   * built to match nothing: the result must either say so in words, or not
+   * claim a match at all. An element that exists and is blank fails both ways.
+   */
+  test('TS-13.04 a signal that matches nothing is named as unmatched, not rendered as a blank answer', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    const name = uniqueName(`${workerPrefix(testInfo)}_nomatch`);
+    // A dimension value nothing in this org could have claimed.
+    const orphan = `${name}_never_claimed`;
+
+    // The engine's own answer first, so the screen is compared against truth.
+    const engine = await simulateRouting(page, {
+      dimensions: { [SERVICE_DIMENSION]: orphan },
+    });
+    expect(engine, 'the preview endpoint must answer even when nothing matches').toBeTruthy();
+
+    await pm.oncallRoutingPage.goto(ORG);
+    await pm.oncallRoutingPage.expectAvailable();
+    await pm.oncallRoutingPage.openSignalTester();
+    await pm.oncallRoutingPage.addSimulatorDimension(SERVICE_DIMENSION, orphan);
+    await pm.oncallRoutingPage.runSimulator();
+
+    const rendered = await pm.oncallRoutingPage.readSimulatorResult();
+    testLogger.info('TS-13.04 unmatched verdict as rendered', rendered);
+
+    expect(rendered.matched,
+      'a result panel that renders empty is the failure mode this case exists to catch')
+      .toBeTruthy();
+
+    // The matched-rule slot: either absent, or carrying words. Never present
+    // and blank — that is a confident answer to a question with no answer.
+    if (rendered.specificity !== null) {
+      expect(
+        rendered.specificity,
+        'W-09: the matched-rule slot renders an empty element instead of saying nothing matched',
+      ).not.toBe('');
+    }
+
+    // And the panel must say, in words a human can act on, that nothing claimed it.
+    expect(
+      String(rendered.matched).toLowerCase(),
+      'an unmatched signal must be described as unmatched — defaulted, unclaimed or nobody — not left to be inferred from a gap',
+    ).toMatch(/no |none|nobody|default|unmatched|unclaimed|not match/);
+  });
+
 });

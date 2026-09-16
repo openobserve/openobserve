@@ -48,6 +48,9 @@ const sink = require('./mail-sink.js');
  * nothing actually leaves the host.
  */
 const SEED_MAIL_DOMAIN = process.env.ONCALL_SEED_MAIL_DOMAIN || 'o2-qa.com';
+// createOrgUser sets this and loginAs signs in with it, so the two must agree —
+// it is the seeded users' own password, unrelated to the root account's.
+const SEED_USER_PASSWORD = process.env.ONCALL_SEED_USER_PASSWORD || 'Complexpass#123';
 
 /** The eight causes, wire values, in the order `RESOLUTION_CAUSES` declares them
  * in web/src/ts/interfaces/oncall.ts — a fixed list, because free text fragments
@@ -107,7 +110,7 @@ function oncallUserEmail(prefix, suffix) {
  * route refuses a non-org address with "add them to the org before putting them
  * on call" — so every spec that needs a pageable human starts here.
  */
-async function createOrgUser(page, { email, role = 'admin', password = 'Complexpass#123' }) {
+async function createOrgUser(page, { email, role = 'admin', password = SEED_USER_PASSWORD }) {
   const payload = {
     email,
     password,
@@ -146,7 +149,7 @@ async function deleteOrgUser(page, email) {
  * its own context and its own sign-in. The selectors are the login screen's,
  * which is why this lives in a util rather than in a spec.
  */
-async function loginAs(browser, { email, password = 'Complexpass#123' }) {
+async function loginAs(browser, { email, password = SEED_USER_PASSWORD }) {
   const context = await browser.newContext({ viewport: { width: 1500, height: 1024 } });
   const page = await context.newPage();
   // The same entry point global-setup uses. An unauthenticated context is
@@ -477,6 +480,118 @@ function extractLinks(message) {
   return [...new Set(found.map((u) => u.replace(/[.,;:]+$/, '')))];
 }
 
+// ---------------------------------------------------- Tier 2 additions
+
+/**
+ * The team's own notification channel, with its provenance.
+ *
+ * SEPARATE from the policy's `destinations`, and the distinction is the whole
+ * point: the response is always `{team_id, destinations: [], source}` — a plain
+ * vector, never an Option — so `source` is the ONLY thing carrying the
+ * difference between "this team deliberately announces nowhere" and "this team
+ * never set a channel, so the policy's list applies". Read `source`, never the
+ * emptiness of the list.
+ */
+async function getTeamChannel(page, teamId) {
+  return await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/channel`);
+}
+
+/**
+ * Set or clear the team channel.
+ *
+ * `destinations: null` restores "never set" (the policy takes over); `[]` says
+ * "no channel on purpose". `#[serde(default)] Option<Vec<String>>` means JSON
+ * `null` and an omitted key both arrive as `None`, so passing `null` is the
+ * documented way to clear — do not collapse the two.
+ */
+async function setTeamChannel(page, teamId, destinations) {
+  return await call(page, 'put', `/oncall/teams/${encodeURIComponent(teamId)}/channel`,
+    { destinations });
+}
+
+/** The policy, unparsed — for a spec that must PUT it back byte-for-byte. */
+async function getPolicy(page, teamId) {
+  return await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/policy`);
+}
+
+/**
+ * Write a policy, returning the status rather than throwing.
+ *
+ * Several Tier-2 cases are ABOUT the refusal — an L0 budget outside 30-600s, a
+ * rung that pages nobody — so this must not throw the way `oncall-seed.js`'s
+ * `must()` does.
+ */
+async function putPolicy(page, teamId, { rungs, destinations = undefined, l0 = undefined }) {
+  const payload = { rungs };
+  if (destinations !== undefined) payload.destinations = destinations;
+  if (l0 !== undefined) payload.l0 = l0;
+  return await call(page, 'put', `/oncall/teams/${encodeURIComponent(teamId)}/policy`, payload);
+}
+
+/** The caller's own inbox: `{total, unread, deliveries}`. Keyed on the auth header, never a param. */
+async function myDeliveries(page, { unreadOnly = undefined, limit = undefined } = {}) {
+  const params = new URLSearchParams();
+  if (unreadOnly !== undefined) params.set('unread_only', String(unreadOnly));
+  if (limit !== undefined) params.set('limit', String(limit));
+  const query = params.toString() ? `?${params}` : '';
+  return await read(page, `/oncall/my/deliveries${query}`);
+}
+
+/** Mark inbox rows read or unread again. `{all: true, read: true}` marks everything. */
+async function markDeliveriesRead(page, { eventIds = [], read: isRead = true, all = false } = {}) {
+  return await call(page, 'post', '/oncall/my/deliveries/read',
+    { event_ids: eventIds, read: isRead, all });
+}
+
+/** The team overview: the summary card's own endpoint, built from four other reads. */
+async function getTeamOverview(page, teamId) {
+  return await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/overview`);
+}
+
+/**
+ * The team's derived attention ROWS — the same list `OnCallTeamAttention.vue` draws.
+ *
+ * `/config-risks` answers an ENVELOPE — `{team_id, horizon_days, total, risks}` —
+ * not a bare array, so anything mapping over the response directly gets a
+ * TypeError rather than an empty list. This unwraps it; `getConfigRisks` above
+ * returns the envelope for callers that want `total`.
+ */
+async function getTeamAttention(page, teamId) {
+  const body = await read(page, `/oncall/teams/${encodeURIComponent(teamId)}/config-risks`);
+  return body?.risks ?? [];
+}
+
+/** Ownership-rule hit statistics, the numbers the rules table renders per row. */
+async function getOwnershipStats(page, { teamId = undefined, days = undefined } = {}) {
+  const params = new URLSearchParams();
+  if (teamId) params.set('team_id', teamId);
+  if (days !== undefined) params.set('days', String(days));
+  const query = params.toString() ? `?${params}` : '';
+  return await read(page, `/oncall/ownership/stats${query}`);
+}
+
+/**
+ * Delete a team, returning the status.
+ *
+ * `oncall-seed.js`'s `deleteTeamById` is a fire-and-forget cleanup helper that
+ * swallows everything — correct for teardown, useless for a case that is ABOUT
+ * whether the delete was refused and what it said.
+ */
+async function deleteTeamExpectingStatus(page, teamId) {
+  return await call(page, 'delete', `/oncall/teams/${encodeURIComponent(teamId)}`);
+}
+
+/**
+ * Create an ownership rule, returning the status instead of throwing.
+ *
+ * TS-12.06 is entirely ABOUT the refusals — an empty rule, a blank value, a
+ * team that does not exist, a path somebody else owns — so the throwing variant
+ * in `oncall-seed.js` cannot express it.
+ */
+async function createOwnershipRuleExpectingStatus(page, body) {
+  return await call(page, 'post', '/oncall/ownership', body);
+}
+
 module.exports = {
   SEED_MAIL_DOMAIN,
   RESOLUTION_CAUSES,
@@ -518,4 +633,15 @@ module.exports = {
   waitForMail,
   mailSince,
   extractLinks,
+  getTeamChannel,
+  setTeamChannel,
+  getPolicy,
+  putPolicy,
+  myDeliveries,
+  markDeliveriesRead,
+  getTeamAttention,
+  getTeamOverview,
+  getOwnershipStats,
+  createOwnershipRuleExpectingStatus,
+  deleteTeamExpectingStatus,
 };

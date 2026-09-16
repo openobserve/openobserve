@@ -77,6 +77,8 @@ export class OnCallTeamsPage {
   editButton(teamId) { return `[data-test="oncall-team-edit-${teamId}"]`; }
   deleteButton(teamId) { return `[data-test="oncall-team-delete-${teamId}"]`; }
   primaryGapTag(teamId) { return `[data-test="oncall-teams-primary-gap-${teamId}"]`; }
+  /** Any team row, keyed by the id-carrying edit control — used to count rows. */
+  anyRow() { return '[data-test^="oncall-team-edit-"]'; }
   rotationChip(teamId, rotationId) {
     return `[data-test="oncall-teams-rotation-${teamId}-${rotationId}"]`;
   }
@@ -95,6 +97,37 @@ export class OnCallTeamsPage {
   getDrawerCancel() {
     return this.page.locator(`${this.locators.formDrawer} [data-test="o-drawer-secondary-btn"]`);
   }
+
+  getAddButton() { return this.page.locator(this.locators.addButton); }
+  getEditButton(teamId) { return this.page.locator(this.editButton(teamId)); }
+  getDeleteButton(teamId) { return this.page.locator(this.deleteButton(teamId)); }
+
+  /** Every rendered team row. `toHaveCount(n)` against this is how a spec counts the list. */
+  getRows() { return this.page.locator(this.anyRow()); }
+
+  /** The id a row carries, read from the first rendered row. */
+  async readFirstRowTeamId() {
+    const attr = await this.getRows().first().getAttribute('data-test');
+    return (attr ?? '').replace('oncall-team-edit-', '');
+  }
+
+  /** The drawer's name INPUT, not its wrapper — `toHaveValue` needs the control itself. */
+  getFormNameField() { return this.page.locator(part(this.locators.formName, 'field')).first(); }
+  getFormMembers() { return this.page.locator(this.locators.formMembers); }
+  getFormAddEveryone() { return this.page.locator(this.locators.formAddEveryone); }
+  getFormManageLink() { return this.page.locator(this.locators.formManageLink); }
+  getConfirmDialog() { return this.page.locator(this.locators.confirmDialog); }
+  getConfirmOk() { return this.page.locator(this.locators.confirmOk); }
+  getPrimaryGapTag(teamId) { return this.page.locator(this.primaryGapTag(teamId)); }
+
+  /**
+   * The refusal notice a 403 draws.
+   *
+   * The wording is passed in rather than pinned here: it is the assertion the
+   * spec is making, and a page object holding the English copy would make every
+   * caller depend on it.
+   */
+  getDeniedNotice(wording) { return this.page.getByText(wording).first(); }
 
   // ---------------------------------------------------------------- navigation
 
@@ -174,10 +207,23 @@ export class OnCallTeamsPage {
    * so matching on the rendered label would break on translation and on the
    * rows the virtualizer has not drawn.
    */
-  async selectOption(fieldSelector, value) {
+  async selectOption(fieldSelector, value, searchTerm = null) {
     const trigger = this.page.locator(part(fieldSelector, 'trigger')).first();
     await trigger.waitFor({ state: 'visible', timeout: 15000 });
     await trigger.click();
+
+    // OSelect is ALWAYS virtualized (`useVirtualizer`, no row-count threshold),
+    // so an option past the first screenful is not in the DOM at all until the
+    // list is narrowed — `waitFor({state:'visible'})` then expires against a row
+    // that was never rendered. Typing in the popover's own search box is the
+    // only thing that puts it there. The box matches the LABEL, never the value.
+    if (searchTerm) {
+      const search = this.page.locator(part(fieldSelector, 'search')).first();
+      await search.waitFor({ state: 'visible', timeout: 15000 });
+      await search.fill(searchTerm);
+      await this.page.waitForTimeout(300);
+    }
+
     const option = this.page
       .locator(`${part(fieldSelector, 'option')}[data-test-value="${value}"]`)
       .first();
@@ -185,8 +231,21 @@ export class OnCallTeamsPage {
     await option.click();
   }
 
+  /**
+   * The zone list is every resolvable IANA name — 400-odd rows, virtualized to a
+   * window of ~17 — so it is always searched rather than scrolled.
+   *
+   * Searched by the CITY segment, not the whole zone: the popover's filter does
+   * not match across the `/`. Verified on :5090 — "Asia" returns the Asian
+   * zones and "Calcutta" returns one, while "Asia/Cal" returns nothing at all.
+   * So a caller passing a full zone name would silently filter the list down to
+   * empty and then time out waiting for an option that was never going to be
+   * drawn. The option is still picked by its exact `data-test-value`, so the
+   * broad search term cannot select the wrong zone.
+   */
   async selectTimezone(timezone) {
-    await this.selectOption(this.locators.formTimezone, timezone);
+    const city = timezone.split('/').pop();
+    await this.selectOption(this.locators.formTimezone, timezone, city);
   }
 
   /**
@@ -381,11 +440,23 @@ export class OnCallTeamsPage {
    * on `isUnavailable()`; this exists for the specs that have already decided
    * the feature must be present.
    */
+  /**
+   * On-call is served here.
+   *
+   * The absent "not available" marker is NOT enough on its own: a blank page, a
+   * 500 and a crashed SPA all render zero of it, so a gate built only on that
+   * absence certifies the deployment from a page that never loaded. The screen's
+   * own root has to be present too.
+   */
   async expectAvailable() {
     await expect(
       this.page.locator(this.locators.notAvailable),
       'on-call is not available on this deployment — the suite needs an enterprise build with O2_ONCALL_ENABLED',
     ).toHaveCount(0, { timeout: 30000 });
+    await expect(
+      this.page.locator(this.locators.root),
+      'the on-call screen did not render, so its availability cannot be read from this page',
+    ).toBeVisible({ timeout: 30000 });
   }
 }
 

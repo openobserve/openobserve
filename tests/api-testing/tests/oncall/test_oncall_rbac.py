@@ -58,6 +58,35 @@ CONFIG_ROUTES = ["create_team", "rename_team", "set_schedule", "set_policy", "cr
 # Fixtures
 # =============================================================================
 
+@pytest.fixture(scope="module", autouse=True)
+def _require_role_grants(client: OpenObserveClient, oncall_org: str) -> None:
+    """Skip this file when the deployment is not writing role grants at all.
+
+    Every assertion here is about on-call's OWN permission model, and that can
+    only be read on a server where roles work in general. On a deployment whose
+    authorizer never receives its tuples, a freshly created **admin** is refused
+    everything — `/streams` included, which on-call has nothing to do with —
+    and all eight scope assertions turn red for a reason that is not on-call's.
+
+    The probe is deliberately narrow, because a gate that skips too eagerly
+    costs the whole file silently: it creates a real admin, asks for a route
+    OUTSIDE on-call, and skips ONLY on an explicit 403. A 200 (the healthy
+    case), a transport error or any other status all fall through and let the
+    tests run and fail normally, so a genuine on-call RBAC regression is still
+    caught here rather than skipped away.
+    """
+    email, as_admin = make_user(client, oncall_org, "admin")
+    try:
+        probe = as_admin.request("GET", "streams")
+    except requests.RequestException:
+        return
+    if probe.status_code == 403:
+        pytest.skip(
+            "this deployment is not writing role grants: the freshly created admin "
+            f"{email} is refused GET /streams (403), a route outside on-call, so a "
+            "403 on an on-call route proves nothing about on-call's own rules")
+
+
 @pytest.fixture(scope="module")
 def staffed(oncall: OnCallClient, responder: tuple[str, OpenObserveClient]) -> str:
     """A team with one member — the roster the scope check reads."""

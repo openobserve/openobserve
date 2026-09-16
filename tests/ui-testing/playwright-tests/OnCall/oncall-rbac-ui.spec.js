@@ -132,12 +132,12 @@ test.describe('On-call configuration controls and permission', {
     await pm.oncallTeamsPage.expectAvailable();
     await pm.oncallTeamsPage.expectCreateControlVisible();
     await pm.oncallTeamsPage.revealTeam(team.id, name);
-    await expect(page.locator(pm.oncallTeamsPage.editButton(team.id))).toBeVisible({ timeout: 30000 });
-    await expect(page.locator(pm.oncallTeamsPage.deleteButton(team.id))).toBeVisible({ timeout: 30000 });
+    await expect(pm.oncallTeamsPage.getEditButton(team.id)).toBeVisible({ timeout: 30000 });
+    await expect(pm.oncallTeamsPage.getDeleteButton(team.id)).toBeVisible({ timeout: 30000 });
 
     await pm.oncallTeamDetailPage.goto(ORG, team.id);
     await expect(
-      page.locator(pm.oncallTeamDetailPage.locators.editButton),
+      pm.oncallTeamDetailPage.getEditButton(),
       'the team detail offers its own edit while the role may configure',
     ).toBeVisible({ timeout: 30000 });
   });
@@ -170,12 +170,12 @@ test.describe('On-call configuration controls and permission', {
     await pm.oncallTeamsPage.saveDrawer();
 
     await expect(
-      page.getByText(DENIED_WORDING).first(),
+      pm.oncallTeamsPage.getDeniedNotice(DENIED_WORDING),
       'a 403 must be named as a permission problem, not as a generic save failure',
     ).toBeVisible({ timeout: 20000 });
 
     await expect(
-      page.locator(pm.oncallTeamsPage.locators.addButton),
+      pm.oncallTeamsPage.getAddButton(),
       'once a write has been refused the create control must stop being offered',
     ).toHaveCount(0, { timeout: 20000 });
     await pm.oncallTeamsPage.expectRowActionsHidden(team.id, { name });
@@ -208,7 +208,7 @@ test.describe('On-call configuration controls and permission', {
     await pm.oncallTeamsPage.openEditDrawer(team.id, { name });
     await pm.oncallTeamsPage.fillTeamDescription('after');
     await pm.oncallTeamsPage.saveDrawer();
-    await expect(page.getByText(DENIED_WORDING).first()).toBeVisible({ timeout: 20000 });
+    await expect(pm.oncallTeamsPage.getDeniedNotice(DENIED_WORDING)).toBeVisible({ timeout: 20000 });
     await pm.oncallTeamsPage.cancelDrawer();
 
     await pm.oncallTeamsPage.openTeam(name);

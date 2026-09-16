@@ -41,6 +41,10 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const path = require('path');
+
+/** The signed-in state global-setup writes; see enhanced-baseFixtures.js. */
+const AUTH_STATE_FILE = path.join(__dirname, '..', 'utils', 'auth', 'user.json');
 const {
   isOnCallAvailable,
   createTeam,
@@ -65,6 +69,7 @@ const {
   getResponseRecord,
   getCauseAnalytics,
   eventsOfKind,
+  getResponseHistory,
   waitForMail,
   waitForResponseState,
   RESOLUTION_CAUSES,
@@ -469,4 +474,193 @@ test.describe('On-call page lifecycle', {
     expect(vueWarnings, 'a Vue warning is a contract between components that has already broken')
       .toEqual([]);
   });
+
+  /**
+   * TS-15.08 — the page detail survives a cold deep link, and each panel loads
+   * on its own.
+   *
+   * A page record is reached from an EMAIL, at 3am, in a browser with no app
+   * state — never by clicking through the list. So the route has to stand up
+   * cold, and one slow or failing panel must not take the screen with it: the
+   * verbs have to be usable while the ledger is still loading, because the
+   * whole point of the screen is the verbs.
+   */
+  test('TS-15.08 the record deep-links cold, and every panel loads independently', {
+    tag: ['@P1'],
+  }, async ({ page, browser }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedRoutedAlert(page, testInfo, 'deep');
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const id = pages[0].id;
+
+    // A genuinely cold context: no history, no warmed store, no prior route —
+    // but still signed in, because the case is about a cold DEEP LINK, not
+    // about the login screen. The auth state is the one global-setup writes;
+    // `project.use.storageState` is not it (the config does not set one — the
+    // enhanced fixtures load `utils/auth/user.json` themselves), and passing
+    // that undefined would have made this an anonymous context that simply
+    // redirects to sign-in and proves nothing.
+    const context = await browser.newContext({
+      storageState: AUTH_STATE_FILE,
+      viewport: { width: 1500, height: 1024 },
+    });
+    const cold = await context.newPage();
+    const coldPm = new PageManager(cold);
+
+    const failures = [];
+    cold.on('response', (res) => {
+      const url = res.url();
+      if (url.includes('/oncall/') && res.status() >= 400) failures.push(`${res.status()} ${url}`);
+    });
+
+    await coldPm.oncallResponseDetailPage.goto(ORG, id);
+    await coldPm.oncallResponseDetailPage.expectDetailVisible();
+
+    // The verbs are the reason somebody opened the link; they must be live
+    // without waiting on the panels below them.
+    await expect(
+      coldPm.oncallResponseDetailPage.getAckButton(),
+      'the acknowledge control must be usable on a cold deep link',
+    ).toBeEnabled({ timeout: 30000 });
+
+    // The tab strip has to exist before a tab can be switched. `OTabPanels`
+    // defaults to `keepAlive=false`, so only the ACTIVE panel is in the DOM at
+    // all — clicking a trigger that has not rendered yet leaves every panel
+    // absent and the wait below expires against a page that is merely still
+    // arriving. This is the cold-load ordering the case is about, so it is
+    // waited for explicitly rather than papered over with a longer timeout.
+    await expect(
+      coldPm.oncallResponseDetailPage.getTabs(),
+      'the record must offer its detail tabs on a cold load',
+    ).toBeVisible({ timeout: 30000 });
+
+    // Each panel, opened in turn: one failing must not have taken the others.
+    // The panel is addressed by the id OTabPanel builds, because the
+    // `data-test` the view writes onto OTabPanel never reaches the DOM — see
+    // the note on `tabPanel()` in the page object.
+    for (const tab of ['activity', 'deliveries', 'causes']) {
+      await coldPm.oncallResponseDetailPage.expectTabPanelVisible(tab);
+    }
+
+    expect(failures, 'a cold deep link must not 404 or 500 on any of its own API calls')
+      .toEqual([]);
+
+    await context.close();
+  });
+
+  /**
+   * TS-15.10 — ledger-only events stay off the human timeline.
+   *
+   * REGRESSION GUARD, and the regression it guards is subtle. The set of people
+   * "already notified" must be computed from the DELIVERY LEDGER, which holds
+   * one row per (run, rung, recipient, channel) including failures. If it were
+   * computed from the human timeline instead — which is filtered for
+   * readability — then everyone the filter hid would be paged a second time on
+   * the next rung.
+   *
+   * So two things are asserted together: the ledger holds strictly more than
+   * the timeline shows, and nobody in the ledger is paged twice for one rung.
+   * Either alone would pass a build that had merged the two.
+   */
+  test('TS-15.10 the delivery ledger is richer than the human timeline, and nobody is paged twice for one rung', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedRoutedAlert(page, testInfo, 'ledger');
+    const { pages } = await firePageAndWait(page, { alertOptions: f.alertOptions });
+    const id = pages[0].id;
+
+    await expect.poll(async () => (await getDeliveries(page, id))?.total, { timeout: 120000 })
+      .toBeGreaterThan(0);
+
+    const ledger = await getDeliveries(page, id);
+    const rows = ledger.deliveries ?? ledger.rows ?? [];
+    expect(rows.length, 'the ledger must hold rows to compare against').toBeGreaterThan(0);
+
+    const events = await getResponseHistory(page, id);
+    const pageEvents = eventsOfKind(events, 'page');
+
+    // The timeline is a READING of the ledger, not the ledger itself: it must
+    // never be the thing the engine counts.
+    expect(
+      rows.length,
+      'the ledger must carry at least as much as the timeline shows — it is the record, the timeline is the summary',
+    ).toBeGreaterThanOrEqual(pageEvents.length);
+
+    // Nobody paged twice for the same (run, rung, channel).
+    const seen = new Map();
+    for (const row of rows) {
+      const key = [row.ladder_run ?? row.run, row.rung ?? row.rung_micros, row.recipient, row.channel]
+        .join('|');
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+    const doubled = [...seen.entries()].filter(([, n]) => n > 1).map(([k]) => k);
+    expect(
+      doubled,
+      'a recipient paged twice for one rung means the already-notified set was read from the filtered timeline, not the ledger',
+    ).toEqual([]);
+
+    // And the screen draws the ledger as its own panel rather than folding it
+    // into the activity list.
+    await pm.oncallResponseDetailPage.goto(ORG, id);
+    await pm.oncallResponseDetailPage.openTab('deliveries');
+    await pm.oncallResponseDetailPage.expectLedgerVisible();
+  });
+
+  /**
+   * TS-15.11 (G24) — the Pages screen asks for nothing that answers 404.
+   *
+   * G24 was a count request that 404ed on every load: harmless-looking, because
+   * the screen still drew, and corrosive, because it trained everyone to ignore
+   * red in the network tab on the one screen where a genuinely failing request
+   * matters most.
+   *
+   * Written as a guard over the WHOLE screen rather than one URL, so it still
+   * holds if the count moves to a different endpoint.
+   */
+  test('TS-15.11 the Pages screen issues no request that 404s, counts included', {
+    tag: ['@P1'],
+  }, async ({ page }, testInfo) => {
+    // A real firing has to clear ingestion, the scheduler and the ladder; the
+    // 3-minute default is for screens, not for this.
+    test.setTimeout(600_000);
+    const f = await seedRoutedAlert(page, testInfo, 'g24');
+    await firePageAndWait(page, { alertOptions: f.alertOptions });
+
+    // Scoped to on-call's OWN endpoints. G24 was an on-call count request that
+    // did not exist; widening this to every `/api/` call on the screen would
+    // make it fail on unrelated endpoints this deployment happens not to serve,
+    // which is a different test and a worse one.
+    const notFound = [];
+    page.on('response', (res) => {
+      if (res.status() === 404 && /\/oncall\//.test(res.url())) notFound.push(res.url());
+    });
+
+    await pm.oncallPagesListPage.goto(ORG);
+    await pm.oncallPagesListPage.filterByTeam(f.team.id);
+
+    // Exercise the grouped view too: the counts are what G24 was about, and
+    // they are only fetched once sections are drawn.
+    await pm.oncallPagesListPage.setGrouped(true);
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+
+    // ANCHOR FIRST. "No 404s" is an absence, and an absence is satisfied just as
+    // well by a screen that never loaded and asked for nothing at all. So prove
+    // the screen actually did its work before reading anything into the silence.
+    const rowKeys = await pm.oncallPagesListPage.readRowKeys();
+    expect(
+      rowKeys.length,
+      'the Pages list must have drawn the seeded page — otherwise "no 404s" only means "no requests"',
+    ).toBeGreaterThan(0);
+
+    expect(
+      notFound,
+      'G24: the Pages screen asked for a count that did not exist — nothing it loads may 404',
+    ).toEqual([]);
+  });
+
 });

@@ -138,11 +138,11 @@ test.describe('On-call Quick start', {
     const { team } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
-    await expect(page.locator('[data-test="oncall-presets-tabs"]')).toBeVisible({ timeout: 20000 });
+    await expect(pm.oncallTeamDetailPage.getPresetsTabs()).toBeVisible({ timeout: 20000 });
     // The catalogue lands on a shape rather than an empty right-hand pane, so
     // Save's only gate (`!chosen`) is already satisfied when the drawer opens.
     await expect(
-      page.locator('[data-test="oncall-presets-tabs"] [data-state="active"]'),
+      pm.oncallTeamDetailPage.getActivePresetTab(),
     ).toHaveCount(1);
   });
 
@@ -162,7 +162,7 @@ test.describe('On-call Quick start', {
     const { team } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
-    const regions = page.locator(pm.oncallTeamDetailPage.presetTab(REGIONS_PRESET));
+    const regions = pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET);
     if (await regions.count()) {
       await pm.oncallTeamDetailPage.chooseQuickStartTemplate(REGIONS_PRESET);
     } else {
@@ -224,7 +224,7 @@ test.describe('On-call Quick start', {
     const { team, members } = await seedEmptyScheduleTeam(page, testInfo);
     await openQuickStartOn(team.id);
 
-    const regions = page.locator(pm.oncallTeamDetailPage.presetTab(REGIONS_PRESET));
+    const regions = pm.oncallTeamDetailPage.getPresetTab(REGIONS_PRESET);
     test.skip(
       (await regions.count()) === 0,
       'this build\'s preset catalogue has no follow_the_sun shape, which is the only one with a required name',
@@ -234,10 +234,10 @@ test.describe('On-call Quick start', {
     // Row keys for a repeated group are `<field>-<index>`, and a group_list
     // opens at its declared minimum — two, for this shape.
     await expect(
-      page.locator(pm.oncallTeamDetailPage.presetRow('groups-0')),
+      pm.oncallTeamDetailPage.getPresetRow('groups-0'),
     ).toBeVisible({ timeout: 20000 });
     await expect(
-      page.locator(pm.oncallTeamDetailPage.presetRow('groups-1')),
+      pm.oncallTeamDetailPage.getPresetRow('groups-1'),
       'follow_the_sun declares min: 2 regions, so the second row opens with the shape',
     ).toBeVisible({ timeout: 20000 });
 
@@ -283,7 +283,7 @@ test.describe('On-call Quick start', {
     await pm.oncallTeamDetailPage.applyQuickStart();
 
     await expect(
-      page.locator('[data-test="confirm-dialog"]'),
+      pm.oncallTeamDetailPage.getConfirmDialog(),
       'replacing an existing schedule must be confirmed first',
     ).toBeVisible({ timeout: 20000 });
   });

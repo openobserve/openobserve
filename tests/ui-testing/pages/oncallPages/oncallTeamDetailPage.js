@@ -205,6 +205,86 @@ export class OnCallTeamDetailPage {
   memberMarkAway(memberId) { return `[data-test="oncall-members-mark-away-${memberId}"]`; }
   memberShift(memberId) { return `[data-test="oncall-members-shift-${memberId}"]`; }
 
+  /** The handover row's zone label and its time input, both indexed by row position. */
+  handoverTimezone(index) { return `[data-test="oncall-schedule-handover-${index}-timezone"]`; }
+  handoverTime(index) { return `[data-test="oncall-schedule-handover-${index}-time"]`; }
+
+  /** An L0 hold band carries the agent id, so it is matched by prefix. */
+  anyLadderL0() { return '[data-test^="oncall-ladder-l0-"]'; }
+  /** Shift-rule tabs are indexed by POSITION, so a count is the only stable read. */
+  anyRuleTab() { return '[data-test^="oncall-schedule-rule-tab-"]'; }
+
+  // ------------------------------------------------------------- element getters
+
+  getRoot() { return this.page.locator(this.locators.root); }
+  getEditButton() { return this.page.locator(this.locators.editButton); }
+  getTabButton(name) { return this.page.locator(this.tabButton(name)); }
+  getConfirmDialog() { return this.page.locator(this.locators.confirmDialog); }
+  getMembersTable() { return this.page.locator(this.locators.membersTable); }
+  getRotationDrawer() { return this.page.locator(this.locators.rotationDrawer); }
+
+  getLaneEdit(rotationId) { return this.page.locator(this.laneEdit(rotationId)); }
+  getLaneCadence(rotationId) { return this.page.locator(this.laneCadence(rotationId)); }
+  getRuleRestriction(ruleIndex, index) {
+    return this.page.locator(this.ruleRestriction(ruleIndex, index));
+  }
+
+  /**
+   * A notice rendered inside one restriction window, scoped to that window.
+   *
+   * The wording is passed in rather than pinned here — it is the product's own
+   * copy and the assertion the spec is making, so holding it in the page object
+   * would make every caller depend on the English.
+   */
+  getRestrictionNotice(ruleIndex, index, wording) {
+    return this.getRuleRestriction(ruleIndex, index).getByText(wording, { exact: false });
+  }
+
+  /** The rotation name INPUT, not its wrapper — `toHaveValue` needs the control. */
+  getScheduleNameField() {
+    return this.page.locator(part(this.locators.scheduleName, 'field')).first();
+  }
+
+  getHandoverTimezone(index) { return this.page.locator(this.handoverTimezone(index)).first(); }
+  /** The picker's `<input>`; the wrapper has no value to read. */
+  getHandoverTimeInput(index) {
+    return this.page.locator(`${this.handoverTime(index)} input`).first();
+  }
+
+  /** How many shift-rule tabs the drawer currently has — the next rule's index. */
+  async countShiftRuleTabs() {
+    return await this.page.locator(this.anyRuleTab()).count();
+  }
+
+  getPresetsTabs() { return this.page.locator(this.locators.presetsTabs); }
+  /** The catalogue lands on a shape rather than an empty pane; this is that shape. */
+  getActivePresetTab() {
+    return this.page.locator(`${this.locators.presetsTabs} [data-state="active"]`);
+  }
+  getPresetTab(presetId) { return this.page.locator(this.presetTab(presetId)); }
+  getPresetRow(rowKey) { return this.page.locator(this.presetRow(rowKey)); }
+
+  /** Every L0 hold band on the ladder. Count, not visibility — there may be none. */
+  getLadderL0Bands() { return this.page.locator(this.anyLadderL0()); }
+
+  /**
+   * A member row found by the address it renders.
+   *
+   * Member controls key off the ROW id and never the email, so the row is found
+   * by its rendered address and the control taken from inside it.
+   */
+  getMemberRowByText(text) {
+    return this.page.locator('[data-test^="o2-table-row-"]').filter({ hasText: text }).first();
+  }
+
+  getMemberRemoveIn(rowLocator) {
+    return rowLocator.locator('[data-test^="oncall-members-remove-"]').first();
+  }
+
+  getConfirmOkIn(dialogLocator) {
+    return dialogLocator.locator('[data-test="o-dialog-primary-btn"]').first();
+  }
+
   // ---------------------------------------------------------------- navigation
 
   /**
@@ -615,11 +695,23 @@ export class OnCallTeamDetailPage {
     return (await this.page.locator(this.locators.notAvailable).count()) > 0;
   }
 
+  /**
+   * On-call is served here.
+   *
+   * The absent "not available" marker is NOT enough on its own: a blank page, a
+   * 500 and a crashed SPA all render zero of it, so a gate built only on that
+   * absence certifies the deployment from a page that never loaded. The screen's
+   * own root has to be present too.
+   */
   async expectAvailable() {
     await expect(
       this.page.locator(this.locators.notAvailable),
       'on-call is not available on this deployment — the suite needs an enterprise build with O2_ONCALL_ENABLED',
     ).toHaveCount(0, { timeout: 30000 });
+    await expect(
+      this.page.locator(this.locators.root),
+      'the on-call screen did not render, so its availability cannot be read from this page',
+    ).toBeVisible({ timeout: 30000 });
   }
 }
 

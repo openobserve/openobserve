@@ -78,10 +78,26 @@ export class OnCallPagesListPage {
 
       // Shared OTable furniture.
       body: '[data-test="o2-table-body"]',
-      // `o2-table-select-header`, NOT `-select-all`: OTableSelectCheckbox builds
-      // `o2-table-select-${rowId ?? 'header'}`, and the header row has no rowId.
-      // `-select-all` appears only in OTable's own unit spec and is never rendered.
-      selectAll: '[data-test="o2-table-select-header"]',
+      // `o2-table-select-all`, NOT `-select-header`. OTableSelectCheckbox's
+      // `o2-table-select-${rowId ?? 'header'}` fallback is dead code on this
+      // table: OTableBodyRow always passes a rowId (`String(row.index)`), and the
+      // HEADER checkbox is a different element in OTableHeader that is spelled
+      // `o2-table-select-all` — which is what the rest of the repo
+      // (alertsPage, alertTemplatesPage, reportFoldersPage) already targets.
+      // Verified on :5090: the responses table renders `o2-table-select-all`,
+      // `o2-table-select-cell` and `o2-table-select-{index}`, and nothing at all
+      // named `-select-header`.
+      //
+      // The data-test lands on the OCheckbox LABEL; the thing that toggles is the
+      // inner `button[role="checkbox"]`, so that is what is clicked.
+      selectAll: '[data-test="o2-table-select-all"] button[role="checkbox"]',
+      confirmOk: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
+      whoIsOn: '[data-test="oncall-who-is-on"]',
+      whoIsOnPrimaryReach: '[data-test="oncall-who-is-on-primary-reach"]',
+      setupBanner: '[data-test="oncall-setup-banner"]',
+      setupChecklist: '[data-test="oncall-setup-checklist"]',
+      setupExpand: '[data-test="oncall-setup-expand"]',
+      setupCollapse: '[data-test="oncall-setup-collapse"]',
       pageSizeSelect: '[data-test="o2-table-page-size-select"]',
       paginationInfo: '[data-test="o2-table-pagination-info"]',
       firstPage: '[data-test="o2-table-first-page-btn"]',
@@ -117,6 +133,42 @@ export class OnCallPagesListPage {
   expandControl(index) { return `[data-test="o2-table-expand-${index}"]`; }
   rowByIndex(index) { return `[data-test="o2-table-row-${index}"]`; }
   rowSelect(index) { return `[data-test="o2-table-select-${index}"]`; }
+
+  /** The ladder-progress cell, keyed by response id rather than row position. */
+  escalationCell(responseId) { return `[data-test="oncall-escalation-cell-${responseId}"]`; }
+
+  // ------------------------------------------------------------- element getters
+
+  getSelectAll() { return this.page.locator(this.locators.selectAll).first(); }
+  getBulkAck() { return this.page.locator(this.locators.bulkAck); }
+  getBulkResolve() { return this.page.locator(this.locators.bulkResolve); }
+  getConfirmOk() { return this.page.locator(this.locators.confirmOk).first(); }
+  getRowByIndex(index) { return this.page.locator(this.rowByIndex(index)); }
+  getEscalationCell(responseId) { return this.page.locator(this.escalationCell(responseId)); }
+  getWhoIsOn() { return this.page.locator(this.locators.whoIsOn); }
+  getWhoIsOnPrimaryReach() { return this.page.locator(this.locators.whoIsOnPrimaryReach); }
+
+  // The setup checklist is drawn by OnCallResponses.vue, so it lives on this screen.
+  getSetupBanner() { return this.page.locator(this.locators.setupBanner); }
+  getSetupChecklist() { return this.page.locator(this.locators.setupChecklist); }
+  getSetupExpand() { return this.page.locator(this.locators.setupExpand).first(); }
+  getSetupCollapse() { return this.page.locator(this.locators.setupCollapse); }
+  getSetupStep(key) { return this.page.locator(this.setupStep(key)).first(); }
+  setupStep(key) { return `[data-test="oncall-setup-step-${key}"]`; }
+
+  /** The step's state as DATA (`data-state`), or null when the step is not drawn. */
+  async readSetupStepState(key) {
+    const el = this.getSetupStep(key);
+    if (!(await el.count())) return null;
+    return await el.getAttribute('data-state');
+  }
+
+  /** Open the checklist if it is sitting collapsed behind its banner. */
+  async expandSetupChecklist() {
+    if (await this.getSetupBanner().count()) {
+      await this.getSetupExpand().click();
+    }
+  }
 
   // ---------------------------------------------------------------- navigation
 
@@ -565,11 +617,23 @@ export class OnCallPagesListPage {
     return (await this.page.locator(this.locators.unavailable).count()) > 0;
   }
 
+  /**
+   * On-call is served here.
+   *
+   * The absent "not available" marker is NOT enough on its own: a blank page, a
+   * 500 and a crashed SPA all render zero of it, so a gate built only on that
+   * absence certifies the deployment from a page that never loaded. The screen's
+   * own root has to be present too.
+   */
   async expectAvailable() {
     await expect(
       this.page.locator(this.locators.unavailable),
       'on-call is not available on this deployment — the suite needs an enterprise build with O2_ONCALL_ENABLED',
     ).toHaveCount(0, { timeout: 30000 });
+    await expect(
+      this.page.locator(this.locators.root),
+      'the on-call screen did not render, so its availability cannot be read from this page',
+    ).toBeVisible({ timeout: 30000 });
   }
 }
 

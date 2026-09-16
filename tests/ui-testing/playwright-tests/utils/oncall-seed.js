@@ -204,7 +204,13 @@ async function listTeams(page) {
   const res = await page.request.get(`${baseUrl()}/api/${orgId()}/oncall/teams`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok()) return [];
+  // An error is not an empty list. Swallowing it here is how an assertion
+  // like `expect(list).toEqual([])` passes the moment the API stops answering.
+  if (!res.ok()) {
+    throw new Error(
+      `listing on-call teams failed: ${res.status()} ${(await res.text()).slice(0, 200)}`,
+    );
+  }
   const body = await res.json().catch(() => ([]));
   return Array.isArray(body) ? body : (body?.list ?? []);
 }
@@ -241,7 +247,13 @@ async function listTeamMembers(page, teamId) {
     `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/members`,
     { headers: getAuthHeaders() },
   );
-  if (!res.ok()) return [];
+  // An error is not an empty list. Swallowing it here is how an assertion
+  // like `expect(list).toEqual([])` passes the moment the API stops answering.
+  if (!res.ok()) {
+    throw new Error(
+      `listing team members failed: ${res.status()} ${(await res.text()).slice(0, 200)}`,
+    );
+  }
   const body = await res.json().catch(() => ([]));
   return Array.isArray(body) ? body : (body?.list ?? []);
 }
@@ -340,7 +352,13 @@ async function whoIsOnCall(page, teamId, atMicros = undefined) {
     `${baseUrl()}/api/${orgId()}/oncall/teams/${encodeURIComponent(teamId)}/on-call${query}`,
     { headers: getAuthHeaders() },
   );
-  if (!res.ok()) return [];
+  // An error is not an empty list. Swallowing it here is how an assertion
+  // like `expect(list).toEqual([])` passes the moment the API stops answering.
+  if (!res.ok()) {
+    throw new Error(
+      `reading who is on call failed: ${res.status()} ${(await res.text()).slice(0, 200)}`,
+    );
+  }
   const body = await res.json().catch(() => ([]));
   return Array.isArray(body) ? body : (body?.list ?? []);
 }
@@ -497,7 +515,13 @@ async function listOwnershipRules(page, teamId = undefined) {
   const res = await page.request.get(`${baseUrl()}/api/${orgId()}/oncall/ownership${query}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok()) return [];
+  // An error is not an empty list. Swallowing it here is how an assertion
+  // like `expect(list).toEqual([])` passes the moment the API stops answering.
+  if (!res.ok()) {
+    throw new Error(
+      `listing ownership rules failed: ${res.status()} ${(await res.text()).slice(0, 200)}`,
+    );
+  }
   const body = await res.json().catch(() => ([]));
   return Array.isArray(body) ? body : (body?.list ?? []);
 }
@@ -816,7 +840,13 @@ async function listResponses(page, {
   const res = await page.request.get(`${baseUrl()}/api/${orgId()}/oncall/responses${query}`, {
     headers: getAuthHeaders(),
   });
-  if (!res.ok()) return [];
+  // An error is not an empty list. Swallowing it here is how an assertion
+  // like `expect(list).toEqual([])` passes the moment the API stops answering.
+  if (!res.ok()) {
+    throw new Error(
+      `listing pages failed: ${res.status()} ${(await res.text()).slice(0, 200)}`,
+    );
+  }
   const body = await res.json().catch(() => ([]));
   return Array.isArray(body) ? body : (body?.list ?? []);
 }
@@ -1017,7 +1047,29 @@ async function deleteOnCallFixturesByPrefix(page, prefix) {
     } catch { /* best effort */ }
   }
 
-  testLogger.debug('on-call fixture cleanup swept', { prefix, teams: doomedTeamIds.length });
+  // Users LAST, and they are swept at all because nothing else sweeps them: the
+  // schedule timeline labels its bands by fetching the whole org's user list, so
+  // every account a run leaves behind widens the window in which a bar shows a
+  // raw address instead of a name. Left unswept the org reached ~1500 accounts
+  // and that window grew long enough to fail an assertion that had been passing.
+  let sweptUsers = 0;
+  try {
+    const res = await page.request.get(`${base}/api/${org}/users`, { headers });
+    if (res.ok()) {
+      const body = await res.json().catch(() => ({}));
+      for (const user of (body?.data ?? [])) {
+        const email = user?.email;
+        if (typeof email === 'string' && email.startsWith(prefix)) {
+          await tryDelete(`${base}/api/${org}/users/${encodeURIComponent(email)}`);
+          sweptUsers += 1;
+        }
+      }
+    }
+  } catch { /* best effort */ }
+
+  testLogger.debug('on-call fixture cleanup swept', {
+    prefix, teams: doomedTeamIds.length, users: sweptUsers,
+  });
 }
 
 /** Delete one team by id, tolerating an already-gone one. */

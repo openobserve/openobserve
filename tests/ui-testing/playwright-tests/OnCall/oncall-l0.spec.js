@@ -359,7 +359,7 @@ test.describe('On-call L0 / AI SRE', {
     await pm.oncallTeamDetailPage.goto(ORG, team.id, 'escalation');
     await pm.oncallTeamDetailPage.openEscalationTab();
 
-    const holdBand = page.locator('[data-test^="oncall-ladder-l0-"]');
+    const holdBand = pm.oncallTeamDetailPage.getLadderL0Bands();
     if (usableL0(preview)) {
       await expect(
         holdBand,

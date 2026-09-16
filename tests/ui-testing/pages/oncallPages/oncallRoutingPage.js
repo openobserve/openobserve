@@ -147,6 +147,7 @@ export class OnCallRoutingPage {
       defaultTeamUnset: '[data-test="oncall-default-team-unset"]',
 
       confirmDialog: '[data-test="confirm-dialog"]',
+      confirmDialogProvider: '[data-test="confirm-dialog-provider"]',
       confirmOk: '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]',
     };
   }
@@ -177,6 +178,25 @@ export class OnCallRoutingPage {
   signalClaim(signalId) { return `[data-test="oncall-routing-claim-${signalId}"]`; }
   signalDismiss(signalId) { return `[data-test="oncall-routing-dismiss-${signalId}"]`; }
   signalAbsorbed(signalId) { return `[data-test="oncall-routing-signal-absorbed-${signalId}"]`; }
+
+  // ------------------------------------------------------------- element getters
+
+  getTabRules() { return this.page.locator(this.locators.tabRules); }
+  getTabSignals() { return this.page.locator(this.locators.tabSignals); }
+  getRuleRow(ruleId) { return this.page.locator(this.ruleRow(ruleId)); }
+  getRuleHealth(ruleId) { return this.page.locator(this.ruleHealth(ruleId)); }
+  getRuleTeam(ruleId) { return this.page.locator(this.ruleTeam(ruleId)); }
+  getUnroutedFilterDefault() { return this.page.locator(this.locators.unroutedFilterDefault); }
+
+  /**
+   * The IMPERATIVE confirm, not the declarative one.
+   *
+   * Nominating an empty team goes through the `confirm()` composable, which
+   * renders via `ConfirmDialogProvider` — a different element from the
+   * `ConfirmDialog` component the rest of the suite waits on. Waiting on the
+   * wrong one times out against a dialog that is on screen.
+   */
+  getConfirmDialogProvider() { return this.page.locator(this.locators.confirmDialogProvider); }
 
   // ---------------------------------------------------------------- navigation
 
@@ -635,11 +655,23 @@ export class OnCallRoutingPage {
     return (await this.page.locator(this.locators.unavailable).count()) > 0;
   }
 
+  /**
+   * On-call is served here.
+   *
+   * The absent "not available" marker is NOT enough on its own: a blank page, a
+   * 500 and a crashed SPA all render zero of it, so a gate built only on that
+   * absence certifies the deployment from a page that never loaded. The screen's
+   * own root has to be present too.
+   */
   async expectAvailable() {
     await expect(
       this.page.locator(this.locators.unavailable),
       'on-call is not available on this deployment — the suite needs an enterprise build with O2_ONCALL_ENABLED',
     ).toHaveCount(0, { timeout: 30000 });
+    await expect(
+      this.page.locator(this.locators.root),
+      'the on-call screen did not render, so its availability cannot be read from this page',
+    ).toBeVisible({ timeout: 30000 });
   }
 }
 

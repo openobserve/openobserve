@@ -75,10 +75,20 @@ export class OnCallResponseDetailPage {
       tabActivity: '[data-test="oncall-response-tab-activity"]',
       tabDeliveries: '[data-test="oncall-response-tab-deliveries"]',
       tabCauses: '[data-test="oncall-response-tab-causes"]',
-      activityPanel: '[data-test="oncall-response-activity"]',
+      // THE PANELS HAVE NO `data-test`, AND CANNOT HAVE ONE.
+      //
+      // OnCallResponseDetail.vue does write `data-test="oncall-response-activity"`
+      // (and -deliveries, -causes) onto each `OTabPanel`, but OTabPanel's template
+      // root is a `v-if`/`v-else` pair of `<template>` blocks, which compiles to a
+      // FRAGMENT — and Vue disables attribute fallthrough on a fragment root, so
+      // the attribute is dropped before it reaches the DOM. Verified on :5090: the
+      // active panel renders as `<div role="tabpanel" id="tab-panel-activity"
+      // class="o-tab-panel p-0">` with `data-test` null.
+      //
+      // So the panel is addressed by the id OTabPanel itself builds — which is the
+      // same handle OTab publishes as `aria-controls`, i.e. the component's own
+      // contract rather than a coincidence of markup.
       activityToggleAll: '[data-test="oncall-response-activity-toggle-all"]',
-      deliveriesPanel: '[data-test="oncall-response-deliveries"]',
-      causesPanel: '[data-test="oncall-response-causes"]',
 
       // The delivery ledger (OnCallDeliveryLedger), rendered inside the tab.
       ledger: '[data-test="oncall-delivery-ledger"]',
@@ -115,6 +125,11 @@ export class OnCallResponseDetailPage {
   // Built rather than stored — these carry a duration or a ledger run/index.
   snoozeOption(minutes) { return `[data-test="oncall-response-snooze-${minutes}"]`; }
   deliveryRow(run, index) { return `[data-test="oncall-delivery-row-${run}-${index}"]`; }
+
+  /** On the Causes tab: what this rule turned out to be on a previous page. */
+  priorCause(cause) { return `[data-test="oncall-prior-cause-${cause}"]`; }
+
+  getPriorCause(cause) { return this.page.locator(this.priorCause(cause)); }
 
   // ---------------------------------------------------------------- navigation
 
@@ -305,15 +320,52 @@ export class OnCallResponseDetailPage {
 
   // ------------------------------------------------------- evidence surfaces
 
+  /** The panel for one tab, by the id OTabPanel builds and OTab's `aria-controls` names. */
+  tabPanel(name) { return `[role="tabpanel"]#tab-panel-${name}`; }
+
+  getTabPanel(name) { return this.page.locator(this.tabPanel(name)); }
+
+  /**
+   * Switch to one of the record's evidence tabs.
+   *
+   * The click is not assumed: `OTabPanels` defaults to `keepAlive=false`, so the
+   * inactive panels are not merely hidden but UNMOUNTED — a click that landed
+   * before the strip was interactive leaves the old panel on screen and the next
+   * assertion reads the wrong one. Waiting for the trigger's own
+   * `data-state="active"` is what makes the switch observable.
+   */
   async openTab(name) {
     const selector = {
       activity: this.locators.tabActivity,
       deliveries: this.locators.tabDeliveries,
       causes: this.locators.tabCauses,
     }[name];
-    await this.page.locator(selector).click();
+    const trigger = this.page.locator(selector);
+    await trigger.waitFor({ state: 'visible', timeout: 30000 });
+    await trigger.click();
+    await expect(trigger, `the ${name} tab must become the active one when it is clicked`)
+      .toHaveAttribute('data-state', 'active', { timeout: 30000 });
   }
 
+  /**
+   * Open one tab and assert ITS panel is the one that mounted.
+   *
+   * Anchored on the panel that is present, never on the absence of the other
+   * two: with `keepAlive=false` the inactive panels are gone from the DOM
+   * whatever happens, so "the others are not there" is true of a screen that
+   * rendered nothing at all.
+   */
+  async expectTabPanelVisible(name) {
+    await this.openTab(name);
+    await expect(this.getTabPanel(name), `the ${name} panel must render on its own`)
+      .toBeVisible({ timeout: 30000 });
+  }
+
+  /** The acknowledge verb, for a spec that needs to assert it is usable. */
+  getAckButton() { return this.page.locator(this.locators.ackButton); }
+
+  /** The tab strip itself — present before any panel can be switched to. */
+  getTabs() { return this.page.locator(this.locators.tabs); }
 
 
 
