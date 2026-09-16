@@ -1,0 +1,182 @@
+===== COMPLETE LIST OF CHANGED FILES (3 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/alerts/AlertGroupChart.spec.ts
+web/src/components/alerts/AlertGroupChart.vue
+web/src/utils/alerts/aggregationPreviewQuery.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/alerts/AlertGroupChart.spec.ts b/web/src/components/alerts/AlertGroupChart.spec.ts
+index 95449687fe6..92157890602 100644
+--- a/web/src/components/alerts/AlertGroupChart.spec.ts
++++ b/web/src/components/alerts/AlertGroupChart.spec.ts
+@@ -145,3 +145,29 @@ describe("AlertGroupChart — threshold visibility", () => {
+     expect(config.y_axis_min).toBeUndefined();
+   });
+ });
++
++describe("AlertGroupChart — stream deleted after the alert was created", () => {
++  it("shows the backend's error instead of a blank 'chart unavailable' state", async () => {
++    // generate_sql validates the stream up front, so a deleted stream 400s
++    // here rather than reaching PanelSchemaRenderer with a doomed query.
++    vi.mocked(alertsService.generate_sql).mockRejectedValue({
++      response: {
++        status: 400,
++        data: { code: 400, message: "Stream 'logs' of type 'logs' does not exist" },
++      },
++    });
++
++    wrapper = await mountChart({
++      stream_name: "logs",
++      stream_type: "logs",
++      query_condition: { type: "sql", sql: "SELECT 1" },
++      trigger_condition: { threshold: 500 },
++    });
++
++    expect(wrapper.findComponent({ name: "PanelSchemaRenderer" }).exists()).toBe(false);
++    expect(wrapper.find('[data-test="alerts-alertgroupchart-error"]').text()).toContain(
++      "Stream 'logs' of type 'logs' does not exist",
++    );
++    expect(wrapper.find('[data-test="alerts-alertgroupchart-empty"]').exists()).toBe(false);
++  });
++});
+diff --git a/web/src/components/alerts/AlertGroupChart.vue b/web/src/components/alerts/AlertGroupChart.vue
+index 4b54f2fdf15..67cb5c56b35 100644
+--- a/web/src/components/alerts/AlertGroupChart.vue
++++ b/web/src/components/alerts/AlertGroupChart.vue
+@@ -68,6 +68,14 @@
+         searchType="ui"
+         data-test="alerts-alertgroupchart-panel"
+       />
++      <div
++        v-else-if="chartError"
++        class="flex h-full flex-col items-center justify-center gap-2"
++        data-test="alerts-alertgroupchart-error"
++      >
++        <OIcon size="md" name="warning" />
++        <span class="text-text-secondary text-sm">{{ chartError }}</span>
++      </div>
+       <div
+         v-else
+         class="flex h-full items-center justify-center"
+@@ -87,6 +95,7 @@ import { computed, onMounted, ref, watch } from "vue";
+ import { useI18nTyped } from "@/types/i18n";
+ import { useStore } from "vuex";
+ 
++import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+ import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
+@@ -99,6 +108,7 @@ import {
+   withCompositeGroupLabel,
+ } from "@/utils/alerts/aggregationPreviewQuery";
+ import { buildThresholdMarkLines, thresholdAxisBounds } from "@/utils/alerts/thresholdMarkLines";
++import { parseSearchError } from "@/utils/query/searchError";
+ 
+ const props = defineProps<{ alert: any }>();
+ 
+@@ -106,6 +116,7 @@ const { t } = useI18nTyped();
+ const store = useStore();
+ 
+ const chartData = ref<any>(null);
++const chartError = ref<string | null>(null);
+ const selectedTimeObj = ref<any>(null);
+ const range = ref<string>("1h");
+ 
+@@ -133,6 +144,7 @@ const onRangeChange = (value: unknown) => {
+ const build = async () => {
+   const agg = aggregation.value;
+   const orgId = store.state.selectedOrganization?.identifier;
++  chartError.value = null;
+   if (!orgId || !props.alert?.stream_name) {
+     chartData.value = null;
+     return;
+@@ -190,8 +202,12 @@ const build = async () => {
+       query_condition: queryCondition.value,
+     });
+     sql = res.data?.sql || res.data?.query || "";
+-  } catch {
++  } catch (error) {
++    // Covers a stream deleted after this alert was created — generate_sql
++    // validates the stream up front and 400s with e.g. "Stream 'foo' of
++    // type 'logs' does not exist" rather than templating a doomed query.
+     chartData.value = null;
++    chartError.value = parseSearchError(error).message;
+     return;
+   }
+   if (!sql) {
+diff --git a/web/src/utils/alerts/aggregationPreviewQuery.ts b/web/src/utils/alerts/aggregationPreviewQuery.ts
+index a4ec96084c5..fd041a452de 100644
+--- a/web/src/utils/alerts/aggregationPreviewQuery.ts
++++ b/web/src/utils/alerts/aggregationPreviewQuery.ts
+@@ -84,6 +84,42 @@ export const cleanAggregationQuery = (query: string): string => {
+ 
+ export default cleanAggregationQuery;
+ 
++/**
++ * Blank out the contents of quoted string literals, keeping length and quote
++ * characters intact, so a keyword search on the result can't be fooled by a
++ * projected string that happens to contain words like "from" or "group by".
++ */
++const maskStringLiterals = (sql: string): string =>
++  sql.replace(
++    /'(?:[^']|'')*'|"(?:[^"]|"")*"/g,
++    (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1],
++  );
++
++/**
++ * Blank out everything inside parentheses, nesting-aware, so a keyword used
++ * inside a function call or subquery — e.g. the FROM in EXTRACT(EPOCH FROM
++ * now()) — can't be mistaken for the statement's own FROM/GROUP BY/etc. Run
++ * this after maskStringLiterals so a literal's own parens can't miscount
++ * depth.
++ */
++const maskParens = (sql: string): string => {
++  let depth = 0;
++  let out = "";
++  for (let i = 0; i < sql.length; i++) {
++    const ch = sql[i];
++    if (ch === "(") {
++      depth++;
++      out += "x";
++    } else if (ch === ")") {
++      depth--;
++      out += "x";
++    } else {
++      out += depth > 0 ? "x" : ch;
++    }
++  }
++  return out;
++};
++
+ /**
+  * Turn a COUNT-family alert's generated SQL into a count-over-time query.
+  *
+@@ -102,16 +138,18 @@ export default cleanAggregationQuery;
+  */
+ export const buildCountChartQuery = (query: string): string | null => {
+   if (!query) return null;
+-  const fromMatch = query.match(/\bFROM\b/i);
+-  if (!fromMatch || !/^\s*SELECT\b/i.test(query)) return null;
++  const masked = maskParens(maskStringLiterals(query));
++  if (!/^\s*SELECT\b/i.test(masked)) return null;
++  const fromMatch = masked.match(/\bFROM\b/i);
++  if (!fromMatch) return null;
++  const fromIndex = fromMatch.index as number;
+ 
+-  // Keep everything from FROM onward, minus the raw-row tail.
+-  let tail = query.slice(fromMatch.index as number);
+-  tail = tail.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
+-  tail = tail.replace(/\s+LIMIT\s+[\s\S]*$/i, "");
+-  tail = tail.replace(/\s+GROUP\s+BY\s+[\s\S]*$/i, "");
+-  tail = tail.replace(/\s+HAVING\s+[\s\S]*$/i, "");
+-  tail = tail.trim();
++  // Keep everything from FROM onward, minus the raw-row tail. Cut on the masked
++  // text so a literal containing "order by"/"limit"/etc. can't truncate early.
++  const maskedTail = masked.slice(fromIndex);
++  const cutMatch = maskedTail.match(/\s+(?:ORDER\s+BY|LIMIT|GROUP\s+BY|HAVING)\b/i);
++  const cutIndex = cutMatch ? fromIndex + (cutMatch.index as number) : undefined;
++  const tail = query.slice(fromIndex, cutIndex).trim();
+   if (!tail) return null;
+ 
+   return `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ${tail} GROUP BY zo_sql_key`;
