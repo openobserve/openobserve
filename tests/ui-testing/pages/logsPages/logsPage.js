@@ -147,6 +147,10 @@ export class LogsPage {
         this.notificationMessage = '[role="alert"]';
         this.indexFieldSearchInput = '[data-test="logs-search-index-list"] [data-test="o-field-list-search-field"]';
         this.errorMessage = '[data-test="logs-search-error-state"]';
+        // Stream-not-found (filter) error branch — frontend pre-run detection of a
+        // missing stream name in a SQL query. Distinct from logs-search-error-state,
+        // which is the post-run backend error (code 20002) path.
+        this.filterErrorMessage = '[data-test="logs-search-filter-error-message"]';
         // Generic error indicator (class/role based) used when no data-test error hook exists.
         this.genericErrorSelector = '[class*="error"], [class*="negative"], [role="alert"]';
         this.warningElement = 'text=warning Query execution';
@@ -12196,6 +12200,71 @@ export class LogsPage {
         const hero = this.page.locator(this.noStreamHero);
         await hero.waitFor({ state: 'visible', timeout: 15000 });
         testLogger.info('No-stream hero is visible');
+    }
+
+    /**
+     * Asserts the generic "no stream selected" hero is NOT visible — the regression
+     * this feature fixes: the filter-error branch must win over the empty state.
+     */
+    async expectNoStreamHeroNotVisible() {
+        await expect(
+            this.page.locator(this.noStreamHero),
+            'No-stream-selected hero should NOT be visible when the filter error is shown',
+        ).not.toBeVisible();
+        testLogger.info('No-stream hero is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to become visible.
+     */
+    async waitForStreamNotFoundError(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be visible',
+        ).toBeVisible({ timeout });
+        testLogger.info('Stream-not-found error is visible');
+    }
+
+    /**
+     * Asserts the stream-not-found (filter) error branch is NOT visible.
+     */
+    async expectStreamNotFoundErrorNotVisible() {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should NOT be visible',
+        ).not.toBeVisible();
+        testLogger.info('Stream-not-found error is not visible');
+    }
+
+    /**
+     * Waits for the stream-not-found (filter) error branch to disappear (query
+     * cleared or a stream selected).
+     */
+    async waitForStreamNotFoundErrorHidden(timeout = 15000) {
+        await expect(
+            this.page.locator(this.filterErrorMessage),
+            'Stream-not-found error should be hidden',
+        ).toBeHidden({ timeout });
+        testLogger.info('Stream-not-found error is hidden');
+    }
+
+    /**
+     * Reads the stream-not-found error summary text (the exact `Stream "<name>"
+     * does not exist` message), polling until the summary is populated.
+     */
+    async getStreamNotFoundErrorText(timeout = 15000) {
+        const summary = this.page.locator(this.searchErrorSummary).first();
+        let text = '';
+        await expect
+            .poll(
+                async () => {
+                    text = ((await summary.textContent().catch(() => null)) || '').trim();
+                    return text;
+                },
+                { timeout, message: 'Stream-not-found error summary never populated' },
+            )
+            .not.toBe('');
+        return text;
     }
 
     /**

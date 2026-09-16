@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/streamNotFound.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsquickmode.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsqueries.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logspage.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/monaco-query-prefill.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing Logs spec exercises the frontend 'stream not found' filter-error path ([data-test='logs-search-filter-error-message']); the selector is only referenced inside logsPage.js wait helpers, never asserted. The behavior is pinned by a Vitest unit spec (SearchBar.streamNotFound.spec.ts) but has zero E2E coverage. It is a single, self-contained Logs feature, so a new spec in Logs/ (registered under the Logs-Core ci_matrix group) is the correct shape — not an append to an unrelated quickmode/queries spec."
+}
