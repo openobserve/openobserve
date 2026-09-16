@@ -85,6 +85,14 @@ export const cleanAggregationQuery = (query: string): string => {
 export default cleanAggregationQuery;
 
 /**
+ * Blank out the contents of quoted string literals, keeping length and quote
+ * characters intact, so a keyword search on the result can't be fooled by a
+ * projected string that happens to contain words like "from" or "group by".
+ */
+const maskStringLiterals = (sql: string): string =>
+  sql.replace(/'(?:[^']|'')*'|"(?:[^"]|"")*"/g, (m) => m[0] + "x".repeat(m.length - 2) + m[m.length - 1]);
+
+/**
  * Turn a COUNT-family alert's generated SQL into a count-over-time query.
  *
  * A count alert has no aggregation: its generated SQL is
@@ -102,16 +110,18 @@ export default cleanAggregationQuery;
  */
 export const buildCountChartQuery = (query: string): string | null => {
   if (!query) return null;
-  const fromMatch = query.match(/\bFROM\b/i);
-  if (!fromMatch || !/^\s*SELECT\b/i.test(query)) return null;
+  const masked = maskStringLiterals(query);
+  if (!/^\s*SELECT\b/i.test(masked)) return null;
+  const fromMatch = masked.match(/\bFROM\b/i);
+  if (!fromMatch) return null;
+  const fromIndex = fromMatch.index as number;
 
-  // Keep everything from FROM onward, minus the raw-row tail.
-  let tail = query.slice(fromMatch.index as number);
-  tail = tail.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+LIMIT\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+GROUP\s+BY\s+[\s\S]*$/i, "");
-  tail = tail.replace(/\s+HAVING\s+[\s\S]*$/i, "");
-  tail = tail.trim();
+  // Keep everything from FROM onward, minus the raw-row tail. Cut on the masked
+  // text so a literal containing "order by"/"limit"/etc. can't truncate early.
+  const maskedTail = masked.slice(fromIndex);
+  const cutMatch = maskedTail.match(/\s+(?:ORDER\s+BY|LIMIT|GROUP\s+BY|HAVING)\b/i);
+  const cutIndex = cutMatch ? fromIndex + (cutMatch.index as number) : undefined;
+  const tail = query.slice(fromIndex, cutIndex).trim();
   if (!tail) return null;
 
   return `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ${tail} GROUP BY zo_sql_key`;
