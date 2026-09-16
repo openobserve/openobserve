@@ -17,7 +17,6 @@ import { queryOptions } from "@tanstack/vue-query";
 import queryFunctions from "./query_functions";
 import { queryFunctionKeys } from "./query_functions.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export const queryFunctionsQuery = (org: string) =>
   queryOptions({
@@ -35,5 +34,4 @@ export const queryFunctionsQuery = (org: string) =>
       }
     },
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });

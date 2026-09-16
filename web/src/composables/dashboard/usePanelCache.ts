@@ -20,8 +20,7 @@
  * behaviour: a panel restores its last result and fires no query. What moved is
  * where the result lives — from a private IndexedDB namespace with its own TTL
  * and LRU to a normal TanStack entry under `["org", <org>, "panels", …]`, held
- * in memory by the query cache and on disk by the same `indexedDbPersister`
- * every other heavy read uses.
+ * in memory by the query cache and on disk by `idbPersister`.
  *
  * Three things follow from being on the query layer rather than beside it:
  *

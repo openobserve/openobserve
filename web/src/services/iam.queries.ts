@@ -29,7 +29,6 @@ import {
 } from "./iam";
 import { iamKeys } from "./iam.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export const groupsQuery = (org: string) =>
   queryOptions({
@@ -50,7 +49,6 @@ export const resourcesQuery = (org: string) =>
     queryKey: iamKeys.resources(org),
     queryFn: async () => (await getResources(org)).data,
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────

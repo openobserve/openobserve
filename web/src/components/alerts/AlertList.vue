@@ -926,7 +926,6 @@ import { alertsListQuery } from "@/services/alerts.queries";
 import { alertKeys } from "@/services/alerts.querykeys";
 import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { dropPersistedCopies } from "@/composables/query/persisters";
 import {
   cloneAnomalyAlertMutation,
   retrainAnomalyMutation,
@@ -2443,13 +2442,11 @@ export default defineComponent({
       const options = templatesQuery(store.state.selectedOrganization.identifier);
       // The mount read stays cache-first; only the form's refresh button forces a server read.
       const ready = force
-        ? dropPersistedCopies(options.queryKey, true).then(() =>
-            queryClient.invalidateQueries({
-              queryKey: options.queryKey,
-              exact: true,
-              refetchType: "none",
-            }),
-          )
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
         : Promise.resolve();
       void ready
         .then(() => queryClient.fetchQuery(options))

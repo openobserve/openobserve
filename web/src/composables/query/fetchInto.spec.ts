@@ -15,11 +15,10 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ref } from "vue";
-import { hashKey, queryOptions } from "@tanstack/vue-query";
+import { queryOptions } from "@tanstack/vue-query";
 import { fetchInto } from "./fetchInto";
 import { queryClient } from "./queryClient";
 import { orgKey } from "./keys";
-import { localStoragePersister, LS_BUSTER, LS_PREFIX } from "./persisters";
 
 const options = (fn: any, key = "list") =>
   queryOptions({ queryKey: orgKey("acme", "spec", key), queryFn: fn });
@@ -114,30 +113,6 @@ describe("fetchInto", () => {
 
     expect(loading.value).toBe(false);
     expect(fetching.value).toBe(false);
-  });
-
-  it("a forced read with cold memory reaches the server instead of the disk copy", async () => {
-    const key = orgKey("acme", "spec", "persisted");
-    // What the persister leaves on disk after an earlier session's fetch.
-    window.localStorage.setItem(
-      `${LS_PREFIX}-${hashKey(key)}`,
-      JSON.stringify({
-        queryKey: key,
-        queryHash: hashKey(key),
-        buster: LS_BUSTER,
-        state: { data: ["stale"], dataUpdatedAt: Date.now(), errorUpdatedAt: 0 },
-      }),
-    );
-    const queryFn = vi.fn(async () => ["fresh"]);
-    const seen: unknown[] = [];
-
-    await fetchInto(queryOptions({ queryKey: key, queryFn, persister: localStoragePersister }), {
-      apply: (v) => seen.push(v),
-      force: true,
-    });
-
-    expect(queryFn).toHaveBeenCalledTimes(1);
-    expect(seen).toEqual([["fresh"]]);
   });
 
   it("serves a fresh entry without calling the endpoint again", async () => {

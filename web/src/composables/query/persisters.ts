@@ -14,10 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Per-query persisters. Persistence is opt-in at the query level (via a tier),
- * never whole-cache: a whole-client persister would write every list — including
+ * The one persister left, for the dashboard panel-result cache. Never
+ * whole-cache: a whole-client persister would write every list — including
  * per-tenant data on shared machines — and re-serialize the entire cache on a
- * debounce.
+ * debounce. No `*.queries.ts` declaration persists: a read restored from disk is
+ * served without any age check, which is a bug for everything but panel results.
  *
  * Storage keys are `<prefix>-<queryHash>`, and every query hash begins
  * `["org","<orgId>",…]` (enforced by `queryKeys.ts`), so purging one org is a
@@ -25,8 +26,6 @@
  */
 
 import { experimental_createQueryPersister } from "@tanstack/query-persist-client-core";
-import type { QueryPersister } from "@tanstack/query-core";
-import type { AsyncStorage } from "@tanstack/query-persist-client-core";
 import {
   CACHE_NAMESPACES,
   cacheRemoveByPrefix,
@@ -42,74 +41,17 @@ import {
 } from "@/composables/fieldValueDB";
 import { GLOBAL_SCOPE } from "./keys";
 
-/** Bump when a cached response shape changes so stale payloads are discarded rather than rendered. */
-export const LS_BUSTER = "2";
-
-/** Deliberately behind `LS_BUSTER`: a bump here re-runs every dashboard panel's search on next read. */
+/** Bump when a persisted response shape changes; a bump re-runs every dashboard panel's search on next read. */
 export const IDB_BUSTER = "1";
 
-export const LS_PREFIX = "o2q";
 export const IDB_PREFIX = "o2q-heavy";
 
 const DAY_MS = 24 * 60 * 60_000;
 
 /**
- * localStorage is unavailable in some private-browsing modes and throws on
- * quota. Wrapped so a storage failure degrades to "no persistence" instead of
- * breaking the query.
- */
-const safeLocalStorage: AsyncStorage<string> | undefined =
-  typeof window !== "undefined" && window.localStorage
-    ? {
-        getItem: (key) => {
-          try {
-            return window.localStorage.getItem(key);
-          } catch {
-            return null;
-          }
-        },
-        setItem: (key, value) => {
-          try {
-            window.localStorage.setItem(key, value);
-          } catch {
-            /* quota exceeded — skip persisting */
-          }
-        },
-        removeItem: (key) => {
-          try {
-            window.localStorage.removeItem(key);
-          } catch {
-            /* ignore */
-          }
-        },
-        entries: () => {
-          const out: Array<[string, string]> = [];
-          try {
-            for (let i = 0; i < window.localStorage.length; i++) {
-              const k = window.localStorage.key(i);
-              if (k === null) continue;
-              out.push([k, window.localStorage.getItem(k) ?? ""]);
-            }
-          } catch {
-            /* ignore */
-          }
-          return out;
-        },
-      }
-    : undefined;
-
-/** Small config-sized values that should survive a reload (T0 / T1 tiers). */
-export const localPersister = experimental_createQueryPersister<string>({
-  storage: safeLocalStorage,
-  maxAge: DAY_MS,
-  prefix: LS_PREFIX,
-  buster: LS_BUSTER,
-});
-
-/**
- * Heavy payloads (panel results, field values, trace DAGs) — IndexedDB, with
- * identity serialize/deserialize so values are structured-cloned rather than
- * stringified on the main thread.
+ * Panel results — IndexedDB, with identity serialize/deserialize so values are
+ * structured-cloned rather than stringified on the main thread. Log field values
+ * keep their own database (`fieldValueDB.ts`).
  */
 export const idbPersister = experimental_createQueryPersister<unknown>({
   storage: isIdbAvailable() ? idbStorage : undefined,
@@ -121,54 +63,15 @@ export const idbPersister = experimental_createQueryPersister<unknown>({
 });
 
 /**
- * The values a declaration hands to TanStack's `persister` option.
- *
- * The cast is a library typing mismatch, not ours: `persisterFn` types its
- * context with `pageParam`/`direction` optional while the query options declare
- * both required. Same function either way.
- */
-export const localStoragePersister = localPersister.persisterFn as QueryPersister<any, any, any>;
-export const indexedDbPersister = idbPersister.persisterFn as QueryPersister<any, any, any>;
-
-/** A write just made these stale: drop the persisted copies under `queryKey` — localStorage only, since the IndexedDB variant reads the whole store. */
-export const dropPersistedCopies = async (
-  queryKey: readonly unknown[],
-  exact = false,
-): Promise<void> => {
-  // Without a key the library removes EVERY entry, which would take every org's data.
-  if (!Array.isArray(queryKey) || queryKey.length === 0) return;
-  try {
-    await localPersister.removeQueries({ queryKey, exact });
-  } catch {
-    /* a storage failure must never fail the write that triggered it */
-  }
-};
-
-/**
  * Storage-key prefix for one org. Every query key starts `["org", orgId]`, and
  * the persister keys storage by the query hash, so this string is the exact
  * prefix of every persisted entry belonging to that org.
  */
 const orgStoragePrefix = (prefix: string, org: string) => `${prefix}-["org",${JSON.stringify(org)}`;
 
-const removeLocalByPrefix = (prefix: string): void => {
-  if (!safeLocalStorage) return;
-  try {
-    const doomed: string[] = [];
-    for (let i = 0; i < window.localStorage.length; i++) {
-      const key = window.localStorage.key(i);
-      if (key && key.startsWith(prefix)) doomed.push(key);
-    }
-    doomed.forEach((k) => window.localStorage.removeItem(k));
-  } catch {
-    /* ignore */
-  }
-};
-
-/** Drop every persisted entry belonging to `org` (localStorage + IndexedDB). */
+/** Drop every persisted entry belonging to `org`. */
 export const purgePersistedOrg = async (org: string): Promise<void> => {
   if (!org) return;
-  removeLocalByPrefix(orgStoragePrefix(LS_PREFIX, org));
   await cacheRemoveByPrefix(orgStoragePrefix(IDB_PREFIX, org));
   // Legacy only. Panel results moved onto the query prefix above, so nothing
   // writes `<namespace>|<org>|…` any more — this drains the entries an older
@@ -188,21 +91,6 @@ export const purgePersistedOrg = async (org: string): Promise<void> => {
  */
 export const purgePersistedExceptOrg = async (keepOrg: string): Promise<void> => {
   if (!keepOrg) return;
-  const keepLs = [orgStoragePrefix(LS_PREFIX, keepOrg), orgStoragePrefix(LS_PREFIX, GLOBAL_SCOPE)];
-  if (safeLocalStorage) {
-    try {
-      const doomed: string[] = [];
-      for (let i = 0; i < window.localStorage.length; i++) {
-        const key = window.localStorage.key(i);
-        if (key && key.startsWith(`${LS_PREFIX}-`) && !keepLs.some((p) => key.startsWith(p))) {
-          doomed.push(key);
-        }
-      }
-      doomed.forEach((k) => window.localStorage.removeItem(k));
-    } catch {
-      /* ignore */
-    }
-  }
   const keepIdb = [
     orgStoragePrefix(IDB_PREFIX, keepOrg),
     orgStoragePrefix(IDB_PREFIX, GLOBAL_SCOPE),
@@ -220,7 +108,6 @@ export const purgePersistedExceptOrg = async (keepOrg: string): Promise<void> =>
 
 /** Drop everything this app persisted. Called on logout. */
 export const purgeAllPersisted = async (): Promise<void> => {
-  removeLocalByPrefix(`${LS_PREFIX}-`);
   await cacheClear();
   await clearAllFieldValues();
 };

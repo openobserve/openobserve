@@ -30,7 +30,7 @@ export {
   GC_TIME,
   PANEL_GC_TIME,
 } from "./cachePolicy";
-export { localPersister, idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters";
+export { idbPersister, purgePersistedOrg, purgeAllPersisted } from "./persisters";
 export { useOrgId } from "./useOrgId";
 export { useServerTable } from "./useServerTable";
 export { fetchInto } from "./fetchInto";

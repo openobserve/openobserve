@@ -18,7 +18,6 @@ import stream from "./stream";
 import type { StreamPageParams } from "./stream";
 import { streamKeys } from "./stream.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export const streamNameListQuery = (org: string, type: string) =>
   queryOptions({
@@ -26,7 +25,6 @@ export const streamNameListQuery = (org: string, type: string) =>
     // `schema: false` deliberately — schemas are fetched per stream on demand.
     queryFn: async (): Promise<any[]> => (await stream.nameList(org, type, false)).data.list ?? [],
     staleTime: MEDIUM_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 export const streamPageQuery = (org: string, type: string, params: StreamPageParams) =>
@@ -58,7 +56,7 @@ export const streamSchemaQuery = (org: string, streamName: string, type: string)
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-/** `streamKeys.all` is the scope: a stream write can touch the persisted name lists, the paged list and every cached schema. */
+/** `streamKeys.all` is the scope: a stream write can touch the name lists, the paged list and every cached schema. */
 export const createStreamMutation = (org: string) =>
   mutationOptions({
     mutationFn: (vars: { name: string; type: string; payload: any }) =>

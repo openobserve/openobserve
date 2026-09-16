@@ -21,7 +21,6 @@ import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { folderKeys } from "@/services/common.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
-import { dropPersistedCopies } from "@/composables/query/persisters";
 import { dropDashboardPanelCache, dropPanelCache } from "@/composables/dashboard/usePanelCache";
 import dashboardService from "../services/dashboards";
 import { subtractRelativeTime } from "@/utils/date";
@@ -989,10 +988,9 @@ export const deleteFolderById = async (store: any, folderId: any) => {
 
 const refreshFolderLists = async (store: any, type: any) => {
   const scope = folderKeys.all(store.state.selectedOrganization.identifier);
-  // The list just changed on the server, so drop the cached copy first —
+  // The list just changed on the server, so invalidate first —
   // `getFoldersListByType` reads the query cache and would otherwise return the
   // still-fresh pre-mutation entry.
-  await dropPersistedCopies(scope);
   await queryClient.invalidateQueries({ queryKey: scope });
   return Promise.all([
     getFoldersListByType(store, type),

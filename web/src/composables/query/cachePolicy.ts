@@ -33,7 +33,7 @@ export const MEDIUM_STALE_TIME = 5 * 60_000;
 /** Dashboards, pipelines, functions, workflows, reports, IAM, settings. */
 export const NORMAL_STALE_TIME = 60 * 60_000;
 
-/** Immutable for the session: /config, and a trace once it is written. */
+/** Immutable for the session: the two /config reads. */
 export const SESSION_STALE_TIME = Infinity;
 
 /** Set once on the client: how long an unused result stays in memory. */

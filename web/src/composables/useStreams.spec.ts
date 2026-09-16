@@ -14,11 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { hashKey } from "@tanstack/vue-query";
 import useStreams from "@/composables/useStreams";
 import StreamService from "@/services/stream";
 import { queryClient } from "@/composables/query/queryClient";
-import { LS_BUSTER, LS_PREFIX } from "@/composables/query/persisters";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import i18nInstance from "@/locales";
 const t = (i18nInstance.global as any).t;
@@ -241,41 +239,23 @@ describe("useStreams Composable", () => {
       expect(StreamService.nameList).toHaveBeenCalled();
     });
 
-    it("a forced read of one type replaces only that type's disk copy and reaches the server", async () => {
-      // What the persister leaves behind after an earlier session's fetch.
-      const seed = (type: string) => {
-        const key = ["org", "test-org", "streams", "nameList", type];
-        window.localStorage.setItem(
-          `${LS_PREFIX}-${hashKey(key)}`,
-          JSON.stringify({
-            queryKey: key,
-            queryHash: hashKey(key),
-            buster: LS_BUSTER,
-            state: { data: [{ name: "stale" }], dataUpdatedAt: Date.now(), errorUpdatedAt: 0 },
-          }),
-        );
-      };
-      const stored = (type: string) => {
-        const key = ["org", "test-org", "streams", "nameList", type];
-        const raw = window.localStorage.getItem(`${LS_PREFIX}-${hashKey(key)}`);
-        return raw ? JSON.parse(raw).state.data.map((s: any) => s.name) : null;
-      };
-      seed("logs");
-      seed("metrics");
-      // Observed at fetch time: the drop must already be done, and no persist can have run yet.
-      let seenAtFetch: unknown = null;
-      vi.mocked(StreamService.nameList).mockImplementation(async () => {
-        seenAtFetch = { logs: stored("logs"), metrics: stored("metrics") };
-        return { data: { list: [{ name: "test-stream", stream_type: "logs" }] } } as any;
-      });
+    it("a forced read of one type reaches the server and leaves the other types' cached lists alone", async () => {
+      queryClient.clear();
+      const key = (type: string) => ["org", "test-org", "streams", "nameList", type];
+      queryClient.setQueryData(key("logs"), [{ name: "stale" }]);
+      queryClient.setQueryData(key("metrics"), [{ name: "stale" }]);
+      mockStore.state.streams.logs = { list: [{ name: "stale" }] };
+      vi.mocked(StreamService.nameList).mockResolvedValueOnce({
+        data: { list: [{ name: "test-stream", stream_type: "logs" }] },
+      } as any);
 
       await streamsInstance.getStreams("logs", false, false, true);
-      // The persister writes the fresh copy on a macrotask.
-      await new Promise((resolve) => setTimeout(resolve, 0));
 
       expect(StreamService.nameList).toHaveBeenCalledTimes(1);
-      expect(seenAtFetch).toEqual({ logs: null, metrics: ["stale"] });
-      expect(stored("logs")).toEqual(["test-stream"]);
+      expect(queryClient.getQueryData(key("logs"))).toEqual([
+        { name: "test-stream", stream_type: "logs" },
+      ]);
+      expect(queryClient.getQueryState(key("metrics"))?.isInvalidated).toBe(false);
     });
 
     it("removeStream still invalidates when Vuex holds no copy of that type", async () => {
@@ -951,26 +931,6 @@ describe("useStreams Composable", () => {
       expect(await streamsInstance.getStreamsFetchedAt()).toBe(1000);
       expect(await streamsInstance.getStreamsFetchedAt("logs")).toBe(2000);
       expect(await streamsInstance.getStreamsFetchedAt("traces")).toBeUndefined();
-    });
-
-    it("getStreamsFetchedAt reports a list restored from disk at its saved time, not the restore time", async () => {
-      queryClient.clear();
-      const key = ["org", "test-org", "streams", "nameList", "enrichment_tables"];
-      const savedAt = Date.now() - 60_000;
-      window.localStorage.setItem(
-        `${LS_PREFIX}-${hashKey(key)}`,
-        JSON.stringify({
-          queryKey: key,
-          queryHash: hashKey(key),
-          buster: LS_BUSTER,
-          state: { data: [{ name: "saved-table" }], dataUpdatedAt: savedAt, errorUpdatedAt: 0 },
-        }),
-      );
-
-      await streamsInstance.getStreams("enrichment_tables", false, false);
-
-      expect(StreamService.nameList).not.toHaveBeenCalled();
-      expect(await streamsInstance.getStreamsFetchedAt("enrichment_tables")).toBe(savedAt);
     });
   });
 });

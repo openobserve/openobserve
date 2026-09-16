@@ -5,7 +5,6 @@ import { providersQuery } from "@/services/online-evals.service.queries";
 import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
 import { fetchInto } from "@/composables/query/fetchInto";
-import { dropPersistedCopies } from "@/composables/query/persisters";
 import { ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import onlineEvalsService, {
@@ -85,7 +84,6 @@ export function useOnlineEvalsData() {
     if (!orgId) return;
     try {
       const options = providersQuery(orgId);
-      await dropPersistedCopies(options.queryKey, true);
       await queryClient.invalidateQueries({
         queryKey: options.queryKey,
         exact: true,

@@ -6,8 +6,9 @@ button, detail, edit) is required to do with it.
 
 This is the developer-facing contract. The mechanics live in
 `src/composables/query/` (client, policy, persisters); each cached read is a
-`defineQuery` declared in the service file that owns its URL
-(`src/services/<domain>.ts`). The full rationale per endpoint is in
+TanStack `queryOptions()` declared next to the service that owns its URL
+(`src/services/<domain>.queries.ts`, keys in `<domain>.querykeys.ts`). The full
+rationale per endpoint is in
 `.claude/skills/ui-architect/references/data-fetching-inventory.md`.
 
 ---
@@ -16,9 +17,9 @@ This is the developer-facing contract. The mechanics live in
 
 | Knob            | Question it answers                             | Where it is set                                                            |
 | --------------- | ----------------------------------------------- | -------------------------------------------------------------------------- |
-| `staleTime`     | How long is a cached value served **without** a request? | A named constant from `src/composables/query/cachePolicy.ts` — never a bare number |
-| `gcTime`        | How long does an unused value stay in memory before it is collected? | Same file, same rule                                                       |
-| Invalidation    | Which writes make which reads refetch?          | The query's `scope` (a key prefix) + `invalidate()` calls after writes     |
+| `staleTime`     | How long is a cached value served **without** a request? | On every declaration: a named tier constant from `src/composables/query/cachePolicy.ts`, or `0` — never another bare number |
+| `gcTime`        | How long does an unused value stay in memory before it is collected? | Once, on the query client (`GC_TIME`). No declaration sets it; only the panel-result cache uses `PANEL_GC_TIME` |
+| Invalidation    | Which writes make which reads refetch?          | The mutation's `meta.invalidates` / `meta.removes`, naming a `<domain>Keys.all(org)` scope |
 
 `cachePolicy.ts` is **the only file in the app allowed to contain durations**.
 A `staleTime: 60000` at a call site or in a declaration is a review rejection —
@@ -26,151 +27,190 @@ if none of the constants fit, add a new named constant there.
 
 ### The constants (current values)
 
+Since 2026-09-15. `DEFAULT_STALE_TIME`, `CONFIG_STALE_TIME` and `LONG_GC_TIME`
+no longer exist.
+
 | Constant             | Value      | Meaning                                                        |
 | -------------------- | ---------- | -------------------------------------------------------------- |
-| `DEFAULT_STALE_TIME` | 30 s       | Set on the query client. Every query that says nothing gets it |
-| `CONFIG_STALE_TIME`  | 5 min      | Org configuration read on nearly every page                    |
-| `SESSION_STALE_TIME` | `Infinity` | Immutable for the session                                      |
-| `LONG_GC_TIME`       | 30 min     | Keep-in-memory for reads that are expensive to rebuild         |
-| _(no `gcTime` set)_  | 5 min      | TanStack's default — what every ordinary query gets            |
+| `LIVE_STALE_TIME`    | 1 min      | Live state: alerts, incidents, SLOs, synthetics monitors, anomaly detection, job statuses. Also the client default — only a safety net for a declaration that forgets its tier |
+| `MEDIUM_STALE_TIME`  | 5 min      | Streams, saved views, traces, service correlation, org summary, AI observability, online evals |
+| `NORMAL_STALE_TIME`  | 1 h        | Dashboards, pipelines, functions, workflows, reports, IAM, tokens, settings, alert destinations and templates |
+| `SESSION_STALE_TIME` | `Infinity` | Immutable for the session: `/config` only          |
+| `0` _(literal)_      | 0          | Payloads that must never be served cached: license usage, cleanup tasks |
+| `GC_TIME`            | 3 h        | Set once on the client: how long an unused result stays in memory |
+| `PANEL_GC_TIME`      | 30 min     | Dashboard panel-result cache only (large, and on IndexedDB anyway) |
+
+`refetchOnWindowFocus` and `refetchOnReconnect` are `false` on the client and no
+declaration turns them on: the console is often left open on a wall display and
+several endpoints are expensive.
 
 ---
 
 ## 2. The tiers
 
-Every read falls into exactly one tier. The tier decides all three knobs at
-once — you never pick `staleTime` and `gcTime` independently.
+Every read falls into exactly one tier, and **the tier is decided by the module
+the read belongs to**, not by the endpoint's shape. The tier sets `staleTime`
+only: `gcTime` is `GC_TIME` for every query, storage is memory, and nothing
+refetches on window focus or reconnect.
 
-| Tier              | `staleTime`          | `gcTime`      | Storage                 | Focus refetch | Typical member                     |
-| ----------------- | -------------------- | ------------- | ----------------------- | ------------- | ---------------------------------- |
-| **ENTITY_LIST**   | default (30 s)       | default (5 m) | memory                  | **yes**       | alerts list, dashboards in folder  |
-| **ENTITY_DETAIL** | default (30 s)       | default (5 m) | memory                  | no            | one alert, one report              |
-| **ORG_CONFIG**    | `CONFIG_STALE_TIME`  | `LONG_GC_TIME`| **localStorage**        | no            | folders, stream names, functions   |
-| **SESSION_STATIC**| `SESSION_STALE_TIME` | `SESSION_STALE_TIME` | localStorage or memory | no     | `/config`, built-in regex patterns |
-| **VOLATILE**      | `0`                  | 60 s          | memory                  | yes           | license usage, cleanup tasks       |
-| **HEAVY_RESULT**  | `0`                  | `LONG_GC_TIME`| **IndexedDB**           | no            | trace DAG payloads                 |
-| **SECRET**        | tier of its shape    | tier's        | **memory only — never persisted** | per tier | ingestion tokens, passcode |
+| Tier              | `staleTime`                  | `gcTime`                 | Storage                                   | Focus / reconnect refetch | Typical member                  |
+| ----------------- | ---------------------------- | ------------------------ | ----------------------------------------- | ------------------------- | ------------------------------- |
+| **LIVE**          | `LIVE_STALE_TIME` (1 min)    | `GC_TIME` (3 h)          | memory                                    | no                        | alerts list, incidents          |
+| **MEDIUM**        | `MEDIUM_STALE_TIME` (5 min)  | `GC_TIME`                | memory                                    | no                        | stream names, saved views       |
+| **NORMAL**        | `NORMAL_STALE_TIME` (1 h)    | `GC_TIME`                | memory                                    | no                        | dashboards in folder, functions |
+| **SESSION**       | `SESSION_STALE_TIME` (∞)     | `GC_TIME`                | memory                                    | no                        | `/config`                       |
+| **ZERO**          | `0`                          | `GC_TIME`                | memory                                    | no                        | license usage, cleanup tasks    |
+| **PANEL_RESULT**  | `Infinity`                   | `PANEL_GC_TIME` (30 min) | **IndexedDB**                             | no                        | dashboard panel results         |
 
-Notes on the two storage exceptions inside a tier:
+Notes:
 
-- **`nodesQuery`** uses ORG_CONFIG durations but is *not* persisted: it is
-  cluster state, and serving yesterday's node list from disk is worse than a
-  second of loading. **Verify the tier against the payload, not the endpoint
-  name** — `/api/license` sounds static but carries live usage counters.
-- **SECRET** is not a duration tier — it is a storage override. A credential
-  list keeps whatever freshness its shape deserves but must never gain a
-  `persister`. Pin this with a comment on the declaration (see
-  `src/services/api_keys.ts`) so a later edit to the file's durations cannot
-  silently start persisting it.
+- **Storage: memory. No `queryOptions()` declaration persists anything.** The
+  only persisted cache is the dashboard panel-result cache (`idbPersister`,
+  IndexedDB), which is not a query declaration; log field values have their own
+  separate IndexedDB database. **A new query must never add a `persister`.**
+  localStorage persistence was removed on 2026-09-15 and the trace DAG's
+  IndexedDB persistence on 2026-09-16, both for the same reason: a persisted
+  read with no `useQuery` observer is restored without any age check — a 12 h
+  old saved DAG was served with zero fetches (browser-verified 2026-09-16, only
+  a >24 h copy re-fetched) — and the DAG tab has no refresh control, so a trace
+  still receiving spans could show a partial DAG for up to a day.
+- **Every declaration names its tier.** The client default (`LIVE_STALE_TIME`)
+  is a safety net that errs on the fresh side, not a tier to rely on.
+- **Verify the tier against the payload, not the endpoint name** —
+  `/api/license` sounds static but carries live usage counters, so it is `0`.
+- **Credential-bearing reads** (ingestion/RUM/agent tokens, passcode, cipher
+  keys, destinations with auth headers) are memory only like every list and must
+  never gain a `persister`. Pin this with a comment on the declaration (see
+  `src/services/api_keys.queries.ts`, `src/services/alert_destination.queries.ts`).
 
 ### Decision tree for a new endpoint
 
 ```
-Not a GET / streaming / single-use URL / a GET that mutates?
-      └── no cache at all. useOrgMutation for writes.
+Not a GET / streaming / single-use URL / a GET that mutates / read-modify-write?
+      └── no cache at all. mutationOptions() with meta for writes.
 GET, reused across surfaces or visits?
-      ├── Immutable for the session?            → SESSION_STATIC
-      ├── Org configuration (names, folders,
-      │   templates, destinations, settings)?   → ORG_CONFIG
-      ├── A list of entities users CRUD?        → ENTITY_LIST
-      ├── One entity (detail / edit form)?      → ENTITY_DETAIL
-      ├── Operational state you poll or that
-      │   must never be a minute old?           → VOLATILE
-      └── Large result payload (MBs)?           → HEAVY_RESULT
-            │
-            └── whatever the tier: carries a token, key,
-                or passcode? → memory only, never persisted
+      ├── Carries live counters or job state that
+      │   must never be served cached?                         → 0
+      ├── Immutable for the session (/config)?                 → SESSION_STALE_TIME
+      └── otherwise, by the module it belongs to:
+            ├── alerts, incidents, SLOs, synthetics monitors,
+            │   anomaly detection, job statuses?               → LIVE_STALE_TIME
+            ├── streams, saved views, traces, service correlation,
+            │   org summary, AI observability, online evals?   → MEDIUM_STALE_TIME
+            └── dashboards, pipelines, functions, workflows,
+                reports, IAM, tokens, settings, destinations,
+                templates?                                      → NORMAL_STALE_TIME
+
+Storage, whatever the tier: memory. No declaration takes a persister — the
+dashboard panel-result cache is the only persisted cache in the app.
 ```
 
 ---
 
 ## 3. Module inventory — who has what today
 
-Derived from the `defineQuery` declarations in `src/services/`. When you add a
-query, add its row here.
+Derived from the `staleTime` on every `queryOptions()` in
+`src/services/*.queries.ts`. Scopes are the domain's `all` key from its
+`querykeys` file, shown without the `["org", <org>]` root. Every query below is
+memory only; the panel-result cache at the end is not a query declaration. When
+you add a query, add its row here.
 
-### ORG_CONFIG — 5 min stale, 30 min gc, localStorage
+### LIVE — 1 min stale, memory
 
-| Module / service            | Query                       | Invalidation scope             |
-| --------------------------- | --------------------------- | ------------------------------ |
-| Folders (`common.ts`)       | `foldersQuery(type)`        | `["folders"]` — all types      |
-| Streams (`stream.ts`)       | `streamNameListQuery(type)` | `["streams"]`                  |
-| Functions (`jstransform.ts`)| `functionsQuery`            | `["functions"]`                |
-| Functions (`query_functions.ts`) | `queryFunctionsQuery`  | `["functions"]`                |
-| Alert templates             | `templatesQuery`            | `["alerts","templates"]`       |
-| Destinations                | `destinationsQuery(module)` | `["alerts","destinations"]`    |
-| Org settings                | `orgSettingsQuery`          | `["organizations","settings"]` |
-| Org list                    | `orgListQuery`              | `["organizations","list"]`     |
-| Per-key settings            | `settingQuery(key, userId)` | `["settings","setting"]`       |
-| Regex patterns              | `regexPatternsQuery`        | `["settings","regexPatterns"]` |
-| AI toolsets                 | `aiToolsetsQuery`           | `["settings","aiToolsets"]`    |
-| Model pricing               | `modelPricingQuery`         | `["settings","modelPricing"]`  |
-| Actions                     | `actionsQuery`              | `["actions"]`                  |
-| IAM resources               | `resourcesQuery`            | `["iam","resources"]`          |
-| Eval providers              | `providersQuery`            | `["onlineEvals"]`              |
+| Module / service                                     | Query                                                                                                                       | Invalidation scope          |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| Alerts (`alerts.queries.ts`)                         | `alertsListQuery(folderId, query, alertType)`, `alertDetailQuery(id)`, `alertDependenciesQuery`, `alertHistoryQuery(query)` | `["alerts"]`                |
+| External alert sources (`alert_sources.queries.ts`)  | `alertSourcesQuery`                                                                                                         | `["alerts","sources"]`      |
+| Anomaly detection (`anomaly_detection.queries.ts`)   | `anomalyConfigsQuery`, `anomalyHistoryQuery(limit)`                                                                         | `["anomalyDetection"]`      |
+| Incidents (`incidents.queries.ts`)                   | `incidentsQuery(status, limit, offset)`                                                                                     | `["incidents"]`             |
+| SLOs (`slos.queries.ts`)                             | `slosQuery(folder)`                                                                                                         | `["slos"]`                  |
+| Synthetics (`synthetics.queries.ts`)                 | `syntheticsMonitorsQuery(folderId)`                                                                                         | `["synthetics","monitors"]` |
+| Enrichment tables (`jstransform.queries.ts`)         | `enrichmentTableStatusesQuery` (URL-import job statuses)                                                                    | `["functions"]`             |
 
-ORG_CONFIG durations but **memory only** (deliberate — see §2 notes):
+### MEDIUM — 5 min stale, memory
 
-| Module      | Query            | Why not persisted                       |
-| ----------- | ---------------- | --------------------------------------- |
-| Nodes       | `nodesQuery`     | live cluster state, stale disk copy misleads |
-| Cipher keys | `cipherKeysQuery`, `cipherKeyDetailQuery` | key material — SECRET override |
+| Module / service                                     | Query                                                                                                             | Invalidation scope             |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| Streams (`stream.queries.ts`)                        | `streamNameListQuery(type)`, `streamPageQuery(type, params)` (server table), `streamSchemaQuery(streamName, type)` | `["streams"]`                  |
+| Saved views (`saved_views.queries.ts`)               | `savedViewsQuery`                                                                                                 | `["search","savedViews"]`      |
+| Service graph (`service_graph.queries.ts`)           | `serviceTopologyQuery(range)` (time-bucketed key)                                                                 | `["traces","topology"]`        |
+| Traces (`search.queries.ts`)                         | `traceDagQuery(streamName, traceId, startTime, endTime)`                                                          | `["traces","dag"]`             |
+| Service streams (`service_streams.queries.ts`)       | `semanticGroupsQuery`, `identityConfigQuery`                                                                      | `["serviceStreams"]`           |
+| Org (`organizations.queries.ts`)                     | `orgSummaryQuery`                                                                                                 | `["organizations","summary"]`  |
+| LLM datasets (`llm-datasets.service.queries.ts`)     | `llmDatasetsQuery`                                                                                                | `["llm","datasets"]`           |
+| LLM experiments (`llm-experiments.queries.ts`)       | `experimentsListQuery(datasetId?)`, `remoteTasksListQuery`                                                        | `["experiments"]`, `["remoteTasks"]` |
+| LLM queues (`llm-queues.service.queries.ts`)         | `llmQueuesQuery`                                                                                                  | `["llm","queues"]`             |
+| GenAI agents (`gen-ai-agent-mapping.queries.ts`)     | `genAiAgentsQuery(startTime, endTime)`                                                                            | `["genAiAgents"]`              |
+| Online evals (`online-evals.service.queries.ts`)     | `providersQuery`, `scoreConfigsQuery`, `scorersQuery`, `evalJobsQuery`                                            | `["onlineEvals"]`              |
 
-### SESSION_STATIC — fresh forever within the session
+### NORMAL — 1 h stale, memory
 
-| Module              | Query                       | Storage       |
-| ------------------- | --------------------------- | ------------- |
-| App config (global) | `configQuery`               | memory (payload too small to be worth disk) |
-| Built-in patterns   | `builtInRegexPatternsQuery` | localStorage  |
+| Module / service                                           | Query                                                        | Invalidation scope                                                   |
+| ---------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Dashboards (`dashboards.queries.ts`)                       | `dashboardsByFolderQuery(folderId)`                          | `["dashboards"]`                                                     |
+| Dashboard annotations (`dashboard_annotations.queries.ts`) | `dashboardAnnotationsQuery(dashboardId, params)`             | `["dashboards"]`                                                     |
+| Folders (`common.queries.ts`)                              | `foldersQuery(type)`                                         | `["folders"]` — all types                                            |
+| Nodes (`common.queries.ts`)                                | `nodesQuery`                                                 | `["settings","nodes"]`                                               |
+| Per-key settings (`settings.queries.ts`)                   | `settingQuery(key, userId)`                                  | `["settings","setting"]`                                             |
+| Pipelines (`pipelines.queries.ts`)                         | `pipelinesQuery`, `pipelineHistoryQuery(params)`             | `["pipelines"]`                                                      |
+| Functions (`jstransform.queries.ts`)                       | `functionsQuery`                                             | `["functions"]`                                                      |
+| SQL function catalogue (`query_functions.queries.ts`)      | `queryFunctionsQuery`                                        | `["functions"]`                                                      |
+| Workflows (`workflows.queries.ts`)                         | `workflowsQuery`                                             | `["workflows"]`                                                      |
+| Reports (`reports.queries.ts`)                             | `reportsQuery(filters)`                                      | `["reports"]`                                                        |
+| IAM (`iam.queries.ts`)                                     | `groupsQuery`, `rolesQuery`, `resourcesQuery`                | `["iam","groups"]`, `["iam","roles"]`, `["iam","resources"]`         |
+| IAM users (`users.queries.ts`)                             | `orgUsersQuery`, `assignableRolesQuery`, `allUserRolesQuery` | `["iam","users"]`                                                    |
+| Service accounts (`service_accounts.queries.ts`)           | `serviceAccountsQuery`                                       | `["iam","serviceAccounts"]`                                          |
+| Ingestion tokens, passcode (`organizations.queries.ts`)    | `ingestionTokensQuery`, `orgPasscodeQuery`                   | `["organizations","ingestionTokens"]`, `["organizations","passcode"]` |
+| RUM token (`api_keys.queries.ts`)                          | `rumTokensQuery`                                             | `["organizations","rumTokens"]`                                      |
+| Synthetics agent tokens (`synthetics.queries.ts`)          | `agentTokensQuery`                                           | `["synthetics","agentTokens"]`                                       |
+| Regex patterns (`regex_pattern.queries.ts`)                | `regexPatternsQuery`, `builtInRegexPatternsQuery`            | `["settings","regexPatterns"]`, `["settings","builtInRegexPatterns"]` |
+| Cipher keys (`cipher_keys.queries.ts`)                     | `cipherKeysQuery`                                            | `["settings","cipherKeys"]`                                          |
+| AI toolsets (`ai_toolsets.queries.ts`)                     | `aiToolsetsQuery`                                            | `["settings","aiToolsets"]`                                          |
+| Model pricing (`model_pricing.queries.ts`)                 | `modelPricingQuery`                                          | `["settings","modelPricing"]`                                        |
+| Org settings (`organizations.queries.ts`)                  | `orgSettingsQuery`                                           | `["organizations","settings"]`                                       |
+| Alert destinations (`alert_destination.queries.ts`)        | `destinationsQuery(module)`                                  | `["alerts","destinations"]`                                          |
+| Alert templates (`alert_templates.queries.ts`)             | `templatesQuery`                                             | `["alerts","templates"]`                                             |
 
-### ENTITY_LIST / ENTITY_DETAIL — 30 s stale, memory
+### SESSION — fresh forever within the session
 
-Lists set `refetchOnWindowFocus: true`; details do not.
+| Module                              | Query                                                  | Storage                                  |
+| ----------------------------------- | ------------------------------------------------------ | ---------------------------------------- |
+| App config (global)                 | `configQuery`                                          | memory                                   |
+| Full org config (`config.queries.ts`) | `configFullQuery`                                    | memory                                   |
 
-| Domain        | List queries                                        | Detail queries               |
-| ------------- | --------------------------------------------------- | ---------------------------- |
-| Alerts        | `alertsListQuery(folderId, query, alertType)`, `alertSourcesQuery`, `alertHistoryQuery` | `alertDetailQuery(id)` |
-| Dashboards    | `dashboardsByFolderQuery(folderId)`, `dashboardAnnotationsQuery` | — (`get_Dashboard` deliberately uncached: its `hash` drives concurrency control) |
-| Reports       | `reportsQuery(filters)`                             | `reportDetailQuery(id)`      |
-| Pipelines     | `pipelinesQuery`                                    | `pipelineDetailQuery(name)`  |
-| SLOs          | `slosQuery(folder)`                                 | `sloDetailQuery(id)`         |
-| Synthetics    | `syntheticsMonitorsQuery(folderId)`                 | `monitorDetailQuery(id)`     |
-| Workflows     | `workflowsQuery`                                    | —                            |
-| Incidents     | `incidentsQuery(status, limit, offset)`             | —                            |
-| Anomaly       | `anomalyConfigsQuery`, `anomalyHistoryQuery(limit)` | —                            |
-| Streams       | `streamPageQuery(type, params)` (server table)      | —                            |
-| Saved views   | `savedViewsQuery`                                   | —                            |
-| Service graph | `serviceTopologyQuery(range)` (time-bucketed key)   | —                            |
-| Org           | `orgSummaryQuery`                                   | —                            |
-| Billing       | `subscriptionQuery`, `invoiceHistoryQuery`, `aiUsageQuery`, `billingGroupMembersQuery` | — |
-| IAM           | `orgUsersQuery`, `pendingInvitesQuery`, `serviceAccountsQuery`, `groupsQuery`, `rolesQuery` | `rolePermissionsQuery(role)` |
-| LLM / Evals   | `llmDatasetsQuery`, `llmQueuesQuery`, `scoreConfigsQuery`, `scorersQuery`, `evalJobsQuery` | — |
+### ZERO — `staleTime: 0`, memory
 
-### VOLATILE — 0 s stale, 60 s gc
+| Module        | Query                                   | Why                                                          |
+| ------------- | --------------------------------------- | ------------------------------------------------------------ |
+| License       | `licenseQuery` (global)                 | carries live usage counters                                  |
+| Cleanup tasks | `cleanupTasksQuery(targetOrg, metaOrg)` | operational job state; the dialog polls every 5 s until done |
 
-| Module        | Query                          | Why                              |
-| ------------- | ------------------------------ | -------------------------------- |
-| License       | `licenseQuery` (global)        | carries live usage counters      |
-| Cleanup tasks | `cleanupTasksQuery(targetOrg)` | operational job state            |
+### PANEL_RESULT — `Infinity` stale, IndexedDB, 30 min gc
 
-### HEAVY_RESULT — 0 s stale, IndexedDB, 30 min gc
+| Module           | Where                                        | Options                                                                |
+| ---------------- | -------------------------------------------- | ---------------------------------------------------------------------- |
+| Dashboard panels | `src/composables/dashboard/usePanelCache.ts` | `staleTime: Infinity`, `gcTime: PANEL_GC_TIME`, `persister: idbPersister.persisterFn` |
 
-| Module | Query                                     |
-| ------ | ----------------------------------------- |
-| Traces | `traceDagQuery(stream, traceId, from, to)`|
+This is a hand-built cache entry, not a `queryOptions()` declaration, and it is
+the only persisted cache in the app: 24 h `maxAge`, an `IDB_BUSTER` string bumped
+when the response shape changes, and an LRU trim in `idbStorage.ts`. A dashboard
+has its own refresh control, which is what makes persisting its panels safe.
 
 ### SECRET — memory only, never a persister
 
 `ingestionTokensQuery`, `orgPasscodeQuery`, `rumTokensQuery`,
-`agentTokensQuery`, `cipherKeysQuery` / `cipherKeyDetailQuery`, plus RUM and
-service-account tokens wherever they appear.
+`agentTokensQuery`, `cipherKeysQuery`, `destinationsQuery` (webhook auth
+headers and integration keys), plus service-account tokens wherever they
+appear. No list is persisted anyway; these carry a comment so it stays that way.
 
 ### Never cached at all
 
 Ad-hoc search (`search.search`, `_around`, partitions, WebSocket), AI chat
 streams, single-use URLs and page tokens, any GET that mutates (billing
-`unsubscribe` / `resume_subscription`), `dashboards.get_Dashboard`, and
-read-modify-write dialogs (e.g. `WorkflowLinkAlertsDialog`).
+`unsubscribe` / `resume_subscription`), billing reads (there are no billing
+query declarations: the billing pages call `BillingService` directly),
+`dashboards.get_Dashboard`, and read-modify-write dialogs (e.g.
+`WorkflowLinkAlertsDialog`).
 
 ---
 
@@ -229,7 +269,7 @@ logout purge, and scope invalidation are all prefix matches on it.
 | Typed catalog          | Folders            | `(type) => ["folders", type]`                                |
 | Per-key setting        | Settings           | `(key, userId) => ["settings", "setting", key, userId ?? "__org__"]` |
 | Time-bucketed result   | Service topology   | `["traces", "topology", quantizeRange(start, end, BUCKET)]`  |
-| Heavy result           | Trace DAG          | `["traces", "dag", traceId, stream, start, end]`             |
+| Result keyed by inputs | Trace DAG          | `["traces", "dag", traceId, stream, start, end]`             |
 | Global singleton       | `/config`, license | `["config", "get"]`, `["license"]` → rooted at `["org", "__global__"]` |
 
 ---
@@ -254,7 +294,6 @@ Save/delete → `invalidate(org)` / `remove(org)` on the module scope.
 | Anomaly detection | `["anomalyDetection","list"]`, `[…,"history",limit]`   | row data                                   |
 | Streams           | `["streams","page",type,params]` (server table)        | schema fetched raw on demand               |
 | Saved views       | `["search","savedViews"]`                              | row data                                   |
-| Billing           | `["billing","subscription" \| "invoices" \| "aiUsage" \| "groupMembers"]` | — (read-only surfaces)      |
 | IAM users         | `["iam","users"]`, `["iam","invitations"]`, `["iam","serviceAccounts"]`, `["iam","groups"]` | row data / raw group fetch |
 | LLM               | `["llm","datasets","list"]`, `["llm","queues","list"]` | row data                                   |
 | Online evals      | `["onlineEvals","scoreConfigs" \| "scorers" \| "jobs"]`| row data                                   |
@@ -276,31 +315,33 @@ go stale independently.
 | Reports     | `["reports","list",folder,filters]`   | `["reports","detail",id]`             |                                 |
 | Pipelines   | `["pipelines","list"]`                | `["pipelines","detail",name]`         |                                 |
 | SLOs        | `["slos","list",folder]`              | `["slos","detail",id]`                |                                 |
-| Synthetics  | `["synthetics","monitors",folderId]`  | `["synthetics","detail",id,folderId]` | `["synthetics","agentTokens"]` (SECRET) |
+| Synthetics  | `["synthetics","monitors",folderId]`  | `["synthetics","detail",id,folderId]` | `["synthetics","agentTokens"]` (credential, memory only) |
 | IAM roles   | `["iam","roles"]`                     | `["iam","roles","permissions",role]`  |                                 |
-| Cipher keys | `["settings","cipherKeys"]`           | `[…,"cipherKeys","detail",name]`      | SECRET — memory only            |
+| Cipher keys | `["settings","cipherKeys"]`           | `[…,"cipherKeys","detail",name]`      | credential — memory only        |
 
 **Reference member to copy: `reports.ts` or `slos.ts`** — the canonical pair.
 
 ### Shape C — config catalog
 
-One unparameterised (or type-keyed) read on the ORG_CONFIG tier, consumed by
-*other* modules' forms and pickers, not by its own CRUD page alone. The managing
-page's save invalidates the catalog so every consumer refetches.
+One unparameterised (or type-keyed) read, consumed by *other* modules' forms
+and pickers, not by its own CRUD page alone. Its tier comes from its module like
+any other read (§3), and it is held in memory only. The managing page's save
+invalidates the catalog so every consumer refetches.
 
-Members: folders `(type)`, stream names `(type)`, functions, alert templates,
-destinations `(module)`, org settings, org list, per-key settings, regex
-patterns, AI toolsets, model pricing, actions, IAM resources, eval providers —
-plus the two memory-only exceptions, nodes and cipher keys (§3).
+Members: folders `(type)`, stream names `(type)`, functions, the SQL function
+catalogue, alert templates, destinations `(module)`, org settings, per-key
+settings, regex patterns, AI toolsets, model pricing, IAM resources, eval
+providers, nodes, cipher keys.
 
 **Reference member to copy: `jstransform.ts` (`functionsQuery`).**
 
 ### Shape D — global / result singletons
 
-Non-org reads (`configQuery`, `licenseQuery` via `defineGlobalQuery`) and
+Non-org reads (`configQuery`, `licenseQuery`, keyed with `globalKey`) and
 result payloads keyed by their inputs (`traceDagQuery`, `serviceTopologyQuery`).
 No CRUD surface; no invalidation from writes — freshness comes from the tier
-(`SESSION_STALE_TIME` or `0`).
+(`SESSION_STALE_TIME` for config, `MEDIUM_STALE_TIME` for the trace DAG and
+service topology, `0` for license).
 
 ### Known inconsistencies (open for discussion)
 
@@ -328,13 +369,15 @@ else reads cached.
 | ----------------------------- | --------------------------------------- | -------------------------------------------------------------- |
 | List page mount, route change | `xQuery.load({ org, apply, loading })` or `xQuery.get(org)` | Cached rows paint instantly; a request fires only if stale |
 | **Refresh button click**      | named handler → loader with `force: true` → `xQuery.refresh(org)` | **Always hits the server** (staleTime bypassed), spinner via `isFetching`/`loading` |
-| Detail page open              | `detailQuery.get(org, id)`              | Cached within 30 s of the last visit; otherwise fetches        |
+| Detail page open              | `detailQuery.get(org, id)`              | Cached within the module's `staleTime` (1 min for alerts); otherwise fetches |
 | Edit form open                | `detailQuery.get(org, id)` — or the raw service call when the payload carries concurrency state (dashboard `hash`) | Same as detail; a form that must not start from stale data uses `refresh()` |
 | Save (create/update)          | service write → `xQuery.invalidate(org)` | Next read of the whole `scope` refetches — list *and* detail   |
 | Delete                        | service delete → `xQuery.remove(org)` (via `useOrgMutation`'s `removes`) | Also drops inactive detail entries so a re-opened detail can't serve the deleted entity |
 | Explicit search / filter submit | loader with `force: true`             | Hits the server                                                |
-| Window refocus                | automatic, lists only (`refetchOnWindowFocus`) | Background refetch if stale — no spinner                  |
-| Org switch                    | automatic (`purgeOrgQueries`)           | Memory kept (keys are org-rooted, `gcTime` collects it), disk purged for the org being left |
+| Window refocus                | nothing (`refetchOnWindowFocus: false` for every query) | No request                             |
+| Network reconnect             | nothing (`refetchOnReconnect: false` for every query)   | No request                             |
+| Browser reload                | nothing to restore — every query is memory only | Every query fetches on its first read; only dashboard panel results come back from IndexedDB |
+| Org switch                    | automatic (`purgeOrgQueries`)           | Memory kept (keys are org-rooted, `gcTime` collects it); IndexedDB entries (panel results, field values) purged for the org being left and for orgs left behind by older sessions |
 | Logout                        | automatic (`purgeAllQueries`)           | Everything cleared, memory and disk                            |
 
 ### The refresh-button rule, spelled out
@@ -376,13 +419,13 @@ const refreshData = () => getData(true);
 
 ### Detail and edit pages, spelled out
 
-- **Detail view** (read-only): `detailQuery.get(org, id)`. Within 30 s of the
-  list visit or the last open, this costs zero requests — that is the point of
-  ENTITY_DETAIL.
-- **Edit form**: also `detailQuery.get(org, id)` for the common case. The 30 s
-  window is short enough that a form seeded from it is safe, *because every
-  write invalidates the scope* — so the cached value can only be stale by 30 s
-  of someone else's edits, same as before caching existed. If the domain needs
+- **Detail view** (read-only): `detailQuery.get(org, id)`. Within the module's
+  `staleTime` (1 min for alerts) of the list visit or the last open, this costs
+  zero requests.
+- **Edit form**: also `detailQuery.get(org, id)` for the common case. *Every
+  write from this client invalidates the scope*, so the cached value can only
+  miss other users' edits made within the module's `staleTime` (up to 1 h on the
+  NORMAL tier); a form that must not start from that uses `refresh()`. If the domain needs
   optimistic-concurrency (dashboards' `hash`) or does read-modify-write on a
   shared object, **do not cache the read at all** — fetch raw.
 - **After save**: `invalidate(org)` on the scope, then navigate. Do not
@@ -410,43 +453,63 @@ const refreshData = () => getData(true);
 
 ## 7. Declaring a new cached read — the template
 
-In the service file that owns the URL, below the builders:
+Keys go in `src/services/<domain>.querykeys.ts`; the read and its writes go in
+`src/services/<domain>.queries.ts`:
 
 ```ts
-import { defineQuery } from "@/composables/query/queryClient";
-import { CONFIG_STALE_TIME, LONG_GC_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
+// things.querykeys.ts — keys only, so another domain can drop this scope without importing the transport
+import { orgKey } from "@/composables/query/keys";
 
-// ENTITY_LIST: say nothing about durations — the client default is the tier.
-export const thingsQuery = defineQuery<[], Thing[]>({
-  key: ["things", "list"], // rooted at ["org", <org>, ...] automatically
-  fetch: async (org) => (await thingService.list(org)).data?.list ?? [],
-  refetchOnWindowFocus: true,
-  scope: ["things"],
-});
+export const thingKeys = {
+  all: (org: string) => orgKey(org, "things"), // the invalidation scope
+  list: (org: string) => orgKey(org, "things", "list"),
+};
+```
 
-// ORG_CONFIG: the named constants plus the persister — all three or none.
-export const thingCatalogQuery = defineQuery<[], Catalog>({
-  key: ["things", "catalog"],
-  fetch: async (org) => (await thingService.catalog(org)).data ?? null,
-  staleTime: CONFIG_STALE_TIME,
-  gcTime: LONG_GC_TIME,
-  persister: localStoragePersister,
-  scope: ["things"],
-});
+```ts
+// things.queries.ts
+import { mutationOptions, queryOptions } from "@tanstack/vue-query";
+import thingService from "./things";
+import { thingKeys } from "./things.querykeys";
+import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+
+// Name the module's tier (§3). No gcTime, no persister, no refetchOn* flags.
+export const thingsQuery = (org: string) =>
+  queryOptions({
+    queryKey: thingKeys.list(org),
+    queryFn: async (): Promise<Thing[]> => (await thingService.list(org)).data?.list ?? [],
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+export const saveThingMutation = (org: string) =>
+  mutationOptions({
+    mutationFn: (payload: Thing) => thingService.save(org, payload),
+    meta: { invalidates: [thingKeys.all(org)] },
+  });
 ```
 
 Rules the template encodes:
 
-- **Defaults are silence.** An ENTITY tier query states no durations at all.
-- **A tier is atomic.** ORG_CONFIG is the constant pair *and* the persister
-  together; don't mix a 5-minute staleTime with the default gcTime.
-- The queryFn never returns `undefined` — `?? null`.
-- A parameterised key is a function of the same args `fetch` takes after `org`,
-  and states its `scope` so siblings invalidate together.
-- `defineGlobalQuery` for the rare non-org read (`/config`, license).
-- A credential-bearing read gets a `// never persisted — <what it carries>`
-  comment where the persister would go.
+- **Every declaration names its tier** — `LIVE_STALE_TIME`, `MEDIUM_STALE_TIME`,
+  `NORMAL_STALE_TIME` or `SESSION_STALE_TIME` by module (§3), or `0` for a
+  payload with live counters. Leaving it out falls back to `LIVE_STALE_TIME`,
+  which is a safety net, not a choice.
+- **No `gcTime` on a declaration.** `GC_TIME` (3 h) is set once on the client;
+  only the panel-result cache sets `PANEL_GC_TIME`.
+- **No `refetchOnWindowFocus` / `refetchOnReconnect`.** Both are `false` on the
+  client for every query.
+- **No `persister`, on any query.** No declaration persists; the dashboard
+  panel-result cache is the only persisted cache and it is not a declaration.
+- The queryFn never returns `undefined` — `?? null` / `?? []`.
+- A parameterised key is a function of the same args the queryFn uses, lives in
+  the `querykeys` file, and sits under the domain's `all` scope so siblings
+  invalidate together.
+- `globalKey` for the rare non-org read (`/config`, license).
+- A credential-bearing read gets a comment on the declaration saying it must
+  never gain a persister (see `api_keys.queries.ts`).
+- Components read with `useQuery(thingsQuery(org))`. `fetchInto` is only for
+  Options API components and imperative flows; it writes a snapshot that an
+  invalidation elsewhere will not repaint.
 
 ---
 
@@ -454,15 +517,19 @@ Rules the template encodes:
 
 Reject a PR that:
 
-- [ ] has a numeric `staleTime`/`gcTime` outside `cachePolicy.ts`
+- [ ] has a numeric `staleTime`/`gcTime` outside `cachePolicy.ts` (the literal
+      `staleTime: 0` is the one exception)
+- [ ] declares a query without naming its tier, or sets `gcTime`,
+      `refetchOnWindowFocus` or `refetchOnReconnect` on a declaration
 - [ ] binds a loader straight to a template event (`@click="getData"`)
 - [ ] passes `force: true` from anywhere except a Refresh button, a post-write
       reload, or an explicit user search
 - [ ] invalidates an exact key instead of the scope, or re-calls a page loader
       from a write path
-- [ ] persists a query whose payload carries a token, key, or passcode
-- [ ] gives operational/cluster state a persister or a non-zero staleTime
-      because its *name* sounded like config
+- [ ] adds a `persister` to any `queryOptions()` declaration — the dashboard
+      panel-result cache is the only persisted cache
+- [ ] gives a payload with live counters or job state a cached tier because its
+      *name* sounded like config
 - [ ] caches a GET that mutates, a single-use URL, or a read-modify-write read
 - [ ] uses `ensureQueryData` (returns stale data after invalidation — the
       layer uses `fetchQuery`)

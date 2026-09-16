@@ -22,7 +22,7 @@ import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
 /**
  * Read by the alert form, pipelines and IAM. Memory-only: destination payloads
  * can carry webhook Authorization headers and PagerDuty/Opsgenie/ServiceNow
- * keys, which must not sit in localStorage like the other config lists do.
+ * keys, so this entry must never gain a persister.
  */
 export const destinationsQuery = (org: string, module?: DestinationModule) =>
   queryOptions({

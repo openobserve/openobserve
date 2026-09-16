@@ -14,12 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { MutationCache, QueryClient } from "@tanstack/vue-query";
-import {
-  dropPersistedCopies,
-  purgeAllPersisted,
-  purgePersistedExceptOrg,
-  purgePersistedOrg,
-} from "./persisters";
+import { purgeAllPersisted, purgePersistedExceptOrg, purgePersistedOrg } from "./persisters";
 import { GC_TIME, LIVE_STALE_TIME } from "./cachePolicy";
 // Type-only: erased at build time. This module must not pull UI or i18n into its
 // runtime graph — the unit-test setup imports it eagerly, so a runtime edge here
@@ -84,16 +79,13 @@ export const queryClient = new QueryClient({
    * makes the migration to this incremental.
    */
   mutationCache: new MutationCache({
-    onSuccess: async (_data, _vars, _onMutateResult, mutation) => {
+    onSuccess: (_data, _vars, _onMutateResult, mutation) => {
       const meta = mutation.meta;
       if (!meta) return;
       for (const key of meta.removes ?? []) {
-        await dropPersistedCopies(key);
         queryClient.removeQueries({ queryKey: key, type: "inactive" });
       }
       for (const key of meta.invalidates ?? []) {
-        // Disk first: the refetch this triggers writes a fresh copy that must never be deleted after it lands.
-        await dropPersistedCopies(key);
         void queryClient.invalidateQueries({ queryKey: key });
       }
       if (meta.successMessage) {
@@ -137,10 +129,9 @@ export const queryClient = new QueryClient({
  * The payoff is that switching back to a recent org inside its staleTime costs
  * no requests at all.
  *
- * Disk is different: localStorage is a ~5 MB budget shared with the whole app,
- * so persisting every org visited would eventually hit quota (silently — the
- * storage wrapper swallows it), and the previous tenant's stream, folder and
- * function names would sit on a possibly shared machine.
+ * Disk is different: IndexedDB would pile up every visited org's panel results
+ * and trace DAGs, and the previous tenant's data would sit on a possibly shared
+ * machine.
  */
 // Imported lazily: this module is loaded eagerly by the unit-test setup, and a
 // static edge to fieldValueStore would load its real dependency graph before

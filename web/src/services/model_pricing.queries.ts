@@ -17,19 +17,17 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import modelPricing from "./model_pricing";
 import { modelPricingKeys } from "./model_pricing.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export const modelPricingQuery = (org: string) =>
   queryOptions({
     queryKey: modelPricingKeys.list(org),
     queryFn: async (): Promise<any[]> => (await modelPricing.list(org)).data ?? [],
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 // ── Writes ──────────────────────────────────────────────────────────────────
 
-/** The list is an hour-long persisted read, so the editor would otherwise route back to a pre-write copy. */
+/** The list is an hour-long cached read, so the editor would otherwise route back to a pre-write copy. */
 export const saveModelPricingMutation = (org: string) =>
   mutationOptions({
     // The id travels in the vars: the editor only knows it per submitted model.

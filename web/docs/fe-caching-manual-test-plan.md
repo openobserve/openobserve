@@ -26,7 +26,7 @@ written. Each module lists: **where to go**, **what to check**, **what to expect
 | --- | --- | --- |
 | **Network tab** | DevTools → Network → filter `Fetch/XHR` | Whether a request actually went to the server. This is the primary signal. |
 | **TanStack Query Devtools** | Bottom corner of the app (**dev builds only**) — click the floating logo | Every cache entry, its key, its state (`fresh` / `stale` / `fetching` / `inactive`) and its payload. Fastest way to prove a screen painted from cache. |
-| **Application tab** | DevTools → Application | **Local Storage** → keys starting `o2q-` · **IndexedDB** → `o2Cache` (store `kv`) and `o2FieldValues` |
+| **Application tab** | DevTools → Application | **IndexedDB** → `o2Cache` (store `kv`, keys `o2q-heavy-…` — **dashboard panel results only** since *trace DAG un-persisted 2026-09-16*; the same store backs Metrics Explorer previews and LLM Insights panels) and `o2FieldValues`. **Local Storage** holds no `o2q-` query keys any more *(localStorage persistence removed 2026-09-15)* — any still there are residue from an older build, and nothing reads them |
 
 Every cache key starts `["org", "<your-org-id>", …]`. If you see a key that does not,
 that is a bug — it opts out of the org-switch and logout purges.
@@ -46,12 +46,12 @@ that is a bug — it opts out of the org-switch and logout purges.
 | Window | Duration | Applies to |
 | --- | --- | --- |
 | Live | **1 minute** *(re-tiered 2026-09-15; was the 30 s "Default" tier)* | Alerts list / detail / history / dependencies, alert sources, incidents, anomaly detection, SLOs, synthetics monitors, enrichment-table statuses |
-| Medium | **5 minutes** *(re-tiered 2026-09-15; was the "Config" tier)* | Streams (name lists, paged list, schema), saved views, service topology, field grouping / identity config, org summary, LLM providers, online evals (score configs, scorers, eval jobs), AI datasets / experiments / remote tasks / queues, GenAI agents |
+| Medium | **5 minutes** *(re-tiered 2026-09-15; was the "Config" tier)* | Streams (name lists, paged list, schema), saved views, service topology, trace DAG *(re-tiered 2026-09-16 from the session tier — trace DAG un-persisted 2026-09-16)*, field grouping / identity config, org summary, LLM providers, online evals (score configs, scorers, eval jobs), AI datasets / experiments / remote tasks / queues, GenAI agents |
 | Normal | **1 hour** *(new tier 2026-09-15)* | Dashboards, folders, annotations, home / favourite settings, pipelines and pipeline history, functions, query-function catalogue, workflows, reports, IAM (users, roles, groups, resources, service accounts, ingestion / RUM / agent tokens, passcode), nodes, regex patterns (built-in too), cipher keys, AI toolsets, model pricing, org settings, destinations, templates |
-| Session | **forever** | `/config`, trace DAG *(built-in regex patterns moved to the 1 h tier 2026-09-15)* |
+| Session | **forever** | `/config` only *(built-in regex patterns moved to the 1 h tier 2026-09-15; the trace DAG moved to the 5 min medium tier — trace DAG un-persisted 2026-09-16)* |
 | Never | **0** | License, cleanup tasks — always re-read |
 | Garbage collection | **3 hours** for every query *(set 2026-09-15; was 5 min, or 30 min for the config tier)*; panel results 30 min | Unused entries in memory |
-| Persisted-to-disk max age | **24 hours** | Anything in `localStorage` / `IndexedDB` |
+| Persisted-to-disk max age | **24 hours** | Anything in `IndexedDB` — dashboard panel results only *(localStorage persistence removed 2026-09-15 — nothing is persisted to `localStorage` any more; trace DAG un-persisted 2026-09-16 — it is memory-only now)* |
 
 > When a step says "wait past the window", use the table above to know whether that is
 > 1 min, 5 min or 1 h for the surface you are on (until 2026-09-15 the choices were 30 s or
@@ -64,10 +64,13 @@ that is a bug — it opts out of the org-switch and logout purges.
 ## 1. The universal checklist — run this on EVERY cached list
 
 > **Cold-read counts assume an empty cache.** Ctrl+Shift+R clears the HTTP cache but **not**
-> `localStorage`, so persisted queries (templates, destinations, streams, folders, functions,
-> regex patterns, org settings) can survive a hard reload and will not re-request. If a C1
-> count comes out lower than listed, that is usually why — not a fault. For a genuinely cold
-> read, log out and back in, or clear site data.
+> `localStorage`, so until 2026-09-15 persisted queries (templates, streams, folders, functions,
+> regex patterns, …) could survive a hard reload and not re-request, and a C1 count could come
+> out lower than listed. **localStorage persistence removed 2026-09-15:** every list is now
+> memory-only, so a hard reload fetches it from the server and the C1 counts hold as listed.
+> Only the IndexedDB caches (dashboard panel results, field values) survive a
+> reload — for a genuinely cold read of those, log out and back in, or clear site data.
+> *(Trace DAG un-persisted 2026-09-16: it no longer survives a reload either.)*
 
 ### Which sections get C1–C8, and which do not
 
@@ -172,10 +175,10 @@ freshness from the Network tab.
 | Tier | Duration | Applies to | How to verify |
 | --- | --- | --- | --- |
 | **Live** | **1 min** *(was the 30 s "Default" tier)* | Alerts, incidents, alert sources, anomaly detection, SLOs, synthetics, enrichment-table statuses | Open a list, watch its Devtools badge flip `fresh` → `stale` after 1 min |
-| **Medium** | **5 min** *(was the "Config" tier)* | Streams, saved views, service topology, field grouping, LLM providers, online evals, AI observability lists | Same, but the flip takes 5 minutes |
+| **Medium** | **5 min** *(was the "Config" tier)* | Streams, saved views, service topology, trace DAG *(trace DAG un-persisted 2026-09-16 — re-tiered here from session)*, field grouping, LLM providers, online evals, AI observability lists | Same, but the flip takes 5 minutes |
 | **Normal** | **1 h** *(new 2026-09-15)* | Dashboards, folders, pipelines, functions, workflows, reports, IAM, settings, nodes, destinations, templates, regex patterns, cipher keys, AI toolsets, model pricing | Same, but the flip takes an hour — backdate `dataUpdatedAt` in the console rather than waiting |
-| **Session** | **forever** | `/config` and the trace DAG only *(built-in regex patterns are 1 h since 2026-09-15)* | Badge stays `fresh` for the whole session — it must **never** go stale |
-| **Persisted max age** | **24 h** | Anything in localStorage / IndexedDB | An entry older than 24 h is discarded on read rather than served |
+| **Session** | **forever** | `/config` only *(built-in regex patterns are 1 h since 2026-09-15; the trace DAG is 5 min — trace DAG un-persisted 2026-09-16)* | Badge stays `fresh` for the whole session — it must **never** go stale |
+| **Persisted max age** | **24 h** | Anything in IndexedDB — panel results only *(localStorage persistence removed 2026-09-15; trace DAG un-persisted 2026-09-16)* | An entry older than 24 h is discarded on read rather than served |
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
@@ -183,7 +186,7 @@ freshness from the Network tab.
 | **P2** | Stale window triggers revalidation | Same, but wait **past 1 min** *(re-tiered 2026-09-15; was 30 s)* | Rows paint instantly, then **one** background request. Badge goes `stale` → `fetching` → `fresh` |
 | **P3** | Medium tier is longer | Open Streams, come back **after 2 minutes** *(re-tiered 2026-09-15; was "after 1 minute" against the 30 s default)* | Still **zero** requests — the 5-minute medium tier has not expired, while an Alerts list (1 min) would already have refetched. This is what distinguishes the tiers |
 | **P4** | Session tier never expires | Sit in the app for 10+ minutes, navigating around | `/config` is requested **once, ever**. Never re-requested |
-| **P5** | Built-in patterns are long-lived and persisted | Settings → Regex Patterns → Built-in tab, revisit repeatedly | One request, and it survives F5 (persisted). *Re-tiered 2026-09-15 to the 1 h normal tier (was session / never): expect one background refetch after an hour, not never* |
+| **P5** | Built-in patterns are long-lived *(and persisted until 2026-09-15)* | Settings → Regex Patterns → Built-in tab, revisit repeatedly | One request, then **0** on every revisit within the window. F5 fetches the list from the server again — **one** request, and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; it used to survive F5 with no request)*. *Re-tiered 2026-09-15 to the 1 h normal tier (was session / never): expect one background refetch after an hour, not never* |
 
 ### Eviction, focus, polling, retry
 
@@ -202,9 +205,9 @@ freshness from the Network tab.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **P14** | Persisted entries survive reload | Visit Streams and Dashboards, then press **F5** | Lists paint from localStorage before any request completes |
-| **P15** | Version buster discards old payloads | Console: `localStorage.setItem('o2q-["org","default","functions","list"]', '{"buster":"0"}')` then reload Functions | The tampered entry is **discarded, not rendered** — a mismatched buster is treated as invalid |
-| **P16** | Corrupt entry is discarded | Console: write `'not json'` into any `o2q-` key, reload that page | Entry removed, page loads normally from the server. **No crash** |
+| **P14** | A reload refetches the lists *(until 2026-09-15: persisted entries survive reload)* | Visit Streams and Dashboards, then press **F5** | Each list is **fetched from the server** — skeleton, then one request per list — and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; the lists used to paint from localStorage before any request completed)*. In-session revisits within the tier still cost **0** requests. Dashboard panel results still restore from IndexedDB (§5.2) |
+| **P15** | Version buster discards old payloads | Console: `localStorage.setItem('o2q-["org","default","functions","list"]', '{"buster":"0"}')` then reload Functions | **N/A since 2026-09-15 — localStorage persistence removed.** *Was:* the tampered entry is **discarded, not rendered** — a mismatched buster is treated as invalid. The IndexedDB buster is covered by §30 row 30.19 |
+| **P16** | Corrupt entry is discarded | Console: write `'not json'` into any `o2q-` key, reload that page | **N/A since 2026-09-15 — localStorage persistence removed** (nothing reads an `o2q-` localStorage key). *Was:* entry removed, page loads normally from the server. **No crash** |
 
 ---
 
@@ -248,12 +251,15 @@ aggressively would stop the "a new version is available" prompt from ever firing
 
 | Check | Expected |
 | --- | --- |
-| Before switching, note the `o2q-` keys in Local Storage for org A | They exist |
-| Switch to org B, then re-inspect Local Storage | **Org A's `o2q-` keys are gone.** Org B's start appearing |
+| Before switching, note the `o2q-` keys in Local Storage for org A | **N/A since 2026-09-15 — localStorage persistence removed** (no `o2q-` localStorage keys are written). *Was:* they exist. The purge is still checked on IndexedDB — last row of this table |
+| Switch to org B, then re-inspect Local Storage | **N/A since 2026-09-15 — localStorage persistence removed.** *Was:* **org A's `o2q-` keys are gone.** Org B's start appearing |
 | Visit Streams, Dashboards, Alerts in org B | You see **org B's data only**. Never a row from org A |
 | Switch back to org A within a couple of minutes and open a list you had open | Rows paint instantly from memory (the in-memory cache is deliberately kept across an org switch — only the on-disk copy is purged) |
 | DevTools → Application → IndexedDB → `o2Cache` → `kv` | No entries left whose key contains org A's identifier |
 
+> **N/A since 2026-09-15 — localStorage persistence removed.** This quirk needed `o2q-`
+> localStorage keys, and none are written now. Kept as the record.
+>
 > **Expected quirk — do not file this as a bug.** After one round trip (A → B → A), you
 > will find **no `o2q-` keys for either org**. That is the design, not a purge failure:
 >
@@ -288,8 +294,8 @@ aggressively would stop the "a new version is available" prompt from ever firing
 
 | Check | Expected |
 | --- | --- |
-| Before logging out, confirm `o2q-*` keys exist in Local Storage and `o2Cache` / `o2FieldValues` have entries in IndexedDB | They do |
-| Sign out, then inspect the Application tab again | **All** `o2q-*` localStorage keys gone; `o2Cache` and `o2FieldValues` emptied |
+| Before logging out, confirm `o2Cache` / `o2FieldValues` have entries in IndexedDB *(the `o2q-*` Local Storage half of this check is N/A since 2026-09-15 — localStorage persistence removed)* | They do |
+| Sign out, then inspect the Application tab again | `o2Cache` and `o2FieldValues` emptied. The logout purge clears IndexedDB only since 2026-09-15 — there are no `o2q-*` localStorage keys to clear *(localStorage persistence removed 2026-09-15; was: all `o2q-*` localStorage keys gone as well)* |
 | Log in as a **different user** | No list anywhere shows the previous user's data, even for a flash |
 | **Field-value residue after logout** (known issue — see §24 item 6) | As user A, expand a field on a stream in Logs. Sign out **without reloading the browser**. Log in as user B, who is restricted from that stream, in the **same org**, within 60 seconds. Type that field name → `=` in the Logs editor  ·  ⚠️ User B may still be offered A's cached values. Logout is a route change, not a page reload, so the in-memory field-value cache survives its 60-second TTL. **A full browser reload clears it.** Confirm the blast radius and report what you see |
 
@@ -301,7 +307,7 @@ aggressively would stop the "a new version is available" prompt from ever firing
 
 | Check | Expected |
 | --- | --- |
-| Reload the page while sitting on Streams | The stream list paints from `localStorage` **before** any request completes, then revalidates in place |
+| Reload the page while sitting on Streams | The page's lists are **fetched from the server** — skeleton, then the §3 C1 request count — and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; the stream list used to paint from `localStorage` before any request completed)*. In-session revisits within the tier still cost **0** requests |
 | Reload while sitting on a Dashboard with panels | Panels restore their last results from IndexedDB **without re-running the queries** |
 
 ---
@@ -366,8 +372,12 @@ prefetches page N+1 after **every** page load, so the counts are not what you mi
 | Deleted stream leaves dropdowns | After deleting, open Logs → stream selector; open Alerts → New Alert → stream dropdown | The deleted stream is **not** offered |
 | Refresh stats button | Streams → **Refresh Stats** button | Issues a request; the table keeps its rows |
 
+**Storage note — N/A since 2026-09-15 — localStorage persistence removed.** The name list is
+memory-only now, so there is no localStorage budget to exhaust. The measurement below is kept as
+the record.
+
 **Storage note — measured.** The stream *name list* (used by every stream dropdown in the
-app) is persisted to `localStorage` under
+app) was persisted to `localStorage` under
 `o2q-["org","<org>","streams","nameList","logs"]`.
 
 Measured on a live instance: **781 bytes per stream** (53 streams → 41.4 KB). So this key
@@ -405,7 +415,7 @@ Object.keys(localStorage).filter(k => k.startsWith('o2q-'))
 | Saved views | Logs → **Saved Views** dropdown in the search bar | Open, close, reopen | Second open issues no request |
 | Saved views write-through | — | — | The new view is listed without a manual refresh |
 | Functions in the search bar | Logs → **Functions** dropdown | Open it, then go to Pipelines → Functions and back | The list is shared — one cache entry, not two requests |
-| SQL editor function catalogue | — | — | **One** request to `/query_functions` the first time; **zero** on reopening the editor; **zero** after F5 (it is persisted to localStorage; 1 h normal tier since 2026-09-15 — was the 5 min config tier, see issues #11). Payload is large — 356 functions on a typical backend — so not re-fetching it per page load is the real win |
+| SQL editor function catalogue | — | — | **One** request to `/query_functions` the first time; **zero** on reopening the editor within the window; **one** after F5 — the catalogue is fetched from the server again and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; it used to be zero after F5)*. 1 h normal tier since 2026-09-15 — was the 5 min config tier, see issues #11. Payload is large — 356 functions on a typical backend — so not re-fetching it on every editor open is the real win |
 | Missing catalogue is remembered | — | ⚠️ **Skip — not testable on a current backend** | Only applies where `/api/{org}/query_functions` is absent (404). Check with `curl -u <email>:<passcode> <url>/api/<org>/query_functions`; a **200 means this row does not apply** |
 | Action scripts (enterprise only) | Left sidebar → **Logs** — the list loads on **page init**, not on menu open | Land on Logs fresh, then navigate to Streams and back | **One** request to `/api/{org}/actions` on first load; **zero** on return. Switching the search-bar transform selector from **Function** to **Action** fetches nothing — it filters an already-loaded list. Requires Enterprise/Cloud (`isActionsEnabled`) |
 | Field values | — | **See §4.1** — it has its own section, because the cache spans nine surfaces beyond Logs and the reader/writer distinction matters | |
@@ -552,7 +562,7 @@ pulled from the shared store:
 | Check | Steps | Expected |
 | --- | --- | --- |
 | Folder switching | Dashboards → click folder A → folder B → back to folder A | Folder A returns instantly with no request |
-| Folder list | Reload the page on Dashboards | The folder rail paints from `localStorage` before the request lands |
+| Folder list | Reload the page on Dashboards | The folder rail is **fetched from the server** — one `GET …/folders/dashboards` — and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; it used to paint from `localStorage` before the request landed)*. Leaving and returning within 1 h still costs **0** requests |
 | **Refresh button actually refreshes** | Dashboards → Refresh icon | One request, every time. *This was a no-op before this branch* |
 | **`r` shortcut** | Dashboards list → press `r` | One request. *Also previously a no-op* |
 | **Delete a dashboard** | Dashboards → folder → delete a dashboard → confirm → go to Streams → come back to Dashboards | Deleted dashboard is gone **and stays gone**. *This was a shipped bug: it used to come back on the next visit* |
@@ -704,7 +714,7 @@ Run **C1–C8** (note C5 `r` — this was one of the broken shortcuts).
 
 | # | Do this | Expect |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2–3 requests** — destinations + the dependency-graph alert read, plus templates *only if its persisted entry has gone stale*. Browser-verified at 2. **Note: a hard reload does NOT clear localStorage**, so persisted queries survive it and the cold count is often lower than a truly empty cache would give. For a genuine cold read, log out first or clear site data |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3 requests** — destinations, the dependency-graph alert read and templates. *(localStorage persistence removed 2026-09-15: templates is no longer restored from disk, so a hard reload always fetches it — browser-verified 2026-09-15 at **3**: `alerts/destinations?…module=alert`, `alerts/templates`, `v2/alerts?…include_dependencies=true`. Browser-verified at 2 before that, while the persisted templates entry was still fresh — a hard reload did not clear localStorage)* |
 | C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
 | C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
@@ -758,7 +768,7 @@ Run **C1–C8** (including the `r` shortcut).
 
 | # | Do this | Expect |
 | --- | --- | --- |
-| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **2** — destinations + the dependency-graph alert read (both feed the “Used by” column). **The template list itself is served from localStorage**, so it fires nothing. Browser-verified request(s) |
+| C1 | Hard-reload (Ctrl+Shift+R), open this page | Skeleton, then rows. **3** — the template list, plus destinations and the dependency-graph alert read (both feed the “Used by” column). *(localStorage persistence removed 2026-09-15: the template list is fetched on a reload now — browser-verified 2026-09-15 at **3**: `alerts/templates`, `v2/alerts?…include_dependencies=true`, `alerts/destinations?…module=alert`. Browser-verified at 2 before that, when the template list itself was served from localStorage and fired nothing)* |
 | C2 | Go to another module, come **straight** back (within **1 h** — re-tiered 2026-09-15; was 5 min) | Rows appear **instantly, no skeleton**, **0 requests** |
 | C3 | Go away, wait past **1 h** (re-tiered 2026-09-15; was 5 min — backdate `dataUpdatedAt` instead of waiting), come back | Rows appear instantly, then **1** background request. Table must **never** blank |
 | C4 | Click the **Refresh** icon | **1** request every time. Rows stay; spinner is on the button, not a full-table skeleton |
@@ -2069,7 +2079,7 @@ cache-populated and costs **zero** extra requests.
 | --- | --- | --- |
 | Roles and Users share one read | Open Roles, then Users, watching Network | The role list is fetched **once**, not once per page |
 | Open a role → **Permissions** tab | | ⚠️ **A request on every open is EXPECTED — not a bug.** `rolePermissionsQuery` is declared but unread (§24 item 8) |
-| Resource list | | The permission resource list is persisted (it is enum-like) — it survives a reload with no request |
+| Resource list | | The permission resource list is cached in memory (it is enum-like): revisits within the 1 h tier cost **0** requests; a reload fetches it once and writes no `o2q-` localStorage key *(localStorage persistence removed 2026-09-15; it used to survive a reload with no request)* |
 | Create / edit / delete a role | | List updates without manual refresh; deleted role stays gone |
 | Bulk-delete roles | | All selected gone; still gone after navigating away |
 
@@ -2619,7 +2629,7 @@ waits would now yield 0 requests — backdate the entry to re-run them).
 
 | # | Expect | Measured | Verdict |
 | --- | --- | --- | --- |
-| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /re_patterns` on a *true* cold read (after clearing the persisted entry). With the persisted entry present it is **0** — see the note below | ✅ |
+| C1 | Skeleton then rows, **1** request | **Exactly 1** `GET /re_patterns` on a *true* cold read (after clearing the persisted entry). With the persisted entry present it is **0** — see the note below. *(localStorage persistence removed 2026-09-15: expect **1** on every hard reload now)* | ✅ |
 | C2 | Instant rows, no skeleton, **0** requests | **0 requests**, entry provably fresh (age 0.5 s, `staleTime` 5 min at the time — 1 h since 2026-09-15). 20 rows, **`firstSample: 20`**, `everBlank: false` | ✅ |
 | C3 | Instant rows, then **1** background request, never blanks | Waited the full **5 min 10 s** past the then `CONFIG_STALE_TIME`: **exactly 1** request. 45 samples, **min = max = 20**, `everBlank: false`. *(Re-tiered 2026-09-15 to 1 h: that wait would now give 0 requests)* | ✅ |
 | C4 | **1** request, rows stay, spinner on the button | **Exactly 1.** Rows constant at 20, **0 visible skeletons** | ✅ |
@@ -2656,6 +2666,8 @@ rather than a live cache, which is why nothing regressed.
 costs **0** requests — better than the plan's "1". The plan's intent (a cold read fetches exactly
 once) was verified by deleting that key first and reloading: **exactly 1** `GET /re_patterns`.
 When measuring C1 on a persisted page, clear the `o2q-` key first or the number will look wrong.
+*(localStorage persistence removed 2026-09-15: this note no longer applies — `regexPatternsQuery`
+is memory-only, a hard reload always costs **1**, and there is no `o2q-` key to clear.)*
 
 ### 15.5 Built-in patterns
 
@@ -2665,7 +2677,7 @@ When measuring C1 on a persisted page, clear the `o2q-` key first or the number 
 
 | Check | Expected |
 | --- | --- |
-| Open, navigate away, return, reload the page | Requested **once per session** and persisted — these never change. *Re-tiered 2026-09-15 to the 1 h normal tier (was session / ∞): still persisted and still 0 requests on revisit and reload, but expect one background refetch once the entry is an hour old* |
+| Open, navigate away, return, reload the page | Requested once and cached in memory: **0** requests on revisit within the window; the reload fetches the list from the server — **one** request — and writes no `o2q-` localStorage key *(localStorage persistence removed 2026-09-15; it used to be persisted and cost 0 on reload)*. *Re-tiered 2026-09-15 to the 1 h normal tier (was session / ∞): expect one background refetch once the entry is an hour old* |
 | Refresh button | Still forces a request |
 
 
@@ -2688,13 +2700,13 @@ via `ImportRegexPattern.vue`. Reach it with Settings → Regex Patterns → **Im
 
 | Own check | Measured | Verdict |
 | --- | --- | --- |
-| **Requested once per session and persisted** | Declared `staleTime: SESSION_STALE_TIME` **and** `gcTime: SESSION_STALE_TIME` (both **Infinity**, verified at runtime) with `persister: localStoragePersister` *(as recorded — since 2026-09-15 it declares `NORMAL_STALE_TIME`, 1 h, with the client-wide 3 h `gcTime`; still persisted)*. Navigate away and back → **0** requests. **Hard reload** → the tab rendered all **147** patterns from `o2q-["org","default","settings","builtInRegexPatterns"]` with **0** requests and `fetchStatus: idle` | ✅ |
+| **Requested once per session and persisted** | Declared `staleTime: SESSION_STALE_TIME` **and** `gcTime: SESSION_STALE_TIME` (both **Infinity**, verified at runtime) with `persister: localStoragePersister` *(as recorded — since 2026-09-15 it declares `NORMAL_STALE_TIME`, 1 h, with the client-wide 3 h `gcTime`; still persisted)*. Navigate away and back → **0** requests. **Hard reload** → the tab rendered all **147** patterns from `o2q-["org","default","settings","builtInRegexPatterns"]` with **0** requests and `fetchStatus: idle`. *(localStorage persistence removed 2026-09-15: the hard-reload half no longer holds — a reload now costs one `GET /re_patterns/built-in` and writes no `o2q-` key)* | ✅ |
 | **Refresh button still forces a request** | **Exactly 1** `GET /re_patterns/built-in` per click, despite the infinite freshness window (1 h since 2026-09-15) | ✅ |
 
 **C5 deviates, and it is defensible.** Pressing `r` fires `GET /re_patterns` (the parent list) and
 **no** built-in request. The shortcut belongs to `RegexPatternList.vue`; the built-in list is a
 child of the Import dialog and owns its own Refresh button, which does force a fetch. Given the
-built-in set is declared as near-immutable (`Infinity` staleTime when recorded, 1 h since 2026-09-15; persisted), *not* re-fetching it
+built-in set is declared as near-immutable (`Infinity` staleTime when recorded, 1 h since 2026-09-15; persisted until localStorage persistence was removed 2026-09-15), *not* re-fetching it
 from a generic page shortcut is consistent with the design rather than a miss. Recorded so the row
 is not silently marked green.
 
@@ -2702,7 +2714,9 @@ is not silently marked green.
 serialisation, so a probe that stringifies query options reports `staleTime: null` and looks like
 "no staleTime configured". Compare with `=== Infinity` in-page instead: both `staleTime` and
 `gcTime` were genuinely `Infinity` here when recorded. (Since 2026-09-15 this query is 1 h / 3 h,
-so the JSON trap no longer bites it — it still applies to `/config` and the trace DAG.)
+so the JSON trap no longer bites it — it still applies to `/config`, and to the dashboard panel
+cache's `staleTime: Infinity`. It no longer applies to the trace DAG, which is 5 min since
+2026-09-16 — *trace DAG un-persisted 2026-09-16*.)
 
 ### 15.6 AI Toolsets
 
@@ -2895,6 +2909,18 @@ so the JSON trap no longer bites it — it still applies to `/config` and the tr
 
 > The trace **search** is uncached (§17). What is cached is the trace DAG.
 
+> **2026-09-16 — trace DAG un-persisted.** `traceDagQuery` is now `staleTime: MEDIUM_STALE_TIME`
+> (5 min, the traces module tier) and **memory only** — the `persister` is gone, and the
+> `indexedDbPersister` export was deleted from `persisters.ts`. A DAG is therefore **re-fetched
+> after a reload** and re-read 5 minutes after it was last fetched, and **no `o2q-heavy-…
+> ["traces","dag",…]` key is ever written**. The DAG tab has no refresh control, so the old
+> ∞ + 24 h-on-disk setting could show a still-growing trace's partial DAG for up to a day —
+> browser-verified 2026-09-16 with the app's own query client and IndexedDB persister at the
+> DAG's exact old settings: a 12 h-old saved copy was served after a reload with **zero**
+> fetches, and only at 25 h (past the persister's 24 h `maxAge`) did it re-fetch.
+> The dashboard panel cache is **unchanged** (`idbPersister.persisterFn`, `staleTime: Infinity`,
+> `gcTime` 30 min, 24 h on disk, LRU) and is now IndexedDB's only query-cache tenant.
+
 > **RESULT — ALL 6 rows verified. No defects found.**
 >
 > The instance had **no trace data** initially, which blocked most of this section. It was unblocked by
@@ -2902,22 +2928,28 @@ so the JSON trap no longer bites it — it still applies to `/config` and the tr
 >
 > | Check | Measured | Verdict |
 > | --- | --- | --- |
-> | Trace DAG is cached to disk | 1st open → `GET /api/default/default/traces/<traceId>/dag?…`. Switch to Flame Graph and back → **0 requests**, instant | ✅ |
-> | DAG persists across reload | Hard reload (`ignoreCache`), reopen the same trace's DAG → **0 requests**. Restored from IndexedDB | ✅ |
-> | Verify the storage | `o2Cache` → `kv` holds the real entry `o2q-heavy-["org","default","traces","dag","eebf4b81…","default",1788348334491000,1788351998491000]`. The same store also carries the metrics-explorer panel cache (`…"panels","__metrics_explorer"…`), confirming both `indexedDbPersister` consumers write here | ✅ |
-> | Purged on org switch | Verified via the real path (MainLayout `changeOrganizationIdentifier` → `purgeOrgQueries`): switching `default` → `_meta` **purged** the default-scoped entry and **kept** the `_meta` one | ✅ |
+> | Trace DAG is cached in-session | 1st open → `GET /api/default/default/traces/<traceId>/dag?…`. Switch to Flame Graph and back → **0 requests**, instant | ✅ *(still expected — but only for 5 minutes since **trace DAG un-persisted 2026-09-16**; past that the reopen costs one request)* |
+> | DAG persists across reload | Hard reload (`ignoreCache`), reopen the same trace's DAG → **0 requests**. Restored from IndexedDB | ✅ *(historic)* — **N/A since 2026-09-16 (trace DAG un-persisted 2026-09-16):** the DAG is memory-only, so a reload now **fetches it again** |
+> | Verify the storage | `o2Cache` → `kv` holds the real entry `o2q-heavy-["org","default","traces","dag","eebf4b81…","default",1788348334491000,1788351998491000]`. The same store also carries the metrics-explorer panel cache (`…"panels","__metrics_explorer"…`), confirming both `indexedDbPersister` consumers write here | ✅ *(historic)* — **N/A since 2026-09-16 (trace DAG un-persisted 2026-09-16):** expect **no** `o2q-heavy-…["traces","dag",…]` entry at all; `o2Cache` now holds panel results only (dashboards, Metrics Explorer previews, LLM Insights) |
+> | Purged on org switch | Verified via the real path (MainLayout `changeOrganizationIdentifier` → `purgeOrgQueries`): switching `default` → `_meta` **purged** the default-scoped entry and **kept** the `_meta` one | ✅ *(historic for the on-disk half)* — since **2026-09-16** there is no persisted DAG entry to purge; only the in-memory query is dropped *(trace DAG un-persisted 2026-09-16)* |
 > | Services catalog keeps its results | 3 consecutive refreshes; row count sampled every 80 ms never dropped below **1** (`minRowsDuring: 1`, `tableEverBlanked: false`). The table does not blank between searches | ✅ |
 > | Services catalog refresh | `services-catalog-refresh-btn` → **1 request each time**, rows stay | ✅ |
 >
-> **Static wiring, consistent with the spec:** `traceDagQuery` (`search.queries.ts`) uses
-> `staleTime: SESSION_STALE_TIME` (a trace is immutable) with `persister: indexedDbPersister` and the
-> `o2q-heavy` prefix — session-cached, written to IndexedDB rather than localStorage. The key carries
-> the trace id *and* the time window, so each DAG is its own immutable entry.
+> **Static wiring as recorded:** `traceDagQuery` (`search.queries.ts`) used
+> `staleTime: SESSION_STALE_TIME` (a trace was treated as immutable) with `persister: indexedDbPersister`
+> and the `o2q-heavy` prefix — session-cached, written to IndexedDB rather than localStorage. The key
+> carries the trace id *and* the time window, so each DAG was its own entry.
+> *(**Trace DAG un-persisted 2026-09-16:** the declaration is now `staleTime: MEDIUM_STALE_TIME` with
+> **no** `persister` — a trace still receiving spans is not immutable, and the tab has no refresh
+> control. `indexedDbPersister` no longer exists; the panel cache uses `idbPersister.persisterFn`
+> directly and is unchanged.)*
 >
 > **The DAG tab needs LLM spans.** It is gated on `hasLLMSpans` (`TraceDetails.vue:644` →
 > `isLLMTrace`), which requires a span carrying a `gen_ai.*` attribute (`gen_ai.system`,
 > `gen_ai.request.model`, `gen_ai.usage.*`, …). An ordinary trace shows Flame Graph and Trace Graph
-> but **no DAG tab** — worth knowing before concluding the feature is missing.
+> but **no DAG tab** — worth knowing before concluding the feature is missing. The endpoint itself
+> is GenAI-only too: it reads `gen_ai_operation_name`, and any other trace stream answers **400**,
+> so the DAG only ever fetches for LLM traces.
 >
 > **Seeded data (left in place, `default` org).** Ingested over `POST /api/default/v1/traces` (OTLP
 > JSON) using the org's own ingestion credential read from `/api/default/passcode`:
@@ -2927,10 +2959,10 @@ so the JSON trap no longer bites it — it still applies to `/config` and the tr
 > Ingest needs that credential — a session cookie alone returns **401**.
 | Check | Steps | Expected |
 | --- | --- | --- |
-| **Trace DAG is cached to disk** | Traces → run a search → open a trace → open the **Service Map / DAG** view → go back → reopen the same trace's DAG | The second open is **instant with no request** — a trace is immutable, so its DAG is cached forever |
-| DAG persists across reload | Open a trace DAG → F5 → reopen the same trace | Restored from IndexedDB |
-| Verify the storage | DevTools → Application → IndexedDB → `o2Cache` → `kv` | Entries for the trace DAG exist |
-| Purged on org switch | Switch org → check `o2Cache` | Previous org's DAG entries gone |
+| **Trace DAG is cached in memory for 5 min** | Traces → run a search → open an **LLM** trace → open the **DAG** view → go back → reopen the same trace's DAG **within 5 minutes** | The second open is **instant with no request**. Reopen it **past 5 minutes** and it re-reads — **one** request *(trace DAG un-persisted 2026-09-16: `MEDIUM_STALE_TIME`, was ∞)* |
+| DAG does **not** survive a reload | Open a trace DAG → F5 → reopen the same trace | **One request** — the DAG is **fetched again**. It is memory-only *(trace DAG un-persisted 2026-09-16; it used to restore from IndexedDB)* |
+| Verify the storage | DevTools → Application → IndexedDB → `o2Cache` → `kv` | **No `o2q-heavy-…["traces","dag",…]` entry exists** — the store holds panel results only *(trace DAG un-persisted 2026-09-16)* |
+| Purged on org switch | Switch org → check `o2Cache` | **N/A since 2026-09-16 (trace DAG un-persisted 2026-09-16)** — there is no persisted DAG entry to purge. *Was:* previous org's DAG entries gone |
 | **Services catalog keeps its results** | Traces → **Services** → run a search → run a second search | The previous results **stay on screen** while the next one runs — the table must not blank between searches |
 | Services catalog refresh | Click Refresh | Reaches the server; results stay while it runs |
 
@@ -2948,6 +2980,8 @@ that is a correctness bug.
 > Note: RUM is **not** gated on the server's `rum.enabled` flag — `RealUserMonitoring.vue:290`
 > decides purely on whether a `_rumdata` logs stream exists. Seeding that stream enables the whole
 > RUM section. Doing so is what exposed **#30** (the persisted stream list hid the new stream).
+> *(localStorage persistence removed 2026-09-15: the stream name list is memory-only, so a reload
+> now refetches it and #30's reload symptom is gone.)*
 >
 > ⚠️ **Correction to an earlier reading: billing is NOT cloud-gated.** The billing routes in
 > `enterprise/composables/router.ts:248` are registered unconditionally, so
@@ -3085,9 +3119,13 @@ that is a correctness bug.
 > **Known exception, filed separately:** alert **destination** payloads persist their `headers` —
 > including any `Authorization: Bearer …` — to `localStorage`. That is a genuine leak of a
 > user-supplied credential and is recorded in its own issue; it is not part of the seven rows above.
+> *(Fixed 2026-08-26 — destinations are memory-only — and localStorage persistence was removed for
+> every query 2026-09-15.)*
 
 Open **DevTools → Application → Local Storage** and **IndexedDB**, then search every
-`o2q-*` value for these. **None of them may appear:**
+`o2q-*` value for these. **None of them may appear.** *(Since 2026-09-15 no `o2q-` localStorage
+keys are written — localStorage persistence removed — so the IndexedDB `o2q-heavy-*` values are what
+remain to search.)*
 
 | Value | Where it comes from | UI path to populate it |
 | --- | --- | --- |
@@ -3284,6 +3322,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 > ⚠️ Creating `_sessionreplay` also runs straight into **#30**: the brand-new stream is invisible until
 > the persisted `o2q-…"streams","nameList","logs"` entry is cleared, so RUM keeps showing onboarding.
 > That entry had to be deleted by hand mid-test — an incidental, real-world demonstration of that issue.
+> *(localStorage persistence removed 2026-09-15: a reload now refetches the name list, so no entry
+> needs clearing.)*
 >
 > **Seeded data left in place (`default` org):** ~150 records in `_rumdata` and 60 in `_sessionreplay`,
 > all under session ids `cachetest_sess_000…029`. These streams did not exist before this testing and
@@ -3346,7 +3386,7 @@ Visit each page above, then re-inspect storage. These values must live in memory
 | --- | --- | --- |
 | **Revisit keeps rows** | Open Evaluations → navigate away → wait past 5 min (re-tiered 2026-09-15; was 30 s) → come back | Rows **stay on screen** and swap in place. *It used to blank the whole page for ~470 ms while it blocked on a stale entry* |
 | **Skeleton only when genuinely cold** | Hard-reload, then open the page | Skeleton on the first visit only |
-| Providers list | Settings → LLM Providers, then a scorer form's provider dropdown | Shared cache — persisted, one request |
+| Providers list | Settings → LLM Providers, then a scorer form's provider dropdown | Shared cache — one request, then **0** on the second surface within the window. A reload fetches it again and writes no `o2q-` localStorage key *(localStorage persistence removed 2026-09-15; was: persisted, one request)* |
 | Scorers / score configs / eval jobs | Each list: run C1–C5 | Standard cache behaviour |
 | Refresh buttons on each list | Click each | **Each reaches the server** — one request per click |
 | Create / activate / pause / delete a scorer or job | | The list updates without a manual refresh |
@@ -3476,8 +3516,8 @@ Visit each page above, then re-inspect storage. These values must live in memory
 
 | Scenario | How to reproduce | Expected |
 | --- | --- | --- |
-| **Private browsing / storage blocked** | Open the app in a private window, or block site data in browser settings | ✅ **Browser-verified.** With every `localStorage` access throwing `SecurityError`, all five surfaces exercised (Reports, Templates, Alerts, Streams, Dashboards) rendered their rows and the app stayed alive, with **0 console errors**. ⚠️ Simulated by replacing the accessor on a running app, so the *cold-boot* path under blocked storage is untested — a real private window is still worth one manual pass |
-| **localStorage quota full** | An org with a very large number of streams, or manually fill localStorage | ✅ **Browser-verified.** Quota genuinely exhausted (every further write threw `QuotaExceededError`); Reports / Templates / Alerts / Streams each still rendered **20 rows**, persistence **silently stopped** (`o2q-*` key count frozen at 13, no new entries), and **0 console errors** |
+| **Private browsing / storage blocked** | Open the app in a private window, or block site data in browser settings | **N/A since 2026-09-15 — localStorage persistence removed** for the localStorage half; a real private window is still worth one pass for the IndexedDB caches (panel results, field values) *(trace DAG un-persisted 2026-09-16 — it is memory-only and no longer part of this check)*. *Recorded before the removal:* ✅ **Browser-verified.** With every `localStorage` access throwing `SecurityError`, all five surfaces exercised (Reports, Templates, Alerts, Streams, Dashboards) rendered their rows and the app stayed alive, with **0 console errors**. ⚠️ Simulated by replacing the accessor on a running app, so the *cold-boot* path under blocked storage is untested — a real private window is still worth one manual pass |
+| **localStorage quota full** | An org with a very large number of streams, or manually fill localStorage | **N/A since 2026-09-15 — localStorage persistence removed** (the query layer no longer writes to localStorage). *Recorded before the removal:* ✅ **Browser-verified.** Quota genuinely exhausted (every further write threw `QuotaExceededError`); Reports / Templates / Alerts / Streams each still rendered **20 rows**, persistence **silently stopped** (`o2q-*` key count frozen at 13, no new entries), and **0 console errors** |
 | **Offline → back online** | DevTools → Network → Offline, navigate around, then go back Online | ✅ **Browser-verified both halves.** Offline: navigating away and back repainted **141 rows from cache**, no crash, no console error. Back online (as first tested, with reconnect refetch still on): **1 automatic refetch** (`GET /api/v2/{org}/reports?folder=default&cache=false`) with `dataUpdatedAt` advancing and rows never blanking. **Superseded 2026-09-15:** `refetchOnReconnect` is now `false` for every query, so the expected result is **zero** requests on reconnect and the rows stay as they were — see P13 and the note below |
 | **Server error on a list** | Stop the backend, then open a cached list | ✅ **Browser-verified.** With the list endpoint forced to `500`, the cached rows **held at 141 across 16 samples** (never blanked) and the failure surfaced as an *"Error while pulling alerts."* toast — not a silent empty table. The 500 was retried **3×**, which is the policy working (5xx retries, 4xx does not) |
 | **4xx does not retry-storm** | Trigger a 403 on a list (a user without permission) | ✅ **Browser-verified.** A forced `403` produced **exactly one attempt** per query — `fetchFailureCount: 1`, `errorUpdateCount: 1` — with one error surfaced and an aggregated *"Access Required"* notice. No retry loop. Real-world corroboration: `/billings/invoices` 404s and also costs exactly **1** request per visit (§22.4) *(as recorded — since 2026-09-15 billing is not cached at all, so that call no longer goes through the query client's retry policy)* |
@@ -3511,6 +3551,8 @@ worth a decision.
    explicitly kept out of storage — destinations are not. They *are* purged on org switch
    and logout, but until then they sit in plaintext on disk. Worth confirming this is
    intentional. Same question, lower stakes, for AI Toolsets and Action Scripts.
+   *(Resolved: destinations are memory-only since 2026-08-26, and since 2026-09-15 no query
+   persists to localStorage at all — localStorage persistence removed.)*
 
 2. **The cache version is two constants, not one.** `LS_BUSTER` (localStorage, now `"2"`) and
    `IDB_BUSTER` (IndexedDB, `"1"`) in `composables/query/persisters.ts` are bumped independently:
@@ -3518,8 +3560,12 @@ worth a decision.
    an older build will be rendered by a newer one. Add a bump-the-buster step to the release
    checklist for any API response-shape change — and note that an `IDB_BUSTER` bump re-runs every
    dashboard panel's search on its next read, which is why the two are split (§30 row 30.19).
+   *(Since 2026-09-15 only `IDB_BUSTER` exists — `LS_BUSTER` was deleted with localStorage
+   persistence, so the two-constant hazard is gone. The bump step still applies to the one
+   IndexedDB-persisted shape: panel results — trace DAG un-persisted 2026-09-16.)*
 
-3. **Stream name list on very large orgs.** It is persisted to `localStorage`, which has a
+3. **N/A since 2026-09-15 — localStorage persistence removed** (the name list is memory-only).
+   Kept as the record: **Stream name list on very large orgs.** It is persisted to `localStorage`, which has a
    ~5 MB budget shared with the rest of the app. Quota errors are swallowed by design, so
    the failure mode is "reload-persistence quietly stops working", not a crash. Worth
    measuring on the largest org available.
@@ -3587,7 +3633,9 @@ worth a decision.
    cd web/src && grep -c useShortcuts views/slos/SloList.vue \n     views/SyntheticMonitoring.vue components/workflows/WorkflowsList.vue   # → 0 0 0
    ```
 
-12. **Returning to an org never re-persists it.** The org-switch purge drops the leaving
+12. **N/A since 2026-09-15 — localStorage persistence removed**: there is no reload-persistence
+   to lose, and every org fetches its lists on F5 by design. Kept as the record:
+   **Returning to an org never re-persists it.** The org-switch purge drops the leaving
    org's localStorage entries but keeps its in-memory ones, and the persister only writes
    after a real fetch. So re-entering an org inside its `staleTime` serves from memory,
    writes nothing to disk, and leaves that org with **no persisted entries at all** until
@@ -3945,12 +3993,12 @@ where it distinguishes pass from fail.
 **UI path:** Data → Streams; Pipelines → new pipeline → Stream node
 **Network filter:** `streams`
 **What changed:** creating a stream, saving stream settings, and deleting fields now drop the
-whole stream scope — the persisted name lists (5-minute tier), the paged list, and every
+whole stream scope — the name lists (5-minute tier; persisted until localStorage persistence was removed 2026-09-15), the paged list, and every
 cached per-stream schema.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **W1** | A new stream reaches the pickers *(highest value here)* | Pipelines → **Add pipeline** → click the source node → **Stream** → toggle **Create new Stream** → name it, type **Logs**, Save. Then **within 30s** open Alerts → **New alert** and open the **Stream Name** dropdown | The new stream is listed. The name lists are persisted, so also press **Ctrl+Shift+R** and re-open the dropdown — it must **still** be there. ✅ **FIXED 2026-09-10** *(was a known fail since 2026-09-09: the invalidation dropped the in-memory entry and left the localStorage copy, which the persister served for up to 24 h)*. A write now deletes the persisted copies under every scope it invalidates (`dropPersistedCopies`, on the persister's own `removeQueries`), so the reload fetches from the server. Verified live on the dev server through the same code path — a stream-settings save, since this instance hides Add Stream (user-defined schemas off): the `o2q-…"streams"…` keys vanished on save, and after a fresh load the list was fetched and re-persisted (entry written after page load, buster `"2"`, 89 streams). Re-run the create-stream form of the check where Add Stream is available — see §30. Design and audit: `fe-caching-persisted-copy-fix-spec.md` |
+| **W1** | A new stream reaches the pickers *(highest value here)* | Pipelines → **Add pipeline** → click the source node → **Stream** → toggle **Create new Stream** → name it, type **Logs**, Save. Then **within 30s** open Alerts → **New alert** and open the **Stream Name** dropdown | The new stream is listed. Also press **Ctrl+Shift+R** and re-open the dropdown — it must **still** be there: the reload fetches the name list from the server (one `GET …/streams?type=logs`) and no `o2q-` localStorage key is written *(localStorage persistence removed 2026-09-15; until then the name lists were persisted, and `dropPersistedCopies` below no longer exists — a write only invalidates)*. ✅ **FIXED 2026-09-10** *(was a known fail since 2026-09-09: the invalidation dropped the in-memory entry and left the localStorage copy, which the persister served for up to 24 h)*. A write now deletes the persisted copies under every scope it invalidates (`dropPersistedCopies`, on the persister's own `removeQueries`), so the reload fetches from the server. Verified live on the dev server through the same code path — a stream-settings save, since this instance hides Add Stream (user-defined schemas off): the `o2q-…"streams"…` keys vanished on save, and after a fresh load the list was fetched and re-persisted (entry written after page load, buster `"2"`, 89 streams). Re-run the create-stream form of the check where Add Stream is available — see §30. Design and audit: `fe-caching-persisted-copy-fix-spec.md` |
 | **W2** | Stream settings save reaches other surfaces | Data → **Streams** → a stream with fields → schema icon → set an **Index Type** on a field → **Update Settings**. Then Dashboards → open a dashboard → **Add panel** → pick that stream | The field list reflects the stream. Network on the panel shows a **fresh** `/schema` request rather than a cache hit |
 | **W3** | Deleting a field removes it everywhere | Data → **Streams** → a stream with fields → schema icon (the same drawer as W2) → tick a field → **Delete** → confirm. Then Alerts → **New alert** → **Anomaly** → pick that stream | The deleted field is **absent** from the field dropdown. This is the original reported bug: server had 10 fields, the dropdown showed 9 |
 
@@ -4342,7 +4390,7 @@ onto the mutation.
 
 | # | Check | Steps | Expected |
 | --- | --- | --- | --- |
-| **D11** | A new model reaches the list | Settings → **LLM Model Pricing** → **Add** → name, match pattern, one price → Save | The editor routes back and the model **is listed**. This list is a 1 h persisted read (re-tiered 2026-09-15; was 5 minutes), so a stale cache would hide it until a hard refresh |
+| **D11** | A new model reaches the list | Settings → **LLM Model Pricing** → **Add** → name, match pattern, one price → Save | The editor routes back and the model **is listed**. This list is a 1 h in-memory read (re-tiered 2026-09-15; was 5 minutes; persisted until localStorage persistence was removed 2026-09-15), so a stale cache would hide it until a hard refresh |
 | **D12** | Editing a model | Edit any model → change a price → Save | The list shows the new price on return |
 
 ---
@@ -4407,7 +4455,8 @@ cache-entry transitions read from the live query client.
 > model-pricing invalidation component-level; it moved onto `saveModelPricingMutation`, and the
 > 2026-09-11 re-run additionally confirmed the write **drops and rewrites the persisted copy**
 > (`o2q-…"modelPricing"` held 89 entries including the new model, buster `"2"`, written after page
-> load).
+> load). *(localStorage persistence removed 2026-09-15: the write now only invalidates, and there is
+> no `o2q-…"modelPricing"` key to rewrite.)*
 
 Read `inv` / `stale` / `obs` / `fetches` as: invalidated flag, staleness, live observers, and how
 many times that entry has been fetched.
@@ -4585,6 +4634,8 @@ RBAC build is still the better test if you have one, but its absence no longer b
 **Clear the persisted copy first.** On a list with an `o2q-` copy on disk the entry re-hydrates and
 `OTable` shows rows, not the lock — `displayRows.length === 0` gates it. Remove the key before
 forcing the 403 or you will conclude the lock state is broken when it is working as designed.
+*(N/A since 2026-09-15 — localStorage persistence removed: no list has an `o2q-` copy on disk any
+more, so there is nothing to clear.)*
 
 ---
 
@@ -4595,22 +4646,30 @@ every scope it invalidates, org settings and the settings KV are no longer persi
 writes that never invalidated (template delete, the AWS folder, stream delete after a reload) now
 do. Design, audit and the list of every invalidation site: `fe-caching-persisted-copy-fix-spec.md`.
 
+> **2026-09-15 — localStorage persistence removed.** `localStoragePersister`, `LS_BUSTER` and
+> `dropPersistedCopies` were deleted (and `persisters.spec.ts` with them), so a write now only
+> invalidates. Every row below that watches `o2q-` keys changes: after a reload the list is
+> **fetched from the server** (one request) and **no** `o2q-` localStorage key is written. The
+> user-visible outcomes — an item listed or absent after Ctrl+Shift+R — still hold and are still
+> worth running. Rows that only test the disk copy are marked N/A.
+
 **Verified live (dev server, 2026-09-10, on the tree after the second `main` merge):** the
 mechanism, through a stream-settings save — the
 `o2q-…"streams"…` keys vanished on save; after a fresh load the list was fetched from the server
 and re-persisted. Unit tests cover the create-stream flow end to end
 (`composables/query/persisters.spec.ts`).
 
-**Still to run by hand** — DevTools → Application → Local Storage, watch the `o2q-` keys:
+**Still to run by hand** — watch Network for the request each reload fires *(until 2026-09-15:
+DevTools → Application → Local Storage, watch the `o2q-` keys)*:
 
 | # | Scenario | Steps | Expected |
 | --- | --- | --- | --- |
-| 30.1 | W1 — stream create | Alerts → Add alert → stream type logs; Streams → Add stream `w1_new`; back on Add alert, Ctrl+Shift+R | `w1_new` listed; the `o2q-…"streams"…` keys vanished when the create succeeded |
+| 30.1 | W1 — stream create | Alerts → Add alert → stream type logs; Streams → Add stream `w1_new`; back on Add alert, Ctrl+Shift+R | `w1_new` listed after the reload, fetched by one `GET …/streams?type=logs`; no `o2q-` localStorage key exists *(localStorage persistence removed 2026-09-15; was: the `o2q-…"streams"…` keys vanished when the create succeeded)* |
 | 30.2 | Stream delete after a reload | Open Streams, Ctrl+Shift+R **on the Streams page**, delete `w1_new`; open the Logs stream picker; re-create `w1_new` and reopen the picker | Gone from the picker, then listed again after the re-create |
-| 30.3 | Metrics Explorer | Note the `o2q-` stream keys; open Metrics Explorer | Only the metrics name list is replaced; the other stream types' keys remain |
+| 30.3 | Metrics Explorer | Note the `o2q-` stream keys; open Metrics Explorer | **N/A since 2026-09-15 — localStorage persistence removed** (there are no `o2q-` stream keys to watch). *Was:* only the metrics name list is replaced; the other stream types' keys remain |
 | 30.4 | Folder create | Alerts rail → new folder `W1`; Ctrl+Shift+R | `W1` in the rail |
 | 30.5 | Folder create, cold | Reload the Alerts list, wait 3 h (the folder entry's `gcTime` since 2026-09-15; was 30 min) without opening Add alert — or evict the folder entry from the Devtools panel — then create folder `W2` | `W2` appears without a reload |
-| 30.6 | AWS folder | Visit Dashboards first (folder list on disk) with no "AWS" folder yet; Ingestion → AWS tile → add a dashboard; Ctrl+Shift+R on Dashboards | "AWS" folder in the rail |
+| 30.6 | AWS folder | Visit Dashboards first (folder list in memory — on disk until localStorage persistence was removed 2026-09-15) with no "AWS" folder yet; Ingestion → AWS tile → add a dashboard; Ctrl+Shift+R on Dashboards | "AWS" folder in the rail |
 | 30.7 | Org settings | Settings → Organization → change Trace ID field → Save; Ctrl+Shift+R; Settings → General → Save; reopen Organization | The new Trace ID field is still saved; no `o2q-…"organizations"…` key exists any more |
 | 30.8 | Favourites, two browsers | Favourite `D1` in browser A; favourite `D2` in browser B; reload A, toggle `D3` | `D1`, `D2`, `D3` all favourited; no `o2q-…"settings","setting"…` keys exist any more |
 | 30.9 | Template delete | Templates → delete `tpl_x`; Ctrl+Shift+R; Destinations → Add → Template | `tpl_x` absent |
@@ -4623,15 +4682,18 @@ and re-persisted. Unit tests cover the create-stream flow end to end
 | 30.16 | Unpin when the pin is already gone server-side | Browser A: pin dashboard `X`. Browser B: delete `X`. Browser A (Home shortcut still showing): **Unpin** | No error toast — the 404 counts as done; the shortcut disappears at once; leave and come back within 1 h (re-tiered 2026-09-15; was 5 min) → still gone (the cached pin is nulled too); Ctrl+Shift+R → still gone |
 | 30.17 | Bulk delete that includes the pinned dashboard | Pin `X`; Dashboards → select `X` and one other row → bulk **Delete** → confirm | Home shortcut gone at once, with one `GET …/settings/home_dashboard` after the deletes; still gone after Ctrl+Shift+R. (30.13 is the single-row delete; this is the other call site) |
 | 30.18 | A transient failure keeps the pin | Pin `X`; leave Dashboards alone for **1–3 h** (stale, not yet evicted; re-tiered 2026-09-15 — was 5–30 min — or backdate `dataUpdatedAt` past an hour); DevTools → Network → **Request blocking** `*/settings/home_dashboard*`; open Dashboards; remove the block | The Home shortcut **stays** and no error toast — the stale copy is shown and the failed revalidation is ignored. Before the fix any error nulled the pin; now only a 404 (pin genuinely gone) clears it |
-| 30.19 | Cache version bump | On a browser that ran the previous build: note the `o2q-` keys whose JSON carries `"buster":"1"`; load this build; visit Streams, Functions, Templates and a dashboard with panels | Each `o2q-` list is refetched **once** and rewritten with `"buster":"2"`; the IndexedDB panel entries (`o2Cache`) keep `"buster":"1"` and the panels restore **without** re-running their searches |
+| 30.19 | Cache version bump | On a browser that ran the previous build: note the `o2q-` keys whose JSON carries `"buster":"1"`; load this build; visit Streams, Functions, Templates and a dashboard with panels | **localStorage half N/A since 2026-09-15 — localStorage persistence removed:** no list is persisted, so there is no `"buster"` to bump — the old `o2q-` keys are ignored (nothing reads them) and each list is fetched from the server. *Was:* each `o2q-` list is refetched **once** and rewritten with `"buster":"2"`. **Still valid:** the IndexedDB panel entries (`o2Cache`) keep `"buster":"1"` and the panels restore **without** re-running their searches |
 | 30.20 | Template bulk delete with one failure | Templates → select two, one of which the server refuses (a template still used by a destination) → bulk **Delete** | The deletable row vanishes at once; the row that failed **stays selected** so a retry is one click; one warning toast; the list then refetches in the background — refresh-button spinner only, **no** table skeleton |
-| 30.21 | Provider Refresh rewrites the disk copy | Browser A: AI → Evaluations (providers persisted). Browser B: create provider `P2`. Browser A: click the providers **Refresh** | `P2` listed after one `GET …/providers`, and A's `o2q-…"onlineEvals","providers"…` value now contains `P2` — the forced read drops the disk copy before it refetches. *(The cold-memory variant is unit-tested only: the page's mount read always warms the entry first)* |
+| 30.21 | Provider Refresh reaches the server *(until 2026-09-15: rewrites the disk copy)* | Browser A: AI → Evaluations (providers loaded). Browser B: create provider `P2`. Browser A: click the providers **Refresh** | `P2` listed after one `GET …/providers`. The disk-copy half is **N/A since 2026-09-15 — localStorage persistence removed**. *Was:* A's `o2q-…"onlineEvals","providers"…` value now contains `P2` — the forced read drops the disk copy before it refetches. *(The cold-memory variant is unit-tested only: the page's mount read always warms the entry first)* |
 | 30.22 | AWS replace — the delete reaches the list even if the import fails *(outbound network is no longer the blocker — W25 passed; the 500 ms window below is)* | Ingestion → AWS tile → **Add Dashboard** on a tile whose dashboard already exists → **Replace**; block `*/dashboards?folder=*` once the `DELETE` has been seen | Dashboards no longer lists the deleted copy, and the failed create shows its own error toast. The window is 500 ms — if you cannot hit it, record as review-only |
 
 **Costs to expect, by design:** every reload now waits for the org-settings and home-pin requests
 before the page paints (they were disk restores before); the first load after this deploy refetches
 each localStorage-backed list once (the localStorage cache version moved to `"2"`; IndexedDB —
-panel results, trace DAGs — is untouched).
+panel results, trace DAGs — is untouched). *(Since 2026-09-15 — localStorage persistence removed —
+every reload fetches each of those lists once, like `main`, so the `"2"` bump is moot; IndexedDB is
+still untouched. Since 2026-09-16 IndexedDB holds panel results only, and a reload also refetches
+the trace DAG — trace DAG un-persisted 2026-09-16.)*
 
 ### 30.23 Verification record (2026-09-14)
 
@@ -4640,7 +4702,7 @@ recorded in §31.8 with the rest of that day's run). That takes §30 to **13 of 
 
 | Row | Result |
 | --- | --- |
-| **30.9** — template delete | ✅ **PASS.** After the bulk delete in 30.20 and a hard reload, the persisted copy `o2q-["org","default","alerts","templates"]` no longer carried `cachetest_tmpl_delete_me` while still carrying `cachetest_tmpl1`, and the destination form's template source listed only the survivor. The delete rewrote the disk copy rather than leaving a stale one |
+| **30.9** — template delete | ✅ **PASS.** After the bulk delete in 30.20 and a hard reload, the persisted copy `o2q-["org","default","alerts","templates"]` no longer carried `cachetest_tmpl_delete_me` while still carrying `cachetest_tmpl1`, and the destination form's template source listed only the survivor. The delete rewrote the disk copy rather than leaving a stale one. *(localStorage persistence removed 2026-09-15: there is no persisted copy to inspect now — re-run by checking the destination form's template source after the reload)* |
 | **30.10** — function saved from Logs | ✅ **PASS.** Saved from the Logs *fx Function Editor* (a different call site from W41's and 31.11's). Toast *Function saved successfully*, both `functions` scopes flipped `inv: true`, and after a hard reload the alert form's function list carried the new function (34 → 35) |
 | **30.12** — model pricing editor across a cold start | ✅ **PASS.** Hard-reloaded **on the editor route**, so the list entry was absent from memory entirely. Save still worked: toast *Model pricing saved*, redirect to the list, and the new model present with the list at 88 → 89. The write's invalidation does not depend on the list having been visited first |
 | **30.14** — refresh templates in the alert form | ✅ **PASS.** With the list-hosted **New alert** form open on Advanced, a template created out of band did not appear on its own; one click of the refresh control beside the template select fired **exactly one** `GET …/alerts/templates` (`fetches` 1→2, 42 → 43) and the new template was listed |
@@ -4732,7 +4794,7 @@ changed: the reload is automatic now.
 | 31.3 | External Sources returns **403** on this instance (§27.13) |
 | 31.6 | needs an endpoint the backend may call — the SSRF guard rejects private IPs (W49) |
 | 31.8 | **reason corrected 2026-09-14** — *not* "needs a provider and a scorer": both can be created here (§31.9), and experiments exist. Clone is refused with *"Cannot clone an Experiment in 'failed' state"*, and the signing half reads *"Nothing to pin yet. Publish a version first."* What it needs is a run that **completes**, i.e. a provider key that actually works |
-| 30.19 | needs a browser that ran the previous build |
+| 30.19 | needs a browser that ran the previous build *(localStorage half N/A since 2026-09-15 — localStorage persistence removed; only the IndexedDB half remains)* |
 | ~~31.5~~ | **no longer blocked — passed 2026-09-14** (§31.9) |
 | ~~30.11~~ | **no longer blocked — passed 2026-09-14** (§31.9) |
 | ~~30.22~~ | **no longer blocked — passed 2026-09-14** (§31.8). Outbound network was the stated reason and W25 had already passed; the 500 ms window is an artefact of blocking the create by hand |
@@ -4782,7 +4844,7 @@ rows recorded as environment-blocked are therefore runnable, and all three now p
 
 | Row | Result |
 | --- | --- |
-| **30.11** — provider delete | ✅ **PASS**, both halves. `DELETE …/providers/{id}` then one `GET …/providers`; **all four** `onlineEvals` scopes flipped `inv: true`; toast *Provider deleted*. After a hard reload the LLM-judge scorer form's Provider dropdown was empty, and the surviving disk copy `o2q-…"onlineEvals","providers"…` **no longer contained** the deleted provider. That closes the one persisted-copy write that had no coverage. **Delete the scorer first** — the server refuses while a scorer references the provider (*"Provider is used by active scorers…"*) |
+| **30.11** — provider delete | ✅ **PASS**, both halves. `DELETE …/providers/{id}` then one `GET …/providers`; **all four** `onlineEvals` scopes flipped `inv: true`; toast *Provider deleted*. After a hard reload the LLM-judge scorer form's Provider dropdown was empty, and the surviving disk copy `o2q-…"onlineEvals","providers"…` **no longer contained** the deleted provider. That closes the one persisted-copy write that had no coverage. *(localStorage persistence removed 2026-09-15: no disk copy exists now; the dropdown half is the check)* **Delete the scorer first** — the server refuses while a scorer references the provider (*"Provider is used by active scorers…"*) |
 | **31.5** — Experiments **Refresh** reaches the server | ✅ **PASS**, all three assertions. An experiment created in a second tab was **not** visible in the first; **one** click fired exactly **one** `GET …/experiments?includeSummary=true` (`fetches` 6→7, 1→2 rows) and the row appeared; two consecutive clicks fired one request each; leaving and coming straight back fired **zero** |
 | **31.9** — the experiment list is shared by its readers | ✅ **PASS**, all four parts. Compare picker and Compare page: **0** list requests, only `…/experiments/compare`. A remote task's detail page: **0**. The experiment form's remote-task dropdown rendered and fired **0** `…/tasks`, reusing the cached Remote Tasks entry (`fetches` stayed 1) |
 

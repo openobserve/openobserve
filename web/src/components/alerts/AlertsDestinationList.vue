@@ -565,8 +565,7 @@ export default defineComponent({
       const org = store.state.selectedOrganization.identifier;
       // The rows above are a render of the cached list, not the cache itself —
       // splice the names out of every cached module list too, or the row returns
-      // on the next visit inside staleTime (and, since this query persists, on a
-      // browser reload that hydrates from its localStorage copy).
+      // on the next visit inside staleTime.
       queryClient.setQueriesData({ queryKey: destinationKeys.all(org) }, (list: any) =>
         Array.isArray(list) ? list.filter((d: any) => !gone.has(d.name)) : list,
       );

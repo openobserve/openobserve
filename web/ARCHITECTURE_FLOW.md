@@ -32,7 +32,7 @@ covers the policies; this covers the *architecture rationale*.
 │ LAYER 3 · Cache engine                @tanstack/query-core (singleton)   │
 │   staleness check · in-flight dedup by key · structural sharing          │
 │   ├── fresh in memory  ──────────────► return, 0 requests                │
-│   ├── persisted (L: persisters.ts) ──► hydrate localStorage / IndexedDB  │
+│   ├── panel result (persisters.ts) ──► hydrate from IndexedDB            │
 │   └── miss or stale ─────────────────► run queryFn                       │
 └──────────────────────────┬───────────────────────────────────────────────┘
                            │  def.fetch(org, ...args)  → the service builder
@@ -49,9 +49,19 @@ covers the policies; this covers the *architecture rationale*.
 (Layer 2, `cachePolicy.ts`, is not a runtime box — it is the compile-time
 source of every duration the other layers reference.)
 
+No query declaration persists. The only persisted cache is the dashboard
+panel-result cache (IndexedDB, via `usePanelCache.ts`), plus the separate log
+field-values database. A read with no `useQuery` observer (`fetchQuery` /
+`fetchInto`) serves a restored copy without comparing its age with `staleTime`,
+which is why localStorage persistence was removed on 2026-09-15 (config lists up
+to 24 h old shown with no request) and the trace DAG's IndexedDB persistence on
+2026-09-16 (browser-verified: a 12 h old saved DAG served with zero fetches, only
+a >24 h copy re-fetched — and the DAG tab has no refresh control, so a trace
+still receiving spans could show a partial DAG for up to a day).
+
 Write path: component → service write builder (axios) → on success
 `xQuery.invalidate(org)` → next read of the scope refetches.
-Purge path: org switch → `purgeOrgQueries` (disk only); logout →
+Purge path: org switch → `purgeOrgQueries` (IndexedDB only); logout →
 `purgeAllQueries` (everything).
 
 ---

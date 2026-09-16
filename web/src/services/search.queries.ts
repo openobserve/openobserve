@@ -16,8 +16,7 @@
 import { queryOptions } from "@tanstack/vue-query";
 import search from "./search";
 import { traceDagKeys } from "./search.querykeys";
-import { SESSION_STALE_TIME } from "@/composables/query/cachePolicy";
-import { indexedDbPersister } from "@/composables/query/persisters";
+import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
 export const traceDagQuery = (
   org: string,
@@ -30,8 +29,7 @@ export const traceDagQuery = (
     queryKey: traceDagKeys.detail(org, streamName, traceId, startTime, endTime),
     queryFn: async () =>
       (await search.getTraceDAG(org, streamName, traceId, startTime, endTime)).data,
-    // A trace is immutable and the key carries the time window, so each entry
-    // is cacheable for the whole session.
-    staleTime: SESSION_STALE_TIME,
-    persister: indexedDbPersister,
+    // Memory only, and it expires: a trace still receiving spans would otherwise
+    // keep serving the partial DAG, and this tab has no refresh control.
+    staleTime: MEDIUM_STALE_TIME,
   });

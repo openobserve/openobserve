@@ -17,7 +17,6 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import onlineEvalsService from "./online-evals.service";
 import { onlineEvalKeys } from "./online-evals.service.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 /** One entry serves both Settings › LLM Providers and Online Evals, so it takes the shorter of the two tiers. */
 export const providersQuery = (org: string) =>
@@ -25,7 +24,6 @@ export const providersQuery = (org: string) =>
     queryKey: onlineEvalKeys.providers(org),
     queryFn: (): Promise<any[]> => onlineEvalsService.providers.list(org),
     staleTime: MEDIUM_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 export const scoreConfigsQuery = (org: string) =>

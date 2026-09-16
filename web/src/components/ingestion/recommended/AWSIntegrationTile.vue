@@ -173,7 +173,6 @@ import { dashboardKeys } from "@/services/dashboards.querykeys";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { queryClient } from "@/composables/query/queryClient";
-import { dropPersistedCopies } from "@/composables/query/persisters";
 import WindowsConfig from "./WindowsConfig.vue";
 import LinuxConfig from "./LinuxConfig.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -385,9 +384,7 @@ export default defineComponent({
           });
           awsFolder = createResponse.data;
           // The dashboard mutation's scope does not cover folders, so the new folder would never reach the rail's cache.
-          const scope = folderKeys.all(orgId);
-          await dropPersistedCopies(scope);
-          await queryClient.invalidateQueries({ queryKey: scope });
+          await queryClient.invalidateQueries({ queryKey: folderKeys.all(orgId) });
         }
 
         return awsFolder.folderId;

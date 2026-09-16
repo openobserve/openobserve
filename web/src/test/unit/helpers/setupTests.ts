@@ -344,7 +344,7 @@ afterEach(() => {
   vi.clearAllTimers();
   // The app's query client is a module singleton, so a cached read would leak
   // into the next test and silently skip its service mock. `clear()` alone is
-  // not enough — persisted tiers would be restored from localStorage.
+  // not enough — persisted entries would be restored from IndexedDB.
   queryClient.clear();
   void purgeAllPersisted();
 });

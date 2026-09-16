@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { Ref } from "vue";
-import { dropPersistedCopies } from "./persisters";
 import { queryClient } from "./queryClient";
 
 /**
@@ -62,8 +61,6 @@ export async function fetchInto<T = any>(
     // query.fetch() stores the passed options, so the 0 would become the
     // entry's standing freshness policy for every later observer.
     if (opts.force) {
-      // Cold memory would otherwise restore the disk copy instead of reaching the server.
-      await dropPersistedCopies(options.queryKey, true);
       await queryClient.invalidateQueries({
         queryKey: options.queryKey,
         exact: true,

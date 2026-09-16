@@ -30,7 +30,6 @@ import { mutationOptions, queryOptions } from "@tanstack/vue-query";
 import jstransform from "./jstransform";
 import { functionKeys } from "./jstransform.querykeys";
 import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 // The endpoint paginates but every consumer wants the whole list.
 const ALL_FUNCTIONS = 100000;
@@ -42,7 +41,6 @@ export const functionsQuery = (org: string) =>
     queryFn: async (): Promise<any[]> =>
       (await jstransform.list(1, ALL_FUNCTIONS, "name", false, "", org)).data.list ?? [],
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 /** URL-import job progress for enrichment tables, so the live tier rather than the functions tier. */

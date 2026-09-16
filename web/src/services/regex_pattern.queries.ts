@@ -17,14 +17,12 @@ import { queryOptions } from "@tanstack/vue-query";
 import regexPatterns from "./regex_pattern";
 import { regexPatternKeys } from "./regex_pattern.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
-import { localStoragePersister } from "@/composables/query/persisters";
 
 export const regexPatternsQuery = (org: string) =>
   queryOptions({
     queryKey: regexPatternKeys.list(org),
     queryFn: async (): Promise<any[]> => (await regexPatterns.list(org)).data?.patterns ?? [],
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });
 
 export const builtInRegexPatternsQuery = (org: string) =>
@@ -33,5 +31,4 @@ export const builtInRegexPatternsQuery = (org: string) =>
     queryFn: async (): Promise<any[]> =>
       (await regexPatterns.getBuiltInPatterns(org)).data.patterns ?? [],
     staleTime: NORMAL_STALE_TIME,
-    persister: localStoragePersister,
   });

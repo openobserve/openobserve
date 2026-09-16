@@ -13,11 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { notifyManager } from "@tanstack/vue-query";
 import { streamNameListQuery } from "@/services/stream.queries";
 import { streamKeys } from "@/services/stream.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { dropPersistedCopies } from "@/composables/query/persisters";
 import { useStore } from "vuex";
 import StreamService from "@/services/stream";
 import { computed, ComputedRef } from "vue";
@@ -71,16 +69,14 @@ const useStreams = (t: TranslateFn) => {
           // No global in-flight promise any more: each stream type is its own
           // query key, so concurrent callers share a request per type instead of
           // every type queueing behind whichever fetch started first.
-          // `force` must reach the server: drop the cached list first, otherwise
+          // `force` must reach the server: invalidate the cached list first, otherwise
           // the query would answer from cache and force would be a no-op.
           if (force) {
             const org = store.state.selectedOrganization.identifier;
             if (streamName === "all") {
-              await dropPersistedCopies(streamKeys.all(org));
               await queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
             } else {
               // One type, exactly: a Metrics Explorer mount must not throw away the logs and traces lists too.
-              await dropPersistedCopies(streamKeys.nameList(org, streamName), true);
               await Promise.all([
                 queryClient.invalidateQueries({
                   queryKey: streamKeys.nameList(org, streamName),
@@ -404,8 +400,6 @@ const useStreams = (t: TranslateFn) => {
 
   // "all" is one query per type, so its age is the oldest of them.
   const getStreamsFetchedAt = async (streamType: string = "all"): Promise<number | undefined> => {
-    // A list restored from disk is stamped "now" first and gets its saved time in a later notify flush; wait for that flush.
-    await new Promise<void>((resolve) => notifyManager.schedule(resolve));
     const org = store.state.selectedOrganization.identifier;
     const types = streamType === "all" ? Object.keys(streamsCache) : [streamType];
     const times = types
@@ -492,10 +486,8 @@ const useStreams = (t: TranslateFn) => {
   // This method is to remove specific stream from cache
   const removeStream = (streamName: string, streamType: string) => {
     const org = store.state.selectedOrganization.identifier;
-    // Ahead of the early return: the disk copy and the page entries hold the deleted row whether Vuex does or not.
-    void dropPersistedCopies(streamKeys.nameList(org, streamType), true).then(() =>
-      queryClient.invalidateQueries({ queryKey: streamKeys.all(org) }),
-    );
+    // Ahead of the early return: the cached name list and page entries hold the deleted row whether Vuex does or not.
+    void queryClient.invalidateQueries({ queryKey: streamKeys.all(org) });
 
     const indexMapping = store.state.streams.streamsIndexMapping[streamType];
 
