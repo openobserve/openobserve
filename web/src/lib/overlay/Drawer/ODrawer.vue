@@ -252,6 +252,7 @@ function handleOpenAutoFocus(event: Event) {
   event.preventDefault();
   nextTick(() => {
     const body = bodyRef.value;
+    const panel = body?.closest<HTMLElement>("[data-o2-drawer]");
     if (body) {
       const candidates = body.querySelectorAll<HTMLElement>(
         [
@@ -264,14 +265,23 @@ function handleOpenAutoFocus(event: Event) {
       );
       if (firstField) {
         firstField.focus();
-        return;
+        if (panel?.contains(document.activeElement)) return;
       }
     }
-    // No form field found → focus primary button (confirm dialog pattern)
+
+    const autofocusTarget = panel?.querySelector<HTMLElement>("[autofocus]");
+    if (autofocusTarget) {
+      autofocusTarget.focus();
+      if (panel?.contains(document.activeElement)) return;
+    }
+
     const btnEl = (primaryBtnRef.value as any)?.$el as HTMLElement | undefined;
     if (btnEl) {
       btnEl.focus();
+      if (panel?.contains(document.activeElement)) return;
     }
+
+    panel?.focus();
   });
 }
 
@@ -370,6 +380,7 @@ watch(internalOpen, (open) => {
       <!-- Drawer panel -->
       <DialogContent
         :force-mount="inline ? true : undefined"
+        tabindex="-1"
         data-o2-drawer
         :data-test="parentDataTest || 'o-drawer-panel'"
         :style="contentStyle"
