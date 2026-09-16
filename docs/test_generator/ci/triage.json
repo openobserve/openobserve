@@ -1,0 +1,27 @@
+{
+  "feature_slug": "logs-stream-not-found",
+  "feature_title": "Logs Search Bar Stream Not Found Message",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "streamNotFound.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/streamNotFound.spec.js",
+  "playwright_group": "Logs-Queries",
+  "source_files": [
+    "web/src/plugins/logs/SearchBar.vue",
+    "web/src/plugins/logs/Index.vue",
+    "web/src/plugins/logs/IndexList.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives in OSS-owned locations: web/src/** (plugins/logs and utils/alerts), tests/ui-testing/** (playwright pages/specs/utils and ci-matrix), and scripts/translations/**. None are under o2_enterprise/, enterprise/, or src/enterprise/, and no enterprise-gated module names (cipher/SSO/SAML/RBAC/SDR/logo-management) appear in the changed paths. Classified OSS.",
+    "skip": "Not skipped. There is no explicit opt-out — feature_hint.txt and trigger_comment.txt are both empty and no tests-added label or skip comment was passed in. The change is not docs/CI-only: it alters user-facing frontend code in web/src (a new Logs SearchBar error message and an alerts aggregation-preview query fix), so it clears the 'no user-facing change' gate.",
+    "e2e": "E2E is warranted. web/src/plugins/logs/SearchBar.vue adds a new user-facing validation/state flow: when a SQL query references a stream the org does not have, it now shows a 'Stream \\\"{stream}\\\" does not exist' message (filterErrMsg) instead of silently falling back to the generic empty state; Index.vue/IndexList.vue adjust the empty-state conditional to honor it. That flow has no Playwright coverage today — only the Vitest unit test SearchBar.streamNotFound.spec.ts. A secondary user-facing change (web/src/utils/alerts/aggregationPreviewQuery.ts SQL keyword-masking fix) is also present but unit-tested.",
+    "area": "Logs — the bulk of the .vue UI changes are in web/src/plugins/logs (Index.vue, IndexList.vue, SearchBar.vue) and the stream-not-found message renders on the Logs page. The PR also touches Alerts (composite-alert regression E2E specs plus the aggregationPreviewQuery util); that is a secondary concern and already has dev-authored Playwright specs in the diff.",
+    "group": "Logs-Queries — the behavior is triggered by SQL-query parsing in the search bar (SearchBar.updateQueryValue), and the closest existing matrix shard with SQL-query specs in the Logs folder is Logs-Queries (logsqueries.spec.js, logsqueries.matchall.spec.js, searchpartition.spec.js). The Engineer should confirm final placement.",
+    "existing_tests": "The diff adds two Playwright E2E specs — tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-14306-composite-clone.spec.js and alerts-14308-composite-trigger-timestamps.spec.js. They cover composite-alert clone and trigger-timestamp behavior, NOT this Logs stream-not-found flow. The Logs change is covered only by the Vitest unit test SearchBar.streamNotFound.spec.ts, which is not E2E coverage. So the stream-not-found flow still needs fresh E2E coverage; the Alerts specs are self-covering for their own feature."
+  }
+}

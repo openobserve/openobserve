@@ -1,0 +1,15 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/streamNotFound.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsqueries.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsQuickPick.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/monaco-query-prefill.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-14306-composite-clone.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Alerts/alerts-14308-composite-trigger-timestamps.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_group": "Logs-Core",
+  "registration_note": "run-context.json names playwright_group 'Logs-Queries', but no such shard exists in ci_matrix.json. The SQL-query specs live under 'Logs-Core' (logsqueries.spec.js, logsqueries.matchall.spec.js, monaco-query-prefill.spec.js); register streamNotFound.spec.js there unless the Engineer confirms a different existing shard.",
+  "rationale": "No existing spec exercises the stream-not-found flow. logsqueries.spec.js pre-selects e2e_automate and runs queries (never types a missing-stream FROM); logsQuickPick.spec.js covers the no-stream empty state but not the filterErrMsg branch; monaco-query-prefill.spec.js covers editor prefill only. The diff's dev-authored specs are Alerts regression suites (composite clone + trigger timestamps), unrelated to Logs. The only existing coverage is the Vitest unit test SearchBar.streamNotFound.spec.ts. The streamNotFound.spec.js file does not exist yet, so this is a brand-new spec requiring ci_matrix registration."
+}
