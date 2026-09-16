@@ -23,10 +23,16 @@
 //!   — "static" contrasts it with *evaluated* state, it does NOT mean write-once: priority is
 //!   editable on any update, like name or description. PT-1.)
 //!
-//! Priority is **display + propagation only**: it filters/sorts the alert
-//! list and is exposed to notification templates so receivers can route on
-//! it. It must never influence evaluation, silence, delivery, or incident
-//! severity — that is a separate, explicitly opted-into extension.
+//! Priority is primarily **display + propagation**: it filters/sorts the
+//! alert list and is exposed to notification templates so receivers can
+//! route on it. It must never influence evaluation, silence, or delivery.
+//!
+//! B-29: incident severity is the one opted-into exception — when set, an
+//! alert's priority takes precedence over the eval_level default
+//! (Critical→P2, Warning→P3) when an incident is created or escalates, so a
+//! P1 alert doesn't open (or get stuck at) a same P2 incident. See
+//! `create_new_incident` / `find_or_create_incident` in
+//! `core::alerts::incidents`.
 //!
 //! Deliberately NOT `IncidentSeverity` (P1–P4): different scale, different
 //! concept, different lifecycle.

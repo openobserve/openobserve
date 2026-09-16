@@ -27,17 +27,12 @@
       >
         <OToggleGroupItem
           v-for="option in scopeOptions"
-          :key="option.id"
-          :value="option.id"
+          :key="option"
+          :value="option"
           size="sm"
-          :data-test="`quality-detail-scope-${option.id}`"
+          :data-test="`quality-detail-scope-${option}`"
         >
-          <span>{{ t(`onlineEvals.quality.scopes.${option.id}`) }}</span>
-          <span
-            class="bg-surface-subtle text-3xs text-text-secondary ml-1 rounded-full px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
-          >
-            {{ compactCount(option.count) }}
-          </span>
+          {{ t(`onlineEvals.quality.scopes.${option}`) }}
         </OToggleGroupItem>
       </OToggleGroup>
     </div>
@@ -254,7 +249,6 @@
       <QualityRunsTable
         :config="config"
         :rows="runs"
-        :counts="runsCounts"
         :active-filter="runsFilter"
         :current-page="runsCurrentPage"
         :page-size="runsPageSize"
@@ -289,7 +283,7 @@ import type {
   DistributionBucket,
   TrendPoint,
 } from "../composables/useQualityDetailCharts";
-import type { QualityScope, ScopeCounts } from "../utils/qualityScope";
+import type { QualityScope } from "../utils/qualityScope";
 import { healthyBooleanValue } from "../utils/qualitySummary";
 import { thresholdForConfig } from "../utils/scoreThreshold";
 import type {
@@ -320,7 +314,6 @@ const props = defineProps<{
   booleanTrendSeries: BooleanTrendSeries[];
   categoricalRows: CategoricalAggRow[];
   scope: QualityScope;
-  scopeCounts: ScopeCounts;
   runs: QualityRunRow[];
   runsCounts: QualityRunCounts;
   runsFilter: QualityRunFilter;
@@ -371,15 +364,7 @@ const healthSummary = computed(() => {
   });
 });
 
-const scopeOptions = computed(() => [
-  {
-    id: "all" as const,
-    count: props.scopeCounts.span + props.scopeCounts.trace + props.scopeCounts.session,
-  },
-  { id: "span" as const, count: props.scopeCounts.span },
-  { id: "trace" as const, count: props.scopeCounts.trace },
-  { id: "session" as const, count: props.scopeCounts.session },
-]);
+const scopeOptions = ["all", "span", "trace", "session"] as const;
 
 const emptyDescription = computed(() => {
   if (props.scope === "all") {
@@ -421,12 +406,6 @@ function toNumber(v: unknown): number {
   if (v == null) return 0;
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
-}
-
-function compactCount(value: number): string {
-  if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-  if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
-  return String(Math.round(value));
 }
 
 const booleanCounts = computed(() => ({

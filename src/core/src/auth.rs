@@ -40,6 +40,7 @@ use {
 };
 
 pub const V2_API_PREFIX: &str = "v2";
+pub const SESSION_AUTH_MARKER: &str = "Session::";
 
 #[cfg(feature = "enterprise")]
 pub async fn get_user_email_from_auth_str(auth_str: &str) -> Option<String> {
@@ -303,7 +304,7 @@ where
                 && let Ok(auth_str) = auth_header.to_str()
             {
                 return Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
+                    auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
                     o2_type: String::new(),
                     org_id: org_id.clone(),
@@ -327,7 +328,7 @@ where
                 && let Ok(auth_str) = auth_header.to_str()
             {
                 return Ok(AuthExtractor {
-                    auth: auth_str.to_owned(),
+                    auth: reject_forged_session_marker(auth_str.to_owned()),
                     method,
                     o2_type: format!("stream:{org_id}"),
                     org_id,
@@ -434,7 +435,7 @@ where
             }
         } else if let Some(auth_header) = parts.headers.get("Authorization") {
             if let Ok(auth_str) = auth_header.to_str() {
-                auth_str.to_owned()
+                reject_forged_session_marker(auth_str.to_owned())
             } else {
                 "".to_string()
             }
@@ -458,6 +459,17 @@ where
         }
 
         Err(AuthExtractorRejection::unauthorized("Unauthorized Access"))
+    }
+}
+
+// Only server-side session resolution may emit the marker; from a client it is a forged trust
+// claim.
+fn reject_forged_session_marker(auth: String) -> String {
+    if auth.starts_with(SESSION_AUTH_MARKER) {
+        log::warn!("rejected client-supplied session trust marker in credentials");
+        String::new()
+    } else {
+        auth
     }
 }
 
@@ -495,7 +507,9 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
                 .get("auth_ext")
                 .map(|cookie| {
                     let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
-                    std::str::from_utf8(&val).unwrap_or_default().to_string()
+                    reject_forged_session_marker(
+                        std::str::from_utf8(&val).unwrap_or_default().to_string(),
+                    )
                 })
                 .unwrap_or_default()
         } else if access_token.starts_with("Basic") || access_token.starts_with("Bearer") {
@@ -525,7 +539,7 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
         }
     } else if let Some(cookie) = cookies.get("auth_ext") {
         let val = config::utils::base64::decode_raw(cookie).unwrap_or_default();
-        std::str::from_utf8(&val).unwrap_or_default().to_string()
+        reject_forged_session_marker(std::str::from_utf8(&val).unwrap_or_default().to_string())
     } else if let Some(auth_header) = headers.get("Authorization") {
         if let Ok(auth_str) = auth_header.to_str() {
             // Log auth type without exposing sensitive tokens
@@ -569,7 +583,7 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
                     }
                 }
             } else {
-                auth_str.to_owned()
+                reject_forged_session_marker(auth_str.to_owned())
             }
         } else {
             "".to_string()
@@ -676,6 +690,45 @@ pub async fn check_permissions(
         .await;
     }
     true
+}
+
+// OSS has no folder boundary to cross, so this allows where the `check_permissions`
+// stub above denies: there is no folder ACL to consult, not a failed lookup.
+#[cfg(not(feature = "enterprise"))]
+pub async fn check_folder_write_permissions(
+    _org_id: &str,
+    _user_id: &str,
+    _folder_type: &str,
+    _folder_id: &str,
+) -> bool {
+    true
+}
+
+/// A source-folder check proves the caller may take the object out, never that
+/// they may put it into a destination folder they cannot otherwise reach.
+///
+/// Checks POST, the verb the create routes require on a folder: putting an
+/// object into a folder is authorized the same way whether it arrives by
+/// create, move or clone.
+#[cfg(feature = "enterprise")]
+pub async fn check_folder_write_permissions(
+    org_id: &str,
+    user_id: &str,
+    folder_type: &str,
+    folder_id: &str,
+) -> bool {
+    check_permissions(
+        folder_id,
+        org_id,
+        user_id,
+        folder_type,
+        "POST",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
 }
 
 #[cfg(feature = "enterprise")]
@@ -997,6 +1050,18 @@ mod tests {
         assert!(!result);
     }
 
+    // OSS has no folder boundary to cross, so the destination check must never
+    // block a move there — only enterprise+OpenFGA gates folders.
+    #[cfg(not(feature = "enterprise"))]
+    #[tokio::test]
+    async fn test_check_folder_write_permissions_non_enterprise_allows() {
+        let result =
+            check_folder_write_permissions("test_org", "test_user", "alert_folders", "dst_folder")
+                .await;
+
+        assert!(result);
+    }
+
     #[test]
     fn test_regex_compilation() {
         // Smoke-test the re-exported regexes compile and behave. Exhaustive
@@ -1094,5 +1159,26 @@ mod tests {
         )
         .unwrap();
         assert_eq!(decoded, ":");
+    }
+
+    #[test]
+    fn test_reject_forged_session_marker() {
+        assert_eq!(
+            reject_forged_session_marker("Session::forged::Basic dXNlcjpwYXNz".to_string()),
+            "",
+            "a client-supplied session marker must not survive extraction"
+        );
+        assert_eq!(
+            reject_forged_session_marker("Session::".to_string()),
+            "",
+            "a bare marker must not survive extraction either"
+        );
+        for untouched in ["Basic dXNlcjpwYXNz", "Bearer jwt", "session abc", ""] {
+            assert_eq!(
+                reject_forged_session_marker(untouched.to_string()),
+                untouched,
+                "ordinary credentials must pass through unchanged"
+            );
+        }
     }
 }

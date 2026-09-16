@@ -55,6 +55,7 @@ impl Ingest for Ingester {
 
         let internal_user = IngestUser::SystemJob(SystemJobType::InternalGrpc);
 
+        let mut metrics_reply: Option<IngestionResponse> = None;
         let resp = match stream_type {
             StreamType::Logs => {
                 let log_ingestion_type = req.ingestion_type.unwrap_or_default();
@@ -93,7 +94,7 @@ impl Ingest for Ingester {
                     let data = bytes::Bytes::from(in_data.data);
                     openobserve_core::metrics::json::ingest(&org_id, stream_name, data, internal_user)
                         .await
-                        .map(|_| ()) // we don't care about success response
+                        .map(|resp| metrics_reply = Some(encode_metrics_reply(&resp)))
                         .map_err(|e| Error::IngestionError(format!("error in ingesting metrics {e}")))
                 }
             }
@@ -183,16 +184,13 @@ impl Ingest for Ingester {
                 }
             }
             _ => Err(Error::IngestionError(
-                "Internal gRPC ingestion service currently only supports Logs, EnrichmentTables, and ServiceGraph"
+                "Internal gRPC ingestion service currently only supports Logs, Metrics, Traces, EnrichmentTables, and ServiceGraph"
                     .to_string(),
             )),
         };
 
         let reply = match resp {
-            Ok(_) => IngestionResponse {
-                status_code: 200,
-                message: "OK".to_string(),
-            },
+            Ok(_) => metrics_reply.unwrap_or_else(ok_reply),
             Err(err) => IngestionResponse {
                 status_code: 500,
                 message: err.to_string(),
@@ -212,13 +210,84 @@ impl Ingest for Ingester {
     }
 }
 
+fn ok_reply() -> IngestionResponse {
+    IngestionResponse {
+        status_code: 200,
+        message: "OK".to_string(),
+    }
+}
+
+/// The proto has only `status_code` + `message`, so `207` carries the partial-failure JSON.
+fn encode_metrics_reply(resp: &ingestion_common::IngestionResponse) -> IngestionResponse {
+    if resp.code != 200 {
+        return IngestionResponse {
+            status_code: i32::from(resp.code),
+            message: resp.error.clone().unwrap_or_default(),
+        };
+    }
+    if resp.status.iter().any(|s| s.status.failed > 0) {
+        return IngestionResponse {
+            status_code: 207,
+            message: json::to_string(resp).unwrap_or_default(),
+        };
+    }
+    ok_reply()
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
 
+    use ingestion_common::{RecordStatus, StreamStatus};
     use proto::cluster_rpc::{IngestRequestMetadata, IngestionData};
 
     use super::*;
+
+    fn metrics_resp(
+        code: u16,
+        failed: u32,
+        error: Option<&str>,
+    ) -> ingestion_common::IngestionResponse {
+        let mut resp = ingestion_common::IngestionResponse::new(
+            code,
+            vec![StreamStatus {
+                name: "m".to_string(),
+                status: RecordStatus {
+                    successful: 1,
+                    failed,
+                    ..Default::default()
+                },
+                items: vec![],
+            }],
+        );
+        resp.error = error.map(str::to_string);
+        resp
+    }
+
+    #[test]
+    fn test_encode_metrics_reply_rejection_keeps_code() {
+        let reply = encode_metrics_reply(&metrics_resp(503, 0, Some("blocked")));
+        assert_eq!(reply.status_code, 503);
+        assert_eq!(reply.message, "blocked");
+        let reply = encode_metrics_reply(&metrics_resp(429, 0, None));
+        assert_eq!(reply.status_code, 429);
+        assert_eq!(reply.message, "");
+    }
+
+    #[test]
+    fn test_encode_metrics_reply_partial_failure_is_207_with_body() {
+        let reply = encode_metrics_reply(&metrics_resp(200, 2, None));
+        assert_eq!(reply.status_code, 207);
+        let body: ingestion_common::IngestionResponse = json::from_str(&reply.message).unwrap();
+        assert_eq!(body.status[0].status.failed, 2);
+    }
+
+    #[test]
+    fn test_encode_metrics_reply_success_is_200_ok() {
+        let reply = encode_metrics_reply(&metrics_resp(200, 0, None));
+        assert_eq!(reply.status_code, 200);
+        assert_eq!(reply.message, "OK");
+    }
 
     #[test]
     fn test_ingester_struct() {

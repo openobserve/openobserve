@@ -15,23 +15,12 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#changes
-pub(crate) fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, ChangesFunc::new(), eval_ctx)
-}
-
 pub struct ChangesFunc;
-
-impl ChangesFunc {
-    pub fn new() -> Self {
-        ChangesFunc {}
-    }
-}
 
 impl RangeFunc for ChangesFunc {
     fn name(&self) -> &'static str {
@@ -40,9 +29,8 @@ impl RangeFunc for ChangesFunc {
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let changes = samples
-            .iter()
-            .zip(samples.iter().skip(1))
-            .map(|(current, next)| (!current.value.eq(&next.value) as u32) as f64)
+            .windows(2)
+            .map(|pair| (!pair[0].value.eq(&pair[1].value) as u32) as f64)
             .sum();
         Some(changes)
     }
@@ -52,9 +40,14 @@ impl RangeFunc for ChangesFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn changes(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, ChangesFunc, eval_ctx)
+    }
     // Test helper
     fn changes_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -75,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_changes_no_changes() {
-        let func = ChangesFunc::new();
+        let func = ChangesFunc;
         let samples = vec![
             Sample::new(1000, 5.0),
             Sample::new(2000, 5.0),

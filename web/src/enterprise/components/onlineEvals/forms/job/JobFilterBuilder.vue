@@ -16,7 +16,7 @@
       >
     </div>
     <div
-      class="[&_.el-border]:border-border-default min-w-0 [&_.el-border]:ml-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.group-container]:w-full [&>.el-border]:mt-0!"
+      class="[&_.el-border]:border-border-default min-w-0 [&_.el-border]:ms-0! [&_.el-border]:w-full [&_.el-border]:max-w-full [&_.group-container]:w-full [&>.el-border]:mt-0!"
     >
       <FilterGroup
         :group="group"

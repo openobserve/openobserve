@@ -64,9 +64,6 @@ impl Event for Eventer {
 
             // Collect files to download
             for item in put_items.iter() {
-                if !infra::cache::file_downloader::should_download(item.meta.records) {
-                    continue;
-                }
                 // files with data older than the cache max age should not be
                 // cached, e.g. merged files from compaction of old partitions
                 if infra::cache::file_downloader::exceeds_cache_max_age(

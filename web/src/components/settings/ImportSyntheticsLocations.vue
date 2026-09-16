@@ -77,10 +77,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <!-- Right: preview & results -->
-      <div class="border-border-default flex min-h-0 flex-1 flex-col border-l p-4">
+      <div class="border-border-default flex min-h-0 flex-1 flex-col border-s p-4">
         <div class="text-text-heading mb-2 text-sm font-semibold">
           {{ t("synthetics.locations.preview") }}
-          <span v-if="parsedLocations.length" class="text-text-secondary ml-1 font-normal">
+          <span v-if="parsedLocations.length" class="text-text-secondary ms-1 font-normal">
             ({{ parsedLocations.length }})
           </span>
         </div>

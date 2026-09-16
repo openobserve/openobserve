@@ -1127,10 +1127,14 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
         const nameError  = pm.dashboardsFormValidation.getPanelNameErrorLocator();
         const saveBtn    = pm.dashboardsFormValidation.getPanelSaveBtnLocator();
 
+        // Validation error / disabled-state resolves a tick after submit; poll instead of sampling once.
+        await expect
+            .poll(async () =>
+                (await nameError.isVisible().catch(() => false)) ||
+                (await saveBtn.isDisabled().catch(() => false)),
+            { timeout: 10000, intervals: [200, 500, 1000] })
+            .toBe(true);
         const errorVisible = await nameError.isVisible().catch(() => false);
-        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
-
-        expect(errorVisible || btnDisabled).toBe(true);
         if (errorVisible) {
             await expect(nameError).toContainText(/required/i);
         }

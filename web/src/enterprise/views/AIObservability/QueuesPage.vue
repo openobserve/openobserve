@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('aiObservability.queues.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -161,8 +162,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
             <OButton
               v-else
-              variant="primary"
-              size="sm"
+              variant="outline"
+              size="sm-toolbar"
               icon-left="play-arrow"
               data-test="ai-queues-review-btn"
               @click.stop="startReviewing(row)"
@@ -388,6 +389,7 @@ const orgQuery = computed(() => ({ org_identifier: orgId.value }));
 
 const queues = ref<LlmQueue[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 const numberedRows = useNumberedRows(queues);
@@ -475,7 +477,7 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
+    header: t("aiObservability.queues.columns.actions"),
     accessorKey: "actions",
     sortable: false,
     isAction: true,
@@ -497,6 +499,7 @@ const columns = computed<OTableColumnDef[]>(() => [
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     // ONE request: the list row now carries targetDatasetName and the review
     // counts, so nothing else is needed to render the table. The Score Config
@@ -505,8 +508,12 @@ async function refresh() {
     // Org-wide catalogs, so a manual refresh invalidates them; the next drawer
     // open re-fetches.
     optionsLoaded.value = false;
-  } catch {
-    toast({ variant: "error", message: t("aiObservability.queues.loadError") });
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({ variant: "error", message: t("aiObservability.queues.loadError") });
+    }
   } finally {
     loading.value = false;
   }

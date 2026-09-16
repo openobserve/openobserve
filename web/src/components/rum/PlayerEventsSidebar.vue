@@ -22,23 +22,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
         <div class="flex w-full flex-col">
           <div class="w-full pb-2 text-xs">
-            <OIcon name="mail" size="sm" class="pr-1" />
+            <OIcon name="mail" size="sm" class="pe-1" />
             {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="mb-2 w-full truncate pr-1 text-xs">
-            <OIcon name="schedule" size="sm" class="pr-1" />
+          <div class="mb-2 w-full truncate pe-1 text-xs">
+            <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="mb-2 w-full truncate pr-1 text-xs">
-            <OIcon name="settings" size="sm" class="pr-1" />
+          <div class="mb-2 w-full truncate pe-1 text-xs">
+            <OIcon name="settings" size="sm" class="pe-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
           <div class="mb-2 w-full truncate text-xs">
-            <OIcon name="language" size="sm" class="pr-1" />
+            <OIcon name="language" size="sm" class="pe-1" />
             {{ sessionDetails.ip }}
           </div>
           <div class="mb-2 w-full truncate text-xs">
-            <OIcon name="location-on" size="sm" class="pr-1" />
+            <OIcon name="location-on" size="sm" class="pe-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
@@ -61,7 +61,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </KeepAlive>
     <template v-if="activeTab !== 'tags' && activeTab !== 'traces'">
       <div class="flex w-full items-center justify-between px-1.5 pt-2">
-        <div class="w-[60%] pr-1">
+        <div class="w-[60%] pe-1">
           <OInput
             v-model="searchEvent"
             clearable
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="event-type-selector relative-position w-[40%] pl-1">
+        <div class="event-type-selector relative-position w-[40%] ps-1">
           <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
@@ -93,13 +93,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
             <div class="truncate">
-              <div class="mr-3 inline" data-test="event-display-time">
+              <div class="me-3 inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
               <OTag
                 type="rumEventType"
                 :value="filteredEvent.type"
-                class="mr-3"
+                class="me-3"
                 data-test="event-type-badge"
               />
               <template
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="mr-1 inline"
+                  class="me-1 inline"
                 />
               </template>
               <div class="inline" :title="filteredEvent.name" data-test="event-name">

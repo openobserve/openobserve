@@ -28,7 +28,7 @@ use config::{
     utils::size::bytes_to_human_readable,
 };
 use db::{self, scheduler::TriggerModule::QueryRecommendations};
-use infra::runtime::{create_grpc_runtime, create_job_runtime};
+use infra::runtime::{create_grpc_runtime, create_job_runtime, create_main_runtime};
 use openobserve::{
     cli::basic::cli,
     migration,
@@ -62,8 +62,12 @@ async fn flush_reporting() {
     usage_reporting::flush().await;
 }
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
+    create_main_runtime()?.block_on(run())
+}
+
+// the HTTP leader parses and rewrites SQL here, so it needs the same stack as the other runtimes
+async fn run() -> Result<(), anyhow::Error> {
     // CLI provides the path to the config file (if any)
     // In case a custom path is provided, the file will be read first
     // and config variables will be loaded.

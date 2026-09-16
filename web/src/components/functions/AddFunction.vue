@@ -55,8 +55,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-model="splitterModel"
           :limits="hideTestPanel ? [100, 100] : [30, 100]"
           class="w-full overflow-hidden"
-          :horizontal="false"
-          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
+          :horizontal="isMobile"
+          :separator-class="
+            hideTestPanel
+              ? 'hidden'
+              : isMobile
+                ? 'h-[0.0625rem] bg-card-glass-border'
+                : 'w-[0.0625rem] bg-card-glass-border'
+          "
         >
           <template v-slot:before>
             <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
@@ -77,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   min-header-height="2.125rem"
                   :show-expand-icon="!hideTestPanel"
-                  :label-class="hideTestPanel ? 'pl-2' : ''"
+                  :label-class="hideTestPanel ? 'ps-2' : ''"
                 />
                 <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
                   <!-- Unified Query Editor (with built-in AI bar) -->
@@ -114,7 +120,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                          vrl but passes no defaultCode. -->
                   <div
                     v-if="!formData.function && functionEditorPlaceholderFlag"
-                    class="pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                    class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
                     <span
                       class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
@@ -137,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="expandState.functionError"
                       data-test="function-error-details"
-                      class="border-status-negative bg-surface-subtle border-l-4 px-2 pb-2"
+                      class="border-status-negative bg-surface-subtle border-s-4 px-2 pb-2"
                     >
                       <pre
                         class="text-status-error-text my-0 whitespace-pre-wrap"
@@ -220,6 +226,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
@@ -300,6 +307,7 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
+    const { isMobile } = useBreakpoint();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
@@ -524,7 +532,10 @@ export default defineComponent({
 
     // Embedded (workflow): the host's bottom Save reads the live editor code from here,
     // then drives its own Update|Create dialog. Exposed for the parent ref.
-    expose({ getCode: () => formData.value.function });
+    // Live buffer (formData lags by the debounce), trimmed like the debounced commit.
+    expose({
+      getCode: () => (editorRef.value?.getValue?.() ?? formData.value.function ?? "").trim(),
+    });
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
@@ -662,6 +673,7 @@ export default defineComponent({
       handleFunctionError,
       vrlFunctionError,
       splitterModel,
+      isMobile,
       closeAddFunction,
       confirmDialogMeta,
       transformTypeOptions,

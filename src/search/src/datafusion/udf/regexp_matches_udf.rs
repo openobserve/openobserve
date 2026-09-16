@@ -150,7 +150,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let is_scalar_pattern = regex.len() == 1;
 
     // Precompile the regex if it's scalar
-    let scalar_regex = if is_scalar_pattern {
+    let scalar_regex = if is_scalar_pattern && !regex.is_null(0) {
         Some(
             Regex::new(regex.value(0))
                 .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?,
@@ -162,7 +162,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let mut list_builder = ListBuilder::new(GenericStringBuilder::<T>::new());
 
     for i in 0..values.len() {
-        if values.is_null(i) || (!is_scalar_pattern && regex.is_null(i)) {
+        if values.is_null(i) || regex.is_null(if is_scalar_pattern { 0 } else { i }) {
             // Append NULL for this row
             list_builder.append(false);
             continue;
@@ -462,5 +462,42 @@ mod tests {
         ];
 
         assert_batches_eq!(expected, &results);
+    }
+
+    #[tokio::test]
+    async fn test_regexp_matches_null_scalar_pattern() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+        let sql = "SELECT re_matches('gateway', CAST(NULL AS VARCHAR)) IS NULL AS missing";
+        let expected = [
+            "+---------+",
+            "| missing |",
+            "+---------+",
+            "| true    |",
+            "+---------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
+        // A one-row batch takes the scalar-pattern path, two rows take the array path.
+        for rows in [1, 2] {
+            let schema = Arc::new(Schema::new(vec![Field::new("job", DataType::Utf8, true)]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec!["gateway"; rows]))],
+            )
+            .unwrap();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+            )
+            .unwrap();
+            let sql = "SELECT re_matches(job, CAST(NULL AS VARCHAR)) IS NULL AS missing FROM t";
+            let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+            let mut expected = vec!["+---------+", "| missing |", "+---------+"];
+            expected.extend(std::iter::repeat_n("| true    |", rows));
+            expected.push("+---------+");
+            assert_batches_eq!(expected, &result);
+            ctx.deregister_table("t").unwrap();
+        }
     }
 }

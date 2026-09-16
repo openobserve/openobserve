@@ -42,12 +42,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="min-h-0 w-full flex-1 overflow-hidden">
         <div class="h-full">
           <OTable
+            ref="oTableRef"
             :frame="false"
             :data="visibleRows"
             :columns="columns"
             row-key="name"
             :loading="loading"
+            :forbidden="forbidden"
             pagination="client"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             :page-size="pageSize"
             :page-size-options="pageSizeOptions"
             selection="multiple"
@@ -59,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="h-full w-full"
           >
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
                 <OSearchInput
                   data-test="functions-list-search-input"
                   v-model="filterQuery"
@@ -123,6 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.updateTitle')"
                   data-test="function-list-edit-function-btn"
                   data-row-action="edit"
+                  class="max-md:hidden"
                   @click="showAddUpdateFn({ row })"
                   icon-left="edit"
                 />
@@ -132,6 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.delete')"
                   data-test="function-list-delete-function-btn"
                   data-row-action="delete"
+                  class="max-md:hidden"
                   @click="showDeleteDialogFn({ row })"
                   icon-left="delete"
                 />
@@ -141,14 +147,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="account-tree"
                   :title="t('function.associatedPipelines')"
                   data-row-action="view"
+                  class="max-md:hidden"
                   @click="getAssociatedPipelines({ row })"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="function-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    data-test="function-list-edit-function-btn-menu"
+                    @select="showAddUpdateFn({ row })"
+                  >
+                    <span>{{ t("function.updateTitle") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="function-list-delete-function-btn-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("function.delete") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="account-tree"
+                    class="md:hidden"
+                    data-test="function-list-associated-pipelines-menu"
+                    @select="getAssociatedPipelines({ row })"
+                  >
+                    <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
             <template #bottom>
               <div class="flex w-full items-center justify-between py-2">
-                <div class="mr-4 flex items-center text-xs font-normal">
+                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal }} {{ t("function.header") }}
                 </div>
                 <OButton
@@ -241,6 +285,8 @@ import searchState from "@/composables/useLogs/searchState";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
@@ -261,6 +307,8 @@ export default defineComponent({
     OButton,
     OBadge,
     ODialog,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTooltip,
   },
@@ -326,9 +374,24 @@ export default defineComponent({
       window.open(routeUrl, "_blank");
     };
 
-    const loading = ref(false);
+    // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
+    const currentPage = ref(1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+    };
+    const oTableRef: any = ref(null);
+    // setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+    const restorePageIndex = () => {
+      setTimeout(() => {
+        oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+      }, 0);
+    };
+
+    const loading = ref(true);
+    const forbidden = ref(false);
     const getJSTransforms = () => {
       loading.value = true;
+      forbidden.value = false;
       // return ;
       const dismiss = toast({
         variant: "loading",
@@ -371,7 +434,8 @@ export default defineComponent({
           console.error("Error while pulling function", err);
 
           dismiss();
-          if (err?.response?.status && err?.response?.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (err?.response?.status && !forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.functions.errorWhilePullingFunction"),
@@ -380,6 +444,7 @@ export default defineComponent({
         })
         .finally(() => {
           loading.value = false;
+          restorePageIndex();
         });
     };
 
@@ -727,6 +792,7 @@ export default defineComponent({
       selectedDelete,
       getJSTransforms,
       loading,
+      forbidden,
       resultTotal,
       refreshList,
       pageSize,
@@ -758,6 +824,10 @@ export default defineComponent({
       confirmBulkDelete,
       selectedFunctions,
       selectedFunctionIds,
+      currentPage,
+      onPageChange,
+      oTableRef,
+      restorePageIndex,
     };
   },
   computed: {

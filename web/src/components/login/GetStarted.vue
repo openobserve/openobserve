@@ -5,10 +5,10 @@
       class="hidden bg-[url('@/assets/images/common/openobserve_banner_compreesed.png')] bg-cover bg-center bg-no-repeat lg:flex lg:w-[40%]"
     >
       <div class="flex h-full items-end justify-start">
-        <div class="mb-8.5 ml-8">
+        <div class="ms-8 mb-8.5">
           <span class="mb-3">
             <img
-              class="-ml-px h-10"
+              class="-ms-px h-10"
               src="@/assets/images/common/openobserve_logo_light.svg"
               :alt="t('login.openObserveLogoAlt')"
             />

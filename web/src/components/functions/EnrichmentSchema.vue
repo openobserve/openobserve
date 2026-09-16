@@ -40,26 +40,26 @@
           >
             <div data-test="schema-stream-title-text">
               {{ t("alerts.stream_name") }}
-              <span class="title mb-4 pl-1 font-bold"> {{ schemaData.name }}</span>
+              <span class="title mb-4 ps-1 font-bold"> {{ schemaData.name }}</span>
             </div>
             <div
               v-if="store.state.zoConfig.show_stream_stats_doc_num"
               data-test="schema-stream-title-text"
             >
               {{ t("logStream.docsCount") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ parseInt(schemaData.stats.doc_num).toLocaleString("en-US") }}
               </span>
             </div>
             <div data-test="schema-stream-title-text">
               {{ t("logStream.storageSize") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.storage_size) }}</span
               >
             </div>
             <div v-if="isCloud !== 'true'" data-test="schema-stream-title-text">
               {{ t("logStream.compressedSize") }}
-              <span class="title mb-4 pl-1 font-bold">
+              <span class="title mb-4 ps-1 font-bold">
                 {{ formatSizeFromMB(schemaData.stats.compressed_size) }}</span
               >
             </div>

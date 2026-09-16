@@ -112,6 +112,23 @@ describe("FlowEdge.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    // Selection is invisible without this: the resting stroke is an INLINE style,
+    // which beats the library's `.selected` stylesheet rule — so the selected
+    // state must be painted from the style object itself.
+    it("selected: overrides the resting stroke with the selection colour", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 }, selected: true });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("var(--color-indigo-500)");
+      expect(style.strokeWidth).toBe(3);
+    });
+
+    it("selected defaults to false and keeps the resting stroke (pipelines unchanged)", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 } });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("grey");
+      expect(style.strokeWidth).toBe(2);
+    });
+
     it("defaults isInView to false", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).isInView ?? false).toBe(false);
@@ -158,6 +175,37 @@ describe("FlowEdge.vue", () => {
       await chip.trigger("mouseleave");
       expect(wrapper.emitted("insert-enter")).toHaveLength(1);
       expect(wrapper.emitted("insert-leave")).toHaveLength(1);
+    });
+  });
+
+  describe("branch path label (label prop)", () => {
+    const chip = (w: any) => w.find('[data-test="workflow-edge-label"]');
+
+    it("renders no label by default (pipelines opt out)", () => {
+      wrapper = createWrapper();
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders no label for an empty label (a non-branch edge)", () => {
+      wrapper = createWrapper({ label: "" });
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the label text when one is supplied", () => {
+      wrapper = createWrapper({ label: "Severe (>=1000)" });
+      expect(chip(wrapper).exists()).toBe(true);
+      expect(chip(wrapper).text()).toBe("Severe (>=1000)");
+    });
+
+    it("exposes the full text as a title so a truncated label stays readable", () => {
+      const long = "Severe breach over one thousand requests per second sustained";
+      wrapper = createWrapper({ label: long });
+      expect(chip(wrapper).attributes("title")).toBe(long);
+    });
+
+    it("positions the label from the bezier midpoint via the shared CSS var", () => {
+      wrapper = createWrapper({ label: "Moderate", sourceX: 10, sourceY: 20 });
+      expect(chip(wrapper).attributes("style")).toContain("--wf-edge-mid");
     });
   });
 

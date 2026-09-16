@@ -102,16 +102,7 @@ pub async fn tantivy_search(
         &query.trace_id,
         &index_file_names
             .iter()
-            .map(|(ttv_file, f)| {
-                (
-                    f.id,
-                    &f.account,
-                    ttv_file,
-                    f.meta.index_size,
-                    f.meta.max_ts,
-                    f.meta.records,
-                )
-            })
+            .map(|(ttv_file, f)| (f.id, &f.account, ttv_file, f.meta.index_size, f.meta.max_ts))
             .collect_vec(),
         &mut scan_stats,
         "index",

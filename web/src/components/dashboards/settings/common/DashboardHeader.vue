@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-header-back-button"
           variant="outline"
           size="icon-xs"
-          class="mr-2"
+          class="me-2"
           @click="onBackClicked"
           icon-left="arrow-back-ios-new"
         >

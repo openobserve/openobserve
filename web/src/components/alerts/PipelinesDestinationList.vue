@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
@@ -109,6 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="edit"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.edit')"
               @click="editDestination(row)"
             >
@@ -119,11 +121,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-row-action="delete"
               variant="ghost"
               size="icon-sm"
+              class="max-md:hidden"
               :title="t('alert_destinations.delete')"
               @click="conformDeleteDestination(row)"
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-destination-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                @select="editDestination(row)"
+              >
+                <span>{{ t("alert_destinations.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{ t("alert_destinations.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
 
           <template v-if="selectedDestinations.length > 0" #bottom>
@@ -195,6 +228,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
@@ -224,6 +259,8 @@ export default defineComponent({
     OTag,
     OSearchInput,
     OTable,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const store = useStore();
@@ -334,6 +371,7 @@ export default defineComponent({
     });
 
     const loading = ref(false);
+    const forbidden = ref(false);
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -341,6 +379,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -356,7 +395,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -377,9 +417,17 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add") editDestination(null);
-      if (router.currentRoute.value.query.action === "update")
-        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      const action = router.currentRoute.value.query.action;
+      const name = router.currentRoute.value.query.name as string;
+      // No-op when the editor already matches the route; a stale getDestinations().then() resolution re-invokes editDestination() and flips the just-opened editor closed.
+      if (action === "add" && !showDestinationEditor.value) {
+        editDestination(null);
+      } else if (
+        action === "update" &&
+        !(showDestinationEditor.value && editingDestination.value?.name === name)
+      ) {
+        editDestination(getDestinationByName(name));
+      }
     };
     const getDestinationByName = (name: string) => {
       return destinations.value.find((destination) => destination.name === name);
@@ -651,6 +699,7 @@ export default defineComponent({
       getImageURL,
       conformDeleteDestination,
       loading,
+      forbidden,
       filterQuery,
       filterData,
       editingDestination,

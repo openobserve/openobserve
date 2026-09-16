@@ -7,6 +7,8 @@ export interface AiPlaygroundRouteOptions {
   datasetId?: string;
   /** Clones this run's task config into the first variant. */
   experimentId?: string;
+  /** Loads the conversation stashed by Trace Details (see playgroundHandoff). */
+  fromSpan?: boolean;
 }
 
 /**
@@ -23,6 +25,7 @@ export function aiPlaygroundRoute(
       org_identifier: orgIdentifier,
       ...(options.datasetId ? { dataset: options.datasetId } : {}),
       ...(options.experimentId ? { experiment: options.experimentId } : {}),
+      ...(options.fromSpan ? { from: "span" } : {}),
     },
   };
 }

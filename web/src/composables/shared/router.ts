@@ -38,6 +38,7 @@ const SearchSchedulersList = () => import("@/plugins/logs/SearchSchedulersList.v
 const AppMetrics = () => import("@/plugins/metrics/Index.vue");
 const AppMetricsExplorer = () => import("@/plugins/metrics/explorer/MetricsExplorer.vue");
 const AppTraces = () => import("@/plugins/traces/Index.vue");
+const AppProfiles = () => import("@/plugins/profiles/Index.vue");
 const PromQLQueryBuilder = () => import("@/views/PromQL/QueryBuilder.vue");
 
 const TraceDetails = () => import("@/plugins/traces/TraceDetails.vue");
@@ -69,6 +70,7 @@ import DbmShell from "@/views/DatabaseMonitoring/DbmShell.vue";
 
 const DbmDatabasesPage = () => import("@/views/DatabaseMonitoring/DatabasesPage.vue");
 const DbmQueriesPage = () => import("@/views/DatabaseMonitoring/QueriesPage.vue");
+const DbmMetricsPage = () => import("@/views/DatabaseMonitoring/MetricsPage.vue");
 const DbmSamplesPage = () => import("@/views/DatabaseMonitoring/SamplesPage.vue");
 const DbmQueryDetailPage = () => import("@/views/DatabaseMonitoring/QueryDetailPage.vue");
 const DbmActivityPage = () => import("@/views/DatabaseMonitoring/ActivityPage.vue");
@@ -215,17 +217,6 @@ const useRoutes = () => {
       meta: {
         keepAlive: true,
         titleKey: "menu.home",
-      },
-    },
-    // TEMPORARY: preview route for the OEmptyState design sample. Remove once
-    // the empty-state design is approved (along with src/views/EmptyStateDemo.vue).
-    {
-      path: "empty-state-demo",
-      name: "emptyStateDemo",
-      component: () => import("@/views/EmptyStateDemo.vue"),
-      meta: {
-        keepAlive: false,
-        titleKey: "routeTitles.emptyStateDemo",
       },
     },
     {
@@ -376,6 +367,18 @@ const useRoutes = () => {
       },
     },
     {
+      path: "profiles",
+      name: "profiles",
+      component: AppProfiles,
+      meta: {
+        keepAlive: true,
+        titleKey: "menu.profiles",
+      },
+      beforeEnter(to: any, from: any, next: any) {
+        routeGuard(to, from, next);
+      },
+    },
+    {
       path: "traces/service-graph",
       redirect: redirectToTraceTab("service-graph"),
     },
@@ -398,6 +401,15 @@ const useRoutes = () => {
           path: "",
           name: "dbmDatabases",
           component: DbmDatabasesPage,
+          meta: {
+            keepAlive: true,
+            title: "Databases",
+          },
+        },
+        {
+          path: "metrics",
+          name: "dbmMetrics",
+          component: DbmMetricsPage,
           meta: {
             keepAlive: true,
             title: "Databases",
@@ -489,6 +501,22 @@ const useRoutes = () => {
         path: `/infra/databases${to.params.dbmPath?.length ? `/${[to.params.dbmPath].flat().join("/")}` : ""}`,
         query: to.query,
       }),
+    },
+    // Ungated by design (detection changes page state, not route existence) and placed past the splice(13) hazard.
+    {
+      path: "infra/hosts",
+      name: "infraHosts",
+      component: () => import("@/views/Infrastructure/HostsPage.vue"),
+      meta: { titleKey: "menu.hosts" },
+      beforeEnter: routeGuard,
+    },
+    {
+      path: "infra/kubernetes",
+      name: "infraKubernetes",
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
+      props: { workload: "kubernetes" },
+      meta: { titleKey: "menu.kubernetes" },
+      beforeEnter: routeGuard,
     },
     {
       path: "traces/trace-details",
@@ -923,6 +951,7 @@ const useRoutes = () => {
       },
     },
     {
+      // Correlation engine is enterprise/cloud-only: bounce to Alerts on OSS — mirrors anomaly/alert-sources guards.
       path: "alerts/import-semantic-groups",
       name: "importSemanticGroups",
       component: () => import("@/components/alerts/ImportSemanticGroups.vue"),
@@ -930,6 +959,12 @@ const useRoutes = () => {
         titleKey: "correlation.importSemanticGroups.title",
       },
       beforeEnter(to: any, from: any, next: any) {
+        const store = (window as any).store;
+        const isOss = store?.state?.zoConfig?.build_type === "opensource";
+        if (isOss || (config.isEnterprise !== "true" && config.isCloud !== "true")) {
+          next({ name: "alertList", query: { org_identifier: to.query.org_identifier } });
+          return;
+        }
         routeGuard(to, from, next);
       },
     },

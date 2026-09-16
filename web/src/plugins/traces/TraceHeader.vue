@@ -48,13 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="trace-header-tics"
       v-if="!isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div class="w-1/4 pl-3 text-xs" data-test="trace-header-tic-label-0">
+      <div class="w-1/4 ps-3 text-xs" data-test="trace-header-tic-label-0">
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-1">
+      <div class="w-1/4 ps-1 text-xs" data-test="trace-header-tic-label-1">
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div class="w-1/4 pl-1 text-xs" data-test="trace-header-tic-label-2">
+      <div class="w-1/4 ps-1 text-xs" data-test="trace-header-tic-label-2">
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div

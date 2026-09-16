@@ -13,16 +13,16 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ─── Model provider selection ──────────────────────────────────────────────
-// The review runs against a single provider per invocation, chosen via env so the
-// same script can be launched once per provider (see .github/workflows/ai-code-review.yml,
-// whose matrix currently has a single deepseek leg). Everything defaults to that
-// DeepSeek-V4-Pro setup, so an invocation with no REVIEW_* env set still works.
+// The review runs against a single provider per invocation, chosen via env so the same script
+// can be launched once per provider (see .github/workflows/ai-code-review.yml, whose matrix
+// currently has a single deepseek leg). Everything defaults to that DeepSeek-V4-Pro setup, so an
+// invocation with no REVIEW_* env set still works. The model is named freely here and in CI logs;
+// what must never name it is the posted PR comment — see redactProviderIdentity.
 //
 // - REVIEW_PROVIDER_ID / REVIEW_MODEL_ID: opencode provider+model IDs (must match a
 //   provider/model registered in opencode.jsonc).
 // - REVIEW_MODEL_VARIANT: opencode `variant` on session.prompt (empty ⇒ omit).
 // - REVIEW_API_KEY_ENV: name of the env var holding the provider API key (checked for presence).
-// - REVIEW_LABEL: short human label used in the posted comment header (e.g. "DeepSeek-V4-Pro").
 // - REVIEW_MARKER: HTML comment marker that identifies this provider's comment on the PR, so
 //   providers post/update independent comments and never clobber each other.
 const PROVIDER_ID = process.env.REVIEW_PROVIDER_ID || "deepseek-review";
@@ -30,35 +30,30 @@ const MODEL_ID = process.env.REVIEW_MODEL_ID || "deepseek-v4-pro";
 const MODEL_VARIANT = process.env.REVIEW_MODEL_VARIANT ?? "";
 // REVIEW_API_KEY_ENV holds the NAME of the env var carrying the key (e.g. "DEEPSEEK_API_KEY"),
 // never the key itself — the value is read only via apiKey() below and is never logged or
-// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs and
-// into a public PR comment on misconfiguration, so a malformed value must not become the
-// vehicle for leaking anything. This also keeps CodeQL's js/clear-text-logging taint analysis
-// from treating the *name* as the secret (it flags any `...API_KEY...` env read reaching a log).
+// posted. Constrain it to an env-var-shaped token anyway: the name is echoed into CI logs, so a
+// malformed value must not become the vehicle for leaking anything. This also keeps CodeQL's
+// js/clear-text-logging taint analysis from treating the *name* as the secret (it flags any
+// `...API_KEY...` env read reaching a log).
 const RAW_API_KEY_VAR_NAME = process.env.REVIEW_API_KEY_ENV || "DEEPSEEK_API_KEY";
 const API_KEY_VAR_NAME = /^[A-Z][A-Z0-9_]{0,63}$/.test(RAW_API_KEY_VAR_NAME)
   ? RAW_API_KEY_VAR_NAME
   : "DEEPSEEK_API_KEY";
-const MODEL_LABEL = process.env.REVIEW_LABEL || "DeepSeek-V4-Pro";
 const MODEL_SLUG = `${PROVIDER_ID}/${MODEL_ID}`;
 
 function apiKey() {
   return process.env[API_KEY_VAR_NAME];
 }
 
-const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review-deepseek -->";
+const REVIEW_MARKER = process.env.REVIEW_MARKER || "<!-- ai-code-review -->";
 
-// Every marker any provider leg may post. findExistingReviewComment matches on substring, so a
-// comment carrying a foreign marker gets claimed — and overwritten — by that other provider's
-// leg. The coordinator prompt is now told not to emit markers at all, but models don't reliably
-// obey formatting instructions, so sanitizeReviewBody strips all of these and re-prepends only
+// The shape of any marker a provider leg may post — matched as a pattern rather than a list so a
+// retired leg's suffixed marker (e.g. the old per-provider ones) is still claimed and rewritten
+// in place. The coordinator prompt is told not to emit markers at all, but models don't reliably
+// obey formatting instructions, so sanitizeReviewBody strips every match and re-prepends only
 // REVIEW_MARKER: exactly one marker per comment, enforced in code rather than by the prompt.
-// Keep in sync with the `marker` values in .github/workflows/ai-code-review.yml.
-// Includes the retired GLM leg's marker so any leftover GLM comment text still gets
-// stripped from model output rather than resurfacing inside a DeepSeek comment.
-const ALL_REVIEW_MARKERS = [
-  "<!-- ai-code-review -->",
-  "<!-- ai-code-review-deepseek -->",
-];
+// findExistingReviewComment matches the same pattern. Keep in sync with the `marker` values in
+// .github/workflows/ai-code-review.yml.
+const ANY_REVIEW_MARKER = "<!--\\s*ai-code-review[a-z0-9-]*\\s*-->";
 
 // ─── Branding (presentation only) ───────────────────────────────────────────
 // The posted comment is branded "OpenObserve Code Review". These strings change ONLY how the
@@ -918,6 +913,21 @@ async function runReviewer(agentKey, agentDef, diff, prContext, existingReview, 
 
 // ─── Sanitization ──────────────────────────────────────────────────────────
 
+// Anything reaching the PR goes through here: the posted review must never name the model or
+// provider behind it, and a model naming itself (or an upstream error echoing the slug) would
+// undo that. The vendor prefix of the ids is redacted too, so "deepseek-v4-pro" and a bare
+// "DeepSeek" both go. Longest term first: alternation is first-match, so an unsorted list would
+// leave the rest of a longer id behind after redacting its prefix.
+function redactProviderIdentity(text) {
+  const vendor = MODEL_ID.split(/[-/_]/)[0];
+  const terms = [PROVIDER_ID, MODEL_ID, vendor.length >= 4 ? vendor : null]
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  if (terms.length === 0) return text;
+  return text.replace(new RegExp(terms.join("|"), "gi"), "[redacted]");
+}
+
 function sanitizeReviewBody(body) {
   if (!body) return "";
 
@@ -953,11 +963,9 @@ function sanitizeReviewBody(body) {
   const boundaryPattern = new RegExp(`</?(${boundaryTags.join("|")})[^>]*>`, "gi");
   cleaned = cleaned.replace(boundaryPattern, "");
 
-  // Strip EVERY known marker (not just ours) wherever it appears, so a model that echoes a
-  // marker from the prompt or from a previous review can't end up carrying two of them.
-  for (const marker of ALL_REVIEW_MARKERS) {
-    cleaned = cleaned.split(marker).join("");
-  }
+  // Strip EVERY marker (not just ours) wherever it appears, so a model that echoes a marker
+  // from the prompt or from a previous review can't end up carrying two of them.
+  cleaned = cleaned.replace(new RegExp(ANY_REVIEW_MARKER, "gi"), "");
 
   // Drop any preamble the model emitted before the review proper ("Now I have all the
   // context. Let me produce the consolidated review."). Runs after marker stripping so a
@@ -968,17 +976,14 @@ function sanitizeReviewBody(body) {
   // Re-prepend exactly one marker — ours.
   cleaned = `${REVIEW_MARKER}\n${cleaned.trimStart()}`;
 
-  // Normalize the review heading to the branded title + model label. Rewrites the whole heading
-  // line — covering a model that dropped the 🔎 emoji or emitted a legacy "AI Code Review"
-  // heading — to a single canonical form, and tags it with the model label so each provider's
-  // comment is visually identifiable. The negative lookahead for "(" keeps re-runs idempotent
-  // (a heading already carrying "(Label)" is left untouched).
+  // Normalize the review heading to the branded title, dropping any trailing "(Label)" an older
+  // comment or the model itself appended — the posted review must not name the model.
   cleaned = cleaned.replace(
-    /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b(?![ \t]*\()[ \t]*[^\n(]*$/mi,
-    `${REVIEW_HEADING} (${MODEL_LABEL})`,
+    /^#{1,3}[ \t]*(?:🔎[ \t]*)?(?:OpenObserve Code Review|AI Code Review)\b[ \t]*[^\n]*$/mi,
+    REVIEW_HEADING,
   );
 
-  return cleaned.trim();
+  return redactProviderIdentity(cleaned.trim());
 }
 
 // ─── Coordinator pass ─────────────────────────────────────────────────────
@@ -1090,7 +1095,7 @@ function buildFallbackReview(agentResults, tier, failedAgents) {
 
   if (sorted.length === 0) {
     return `${REVIEW_MARKER}
-${REVIEW_HEADING} (${MODEL_LABEL})
+${REVIEW_HEADING}
 
 > [!TIP]
 > ### ✅ Approved
@@ -1141,7 +1146,7 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
     : "";
 
   return `${REVIEW_MARKER}
-${REVIEW_HEADING} (${MODEL_LABEL})
+${REVIEW_HEADING}
 
 > [!NOTE]
 > ### 💬 Approved with comments
@@ -1168,7 +1173,8 @@ ${failedAgents.length > 0 ? `- Failed reviewers: ${failedAgents.map(r => r.agent
 function findExistingReviewComment(prNumber) {
   try {
     const comments = ghJson(`api "repos/${process.env.GITHUB_REPOSITORY}/issues/${prNumber}/comments"`);
-    const ourComments = comments.filter(c => c.body?.includes(REVIEW_MARKER));
+    const markerRe = new RegExp(ANY_REVIEW_MARKER, "i");
+    const ourComments = comments.filter(c => markerRe.test(c.body || ""));
     return ourComments.length > 0 ? ourComments[ourComments.length - 1] : null;
   } catch {
     return null;
@@ -1241,10 +1247,12 @@ async function main() {
       // fail loudly (non-zero exit) instead of warn+return, so review coverage silently
       // dropping to zero can't slip by as a green check. Also post to the PR so it's
       // visible without digging into Actions logs.
-      const message = `${API_KEY_VAR_NAME} is not set. OpenObserve Code Review (${MODEL_LABEL}) did not run for this PR — this is a CI misconfiguration, not a skip.`;
+      const message = `${API_KEY_VAR_NAME} is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip.`;
       console.error(`[${isoNow()}] ${message}`);
       try {
-        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING} (${MODEL_LABEL})\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> ${message} Please confirm the \`${API_KEY_VAR_NAME}\` secret is provisioned.`);
+        // The key's env var name is named in the log but not in the comment: it carries the
+        // provider name, and the posted comment must not.
+        postReviewComment(prNumber, `${REVIEW_MARKER}\n${REVIEW_HEADING}\n\n> [!CAUTION]\n> ### ⛔ Not reviewed\n> The review API key is not set. OpenObserve Code Review did not run for this PR — this is a CI misconfiguration, not a skip. Please confirm the review secrets are provisioned.`);
       } catch (postErr) {
         console.error(`[${isoNow()}] Also failed to post the misconfiguration notice: ${postErr.message}`);
       }
@@ -1397,11 +1405,11 @@ async function main() {
         "review.coordinator_skipped": true,
       });
       finalReview = [
-        `${REVIEW_HEADING} (${MODEL_LABEL})`,
+        REVIEW_HEADING,
         ``,
         `> [!CAUTION]`,
         `> ### ⛔ Not reviewed`,
-        `> All ${results.length} reviewers failed against \`${MODEL_SLUG}\`, so there are no findings to report — this is an infrastructure failure, not an approval.`,
+        `> All ${results.length} reviewers failed, so there are no findings to report — this is an infrastructure failure, not an approval.`,
         ``,
         `<details>`,
         `<summary>🧾 Reviewer failures (${failedAgents.length})</summary>`,

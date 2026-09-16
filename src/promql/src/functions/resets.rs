@@ -15,23 +15,12 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#resets
-pub(crate) fn resets(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, ResetsFunc::new(), eval_ctx)
-}
-
 pub struct ResetsFunc;
-
-impl ResetsFunc {
-    pub fn new() -> Self {
-        ResetsFunc {}
-    }
-}
 
 impl RangeFunc for ResetsFunc {
     fn name(&self) -> &'static str {
@@ -40,9 +29,8 @@ impl RangeFunc for ResetsFunc {
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
         let resets = samples
-            .iter()
-            .zip(samples.iter().skip(1))
-            .map(|(current, next)| (current.value.gt(&next.value) as u32) as f64)
+            .windows(2)
+            .map(|pair| (pair[0].value.gt(&pair[1].value) as u32) as f64)
             .sum();
         Some(resets)
     }
@@ -71,7 +59,7 @@ mod tests {
 
     #[test]
     fn test_exec_no_resets() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Monotonically increasing - should have 0 resets
         let data = create_range_value(vec![1.0, 2.0, 3.0, 4.0, 5.0]);
@@ -88,7 +76,7 @@ mod tests {
 
     #[test]
     fn test_exec_single_reset() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // One reset: values go up then down
         let data = create_range_value(vec![1.0, 2.0, 3.0, 1.0, 2.0]);
@@ -105,7 +93,7 @@ mod tests {
 
     #[test]
     fn test_exec_multiple_resets() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Multiple resets: up-down-up-down pattern
         let data = create_range_value(vec![1.0, 5.0, 2.0, 6.0, 3.0]);
@@ -122,7 +110,7 @@ mod tests {
 
     #[test]
     fn test_exec_edge_cases() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Single sample - should have 0 resets (no pairs to compare)
         let data = create_range_value(vec![42.0]);
@@ -143,7 +131,7 @@ mod tests {
 
     #[test]
     fn test_exec_negative_values() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // All negative values - decreasing (more negative)
         let data = create_range_value(vec![-1.0, -2.0, -3.0]);
@@ -160,7 +148,7 @@ mod tests {
 
     #[test]
     fn test_exec_floating_point_precision() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Test with very close floating point values
         let data = create_range_value(vec![1.0000001, 1.0000002, 1.0000001]);
@@ -173,7 +161,7 @@ mod tests {
 
     #[test]
     fn test_exec_special_values() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Test with infinity
         let data = create_range_value(vec![1.0, f64::INFINITY, 2.0]);
@@ -190,7 +178,7 @@ mod tests {
 
     #[test]
     fn test_exec_counter_overflow_scenarios() {
-        let func = ResetsFunc::new();
+        let func = ResetsFunc;
 
         // Typical counter overflow scenario (common in monitoring)
         let data = create_range_value(vec![

@@ -16,6 +16,8 @@ import {
 import OSelectItem from "./OSelectItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useIsTruncated } from "@/lib/overlay/Tooltip/useIsTruncated";
 import {
   ListboxFilter,
   ListboxItem,
@@ -48,6 +50,7 @@ import {
   watch,
   watchEffect,
 } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   O_DROPDOWN_NESTED_KEY,
   setActiveOverlay,
@@ -76,6 +79,8 @@ type NormalizedOption = {
   badge?: string;
   /** Tooltip for the badge. Use when the badge is abbreviated (e.g. `C` → "Counter"). */
   badgeTitle?: string;
+  /** Tints the badge neutral instead of positive, e.g. a badge naming why a disabled row is disabled. */
+  badgeMuted?: boolean;
   /**
    * Per-option badge colours, e.g. `{ color, background }`. A styled badge renders
    * as a filled pill in that option's own colour, right-aligned into a single
@@ -87,6 +92,8 @@ type NormalizedOption = {
 const DEFAULT_OPTION_LABEL = "label";
 const DEFAULT_OPTION_VALUE = "value";
 const DEFAULT_OPTION_DISABLED = "disabled";
+
+const { lgUp } = useBreakpoint();
 
 const props = withDefaults(defineProps<SelectProps>(), {
   size: "md",
@@ -217,6 +224,7 @@ function normalizeOption(input: unknown): NormalizedOption | null {
       option["badgeStyle"] && typeof option["badgeStyle"] === "object"
         ? (option["badgeStyle"] as Record<string, string>)
         : undefined,
+    badgeMuted: option["badgeMuted"] === true,
   };
 }
 
@@ -399,6 +407,9 @@ const triggerDisplayLabel = computed(() => {
   if (props.multiple) return selectedLabels.value.join(", ");
   return selectedLabels.value[0] ?? "";
 });
+
+const triggerLabelRef = ref<HTMLElement | null>(null);
+const { isTruncated: isTriggerLabelTruncated } = useIsTruncated(triggerLabelRef);
 
 watch(searchTerm, (value) => {
   if (!inputEnabled.value) return;
@@ -602,10 +613,16 @@ function close() {
   searchTerm.value = "";
 }
 
-/** Focus the trigger programmatically (both listbox and native-select modes). */
+/** Focus the trigger and open it, so a programmatic call reads as more than a ring. */
 function focus() {
   if (typeof document === "undefined") return;
   document.getElementById(inputId.value)?.focus();
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
 }
 
 defineExpose({ close, focus });
@@ -653,8 +670,31 @@ const navigableIndices = computed(() =>
 );
 
 // Reset highlight whenever the dropdown opens or the filtered list changes.
+// Single-select: land on the current value instead of the top of the list —
+// a 48-row virtualised list (e.g. a time-of-day picker) otherwise always opens
+// scrolled to its first entry, forcing a scroll/search just to see what's
+// already chosen. Multi-select keeps its own affordance (pinned-to-top in
+// `baseFilteredOptions`), so it stays untouched.
 watch(popoverOpen, (open) => {
-  if (open) highlightedIndex.value = -1;
+  if (!open) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  if (props.multiple) {
+    highlightedIndex.value = -1;
+    return;
+  }
+  const selected = selectedValues.value[0];
+  const index =
+    selected === undefined
+      ? -1
+      : filteredOptions.value.findIndex((opt) => !opt.header && opt.value === selected);
+  highlightedIndex.value = index;
+  if (index < 0) return;
+  nextTick(() => {
+    virtualizer.value.scrollToIndex(index, { align: "center", behavior: "auto" });
+    nextTick(scrollHighlightedIntoView);
+  });
 });
 watch(filteredOptions, () => {
   highlightedIndex.value = -1;
@@ -749,7 +789,7 @@ function getPaletteGradient(colors: string[]): string {
 
 // Aligned with OInput and OButton sm: h-[2.125rem] ≈ 30px at the 14px html base.
 const heightClasses: Record<NonNullable<SelectProps["size"]>, string> = {
-  sm: "h-6 text-sm",
+  sm: "h-[2.125rem] text-sm",
   md: "h-[2.125rem] text-sm",
 };
 
@@ -1160,6 +1200,7 @@ const fieldWidthClass = computed(() => {
                       >
                         {{ labelText }}
                       </span>
+                      <OTooltip :content="raw(String(labelText ?? ''))" />
                     </slot>
                     <span
                       v-if="overflowSelectedCount > 0"
@@ -1170,25 +1211,31 @@ const fieldWidthClass = computed(() => {
                     </span>
                   </div>
                 </template>
-                <span
-                  v-else
-                  :title="optionTooltip && hasSelection ? triggerDisplayLabel : undefined"
-                  :class="[
-                    'text-start',
-                    // An inline trigger is a word in a sentence: it grows to fit
-                    // its value. `truncate` would also zero its min-content
-                    // width, letting any ancestor squeeze it to a lone ellipsis.
-                    isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
-                    labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
-                    disabled
-                      ? 'text-select-disabled-text'
-                      : hasSelection
-                        ? 'text-select-text'
-                        : 'text-select-placeholder',
-                  ]"
-                >
-                  {{ hasSelection ? triggerDisplayLabel : placeholder }}
-                </span>
+                <template v-else>
+                  <span
+                    ref="triggerLabelRef"
+                    :class="[
+                      'text-start',
+                      // An inline trigger is a word in a sentence: it grows to fit
+                      // its value. `truncate` would also zero its min-content
+                      // width, letting any ancestor squeeze it to a lone ellipsis.
+                      isInlineAppearance ? 'whitespace-nowrap' : 'flex-1 truncate text-sm',
+                      labelPosition === 'inside' && label ? 'text-xs leading-4' : '',
+                      disabled
+                        ? 'text-select-disabled-text'
+                        : hasSelection
+                          ? 'text-select-text'
+                          : 'text-select-placeholder',
+                    ]"
+                  >
+                    {{ hasSelection ? triggerDisplayLabel : placeholder }}
+                  </span>
+                  <OTooltip
+                    v-if="hasSelection"
+                    :content="raw(triggerDisplayLabel)"
+                    :disabled="!isTriggerLabelTruncated"
+                  />
+                </template>
               </slot>
             </div>
           </PopoverTrigger>
@@ -1561,13 +1608,17 @@ const fieldWidthClass = computed(() => {
                                 >
                                 <span
                                   v-if="filteredOptions[vRow.index].badge"
-                                  class="rounded-default text-status-positive border-status-positive shrink-0 border border-solid"
+                                  class="rounded-default shrink-0 border border-solid"
                                   :class="[
+                                    // `pointer-events-auto` keeps a muted badge's tooltip reachable despite the row's own `pointer-events-none`.
+                                    filteredOptions[vRow.index].badgeMuted
+                                      ? 'text-text-secondary border-border-default pointer-events-auto'
+                                      : 'text-status-positive border-status-positive',
                                     filteredOptions[vRow.index].badgeTitle
                                       ? 'cursor-help'
                                       : undefined,
                                     filteredOptions[vRow.index].badgeStyle
-                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      ? 'ms-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"
@@ -1610,11 +1661,9 @@ const fieldWidthClass = computed(() => {
                               class="shrink-0"
                             />
                             <span v-else-if="iconKey" class="size-4 shrink-0" />
-                            <span
-                              class="truncate"
-                              :title="optionTooltip ? filteredOptions[vRow.index].label : undefined"
-                              >{{ filteredOptions[vRow.index].label }}</span
-                            >
+                            <span class="truncate" :title="filteredOptions[vRow.index].label">{{
+                              filteredOptions[vRow.index].label
+                            }}</span>
                           </template>
                         </ListboxItem>
                       </div>
@@ -1821,10 +1870,12 @@ const fieldWidthClass = computed(() => {
           position="popper"
           :side-offset="4"
           :hide-when-detached="true"
+          :collision-padding="lgUp ? 0 : 8"
           :data-test="parentDataTest ? `${parentDataTest}-popover` : undefined"
           :class="[
-            'z-10001 min-w-(--reka-select-trigger-width)',
+            'z-10001 min-w-(--reka-select-trigger-width) max-lg:max-w-[calc(100vw-1rem)]',
             'overflow-hidden',
+            'max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto',
             'rounded-default border shadow-md',
             'bg-select-content-bg border-select-content-border',
             // Clip-path reveal: unveiled at full size from its trigger edge (no

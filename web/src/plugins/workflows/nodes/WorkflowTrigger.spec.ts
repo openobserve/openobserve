@@ -125,18 +125,18 @@ describe("WorkflowTrigger", () => {
     });
   });
 
-  describe("incident event-type preview (split view)", () => {
+  describe("incident event-type preview (merged payload)", () => {
     const select = (w: any) => w.findComponent({ name: "OSelect" });
     const jsonEditors = (w: any) => w.findAllComponents({ name: "QueryEditor" });
-    // common block is the first editor; its sample is the `[{meta,data}]` envelope
-    const commonMeta = (w: any) => JSON.parse(jsonEditors(w)[0].props("query"))[0].meta;
+    // The single merged editor's sample is the `[{meta,data}]` envelope.
+    const metaOf = (w: any) => JSON.parse(jsonEditors(w)[0].props("query"))[0].meta;
     const asIncident = () => {
       workflowObj.currentSelectedNodeData = {
         data: { trigger_kind: "incident_event" },
       } as any;
     };
 
-    it("shows NO dropdown / split for an alert trigger (single sample)", () => {
+    it("shows NO dropdown for an alert trigger (single sample)", () => {
       workflowObj.currentSelectedNodeData = {
         data: { trigger_kind: "alert_fired" },
       } as any;
@@ -145,7 +145,7 @@ describe("WorkflowTrigger", () => {
       expect(w.find('[data-test="workflow-trigger-structure"]').exists()).toBe(true);
     });
 
-    it("offers a dropdown of every incident event_type", () => {
+    it("offers a dropdown valued by every raw incident event_type", () => {
       asIncident();
       const options = select(createWrapper())
         .props("options")
@@ -153,42 +153,45 @@ describe("WorkflowTrigger", () => {
       expect(options).toEqual(INCIDENT_EVENT_TYPES);
     });
 
-    it("shows only the common fields in the common block", () => {
+    it("labels each event_type with a human-readable name, not the raw value", () => {
+      asIncident();
+      const options = select(createWrapper()).props("options");
+      expect(options.find((o: any) => o.value === "created").label).toBe("Incident Created");
+      expect(options.find((o: any) => o.value === "ai_analysis_failed").label).toBe(
+        "AI Analysis Failed",
+      );
+    });
+
+    it("renders ONE merged payload editor (no separate common/specific blocks)", () => {
       asIncident();
       const w = createWrapper();
-      expect(w.find('[data-test="workflow-trigger-common-structure"]').exists()).toBe(true);
-      const meta = commonMeta(w);
+      expect(jsonEditors(w)).toHaveLength(1);
+      expect(w.find('[data-test="workflow-trigger-common-structure"]').exists()).toBe(false);
+      expect(w.find('[data-test="workflow-trigger-specific-structure"]').exists()).toBe(false);
+      expect(w.find('[data-test="workflow-trigger-structure"]').exists()).toBe(true);
+    });
+
+    it("shows common fields for an event with no extras (created)", () => {
+      asIncident(); // default first event = "created" → no extras
+      const meta = metaOf(createWrapper());
       expect(meta.event_type).toBe(INCIDENT_EVENT_TYPES[0]);
       expect(meta).toHaveProperty("incident_id");
       expect(meta).toHaveProperty("status");
+      expect(Object.keys(meta)).not.toContain("..."); // real merged shape, no placeholder
     });
 
-    it("shows the no-extra-fields note for an event with no extras (created)", () => {
-      asIncident(); // default first event = "created" → no extras
-      const w = createWrapper();
-      expect(w.find('[data-test="workflow-trigger-no-extras"]').exists()).toBe(true);
-      expect(w.find('[data-test="workflow-trigger-specific-structure"]').exists()).toBe(false);
-    });
-
-    it("reveals ONLY the added fields when picking an event with extras", async () => {
+    it("merges common AND event-specific fields into one meta when picking an event with extras", async () => {
       asIncident();
       const w = createWrapper();
       select(w).vm.$emit("update:modelValue", "resolved");
       await w.vm.$nextTick();
 
-      // common block reflects the picked event but stays common-only
-      const meta = commonMeta(w);
+      const meta = metaOf(w);
       expect(meta.event_type).toBe("resolved");
       expect(meta.status).toBe("resolved");
-      expect(meta).not.toHaveProperty("user_id");
-
-      // event-specific block shows the extras INSIDE meta, with a "..."
-      // placeholder for the common fields (not repeated).
-      expect(w.find('[data-test="workflow-trigger-specific-structure"]').exists()).toBe(true);
-      const specific = JSON.parse(jsonEditors(w)[1].props("query"));
-      expect(specific.meta).toHaveProperty("..."); // stands in for common fields
-      expect(specific.meta).toHaveProperty("user_id"); // the event's added field
-      expect(specific.meta).not.toHaveProperty("incident_id"); // common not repeated
+      expect(meta).toHaveProperty("incident_id"); // common
+      expect(meta).toHaveProperty("user_id"); // event-specific, now in the SAME meta
+      expect(Object.keys(meta)).not.toContain("..."); // no placeholder
     });
   });
 

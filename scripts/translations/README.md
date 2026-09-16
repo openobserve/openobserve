@@ -53,6 +53,7 @@ no API calls, needs no API key, and installs nothing, so it costs a few seconds.
 The list lives in `LANGUAGE_NAMES` in `translator.py` — that dict is the single
 source of truth for both the locale codes and the language names used in the prompt.
 
+- 🇸🇦 Arabic (ar-SA)
 - 🇹🇷 Turkish (tr-TR)
 - 🇨🇳 Simplified Chinese (zh-CN)
 - 🇹🇼 Traditional Chinese (zh-TW)
@@ -67,9 +68,6 @@ source of truth for both the locale codes and the language names used in the pro
 - 🇷🇺 Russian (ru-RU)
 - 🇵🇱 Polish (pl-PL)
 - 🇻🇳 Vietnamese (vi-VN)
-
-RTL languages (Arabic, Persian) are deliberately excluded until the web app has
-`dir="rtl"` support — see the note in `translator.py`.
 
 ## How It Works
 
@@ -339,6 +337,7 @@ scripts/translations/
 
 web/src/locales/languages/
 ├── en-US.json           # Source file (English)
+├── ar-SA.json           # Arabic translations
 ├── tr-TR.json           # Turkish translations
 ├── zh-CN.json           # Chinese translations
 ├── fr-FR.json           # French translations
@@ -424,7 +423,7 @@ lose it, nothing breaks; the run simply re-bills those strings.
 ### Two PRs Conflict in the Generated Locale Files
 
 **Symptom:** two open PRs both changed `en-US.json`; the second to merge has conflicts
-in the 14 locale files and in `.translation_state.json`.
+in the 15 locale files and in `.translation_state.json`.
 
 This is inherent to generating in each PR rather than in one serialised bot PR. Both
 branches rewrote the same generated files. Generating at merge time rather than on
@@ -536,7 +535,7 @@ check that PR:
 
 4. **Click "Merge when ready".** Now the workflow:
    - Triggers, because `en-US.json` differs from the base branch
-   - Translates only the **new or modified** keys to all 14 languages
+   - Translates only the **new or modified** keys to all 15 languages
    - Pushes `fr-FR.json`, `es-ES.json`, etc. plus `.translation_state.json` onto your branch
    - That one push re-runs your PR's checks; then it queues and merges
 
@@ -586,7 +585,7 @@ source of truth that keeps subsequent runs incremental.
 ## Cost Considerations
 
 Translation is billed per token by DeepSeek. The whole `en-US.json` is ~10,700
-strings; a full 14-language rebuild is a one-time cost, and day-to-day runs only
+strings; a full 15-language rebuild is a one-time cost, and day-to-day runs only
 translate the handful of new/changed keys in a given PR.
 
 ### Cost Optimization:

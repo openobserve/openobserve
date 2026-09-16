@@ -421,6 +421,151 @@ describe("LLMContentRenderer", () => {
       const messages = wrapper.vm.parsedMessages;
       expect(messages[0].content).toContain("[Image: base64]");
     });
+
+    // OTel GenAI semconv v5 (issue #14127): a message carries `parts`
+    // instead of `content`. Preview must stay in sync with the Thread tab
+    // (threadView.utils.ts), which already understands these part types.
+    it("renders a v5 message that only has `parts`, no `content`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "user", parts: [{ type: "text", content: "What's the weather?" }] },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages[0].content).toBe("What's the weather?");
+    });
+
+    it("renders reasoning and tool_call v5 parts instead of leaving the turn blank", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [
+                { type: "reasoning", content: "I should check the weather." },
+                { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+              ],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages[0].content).toContain("I should check the weather.");
+      expect(messages[0].content).toContain("get_weather");
+    });
+
+    // Some SDKs don't use the spec's own field/type names literally, even
+    // when the shape (a typed `parts` array) is otherwise correct.
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            { role: "assistant", parts: [{ type: "thinking", content: "let me check" }] },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.vm.parsedMessages[0].content).toBe("let me check");
+    });
+
+    it("renders a tool_call_response part that uses a `result` field instead of `response`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "tool",
+              parts: [{ type: "tool_call_response", id: "call_1", result: "rainy, 57F" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      expect(wrapper.vm.parsedMessages[0].content).toBe("rainy, 57F");
+    });
+
+    it("renders a v5 single message object (not an array) that only has `parts`", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify({
+            role: "assistant",
+            parts: [{ type: "text", content: "Single v5 response" }],
+          }),
+          viewMode: "formatted",
+        },
+      });
+
+      const messages = wrapper.vm.parsedMessages;
+      expect(messages).toHaveLength(1);
+      expect(messages[0].content).toBe("Single v5 response");
+    });
+
+    // Preview is a full-fidelity view: unlike the Thread tab, it still shows
+    // *something* for a part type with no text representation (blob/file/uri)
+    // — but a friendly placeholder (matching the existing image_url/image
+    // pattern), not a raw JSON dump of a base64 payload.
+    it("shows a placeholder for a blob part, not the raw base64 payload", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [
+                { type: "blob", modality: "image", mime_type: "image/png", content: "aGVsbG8=" },
+              ],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toBeTruthy();
+      expect(content).not.toContain("aGVsbG8=");
+    });
+
+    it("shows a placeholder for a file part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [{ type: "file", modality: "document", file_id: "report.pdf" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toContain("report.pdf");
+      expect(content).not.toContain('"type"');
+    });
+
+    it("shows a placeholder for a uri part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: {
+          content: JSON.stringify([
+            {
+              role: "assistant",
+              parts: [{ type: "uri", modality: "image", uri: "https://example.com/x.png" }],
+            },
+          ]),
+          viewMode: "formatted",
+        },
+      });
+
+      const content = wrapper.vm.parsedMessages[0].content;
+      expect(content).toContain("https://example.com/x.png");
+      expect(content).not.toContain('"type"');
+    });
   });
 
   describe("Content Truncation", () => {
@@ -773,7 +918,9 @@ describe("LLMContentRenderer", () => {
       expect(result).toContain("[Image: https://example.com/image.png]");
     });
 
-    it("should handle unknown part types gracefully", () => {
+    // Same "[type]" marker as the Thread tab (threadView.utils.ts) for a
+    // part type neither side has been taught about — never a raw JSON dump.
+    it("shows a [type] marker for unknown part types, matching the Thread tab", () => {
       const content = [{ type: "unknown_type", data: "some data" }];
 
       wrapper = mount(LLMContentRenderer, {
@@ -784,7 +931,60 @@ describe("LLMContentRenderer", () => {
       });
 
       const result = wrapper.vm.formatContent(content);
-      expect(result).toBeTruthy();
+      expect(result).toBe("[unknown_type]");
+    });
+
+    // A malformed array item with no `type` at all can't build a marker —
+    // raw JSON stays the last-resort fallback so nothing is silently lost.
+    it("still dumps raw JSON for a typeless/malformed array item", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ random: "field" }]);
+      expect(result).toContain('"random"');
+    });
+
+    it("formats a v5 text part keyed by `content` (not just legacy `text`)", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ type: "text", content: "hello there" }]);
+      expect(result).toBe("hello there");
+    });
+
+    it("formats a tool_call part as a readable call, not raw JSON", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([
+        { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+      ]);
+      expect(result).toContain("get_weather");
+      expect(result).toContain("Boston");
+      expect(result).not.toContain('"type"');
+    });
+
+    it("formats a `thinking`-typed part the same as a reasoning part", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([{ type: "thinking", content: "let me check" }]);
+      expect(result).toBe("let me check");
+    });
+
+    it("formats a tool_call_response part that only has a `result` field", () => {
+      wrapper = mount(LLMContentRenderer, {
+        props: { content: "dummy", viewMode: "formatted" },
+      });
+
+      const result = wrapper.vm.formatContent([
+        { type: "tool_call_response", id: "call_1", result: "rainy, 57F" },
+      ]);
+      expect(result).toBe("rainy, 57F");
     });
   });
 

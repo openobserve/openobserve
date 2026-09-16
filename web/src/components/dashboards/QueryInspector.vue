@@ -238,7 +238,8 @@ export default defineComponent({
     },
     metaData: {
       type: Object as PropType<Record<string, any> | null>,
-      required: true,
+      required: false,
+      default: null,
     },
     data: {
       type: Object,
@@ -320,7 +321,7 @@ export default defineComponent({
 
     const copyText = (text: string | undefined) => {
       if (!text) return;
-      copyToClipboard(text, t, { silent: true });
+      copyToClipboard(text, t);
     };
 
     watch(() => props.metaData, updateColorizedQueries, {

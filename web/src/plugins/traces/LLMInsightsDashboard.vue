@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="llm-insights"
       all-agents
       agent-skeleton
+      :show-agent-toggle="isEnterpriseOrCloud"
       :show-version="!compareMode"
       :labels="{
         agent: t('traces.lLMInsightsDashboard.agent'),
@@ -63,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              affordance when it can't apply is cleaner (ui-architect empty-affordance
              rule). The tooltip explains the concept when the entry IS available. -->
         <OTooltip
-          v-if="canCompare && !compareMode"
+          v-if="isEnterpriseOrCloud && canCompare && !compareMode"
           :content="t('traces.lLMInsightsDashboard.compareEntryHint')"
         >
           <OButton
@@ -92,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </AiScopeBar>
 
     <VersionCompareView
-      v-if="compareMode"
+      v-if="isEnterpriseOrCloud && compareMode"
       :version-list="compareVersionList"
       :stream="effectiveStream"
       :windows="versionCompare.windows.value"
@@ -185,7 +186,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="card in kpiCards"
             :key="card.label"
-            class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5"
+            class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 max-lg:shrink-0 max-lg:basis-auto max-lg:px-1.5 max-lg:py-1"
+            :title="lgUp ? undefined : card.label"
           >
             <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
@@ -199,10 +201,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSkeleton type="text" class="h-6 w-[55%]" />
             </template>
             <template v-else>
-              <div class="flex flex-col gap-1">
-                <div class="mb-1 flex items-center justify-between gap-2">
+              <div
+                class="flex flex-col gap-1 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5"
+              >
+                <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
                   <div
-                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+                    class="text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
                   >
                     {{ card.label }}
                   </div>
@@ -213,7 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </span>
                 </div>
                 <div class="flex items-baseline gap-[0.2rem]">
-                  <span class="text-text-secondary text-2xl leading-none font-bold">
+                  <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
                     {{ card.value }}
                   </span>
                   <span v-if="card.unit" class="text-compact text-text-secondary font-semibold">
@@ -226,7 +230,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :data="card.sparkData"
                 :color="card.sparkColor"
                 :height="32"
-                class="mt-auto"
+                class="mt-auto max-lg:hidden"
               />
             </template>
           </div>
@@ -285,6 +289,7 @@ import type { AcceptableValue } from "reka-ui";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useLLMInsights } from "./composables/useLLMInsights";
 import { splitNumberWithUnit, splitDuration, splitCost } from "./llmInsightsDashboard.utils";
 import KpiSparkline from "./KpiSparkline.vue";
@@ -308,8 +313,10 @@ import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import VersionCompareView from "@/enterprise/components/AIObservability/VersionCompareView.vue";
 import { useVersionCompare } from "./composables/useVersionCompare";
+import config from "@/aws-exports";
 
 const { t } = useI18nTyped();
+const { lgUp } = useBreakpoint();
 const { getStreams } = useStreams(t);
 const router = useRouter();
 const route = useRoute();
@@ -371,10 +378,20 @@ const switching = ref(false);
 // Filter mode: "stream" = view a whole stream; "agent" = view a single agent,
 // whose source stream + trace filter both come from the agents API.
 const MODE_LS_KEY = "llmInsights_filterMode";
+// Cloud registers the SAME enterprise route tree and backend as an enterprise
+// build (see router/index.ts's userCloudRoutes() picked for isCloud too) — only
+// a true OSS build lacks the agent-mapping API this gates. Matches the
+// predicate already used for this exact purpose in Index.vue/SessionsPage.vue.
+const isEnterpriseOrCloud = config.isEnterprise == "true" || config.isCloud == "true";
 // Default scope is ALWAYS "agent" — the AI module is agent-centric and every AI
 // page lands on Agent for consistency. Only an explicit `?type=stream` URL param
 // overrides it (a stale saved preference must not silently land on Stream).
-const filterMode = ref<"stream" | "agent">(urlType === "stream" ? "stream" : "agent");
+// Agent mode calls the enterprise-only agent-mapping API (and gates version
+// compare), so OSS is pinned to Stream regardless of the URL/localStorage —
+// there's no toggle to reach Agent from anyway.
+const filterMode = ref<"stream" | "agent">(
+  !isEnterpriseOrCloud ? "stream" : urlType === "stream" ? "stream" : "agent",
+);
 // Agent NAME to seed the cascade with once the list loads: the URL `?agent=`
 // deep-link first, else the persisted last selection. Resolved into
 // selectedEnv/AgentName/Version via `selectAgentByName`, then cleared. (The URL
@@ -992,5 +1009,6 @@ onMounted(() => {
 // the user pays for work they don't see.
 onUnmounted(() => {
   cancelAll();
+  versionCompare.cancel();
 });
 </script>

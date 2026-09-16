@@ -12,10 +12,12 @@
     <PlaygroundMessageList
       :variant="variant"
       :var-names="varNames"
+      :vars="vars"
       @update="onMessageUpdate"
       @remove="onMessageRemove"
       @add="onMessageAdd"
       @set-tool="onMessageToolChange"
+      @set-tool-arguments="onMessageToolArgumentsChange"
       @set-role="onMessageRoleChange"
       @move="onMessageMove"
     />
@@ -27,6 +29,7 @@ import PlaygroundMessageList from "./PlaygroundMessageList.vue";
 import {
   moveMessage,
   playgroundId,
+  toolCallId,
   withRole,
   type PlaygroundRole,
   type PlaygroundVariant,
@@ -36,6 +39,8 @@ const props = defineProps<{
   variant: PlaygroundVariant;
   /** Every `{{variable}}` on the bench — the completion list offered after `{{`. */
   varNames: string[];
+  /** Values, for the hover-value popover when the caret sits inside a token. */
+  vars: Record<string, string>;
 }>();
 
 const emit = defineEmits<{
@@ -49,7 +54,22 @@ function patch(changes: Partial<PlaygroundVariant>) {
 function onMessageToolChange(messageId: string, toolName: string) {
   patch({
     messages: props.variant.messages.map((message) =>
-      message.id === messageId ? { ...message, toolName } : message,
+      message.id === messageId
+        ? {
+            ...message,
+            toolName,
+            toolCallId: toolName ? message.toolCallId || toolCallId(message.id) : undefined,
+            toolArguments: toolName ? message.toolArguments || "{}" : undefined,
+          }
+        : message,
+    ),
+  });
+}
+
+function onMessageToolArgumentsChange(messageId: string, toolArguments: string) {
+  patch({
+    messages: props.variant.messages.map((message) =>
+      message.id === messageId ? { ...message, toolArguments } : message,
     ),
   });
 }

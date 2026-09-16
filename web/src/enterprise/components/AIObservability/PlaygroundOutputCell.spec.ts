@@ -18,10 +18,6 @@ vi.mock("@/types/i18n", async () => {
   };
 });
 
-const OBanner = {
-  props: ["variant", "dense", "content", "icon", "inlineActions"],
-  template: '<div class="o-banner" :data-variant="variant" :data-content="content"><slot /></div>',
-};
 const OButton = {
   props: ["variant", "size", "iconLeft", "title"],
   emits: ["click"],
@@ -31,11 +27,19 @@ const OTag = {
   props: ["variant", "size", "label"],
   template: '<span class="o-tag" :data-label="label" />',
 };
+const OBanner = {
+  props: ["variant", "dense", "preserveWhitespace"],
+  template: '<div v-bind="$attrs"><slot /></div>',
+};
+const OSpinner = {
+  props: ["variant", "size"],
+  template: '<span class="o-spinner" />',
+};
 
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OBanner, OButton, OTag } },
+    global: { stubs: { OButton, OTag, OBanner, OSpinner } },
   });
 }
 
@@ -70,6 +74,22 @@ describe("PlaygroundOutputCell", () => {
 
     expect(text.text()).toContain("The refund");
     expect(text.find(".animate-pulse").exists()).toBe(true);
+  });
+
+  it("shows a rotating analyzing message before any text has streamed back", () => {
+    const wrapper = mountCell({ ...idleCell(), status: "streaming", text: "" });
+    const waiting = wrapper.find('[data-test="ai-playground-output-analyzing"]');
+
+    expect(waiting.exists()).toBe(true);
+    expect(waiting.find(".o-spinner").exists()).toBe(true);
+    expect(wrapper.find('[data-test="ai-playground-output-text"]').exists()).toBe(false);
+  });
+
+  it("switches to the streamed text as soon as the first token arrives", () => {
+    const wrapper = mountCell({ ...idleCell(), status: "streaming", text: "The re" });
+
+    expect(wrapper.find('[data-test="ai-playground-output-analyzing"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="ai-playground-output-text"]').exists()).toBe(true);
   });
 
   it("hides usage while still streaming — a partial total would be wrong", () => {
@@ -134,16 +154,17 @@ describe("PlaygroundOutputCell", () => {
       error: { message: "provider 429", retryable: true },
     });
 
-    expect(
-      wrapper.find('[data-test="ai-playground-output-error"]').attributes("data-content"),
-    ).toBe("provider 429");
+    expect(wrapper.find('[data-test="ai-playground-output-error"]').text()).toBe("provider 429");
     await wrapper.find('[data-test="ai-playground-output-retry"]').trigger("click");
     expect(wrapper.emitted("retry")).toHaveLength(1);
   });
 
   it("renders a tool call as the output, with no answer text", () => {
     const wrapper = mountCell(
-      doneCell({ text: "", toolCall: { name: "lookup_order", arguments: '{ "id": 1 }' } }),
+      doneCell({
+        text: "",
+        toolCall: { id: "call_1", name: "lookup_order", arguments: '{ "id": 1 }' },
+      }),
     );
     const call = wrapper.find('[data-test="ai-playground-output-tool-call"]');
 

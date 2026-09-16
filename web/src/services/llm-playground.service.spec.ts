@@ -7,6 +7,9 @@ vi.mock("@/services/http", () => ({ attemptTokenRefresh: vi.fn() }));
 
 import {
   PlaygroundRunError,
+  dropsResponseSchema,
+  providerDropsResponseSchema,
+  responseSchemaSupport,
   runPlayground,
   type PlaygroundRunRequest,
 } from "./llm-playground.service";
@@ -159,8 +162,37 @@ describe("runPlayground — live adapter", () => {
 
     const result = await runPlayground("org", request(), { onDelta: () => {} });
 
-    expect(result.toolCall).toEqual({ name: "get_weather", arguments: '{"city":"Paris"}' });
+    expect(result.toolCall).toEqual({
+      id: "call_1",
+      name: "get_weather",
+      arguments: '{"city":"Paris"}',
+    });
     expect(result.text).toBe("");
+  });
+
+  it("preserves DeepSeek reasoning from the terminal stream frame", async () => {
+    stubFetch(
+      streamingResponse([
+        frame({
+          type: "toolCall",
+          id: "call_1",
+          name: "lookup_order",
+          arguments: '{"order_id":"123"}',
+        }),
+        frame({
+          type: "done",
+          reasoningContent: "I need the order lookup before answering.",
+          latencyMs: 9,
+          usage: {},
+        }),
+      ]),
+    );
+
+    const result = await runPlayground("org", request(), { onDelta: () => {} });
+
+    expect((result as unknown as { reasoningContent: string | null }).reasoningContent).toBe(
+      "I need the order lookup before answering.",
+    );
   });
 
   it("throws a retryable error for an error frame inside an open stream", async () => {
@@ -230,6 +262,56 @@ describe("runPlayground — live adapter", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/api/org/playground/run");
   });
 
+  it("preserves a tool call and its linked result in the request body", async () => {
+    const fetchMock = stubFetch(streamingResponse([]));
+
+    await runPlayground(
+      "org",
+      request({
+        messages: [
+          {
+            role: "assistant",
+            content: "",
+            reasoningContent: "I should look up this order.",
+            toolCalls: [
+              {
+                id: "call_1",
+                name: "lookup_order",
+                arguments: '{"order_id":"123"}',
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: '{"status":"shipped"}',
+            toolCallId: "call_1",
+          },
+        ],
+      } as Partial<PlaygroundRunRequest>),
+      { onDelta: () => {} },
+    );
+
+    expect(sentBody(fetchMock).column.messages).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        reasoningContent: "I should look up this order.",
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "lookup_order",
+            arguments: '{"order_id":"123"}',
+          },
+        ],
+      },
+      {
+        role: "tool",
+        content: '{"status":"shipped"}',
+        toolCallId: "call_1",
+      },
+    ]);
+  });
+
   it("omits an empty model so the provider's default stands in", async () => {
     const fetchMock = stubFetch(
       streamingResponse([frame({ type: "done", latencyMs: 1, usage: {} })]),
@@ -288,6 +370,56 @@ describe("runPlayground — live adapter", () => {
       { name: "lookup", description: "Find it", input_schema: { type: "object" } },
     ]);
     expect(column.responseFormat).toBeUndefined();
+  });
+
+  // The UI reads this to warn while the schema is being written, so it has to
+  // answer for a provider type alone — before there is a request to inspect.
+  it("names the provider kinds whose request cannot carry a schema", () => {
+    expect(providerDropsResponseSchema("Anthropic")).toBe(true);
+    expect(providerDropsResponseSchema(" anthropic ")).toBe(true);
+    expect(providerDropsResponseSchema("openai")).toBe(false);
+    expect(providerDropsResponseSchema(undefined)).toBe(false);
+  });
+
+  // DeepSeek answers `json_schema` with a 400; the server degrades it, the UI only warns ahead.
+  it("grades how far each provider kind honours a schema", () => {
+    expect(responseSchemaSupport("openai")).toBe("native");
+    expect(responseSchemaSupport("ollama")).toBe("native");
+    expect(responseSchemaSupport(undefined)).toBe("native");
+    expect(responseSchemaSupport("DeepSeek")).toBe("approximated");
+    expect(responseSchemaSupport(" deepseek ")).toBe("approximated");
+    expect(responseSchemaSupport("anthropic")).toBe("dropped");
+  });
+
+  // The server owns the DeepSeek downgrade; only Anthropic is shaped away client-side.
+  it("still sends the json_schema shape to a provider that approximates it", async () => {
+    const fetchMock = stubFetch(
+      streamingResponse([frame({ type: "done", latencyMs: 1, usage: {} })]),
+    );
+    await runPlayground(
+      "org",
+      request({ providerType: "deepseek", responseSchema: { type: "object" } }),
+      { onDelta: () => {} },
+    );
+    const column = sentBody(fetchMock).column;
+    expect(column.responseFormat).toEqual({
+      type: "json_schema",
+      json_schema: { name: "playground_response", schema: { type: "object" }, strict: false },
+    });
+    expect(dropsResponseSchema(request({ providerType: "deepseek", responseSchema: {} }))).toBe(
+      false,
+    );
+  });
+
+  it("reports a drop only when a schema was asked for", () => {
+    const anthropic = { providerType: "anthropic" };
+    expect(dropsResponseSchema(request({ ...anthropic, responseSchema: { type: "object" } }))).toBe(
+      true,
+    );
+    expect(dropsResponseSchema(request({ ...anthropic, responseSchema: null }))).toBe(false);
+    expect(
+      dropsResponseSchema(request({ providerType: "openai", responseSchema: { type: "object" } })),
+    ).toBe(false);
   });
 
   it("sends no tools key at all when the bench defines none", async () => {

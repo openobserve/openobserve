@@ -183,7 +183,7 @@ const joinSlack = () => {
         <OButton
           variant="ghost"
           size="icon-sm"
-          class="-mr-1 shrink-0"
+          class="-me-1 shrink-0"
           :aria-label="t('common.close')"
           data-test="community-slack-invite-close-btn"
           @click="dismiss"
@@ -232,7 +232,7 @@ const joinSlack = () => {
             :class="[
               'text-text-inverse ring-surface-panel flex h-7 w-7 items-center justify-center rounded-full ring-2',
               bg,
-              i > 0 ? '-ml-2' : '',
+              i > 0 ? '-ms-2' : '',
             ]"
           >
             <OIcon name="person" size="sm" />

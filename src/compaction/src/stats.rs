@@ -13,17 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
+use std::{collections::HashSet, time::Duration};
 
 use config::{
     cluster::LOCAL_NODE,
     get_config,
-    meta::stream::StreamType,
+    meta::stream::{StreamStats, StreamType},
     metrics,
     utils::time::{HourFormat, day_micros, get_ymdh_from_micros, now_micros},
 };
 use db;
 use infra::{cluster::get_node_by_uuid, dist_lock, file_list as infra_file_list};
+
+const STATS_SCAN_MAX_ATTEMPTS: u32 = 3;
+const STATS_SCAN_RETRY_DELAY: Duration = Duration::from_secs(2);
 
 pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     let latest_updated_at = infra_file_list::get_max_update_at()
@@ -75,11 +78,7 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
         HashSet::new()
     };
 
-    let yesterday_boundary = get_yesterday_boundary();
-    let new_data_range = (yesterday_boundary.clone(), "".to_string());
-    let old_data_range = ("".to_string(), yesterday_boundary.clone());
-
-    let iter = [(new_data_range, true), (old_data_range, false)];
+    let iter = stats_date_ranges();
 
     let grouped = db::schema::list_all_streams_grouped().await;
     let mut total_streams = 0;
@@ -89,7 +88,6 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                 continue;
             }
             total_streams += streams.len();
-            let stream_type_str = stream_type.to_string();
             for stream_name in streams {
                 let stream_key = format!("{org_id}/{stream_type}/{stream_name}");
                 if !updated_streams.is_empty() && !updated_streams.contains(&stream_key) {
@@ -101,37 +99,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
                     if !is_recent && no_need_update_old_stats {
                         continue;
                     }
-                    let start = std::time::Instant::now();
-                    let result = update_stats_from_file_list_for_stream(
+                    update_stream_stats_with_retry(
                         &org_id,
                         stream_type,
                         &stream_name,
                         date_range.clone(),
                         *is_recent,
                     )
-                    .await;
-
-                    // Record metrics
-                    let duration = start.elapsed().as_secs_f64();
-                    let scan_type = if *is_recent { "recent" } else { "historical" }.to_string();
-                    metrics::STREAM_STATS_SCAN_DURATION
-                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                        .observe(duration);
-
-                    metrics::STREAM_STATS_SCAN_TOTAL
-                        .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                        .inc();
-
-                    if let Err(e) = result {
-                        metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
-                            .with_label_values(&[&org_id, &stream_type_str, &scan_type])
-                            .inc();
-
-                        log::error!(
-                            "[STATS] update stats for {org_id}/{stream_type}/{stream_name} error: {e}"
-                        );
-                        return Err(e);
-                    }
+                    .await?;
                 }
 
                 log::info!(
@@ -158,13 +133,14 @@ pub async fn update_stats_from_file_list() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Returns the stats it wrote so callers need not read `stream_stats` back through a replica.
 pub async fn update_stats_from_file_list_for_stream(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: (String, String),
     is_recent: bool,
-) -> Result<(), anyhow::Error> {
+) -> Result<StreamStats, anyhow::Error> {
     let mut stats =
         infra_file_list::stats_by_date_range(org_id, stream_type, stream_name, date_range.clone())
             .await?;
@@ -183,7 +159,7 @@ pub async fn update_stats_from_file_list_for_stream(
     }
     infra_file_list::set_stream_stats(org_id, stream_type, stream_name, &stats, is_recent).await?;
 
-    Ok(())
+    Ok(stats)
 }
 
 async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
@@ -206,6 +182,64 @@ async fn update_stats_lock_node() -> Result<Option<i64>, anyhow::Error> {
     } else {
         Ok(Some(offset))
     }
+}
+
+// Transient metastore errors must not abort the whole run, which would restart it from scratch
+async fn update_stream_stats_with_retry(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date_range: (String, String),
+    is_recent: bool,
+) -> Result<(), anyhow::Error> {
+    let stream_type_str = stream_type.to_string();
+    let scan_type = if is_recent { "recent" } else { "historical" };
+    let labels = [org_id, stream_type_str.as_str(), scan_type];
+    let mut attempt = 1;
+    loop {
+        let start = std::time::Instant::now();
+        let result = update_stats_from_file_list_for_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range.clone(),
+            is_recent,
+        )
+        .await;
+        metrics::STREAM_STATS_SCAN_DURATION
+            .with_label_values(&labels)
+            .observe(start.elapsed().as_secs_f64());
+        metrics::STREAM_STATS_SCAN_TOTAL
+            .with_label_values(&labels)
+            .inc();
+        let Err(e) = result else {
+            return Ok(());
+        };
+        metrics::STREAM_STATS_SCAN_ERRORS_TOTAL
+            .with_label_values(&labels)
+            .inc();
+        if attempt >= STATS_SCAN_MAX_ATTEMPTS {
+            log::error!(
+                "[STATS] update stats for {org_id}/{stream_type}/{stream_name} failed after {attempt} attempts: {e}"
+            );
+            return Err(e);
+        }
+        let delay = STATS_SCAN_RETRY_DELAY * attempt;
+        log::warn!(
+            "[STATS] update stats for {org_id}/{stream_type}/{stream_name} attempt {attempt} error: {e}, retry in {delay:?}"
+        );
+        tokio::time::sleep(delay).await;
+        attempt += 1;
+    }
+}
+
+/// Recent and historical scan ranges as `((start, end), is_recent)`; an empty bound is open-ended.
+pub fn stats_date_ranges() -> [((String, String), bool); 2] {
+    let yesterday_boundary = get_yesterday_boundary();
+    [
+        ((yesterday_boundary.clone(), String::new()), true),
+        ((String::new(), yesterday_boundary), false),
+    ]
 }
 
 /// Get yesterday's boundary date (yesterday 00:00:00 in YYYY/MM/DD/00)
@@ -296,6 +330,16 @@ mod tests {
 
         // Should handle empty range gracefully (may return error or empty stats)
         let _ = result; // Test structure - actual behavior depends on implementation
+    }
+
+    #[test]
+    fn test_stats_date_ranges() {
+        let [(recent_range, recent), (old_range, old)] = stats_date_ranges();
+        let boundary = get_yesterday_boundary();
+        assert!(recent);
+        assert_eq!(recent_range, (boundary.clone(), String::new()));
+        assert!(!old);
+        assert_eq!(old_range, (String::new(), boundary));
     }
 
     #[test]

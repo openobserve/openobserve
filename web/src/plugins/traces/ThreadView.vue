@@ -32,12 +32,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-warning! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--steps bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-warning! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
         :title="t('traces.threadView.llmStep', { n: summary.turnCount })"
       >
         <template #icon><OIcon name="auto-awesome" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.steps") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">{{
@@ -47,11 +47,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-info! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--tools bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-info! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="build" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.tools") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">{{
@@ -61,11 +61,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-l-thread-rail-neutral! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--duration bg-surface-base! border-border-default rounded-default! text-text-body! border-s-thread-rail-neutral! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="schedule" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.duration") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">
@@ -75,11 +75,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OTag
         type="metricChip"
-        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-l-success-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--cost bg-surface-base! border-border-default rounded-default! text-text-body! border-s-success-600! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="payments" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.cost") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">
@@ -90,12 +90,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.dominantModel"
         type="metricChip"
-        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-l-ai-accent! dark:border-l-thread-accent-strong! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--model bg-surface-base! border-border-default rounded-default! text-text-body! border-s-ai-accent! dark:border-s-thread-accent-strong! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
         :title="summary.dominantModel"
       >
         <template #icon><OIcon name="bolt" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.model") }}</span
         >
         <span class="thread-chip__value text-text-body text-xs font-semibold">{{
@@ -106,11 +106,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OTag
         v-if="summary.errorCount > 0"
         type="metricChip"
-        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-l-error-600! h-6.5! border border-l-3! px-2.5! py-0! text-xs!"
+        class="thread-chip thread-chip--error bg-surface-base! border-border-default rounded-default! text-text-body! border-s-error-600! h-6.5! border border-s-3! px-2.5! py-0! text-xs!"
       >
         <template #icon><OIcon name="error-outline" size="xs" /></template>
         <span
-          class="thread-chip__label text-text-secondary text-2xs mr-[0.3125rem] font-medium tracking-normal"
+          class="thread-chip__label text-text-secondary text-2xs me-[0.3125rem] font-medium tracking-normal"
           >{{ t("traces.threadView.errors") }}</span
         >
         <span
@@ -146,7 +146,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- System prompt (global — identical across traces in a session). -->
       <div
         v-if="head.systemPrompt"
-        class="thread-system border-border-default border-l-ai-accent rounded-default bg-surface-base dark:border-l-thread-accent-strong mb-4 overflow-hidden border border-l-3"
+        class="thread-system border-border-default border-s-ai-accent rounded-default bg-surface-base dark:border-s-thread-accent-strong mb-4 overflow-hidden border border-s-3"
       >
         <div
           class="thread-system__head hover:bg-ai-accent/4 dark:hover:bg-ai-accent/8 flex cursor-pointer items-center gap-2.5 px-3 py-2 transition-all duration-120"
@@ -155,7 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             class="thread-system__badge text-ai-accent rounded-default text-2xs bg-ai-accent/10 dark:bg-ai-accent/18 dark:text-thread-accent-strong inline-flex shrink-0 items-center px-2 py-[0.15rem] font-semibold tracking-[0.02rem]"
           >
-            <OIcon name="settings" size="xs" class="mr-1" />
+            <OIcon name="settings" size="xs" class="me-1" />
             {{ t("traces.threadView.system") }}
           </span>
           <span
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- This group's user query. -->
         <div
           v-if="group.userQuery"
-          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark mb-4 ml-auto flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
+          class="thread-bubble thread-bubble--user thread-user-row rounded-default text-text-body border-chat-bubble-user-border bg-chat-bubble-user dark:border-thread-bubble-border-dark ms-auto mb-4 flex w-fit max-w-[40%] items-start gap-2.5 border px-3.5 py-2.5 text-sm leading-normal break-words whitespace-pre-wrap shadow-xs dark:shadow-white/8"
         >
           <div
             class="thread-user-avatar text-2xs bg-gradient-ai inline-flex h-6 w-6 shrink-0 cursor-default items-center justify-center rounded-full font-bold text-white dark:bg-[image:linear-gradient(135deg,var(--color-indigo-600)_0%,var(--color-indigo-500)_100%)]"
@@ -214,7 +214,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Timeline rail of turns. -->
-        <div class="thread-rail relative pl-0">
+        <div class="thread-rail relative ps-0">
           <div
             v-for="turn in group.turns"
             :key="turn.span.span_id"
@@ -302,7 +302,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("traces.threadView.error") }}
                 </span>
                 <button
-                  class="thread-turn__view-span rounded-default text-theme-accent hover:border-status-info-text/25 hover:bg-status-info-text/8 dark:hover:border-status-info-text/30 dark:hover:bg-status-info-text/12 ml-auto inline-flex shrink-0 cursor-pointer items-center gap-[0.2rem] border border-transparent bg-transparent px-[0.55rem] py-[0.2rem] text-xs font-medium transition-all duration-120"
+                  class="thread-turn__view-span rounded-default text-theme-accent hover:border-status-info-text/25 hover:bg-status-info-text/8 dark:hover:border-status-info-text/30 dark:hover:bg-status-info-text/12 ms-auto inline-flex shrink-0 cursor-pointer items-center gap-[0.2rem] border border-transparent bg-transparent px-[0.55rem] py-[0.2rem] text-xs font-medium transition-all duration-120"
                   @click="emit('span-selected', turn.span.span_id)"
                 >
                   {{ t("traces.threadView.viewSpan") }}

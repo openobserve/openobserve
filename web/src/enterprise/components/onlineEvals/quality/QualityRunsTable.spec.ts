@@ -67,7 +67,6 @@ function mountTable(config: ScoreConfig) {
     props: {
       config,
       rows: [run("healthy"), run("second")],
-      counts: { all: 42, unhealthy: 7 },
       activeFilter: "all",
       currentPage: 2,
       pageSize: 10,
@@ -86,7 +85,7 @@ function mountTable(config: ScoreConfig) {
 }
 
 describe("QualityRunsTable", () => {
-  it("uses server pagination and exposes global unhealthy counts", async () => {
+  it("uses server pagination and switches the active filter", async () => {
     const wrapper = mountTable({
       id: "config-1",
       name: "Answer relevance",
@@ -99,7 +98,7 @@ describe("QualityRunsTable", () => {
     expect(table.props("sorting")).toBe("none");
     expect(table.props("totalCount")).toBe(42);
     expect(wrapper.get('[data-test="stub-row-count"]').text()).toBe("2");
-    expect(wrapper.get('[data-test="quality-runs-filter-unhealthy"]').text()).toContain("7");
+    expect(wrapper.get('[data-test="quality-runs-filter-unhealthy"]').text()).toBe("Unhealthy");
 
     await wrapper.get('[data-test="quality-runs-filter-unhealthy"]').trigger("click");
     expect(wrapper.emitted("filter-change")).toEqual([["unhealthy"]]);

@@ -15,23 +15,12 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
-use crate::{common::std_variance, functions::RangeFunc};
+use crate::{common::variance, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stdvar_over_time
-pub(crate) fn stdvar_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, StdvarOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct StdvarOverTimeFunc;
-
-impl StdvarOverTimeFunc {
-    pub fn new() -> Self {
-        StdvarOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for StdvarOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -39,11 +28,7 @@ impl RangeFunc for StdvarOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
-        let sample_values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-        std_variance(&sample_values)
+        variance(samples.iter().map(|sample| sample.value))
     }
 }
 
@@ -64,25 +49,25 @@ mod tests {
 
     #[test]
     fn test_stdvar_over_time_name() {
-        assert_eq!(StdvarOverTimeFunc::new().name(), "stdvar_over_time");
+        assert_eq!(StdvarOverTimeFunc.name(), "stdvar_over_time");
     }
 
     #[test]
     fn test_stdvar_over_time_empty() {
-        let func = StdvarOverTimeFunc::new();
+        let func = StdvarOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::from_secs(1)).is_none());
     }
 
     #[test]
     fn test_stdvar_over_time_constant() {
-        let func = StdvarOverTimeFunc::new();
+        let func = StdvarOverTimeFunc;
         let samples = make_samples(&[5.0, 5.0, 5.0]);
         assert_eq!(func.exec(&samples, 0, &Duration::from_secs(1)), Some(0.0));
     }
 
     #[test]
     fn test_stdvar_over_time_non_trivial() {
-        let func = StdvarOverTimeFunc::new();
+        let func = StdvarOverTimeFunc;
         // [1,2,3]: mean=2, variance=(1+0+1)/3 = 2/3
         let samples = make_samples(&[1.0, 2.0, 3.0]);
         let result = func.exec(&samples, 0, &Duration::from_secs(1)).unwrap();

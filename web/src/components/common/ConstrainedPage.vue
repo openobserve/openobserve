@@ -68,5 +68,5 @@ const maxWidthClass = computed(() => SIZE_CLASS[props.size]);
 
 // `center` keeps the column centered (mx-auto); `left` pins it to the start so
 // form pages read left-aligned instead of floating in the middle of wide screens.
-const alignClass = computed(() => (props.align === "left" ? "mr-auto" : "mx-auto"));
+const alignClass = computed(() => (props.align === "left" ? "me-auto" : "mx-auto"));
 </script>

@@ -17,10 +17,16 @@ export function useOnlineEvalsData() {
   const scoreConfigVersions = ref<Record<string, ScoreConfig[]>>({});
   const providers = ref<Provider[]>([]);
   const isLoading = ref(false);
+  const jobsForbidden = ref(false);
+  const scorersForbidden = ref(false);
+  const scoreConfigsForbidden = ref(false);
 
   async function loadAll(orgId: string) {
     if (!orgId) return;
     isLoading.value = true;
+    jobsForbidden.value = false;
+    scorersForbidden.value = false;
+    scoreConfigsForbidden.value = false;
     try {
       const [providerResult, scoreConfigResult, scorerResult, jobResult] = await Promise.allSettled(
         [
@@ -43,18 +49,21 @@ export function useOnlineEvalsData() {
           scoreConfigResult.value.map((config) => [entityId(config), [config]]),
         );
       } else {
+        scoreConfigsForbidden.value = scoreConfigResult.reason?.response?.status === 403;
         showError(scoreConfigResult.reason, t("onlineEvals.loadError"));
       }
 
       if (scorerResult.status === "fulfilled") {
         scorers.value = scorerResult.value;
       } else {
+        scorersForbidden.value = scorerResult.reason?.response?.status === 403;
         showError(scorerResult.reason, t("onlineEvals.loadError"));
       }
 
       if (jobResult.status === "fulfilled") {
         jobs.value = jobResult.value;
       } else {
+        jobsForbidden.value = jobResult.reason?.response?.status === 403;
         showError(jobResult.reason, t("onlineEvals.loadError"));
       }
     } finally {
@@ -94,6 +103,9 @@ export function useOnlineEvalsData() {
     scoreConfigVersions,
     providers,
     isLoading,
+    jobsForbidden,
+    scorersForbidden,
+    scoreConfigsForbidden,
     loadAll,
     loadProviders,
     ensureScoreConfigVersions,

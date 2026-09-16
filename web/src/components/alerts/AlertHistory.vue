@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="onAlertSelected"
         :placeholder="t('alerts.searcHistory')"
         data-test="alert-history-search-select"
-        class="o2-search-input min-w-62.5"
+        class="o2-search-input min-w-62.5 max-md:hidden"
         clearable
         @clear="clearSearch"
       >
@@ -60,6 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         variant="ghost"
         icon-left="search"
         size="icon-sm"
+        class="max-md:hidden"
         @click="manualSearch"
         data-test="alert-history-manual-search-btn"
         :disabled="loading"
@@ -77,6 +78,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OTooltip :content="t('common.refresh')" />
       </OButton>
     </template>
+    <div
+      class="border-border-default flex shrink-0 items-center gap-1 border-b px-3 py-1.5 md:hidden"
+    >
+      <OSelect
+        v-model="selectedAlert"
+        :options="filteredAlertOptions"
+        labelKey="label"
+        valueKey="value"
+        @update:model-value="onAlertSelected"
+        :placeholder="t('alerts.searcHistory')"
+        data-test="alert-history-search-select-mobile"
+        class="o2-search-input min-w-0 flex-1"
+        clearable
+        @clear="clearSearch"
+      >
+        <template #icon-left>
+          <OIcon class="o2-search-input-icon" name="search" size="sm" />
+        </template>
+        <template #empty>
+          <div class="text-muted-foreground px-3 py-2">
+            {{ t("alerts.noAlertsFound") }}
+          </div>
+        </template>
+      </OSelect>
+      <OButton
+        variant="ghost"
+        icon-left="search"
+        size="icon-sm"
+        @click="manualSearch"
+        data-test="alert-history-manual-search-btn-mobile"
+        :disabled="loading"
+      >
+        <OTooltip :content="t('common.search')" />
+      </OButton>
+    </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
@@ -214,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span class="ml-1 text-xs">×{{ row.group_size || 1 }}</span>
+              <span class="ms-1 text-xs">×{{ row.group_size || 1 }}</span>
             </div>
             <div v-else class="text-status-positive flex items-center justify-center">
               <OIcon name="check-circle" size="md">
@@ -227,7 +263,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </template>
                 </OTooltip>
               </OIcon>
-              <span v-if="row.dedup_count && row.dedup_count > 1" class="ml-1 text-xs">
+              <span v-if="row.dedup_count && row.dedup_count > 1" class="ms-1 text-xs">
                 ×{{ row.dedup_count }}
               </span>
             </div>
@@ -238,6 +274,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost"
               size="icon-sm"
               icon-left="visibility"
+              class="max-md:hidden"
               @click="showDetailsDialog(row)"
               data-test="alert-history-view-details"
             >
@@ -249,6 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="error"
+              class="max-md:hidden"
               @click.stop="showErrorDialog(row)"
             >
               <OTooltip
@@ -257,6 +295,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 "
               />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-history-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="alert-history-view-details-menu"
+                @select="showDetailsDialog(row)"
+              >
+                <span>{{ t("alerts.viewDetails") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.error"
+                icon-left="error"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`pipeline-list-${row.name}-error-indicator-menu`"
+                @select="showErrorDialog(row)"
+              >
+                <span>{{
+                  t("common.lastErrorAt", { time: new Date(row.timestamp / 1000).toLocaleString() })
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
         </OTable>
       </div>
@@ -318,7 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="text-sm">
                 <OIcon
                   :name="selectedRow.is_realtime ? 'speed' : 'schedule'"
-                  class="mr-1"
+                  class="me-1"
                   size="xs"
                 />
                 {{ selectedRow.is_realtime ? t("common.realTime") : t("alerts.scheduled") }}
@@ -329,8 +399,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("alerts.insights.filters.silenced") }}
               </div>
               <div class="text-sm">
-                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="mr-1" />
-                <OIcon v-else name="volume-up" size="xs" class="mr-1" />
+                <OIcon v-if="selectedRow.is_silenced" name="volume-off" size="xs" class="me-1" />
+                <OIcon v-else name="volume-up" size="xs" class="me-1" />
                 {{ selectedRow.is_silenced ? t("common.yes") : t("common.no") }}
               </div>
             </div>
@@ -382,7 +452,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="error" size="xs" class="mr-1" />
+              <OIcon name="error" size="xs" class="me-1" />
               {{ t("alerts.errorDetails") }}
             </div>
             <div
@@ -407,7 +477,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSeparator class="my-2" />
           <div class="px-0 py-1">
             <div class="text-text-secondary mb-1 text-xs">
-              <OIcon name="check-circle" size="xs" class="mr-1" />
+              <OIcon name="check-circle" size="xs" class="me-1" />
               {{ t("alerts.response") }}
             </div>
             <div
@@ -442,9 +512,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon name="error" size="sm" class="text-status-error-text" />
       </template>
       <template #header-right>
-        <div class="text-compact ml-9 flex items-center text-xs opacity-70">
-          <span class="mr-1">{{ t("alerts.lastError") }}</span>
-          <OIcon name="schedule" size="xs" class="mr-1" />
+        <div class="text-compact ms-9 flex items-center text-xs opacity-70">
+          <span class="me-1">{{ t("alerts.lastError") }}</span>
+          <OIcon name="schedule" size="xs" class="me-1" />
           {{
             errorMessage.last_error_timestamp &&
             new Date(errorMessage.last_error_timestamp / 1000).toLocaleString()
@@ -486,6 +556,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { COL } from "@/lib/core/Table/OTable.types";

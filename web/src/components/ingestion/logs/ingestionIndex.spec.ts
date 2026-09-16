@@ -112,6 +112,7 @@ describe("IngestLogs Index Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
       expect(wrapper.vm.ingestRoutes).toEqual(expectedRoutes);
@@ -307,6 +308,7 @@ describe("IngestLogs Index Component", () => {
         "fluentd",
         "vector",
         "syslogNg",
+        "splunkHec",
         "loongcollector",
       ];
 

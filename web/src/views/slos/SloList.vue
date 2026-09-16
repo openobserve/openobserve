@@ -36,13 +36,7 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" />
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="add"
-        data-test="slos-slolist-new"
-        @click="goToNew"
-      >
+      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
         {{ t("slos.new") }}
       </OButton>
     </template>
@@ -51,10 +45,11 @@
          so `type="alerts"` is not a copy-paste slip — it is what makes a
          "payments" folder hold that team's alerts and its SLOs together. -->
     <template #sidebar>
-      <FolderList type="alerts" @update:activeFolderId="onFolderChange" />
+      <FolderList type="alerts" :drawer-on-mobile="false" @update:activeFolderId="onFolderChange" />
     </template>
 
     <OTable
+      ref="oTableRef"
       v-model:selected-ids="selectedIds"
       selection="multiple"
       :data="visibleRows"
@@ -64,6 +59,7 @@
       :error="error"
       :page-size="25"
       :page-size-options="[25, 50, 100]"
+      :current-page="currentPage"
       :show-global-filter="false"
       table-id="slos-list"
       :persist-columns="true"
@@ -71,9 +67,10 @@
       :enable-column-resize="true"
       data-test="slos-slolist-table"
       @row-click="onRowClick"
+      @update:current-page="onPageChange"
     >
       <template #toolbar>
-        <div class="flex w-full items-center gap-2">
+        <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
           <OButton
             v-if="selectedIds.length"
             variant="outline"
@@ -95,7 +92,7 @@
           >
             {{ t("common.export") }}
           </OButton>
-          <OToggleGroup v-model="typeFilter" data-test="slos-slolist-type-filter">
+          <OToggleGroup v-model="typeFilter" mobile-dropdown data-test="slos-slolist-type-filter">
             <OToggleGroupItem
               v-for="opt in typeOptions"
               :key="opt.value"
@@ -113,7 +110,7 @@
                will not shrink below its content width without it, which is
                how a long placeholder pushes the toolbar wider than the table.
                Same wrapper the Alerts toolbar uses. -->
-          <div class="min-w-0 flex-1">
+          <div class="min-w-0 flex-1 max-md:min-w-40">
             <OSearchInput
               v-model="search"
               class="w-full"
@@ -228,7 +225,7 @@
 
       <template #cell-window="{ row }">
         <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
+        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
       </template>
 
       <template #cell-tags="{ row }">
@@ -254,6 +251,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="edit"
+            class="max-md:hidden"
             :title="t('slos.edit')"
             :data-test="`slos-slolist-edit-${row.name}`"
             @click="goToEdit(row)"
@@ -262,6 +260,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="drive-file-move"
+            class="max-md:hidden"
             :title="t('slos.move')"
             :data-test="`slos-slolist-move-${row.name}`"
             @click="openMove([row])"
@@ -270,6 +269,7 @@
             variant="ghost"
             size="icon-sm"
             :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+            class="max-md:hidden"
             :title="row.enabled ? t('slos.pause') : t('slos.resume')"
             :data-test="`slos-slolist-toggle-${row.name}`"
             @click="toggleEnabled(row)"
@@ -278,6 +278,7 @@
             variant="ghost"
             size="icon-sm"
             icon-left="download"
+            class="max-md:hidden"
             :title="t('common.export')"
             :data-test="`slos-slolist-export-${row.name}`"
             @click="openExport([row])"
@@ -286,10 +287,64 @@
             variant="ghost"
             size="icon-sm"
             icon-left="delete"
+            class="max-md:hidden"
             :title="t('slos.delete')"
             :data-test="`slos-slolist-delete-${row.name}`"
             @click="confirmDelete(row)"
           />
+          <ODropdown side="bottom" align="end">
+            <template #trigger>
+              <OButton
+                icon-left="more-vert"
+                variant="ghost"
+                size="icon-xs-sq"
+                class="md:hidden"
+                data-test="slos-slolist-row-more-actions"
+                @click.stop
+              />
+            </template>
+            <ODropdownItem
+              icon-left="edit"
+              class="md:hidden"
+              :data-test="`slos-slolist-edit-${row.name}-menu`"
+              @select="goToEdit(row)"
+            >
+              <span>{{ t("slos.edit") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="drive-file-move"
+              class="md:hidden"
+              :data-test="`slos-slolist-move-${row.name}-menu`"
+              @select="openMove([row])"
+            >
+              <span>{{ t("slos.move") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+              class="md:hidden"
+              :data-test="`slos-slolist-toggle-${row.name}-menu`"
+              @select="toggleEnabled(row)"
+            >
+              <span>{{ row.enabled ? t("slos.pause") : t("slos.resume") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="download"
+              class="md:hidden"
+              :data-test="`slos-slolist-export-${row.name}-menu`"
+              @select="openExport([row])"
+            >
+              <span>{{ t("common.export") }}</span>
+            </ODropdownItem>
+            <ODropdownItem
+              icon-left="delete"
+              variant="destructive"
+              class="md:hidden"
+              :data-test="`slos-slolist-delete-${row.name}-menu`"
+              @select="confirmDelete(row)"
+            >
+              <span>{{ t("slos.delete") }}</span>
+            </ODropdownItem>
+          </ODropdown>
         </div>
       </template>
 
@@ -404,7 +459,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -416,6 +471,8 @@ import SelectFolderDropDown from "@/components/common/sidebar/SelectFolderDropDo
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
@@ -457,7 +514,8 @@ const route = useRoute();
 const store = useStore();
 
 const rows = ref<SloListItem[]>([]);
-const loading = ref(false);
+// Starts true: shows the skeleton instead of flashing empty on first render, and keeps the page-restore watch's `{once:true}` from firing on a spurious false→true edge before the real load ever settles.
+const loading = ref(true);
 const error = ref<string | null>(null);
 const search = ref("");
 const typeFilter = ref("all");
@@ -468,6 +526,15 @@ const selectedIds = ref<string[]>([]);
 const moveDialog = ref(false);
 const moveTarget = ref("");
 const pendingMove = ref<SloListItem[]>([]);
+const oTableRef: any = ref(null);
+
+// URL-synced so returning from add/edit/detail (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+const currentPage = ref(Number(route.query.page) || 1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+  if (String(route.query.page ?? "1") === String(page)) return;
+  router.replace({ query: { ...route.query, page: String(page) } });
+};
 
 // The route is the source of truth for the active folder, so a reload or a
 // shared link lands on the same folder the rail is showing.
@@ -757,6 +824,18 @@ function onStatSelect(key: string | null) {
   healthFilter.value = key === "total" ? null : key;
 }
 
+// The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+watch(
+  loading,
+  (isLoading) => {
+    if (isLoading) return;
+    setTimeout(() => {
+      oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+    }, 0);
+  },
+  { once: true },
+);
+
 // Both optional: refresh calls `load()` bare and falls back to the current org
 // and active folder — the folder-change path is the only caller that passes a
 // folder the refs have not caught up with yet.
@@ -825,20 +904,22 @@ async function doMove() {
   }
 }
 
+// Spreads the list's own query (page, folder, …) forward so the editor's `backTarget` has something to restore.
 function goToNew() {
-  router.push({ name: "addSlo", query: { org_identifier: org.value } });
+  router.push({ name: "addSlo", query: { ...route.query, org_identifier: org.value } });
 }
 
 function goToEdit(row: SloListItem) {
   router.push({
     name: "editSlo",
     params: { slo_id: row.id },
-    query: { org_identifier: org.value },
+    query: { ...route.query, org_identifier: org.value },
   });
 }
 
 function onRowClick(row: SloListItem) {
-  router.push(sloDetailRoute(row.id, org.value));
+  const target = sloDetailRoute(row.id, org.value);
+  router.push({ ...target, query: { ...route.query, ...target.query } });
 }
 
 async function toggleEnabled(row: SloListItem) {

@@ -569,13 +569,8 @@ mod tests {
         use config::{FileFormat, PARQUET_MAX_ROW_GROUP_SIZE, TIMESTAMP_COL_NAME};
         use tantivy::directory::RamDirectory;
         use vortex::{
-            VortexSessionDefault,
-            array::ArrayRef,
-            arrow::{FromArrowArray, FromArrowType},
-            dtype::DType,
-            file::{VortexWriteOptions, WriteStrategyBuilder},
-            io::session::RuntimeSessionExt,
-            session::VortexSession,
+            VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt,
+            file::VortexWriteOptions, io::session::RuntimeSessionExt, session::VortexSession,
         };
 
         const CHUNK_ROWS: u64 = PARQUET_MAX_ROW_GROUP_SIZE as u64;
@@ -610,13 +605,16 @@ mod tests {
         async fn create_test_vortex_bytes(batches: Vec<RecordBatch>) -> Bytes {
             let schema = batches[0].schema();
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let write_options = VortexWriteOptions::new(session)
-                .with_strategy(WriteStrategyBuilder::default().build());
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref()).unwrap();
+            // Let the file writer select a strategy for the session's enabled editions.
+            let write_options = VortexWriteOptions::new(session.clone());
             let mut buf = Vec::new();
             let mut writer = write_options.writer(&mut buf, dtype);
             for batch in batches {
-                let array: ArrayRef = ArrayRef::from_arrow(batch, false).unwrap();
+                let array: ArrayRef = session
+                    .arrow()
+                    .from_arrow_record_batch(batch, schema.as_ref())
+                    .unwrap();
                 writer.push(array).await.unwrap();
             }
             writer.finish().await.unwrap();

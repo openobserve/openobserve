@@ -187,9 +187,9 @@ impl Sql {
                 matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
             });
 
-        // check if need exact limit and offset
-        if (limit == -1 || limit == 0)
-            && let Some(n) = column_visitor.limit
+        // An explicit SQL LIMIT wins over the request size; the plan keeps it anyway.
+        if let Some(n) = column_visitor.limit
+            && n > 0
         {
             limit = n;
         }
@@ -219,7 +219,7 @@ impl Sql {
                 &columns,
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
-                cfg.limit.quick_mode_num_fields,
+                stream_type,
                 &search_event_type,
                 match_visitor.has_match_all,
             );

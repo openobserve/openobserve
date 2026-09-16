@@ -119,11 +119,11 @@ function removeCookie(index: number) {
 <template>
   <div class="rounded-default border-border-default mb-4 border">
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.authNetwork.title") }}
       </h3>
-      <OBadge variant="default-soft" size="sm" class="ml-2">{{
+      <OBadge variant="default-soft" size="sm" class="ms-2">{{
         t("synthetics.authNetwork.optional")
       }}</OBadge>
       <div class="flex-1" />
@@ -147,7 +147,7 @@ function removeCookie(index: number) {
           <div>
             <label class="text-text-body mb-1 block text-sm font-medium">
               {{ t("synthetics.authNetwork.password") }}
-              <OBadge variant="default-soft" size="sm" class="ml-1">{{
+              <OBadge variant="default-soft" size="sm" class="ms-1">{{
                 t("synthetics.authNetwork.secret")
               }}</OBadge>
             </label>

@@ -350,6 +350,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs,
         from_node: undefined,
+        suppress_destinations: true,
       });
     });
 
@@ -368,6 +369,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs,
         from_node: "node-3",
+        suppress_destinations: true,
       });
     });
 
@@ -380,6 +382,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs: [],
         from_node: undefined,
+        suppress_destinations: true,
       });
     });
 
@@ -389,7 +392,27 @@ describe("workflows service", () => {
       await workflows.testWorkflow({ org_identifier: "o", workflow: wf, inputs: [] });
 
       const body = mockHttpInstance.post.mock.calls[0][1];
-      expect(Object.keys(body).sort()).toEqual(["from_node", "inputs", "workflow"]);
+      expect(Object.keys(body).sort()).toEqual([
+        "from_node",
+        "inputs",
+        "suppress_destinations",
+        "workflow",
+      ]);
+    });
+
+    // The one value that makes a test dispatch for real, so it must survive the
+    // default rather than being clamped back to the safe one.
+    it("forwards an explicit suppress_destinations=false for a live test", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+
+      await workflows.testWorkflow({
+        org_identifier: "o",
+        workflow: wf,
+        inputs: [],
+        suppress_destinations: false,
+      });
+
+      expect(mockHttpInstance.post.mock.calls[0][1].suppress_destinations).toBe(false);
     });
 
     it("propagates a test failure", async () => {

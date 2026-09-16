@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :data-test="`log-search-expand-${field.name}-field-btn`"
         :highlight="isFieldSelected"
       >
-        <span class="mr-1 flex w-[0.55rem] shrink-0 items-center justify-center">
+        <span class="me-1 flex w-[0.55rem] shrink-0 items-center justify-center">
           <OIcon
             class="text-text-muted inline-flex w-4 shrink-0 items-center justify-center"
             :name="isExpanded ? 'expand-more' : 'chevron-right'"
@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`log-search-index-list-interesting-${field.name}-field-btn`"
           v-if="showQuickMode"
           variant="ghost-neutral"
-          class="mr-1 gap-0!"
+          class="me-1 gap-0!"
           :title="
             field.isInterestingField
               ? t('logStream.removeFromInterestingFields')
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OFieldRow>
     </template>
 
-    <div class="py-0 pr-2 pl-4">
+    <div class="py-0 ps-4 pe-2">
       <slot name="body">
         <FieldValuesPanel
           ref="fieldValuesPanelRef"

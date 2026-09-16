@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </div>
       </div>
-      <div class="border-border-default flex flex-col gap-1 border-l pl-4">
+      <div class="border-border-default flex flex-col gap-1 border-s ps-4">
         <div class="text-text-tertiary text-xs">
           {{ t("alert_templates.testSendGroupLabel") }}
         </div>

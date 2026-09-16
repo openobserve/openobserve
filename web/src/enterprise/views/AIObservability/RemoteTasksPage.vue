@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :columns="columns"
         row-key="entityId"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('aiObservability.remoteTasks.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -156,6 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="edit"
               :disabled="!canEdit(row)"
+              class="max-md:hidden"
               :data-test="`ai-remote-tasks-edit-${row.entityId}`"
               @click.stop="openEdit(row)"
             >
@@ -172,11 +174,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :data-test="`ai-remote-tasks-delete-${row.entityId}`"
               @click.stop="removeTask(row)"
             >
               <OTooltip side="bottom" :content="t('common.delete')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-remote-tasks-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="!canEdit(row)"
+                :data-test="`ai-remote-tasks-edit-${row.entityId}-menu`"
+                @select="openEdit(row)"
+              >
+                <span>{{ t("aiObservability.remoteTasks.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-remote-tasks-delete-${row.entityId}-menu`"
+                @select="removeTask(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -197,6 +230,8 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
@@ -231,6 +266,7 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 
 const tasks = ref<RemoteTask[]>([]);
 const loading = ref(false);
+const forbidden = ref(false);
 const search = ref("");
 
 /**
@@ -404,13 +440,18 @@ async function loadReferenceCounts() {
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;
+  forbidden.value = false;
   try {
     tasks.value = await remoteTasksService.list(orgId.value);
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
-    });
+    forbidden.value = error?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) {
+      toast({
+        variant: "error",
+        message: raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.loadError"),
+      });
+    }
   } finally {
     loading.value = false;
   }

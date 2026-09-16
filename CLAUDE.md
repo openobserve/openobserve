@@ -12,7 +12,12 @@
 ## Rust code organization
 
 Item order inside a file/module, top to bottom (clippy's default grouping):
-`mod`/`pub mod` declarations → `use` imports → macros → `const`/`static` → types (`struct`/`enum`/`trait`/`type`) → `impl` blocks → functions.
+`mod`/`pub mod` declarations → `use` imports → macros → `const`/`static` → types (`struct`/`enum`/`trait`/`type`), each immediately followed by its own `impl` blocks (inherent impl first, then trait impls) → functions.
+
+- A type and its `impl` blocks stay together. Do not collect all types at the top and all
+  `impl` blocks below them; a reader must see a struct's methods right under its fields.
+  Types that only serve another type (private helper structs/enums) go after the type that
+  uses them, again followed by their own impls. No lint enforces adjacency, review does.
 
 - Function length, cognitive complexity, and nesting depth are capped by the
   thresholds in clippy.toml (set just above the worst existing code). They only
@@ -50,6 +55,12 @@ reworded:
 
 ## PR conventions
 
+- CI runs on a PR only while it carries the `ready-for-ci` label and is not a draft
+  (no label or draft = nothing runs except `ci-gate`, and no red checks). Add the
+  label when you want the run, not when you open the PR; clicking "Merge when
+  ready" adds it automatically if it is missing. Which suites run is decided by
+  path detection, never by a label. The merge queue only compiles and unit-tests the merged code, so the
+  labelled PR run is the one that has to be green.
 - PR titles starting with `feat:` require `Design at: #xxx` as the FIRST line
   of the description (enforced by `.github/workflows/feat-design-checker.yml`);
   `fix:`/`chore:`/`test:` PRs skip the check.

@@ -28,6 +28,8 @@ use axum::{
 };
 use config::meta::slo::{Slo, SloStatusView};
 use openobserve_api_common::extractors::Headers;
+#[cfg(feature = "enterprise")]
+use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
 use openobserve_core::{auth::UserEmail, slo::service as slo_service};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -128,6 +130,7 @@ pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id))]
@@ -142,8 +145,22 @@ pub async fn create_slo(
     if slo.id.is_empty() {
         slo.id = config::ider::generate();
     }
+    // Resolve the effective destination BEFORE authorizing it: an empty
+    // folder_id writes to the default folder, which the `?folder=` gate did not
+    // necessarily cover, so skipping the check on empty would leave a hole.
     if slo.folder_id.is_empty() {
         slo.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &slo.org,
+        &user_email.user_id,
+        "alert_folders",
+        &slo.folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
@@ -181,6 +198,7 @@ pub async fn create_slo(
     responses(
         (status = 200, description = "Updated", content_type = "application/json", body = MetaHttpResponse),
         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
     ),
 )]
 #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
@@ -193,6 +211,27 @@ pub async fn update_slo(
     // the permission check ran against.
     slo.org = org_id;
     slo.id = slo_id;
+    // An update that changes folder_id is also a move, so the destination needs
+    // its own check. Compared against the stored folder because a plain edit
+    // round-trips the current one unchanged.
+    #[cfg(feature = "enterprise")]
+    if !slo.folder_id.is_empty() {
+        let current = slo_service::folders_of(&slo.org, std::slice::from_ref(&slo.id))
+            .await
+            .ok()
+            .and_then(|mut found| found.pop().map(|(_, folder_id)| folder_id));
+        if current.as_deref() != Some(slo.folder_id.as_str())
+            && !check_folder_write_permissions(
+                &slo.org,
+                &user_email.user_id,
+                "alert_folders",
+                &slo.folder_id,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());
     }
@@ -254,12 +293,13 @@ pub struct MoveSlosRequestBody {
     tag = "SLOs",
     operation_id = "MoveSlos",
     summary = "Move SLOs between folders",
-    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. A move never changes an SLO's definition and never restarts its measurement.",
+    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to each SLO being moved, and to the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
     security(("Authorization" = [])),
     params(("org_id" = String, Path, description = "Organization identifier")),
     request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved", content_type = "application/json", body = MetaHttpResponse),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
         (status = 409, description = "Name already used in the destination", content_type = "application/json", body = MetaHttpResponse),
     ),
@@ -280,6 +320,47 @@ pub async fn move_slos(
         )
         .into_response();
     }
+    // The move route is bypass:true, so both sides are authorized here. Source
+    // first: an SLO is checked as an alert parented by its current folder, the
+    // same shape /{org}/slos/{id} PUT resolves to.
+    #[cfg(feature = "enterprise")]
+    {
+        let sources = match slo_service::folders_of(&org_id, &req_body.slo_ids).await {
+            Ok(sources) => sources,
+            Err(e) => return save_error(e),
+        };
+        for (slo_id, folder_id) in &sources {
+            if !check_permissions(
+                slo_id,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "PUT",
+                Some(folder_id),
+                false,
+                true,
+                false,
+            )
+            .await
+            {
+                return MetaHttpResponse::forbidden("Unauthorized Access");
+            }
+        }
+    }
+
+    // SLOs share the alert folder namespace, so the destination is an alert folder.
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "alert_folders",
+        &req_body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
+    }
+
     match slo_service::move_to_folder(
         &org_id,
         &req_body.slo_ids,

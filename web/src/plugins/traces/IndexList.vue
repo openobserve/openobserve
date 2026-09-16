@@ -93,10 +93,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-for="p in PERCENTILE_LABELS"
                       :key="p.key"
-                      class="flex items-center justify-between py-[0.15rem] pl-2"
+                      class="flex items-center justify-between py-[0.15rem] ps-2"
                     >
                       <span class="w-8 shrink-0 text-xs">{{ p.label }}</span>
-                      <span class="flex-1 pr-1 text-right text-xs">
+                      <span class="flex-1 pe-1 text-right text-xs">
                         {{ formatPercentile(durationPercentiles[p.key]) }}
                       </span>
                       <div class="flex w-12">
@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               `duration>='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover border-card-glass-border! ml-1! border!"
+                          class="o2-custom-button-hover border-card-glass-border! ms-1! border!"
                         >
                           <OIcon name="arrow-forward-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
@@ -131,14 +131,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               `duration<='${formatPercentile(durationPercentiles[p.key])}'`,
                             )
                           "
-                          class="o2-custom-button-hover border-card-glass-border! mr-2.5! ml-auto! border!"
+                          class="o2-custom-button-hover border-card-glass-border! ms-auto! me-2.5! border!"
                         >
                           <OIcon name="arrow-back-ios" size="sm" class="h-2! w-2!" />
                         </OButton>
                       </div>
                     </div>
                   </template>
-                  <div v-else class="py-1 pl-3 text-sm font-medium">
+                  <div v-else class="py-1 ps-3 text-sm font-medium">
                     {{ durationPercentileErrMsg || t("traces.indexList.noValuesFound") }}
                   </div>
                 </template>
@@ -199,6 +199,7 @@ import useDurationPercentiles, {
 } from "@/composables/useDurationPercentiles";
 import { SPAN_KIND_MAP, parseSpanKindWhereClause } from "@/utils/traces/constants";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 
 export default defineComponent({
   name: "ComponentSearchIndexSelect",
@@ -512,11 +513,15 @@ export default defineComponent({
     const handleAddSearchTerm = (fieldName: string, value: string, action: string) => {
       if (action === "include") {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}>=${value}` : `${fieldName}='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}>=${value}`
+            : `${fieldName}='${escapeSingleQuotes(value)}'`,
         );
       } else {
         addSearchTerm(
-          fieldName === "duration" ? `${fieldName}<=${value}` : `${fieldName}!='${value}'`,
+          fieldName === "duration"
+            ? `${fieldName}<=${value}`
+            : `${fieldName}!='${escapeSingleQuotes(value)}'`,
         );
       }
     };
@@ -524,7 +529,9 @@ export default defineComponent({
     const handleAddMultipleSearchTerms = (fieldName: string, values: string[], action: string) => {
       const joinOp = action === "include" ? " or " : " and ";
       const expressions = values.map((v) =>
-        action === "include" ? `${fieldName}='${v}'` : `${fieldName}!='${v}'`,
+        action === "include"
+          ? `${fieldName}='${escapeSingleQuotes(v)}'`
+          : `${fieldName}!='${escapeSingleQuotes(v)}'`,
       );
       const combined = expressions.length > 1 ? `(${expressions.join(joinOp)})` : expressions[0];
       addSearchTerm(combined);
@@ -687,6 +694,13 @@ export default defineComponent({
 .index-table :deep(table) {
   width: 100%;
   table-layout: fixed;
+}
+
+/* Touch has no hover — keep the field quick-actions visible. */
+@media (max-width: 47.99rem) {
+  .index-menu :deep(.field_list .field_overlay) {
+    visibility: visible;
+  }
 }
 
 .index-table :deep(table .field-container:hover .field_overlay) {

@@ -94,9 +94,9 @@ watch(
               // scrolling — OToggleGroup items are positioned at z-10, so a
               // z-10 header would tie and let the toggle bleed over it.
               'bg-surface-panel sticky top-11 z-20',
-              'border-l-2 border-l-transparent',
+              'border-s-2 border-s-transparent',
               'data-[state=open]:bg-collapsible-trigger-open-bg',
-              'data-[state=open]:border-l-collapsible-open-accent',
+              'data-[state=open]:border-s-collapsible-open-accent',
             ]
           : variant === 'sidebar'
             ? 'min-h-9 rounded-none px-3 py-0'

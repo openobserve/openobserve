@@ -290,14 +290,14 @@ onBeforeUnmount(() => {
             :style="{ width: `${progressPct}%` }"
           />
           <div
-            class="bg-accent absolute -bottom-1.25 -ml-px h-3.75 w-0.5 transition-[left] duration-100 ease-linear"
+            class="bg-accent absolute -bottom-1.25 -ms-px h-3.75 w-0.5 transition-[left] duration-100 ease-linear"
             :style="{ left: `${progressPct}%` }"
           />
           <div
             v-for="(event, i) in props.events ?? []"
             :key="event.id ?? i"
             data-test="rum-mobile-replay-event-marker"
-            class="absolute -bottom-1.25 -ml-px cursor-pointer"
+            class="absolute -bottom-1.25 -ms-px cursor-pointer"
             :class="
               event.frustration_types?.length
                 ? 'ring-badge-orange-solid-bg h-4.5 w-[0.1875rem] ring-2'
@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
               @click="skip('forward')"
             />
             <span
-              class="text-text-body ml-2 whitespace-nowrap tabular-nums"
+              class="text-text-body ms-2 whitespace-nowrap tabular-nums"
               data-test="rum-mobile-replay-time"
             >
               {{ fmt(playhead) }} / {{ fmt(timeline.duration) }}

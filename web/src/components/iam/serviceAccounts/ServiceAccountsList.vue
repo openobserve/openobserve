@@ -42,6 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="email"
           :loading="loading"
+          :forbidden="forbidden"
           pagination="client"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
@@ -61,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('serviceAccounts.search')"
@@ -104,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="service-accounts-system-badge"
                 type="serviceAccountKind"
                 value="system"
-                class="ml-2"
+                class="ms-2"
               />
             </template>
             <template v-else-if="isSyntheticSA(row.email)">
@@ -174,6 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="refresh"
+                class="max-md:hidden"
                 @click="confirmRefreshAction(row)"
               />
               <OButton
@@ -183,6 +185,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="edit"
+                class="max-md:hidden"
                 @click="addRoutePush(row)"
               />
               <OButton
@@ -192,13 +195,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="delete"
+                class="max-md:hidden"
                 @click="confirmDeleteAction(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="service-accounts-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="refresh"
+                  class="md:hidden"
+                  data-test="service-accounts-refresh-menu"
+                  @select="confirmRefreshAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.rotate") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="service-accounts-edit-menu"
+                  @select="addRoutePush(row)"
+                >
+                  <span>{{ t("serviceAccounts.update") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="service-accounts-delete-menu"
+                  @select="confirmDeleteAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.deleteServiceAccount") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </template>
           </template>
 
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ serviceAccountsState.service_accounts_users.length }}
               {{ t("serviceAccounts.header") }}</span
             >
@@ -318,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="service-accounts-list-token-download-btn"
               variant="outline"
               size="icon-md"
-              class="ml-2"
+              class="ms-2"
               :title="t('serviceAccounts.downloadToken')"
               @click.stop="downloadTokenAsFile(serviceToken)"
             >
@@ -440,6 +482,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -488,6 +532,8 @@ export default defineComponent({
     AddServiceAccount,
     ConfirmDialog,
     OButton,
+    ODropdown,
+    ODropdownItem,
     ODialog,
     OIcon,
     OPageLayout,
@@ -748,6 +794,7 @@ export default defineComponent({
       deleteUserEmailIdentifier.value = row.email;
     };
     const loading = ref(false);
+    const forbidden = ref(false);
     const getServiceAccountsUsers = async () => {
       const dismiss = toast({
         variant: "loading",
@@ -756,6 +803,7 @@ export default defineComponent({
       });
 
       loading.value = true;
+      forbidden.value = false;
       return new Promise((resolve, reject) => {
         service_accounts
           .list(store.state.selectedOrganization.identifier)
@@ -779,7 +827,8 @@ export default defineComponent({
 
             resolve(true);
           })
-          .catch(() => {
+          .catch((err: any) => {
+            forbidden.value = err?.response?.status === 403;
             dismiss();
             reject(false);
           })
@@ -1093,6 +1142,7 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       loading,
+      forbidden,
       orgData,
       confirmDelete,
       serviceAccounts,

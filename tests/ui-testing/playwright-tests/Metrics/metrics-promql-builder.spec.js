@@ -816,19 +816,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       selectedOperator = operatorText.trim();
       testLogger.info(`Operator: ${selectedOperator}`);
 
-      // Select a value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-
-        const valueCount = await builder.valueOptions.count();
-        if (valueCount > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Selected value: ${selectedValue}`);
-        }
+      // Select a value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Selected value: ${selectedValue}`);
       }
 
       // Close the filter menu — LabelFilterEditor chip menu is ODropdown post-migration
@@ -1018,17 +1009,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       const operatorText = await builder.operatorSelectLast.textContent().catch(() => '');
       expect(operatorText).toContain('=');
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
 
       await page.keyboard.press('Escape');
@@ -1197,17 +1181,10 @@ test.describe("Metrics PromQL Builder Mode testcases", () => {
       await builder.labelPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
       testLogger.info(`Label: ${selectedLabel}`);
 
-      // Select value
-      const isDisabled = await builder.isValueSelectDisabled();
-      if (!isDisabled) {
-        await builder.valueSelectLast.click();
-        await builder.valuePopover.waitFor({ state: 'visible', timeout: 5000 });
-        if (await builder.valueOptions.count() > 0) {
-          selectedValue = (await builder.valueOptions.first().textContent()).trim();
-          await builder.valueOptions.first().click();
-          await builder.valuePopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-          testLogger.info(`Value: ${selectedValue}`);
-        }
+      // Select value (gates on the async values fetch so the filter isn't left empty)
+      selectedValue = await builder.selectFirstLabelValue();
+      if (selectedValue) {
+        testLogger.info(`Value: ${selectedValue}`);
       }
       await page.keyboard.press('Escape');
       // LabelFilterEditor chip menu = ODropdown post-migration

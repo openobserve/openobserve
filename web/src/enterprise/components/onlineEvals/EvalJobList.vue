@@ -9,6 +9,7 @@
         :columns="columns"
         row-key="id"
         :loading="loading"
+        :forbidden="forbidden"
         :footer-title="t('onlineEvals.job.listTitle')"
         :global-filter="search"
         :show-global-filter="false"
@@ -77,14 +78,14 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
+          <span class="text-xs font-normal max-md:hidden">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.job.listTitle") }}
           </span>
           <OButton
             v-if="selectedIds.length > 0"
             variant="outline-destructive"
             size="sm"
-            class="ml-3"
+            class="ms-3"
             icon-left="delete"
             data-test="eval-job-bulk-delete-btn"
             :loading="actionLoading"
@@ -125,6 +126,7 @@
               icon-left="play-arrow"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('activate', row)"
             />
             <OButton
@@ -136,6 +138,7 @@
               icon-left="pause"
               :loading="pendingStatusId === row.id"
               :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+              class="max-md:hidden"
               @click.stop="$emit('pause', row)"
             />
             <OButton
@@ -144,6 +147,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
+              class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
@@ -152,8 +156,59 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
               icon-left="delete"
+              class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="eval-job-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="canActivate(row.status)"
+                icon-left="play-arrow"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-activate-btn-menu`"
+                @select="$emit('activate', row)"
+              >
+                <span>{{ t("onlineEvals.actions.activate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="canPause(row.status)"
+                icon-left="pause"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="pendingStatusId !== null && pendingStatusId !== row.id"
+                :data-test="`eval-job-list-${row.name}-pause-btn-menu`"
+                @select="$emit('pause', row)"
+              >
+                <span>{{ t("onlineEvals.actions.pause") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-edit-btn-menu`"
+                @select="$emit('edit', row)"
+              >
+                <span>{{ t("onlineEvals.actions.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`eval-job-list-${row.name}-delete-btn-menu`"
+                @select="$emit('delete', row)"
+              >
+                <span>{{ t("onlineEvals.actions.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -166,6 +221,8 @@ import { computed, ref, watch } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -185,6 +242,7 @@ const props = defineProps<{
   rows: EvalJob[];
   search: string;
   loading?: boolean;
+  forbidden?: boolean;
   /** A bulk action (e.g. delete-selected) is in flight — shows the table overlay. */
   actionLoading?: boolean;
   /** ID of the job whose activate/pause request is currently in flight. */
@@ -327,38 +385,28 @@ const statusCounts = computed(() => {
   const rows = props.rows || [];
   let active = 0;
   let paused = 0;
-  let degraded = 0;
   let draft = 0;
-  let archived = 0;
   for (const r of rows) {
     const s = statusOf(r);
     if (s === "active") active += 1;
     else if (s === "paused") paused += 1;
-    else if (s === "degraded") degraded += 1;
     else if (s === "draft") draft += 1;
-    else if (s === "archived") archived += 1;
   }
-  return { active, paused, degraded, draft, archived, total: rows.length };
+  return { active, paused, draft, total: rows.length };
 });
 // The strip is the ONLY status filter (the redundant dropdown was removed), so it
-// carries every backend status. Attention-first order (degraded, paused, active,
-// then the inert draft/archived), "All" last — matching the Alerts / Incidents
-// strip. Tones echo the evalStatus chip exactly (degraded = orange, not red).
+// carries every status the UI can actually produce. "degraded" and "archived"
+// are both excluded on purpose: nothing in the product currently transitions a
+// job into either status (no health-check sets degraded; there's no archive
+// action in the UI), so their tiles would always read zero. Attention-first
+// order (paused, active, then the inert draft), "All" last — matching the
+// Alerts / Incidents strip.
 const summaryStats = computed<StatItem[]>(() => {
   const c = statusCounts.value;
   const has = c.total > 0;
   const v = (n: number): string | number => (has ? n : "—");
   const share = has ? c.total : undefined;
   return [
-    {
-      key: "degraded",
-      label: t("onlineEvals.jobStatus.degraded"),
-      value: v(c.degraded),
-      icon: "error-outline",
-      tone: "orange",
-      max: share,
-      dataTest: "eval-job-summary-degraded",
-    },
     {
       key: "paused",
       label: t("onlineEvals.jobStatus.paused"),
@@ -385,15 +433,6 @@ const summaryStats = computed<StatItem[]>(() => {
       tone: "neutral",
       max: share,
       dataTest: "eval-job-summary-draft",
-    },
-    {
-      key: "archived",
-      label: t("onlineEvals.jobStatus.archived"),
-      value: v(c.archived),
-      icon: "inventory-2",
-      tone: "neutral",
-      max: share,
-      dataTest: "eval-job-summary-archived",
     },
     {
       key: "all",

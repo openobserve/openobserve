@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="cloud-upload"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
@@ -184,6 +183,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   icon-left="edit"
+                  class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-edit-${row.id}`"
                   @click.stop="openEditItem(row)"
                 >
@@ -193,11 +193,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   icon-left="delete"
+                  class="max-md:hidden"
                   :data-test="`ai-dataset-detail-item-delete-${row.id}`"
                   @click.stop="removeItem(row)"
                 >
                   <OTooltip side="bottom" :content="t('common.delete')" />
                 </OButton>
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="ai-dataset-detail-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`ai-dataset-detail-item-edit-${row.id}-menu`"
+                    @select="openEditItem(row)"
+                  >
+                    <span>{{ t("common.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`ai-dataset-detail-item-delete-${row.id}-menu`"
+                    @select="removeItem(row)"
+                  >
+                    <span>{{ t("common.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
           </OTable>
@@ -210,11 +240,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :org-id="orgId"
               :experiments="experiments"
               :datasets="[dataset]"
-              :details="experimentDetails"
               :fixed-dataset-id="datasetId"
               :loading="loading"
               compact
               @open-filtered="openExperiments"
+              @refresh="refreshExperiments"
+              @baseline-changed="onBaselineChanged"
             />
           </OContent>
         </OTabPanel>
@@ -347,6 +378,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { formatDistanceToNowStrict } from "date-fns";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -355,6 +387,8 @@ import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OContent from "@/lib/core/Content/OContent.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -379,11 +413,7 @@ import llmDatasetsService, {
   type LlmDatasetItem,
   type LlmDatasetItemSource,
 } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
-import { fetchExperimentDetails } from "./experimentDiscovery";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
@@ -400,7 +430,6 @@ const datasetId = computed<string>(() => String(route.params.id ?? ""));
 const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
 const experiments = ref<LlmExperiment[]>([]);
-const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const loading = ref(false);
 const search = ref("");
 const activeTab = ref<"items" | "experiments">("items");
@@ -415,9 +444,13 @@ const pageSizeOptions = [20, 50, DATASET_ITEMS_MAX_PAGE_SIZE];
  *  item detail drawer. */
 const versionLabel = (version: number) => raw(`v${version}`);
 
+const { goBack: backToDatasets } = useSmartBack(() => ({
+  name: "aiDatasets",
+  query: { org_identifier: orgId.value },
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.datasets"),
-  to: { name: "aiDatasets", query: { org_identifier: orgId.value } },
+  onClick: backToDatasets,
 }));
 
 const metaSubtitle = computed(() => {
@@ -476,7 +509,7 @@ const columns = computed(() => [
     accessorKey: "version",
     hideable: true,
     sortable: false,
-    size: 90,
+    size: 140,
     meta: { align: "left" },
   },
   {
@@ -516,17 +549,22 @@ async function refresh() {
   }
 }
 
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
 async function refreshExperiments() {
   try {
-    experiments.value = (await llmExperimentsService.list(orgId.value)).filter(
-      (experiment) => experiment.datasetId === datasetId.value,
-    );
-    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
-      llmExperimentsService.get(orgId.value, experimentId),
-    );
+    experiments.value = await llmExperimentsService.list(orgId.value, {
+      includeSummary: true,
+      datasetId: datasetId.value,
+    });
   } catch {
     experiments.value = [];
-    experimentDetails.value = {};
   }
 }
 

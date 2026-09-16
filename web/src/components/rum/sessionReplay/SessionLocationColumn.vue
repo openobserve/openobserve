@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-w-0 flex-nowrap items-center">
       <span
         v-if="column.country_iso_code"
-        :class="`fi fi-${column.country_iso_code} mr-1.5 shrink-0`"
+        :class="`fi fi-${column.country_iso_code} me-1.5 shrink-0`"
       />
       <div class="truncate text-xs">{{ column.country || t("common.unknown") }}</div>
     </div>

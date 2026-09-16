@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <span
             >{{ t("alerts.incidents.payloadSourceLabel") }} {{ payloadData.detected_source }}</span
           >
-          <span v-if="payloadData.source_url" class="ml-3">{{ payloadData.source_url }}</span>
+          <span v-if="payloadData.source_url" class="ms-3">{{ payloadData.source_url }}</span>
         </div>
         <pre
           data-test="trigger-payload-json"

@@ -14,6 +14,7 @@ feel like one product.
   - [The mandatory listing toolbar: search · refresh · column toggle](#the-mandatory-listing-toolbar)
   - [Columns: hideable + default-hidden + persisted](#columns-hideable--default-hidden--persisted)
   - [Empty state: filtered vs first-run](#empty-state-filtered-vs-first-run)
+  - [Denied: the third empty state (`:forbidden`)](#denied-the-third-empty-state-forbidden)
   - [States, actions, shortcuts, data](#states-actions-shortcuts-data)
 - [Recipe: detail / editor page](#recipe-detail--editor-page)
 - [Listing-page checklist](#listing-page-checklist)
@@ -26,9 +27,16 @@ Any routed view is: an `OPageHeader` (rule 1) on top, then the page body below
 it, all inside a **full-height flex column** so the header stays put and only the
 body scrolls.
 
-- **Primary page action** (New / Add / Create) and page-level secondary actions
-  (Import, an overflow `ODropdown`) go in the header's **`#actions`** slot as O2
-  buttons — never in the table toolbar.
+- **Primary page action** (New / Add / Create) goes in the header's
+  **`#actions`** slot; page-level secondary actions (Import, Export, an overflow
+  `ODropdown`) go in **`#actions-overflow`** — inline on desktop, behind one ⋮ on
+  phones (add `overflow-first` so they keep their place before the CTA). Never in the
+  table toolbar. See [responsive.md](responsive.md#page-shell-the-header-stays-on-one-row).
+- **The create CTA is label-only — no `icon-left="add"`.** Secondary header
+  actions keep their semantic icons (Import → `upload-file`), and in-section
+  adders inside the body keep their `+`; it is only the header's create button
+  that carries no icon. See
+  [house-rules § The header create CTA carries no icon](house-rules.md#the-header-create-cta-carries-no-icon).
 - The header owns its own chrome — don't wrap it in a bordered/padded div, but
   **do** give it horizontal padding and a bottom divider so the header aligns with
   the app frame while the table below runs flush (see the skeleton next).
@@ -68,7 +76,7 @@ while the header aligns with the app frame:
       class="shrink-0 px-4 border-b border-border-default"
     >
       <template #actions>
-        <OButton variant="primary" size="sm" icon-left="add" data-test="channels-new" @click="create">
+        <OButton variant="primary" size="sm" data-test="channels-new" @click="create">
           {{ t("channels.new") }}
         </OButton>
       </template>
@@ -135,21 +143,29 @@ for every list — don't ship a listing page without them.
   data-test="channels-table"
   @row-click="edit"
 >
-  <!-- filters + search on the LEFT of the toolbar (fills the row) -->
+  <!-- filters + search on the LEFT of the toolbar (fills the row); max-md:contents +
+       mobile-dropdown keep the phone toolbar on one row -->
   <template #toolbar>
-    <div class="flex items-center gap-2 w-full">
-      <OToggleGroup :model-value="typeFilter" @update:model-value="filterByType">
+    <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+      <OToggleGroup
+        mobile-dropdown
+        :model-value="typeFilter"
+        data-test="channels-type-filter"
+        @update:model-value="filterByType"
+      >
         <OToggleGroupItem value="all" size="sm">{{ t("channels.all") }}</OToggleGroupItem>
         <OToggleGroupItem value="prebuilt" size="sm">{{ t("channels.prebuilt") }}</OToggleGroupItem>
         <OToggleGroupItem value="custom" size="sm">{{ t("channels.custom") }}</OToggleGroupItem>
       </OToggleGroup>
-      <OSearchInput
-        v-model="search"
-        class="flex-1"
-        :placeholder="t('channels.search')"
-        clearable
-        data-test="channels-search"
-      />
+      <div class="min-w-0 flex-1 max-md:min-w-40">
+        <OSearchInput
+          v-model="search"
+          class="w-full"
+          :placeholder="t('channels.search')"
+          clearable
+          data-test="channels-search"
+        />
+      </div>
     </div>
   </template>
 
@@ -282,6 +298,63 @@ blocks:
   first-run title/description/illustration/action cards — pick or add one rather
   than passing raw title/description strings for a listing page.
 
+### Denied: the third empty state (`:forbidden`)
+
+A 403 and a genuinely empty list are **both zero rows**, so without help the table
+shows the first-run state — inviting a user to "create your first alert" behind
+buttons that will each 403. The page carries one boolean so `OTable` can tell them
+apart:
+
+```vue
+<OTable :loading="loading" :forbidden="forbidden" ... />
+```
+
+```ts
+const forbidden = ref(false);
+
+const getAlerts = async () => {
+  loading.value = true;
+  forbidden.value = false;                 // clear at the START of every load
+  try {
+    rows.value = (await alertsService.list(org)).data.list;
+  } catch (err: any) {
+    forbidden.value = err?.response?.status === 403;
+    // the grouped access toast already reports a 403; a second red toast adds nothing
+    if (!forbidden.value) showErrorNotification(...);
+  } finally {
+    loading.value = false;
+  }
+};
+```
+
+`OTable` renders the shared `no-access` state ("You don't have access", no action
+cards) when `forbidden` is true **and** the table has no rows. It never overrides
+visible data.
+
+**The rules that matter:**
+
+- **Only the request that fetches THIS table's rows may set it.** A 403 from a
+  *different* endpoint says nothing about this one. Sibling resources are granted
+  independently — `dfolder` vs `dashboard`, `alerts` vs `alerts/templates` — so a
+  denied folder list must not blank a dashboard list the user can read.
+- **Wire every load path.** Initial load *and* refresh/refetch, or the flag goes
+  stale between them.
+- **The `#empty` slot is the only place for the empty state.** If a page renders
+  its first-run state in an outer `v-else-if="!rows.length"` branch, the table
+  never mounts when the list is empty and `:forbidden` is dead code. Fold both
+  first-run and filtered copy into `#empty` (conditional `title`/`description`)
+  so there is one code path.
+- **Presentational tables** (a child that receives `:loading` as a prop) need a
+  `forbidden?: boolean` prop forwarded the same way; the parent that owns the
+  fetch sets it.
+- **Never put `data-test` on `OEmptyState` itself** — Vue attribute fallthrough
+  lands it on the same root element and silently *replaces* the component's own
+  `data-test="o2-empty-state"`. Put it on the wrapper.
+- **Beware composables that rewrap errors.** A helper that rejects with
+  `new Error(e.message)` drops `.response`, so `err?.response?.status` is
+  `undefined` and the flag can never fire. Preserve the status on the rejection.
+
+
 ### States, actions, shortcuts, data
 
 - **Loading / empty / error:** pass `:loading`; provide the single `#empty`
@@ -289,7 +362,9 @@ blocks:
   blank table.
 - **Primary action** (New) is in the header `#actions`; **row actions**
   (edit/delete/…) are in the `isAction` column as O2 buttons; **destructive
-  delete** goes through `ConfirmDialog` + `useConfirmDialog`.
+  delete** goes through `ConfirmDialog` + `useConfirmDialog`. On phones the inline
+  row buttons are `max-md:hidden` and one `md:hidden` kebab mirrors them — see
+  [responsive § Tables and row actions](responsive.md#tables-and-row-actions).
 - **Keyboard shortcuts** (register + bind — see
   [keyboard-shortcuts.md](keyboard-shortcuts.md)): `n` → create, `/` → focus
   search, `r` → refresh. Advertise `r` via the refresh button's `OTooltip
@@ -323,7 +398,7 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
       `card-container flex-1 min-h-0 overflow-hidden` — **no page padding**, table
       runs **flush**.
 - [ ] `OPageHeader` on top (description via **`subtitle`** prop); primary
-      **New** action in `#actions`.
+      **New** action in `#actions`, **label-only — no `icon-left="add"`**.
 - [ ] `OTable :frame="false"`; filters + **search** in `#toolbar`
       (`:show-global-filter="false"`), or the built-in global filter for a
       search-only list.
@@ -335,8 +410,17 @@ form — those go in an `ODialog`/`ODrawer`; see SKILL.md § Forms):
 - [ ] Non-essential columns **hidden by default** via `:column-visibility`.
 - [ ] Single `#empty` `OEmptyState` with a `preset` + **`:filtered`** (true when
       search/filter active) + an `@action` that resets on `clear-filters`;
-      `#error` if fetch can fail; `:loading` bound.
-- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`.
+      `#error` if fetch can fail; `:loading` bound. **No first-run state in an
+      outer `v-if` branch** — the table must mount even when the list is empty.
+- [ ] **`:forbidden`** bound to a ref the page sets from a 403 on *its own* list
+      request (cleared at the start of every load path), so a denied user sees
+      "You don't have access" rather than a create CTA that will 403.
+- [ ] Row actions in an `isAction` column; delete via `ConfirmDialog`; inline
+      buttons `max-md:hidden` + a `md:hidden` kebab mirroring them (`-menu` data-tests).
+- [ ] **Responsive** — toolbar recipe (`max-md:contents`, `mobile-dropdown`, search
+      floor), footer count `max-md:hidden`, secondary header actions in
+      `#actions-overflow`; checked at 375 / 768 / 1280 with 1280 identical to main
+      (see [responsive.md](responsive.md)).
 - [ ] `n` / `/` / `r` keyboard shortcuts registered and bound.
 - [ ] **Registered in navigation** and gated for the right env/role — see
       [navigation-menus.md](navigation-menus.md).

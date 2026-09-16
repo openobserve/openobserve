@@ -13,10 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::{
+    cell::Cell,
+    time::{Duration, Instant},
+};
+
 use config::{meta::function::RESULT_ARRAY, stats::MemorySize, utils::json};
 use rquickjs::{Context, Runtime};
 
 thread_local! {
+    /// Deadline for the eval running on this thread; the interrupt handler aborts once it passes.
+    static JS_DEADLINE: Cell<Option<Instant>> = const { Cell::new(None) };
+
     /// Thread-local JS runtime - each thread gets its own runtime with security hardening
     /// This pattern matches the VRL runtime approach and ensures thread safety
     ///
@@ -35,6 +43,11 @@ thread_local! {
         // 512KB max stack - prevents stack overflow attacks and excessive recursion
         rt.set_max_stack_size(512 * 1024);
 
+        // A non-yielding function (e.g. `while(true){}`) would otherwise pin the thread forever.
+        rt.set_interrupt_handler(Some(Box::new(|| {
+            JS_DEADLINE.with(|d| d.get().is_some_and(|deadline| Instant::now() >= deadline))
+        })));
+
         rt
     };
 
@@ -47,10 +60,13 @@ thread_local! {
         // doesn't expose individual global registration. Instead, we rely on:
         // 1. Comprehensive pattern blocking (Phase 1)
         // 2. Memory/stack limits (Phase 2)
-        // 3. Execution timeout (100ms, enforced in pipeline/batch_execution.rs)
+        // 3. Execution deadline via the runtime interrupt handler (see JS_DEADLINE / JsDeadlineGuard)
         Context::full(rt).expect("Failed to create JS context")
     });
 }
+
+/// Fallback when the configured limit is 0; every eval stays bounded (no unlimited option).
+const DEFAULT_JS_EXEC_TIMEOUT_SECS: u64 = 5;
 
 /// Compiled JS function configuration
 #[derive(Clone, Debug)]
@@ -65,6 +81,29 @@ impl MemorySize for JSRuntimeConfig {
     }
 }
 
+/// Arms the thread-local eval deadline; clears it on drop (including early return/panic).
+struct JsDeadlineGuard {
+    deadline: Instant,
+}
+
+impl JsDeadlineGuard {
+    fn new(timeout: Duration) -> Self {
+        let deadline = Instant::now() + timeout;
+        JS_DEADLINE.with(|d| d.set(Some(deadline)));
+        Self { deadline }
+    }
+
+    fn expired(&self) -> bool {
+        Instant::now() >= self.deadline
+    }
+}
+
+impl Drop for JsDeadlineGuard {
+    fn drop(&mut self) {
+        JS_DEADLINE.with(|d| d.set(None));
+    }
+}
+
 /// Initialize a new JS runtime for the current thread
 /// This is called automatically via thread_local!, but can be used to verify runtime
 pub fn init_js_runtime() -> Result<(), String> {
@@ -73,7 +112,15 @@ pub fn init_js_runtime() -> Result<(), String> {
 
 /// Compile and validate a JS function
 /// Similar to compile_vrl_function but for JavaScript
-pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
+pub fn compile_js_function(func: &str, org_id: &str) -> Result<JSRuntimeConfig, std::io::Error> {
+    compile_js_function_inner(func, org_id, exec_timeout())
+}
+
+fn compile_js_function_inner(
+    func: &str,
+    _org_id: &str,
+    timeout: Duration,
+) -> Result<JSRuntimeConfig, std::io::Error> {
     // Basic validation: function must not be empty
     if func.trim().is_empty() {
         return Err(std::io::Error::other("JavaScript function cannot be empty"));
@@ -146,12 +193,9 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
     let var_name = if is_result_array { "rows" } else { "row" };
     let test_value = if is_result_array { "[]" } else { "{}" };
 
-    // Try to compile the function to check syntax
+    // Execute against empty input so an obvious infinite loop is rejected at save, not at runtime.
     JS_CONTEXT.with(|ctx| {
         ctx.with(|ctx| {
-            // Create a test wrapper that catches errors and returns error details as a string
-            // This way we can extract the actual error message from JavaScript
-            // Use 'rows' for #ResultArray# functions, 'row' for regular functions
             let test_code = format!(
                 r#"
                 (function() {{
@@ -160,25 +204,24 @@ pub fn compile_js_function(func: &str, _org_id: &str) -> Result<JSRuntimeConfig,
                         {}
                     }} catch(e) {{
                     }}
-                    // the syntax errors will be caught separately, but because we are
-                    // assigning the var_name as empty object, user's code will likely throw exception
-                    // through no fault of their own. So we ignore that.
                     return JSON.stringify({{ success: true }});
                 }})();
                 "#,
                 var_name, test_value, func_for_compilation
             );
 
+            let guard = JsDeadlineGuard::new(timeout);
+            let eval_result = ctx.eval::<String, _>(test_code);
+            if guard.expired() {
+                return Err(std::io::Error::other(
+                    "JavaScript function exceeded the execution time limit (possible infinite loop)",
+                ));
+            }
             // error here would mean there was some syntax error, which should be propagated
-            let _: String = ctx
-                .eval(test_code)
-                .map_err(|e| {
-                    std::io::Error::other(format!("JS compilation failed: {}", e))
-                })?;
-            // Extract parameter names (simple heuristic)
-            // TODO: Parse function signature properly
-            let params = vec!["row".to_string()];
+            let _: String = eval_result
+                .map_err(|e| std::io::Error::other(format!("JavaScript syntax error: {}", e)))?;
 
+            let params = vec!["row".to_string()];
             Ok(JSRuntimeConfig {
                 function: func.to_string(), // Store original with marker
                 params,
@@ -207,6 +250,18 @@ fn strip_result_array_marker(func: &str) -> String {
         .to_string();
 
     result
+}
+
+/// Per-eval execution budget; a configured `0` falls back to the default rather than disabling it.
+pub fn exec_timeout() -> Duration {
+    let secs = config::get_config()
+        .limit
+        .js_function_max_execution_time_secs;
+    Duration::from_secs(if secs == 0 {
+        DEFAULT_JS_EXEC_TIMEOUT_SECS
+    } else {
+        secs
+    })
 }
 
 /// Apply a JS function to transform data
@@ -292,7 +347,14 @@ pub fn apply_js_fn(
             );
 
             // Execute the function
-            match ctx.eval::<String, _>(exec_code) {
+            let guard = JsDeadlineGuard::new(exec_timeout());
+            let eval_result = ctx.eval::<String, _>(exec_code);
+            if guard.expired() {
+                let msg = "JavaScript function exceeded the execution time limit".to_string();
+                log::error!("{}/{:?} {}", org_id, stream_name, msg);
+                return (row, Some(msg));
+            }
+            match eval_result {
                 Ok(result_json) => {
                     // Parse the result to check if there was an error
                     match serde_json::from_str::<json::Value>(&result_json) {
@@ -409,6 +471,47 @@ mod tests {
     }
 
     #[test]
+    fn test_compile_rejects_infinite_loop() {
+        // Executing at compile time rejects an obvious infinite loop before it can be saved.
+        let start = Instant::now();
+        let result =
+            compile_js_function_inner("while (true) {}", "test_org", Duration::from_millis(100));
+        let err = result.expect_err("infinite loop must be rejected at compile");
+        assert!(
+            err.to_string().contains("time limit"),
+            "error should mention the time limit, got: {err}"
+        );
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "compile must fail fast, not hang"
+        );
+    }
+
+    #[test]
+    fn test_infinite_loops_are_interrupted() {
+        // The deadline is enforced at runtime, so interception is independent of how the loop is
+        // written; whitespace, comments and alternate loop forms all reach the same handler.
+        let payloads = [
+            "while (true) {}",
+            "while(true){}",
+            "while ( true ) { /* spin */ }",
+            "while (1) {}",
+            "for (;;) {}",
+            "do {} while (true);",
+        ];
+        for src in payloads {
+            let start = Instant::now();
+            let _guard = JsDeadlineGuard::new(Duration::from_millis(100));
+            let result: Result<String, _> = JS_CONTEXT.with(|ctx| ctx.with(|ctx| ctx.eval(src)));
+            assert!(result.is_err(), "infinite loop must be interrupted: {src}");
+            assert!(
+                start.elapsed() < Duration::from_secs(5),
+                "interrupt must fire near the deadline, not hang: {src}"
+            );
+        }
+    }
+
+    #[test]
     fn test_apply_js_fn_modify_field() {
         let func = r#"
             row.count = (row.count || 0) + 1;
@@ -512,8 +615,8 @@ rows.map(function(r) {
         println!("Captured error message: {}", err_msg);
         // The error message should contain information about the undefined variable
         assert!(
-            err_msg.contains("Exception") || err_msg.contains("compilation failed"),
-            "Error message should mention compilation failed, got: {}",
+            err_msg.contains("Exception") || err_msg.contains("syntax"),
+            "Error message should mention a syntax error, got: {}",
             err_msg
         );
         // Should NOT contain "(line: unknown, column: unknown)"

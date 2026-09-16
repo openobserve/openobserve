@@ -14,7 +14,7 @@
 -->
 <template>
   <aside
-    class="border-border-default max-[68.75rem]:border-border-default flex min-h-0 flex-col overflow-auto border-l max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
+    class="border-border-default max-[68.75rem]:border-border-default flex min-h-0 flex-col overflow-auto border-s max-[68.75rem]:border-s-0 max-[68.75rem]:border-t"
     data-test="ai-remote-task-test-panel"
   >
     <div class="flex flex-col gap-4 p-5">

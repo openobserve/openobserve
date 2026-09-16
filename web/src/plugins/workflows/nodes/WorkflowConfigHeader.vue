@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   (e.g. the Condition guidelines info icon).
 -->
 <template>
-  <div class="flex h-8 shrink-0 items-center gap-1.5 pl-2">
+  <div class="flex h-8 shrink-0 items-center gap-1.5 ps-2">
     <span class="text-text-body text-sm font-bold">{{ t("workflow.ndv.config") }}</span>
     <slot />
   </div>

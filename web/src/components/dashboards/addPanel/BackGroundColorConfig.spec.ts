@@ -438,9 +438,9 @@ describe("BackGroundColorConfig", () => {
       const colorWrapper = wrapper.find('[data-test="dashboard-config-color-input-wrapper"]');
 
       expect(colorWrapper.exists()).toBeTruthy();
-      // Inline `margin-top: 36px; margin-left: 5px` -> mt-9 (2.25rem) / ml-1.25 (0.3125rem).
+      // Inline `margin-top: 36px; margin-left: 5px` -> mt-9 (2.25rem) / ms-1.25 (0.3125rem).
       expect(colorWrapper.classes()).toContain("mt-9");
-      expect(colorWrapper.classes()).toContain("ml-1.25");
+      expect(colorWrapper.classes()).toContain("ms-1.25");
     });
 
     it("should bind color input value correctly", () => {

@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
+          ref="oTableRef"
           :frame="false"
           :key="activeTab"
           data-test="pipeline-list-table"
@@ -30,10 +31,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="otableColumns"
           row-key="pipeline_id"
           :loading="loading"
+          :forbidden="forbidden"
           :global-filter="filterQuery"
           :show-global-filter="false"
           :page-size="20"
           :page-size-options="[20, 50, 100, 250, 500]"
+          :current-page="currentPage"
+          @update:current-page="onPageChange"
           selection="multiple"
           :enable-column-resize="true"
           :persist-columns="true"
@@ -69,15 +73,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
-                @update:model-value="
-                  (v) => {
-                    activeTab = v as string;
-                    updateActiveTab();
-                  }
-                "
+                @update:model-value="onTabChange"
                 data-test="pipeline-list-tabs"
               >
                 <OToggleGroupItem value="all" size="sm" data-test="tab-all">
@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ t("pipeline_list.tab_realtime") }}
                 </OToggleGroupItem>
               </OToggleGroup>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 max-md:min-w-40">
                 <OInput
                   data-test="pipeline-list-search-input"
                   v-model="filterQuery"
@@ -162,6 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
                 size="icon-sm"
                 :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                class="max-md:hidden"
                 @click.stop="togglePipeline(row)"
               >
                 <OTooltip
@@ -170,11 +171,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :shortcut-id="row.enabled ? 'pipelinesRowPause' : undefined"
                 />
               </OButton>
+              <!-- Hover-only preview with no click action, so it has no menu counterpart below md. -->
               <OButton
                 :data-test="`pipeline-list-${row.name}-view-pipeline`"
                 variant="ghost"
                 size="icon-sm"
                 :title="t('pipeline.view')"
+                class="max-md:hidden"
                 icon-left="visibility"
               >
                 <OTooltip max-width="none" side="left">
@@ -186,6 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 @click.stop="editPipeline(row)"
                 icon-left="edit"
               >
@@ -223,6 +227,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     icon-left="more-vert"
                   />
                 </template>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-pause-start-action-menu`"
+                  class="md:hidden"
+                  @select="togglePipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" :name="row.enabled ? 'pause' : 'play-arrow'" />
+                  </template>
+                  {{ row.enabled ? t("alerts.pause") : t("alerts.start") }}
+                </ODropdownItem>
+                <ODropdownItem
+                  :data-test="`pipeline-list-${row.name}-update-pipeline-menu`"
+                  class="md:hidden"
+                  @select="editPipeline(row)"
+                >
+                  <template #icon-left>
+                    <OIcon size="sm" name="edit" />
+                  </template>
+                  {{ t("alerts.edit") }}
+                </ODropdownItem>
+                <ODropdownSeparator class="md:hidden" />
                 <ODropdownItem
                   :data-test="`pipeline-list-${row.name}-export-action`"
                   shortcut-id="pipelinesRowExport"
@@ -290,7 +315,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5 whitespace-normal"
+                  class="border-border-default border-s-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -316,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
+              <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -476,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-s-status-negative text-banner-error-soft-text border-s-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>
@@ -556,13 +581,28 @@ const resumePipelineDialogMeta: any = ref({
 
 const { pipelineObj } = useDragAndDrop(t);
 
+const oTableRef: any = ref(null);
+// Plain ref, not URL/store-backed: PipelinesList stays mounted across pipelineEditor/import/history/backfill child-route navigation, so this alone survives the round trip.
+const currentPage = ref(1);
+const onPageChange = (page: number) => {
+  currentPage.value = page;
+};
+
+// setTimeout(0) is a macrotask, so it runs after TanStack's own deferred auto-reset-on-data-change (its own microtask queue), letting the restored page win.
+const restorePageIndex = () => {
+  setTimeout(() => {
+    oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+  }, 0);
+};
+
+// Only re-fetches when landing back on the list itself; the `v-if` swap destroys and recreates OTable for the whole editor/import/history/backfill visit, so its page needs reasserting once this fetch settles.
 watch(
   () => router.currentRoute.value.name,
   async (newName, oldName) => {
-    // Only re-fetch when we land back on the list itself
     if (newName !== "pipelines" || newName === oldName) return;
     await getPipelines();
     updateActiveTab();
+    restorePageIndex();
   },
 );
 
@@ -755,6 +795,13 @@ const updateActiveTab = () => {
 
   columns.value = getColumnsForActiveTab(activeTab.value);
 };
+
+// Resets the page too: `:key="activeTab"` remounts OTable, which could otherwise land past the newly-filtered tab's last page.
+const onTabChange = (tab: any) => {
+  activeTab.value = tab as string;
+  currentPage.value = 1;
+  updateActiveTab();
+};
 //this is the function to check whether the pipeline is enabled or not
 //becuase if it is not enabled then we need to show the dialog to resume the pipeline from where it paused / start from now
 //else we need to toggle the pipeline state
@@ -929,6 +976,7 @@ columns.value = getColumnsForActiveTab(activeTab.value);
 onMounted(async () => {
   await getPipelines(); // Ensure pipelines are fetched before updating
   updateActiveTab();
+  restorePageIndex();
 });
 
 // Empty-state "New pipeline" → the dedicated pipeline-builder page (not the
@@ -949,8 +997,10 @@ const goToImportPipeline = () => {
 };
 
 const loading = ref(true);
+const forbidden = ref(false);
 const getPipelines = async () => {
   loading.value = true;
+  forbidden.value = false;
   try {
     const response = await pipelineService.getPipelines(
       store.state.selectedOrganization.identifier,
@@ -1007,8 +1057,9 @@ const getPipelines = async () => {
         ...pipeline,
       };
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error(error);
+    forbidden.value = error?.response?.status === 403;
   } finally {
     loading.value = false;
   }

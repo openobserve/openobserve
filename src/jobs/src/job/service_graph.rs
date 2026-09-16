@@ -29,6 +29,13 @@ pub async fn run() -> Result<(), anyhow::Error> {
             return Ok(());
         }
 
+        if !get_o2_config().service_graph.enabled {
+            log::info!(
+                "[SERVICE_GRAPH::JOB] Service graph jobs disabled by O2_SERVICE_GRAPH_ENABLED"
+            );
+            return Ok(());
+        }
+
         log::info!("[SERVICE_GRAPH::JOB] Service graph processor is enabled");
 
         spawn_pausable_job!(
@@ -41,6 +48,15 @@ pub async fn run() -> Result<(), anyhow::Error> {
                 {
                     log::error!("[SERVICE_GRAPH::JOB] Processing failed: {e}");
                 }
+            }
+        );
+
+        spawn_pausable_job!(
+            "service_graph_v4",
+            get_o2_config().service_graph.interval_secs,
+            {
+                use openobserve_core::traces::service_graph::v4;
+                v4::run_tick(v4::Settings::from_config()).await;
             }
         );
     }

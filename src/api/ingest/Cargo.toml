@@ -12,11 +12,13 @@ path = "src/lib.rs"
 default = []
 enterprise = [
     "dep:o2_enterprise",
+    "db/enterprise",
     "openobserve-api-common/enterprise",
     "openobserve-core/enterprise",
 ]
 cloud = [
     "enterprise",
+    "db/cloud",
     "o2_enterprise/cloud",
     "openobserve-core/cloud",
     "openobserve-api-common/cloud",
@@ -28,6 +30,7 @@ axum.workspace = true
 chrono.workspace = true
 common.workspace = true
 config.workspace = true
+db.workspace = true
 flate2.workspace = true
 hashbrown.workspace = true
 infra.workspace = true

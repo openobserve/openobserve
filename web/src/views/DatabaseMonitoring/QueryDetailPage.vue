@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template #label>
                   {{ tile.label
-                  }}<span v-if="tile.sub" class="ml-1 font-normal opacity-70">{{ tile.sub }}</span>
+                  }}<span v-if="tile.sub" class="ms-1 font-normal opacity-70">{{ tile.sub }}</span>
                 </template>
                 <template #value>
                   <OSkeleton v-if="loading" type="text" class="h-6 w-16" />
@@ -642,7 +642,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #cell-location="{ row: whereRow }">
                 <div
                   class="flex min-w-0 items-center gap-1.5"
-                  :class="whereRow.isChild ? 'pl-6' : ''"
+                  :class="whereRow.isChild ? 'ps-6' : ''"
                 >
                   <OIcon
                     v-if="whereRow.isChild"

@@ -66,9 +66,9 @@ test.describe(
       });
       await pm.workflowsPage.goToList();
       await pm.workflowsPage.openEdit(name);
-      await pm.workflowsPage.testRunFromEditor();
-      await pm.workflowsPage.expectNodeTestOk('destination');
-      await pm.workflowsPage.expectNodeTestOk('workflow_trigger');
+      await pm.workflowsPage.testRunFromEditor({ liveSend: true });
+      await pm.workflowsPage.expectNodeTestPassed('destination');
+      await pm.workflowsPage.expectNodeTestPassed('workflow_trigger');
       testLogger.info('destination reported a successful send', { name });
     });
 
@@ -85,8 +85,8 @@ test.describe(
       });
       await pm.workflowsPage.goToList();
       await pm.workflowsPage.openEdit(name);
-      await pm.workflowsPage.testRunFromEditor();
-      await pm.workflowsPage.expectNodeTestOk('destination');
+      await pm.workflowsPage.testRunFromEditor({ liveSend: true });
+      await pm.workflowsPage.expectNodeTestPassed('destination');
 
       // The receiving side confirms it stored the record. Verified live:
       // {"code":200,"status":[{"name":"wf_auto_sink_...","successful":1,"failed":0}]}

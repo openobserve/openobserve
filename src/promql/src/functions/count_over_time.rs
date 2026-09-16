@@ -15,22 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
-pub(crate) fn count_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, CountOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct CountOverTimeFunc;
-
-impl CountOverTimeFunc {
-    pub fn new() -> Self {
-        CountOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for CountOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -49,9 +38,14 @@ impl RangeFunc for CountOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn count_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, CountOverTimeFunc, eval_ctx)
+    }
     // Test helper
     fn count_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -72,7 +66,7 @@ mod tests {
 
     #[test]
     fn test_count_over_time_exec_empty_samples_returns_none() {
-        let func = CountOverTimeFunc::new();
+        let func = CountOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

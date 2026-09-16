@@ -186,8 +186,25 @@ describe("root store", () => {
         stream: "payments_traces",
       });
 
-      expect(cache().byTraceId["01a034c1aabc72f78880daf6c9755cff"]).toBe("payments_traces");
+      expect(cache().byTraceId["01a034c1aabc72f78880daf6c9755cff"]).toEqual({
+        stream: "payments_traces",
+        range: undefined,
+      });
       expect(cache().knownStreams).toEqual(["payments_traces"]);
+    });
+
+    it("keeps the indexed range alongside the stream when one was resolved", () => {
+      store.commit("resetOrganizationData");
+      store.commit("setCorrelatedTracesStream", {
+        traceId: "01a034c1aabc72f78880daf6c9755cff",
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_002_000_000 },
+      });
+
+      expect(cache().byTraceId["01a034c1aabc72f78880daf6c9755cff"]).toEqual({
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_002_000_000 },
+      });
     });
 
     it("does not duplicate a stream already learned", () => {

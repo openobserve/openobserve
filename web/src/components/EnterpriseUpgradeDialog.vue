@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="!dialogConfig.showUsageIndicator"
                     :name="dialogConfig.badgeIcon"
                     size="md"
-                    class="mr-1"
+                    class="me-1"
                   />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
@@ -243,7 +243,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="feature.link"
                     name="open-in-new"
                     size="xs"
-                    class="ml-1 align-middle opacity-60"
+                    class="ms-1 align-middle opacity-60"
                   />
                 </div>
                 <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
@@ -286,7 +286,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="feature.link"
                     name="open-in-new"
                     size="xs"
-                    class="ml-1 align-middle opacity-60"
+                    class="ms-1 align-middle opacity-60"
                   />
                   <OTag
                     v-if="feature.beta"
@@ -343,7 +343,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     name="open-in-new"
                     size="xs"
                     data-test="enterprise-upgrade-feature-external-link"
-                    class="ml-1 align-middle opacity-60"
+                    class="ms-1 align-middle opacity-60"
                   />
                   <OTag
                     v-if="feature.beta"

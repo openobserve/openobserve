@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
     bleed
   >
-    <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="false">
+    <OSplitter class="h-full" v-model="splitterModel" unit="%" :horizontal="isMobile">
       <template v-slot:before>
         <OForm :form="form" v-slot="{ isSubmitting }" class="bg-card-glass-bg flex h-full flex-col">
           <div class="overflow-auto p-3">
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-l px-2 pt-2"
+          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-s px-2 pt-2"
         >
           <template v-if="editorMode === 'content'">
             <!--
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               column's own `overflow-auto` do the scrolling instead.
             -->
             <TemplatePreviewPanel :spec="contentSpec" data-test="add-template-preview-panel" />
-            <OSeparator class="mt-2 mr-2 -ml-2" />
+            <OSeparator class="-ms-2 me-2 mt-2" />
           </template>
 
           <OCollapsible
@@ -314,6 +314,7 @@ import {
   type AddTemplateForm,
 } from "./AddTemplate.schema";
 import ContentTemplateForm from "./template-content/ContentTemplateForm.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   emptyContentSpec,
   linkUrlBadScheme,
@@ -341,6 +342,7 @@ const emit = defineEmits(["get:templates", "cancel:hideform"]);
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 const { t } = useI18nTyped();
 const splitterModel: Ref<number> = ref(55);
+const { isMobile } = useBreakpoint();
 const store = useStore();
 const router = useRouter();
 const isUpdatingTemplate = ref(false);

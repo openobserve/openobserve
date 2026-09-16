@@ -37,6 +37,62 @@ const logData = require("../../../fixtures/log.json");
 const { ingestTestData, sendRequest, getHeaders, getIngestionUrl, waitForFieldValueSearchable } = require('../../utils/data-ingestion.js');
 const { getOrgIdentifier, isCloudEnvironment } = require('../../utils/cloud-auth.js');
 
+// Auto-derives to a bar chart with X+Y populated, so a saved chart type of "line"
+// is provably restored config rather than config re-derived from this query.
+const BUILDER_QUERY =
+  'SELECT histogram(_timestamp) as "x_axis_1", count(*) as "y_axis_1" FROM "e2e_automate" GROUP BY x_axis_1';
+
+/**
+ * Build a chart on the Build tab and save it as a saved view.
+ * The view must be saved while the Build tab is open — SearchBar only persists
+ * buildData when logsVisualizeToggle === 'build'.
+ */
+async function createBuilderSavedView(pm, page, viewName, chartType) {
+  await pm.logsPage.enableSqlModeIfNeeded();
+  await pm.logsPage.setQueryEditorContent(BUILDER_QUERY);
+  await pm.logsPage.runQueryAndWaitForResults();
+
+  await pm.logsPage.clickBuildToggle();
+  const loaded = await pm.logsPage.waitForBuildTabLoaded();
+  expect(loaded, 'Build tab must finish initializing before saving the view').toBeTruthy();
+
+  await pm.logsPage.selectChartType(chartType);
+  await pm.logsPage.verifyChartTypeSelected(chartType);
+
+  // clickSaveViewButton opens the utilities menu itself, so the list dialog is not
+  // opened here — clickSaveViewButton would only have to close it again.
+  await pm.logsPage.clickSaveViewButton();
+  await page.waitForTimeout(500);
+  await pm.logsPage.fillSavedViewName(viewName);
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSavedViewDialogSave();
+  await page.waitForTimeout(2000);
+  testLogger.info(`Builder saved view created: ${viewName} (chart type ${chartType})`);
+}
+
+async function applySavedViewByName(pm, page, viewName) {
+  await pm.logsPage.clickSavedViewsExpand();
+  await page.waitForTimeout(500);
+  await pm.logsPage.clickSavedViewSearchInput();
+  await pm.logsPage.fillSavedViewSearchInput(viewName);
+  await page.waitForTimeout(1000);
+  await pm.logsPage.waitForSavedViewText(viewName);
+  await pm.logsPage.clickSavedViewByText(viewName);
+  await page.waitForTimeout(3000);
+  testLogger.info(`Applied saved view: ${viewName}`);
+}
+
+async function deleteSavedViewQuietly(pm, page, viewName) {
+  try {
+    await pm.logsPage.clickDeleteSavedViewButton(viewName).catch(() => {});
+    await page.waitForTimeout(500);
+    await pm.logsPage.clickConfirmButton().catch(() => {});
+    testLogger.info(`Cleaned up saved view: ${viewName}`);
+  } catch (cleanupError) {
+    testLogger.debug(`Saved view cleanup skipped: ${viewName}`);
+  }
+}
+
 test.describe("Logs Regression Bug Fixes", () => {
   // Changed from serial to parallel - tests are independent (each gets own page/PM in beforeEach)
   test.describe.configure({ mode: 'parallel' });
@@ -1915,6 +1971,136 @@ test.describe("Logs Regression Bug Fixes", () => {
     testLogger.info('Bug #4091 verification complete');
   });
 
+
+  // ==========================================================================
+  // Bug #14228: Builder saved view does not apply when already on the Build tab
+  // https://github.com/openobserve/openobserve/issues/14228
+  // ==========================================================================
+  test("should apply a builder saved view while already on the build tab", {
+    tag: ['@bug-14228', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Builder saved view applies without a tab toggle (Bug #14228)');
+    test.setTimeout(180000);
+
+    // The "streamslog" prefix lets CI saved-view cleanup reap any leak.
+    const savedViewName = `streamslog_build_14228_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+      // Diverge the live builder from the saved view. Without this the assertion
+      // would pass even unfixed, since the builder would already show "line".
+      await pm.logsPage.selectChartType('area');
+      await pm.logsPage.verifyChartTypeSelected('area');
+      await pm.logsPage.expectBuildTabSelected();
+      testLogger.info('Builder diverged to area chart before applying the saved view');
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // No tab toggle happened, so BuildQueryPage never remounts — the watcher on
+      // searchObj.meta.savedBuildConfig is the only thing that can apply the view.
+      await pm.logsPage.expectBuildTabSelected();
+      await pm.logsPage.verifyChartTypeSelected('line');
+      await pm.logsPage.verifyChartTypeSelected('area', false);
+      testLogger.info('✓ PRIMARY CHECK PASSED: builder re-initialized to the saved chart type');
+
+      const xCount = await pm.logsPage.expectXAxisHasItems();
+      const yCount = await pm.logsPage.expectYAxisHasItems();
+      expect(xCount, 'Bug #14228: X-axis must stay populated after applying the view').toBeGreaterThan(0);
+      expect(yCount, 'Bug #14228: Y-axis must stay populated after applying the view').toBeGreaterThan(0);
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Builder saved view applied in place (Bug #14228)');
+  });
+
+  test("should still apply a builder saved view when toggling in from the logs tab", {
+    tag: ['@bug-14228', '@P1', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Toggle-in path still applies builder saved views (Bug #14228 no-regression)');
+    test.setTimeout(180000);
+
+    const savedViewName = `streamslog_build_14228_toggle_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      await createBuilderSavedView(pm, page, savedViewName, 'line');
+
+      await pm.logsPage.clickLogsToggle();
+      await pm.logsPage.expectLogsTabSelected();
+      testLogger.info('Switched back to the Logs tab');
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // Here the view flips the toggle to build and BuildQueryPage mounts, so
+      // onMounted applies the config. The watcher must not undo or double-apply it.
+      await pm.logsPage.expectBuildTabSelected();
+      await pm.logsPage.verifyChartTypeSelected('line');
+      testLogger.info('✓ CHECK PASSED: toggle-in path still restores the saved chart type');
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Toggle-in path unaffected (Bug #14228)');
+  });
+
+  test("should not re-initialize the builder when applying a non-builder saved view", {
+    tag: ['@bug-14228', '@P2', '@regression', '@logsRegression', '@savedViews', '@queryBuilder']
+  }, async ({ page }) => {
+    testLogger.info('Test: Non-builder saved views do not trigger builder re-init (Bug #14228)');
+    test.setTimeout(180000);
+
+    const savedViewName = `streamslog_logs_14228_${Date.now()}`;
+
+    try {
+      await page.goto(`${logData.logsUrl}?org_identifier=${getOrgIdentifier() || 'default'}`);
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await pm.logsPage.selectStream('e2e_automate');
+      await page.waitForTimeout(1000);
+
+      // Saved from the Logs tab, so the view carries no buildData.
+      await pm.logsPage.clickRefreshButton();
+      await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+      await page.waitForTimeout(2000);
+
+      await pm.logsPage.clickSaveViewButton();
+      await page.waitForTimeout(500);
+      await pm.logsPage.fillSavedViewName(savedViewName);
+      await page.waitForTimeout(500);
+      await pm.logsPage.clickSavedViewDialogSave();
+      await page.waitForTimeout(2000);
+      testLogger.info(`Logs-tab saved view created: ${savedViewName}`);
+
+      await pm.logsPage.clickBuildToggle();
+      await pm.logsPage.waitForBuildTabLoaded();
+      await pm.logsPage.expectBuildTabSelected();
+
+      await applySavedViewByName(pm, page, savedViewName);
+
+      // buildData is null, so the watcher's guard must skip it and the view's own
+      // logs toggle must win.
+      await pm.logsPage.expectLogsTabSelected();
+      await pm.logsPage.expectLogsTableVisible();
+      testLogger.info('✓ CHECK PASSED: non-builder view applied with no builder re-init');
+
+    } finally {
+      await deleteSavedViewQuietly(pm, page, savedViewName);
+    }
+
+    testLogger.info('✓ PASSED: Non-builder saved view handled correctly (Bug #14228)');
+  });
 
   test.afterEach(async () => {
     // Cleanup new stream created by field cache test (e2e_automate is never deleted)

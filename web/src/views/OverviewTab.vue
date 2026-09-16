@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-5"
       data-test="overview-incidents-section"
     >
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeIncidents") }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span
             v-if="incidentsTotal > incidents.length"
-            class="text-text-secondary ml-2 align-middle text-xs font-normal"
+            class="text-text-secondary ms-2 align-middle text-xs font-normal"
             >{{ t("overview.showingOf", { shown: incidents.length, total: incidentsTotal }) }}</span
           >
         </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-b-[0.0625em] border-l-[0.1875em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
+          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -127,13 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-5"
       data-test="overview-services-section"
     >
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.services") }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span
             v-if="servicePanelVisible && selectedService"
-            class="text-text-secondary ml-1 text-xs font-normal"
+            class="text-text-secondary ms-1 text-xs font-normal"
           >
             {{ t("overview.viewingLabel") }}
             <strong class="text-text-body font-semibold">{{
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
         <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pr-8 transition-opacity duration-200"
+          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
           <button
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="svc.label ?? svc.id"
                 >{{ svc.label }}</span
               >
-              <span class="ml-1 inline-flex shrink-0 items-center">
+              <span class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
                   variant="ghost-muted"
                   size="icon"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right fade + floating scroll control (only present when scrollable) -->
         <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent pl-8 transition-opacity duration-200"
+          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
           <button
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ACTIVE ANOMALIES -->
     <section v-if="anomalies.length > 0" class="mb-5" data-test="overview-anomalies-section">
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeAnomalies") }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.recentEvents") }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showAlertsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-alerts-card"
           @click="goToAlertList"
         >
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showLogsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-logs-card"
           @click="goToLogs"
         >
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showTracesCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-traces-card"
           @click="goToTraces"
         >
@@ -525,6 +525,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -979,17 +980,17 @@ const shortDimKey = (key: string): string =>
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
-    ? "border-l-[0.1875em] border-l-error-600"
-    : "border-l-[0.1875em] border-l-warning-600";
+    ? "border-s-[0.1875em] border-s-error-600"
+    : "border-s-[0.1875em] border-s-warning-600";
 
 const severityIconClass = (severity: string) =>
   severity === "critical" ? "text-error-600" : "text-warning-600";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "border-l-error-600";
-  if (s === "p2") return "border-l-warning-600";
-  return "border-l-status-info-text";
+  if (s === "p1") return "border-s-error-600";
+  if (s === "p2") return "border-s-warning-600";
+  return "border-s-status-info-text";
 };
 
 const incidentIconClass = (severity: string) => {
@@ -1000,9 +1001,9 @@ const incidentIconClass = (severity: string) => {
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-error-600";
-  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-warning-600";
-  return "border-l-[0.1875em] border-l-status-positive";
+  if (svc.errorFlag && svc.error_rate >= 5) return "border-s-[0.1875em] border-s-error-600";
+  if (svc.errorFlag || svc.latencyFlag) return "border-s-[0.1875em] border-s-warning-600";
+  return "border-s-[0.1875em] border-s-status-positive";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -1016,7 +1017,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
-  let filter = `service_name = '${svc.label ?? svc.id}'`;
+  let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {

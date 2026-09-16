@@ -125,9 +125,8 @@ const DOMAIN_TONE: Record<string, Record<string, StatusTone>> = {
   // Services / nodes catalog: "warning" sits between degraded and critical.
   service: { warning: "warning", degraded: "warning", critical: "error" },
   node: { warning: "warning" },
-  // Eval jobs: "archived" is a deliberate end-state, keep neutral; "degraded"
-  // means the job is firing but unhealthy → warning.
-  eval: { archived: "neutral", degraded: "warning" },
+  // Eval: "archived" is a deliberate end-state, "degraded" fires but unhealthy, "scoring" is in-flight.
+  eval: { archived: "neutral", degraded: "warning", scoring: "info" },
 };
 
 export interface StatusVariantResult {

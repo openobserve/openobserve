@@ -282,6 +282,24 @@ describe("WorkflowsList", () => {
       expect(rows(wrapper)[0].trigger).toBe("—");
     });
 
+    // Sorting the rendered string orders "9:54 AM" after "1:19 PM" — the Updated
+    // column is the one users click most, so it has to sort chronologically.
+    it("sorts Updated by the raw timestamp, not the formatted string", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      const col = table(wrapper)
+        .props("columns")
+        .find((c: any) => c.id === "updated_at");
+      expect(col.accessorKey).toBe("updated_at");
+
+      const morning = new Date("2026-09-01T09:54:00Z").getTime() * 1000;
+      const afternoon = new Date("2026-09-01T13:19:00Z").getTime() * 1000;
+      const sorted = [{ updated_at: afternoon }, { updated_at: morning }].sort(
+        (a: any, b: any) => a[col.accessorKey] - b[col.accessorKey],
+      );
+      expect(sorted[0].updated_at).toBe(morning);
+    });
+
     it("formats a microsecond updated_at timestamp", async () => {
       wrapper = mountList();
       await flushPromises();
@@ -813,6 +831,98 @@ describe("WorkflowsList", () => {
       const previews = wrapper.findAllComponents({ name: "WorkflowView" });
       expect(previews).toHaveLength(2);
       expect(previews[0].props("workflow").id).toBe("wf-1");
+    });
+  });
+
+  // ── page restoration across route navigation (OTable pagination-reset fix) ─
+
+  describe("page restoration across route navigation", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("defaults currentPage to 1", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.vm.onPageChange(4);
+      expect(wrapper.vm.currentPage).toBe(4);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+
+      wrapper.vm.restorePageIndex();
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("reasserts the persisted page once the initial fetch resolves on mount", async () => {
+      let resolveFetch: (v: any) => void = () => {};
+      listWorkflows.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      vi.useFakeTimers();
+
+      wrapper = mountList();
+      wrapper.vm.currentPage = 3;
+
+      resolveFetch({ data: [makeWorkflow(1)] });
+      await flushPromises();
+
+      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("reasserts the restored page when a save lands while OTable has remounted mid-fetch", async () => {
+      let resolveFetch: (v: any) => void = () => {};
+      mockRouter.currentRoute.value = { name: "workflowEditor", query: {} } as any;
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.vm.currentPage = 3;
+      vi.useFakeTimers();
+
+      listWorkflows.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      // "saved" starts the re-fetch while still on the editor route (OTable isn't mounted yet).
+      wrapper.findComponent({ name: "FakeEditor" }).vm.$emit("saved");
+      // goBack() lands the route on "workflows" — remounting OTable — before the fetch resolves.
+      mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
+      await nextTick();
+
+      resolveFetch({ data: [makeWorkflow(1)] });
+      await flushPromises();
+
+      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake.
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      vi.runAllTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
     });
   });
 });

@@ -52,6 +52,12 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
+//
+// Bump this with every migration that must reach an existing database:
+// `init_db` returns early when the stored version already matches, *before* it
+// reaches the SeaORM migrator, so an unbumped version means new migrations run
+// on fresh installs only.
+//
 // Bump on every new sea-orm migration: `init_db` returns early when the stored
 // version matches, so an un-bumped migration never runs on an existing
 // deployment. Fresh installs still get it, which hides the omission locally.
@@ -62,7 +68,18 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 76: add steps_configured to synthetics_jobs.
 // 77: create status_pages tables and status_page_custom_domains.
 // 78: alert pending period cols
-pub const DB_SCHEMA_VERSION: u64 = 78;
+// 79: on-call tables, ownership, unrouted signals, routing config, overrides,
+// contacts/reads, unavailability, incident-acknowledged columns, and
+// exhausted_at on oncall_responses — one bump for the whole feature, not one
+// per migration written (they were revised in place before the feature
+// shipped anywhere; `init_db` compares for equality and never orders these,
+// so no path can tell an intermediate value ever existed).
+// 80: add splunk_token to org_ingestion_tokens.
+// 81: anomaly_detection_config retries reset, last_failed_at,
+// last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
+// one bump for the whole anomaly phase, same rationale as 79.
+// 82: add profiles_streams to service_streams.
+pub const DB_SCHEMA_VERSION: u64 = 82;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -90,7 +107,9 @@ pub const SIZE_IN_GB: f64 = 1024.0 * 1024.0 * 1024.0;
 pub const PARQUET_MAX_ROW_GROUP_SIZE: usize = 128 * 1024;
 pub const PARQUET_FILE_CHUNK_SIZE: usize = 100 * 1024; // 100k, num_rows
 pub const DEFAULT_BLOOM_FILTER_FPP: f64 = 0.01;
-pub const SOURCEMAP_ZIP_MAX_SIZE: usize = 1024 * 1024 * 100; // 100 MB
+// Uncompressed total per upload; the request body cap only bounds compressed bytes.
+pub const SOURCEMAP_ZIP_MAX_SIZE: u64 = 1024 * 1024 * 100; // 100 MB
+pub const SOURCEMAP_ZIP_MAX_ENTRIES: usize = 1000;
 // max file size for individual sourcemap. We temp cache these in mem,
 // so it will affect spikes in mem at resolving stacktrace
 pub const SOURCEMAP_FILE_MAX_SIZE: u64 = 1024 * 1024 * 5; // 5 MB
@@ -208,20 +227,36 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_quick_mode_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -716,6 +751,40 @@ impl FileFormat {
             Some(Self::Vortex)
         } else {
             None
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum VortexCompression {
+    #[default]
+    O2,
+    Native,
+    Compact,
+}
+
+impl std::fmt::Display for VortexCompression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::O2 => write!(f, "o2"),
+            Self::Native => write!(f, "native"),
+            Self::Compact => write!(f, "compact"),
+        }
+    }
+}
+
+impl std::str::FromStr for VortexCompression {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "o2" => Ok(Self::O2),
+            "native" => Ok(Self::Native),
+            "compact" => Ok(Self::Compact),
+            _ => Err(anyhow::anyhow!(
+                "Invalid vortex compression '{s}': expected o2, native or compact"
+            )),
         }
     }
 }
@@ -1528,9 +1597,27 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
-        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
     )]
     pub feature_metrics_fused_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
+    )]
+    pub feature_metrics_streaming_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
+        default = false,
+        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+    )]
+    pub metrics_index_selection_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        default = 256,
+        help = "Maximum memory size in MB of the metrics index selection cache."
+    )]
+    pub metrics_index_selection_cache_max_size: usize,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1564,6 +1651,12 @@ pub struct Search {
         help = "Enable broadcast join"
     )]
     pub feature_broadcast_join_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_SHARED_CTE_ENABLED",
+        default = true,
+        help = "Execute a CTE or subquery that is referenced several times only once on the leader; the result may use half of the query memory pool before it spills to disk"
+    )]
+    pub feature_shared_cte_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_BROADCAST_JOIN_LEFT_SIDE_MAX_ROWS",
         default = 0,
@@ -1700,11 +1793,12 @@ pub struct Common {
     )]
     pub file_format: FileFormatConfig,
     #[env_config(
-        name = "ZO_VORTEX_USE_NATIVE_COMPRESSION",
-        default = false,
-        help = "Use Vortex's built-in compression strategy. By default, OpenObserve's custom UTF8/Zstd compressor is used"
+        name = "ZO_VORTEX_COMPRESSION",
+        parse,
+        default = "o2",
+        help = "Vortex write compression: o2 (OpenObserve's UTF8/Zstd compressor on top of BtrBlocks), native (Vortex's default BtrBlocks strategy) or compact (BtrBlocks with the Pco and Zstd schemes, smaller files at a higher decode cost)"
     )]
-    pub vortex_use_native_compression: bool,
+    pub vortex_compression: VortexCompression,
     #[env_config(name = "ZO_PARQUET_COMPRESSION", default = "zstd")]
     pub parquet_compression: String,
     #[env_config(
@@ -1737,7 +1831,11 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_QUICK_MODE_FIELDS",
+        default = "",
+        help = "Comma-separated extra fields quick mode always returns when the stream has them, on top of the built-in defaults"
+    )]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
@@ -1892,12 +1990,6 @@ pub struct Common {
     pub print_plan_single_line: bool,
     // usage reporting
     #[env_config(
-        name = "ZO_USAGE_REPORTING_ENABLED",
-        default = false,
-        help = "Report usage (metering) and error data. Does NOT cover trigger records: alert and report execution history is published unconditionally, because it is product history rather than telemetry and several features read it."
-    )]
-    pub usage_enabled: bool,
-    #[env_config(
         name = "ZO_USAGE_REPORTING_MODE",
         default = "local",
         help = "possible values - 'local', 'remote', 'both'"
@@ -1905,12 +1997,17 @@ pub struct Common {
     pub usage_reporting_mode: String,
     #[env_config(
         name = "ZO_USAGE_REPORTING_URL",
-        default = "http://localhost:5080/api/_meta/usage/_json"
+        default = "http://localhost:5080/api/_meta/usage/_json",
+        help = "Where remote usage reporting posts. Unused in the open source build, which never reports usage."
     )]
     pub usage_reporting_url: String,
     #[env_config(name = "ZO_USAGE_REPORTING_CREDS", default = "")]
     pub usage_reporting_creds: String,
-    #[env_config(name = "ZO_USAGE_REPORTING_ERRORS_ENABLED", default = true)]
+    #[env_config(
+        name = "ZO_USAGE_REPORTING_ERRORS_ENABLED",
+        default = true,
+        help = "Report error data. Writes the _meta errors stream and fills the last-error panel on the pipelines page. Error text can echo the record that failed."
+    )]
     pub usage_reporting_errors_enabled: bool,
     #[env_config(name = "ZO_USAGE_BATCH_SIZE", default = 2000)]
     pub usage_batch_size: usize,
@@ -2157,6 +2254,12 @@ pub struct Common {
         help = "Enable Live Mode feature in the UI. When true, users can toggle auto-query on filter/time-range changes. When false, the Live Mode toggle is hidden and Run Query button is always shown."
     )]
     pub auto_query_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_PROFILING_ENABLED",
+        default = false,
+        help = "Show the Profiles module in the UI. Early-stage feature, hidden by default; ingestion and APIs stay available regardless"
+    )]
+    pub profiling_enabled: bool,
 }
 
 impl Common {
@@ -2175,6 +2278,9 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
+    pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk
@@ -2241,8 +2347,12 @@ pub struct Limit {
     pub query_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_THREAD_NUM", default = 0)]
     pub file_download_thread_num: usize,
-    #[env_config(name = "ZO_FILE_DOWNLOAD_MIN_RECORDS", default = 100)]
-    pub file_download_min_records: i64,
+    #[env_config(
+        name = "ZO_FILE_DOWNLOAD_SYNC_MAX_SIZE",
+        default = 1,
+        help = "Files up to this size in MB are downloaded into the cache before a search reads them instead of being range-read from object storage, 0 disables"
+    )]
+    pub file_download_sync_max_size: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_THREAD_NUM", default = 0)]
     pub file_download_priority_queue_thread_num: usize,
     #[env_config(name = "ZO_FILE_DOWNLOAD_PRIORITY_QUEUE_WINDOW_SECS", default = 3600)]
@@ -2431,11 +2541,13 @@ pub struct Limit {
     pub scheduler_watch_interval: i64,
     // Per-module scheduler pullers (Part A / A3+A4). When enabled, each TriggerModule gets its
     // own pull loop, cadence, LIMIT budget, channel and worker pool, so a backlog or slow handler
-    // in one module cannot starve another. Default off → single shared puller (legacy behavior).
+    // in one module cannot starve another. Default off → single shared puller (legacy behavior),
+    // with one exception: on-call escalation always gets its own lane, because a paging timer
+    // queued behind an alert backlog does not fire late, it fires after nobody was woken up.
     #[env_config(
         name = "ZO_SCHEDULER_PER_MODULE_PULLERS",
         default = false,
-        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy)."
+        help = "Run a dedicated pull loop + worker pool per scheduler module. When false, a single shared puller handles all modules (legacy) — except on-call escalation, which always gets its own lane when O2_ONCALL_ENABLED is on."
     )]
     pub scheduler_per_module_pullers: bool,
     // Per-module concurrency (LIMIT + channel cap + worker count). 0 = inherit
@@ -2472,6 +2584,12 @@ pub struct Limit {
         help = "Max SLO backfill jobs pulled per cycle and the SLO backfill worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. Defaults to 1 so a bulk historical scan never crowds out latency-sensitive incremental SLI passes."
     )]
     pub scheduler_slo_backfill_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_CONCURRENCY",
+        default = 0,
+        help = "Max on-call escalation jobs pulled per cycle and the escalation worker-pool size. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 falls back to O2_ONCALL_ESCALATION_CONCURRENCY, then to ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_oncall_concurrency: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_CONCURRENCY",
         default = 0,
@@ -2518,6 +2636,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the SLO backfill puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_slo_backfill_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_ONCALL_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the on-call escalation puller. The on-call lane exists whether or not ZO_SCHEDULER_PER_MODULE_PULLERS is set. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_oncall_interval: i64,
     #[env_config(
         name = "ZO_SCHEDULER_ANOMALY_INTERVAL",
         default = 0, // seconds
@@ -2705,7 +2829,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_ENABLED",
         default = false,
-        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
+        help = "Experimental metrics index layout. The ingester writes Parquet metrics files ordered by (__hash__, _timestamp) instead of _timestamp DESC and marks them with a `hash-sorted-v1-` file name prefix; the compactor writes the configured Parquet or Vortex format and merges the pending files of an open hour into size-split `hash-merged-v1-` files and a closed hour into size-split `indexed-v1-` files with a `.midx` metrics index. Only affects newly written metrics files of streams whose __hash__ column is UInt64; SQL queries on metrics streams must not assume a _timestamp order while it is on."
     )]
     pub metrics_index_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds
@@ -3609,6 +3733,7 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     } else {
         cfg.limit.max_file_size_in_memory *= 1024 * 1024;
     }
+    cfg.limit.file_download_sync_max_size *= 1024 * 1024;
 
     // check for metrics limit
     if cfg.limit.metrics_max_points_per_series == 0 {
@@ -4998,6 +5123,23 @@ mod tests {
         assert_eq!("vortex".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert_eq!("VORTEX".parse::<FileFormat>().unwrap(), FileFormat::Vortex);
         assert!("unknown".parse::<FileFormat>().is_err());
+    }
+
+    #[test]
+    fn test_vortex_compression_from_str() {
+        assert_eq!(VortexCompression::default(), VortexCompression::O2);
+        for (text, expected) in [
+            ("o2", VortexCompression::O2),
+            ("Native", VortexCompression::Native),
+            (" compact ", VortexCompression::Compact),
+        ] {
+            assert_eq!(text.parse::<VortexCompression>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<VortexCompression>().unwrap(),
+                expected
+            );
+        }
+        assert!("true".parse::<VortexCompression>().is_err());
     }
 
     #[test]

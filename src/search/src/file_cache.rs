@@ -28,7 +28,7 @@ pub fn calc_target_partitions(cpu_num: usize, query_thread_num: usize, cached_ra
 #[tracing::instrument(name = "service:search:grpc:storage:cache_files", skip_all)]
 pub async fn cache_files(
     trace_id: &str,
-    files: &[(i64, &String, &String, i64, i64, i64)],
+    files: &[(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> (file_data::CacheType, u64, u64) {
@@ -36,7 +36,7 @@ pub async fn cache_files(
     let (mut cache_hits, mut cache_misses) = (0, 0);
 
     let start = std::time::Instant::now();
-    for (_id, _account, file, _size, max_ts, _records) in files.iter() {
+    for (_id, _account, file, _size, max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(file);
@@ -49,7 +49,7 @@ pub async fn cache_files(
             cache_misses += 1;
         }
 
-        let stream_type = if file_type == "index" {
+        let stream_type = if file_type == "index" || file_type == "midx" {
             config::meta::stream::StreamType::Index
         } else if file.contains("/logs/") {
             config::meta::stream::StreamType::Logs
@@ -98,41 +98,42 @@ pub async fn cache_files(
         return (file_data::CacheType::None, cache_hits, cache_misses);
     };
 
-    let trace_id = trace_id.to_string();
-    let files = files
+    let sync_max_size = cfg.limit.file_download_sync_max_size as i64;
+    let (small, large): (Vec<_>, Vec<_>) = files
         .iter()
-        .filter_map(|(id, account, file, size, ts, records)| {
-            if cached_files.contains(file) || !file_downloader::should_download(*records) {
-                None
-            } else {
-                Some((*id, account.to_string(), file.to_string(), *size, *ts))
-            }
+        .filter(|(_, _, file, ..)| !cached_files.contains(file))
+        .map(|(id, account, file, size, ts)| {
+            (*id, account.to_string(), file.to_string(), *size, *ts)
         })
-        .collect::<Vec<_>>();
-    let file_type = file_type.to_string();
-    tokio::spawn(async move {
-        let files_num = files.len();
-        for (id, account, file, size, ts) in files {
-            if let Err(e) = file_downloader::queue_download(
-                trace_id.clone(),
-                id,
-                account,
-                file.clone(),
-                size,
-                ts,
-                cache_type,
-            )
-            .await
-            {
-                log::error!(
-                    "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
-                );
+        .partition(|(.., size, _)| (1..=sync_max_size).contains(size));
+    if !large.is_empty() {
+        let trace_id = trace_id.to_string();
+        let file_type = file_type.to_string();
+        tokio::spawn(async move {
+            let files_num = large.len();
+            for (id, account, file, size, ts) in large {
+                if let Err(e) = file_downloader::queue_download(
+                    trace_id.clone(),
+                    id,
+                    account,
+                    file.clone(),
+                    size,
+                    ts,
+                    cache_type,
+                )
+                .await
+                {
+                    log::error!(
+                        "[trace_id {trace_id}] error in queuing file {file} for background download: {e}"
+                    );
+                }
             }
-        }
-        log::info!(
-            "[trace_id {trace_id}] search->storage: successfully enqueued {files_num} files of {file_type} for background download into {cache_type:?}",
-        );
-    });
+            log::info!(
+                "[trace_id {trace_id}] search->storage: successfully enqueued {files_num} files of {file_type} for background download into {cache_type:?}",
+            );
+        });
+    }
+    download_small_files(trace_id, small, cache_type, scan_stats, file_type).await;
 
     if scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files < files_num / 2
     {
@@ -140,6 +141,32 @@ pub async fn cache_files(
     } else {
         (cache_type, cache_hits, cache_misses)
     }
+}
+
+// one full GET per small file is cheaper than a cold range read, so fetch them before the search
+async fn download_small_files(
+    trace_id: &str,
+    files: Vec<file_downloader::DownloadFile>,
+    cache_type: file_data::CacheType,
+    scan_stats: &mut ScanStats,
+    file_type: &str,
+) {
+    if files.is_empty() {
+        return;
+    }
+    let start = std::time::Instant::now();
+    let total = files.len();
+    let concurrency = get_config().limit.query_thread_num;
+    let cached = file_downloader::download_sync(trace_id, files, cache_type, concurrency).await;
+    if cache_type == file_data::CacheType::Memory {
+        scan_stats.querier_memory_cached_files += cached as i64;
+    } else {
+        scan_stats.querier_disk_cached_files += cached as i64;
+    }
+    log::info!(
+        "[trace_id {trace_id}] search->storage: downloaded {cached} of {total} small files of {file_type} into {cache_type:?} before search, took: {} ms",
+        start.elapsed().as_millis()
+    );
 }
 
 #[cfg(test)]

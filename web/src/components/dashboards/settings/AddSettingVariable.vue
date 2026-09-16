@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mt-4 text-base font-bold">
               {{ t("dashboard.addGeneralSettings") }}
             </div>
-            <div class="mt-3 flex gap-4">
+            <div class="mt-3 flex gap-4 max-md:flex-col max-md:gap-2">
               <div class="flex flex-1 flex-col">
                 <OFormInput
                   name="name"
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    line at the bottom of that select. Bottom-aligning would shove the
                    error-free sibling down to stay flush; top-aligning keeps both
                    inputs aligned and lets the error hang below. -->
-              <div class="flex items-start gap-x-4">
+              <div class="flex items-start gap-x-4 max-md:flex-col max-md:gap-y-2">
                 <OFormSelect
                   name="query_data.stream_type"
                   :label="t('dashboard.selectStreamType')"
@@ -319,13 +319,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="w-6 pt-3.5">{{ index + 1 }}</span>
               <OFormInput
                 :name="`options[${index}].label`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-label`"
                 :placeholder="t('dashboard.addSettingVariable.labelPlaceholder', { n: index + 1 })"
               />
               <OFormInput
                 :name="`options[${index}].value`"
-                class="mr-2 flex-1"
+                class="me-2 flex-1"
                 :data-test="`dashboard-custom-variable-${index}-value`"
                 :placeholder="t('dashboard.addSettingVariable.valuePlaceholder', { n: index + 1 })"
               />
@@ -412,7 +412,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :key="index"
                 class="mt-3 flex-wrap"
               >
-                <div class="mr-2 flex w-1/2">
+                <div class="me-2 flex w-1/2">
                   <OFormInput
                     :name="`customMultiSelectValue[${index}]`"
                     :placeholder="t('dashboard.addSettingVariable.enterValue')"
@@ -460,6 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('dashboard.escapeSingleQuotes')"
               data-test="dashboard-variable-escape-single-quotes"
               size="lg"
+              disabled
             >
               <template #tooltip>
                 <OTooltip max-width="18.75rem">
@@ -592,7 +593,7 @@ export default defineComponent({
       hideOnDashboard: false,
       selectAllValueForMultiSelect: "first",
       customMultiSelectValue: [],
-      escapeSingleQuotes: false,
+      escapeSingleQuotes: true,
     });
     const { t } = useI18nTyped();
 
@@ -885,7 +886,7 @@ export default defineComponent({
         hideOnDashboard: variable.hideOnDashboard ?? false,
         selectAllValueForMultiSelect: variable.selectAllValueForMultiSelect ?? "first",
         customMultiSelectValue: variable.customMultiSelectValue ?? [],
-        escapeSingleQuotes: variable.escapeSingleQuotes ?? false,
+        escapeSingleQuotes: variable.escapeSingleQuotes ?? true,
       };
     };
 

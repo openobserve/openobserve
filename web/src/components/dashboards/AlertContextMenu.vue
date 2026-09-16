@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleMenuItemClick('above')"
         data-test="alert-context-menu-above"
       >
-        <OIcon name="arrow-upward" size="sm" class="mr-2" />
+        <OIcon name="arrow-upward" size="sm" class="me-2" />
         <span class="select-none">{{
           t("dashboard.alertContextMenu.thresholdAbove", { value: formattedValue })
         }}</span>
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="handleMenuItemClick('below')"
         data-test="alert-context-menu-below"
       >
-        <OIcon name="arrow-downward" size="sm" class="mr-2" />
+        <OIcon name="arrow-downward" size="sm" class="me-2" />
         <span class="select-none">{{
           t("dashboard.alertContextMenu.thresholdBelow", { value: formattedValue })
         }}</span>

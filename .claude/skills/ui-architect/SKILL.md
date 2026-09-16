@@ -3,7 +3,7 @@ name: ui-architect
 description: >-
   Authoring guardrails for building ANY new frontend UI in the OpenObserve web
   app (web/) — new views, pages, panels, dialogs, feature components, or edits
-  to existing ones. Enforce six house rules the moment you write Vue/template
+  to existing ones. Enforce seven house rules the moment you write Vue/template
   markup: (1) use OPageHeader for every page/module header, (2) build UI from
   O2 library components in web/src/lib — never bare HTML controls when an O2
   equivalent exists, (3) NEVER write px — always rem, including inside Tailwind class
@@ -29,7 +29,12 @@ description: >-
   is banned) with keys added to web/src/locales/languages/en-US.json; text-carrying
   props/fields are typed I18nText and i18n keys stored as data are typed I18nKey,
   and the ONLY opt-out for a genuinely non-translatable string is raw() — never an
-  eslint-disable. It also settles the recurring
+  eslint-disable, (7) every page is responsive — phones and tablets adapt through
+  max-md:/max-lg: variants and useBreakpoint() while the laptop (≥lg) view stays
+  identical; headers, toolbars and stat strips keep one row, filter toggles collapse
+  to dropdowns (mobile-dropdown), secondary header actions go to #actions-overflow,
+  side panels become drawers that open from their own row, row actions fold into a
+  kebab, and popups fit the viewport. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
   view → service → Vuex/local-ref layering for fetching list data, choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
@@ -38,7 +43,8 @@ description: >-
   v-model/ref mirrors, automatic submit/loading, correct field-array keys).
   Trigger this whenever the user asks to create, add, build, scaffold, lay out,
   validate, or restyle any screen, component, header, table, list, dialog,
-  drawer, form, field, or panel in the web frontend, or asks where a
+  drawer, form, field, or panel in the web frontend, asks to make any of them
+  work on mobile / phone / tablet / small screens (responsive), or asks where a
   form/table/fetch should live, how to validate a form, how to add a keyboard
   shortcut, how to build a new reusable/common O2 component when nothing existing
   fits (create one in web/src/lib instead of assembling divs and classes),
@@ -61,7 +67,7 @@ token system, one spacing scale.
 
 This skill governs **feature/app UI** — views under `web/src/views` and components
 under `web/src/components` — built from the shared **O2 component library** in
-`web/src/lib`. This page is the **contract + map**: the six laws and the
+`web/src/lib`. This page is the **contract + map**: the seven laws and the
 recurring structural decisions, each in a line or two, each pointing to the
 reference that carries the full rationale, examples, and per-component detail.
 Open the linked reference before you implement that specific thing — don't guess a
@@ -69,17 +75,19 @@ prop, a class string, or a path.
 
 ---
 
-## The six house rules
+## The seven house rules
 
 The always-true laws. Each is stated here in brief; the full **what / why / how +
-code** for all six is in [references/house-rules.md](references/house-rules.md) —
+code** for rules 1–6 is in [references/house-rules.md](references/house-rules.md), and
+rule 7 has its own [references/responsive.md](references/responsive.md) —
 read it once, it is the backbone of everything below.
 
 1. **Every page/module header is `OPageHeader`** — never a hand-rolled
    `<div class="header">…<h1>` or a `q-toolbar`. One header contract keeps the
    title in the same place across list → detail → edit. Peer/section tabs need
    **`tabs-below`** (the slot alone renders them inline beside the title), and the
-   header `icon` must be the SAME `IconName` the page's nav entry declares.
+   header `icon` must be the SAME `IconName` the page's nav entry declares. The
+   header's **create CTA is label-only — never `icon-left="add"`**.
 2. **Build from O2 components in `web/src/lib`** — never a bare HTML control
    (`<button>`, `<input>`) or a third-party UI primitive when an `O*` equivalent
    exists. Drive them by **intent**
@@ -512,6 +520,33 @@ read it once, it is the backbone of everything below.
    > Toast/notification copy added by this convention lives under `toastMessages.*`,
    > grouped by module.
 
+7. **Every page is responsive — and the laptop view does not move.** New pages
+   are built for 375 px phones and 768 px tablets from the first commit, using the
+   method in [references/responsive.md](references/responsive.md):
+   - **Desktop is frozen.** Responsive rules are additive below a breakpoint —
+     `max-md:` (phone), `max-lg:` / `md:max-lg:` (tablet) — or a JS branch on
+     `useBreakpoint()`'s `isMobile` / `!lgUp`. An unprefixed class change or a bare
+     `md:`/`lg:` class that alters ≥1024 px is a blocker. JS is only for structure
+     (rail → drawer, toggle strip → dropdown, splitter locked shut).
+   - **One row of chrome.** Header: primaries in `#actions`, secondaries in
+     `#actions-overflow` (inline on desktop, one ⋮ below md; `overflow-first` when
+     they precede the CTA). Toolbar: wrapper `max-md:contents`, filter
+     `OToggleGroup mobile-dropdown`, search `min-w-0 flex-1 max-md:min-w-40`.
+     Stat tiles: `OStatStrip` / `KpiCard` (compact to icon + value below lg).
+   - **Side panels open from their own row.** `OPageLayout #sidebar` and
+     `FolderList` already become drawers; any other rail renders in an
+     `ODrawer` with `anchor` set to its trigger's row. Only the main nav opens from
+     the top.
+   - **Tables keep every column** and scroll within the frame (OTable does it);
+     inline row actions get `max-md:hidden` plus one `md:hidden` kebab mirroring them
+     with `<data-test>-menu` items; the footer count is `max-md:hidden`.
+   - **Nothing clipped, nothing hover-only.** Popups use library components and
+     `min(<w>, calc(100vw - 1.5rem))` widths; an `h-full` pane beside a stacked
+     sibling gets `max-md:h-auto max-md:min-h-0`; hover-revealed controls get
+     `max-md:opacity-100`.
+   - **Verify** at 375 / 360 / 768 / 1280 in the in-app browser, and at 1280 compare
+     against main — identical is the bar.
+
 ## Structural decisions
 
 *What* to reach for and *where the code lives* — the recurring calls that
@@ -527,13 +562,14 @@ and each domain has its own reference below.
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
-| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered` | [page-recipes](references/page-recipes.md) |
+| **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered`, in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
 | **Data fetching** | view → domain service (`src/services`, via the `http.ts` wrapper) → Vuex (shared/cached) or local `ref` (ephemeral); never call `http`/axios from a component | [conventions](references/conventions.md) |
 | **Form container** | confirm → `ConfirmDialog`; short form → `ODialog`; tall or contextual form → `ODrawer`; primary multi-section flow → a full in-page view. Use `ODialog` / `ODrawer` for these | [conventions](references/conventions.md) |
 | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
 | **New page in nav** | a route **+ exactly one** surface (rail item / flyout child / Settings / IAM sub-page) **+** an env/role gate — the route condition, the nav-entry gate, and the SectionRail `visible` all express the same rule | [navigation-menus](references/navigation-menus.md) |
 | **Keyboard shortcuts** | registry-driven — declare in `shortcutRegistry.ts`, bind with `useShortcuts([{ id, handler }])`; never an ad-hoc `keydown` listener or a hardcoded `⌘N` in a template | [keyboard-shortcuts](references/keyboard-shortcuts.md) |
 | **Cancel / Save row** | cancel = `variant="outline"`, save = `variant="primary"`, both `size="sm-action"`, spaced with `gap-2` on the parent | [conventions](references/conventions.md) |
+| **Responsive** | `max-md:`/`max-lg:` variants + `useBreakpoint()` for structure; desktop unchanged; one row of header/toolbar/stat chrome; rails → anchored drawers; row actions → kebab; popups ≤ viewport | [responsive](references/responsive.md) |
 | **Nothing fits** | build a reusable component — generic primitive → a new `O*` in `web/src/lib`; app-specific composition → a named component in `web/src/components`. Never hand-assemble `<div>` + utility classes to fake a component | [creating-components](references/creating-components.md) |
 
 **Dark mode is automatic** — every O2 component and token resolves correctly in
@@ -558,6 +594,39 @@ per-archetype recipes: [references/calm-signal.md](references/calm-signal.md).
 Reference implementation: the Alerts list
 (`web/src/components/alerts/AlertList.vue`).
 
+## Interaction cost — the click budget
+
+Colour decides what a screen *says*; this decides what it *costs*. One rule:
+**the shortest path to the thing the screen exists for is one click, and no
+complete flow exceeds two — three at the absolute limit.**
+
+| Kind of thing | Budget |
+|---|---|
+| An answer the product already knows (a status, a count, a "would this work") | **0** — it is on the screen you already opened, not behind a drill-in |
+| A screen's primary action (acknowledge, resolve, enable, add) | **1** from the list the user is already looking at |
+| A complete flow, start to saved | **2**, hard ceiling **3** |
+
+Four consequences, each of which is a review objection on its own:
+
+1. **A navigation step is a click.** Rail → flyout → page → tab → button is four
+   spent before the user acts. A deep-linkable tab is shareable, not free.
+2. **Act from the row.** If a list can render a thing it can act on it — inline
+   row actions plus a bulk action on selection, not a mandatory drill-in.
+   Reference: the Alerts list, and `OnCallResponses.vue`'s inline
+   acknowledge/resolve.
+3. **Pre-fill from context.** A form opened from a row, a gap, or a failing item
+   arrives with everything that row already knew filled in. The click worth
+   removing is the one where the user re-types what the app is displaying.
+4. **No modal chains.** One `ODialog`/`ODrawer` per flow. A dialog that opens a
+   dialog has spent the budget on chrome. If a form needs a second surface, it
+   needs a better default instead — see below.
+
+**When a flow genuinely cannot fit**, the fix is a **better default, not a
+shorter form**: a preset/template that turns construction into *pick a shape →
+confirm*, a sensible value for every field the user has no opinion about, and a
+preview instead of a wizard step. Do not hit the budget by hiding required
+fields behind "Advanced" — that moves the click, it does not remove it.
+
 ## Pick a component
 
 The **scenario → component** index and the per-file catalog (what each `O*` is,
@@ -574,6 +643,9 @@ Run this in your head before writing template markup, and again before
 considering the UI done:
 
 - [ ] Page/module header is `OPageHeader` (not a hand-built header bar).
+- [ ] The header's **create CTA is label-only** — no `icon-left="add"`. The `+`
+      stays on in-section adders, icon-only buttons, and never applies to
+      utility actions (Import/Refresh/Edit keep their semantic icons).
 - [ ] Peer/section tabs pass **`tabs-below`** so the strip is the full-width
       row-2 band — the bare `#header-tabs`/`#tabs` slot renders them inline
       beside the title, where they shift as the title's width changes.
@@ -630,6 +702,12 @@ considering the UI done:
 - [ ] Form container matches weight: confirm → `ConfirmDialog`, short form →
       `ODialog`, large/contextual form → `ODrawer`, primary multi-section flow →
       full page.
+- [ ] **Click budget holds**: the screen's primary action is **1 click** from the
+      list (inline row action, not a mandatory drill-in), the whole flow is **≤ 2
+      clicks** (3 only with a reason), a form opened from a row arrives
+      **pre-filled from that row**, and no dialog opens another dialog. Count
+      navigation steps as clicks. If it doesn't fit, add a better default or a
+      preset — not an "Advanced" section.
 - [ ] Validated form uses `OForm` + a colocated Zod `<Form>.schema.ts`; every
       control inside is an `OForm*` addressed only by `name=` (no `v-model`/`ref`
       mirror, no `formData`), required via the `required` prop.
@@ -705,9 +783,21 @@ considering the UI done:
 - [ ] `data-test` on every interactive and key output element, pattern
       `<module>-<filename>-<descriptor>` (see the project FE rules).
 - [ ] New component uses `<script setup lang="ts">`, no `// @ts-nocheck`.
-- [ ] **Comments are one or two lines** — the *why* of a non-obvious choice, not
-      a re-telling of the code or the history of the PR that added it (no ticket
-      ids, "review finding", "as discussed"). Same in specs. See
+- [ ] **Responsive, desktop untouched** — every new/changed class that affects
+      layout is `max-md:` / `max-lg:` gated (run the grep in
+      [responsive § The contract](references/responsive.md#the-contract)); the page
+      was checked at 375, 768 and 1280 and 1280 matches main.
+- [ ] **Phone chrome is one row** — secondary header actions in
+      `#actions-overflow`, toolbar filter `OToggleGroup mobile-dropdown`, search with
+      a `max-md:min-w-*` floor, stat tiles via `OStatStrip` / `KpiCard`.
+- [ ] **Rails and row actions adapt** — side rails render in an `ODrawer` anchored
+      to their trigger's row (or come from `OPageLayout #sidebar` / `FolderList`);
+      inline row actions are `max-md:hidden` with a `md:hidden` kebab mirroring them
+      (`<data-test>-menu`); no hover-only affordance without `max-md:opacity-100`.
+- [ ] **Comments are one line, or none** — the *why* of a non-obvious constraint,
+      never layout narration ("< md this wraps"), a re-telling of the code, or the
+      history of the PR that added it (no ticket ids, "review finding", "as
+      discussed"). Same in specs. See
       [conventions § Comments stay short](references/conventions.md).
 - [ ] `cd web && npm run lint && npm run type-check:app` pass. **`type-check:app`,
       not `type-check`** — the latter runs `tsconfig.vitest.json`, whose `include`

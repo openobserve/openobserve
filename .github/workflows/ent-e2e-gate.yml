@@ -10,10 +10,10 @@ name: Playwright E2E Crosscheck
 # Behaviour (A+A+C design):
 #   - PR does NOT touch web/** or tests/ui-testing/**            → pass instantly (never blocks).
 #   - Touches them + `skip-ent-e2e` label                       → pass (explicit, auditable opt-out).
-#   - Touches them + NO `e2e` label                             → FAIL "add the e2e label" (blocks; no silent miss).
-#   - Touches them + `e2e` label:
+#   - Touches them (the e2e label gates the whole job, like every paid workflow):
 #       · open sister ENT PR (same-named branch) → DEFER to that PR's checks (link it, don't build here)
 #       · sister ENT branch only (no PR)          → build the enterprise binary against that branch
+#       · PR base is a release line (not main) with a same-named ENT branch → build against THAT branch
 #       · no ENT counterpart                      → build against ENT main
 #     then POLL and mirror pass/fail.
 #
@@ -30,12 +30,14 @@ name: Playwright E2E Crosscheck
 
 on:
   pull_request:
-    # labeled/unlabeled so adding `e2e`/`skip-ent-e2e` re-fires and re-evaluates the gate.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # Fires once per PR when "Merge when ready" is clicked, then for pushes/labels while auto-merge stays on.
+    types: [auto_merge_enabled, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  # A required check must also report on merge-queue commits; the gate already passed on the PR head.
+  merge_group:
 
 # PR-scoped: a new push/label supersedes the previous gate attempt for the same PR.
 concurrency:
-  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number }}
+  group: playwright-e2e-crosscheck-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -44,6 +46,8 @@ permissions:
 
 jobs:
   playwright-e2e-crosscheck:
+    # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
+    if: ${{ github.event_name == 'merge_group' || ((contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null) }}
     name: Playwright E2E Crosscheck
     runs-on: ubuntu-latest
     # ~5 min to find the ENT run + up to ~75 min to poll. Generous on purpose: normal is ~20 min,
@@ -51,17 +55,20 @@ jobs:
     # the gate ("timed out") while ENT is still legitimately running.
     timeout-minutes: 90
     steps:
-      - name: Triage — relevant paths? which label?
+      - name: Triage — relevant paths? opted out?
         id: triage
         env:
           GH_TOKEN: ${{ github.token }}          # OSS is same-repo/public → default token can read PR files
           PR: ${{ github.event.pull_request.number }}
-          HAS_E2E: ${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}
           HAS_SKIP: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
           DISABLED: ${{ vars.ENT_E2E_GATE_DISABLED }}
           IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
         run: |
           set -euo pipefail
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            echo "::notice::merge queue commit — gate already passed on the PR head."
+            echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           if [ "$DISABLED" = "true" ]; then
             echo "::notice::ENT_E2E_GATE_DISABLED=true — passing without dispatch."
             echo "mode=pass" >> "$GITHUB_OUTPUT"; exit 0
@@ -88,8 +95,6 @@ jobs:
           elif [ "$HAS_SKIP" = "true" ]; then
             echo "::warning::PR carries 'skip-ent-e2e' — enterprise gate explicitly opted out (auditable)."
             echo "mode=skip" >> "$GITHUB_OUTPUT"
-          elif [ "$HAS_E2E" != "true" ]; then
-            echo "mode=need-label" >> "$GITHUB_OUTPUT"
           else
             echo "mode=run" >> "$GITHUB_OUTPUT"
           fi
@@ -98,13 +103,6 @@ jobs:
         if: steps.triage.outputs.mode == 'pass' || steps.triage.outputs.mode == 'skip'
         run: echo "✅ Playwright E2E Crosscheck not required for this PR."
 
-      - name: Block — enterprise-relevant change without the e2e label
-        if: steps.triage.outputs.mode == 'need-label'
-        run: |
-          echo "::error::This PR changes web/** or tests/ui-testing/**, which can break enterprise-only e2e specs."
-          echo "::error::Add the 'e2e' label to run the enterprise gate (or 'skip-ent-e2e' to explicitly opt out)."
-          exit 1
-
       - name: Run — dispatch ENT engine, poll, mirror result
         if: steps.triage.outputs.mode == 'run'
         env:
@@ -112,6 +110,7 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           ENT_REF: ${{ vars.ENT_GATE_REF || 'main' }}
         run: |
           set -euo pipefail
@@ -133,7 +132,7 @@ jobs:
 
           # Sister ENT resolution. An OPEN same-named ENT PR is the live counterpart — let ITS checks
           # own enterprise validation; we DEFER (don't build here), just link. Only a branch (no PR) →
-          # build against that branch. Neither → build against main.
+          # build against that branch. Neither → the PR's base-line ENT branch if it exists, else main.
           SISTER_PR=$(gh pr list --repo "$REPO" --head "$HEAD_REF" --state open --json number -q '.[0].number' 2>/dev/null || echo "")
           if [ -n "$SISTER_PR" ] && [ "$SISTER_PR" != "null" ]; then
           sticky "### ⏭️ Playwright E2E Crosscheck — handled by the sister ENT PR
@@ -144,14 +143,22 @@ jobs:
             exit 0
           fi
 
+          # No sister branch/PR → build against the PR's base line, not blindly main. A PR onto a
+          # release branch (e.g. branch-v1.0.0) must build against the ENT branch of the same name;
+          # ENT main would fail to compile the release-line OSS code. Fall back to main only when
+          # the base is main or has no ENT counterpart.
           if gh api "repos/$REPO/branches/$HEAD_REF" >/dev/null 2>&1; then
             ENT_CODE_REF="$HEAD_REF"
             SISTER_NOTE="Built against the matching ENT branch \`$HEAD_REF\` (no ENT PR yet)."
             echo "::notice::ENT branch '$HEAD_REF' exists (no PR) — building against it."
+          elif [ "$BASE_REF" != "main" ] && [ "$BASE_REF" != "master" ] && gh api "repos/$REPO/branches/$BASE_REF" >/dev/null 2>&1; then
+            ENT_CODE_REF="$BASE_REF"
+            SISTER_NOTE="No same-named ENT branch — built against the PR's base line \`$BASE_REF\` on ENT."
+            echo "::notice::No ENT branch '$HEAD_REF'; PR targets '$BASE_REF' which exists on ENT — building against it."
           else
             ENT_CODE_REF=main
             SISTER_NOTE="No ENT counterpart — built against ENT \`main\`."
-            echo "::notice::No ENT counterpart for '$HEAD_REF' — building against main."
+            echo "::notice::No ENT counterpart for '$HEAD_REF' (base '$BASE_REF') — building against main."
           fi
 
           # Stamp the time BEFORE dispatch so correlation can reject stale prior runs for this PR.

@@ -38,6 +38,19 @@ impl usage_reporting::BatchPublisher for CoreBatchPublisher {
     }
 }
 
+fn collect_additional_reporting_orgs(configured: &str) -> Vec<String> {
+    let mut orgs: Vec<String> = configured
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+    orgs.push(META_ORG_ID.to_string());
+    orgs.sort();
+    orgs.dedup();
+    orgs
+}
+
 async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
     log::debug!(
         "[SELF-REPORTING] thread_{thread_id} ingests {} buffered data",
@@ -78,22 +91,10 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
         super::ingestion::ingest_usages(usages).await;
     }
 
+    let additional_reporting_orgs =
+        collect_additional_reporting_orgs(&cfg.common.additional_reporting_orgs);
+
     if !triggers.is_empty() {
-        let mut additional_reporting_orgs: Vec<String> =
-            if !cfg.common.additional_reporting_orgs.is_empty() {
-                cfg.common
-                    .additional_reporting_orgs
-                    .split(",")
-                    .map(|s| s.to_string())
-                    .collect()
-            } else {
-                Vec::new()
-            };
-        additional_reporting_orgs.push(META_ORG_ID.to_string());
-
-        additional_reporting_orgs.sort();
-        additional_reporting_orgs.dedup();
-
         // Ensure triggers stream exists with complete schema for each org (lazy, once per restart)
         for org in &additional_reporting_orgs {
             if let Err(e) = super::triggers_schema::ensure_triggers_stream_initialized(org).await {
@@ -146,6 +147,10 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
             if let Ok(mut trigger) = json::from_value::<TriggerData>(trigger_json.clone()) {
                 trigger.normalize_legacy_outcome();
                 let org_id = &trigger.org;
+                // The fan-out above already wrote every trigger into these orgs
+                if additional_reporting_orgs.contains(org_id) {
+                    continue;
+                }
                 #[cfg(feature = "cloud")]
                 match organization::is_org_in_free_trial_period(org_id).await {
                     Ok(ongoing) => {
@@ -221,5 +226,38 @@ async fn ingest_buffered_data(thread_id: usize, buffered: Vec<ReportingData>) {
                 );
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_collect_additional_reporting_orgs_always_has_meta() {
+        assert_eq!(
+            collect_additional_reporting_orgs(""),
+            vec![META_ORG_ID.to_string()]
+        );
+    }
+
+    #[test]
+    fn test_collect_additional_reporting_orgs_trims_and_dedups() {
+        assert_eq!(
+            collect_additional_reporting_orgs("default, prod ,,default"),
+            vec![
+                META_ORG_ID.to_string(),
+                "default".to_string(),
+                "prod".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_collect_additional_reporting_orgs_covers_own_org_skip() {
+        let orgs = collect_additional_reporting_orgs("default");
+        assert!(orgs.contains(&"default".to_string()));
+        assert!(orgs.contains(&META_ORG_ID.to_string()));
+        assert!(!orgs.contains(&"other".to_string()));
     }
 }

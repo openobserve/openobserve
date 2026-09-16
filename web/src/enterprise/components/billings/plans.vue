@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ t("billing.billingGroup.viewOrgGroup") }}
         <template #icon-right>
-          <OIcon name="arrow-forward" size="sm" class="ml-1" />
+          <OIcon name="arrow-forward" size="sm" class="ms-1" />
         </template>
       </OButton>
     </div>
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           store.state.selectedOrganization.hasOwnProperty('note') &&
           store.state.selectedOrganization.note
         "
-        class="text-status-error-text flex items-center justify-start gap-2 pb-4 pl-6 text-xl font-semibold"
+        class="text-status-error-text flex items-center justify-start gap-2 ps-6 pb-4 text-xl font-semibold"
       >
         <OIcon name="warning" size="sm" class="pt-2" />
         >{{ store.state.selectedOrganization.note }}
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="loading" class="text-center text-xl font-medium font-semibold">
         <OSpinner size="md" class="mx-auto mt-3 block text-center" />
       </div>
-      <div v-else class="mt-3 grid grid-cols-2 gap-3">
+      <div v-else class="mt-3 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
         <ProPlan
           :planType="planType"
           :billingProvider="billingProvider"

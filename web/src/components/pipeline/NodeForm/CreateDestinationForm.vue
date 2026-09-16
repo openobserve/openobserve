@@ -342,13 +342,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OCardSection role="body">
                 <div class="mb-2 flex items-center">
-                  <OIcon name="info" size="md" class="mr-2" />
+                  <OIcon name="info" size="md" class="me-2" />
                   <div class="text-sm font-medium">
                     {{ connectionNotes.title }}
                   </div>
                 </div>
                 <div class="text-sm">
-                  <ol class="mb-0 pl-3 leading-[1.8]">
+                  <ol class="mb-0 ps-3 leading-[1.8]">
                     <li
                       v-for="(stepText, index) in connectionNotes.steps"
                       :key="index"
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="rounded-default text-compact bg-surface-base mt-2 p-2"
                   >
                     <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
-                    <code class="text-text-link ml-1 bg-transparent p-0 font-mono">{{
+                    <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
                       connectionNotes.example
                     }}</code>
                   </div>

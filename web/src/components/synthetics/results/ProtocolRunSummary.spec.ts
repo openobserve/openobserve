@@ -53,6 +53,7 @@ vi.mock("vue-i18n", () => ({
 
 vi.mock("vue-router", () => ({
   useRoute: vi.fn(() => ({ query: {} })),
+  useRouter: vi.fn(() => ({ currentRoute: { value: { fullPath: "/" } } })),
 }));
 
 // ── Stubs for O2 and layout components ──────────────────────────────────────

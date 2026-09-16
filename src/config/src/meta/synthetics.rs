@@ -111,7 +111,8 @@ pub struct Synthetic {
     pub id: String,
     #[serde(default)]
     pub org_id: String,
-    /// KSUID of the folder this synthetic belongs to (`folders.id`).
+    /// Folder this synthetic belongs to, as the public folder slug the API
+    /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
     #[serde(default)]
     pub folder_id: String,
     /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.

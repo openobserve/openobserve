@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, type Ref } from "vue";
+import { ref, getCurrentScope, onScopeDispose, type Ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
 import store from "@/stores";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -91,6 +91,12 @@ const useFieldValuesStream = (t: TranslateFn) => {
       traceIdMapper.value[fieldName] = [];
     }
   };
+
+  const cancelAllFieldStreams = () => {
+    Object.keys(traceIdMapper.value).forEach((fieldName) => cancelFieldStream(fieldName));
+  };
+
+  if (getCurrentScope()) onScopeDispose(cancelAllFieldStreams);
 
   /** Reset field state; pass isLoading=true when a new fetch is about to start. */
   const resetFieldValues = (fieldName: string, isLoading = false) => {
@@ -251,6 +257,7 @@ const useFieldValuesStream = (t: TranslateFn) => {
     fieldValuesCurrentSize,
     fetchFieldValues,
     cancelFieldStream,
+    cancelAllFieldStreams,
     resetFieldValues,
   };
 };

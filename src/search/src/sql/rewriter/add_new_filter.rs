@@ -89,29 +89,31 @@ impl VisitorMut for AddNewFiltersWithAndOperatorVisitor {
             return ControlFlow::Break(());
         };
         match query.body.as_mut() {
-            SetExpr::Select(statement) => match statement.selection.as_mut() {
-                None => {
-                    statement.selection = Some(filter_exprs);
-                }
-                Some(selection) => {
-                    statement.selection = Some(Expr::BinaryOp {
-                        left: if matches!(
+            SetExpr::Select(statement) => {
+                // move the existing predicate instead of cloning it, the tree may be deep
+                statement.selection = Some(match statement.selection.take() {
+                    None => filter_exprs,
+                    Some(selection) => {
+                        let left = if matches!(
                             selection,
                             Expr::BinaryOp {
                                 op: BinaryOperator::Or,
                                 ..
                             }
                         ) {
-                            Box::new(Expr::Nested(Box::new(selection.clone())))
+                            Expr::Nested(Box::new(selection))
                         } else {
-                            Box::new(selection.clone())
-                        },
-                        op: BinaryOperator::And,
-                        // the right side must be AND so don't need to check
-                        right: Box::new(filter_exprs),
-                    });
-                }
-            },
+                            selection
+                        };
+                        Expr::BinaryOp {
+                            left: Box::new(left),
+                            op: BinaryOperator::And,
+                            // the right side must be AND so don't need to check
+                            right: Box::new(filter_exprs),
+                        }
+                    }
+                });
+            }
             _ => {
                 return ControlFlow::Break(());
             }

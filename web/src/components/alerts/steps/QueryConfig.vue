@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
         <div
-          class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
         />
         <span
           class="section-header-title text-compact text-text-heading font-semibold tracking-[0.01em]"
@@ -887,7 +887,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <!-- Review your SQL query hint -->
                       <span
                         v-if="generatedSqlQuery && !showFilters"
-                        class="ml-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
+                        class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
                         :class="'text-text-secondary'"
                       >
                         {{ t("alerts.queryConfig.viewAlertQuery") }}
@@ -911,14 +911,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="frequencyMode === 'cron' && cronDescription && !cronError"
-                    class="text-2xs ml-0 italic"
+                    class="text-2xs ms-0 italic"
                     :class="'text-text-secondary'"
                   >
                     {{ cronDescription }}
                   </div>
                   <div
                     v-if="frequencyMode === 'cron' && cronError"
-                    class="text-status-error-text text-2xs ml-0"
+                    class="text-status-error-text text-2xs ms-0"
                   >
                     {{ cronError }}
                   </div>
@@ -979,7 +979,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Review your SQL query hint -->
                   <span
                     v-if="generatedSqlQuery && !showFilters"
-                    class="ml-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
+                    class="ms-1 cursor-help text-xs whitespace-nowrap italic underline decoration-dotted underline-offset-2"
                     :class="'text-text-secondary'"
                   >
                     {{ t("alerts.queryConfig.viewAlertQuery") }}
@@ -1060,7 +1060,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         (localTab === 'sql' ? !localSqlQuery : !localPromqlQuery) &&
                         queryEditorPlaceholderFlag
                       "
-                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
+                      class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                     >
                       <span class="query-editor-placeholder-typewriter">{{
                         inlineEditorPlaceholder
@@ -1103,7 +1103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                 <!-- VRL pane — with its own header, side-by-side with SQL pane -->
                 <div
-                  class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-l"
+                  class="border-border-default flex w-1/2 shrink-0 flex-col overflow-hidden border-s"
                   v-if="showVrl && localTab === 'sql'"
                 >
                   <div
@@ -1164,7 +1164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       />
                       <div
                         v-if="!vrlFunctionContent && vrlEditorPlaceholderFlag"
-                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start pt-0.75 pr-2 pl-[2.15rem] select-none"
+                        class="query-editor-placeholder-overlay pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 select-none"
                       >
                         <span class="query-editor-placeholder-typewriter">{{
                           vrlPlaceholder

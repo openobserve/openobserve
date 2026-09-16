@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('billing.downloadInvoice')"
         variant="ghost"
         size="icon-sm"
-        class="ml-1"
+        class="ms-1"
       >
         <OIcon name="download" size="sm" />
       </OButton>

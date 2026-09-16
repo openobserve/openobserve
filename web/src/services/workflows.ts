@@ -111,6 +111,7 @@ const workflows = {
     inputs,
     from_node,
     draft = false,
+    suppress_destinations = true,
   }: {
     org_identifier: string;
     workflow: any;
@@ -119,9 +120,11 @@ const workflows = {
     // `draft=true` when dry-running a draft / unsaved graph, so the backend skips
     // the strict published-workflow validation for the test run.
     draft?: boolean;
+    // Defaults to true so a caller that forgets the flag cannot page on-call.
+    suppress_destinations?: boolean;
   }) => {
     const url = `/api/${org_identifier}/workflows/test${draft ? "?draft=true" : ""}`;
-    return http().post(url, { workflow, inputs, from_node });
+    return http().post(url, { workflow, inputs, from_node, suppress_destinations });
   },
 
   // Run history for a workflow. `start_time`/`end_time` are Unix microseconds;

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::borrow::Cow;
+
 use serde_json::value::{Map, Value};
 
 const KEY_SEPARATOR: &str = "_";
@@ -189,9 +191,22 @@ pub fn format_key(key: &mut String) {
 }
 
 pub fn format_label_name(label_name: &str) -> String {
-    let mut key = label_name.to_string();
-    format_key(&mut key);
-    key
+    format_label_name_owned(label_name.to_string())
+}
+
+/// `format_label_name` for an owned name, so a name needing no rewrite costs no allocation.
+pub fn format_label_name_owned(mut label_name: String) -> String {
+    format_key(&mut label_name);
+    label_name
+}
+
+/// `format_label_name` that borrows a name needing no rewrite instead of copying it.
+pub fn format_label_name_cow(label_name: &str) -> Cow<'_, str> {
+    if check_key(label_name) {
+        Cow::Borrowed(label_name)
+    } else {
+        Cow::Owned(format_label_name(label_name))
+    }
 }
 
 fn check_key(key: &str) -> bool {

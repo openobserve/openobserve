@@ -30,7 +30,15 @@ use config::{
 use datafusion::{arrow::datatypes::Schema, error::DataFusionError, prelude::SessionContext};
 use hashbrown::HashSet;
 use infra::errors::Result;
-use promql::{DEFAULT_LOOKBACK, TableProvider, exec::PromqlContext, promql::name_visitor};
+use promql::{
+    DEFAULT_LOOKBACK, TableProvider,
+    ast::{
+        name_visitor,
+        selector_window::{SelectorWindow, selector_window},
+    },
+    exec::PromqlContext,
+    micros,
+};
 use promql_parser::{label::Matchers, parser};
 use proto::cluster_rpc;
 use rayon::slice::ParallelSliceMut;
@@ -40,6 +48,14 @@ mod storage;
 mod wal;
 
 type Context = (SessionContext, Arc<Schema>, ScanStats, bool);
+
+/// What a range query's groups are planned from.
+struct GroupPlan {
+    /// The heaviest stream's files, oldest `max_ts` first.
+    files: Vec<FileKey>,
+    /// What the query reads beyond its evaluation range.
+    window: SelectorWindow,
+}
 
 struct StorageProvider {
     trace_id: String,
@@ -104,14 +120,10 @@ impl TableProvider for StorageProvider {
             .is_err()
         {
             log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
-            return Err(DataFusionError::Plan(
-                infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(
-                    format!(
-                        "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
-                    ),
-                ))
-                .to_string(),
-            ));
+            return Err(infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
+            ))
+            .into());
         }
         Ok(Some(abort_receiver))
     }
@@ -137,7 +149,7 @@ pub async fn search(
     } else {
         // 1. get max records stream
         let start_ts = std::time::Instant::now();
-        let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+        let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -153,8 +165,21 @@ pub async fn search(
 
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
+        let wal_floor = wal_floor();
+        // no cut without streaming, and none around a subquery, whose inner expression is per-group
+        let cut = if cfg.search.feature_metrics_streaming_agg_enabled
+            && !query.query_exemplars
+            && !req.is_super_cluster
+            && !plan.window.subquery
+        {
+            wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
+        } else {
+            None
+        };
         let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-        let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
+        let group = match generate_search_groups(memory_limit, plan.files, start, end, step, cut)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -164,7 +189,9 @@ pub async fn search(
             }
         };
         if group.len() > 1 {
-            log::info!("[trace_id {trace_id}] promql->search->grpc: get groups {group:?}");
+            log::info!(
+                "[trace_id {trace_id}] promql->search->grpc: get groups {group:?}, wal cut {cut:?}"
+            );
         }
         log::info!(
             "[trace_id {trace_id}] promql->search->grpc: generate search group, took: {} ms",
@@ -174,8 +201,7 @@ pub async fn search(
         // 3. search each group
         for (start, end) in group {
             let mut req = req.clone();
-            req.need_wal =
-                end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+            req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
@@ -261,7 +287,7 @@ pub async fn data(
         return Ok(());
     }
     // 1. get max records stream
-    let file_list = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
+    let plan = match get_max_file_list(&trace_id, org_id, &query.query, start, end).await {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -278,7 +304,7 @@ pub async fn data(
     // 2. generate search group with max records stream
     let start_ts = std::time::Instant::now();
     let memory_limit = cfg.memory_cache.datafusion_max_size; // bytes
-    let group = match generate_search_group(memory_limit, file_list, start, end, step).await {
+    let group = match generate_search_group(memory_limit, plan.files, start, end, step).await {
         Ok(v) => v,
         Err(e) => {
             log::error!(
@@ -296,10 +322,10 @@ pub async fn data(
     );
 
     // 3. search each group
+    let wal_floor = wal_floor();
     for (start, end) in group {
         let mut req = req.clone();
-        req.need_wal =
-            end >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req).await?;
@@ -399,12 +425,14 @@ async fn get_max_file_list(
     query: &str,
     start: i64,
     end: i64,
-) -> Result<Vec<FileKey>> {
+) -> Result<GroupPlan> {
     // 1. get metrics name
     let ast = parser::parse(query).map_err(DataFusionError::Execution)?;
     let mut visitor = name_visitor::MetricNameVisitor::default();
-    promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+    promql_parser::util::walk_expr(&mut visitor, &ast)
+        .map_err(|e| DataFusionError::Execution(e.to_string()))?;
     let metrics_name = visitor.into_names();
+    let window = selector_window(&ast);
 
     // 2. get max records stream
     let mut file_list = Vec::new();
@@ -427,7 +455,52 @@ async fn get_max_file_list(
         }
     }
     file_list.par_sort_unstable_by(|a, b| a.meta.max_ts.cmp(&b.meta.max_ts));
-    Ok(file_list)
+    Ok(GroupPlan {
+        files: file_list,
+        window,
+    })
+}
+
+/// The time from which a group must also read the WAL.
+fn wal_floor() -> i64 {
+    let retention = config::get_config().limit.max_file_retention_time as i64;
+    now_micros() - second_micros(retention * 3)
+}
+
+/// The grid-aligned cut before the WAL floor, `None` when the range does not straddle it.
+fn wal_cut(start: i64, end: i64, step: i64, ahead: i64, wal_floor: i64) -> Option<i64> {
+    // a group ending before the cut still reads `ahead` past its end, which must stay off the WAL
+    let cut = wal_floor - ahead;
+    if cut <= start || cut > end {
+        return None;
+    }
+    // groups evaluate on the query's own grid
+    let cut = start + (cut - start + step - 1) / step * step;
+    // a lone point evaluates as an instant vector the leader cannot merge: both pieces keep two
+    (cut >= start + 2 * step && cut + step <= end).then_some(cut)
+}
+
+/// Sizes the groups by memory on each side of the cut, so no group straddles it.
+async fn generate_search_groups(
+    memory_limit: usize,
+    files: Vec<FileKey>,
+    start: i64,
+    end: i64,
+    step: i64,
+    cut: Option<i64>,
+) -> Result<Vec<(i64, i64)>> {
+    let Some(cut) = cut else {
+        return generate_search_group(memory_limit, files, start, end, step).await;
+    };
+    let head = files
+        .iter()
+        .filter(|f| f.meta.min_ts <= cut - step)
+        .cloned()
+        .collect();
+    let tail = files.into_iter().filter(|f| f.meta.max_ts >= cut).collect();
+    let mut groups = generate_search_group(memory_limit, head, start, cut - step, step).await?;
+    groups.extend(generate_search_group(memory_limit, tail, cut, end, step).await?);
+    Ok(groups)
 }
 
 /// generate search group
@@ -635,5 +708,67 @@ mod tests {
         let expected = vec![(0, 200), (210, 300), (310, 430)];
         assert!(resp.is_ok());
         assert_eq!(resp.unwrap(), expected);
+    }
+
+    fn file(min_ts: i64, max_ts: i64, records: i64) -> FileKey {
+        FileKey {
+            meta: FileMeta {
+                records,
+                min_ts,
+                max_ts,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_wal_cut_lands_on_the_query_grid() {
+        // the floor rounds up to the query's own grid
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2000), Some(2010));
+        assert_eq!(wal_cut(5, 3000, 30, 0, 2000), Some(2015));
+        // a floor outside (start, end] leaves one group
+        assert_eq!(wal_cut(1400, 3000, 30, 0, 1000), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 4000), None);
+        // both pieces keep at least two points
+        assert_eq!(wal_cut(0, 2010, 30, 0, 2000), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2970), Some(2970));
+        assert_eq!(wal_cut(0, 3000, 30, 0, 2980), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 30), None);
+        assert_eq!(wal_cut(0, 3000, 30, 0, 31), Some(60));
+        // a negative offset reads past the group end, so the cut moves that far earlier
+        assert_eq!(wal_cut(0, 3000, 30, 100, 2000), Some(1920));
+    }
+
+    #[tokio::test]
+    async fn test_generate_search_groups_never_straddle_the_cut() {
+        let files = vec![
+            file(0, 100, 100),
+            file(100, 200, 100),
+            file(200, 300, 100),
+            file(300, 400, 100),
+            file(400, 430, 30),
+        ];
+        // no cut: the memory sizing alone
+        assert_eq!(
+            generate_search_groups(100, files.clone(), 0, 430, 5, None)
+                .await
+                .unwrap(),
+            vec![(0, 200), (205, 300), (305, 400), (405, 430)]
+        );
+        // each side is sized on its own and the tail starts exactly at the cut
+        assert_eq!(
+            generate_search_groups(100, files.clone(), 0, 430, 5, Some(300))
+                .await
+                .unwrap(),
+            vec![(0, 200), (205, 295), (300, 400), (405, 430)]
+        );
+        // the tail may be a two-point group of its own
+        assert_eq!(
+            generate_search_groups(100_000, files, 0, 430, 10, Some(420))
+                .await
+                .unwrap(),
+            vec![(0, 410), (420, 430)]
+        );
     }
 }

@@ -60,6 +60,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         tabindex="0"
         data-test="destination-picker-select"
       />
+      <!-- The dropdown shows each endpoint but drops it on selection, leaving no way
+           to confirm where the step posts without reopening the list. -->
+      <div
+        v-if="selectedDestination"
+        data-test="destination-picker-details"
+        class="border-border-default rounded-default mt-2 flex flex-col gap-1 border px-3 py-2"
+      >
+        <div class="flex flex-wrap items-baseline gap-2">
+          <OBadge variant="default-soft" size="sm">{{ selectedMethod }}</OBadge>
+          <span class="text-text-body font-mono text-xs break-all">{{
+            selectedDestination.url
+          }}</span>
+        </div>
+        <div v-if="selectedHeaderNames.length" class="flex gap-2 text-xs">
+          <span class="text-text-secondary shrink-0">{{ t("workflow.results.headersLabel") }}</span>
+          <span class="text-text-body break-words">{{ selectedHeaderNames.join(", ") }}</span>
+        </div>
+      </div>
     </OForm>
   </div>
 </template>
@@ -69,6 +87,7 @@ import { computed, onBeforeMount, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -140,6 +159,21 @@ watch(createNewDestination, async (v) => {
     pendingSelection.value = "";
   }
 });
+
+// form.useStore, not form.state: the latter is a snapshot, so the pane would stay
+// pinned to whatever was selected when it first rendered.
+const selectedName = form.useStore((s: any) => s.values.selectedDestination as string);
+const selectedDestination = computed<any | null>(() => {
+  const name = selectedName.value || props.initialName || "";
+  if (!name) return null;
+  return destinations.value.find((d: any) => d.name === name && d.url) || null;
+});
+const selectedMethod = computed(() =>
+  String(selectedDestination.value?.method || "POST").toUpperCase(),
+);
+// Header VALUES are withheld: this pane gets screenshotted into tickets and an
+// Authorization token should not travel with it.
+const selectedHeaderNames = computed(() => Object.keys(selectedDestination.value?.headers || {}));
 
 const toOption = (d: any) => ({
   label: d.name,

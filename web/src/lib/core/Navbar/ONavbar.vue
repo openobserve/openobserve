@@ -22,7 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :aria-label="t('components.navbar.mainNavigation')"
     data-test="navbar-main-nav"
     data-o2-navbar
-    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] shrink-0 flex-col overflow-y-auto pb-1"
+    class="left-drawer o2-navbar-scroll bg-surface-chrome-deeper flex min-h-0 w-[5.5rem] flex-col overflow-y-auto pb-1 max-md:w-full"
+    :class="overlay ? 'fixed inset-y-0 left-0 z-40 shadow-lg' : 'shrink-0'"
     @keydown="handleKeydown"
   >
     <!-- Three rail-entry shapes (see navGroups.ts):
@@ -91,6 +92,7 @@ import { useRouter } from "vue-router";
 import type { NavbarProps, NavbarEmits, NavbarSlots, RailEntry } from "./ONavbar.types";
 import { RailIndicatorActiveKey } from "./ONavbar.types";
 import { groupNavLinks } from "./navGroups";
+import { isGateOpen, useNavGateContext } from "./useNavGateContext";
 import MenuLink from "@/components/MenuLink.vue";
 import ONavGroup from "./ONavGroup.vue";
 
@@ -99,6 +101,7 @@ defineOptions({ inheritAttrs: false });
 const props = withDefaults(defineProps<NavbarProps>(), {
   miniMode: false,
   visible: true,
+  overlay: false,
 });
 
 const emit = defineEmits<NavbarEmits>();
@@ -110,8 +113,13 @@ const { t } = useI18nTyped();
 // Reshape the flat link list into rail entries: daily-use links stay top-level,
 // config / occasional items fold into flyout groups. Split out pinned-bottom
 // groups so the template can float them to the foot of the rail. `t` is passed
-// so group tile labels are localized (and re-resolve on language change).
-const railEntries = computed<RailEntry[]>(() => groupNavLinks(props.linksList, t));
+// so group tile labels are localized (and re-resolve on language change), and
+// the gate evaluator so a group whose children a feature flag removes does not
+// collapse into a flyout with nothing worth flying out.
+const gateContext = useNavGateContext();
+const railEntries = computed<RailEntry[]>(() =>
+  groupNavLinks(props.linksList, t, (gate) => isGateOpen(gateContext.value, gate)),
+);
 const topEntries = computed(() =>
   railEntries.value.filter((e) => !(e.type === "group" && e.pinBottom)),
 );
@@ -206,7 +214,7 @@ onBeforeUnmount(() => {
 // tinted selected pill + lighter accent in dark, where a white pill would vanish
 // on the near-black rail.
 const indicatorClass = computed(() => [
-  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-l-2",
+  "pointer-events-none absolute left-0 top-0 z-0 rounded-surface border-s-2",
   "bg-surface-base border-accent dark:bg-tabs-active-bg dark:border-accent",
   transitionOn.value &&
     "transition-[transform,width,height] duration-300 ease-out motion-reduce:transition-none",

@@ -6,6 +6,17 @@
 
 import { raw, type TranslateFn } from "@/types/i18n";
 
+// Escape user-controlled strings before embedding in HTML (XSS prevention) —
+// mirrors alertSummaryGenerator.ts's esc(), so both generators emit HTML that
+// is already safe rather than leaving escaping to whoever calls v-html.
+const esc = (s: string) =>
+  String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export function generateAnomalySummary(
   config: any,
   destinations: any[],
@@ -18,7 +29,8 @@ export function generateAnomalySummary(
 
   // The markup stays here rather than in en-US.json: translators get whole
   // sentences with {placeholders} and never have to preserve a tag.
-  const chip = (value: string | number) => `<span class="summary-clickable">${value}</span>`;
+  const chip = (value: string | number) =>
+    `<span class="summary-clickable">${esc(String(value))}</span>`;
 
   // Step 1+: Stream & query info
   if (wizardStep >= 1) {
@@ -71,17 +83,30 @@ export function generateAnomalySummary(
         : t("alerts.anomaly.summaryRetrainEveryDays", { days: config.retrain_interval_days });
     parts.push(t("alerts.anomaly.summaryRetrain", { retrain: chip(retrain) }));
 
-    // A cleared field reaches here as "", and 100 - "" is 100 — "flag everything".
-    // Number("") and Number(null) are both 0, so blanks need excluding first.
-    const stored = config.threshold;
-    const percentile =
-      stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
-    if (Number.isFinite(percentile)) {
-      parts.push(
-        t("alerts.anomaly.summaryThreshold", {
-          threshold: chip(t("alerts.anomaly.summaryThresholdRate", { rate: 100 - percentile })),
-        }),
-      );
+    const budget = Number(config.alert_budget_per_day);
+    if (Number.isFinite(budget) && budget > 0) {
+      // Budget mode: the enforced cap IS the sensitivity statement.
+      const round = (n: number) => Math.round(n * 1e6) / 1e6;
+      const label =
+        budget < 1
+          ? t("alerts.anomaly.summaryBudgetPerWeek", { count: round(budget * 7) })
+          : t("alerts.anomaly.summaryBudgetPerDay", { count: round(budget) });
+      parts.push(t("alerts.anomaly.summaryThreshold", { threshold: chip(label) }));
+    } else {
+      // A cleared field reaches here as "", and Number("")/Number(null) are
+      // both 0, so blanks need excluding before any number is shown.
+      const stored = config.threshold;
+      const percentile =
+        stored === null || stored === undefined || stored === "" ? NaN : Number(stored);
+      if (Number.isFinite(percentile)) {
+        // The stored percentile indexes TRAINING scores; never restate it as
+        // a live anomaly rate — that arithmetic was measured false.
+        parts.push(
+          t("alerts.anomaly.summaryThreshold", {
+            threshold: chip(t("alerts.anomaly.summaryThresholdPercentile", { percentile })),
+          }),
+        );
+      }
     }
   }
 
@@ -130,14 +155,14 @@ export function generateAnomalySummary(
 function generatePlainEnglish(config: any, wizardStep: number, t: TranslateFn): string {
   if (!config.stream_name) return "";
 
-  const stream = config.stream_name;
-  const fn = config.detection_function || "count";
-  const schedule = `${config.schedule_interval_value}${config.schedule_interval_unit}`;
+  const stream = esc(config.stream_name);
+  const fn = esc(config.detection_function || "count");
+  const schedule = esc(`${config.schedule_interval_value}${config.schedule_interval_unit}`);
   const trainingDays = config.training_window_days || 14;
 
   if (wizardStep < 2) {
     return t("alerts.anomaly.summaryConfiguring", {
-      streamType: config.stream_type || "logs",
+      streamType: esc(config.stream_type || "logs"),
       stream,
     });
   }

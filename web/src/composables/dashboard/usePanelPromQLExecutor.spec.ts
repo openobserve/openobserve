@@ -489,3 +489,85 @@ describe("streaming PromQL errors reach the user as sentences", () => {
     expect(detail.code).toBe(404);
   });
 });
+
+describe("a superseded run cannot write over the newer one (#14350)", () => {
+  // A superseded run's stream is never cancelled, so its handlers must go quiet once its controller is aborted.
+  const supersededRun = async () => {
+    const { ctx, state, fetchQueryDataWithHttpStream, removeTraceId } = makeCtx();
+    const abortController = new AbortController();
+    let handlers: any;
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_payload: any, h: any) => {
+      handlers = h;
+    });
+
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(0, 300_000_000, abortController);
+
+    // The newer run has rendered by now; this one is history.
+    state.data = [{ result: [{ metric: { environment: "development" }, values: [[1, "1"]] }] }];
+    state.loading = false;
+    abortController.abort();
+
+    return { state, handlers, removeTraceId };
+  };
+
+  it("drops a late promql_response instead of overwriting the rendered results", async () => {
+    const { state, handlers } = await supersededRun();
+    const rendered = state.data;
+
+    handlers.data({}, { type: "promql_response", content: { results: { result: [] } } });
+
+    expect(state.data).toBe(rendered);
+  });
+
+  it("drops a late progress frame instead of re-flagging partial data", async () => {
+    const { state, handlers } = await supersededRun();
+
+    handlers.data({}, { type: "event_progress", content: { percent: 40 } });
+
+    expect(state.loadingProgressPercentage).toBe(0);
+    expect(state.isPartialData).toBe(false);
+  });
+
+  it("drops a late completion but still releases the trace id", async () => {
+    const { state, handlers, removeTraceId } = await supersededRun();
+    const rendered = state.data;
+
+    handlers.complete({}, {});
+
+    expect(state.data).toBe(rendered);
+    expect(removeTraceId).toHaveBeenCalledWith("mock-trace-id");
+  });
+
+  it("drops a late error instead of showing it over the newer results", async () => {
+    const { state, handlers, removeTraceId } = await supersededRun();
+
+    handlers.error({}, { content: { message: "query failed", code: 400 } });
+
+    expect(state.errorDetail.message).toBe("");
+    expect(removeTraceId).toHaveBeenCalledWith("mock-trace-id");
+  });
+
+  it("still lets the run that owns the controller write its results", async () => {
+    const { ctx, state, fetchQueryDataWithHttpStream } = makeCtx();
+    const abortController = new AbortController();
+    let handlers: any;
+    (fetchQueryDataWithHttpStream as any).mockImplementation((_payload: any, h: any) => {
+      handlers = h;
+    });
+
+    const { executePromQL } = usePanelPromQLExecutor(ctx as any);
+    await executePromQL(0, 300_000_000, abortController);
+
+    handlers.data({}, { type: "event_progress", content: { percent: 40 } });
+    handlers.data(
+      {},
+      { type: "promql_response", content: { results: { result: [{ metric: {}, values: [] }] } } },
+    );
+    handlers.complete({}, {});
+
+    expect(state.loadingProgressPercentage).toBe(40);
+    expect(state.data[0].result).toHaveLength(1);
+    expect(state.loading).toBe(false);
+  });
+});

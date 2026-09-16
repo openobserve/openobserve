@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alerts.header')"
@@ -31,34 +32,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <OButton
+          data-test="alert-destination-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          :disabled="!templates.length"
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton
+        >
+      </template>
+      <template #actions-overflow>
+        <OButton
           variant="outline"
           size="sm"
           @click="importDestination"
           data-test="destination-import"
           >{{ t(`dashboard.import`) }}</OButton
         >
-        <OButton
-          data-test="alert-destination-list-add-alert-btn"
-          variant="primary"
-          size="sm"
-          icon-left="add"
-          :disabled="!templates.length"
-          @click="editDestination(null)"
-          >{{ t(`alert_destinations.add`) }}</OButton
-        >
       </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
+          ref="oTableRef"
           data-test="alert-destinations-list-table"
           :data="visibleRows"
           :columns="columns"
           row-key="name"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedDestinationIds"
           selection="multiple"
           pagination="client"
           :page-size="20"
           :page-size-options="[5, 10, 20, 50, 100]"
+          :current-page="currentPage"
           :footer-title="t('alert_destinations.header')"
           sorting="client"
           :default-columns="false"
@@ -68,10 +74,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           show-index
           :show-global-filter="false"
           @update:selected-ids="handleSelectedIdsUpdate"
+          @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="
                   (v) => {
@@ -96,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filterQuery"
                 data-test="destination-list-search-input"
-                class="flex-1"
+                class="flex-1 max-lg:min-w-0 max-md:min-w-40"
                 :placeholder="t('alert_destinations.search')"
               />
             </div>
@@ -119,7 +127,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal">
+            <span class="text-xs font-normal max-md:hidden">
               {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
             </span>
             <OButton
@@ -219,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
@@ -229,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
@@ -239,12 +249,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-destination-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="download"
+                  class="md:hidden"
+                  data-test="destination-export-menu"
+                  @select="exportDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.exportDestination") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                  @select="editDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                  @select="conformDeleteDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
 
@@ -303,7 +351,7 @@ import destinationService from "@/services/alert_destination";
 import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
@@ -320,6 +368,8 @@ import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -347,6 +397,8 @@ export default defineComponent({
     ImportDestination,
     OButton,
     OTooltip,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTag,
     OTable,
@@ -453,9 +505,19 @@ export default defineComponent({
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
+    const route = useRoute();
     const filterQuery = ref("");
     const resultTotal = ref(0);
     const deletingDestinations = ref(new Set<string>());
+    const oTableRef: any = ref(null);
+
+    // URL-synced so returning from add/edit/import (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const selectedDestinationIds = computed(() =>
       selectedDestinations.value.map((d: any) => d.name),
@@ -517,6 +579,18 @@ export default defineComponent({
     };
 
     const loading = ref(false);
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
     const getDestinations = () => {
       const dismiss = toast({
         variant: "loading",
@@ -524,6 +598,7 @@ export default defineComponent({
         timeout: 0,
       });
       loading.value = true;
+      forbidden.value = false;
       destinationService
         .list({
           page_num: 1,
@@ -547,7 +622,8 @@ export default defineComponent({
           updateRoute();
         })
         .catch((err) => {
-          if (err.response.status != 403) {
+          forbidden.value = err?.response?.status === 403;
+          if (!forbidden.value) {
             toast({
               variant: "error",
               message: t("toastMessages.alerts.errorWhilePullingDestinations"),
@@ -586,9 +662,11 @@ export default defineComponent({
       toggleDestinationEditor();
       resetEditingDestination();
       if (!destination) {
+        const { name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             action: "add",
             org_identifier: store.state.selectedOrganization.identifier,
           },
@@ -598,6 +676,7 @@ export default defineComponent({
         router.push({
           name: "alertDestinations",
           query: {
+            ...router.currentRoute.value.query,
             action: "update",
             name: destination.name,
             org_identifier: store.state.selectedOrganization.identifier,
@@ -648,13 +727,16 @@ export default defineComponent({
     };
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
-      if (!showDestinationEditor.value)
+      if (!showDestinationEditor.value) {
+        const { action: _action, name: _name, ...restQuery } = router.currentRoute.value.query;
         router.push({
           name: "alertDestinations",
           query: {
+            ...restQuery,
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      }
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -691,9 +773,11 @@ export default defineComponent({
     };
     const importDestination = () => {
       showImportDestination.value = true;
+      const { name: _name, ...restQuery } = router.currentRoute.value.query;
       router.push({
         name: "alertDestinations",
         query: {
+          ...restQuery,
           action: "import",
           org_identifier: store.state.selectedOrganization.identifier,
         },
@@ -879,6 +963,7 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      forbidden,
       conformDeleteDestination,
       filterQuery,
       filterData,
@@ -913,6 +998,9 @@ export default defineComponent({
       getPrebuiltTypeName,
       getCustomDestinationLabel,
       isDefaultPrebuiltTemplate,
+      oTableRef,
+      currentPage,
+      onPageChange,
     };
   },
 });

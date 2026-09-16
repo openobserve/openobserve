@@ -77,13 +77,15 @@ export const STATUS_REASON = {
 } as const;
 
 /**
- * Why an `error` record exists. `dispatch` — the probe was never invoked, and
- * the control plane wrote the record. `probe` — the probe ran and crashed.
- * Two structurally different records used to arrive under one status,
- * distinguishable only by sniffing which fields happened to be present.
+ * Why an `error` record exists. `dispatch` — the probe was never invoked and the
+ * control plane wrote the record; `quota` — the scheduler skipped the run because
+ * the org's step budget was exhausted; `queue` — the job was acked without ever
+ * running; `probe` — the probe ran and crashed.
  */
 export const ERROR_SOURCE = {
   dispatch: "dispatch",
+  quota: "quota",
+  queue: "queue",
   probe: "probe",
 } as const;
 
@@ -1687,7 +1689,13 @@ function runExecutionWhere(
   if (has("run_id")) clauses.push(`run_id = '${rid}'`);
   const execMatch: string[] = [];
   if (has(F.executionId)) execMatch.push(`${F.executionId} = '${eid}'`);
-  if (has("job_id")) execMatch.push(`job_id = '${eid}'`);
+  if (has("job_id")) {
+    // Guard the job_id fallback to rows lacking their own execution_id, else a passed row sharing a job_id (AlreadySettled) resolves over the error since consumers read rows[0] and the engine ignores a CASE in ORDER BY.
+    const guard = has(F.executionId)
+      ? ` AND (${F.executionId} = '' OR ${F.executionId} IS NULL)`
+      : "";
+    execMatch.push(`(job_id = '${eid}'${guard})`);
+  }
   if (execMatch.length > 0) clauses.push(`(${execMatch.join(" OR ")})`);
   return clauses.map((c) => ` AND ${c}`).join("");
 }

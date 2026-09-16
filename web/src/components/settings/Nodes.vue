@@ -27,10 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:model-value="(v: number) => (splitterModel = v)"
       :limits="[0, 250]"
       unit="px"
+      :horizontal="isMobile"
       class="min-h-0 flex-1 overflow-hidden"
     >
       <template #before>
-        <div class="border-r4 border-border-default flex h-full flex-col border-r">
+        <div
+          class="border-r4 border-border-default flex h-full flex-col border-e max-md:overflow-y-auto max-md:border-e-0 max-md:border-b"
+        >
           <div class="sticky top-0 shrink-0 px-2">
             <div class="flex items-center justify-between p-2 text-lg">
               <span class="flex items-center gap-1">
@@ -179,7 +182,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:selected-ids="handleSelectedStatusIdsUpdate"
                   >
                     <template #cell-name="{ row }">
-                      <span :class="statusIndicatorClass(row.name)" class="mr-1 self-stretch"></span
+                      <span :class="statusIndicatorClass(row.name)" class="me-1 self-stretch"></span
                       >{{ row.name }}
                     </template>
                   </OTable>
@@ -193,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.cpuusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       data-test="nodes-filter-cpuusage-min"
                       type="number"
@@ -222,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxCPUUsage"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -235,7 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :label="t('nodes.memoryusage')"
               >
                 <div class="px-1 pb-2">
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       data-test="nodes-filter-memoryusage-min"
                       type="number"
@@ -264,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxMemoryUsage"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -282,7 +285,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="establishedToggle"
                     :label="t('nodes.establishedLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!establishedToggle"
                       data-test="nodes-filter-established-min"
@@ -314,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxEstablished"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -323,7 +326,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="closewaitToggle"
                     :label="t('nodes.closewaitLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!closewaitToggle"
                       data-test="nodes-filter-closewait-min"
@@ -355,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxClosewait"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
 
                   <OCheckbox
@@ -364,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-model="waittimeToggle"
                     :label="t('nodes.waittimeLabel')"
                   />
-                  <div class="ml-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pr-2">
+                  <div class="ms-1 grid grid-cols-[1fr_auto_1fr] items-center gap-1 pe-2">
                     <OInput
                       :disable="!waittimeToggle"
                       data-test="nodes-filter-waittime-min"
@@ -396,7 +399,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     "
                     :min="0"
                     :max="maxWaittime"
-                    class="mt-3 ml-3 w-[85%]"
+                    class="ms-3 mt-3 w-[85%]"
                   />
                 </div>
               </OCollapsible>
@@ -501,7 +504,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template v-if="store.state.zoConfig.super_cluster_enabled" #cell-region="{ row }">
-              <OTag type="fieldTag" class="badge-region mr-1"
+              <OTag type="fieldTag" class="badge-region me-1"
                 >{{ row.region }}
                 <OTooltip :content="t('nodes.region')" />
               </OTag>
@@ -551,7 +554,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, ref, computed } from "vue";
+import { defineComponent, reactive, ref, computed, watch } from "vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -620,6 +624,14 @@ export default defineComponent({
     const originalData: any = ref([]);
     const loading = ref(false);
     const splitterModel = ref(250);
+    const { isMobile } = useBreakpoint();
+    watch(
+      isMobile,
+      (mobile) => {
+        splitterModel.value = mobile ? 180 : 250;
+      },
+      { immediate: true },
+    );
     const filterQuery = ref("");
 
     const filterOTableColumns: OTableColumnDef[] = [
@@ -1048,14 +1060,14 @@ export default defineComponent({
     // directly and the token is reached through its registered utility.
     // An unknown status yields no rail, exactly as an unmatched selector did.
     const statusIndicatorClass = (name: unknown): string => {
-      const base = "border-l-[0.3125rem]! border-solid";
+      const base = "border-s-[0.3125rem]! border-solid";
       switch (String(name ?? "").toLowerCase()) {
         case "online":
-          return `${base} border-l-status-positive!`;
+          return `${base} border-s-status-positive!`;
         case "offline":
-          return `${base} border-l-status-negative!`;
+          return `${base} border-s-status-negative!`;
         case "prepare":
-          return `${base} border-l-status-warning-text!`;
+          return `${base} border-s-status-warning-text!`;
         default:
           return "";
       }
@@ -1227,6 +1239,7 @@ export default defineComponent({
       onStatSelect,
       summaryStats,
       splitterModel,
+      isMobile,
       getData,
       resultTotal,
       cpuUsage,

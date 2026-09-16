@@ -29,6 +29,10 @@
         <OSpinner size="md" />
       </div>
 
+      <div v-else-if="forbidden" class="flex flex-1 items-center justify-center">
+        <OEmptyState size="hero" preset="no-access" data-test="llm-providers-forbidden" />
+      </div>
+
       <div v-else-if="!providers.length" class="flex flex-1 items-center justify-center">
         <!-- First-run state — uses the same `no-llm-providers` preset the
              OTable's #empty slot uses for the filtered case, so the empty
@@ -51,6 +55,7 @@
           :columns="columns"
           row-key="id"
           :loading="isLoading"
+          :forbidden="forbidden"
           :footer-title="t('llmProviders.title')"
           :global-filter="searchQuery"
           :show-global-filter="false"
@@ -103,7 +108,7 @@
           </template>
 
           <template #cell-endpoint="{ row }">
-            <span class="font-mono text-xs">{{ row.endpoint || endpointFallback(row) }}</span>
+            <span class="font-mono text-xs">{{ resolvedEndpointOf(row) || "—" }}</span>
           </template>
 
           <template #cell-defaultModel="{ row }">
@@ -117,6 +122,7 @@
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.edit')"
                 icon-left="edit"
                 @click.stop="openEdit(row)"
@@ -126,10 +132,40 @@
                 data-row-action="delete"
                 variant="ghost-destructive"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('onlineEvals.actions.delete')"
                 icon-left="delete"
                 @click.stop="confirmDelete(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="llm-providers-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-edit-btn-menu`"
+                  @select="openEdit(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`llm-providers-${row.name}-delete-btn-menu`"
+                  @select="confirmDelete(row)"
+                >
+                  <span>{{ t("onlineEvals.actions.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -152,6 +188,8 @@ import { useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -162,6 +200,7 @@ import onlineEvalsService, { type Provider } from "@/services/online-evals.servi
 import {
   defaultModelOf,
   providerTypeOf,
+  resolvedEndpointOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import { showError } from "@/enterprise/components/onlineEvals/utils/evalFormat";
 import ProviderFormPage from "@/enterprise/components/onlineEvals/forms/ProviderFormPage.vue";
@@ -179,6 +218,7 @@ const router = useRouter();
 
 const providers = ref<Provider[]>([]);
 const isLoading = ref(false);
+const forbidden = ref(false);
 const searchQuery = ref("");
 const formPage = ref<{ mode: "create" | "edit"; row: Provider | null } | null>(null);
 
@@ -212,7 +252,7 @@ const columns = computed(() => [
   {
     id: "endpoint",
     header: t("llmProviders.columns.endpoint"),
-    accessorFn: (row: Provider) => row.endpoint || endpointFallback(row),
+    accessorFn: (row: Provider) => resolvedEndpointOf(row),
     sortable: false,
     resizable: true,
     hideable: true,
@@ -244,7 +284,7 @@ const filteredProviders = computed(() => {
   const filtered = !query
     ? providers.value
     : providers.value.filter((p) =>
-        [p.name, providerTypeOf(p), p.endpoint]
+        [p.name, providerTypeOf(p), resolvedEndpointOf(p)]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(query)),
       );
@@ -264,24 +304,16 @@ watch(
 async function loadProviders() {
   if (!orgId.value) return;
   isLoading.value = true;
+  forbidden.value = false;
   try {
     providers.value = await onlineEvalsService.providers.list(orgId.value);
   } catch (err: any) {
-    showError(err, t("llmProviders.loadError"));
+    forbidden.value = err?.response?.status === 403;
+    // The grouped access toast already reports a 403; a second red toast adds nothing.
+    if (!forbidden.value) showError(err, t("llmProviders.loadError"));
   } finally {
     isLoading.value = false;
   }
-}
-
-const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "api.openai.com",
-  deepseek: "api.deepseek.com",
-  anthropic: "api.anthropic.com",
-};
-
-function endpointFallback(provider: Provider) {
-  const type = providerTypeOf(provider).toLowerCase();
-  return DEFAULT_ENDPOINTS[type] ?? "—";
 }
 
 function pushRouteAction(extra: Record<string, string | undefined>) {

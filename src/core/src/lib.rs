@@ -49,6 +49,7 @@ pub mod org_cleanup;
 pub mod org_usage;
 pub mod organization;
 pub mod pipeline;
+pub mod profiles;
 #[cfg(feature = "enterprise")]
 pub mod providers;
 #[cfg(feature = "enterprise")]

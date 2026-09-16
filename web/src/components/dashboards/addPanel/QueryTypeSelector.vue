@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <div class="flex gap-3">
+    <div class="flex gap-3 max-md:flex-wrap max-md:gap-1">
       <!-- Query Type: SQL / PromQL -->
       <OToggleGroup
         v-if="showQueryType"
@@ -130,6 +130,7 @@ export default defineComponent({
       if (dashboardPanelData.data.type == "custom_chart") {
         // For custom_chart, check the actual query type and customQuery flag
         selectedButtonType.value = "custom";
+        await nextTick();
         ignoreSelectedButtonTypeUpdate.value = false;
         return;
       }

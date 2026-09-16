@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="alert-settings-refresh-destinations-btn"
-      class="ml-1"
+      class="ms-1"
       variant="ghost"
       size="icon-circle-sm"
       :title="t('alerts.alertSettings.refreshDestinations')"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2"
       @click="emit('create-workflow')"
     >
       {{ t("workflow.create") }}

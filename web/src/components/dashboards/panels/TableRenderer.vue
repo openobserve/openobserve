@@ -110,16 +110,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState,
-           so mirror the chart panels' "No Data" treatment here. -->
+      <!-- PanelSchemaRenderer excludes `table` panels from its own OEmptyState, so
+           mirror the chart panels' "No Data" treatment here. Forwarded like #bottom
+           so a parent can reword it — a triage table reports empty as "All clear". -->
       <template #empty>
-        <OEmptyState
-          size="inline"
-          icon="bar-chart"
-          :title="t('panel.noData')"
-          :backdrop="false"
-          data-test="no-data"
-        />
+        <slot name="empty">
+          <OEmptyState
+            size="inline"
+            icon="bar-chart"
+            :title="t('panel.noData')"
+            :backdrop="false"
+            data-test="no-data"
+          />
+        </slot>
       </template>
 
       <!-- Pagination footer: forward parent's #bottom slot or show default pagination controls -->
@@ -131,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                shows the row count alone, so it drops the bar chrome. -->
           <div
             class="flex w-full items-center"
-            :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pr-2'"
+            :class="showPagination ? 'border-border-default min-h-10 border-t px-3 py-1' : 'pe-2'"
             data-test="dashboard-table-pagination"
           >
             <div class="flex-1" />
@@ -709,6 +712,13 @@ export default defineComponent({
 
 .table-wrapper :deep(th:hover .pivot-sort-icon) {
   opacity: 0.4;
+}
+
+/* Touch has no th:hover — keep the sort affordance faintly visible. */
+@media (max-width: 47.99rem) {
+  .table-wrapper :deep(.pivot-sort-icon) {
+    opacity: 0.4;
+  }
 }
 
 .table-wrapper :deep(.pivot-sort-active) {

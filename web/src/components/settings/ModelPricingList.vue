@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main List View -->
     <OPageLayout
+      overflow-first
       v-if="!showImportModelPricingPage"
       icon="paid"
       :subtitle="t('settings.modelPricingList.subtitle')"
@@ -36,12 +37,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-sm" class="-ml-1" data-test="model-pricing-info-btn">
+        <OButton variant="ghost" size="icon-sm" class="-ms-1" data-test="model-pricing-info-btn">
           <OIcon name="info-outline" size="sm" />
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
       </template>
-      <template #actions>
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"
@@ -67,6 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("modelPricing.importBtn") }}
         </OButton>
+      </template>
+      <template #actions>
         <OButton
           variant="primary"
           size="sm"
@@ -87,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :columns="columns"
           row-key="id"
           :loading="loading"
+          :forbidden="forbidden"
           :selected-ids="selectedIds"
           selection="multiple"
           pagination="client"
@@ -108,10 +112,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
+                  mobile-dropdown
                   :tabs="tabOptions"
                   v-model:active-tab="selectedTab"
                   @update:active-tab="onTabChange"
@@ -119,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSearchInput
                 v-model="filterQuery"
-                class="ml-auto w-64"
+                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
@@ -152,7 +157,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative z-2 flex min-h-6 flex-nowrap items-center">
               <span
                 v-if="getSource(row) === 'built_in'"
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip
@@ -166,12 +171,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getSource(row) === 'meta_org' ||
                   (getSource(row) === 'org' && row.org_id !== orgIdentifier)
                 "
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
               </span>
-              <span v-else class="mr-1 inline-flex shrink-0 cursor-default">
+              <span v-else class="me-1 inline-flex shrink-0 cursor-default">
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
@@ -233,12 +238,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <thead>
                             <tr>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-4 pb-1 pl-0 text-left font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
                               >
                                 {{ t("modelPricing.usageType") }}
                               </th>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-0 pb-1 pl-0 text-right font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
                               >
                                 {{ t("modelPricing.colPricingSimple") }}
                               </th>
@@ -251,8 +256,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )"
                               :key="key"
                             >
-                              <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                              <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                              <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                              <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                 {{ formatPerMillion(price) }}
                               </td>
                             </tr>
@@ -305,8 +310,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 v-for="[key, price] in sortedPriceEntries(tier.prices || {})"
                                 :key="key"
                               >
-                                <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                                <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                                <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                                <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                   {{ formatPerMillion(price) }}
                                 </td>
                               </tr>
@@ -327,6 +332,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="
                     row.enabled ? t('modelPricing.actionDisable') : t('modelPricing.actionEnable')
                   "
@@ -338,6 +344,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionEdit')"
                   @click.stop="openEditor(row)"
                   data-test="model-pricing-edit-btn"
@@ -347,6 +354,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDelete')"
                   @click.stop="confirmDelete(row)"
                   data-test="model-pricing-delete-btn"
@@ -356,12 +364,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OButton
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   :title="t('modelPricing.actionDuplicate')"
                   @click.stop="duplicateModel(row)"
                   data-test="model-pricing-duplicate-btn"
                   data-row-action="duplicate"
                   icon-left="content-copy"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="model-pricing-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    :variant="row.enabled ? 'destructive' : 'default'"
+                    class="md:hidden"
+                    data-test="model-pricing-toggle-btn-menu"
+                    @select="toggleEnabled(row, !row.enabled)"
+                  >
+                    <span>{{
+                      row.enabled ? t("modelPricing.actionDisable") : t("modelPricing.actionEnable")
+                    }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    data-test="model-pricing-edit-btn-menu"
+                    @select="openEditor(row)"
+                  >
+                    <span>{{ t("modelPricing.actionEdit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="model-pricing-delete-btn-menu"
+                    @select="confirmDelete(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDelete") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="model-pricing-duplicate-btn-menu"
+                    @select="duplicateModel(row)"
+                  >
+                    <span>{{ t("modelPricing.actionDuplicate") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
               <template v-else>
                 <OButton
@@ -389,7 +446,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom>
             <div class="flex h-12 w-full items-center gap-x-2">
-              <div class="flex w-25 items-center text-xs font-normal">
+              <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ t("modelPricing.modelsCount", { count: resultTotal }) }}
               </div>
               <OButton
@@ -501,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="tier.utc_windows?.length" class="mt-2">
                     <div class="text-2xs mb-1.5 opacity-55">
                       {{ t("modelPricing.timeWindows") }}
-                      <span class="ml-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
+                      <span class="ms-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
                     </div>
                     <div
                       v-if="tierWindowsLocal(tier)"
@@ -588,6 +645,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import TestModelMatchDialog from "@/components/settings/TestModelMatchDialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -613,6 +672,7 @@ const router = useRouter();
 const qTableRef = ref<any>(null);
 const models = ref<any[]>([]);
 const loading = ref(true);
+const forbidden = ref(false);
 const refreshing = ref(false);
 
 const showPricingDialog = ref(false);
@@ -873,10 +933,12 @@ function notifyError(prefix: string, e: any) {
 
 async function fetchModels() {
   loading.value = true;
+  forbidden.value = false;
   try {
     const res = await modelPricingService.list(orgIdentifier.value);
     models.value = res.data || [];
   } catch (e: any) {
+    forbidden.value = e?.response?.status === 403;
     notifyError(t("modelPricing.errLoadModels"), e);
   } finally {
     loading.value = false;

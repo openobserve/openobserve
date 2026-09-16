@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          class="border-border-default relative flex min-h-0 min-w-0 flex-1 items-end gap-0.75 border-b border-l"
+          class="border-border-default relative flex min-h-0 min-w-0 flex-1 items-end gap-0.75 border-s border-b"
         >
           <!-- gridlines (top + mid) to echo the dashboard chart grid -->
           <div class="border-border-default absolute inset-x-0 top-0 border-t opacity-60" />

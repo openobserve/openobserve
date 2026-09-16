@@ -15,25 +15,11 @@
 
 use std::time::Duration;
 
-use config::{
-    meta::promql::value::{EvalContext, Sample, Value},
-    utils::sort::sort_float,
-};
-use datafusion::error::Result;
+use config::{meta::promql::value::Sample, utils::sort::sort_float};
 
 use crate::functions::RangeFunc;
 
-pub(crate) fn min_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, MinOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct MinOverTimeFunc;
-
-impl MinOverTimeFunc {
-    pub fn new() -> Self {
-        MinOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for MinOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -41,10 +27,7 @@ impl RangeFunc for MinOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
-        Some(samples.iter().map(|s| s.value).min_by(sort_float).unwrap())
+        samples.iter().map(|s| s.value).min_by(sort_float)
     }
 }
 
@@ -52,9 +35,14 @@ impl RangeFunc for MinOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn min_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, MinOverTimeFunc, eval_ctx)
+    }
     // Test helper
     fn min_over_time_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -75,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_min_over_time_exec_empty_samples_returns_none() {
-        let func = MinOverTimeFunc::new();
+        let func = MinOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

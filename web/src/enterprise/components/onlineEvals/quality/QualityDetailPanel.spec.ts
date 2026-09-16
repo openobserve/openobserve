@@ -33,7 +33,6 @@ function mountPanel(scope: "all" | "span" | "trace" | "session" = "all") {
       booleanTrendSeries: [],
       categoricalRows: [],
       scope,
-      scopeCounts: { span: 1200, trace: 50, session: 5 },
       runs: [],
       runsCounts: { all: 0, unhealthy: null },
       runsFilter: "all",
@@ -56,13 +55,13 @@ function mountPanel(scope: "all" | "span" | "trace" | "session" = "all") {
 }
 
 describe("QualityDetailPanel", () => {
-  it("shows all scope counts and emits a diagnostic scope change", async () => {
+  it("shows every scope option and emits a diagnostic scope change", async () => {
     const wrapper = mountPanel();
 
-    expect(wrapper.find('[data-test="quality-detail-scope-all"]').text()).toBe("All1.3k");
-    expect(wrapper.find('[data-test="quality-detail-scope-span"]').text()).toBe("Span1.2k");
-    expect(wrapper.find('[data-test="quality-detail-scope-trace"]').text()).toBe("Trace50");
-    expect(wrapper.find('[data-test="quality-detail-scope-session"]').text()).toBe("Session5");
+    expect(wrapper.find('[data-test="quality-detail-scope-all"]').text()).toBe("All");
+    expect(wrapper.find('[data-test="quality-detail-scope-span"]').text()).toBe("Span");
+    expect(wrapper.find('[data-test="quality-detail-scope-trace"]').text()).toBe("Trace");
+    expect(wrapper.find('[data-test="quality-detail-scope-session"]').text()).toBe("Session");
 
     await wrapper.find('[data-test="quality-detail-scope-trace"]').trigger("click");
 

@@ -78,17 +78,17 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <div
-        v-if="loading"
-        class="border-border-default text-text-secondary rounded-default m-page-edge border p-4 text-center"
-        data-test="ai-experiment-compare-loading"
-      >
-        {{ t("aiObservability.experiments.comparePage.loading") }}
-      </div>
+      <!-- The panel now tolerates `comparison === null` (empty stats, empty
+           table) so it can mount immediately and show ITS OWN `loading`
+           skeleton on the real table — no separate placeholder needed for
+           the first load. -->
       <ExperimentComparisonPanel
-        v-else-if="comparison"
+        v-if="comparison || loading"
         :comparison="comparison"
+        :outcome-dimensions="outcomeDimensions"
+        :loading="loading"
         @apply-threshold="applyThreshold"
+        @select-outcome-dimensions="applyOutcomeDimensions"
         @inspect="inspectRow"
       />
       <div
@@ -122,6 +122,7 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -143,6 +144,7 @@ import { aiExperimentCompareRoute, aiExperimentsRoute } from "./experimentRoutes
 defineOptions({ name: "AIExperimentComparePage" });
 
 const { t } = useI18nTyped();
+
 const store = useStore();
 const route = useRoute();
 const router = useRouter();
@@ -153,6 +155,9 @@ const candidateId = computed(() => String(route.params.candidateId ?? ""));
 
 const comparison = ref<ExperimentComparison | null>(null);
 const loading = ref(false);
+const comparisonThreshold = ref<number>();
+const outcomeDimensions = ref<string[]>();
+let comparisonRequest = 0;
 const rowDrawerOpen = ref(false);
 const selectedRow = ref<ExperimentComparisonRow | null>(null);
 /** The filtered order the panel is showing, so paging follows what's on screen. */
@@ -162,9 +167,12 @@ const candidateRow = ref<ExperimentRowDetail | null>(null);
 const experiments = ref<LlmExperiment[]>([]);
 const optionsLoading = ref(false);
 
+// Real browser back when there's history to pop — returns to the Experiment
+// Detail page the compare was launched from, not just the bare list.
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
 
 /** The dataset both sides are pinned to — the server refuses to compare across datasets. */
@@ -244,21 +252,32 @@ function swapSides() {
   comparePair(candidateId.value, baselineId.value);
 }
 
-async function loadComparison(threshold?: number) {
+async function loadComparison(
+  threshold = comparisonThreshold.value,
+  dimensions = outcomeDimensions.value,
+) {
+  const request = ++comparisonRequest;
   if (!orgId.value || !baselineId.value || !candidateId.value) {
     comparison.value = null;
+    loading.value = false;
     return;
   }
   loading.value = true;
+  outcomeDimensions.value = dimensions;
   try {
-    comparison.value = await llmExperimentsService.compare(
+    const result = await llmExperimentsService.compare(
       orgId.value,
       baselineId.value,
       candidateId.value,
       threshold,
+      dimensions,
     );
+    if (request !== comparisonRequest) return;
+    comparison.value = result;
+    comparisonThreshold.value = result.threshold;
   } catch (error: any) {
-    comparison.value = null;
+    if (request !== comparisonRequest) return;
+    outcomeDimensions.value = comparison.value?.outcomeDimensions;
     toast({
       variant: "error",
       message:
@@ -266,12 +285,16 @@ async function loadComparison(threshold?: number) {
         t("aiObservability.experiments.comparePage.loadError"),
     });
   } finally {
-    loading.value = false;
+    if (request === comparisonRequest) loading.value = false;
   }
 }
 
 function applyThreshold(threshold: number) {
   void loadComparison(threshold);
+}
+
+function applyOutcomeDimensions(dimensions: string[]) {
+  void loadComparison(comparisonThreshold.value, dimensions);
 }
 
 const rowIndex = computed(() =>
@@ -313,5 +336,14 @@ async function inspectRow(row: ExperimentComparisonRow, siblings?: ExperimentCom
 }
 
 watch(orgId, () => void loadExperiments(), { immediate: true });
-watch([orgId, baselineId, candidateId], () => loadComparison(), { immediate: true });
+watch(
+  [orgId, baselineId, candidateId],
+  () => {
+    comparison.value = null;
+    outcomeDimensions.value = undefined;
+    rowDrawerOpen.value = false;
+    void loadComparison();
+  },
+  { immediate: true },
+);
 </script>

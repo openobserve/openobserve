@@ -363,6 +363,78 @@ describe("extractContent", () => {
   it("returns empty string for unrecognised object shapes", () => {
     expect(extractContent({ random: "field" })).toBe("");
   });
+
+  // OTel GenAI semconv v5 part types (issue #14127) — a "thinking then call
+  // a tool" turn must survive instead of vanishing entirely.
+  it("renders a reasoning part", () => {
+    expect(extractContent([{ type: "reasoning", content: "let me check" }])).toBe("let me check");
+  });
+
+  it("renders a tool_call part instead of dropping the turn", () => {
+    const result = extractContent([
+      { type: "reasoning", content: "checking the weather" },
+      { type: "tool_call", name: "get_weather", arguments: { city: "Boston" } },
+    ]);
+    expect(result).toContain("checking the weather");
+    expect(result).toContain("get_weather");
+  });
+
+  it("renders a tool_call_response part", () => {
+    expect(extractContent([{ type: "tool_call_response", response: "rainy, 57F" }])).toBe(
+      "rainy, 57F",
+    );
+  });
+
+  // blob/file/uri stay suppressed — they have first-class rendering
+  // elsewhere and would just dump binary/reference JSON into the chat.
+  it("still drops blob/file/uri parts", () => {
+    expect(extractContent([{ type: "blob", modality: "image", content: "aGVsbG8=" }])).toBe("");
+  });
+
+  // A part type the spec hasn't been taught about yet must not make the
+  // whole turn disappear — show a generic marker instead of "".
+  it("renders a generic marker for an unrecognised future part type", () => {
+    expect(extractContent([{ type: "some_new_part_type", data: 1 }])).toBe("[some_new_part_type]");
+  });
+
+  // The same marker applies to a *recognised* type with nothing to render
+  // (empty content) — not just genuinely unrecognised ones.
+  it("renders a generic marker for a recognised type that yields no text", () => {
+    expect(extractContent([{ type: "text" }])).toBe("[text]");
+  });
+
+  // Real-world SDK field-name aliases (verified against actual instrumentation
+  // source, not the spec doc) — same coverage as genAiParts.spec.ts, exercised
+  // through the Thread tab's actual entry point so a regression is caught here too.
+  it("renders a `thinking`-typed part", () => {
+    expect(extractContent([{ type: "thinking", content: "let me check" }])).toBe("let me check");
+  });
+
+  it("renders a tool_call_response part via its `result` field", () => {
+    expect(extractContent([{ type: "tool_call_response", result: "rainy, 57F" }])).toBe(
+      "rainy, 57F",
+    );
+  });
+
+  // The exact shape ingested by repro_14127.py's turn 3 (issue-14127-repro/):
+  // a real tool-calling turn, end to end through extractContent.
+  it("renders a full tool-calling turn (thinking + tool_call)", () => {
+    const result = extractContent([
+      { type: "thinking", content: "I should call get_weather for Boston." },
+      { type: "tool_call", id: "call_1", name: "get_weather", arguments: { city: "Boston" } },
+    ]);
+    expect(result).toContain("I should call get_weather for Boston.");
+    expect(result).toContain("Called get_weather");
+    expect(result).toContain("Boston");
+  });
+
+  it("renders the tool response side of that turn (tool_call_response with `result`)", () => {
+    expect(
+      extractContent([
+        { type: "tool_call_response", id: "call_1", name: "get_weather", result: "rainy, 57F" },
+      ]),
+    ).toBe("rainy, 57F");
+  });
 });
 
 // ===========================================================================

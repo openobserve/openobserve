@@ -71,7 +71,7 @@ export default {
 
 <template>
   <div
-    class="np-sidebar bg-surface-panel border-border-default flex h-full w-44 shrink-0 flex-col border-r"
+    class="np-sidebar bg-surface-panel border-border-default flex h-full w-44 shrink-0 flex-col border-e"
     :data-test="testPrefix"
   >
     <div class="np-body min-h-0 flex-1 overflow-y-auto px-1.5 py-2">
@@ -105,7 +105,7 @@ export default {
               </template>
             </OTooltip>
             <div
-              class="node-content grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 py-1 pr-1.5"
+              class="node-content grid w-full grid-cols-[auto_1fr_auto] items-center gap-2 py-1 pe-1.5"
             >
               <div class="node-icon-section flex items-center gap-2">
                 <img
