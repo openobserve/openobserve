@@ -256,8 +256,13 @@ export const withCompositeGroupLabel = (query: string, groupBy: string[]): strin
     out.slice(groupByEnd);
 
   // The severity ORDER BY references the aggregate, which is still present;
-  // but any trailing order on the raw columns is now dangling.
-  out = out.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
+  // but any trailing order on the raw columns is now dangling. Located on a
+  // masked copy so a filter value containing "order by" can't be mistaken
+  // for the clause and truncate the query mid string-literal.
+  const trailingOrderByMatch = maskForKeywordSearch(out).match(/\s+ORDER\s+BY\s+[\s\S]*$/i);
+  if (trailingOrderByMatch && trailingOrderByMatch.index !== undefined) {
+    out = out.slice(0, trailingOrderByMatch.index);
+  }
   return out.trim();
 };
 
