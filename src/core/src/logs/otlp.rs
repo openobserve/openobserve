@@ -42,7 +42,7 @@ use prost::Message;
 use schema::{get_future_discard_error, get_upto_discard_error};
 use transform::TRANSFORM_FAILED;
 
-use super::{LogRecord, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
     common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
     db_monitoring::server_vantage::O2_EVENT_NAME,
@@ -273,9 +273,8 @@ pub async fn handle_request(
                     pipeline_inputs.push(rec);
                     original_options.push(original_data);
                 } else {
-                    let rec_size = json::estimate_json_bytes(&rec);
                     let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                    *size += rec_size;
+                    *size += json::estimate_json_bytes(&rec);
                     // JSON Flattening - use per-stream flatten level
                     let flatten_level =
                         get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
@@ -356,11 +355,7 @@ pub async fn handle_request(
                     let (ts_data, fn_num) = json_data_by_stream
                         .entry(stream_name.clone())
                         .or_insert((Vec::new(), None));
-                    ts_data.push(LogRecord {
-                        timestamp,
-                        size: rec_size,
-                        value: local_val,
-                    });
+                    ts_data.push((timestamp, local_val));
                     *fn_num = Some(0); // no pl -> no func
                 }
             }
@@ -527,11 +522,7 @@ pub async fn handle_request(
                             let (ts_data, fn_num) = json_data_by_stream
                                 .entry(destination_stream.clone())
                                 .or_insert((Vec::new(), None));
-                            ts_data.push(LogRecord {
-                                timestamp,
-                                size: original_size,
-                                value: local_val,
-                            });
+                            ts_data.push((timestamp, local_val));
                             *fn_num = Some(function_no); // no pl -> no func
                         }
                     }
@@ -563,9 +554,8 @@ pub async fn handle_request(
                     }
                 };
 
-                let rec_size = json::estimate_json_bytes(&res);
                 let size: &mut usize = size_by_stream.entry(stream_name.clone()).or_insert(0);
-                *size += rec_size;
+                *size += json::estimate_json_bytes(&res);
 
                 let flatten_level = get_flatten_level(org_id, &stream_name, StreamType::Logs).await;
                 res = flatten::flatten_with_level(res, flatten_level)?;
@@ -639,11 +629,7 @@ pub async fn handle_request(
                 let (ts_data, fn_num) = json_data_by_stream
                     .entry(stream_name.clone())
                     .or_insert((Vec::new(), None));
-                ts_data.push(LogRecord {
-                    timestamp,
-                    size: rec_size,
-                    value: local_val,
-                });
+                ts_data.push((timestamp, local_val));
                 *fn_num = Some(0);
             }
         }
