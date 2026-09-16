@@ -97,14 +97,16 @@ describe("IacRegistryLinks", () => {
     expect(text).toContain("OpenTofu");
   });
 
-  // Secondary, not bare text: these must read as controls beside Import/New alert.
-  it("renders each registry as a secondary button", () => {
+  // Must be visually identical to the Import button it sits beside, which is
+  // variant="outline" — anything else reads as stray text next to a real control.
+  it("renders each registry as an outline button, matching Import", () => {
     const wrapper = mountLinks("light");
     const tf = wrapper.find('[data-test="iac-registry-links-terraform"]');
 
     expect(tf.exists()).toBe(true);
     expect(tf.element.tagName).toBe("A");
-    expect(tf.classes().join(" ")).toContain("bg-button-secondary");
+    expect(tf.classes().join(" ")).toContain("border-button-outline-border");
+    expect(tf.classes().join(" ")).not.toContain("bg-button-secondary");
   });
 
   it("derives each link's data-test from dataTest", () => {
