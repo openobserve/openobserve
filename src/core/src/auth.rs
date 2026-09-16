@@ -597,10 +597,12 @@ pub async fn extract_auth_str_from_headers(headers: &HeaderMap) -> String {
 ///
 /// # Arguments
 ///
+/// * `username` - The username of the user.
+/// * `password` - The plaintext password to hash.
+/// * `salt` - The salt used for hashing.
 /// * `base_url` - The base URL of the authentication service.
-/// * `time` - The request time.
 /// * `exp_in` - The expiration time.
-/// * `auth` - The authentication token.
+/// * `time` - The request time.
 ///
 /// # Returns
 ///
