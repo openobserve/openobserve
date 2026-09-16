@@ -107,7 +107,7 @@ struct LongTextCompressor {
 impl LongTextCompressor {
     fn new(builder: BtrBlocksCompressorBuilder) -> Self {
         Self {
-            btr_compressor: builder.exclude_schemes([IntDictScheme.id()]).build(),
+            btr_compressor: builder.build(),
             options: LongTextCompressionOptions::default(),
         }
     }
@@ -204,10 +204,12 @@ fn build_vortex_write_strategy(
     if use_native_compression {
         builder.build()
     } else {
-        let compressor = LongTextCompressor::new(btrblocks);
+        // probe keeps IntDictScheme so DictStrategy can pick dict; data side must not re-dict codes
+        let probe = LongTextCompressor::new(btrblocks.clone());
+        let data = LongTextCompressor::new(btrblocks.exclude_schemes([IntDictScheme.id()]));
         builder
-            .with_compressor(compressor.clone())
-            .with_probe_compressor(compressor)
+            .with_compressor(data)
+            .with_probe_compressor(probe)
             .build()
     }
 }
@@ -435,5 +437,52 @@ mod tests {
         assert!(encoding_tree.contains("body: vortex.zstd"));
         assert!(!encoding_tree.contains("body: vortex.dict"));
         assert!(encoding_tree.contains("tag: vortex.dict"));
+    }
+
+    #[tokio::test]
+    async fn test_custom_strategy_dict_encodes_low_cardinality_integers() {
+        // 240 distinct scrape timestamps cycling over series, as in a hash-sorted metrics file
+        let ts = vortex::array::arrays::PrimitiveArray::from_iter(
+            (0..8192i64).map(|i| 1_789_452_000_000_000 + (i % 240) * 15_000_000),
+        )
+        .into_array();
+        let array = StructArray::try_new(
+            FieldNames::from(["ts"]),
+            vec![ts],
+            8192,
+            vortex::array::validity::Validity::NonNullable,
+        )
+        .unwrap()
+        .into_array();
+        let dtype = array.dtype().clone();
+        let session = VortexSession::default().with_tokio();
+        let write_options = VortexWriteOptions::new(session.clone())
+            .with_strategy(build_vortex_write_strategy(&session, false));
+        let mut buf = Vec::new();
+        let mut writer = write_options.writer(&mut buf, dtype.clone());
+
+        writer.push(array).await.unwrap();
+        writer.finish().await.unwrap();
+
+        let projected = session
+            .open_options()
+            .open_buffer(buf)
+            .unwrap()
+            .scan()
+            .unwrap()
+            .with_projection(select(["ts"], root()).bind(&dtype).unwrap())
+            .into_array_stream()
+            .unwrap()
+            .read_all()
+            .await
+            .unwrap();
+        let encoding_tree = projected.display_tree_encodings_only().to_string();
+
+        assert!(encoding_tree.contains("ts: vortex.dict"), "{encoding_tree}");
+        assert_eq!(
+            encoding_tree.matches("vortex.dict").count(),
+            1,
+            "{encoding_tree}"
+        );
     }
 }
