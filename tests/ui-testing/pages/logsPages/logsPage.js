@@ -1119,7 +1119,16 @@ export class LogsPage {
         const option = this.page.locator(
             `[data-test="log-search-index-list-select-stream-option"][data-test-value="${streamName}"]`,
         );
-        await option.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+        // The options are fetched once when the page loads, so a stream created after
+        // that is absent until a reload. Swallowing this made the caller a silent no-op.
+        try {
+            await option.first().waitFor({ state: 'attached', timeout: 5000 });
+        } catch {
+            throw new Error(
+                `Stream "${streamName}" is not among the stream select's options. A stream `
+                + 'created after the logs page loaded only appears after a page reload.',
+            );
+        }
         // Click the checkbox to ADD to the multi-selection (not replace it).
         const streamCheckbox = option.first().locator('[data-select-checkbox]');
         await streamCheckbox.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {});
@@ -1133,6 +1142,16 @@ export class LogsPage {
         // Close the popover after selection
         await popover.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         await this.page.keyboard.press('Escape').catch(() => {});
+
+        // rowClickSingleSelect makes a row click REPLACE the selection, so prove it was added.
+        await expect(
+            this.page.locator(this.indexDropDownTrigger).first(),
+            `"${streamName}" should have been added to the stream selection, not replaced it`,
+        ).toHaveAttribute(
+            'data-test-selected-value',
+            new RegExp(`(^|,)${streamName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(,|$)`),
+            { timeout: 5000 },
+        );
     }
 
     async expectTimestampColumnVisible() {
@@ -1370,18 +1389,35 @@ export class LogsPage {
         const editor = this.page.locator(this.queryEditor);
         await editor.waitFor({ state: 'visible', timeout: 10000 });
 
-        // Click to focus the editor
-        await editor.click();
-
         // Use .inputarea.fill() directly - this is more reliable than keyboard.type()
         // as it avoids Monaco editor line number interference (the "1 SELECT" bug)
         // The .fill() method will replace the selected content
         const inputArea = editor.locator('.inputarea');
-        await inputArea.waitFor({ state: 'visible', timeout: 5000 });
 
-        // Select all existing content
-        await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-        await inputArea.fill(query);
+        // Monaco renders each line as a separate node and pads with nbsp, so only the
+        // whitespace-stripped text is comparable across a re-render.
+        const strip = (t) => (t || '').replace(/\s|\u00a0/g, '');
+        const wanted = strip(query);
+
+        // Enabling SQL mode re-populates the editor from the selected stream, and that
+        // write lands asynchronously — a fill that gets in first is silently wiped.
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await editor.click();
+            await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+            await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+            await inputArea.fill(query);
+
+            await this.page.waitForTimeout(1200);
+            const actual = strip(await editor.locator('.view-lines').first().textContent());
+            if (actual.includes(wanted)) {
+                return;
+            }
+            testLogger.warn(
+                `Query editor was reset after fill (attempt ${attempt}/3); retrying`,
+                { wanted: query, actual },
+            );
+        }
+        throw new Error(`Query editor did not retain "${query}" after 3 attempts`);
     }
 
     async typeQuery(query) {
@@ -8452,18 +8488,6 @@ export class LogsPage {
      * Click the VRL toggle button to enable/disable VRL editor
      * @returns {Promise<void>}
      */
-    // The toggle lives in the utilities ("More") dropdown, not the toolbar.
-    // Idempotent: restoring a saved view re-opens the editor, so a blind toggle closes it.
-    async ensureVrlEditorOpen() {
-        const editor = this.page.locator(this.fnEditor).first();
-        if (await editor.isVisible({ timeout: 2000 }).catch(() => false)) {
-            testLogger.info('VRL editor already open');
-            return;
-        }
-        await this.toggleQueryModeEditor();
-        testLogger.info('Opened the VRL/function editor');
-    }
-
     // Tees the UI-histogram SSE stream in-page: Chrome frees a streamed body once
     // the app consumes it, so Playwright's response event reads it only sometimes.
     async captureHistogramFrames() {
@@ -12320,76 +12344,37 @@ export class LogsPage {
         testLogger.info('Field list loaded after stream selection');
     }
 
-    // Timed in-page: the histogram leg is SSE and Chrome frees the body once consumed, so the response event cannot time it.
-    /** Record every `_search`/`_around` call's start and end in-page. */
-    async captureSearchRequestTimeline() {
-        await this.page.addInitScript(() => {
-            const w = /** @type {any} */ (window);
-            w.__searchCalls = [];
-            const origFetch = w.fetch;
-            w.fetch = async (...args) => {
-                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-                if (!/_search/.test(url)) return origFetch(...args);
-                const entry = {
-                    url,
-                    isHistogram: /is_ui_histogram=true/.test(url),
-                    start: performance.now(),
-                    end: -1,
-                };
-                w.__searchCalls.push(entry);
-                const res = await origFetch(...args);
-                // A streamed body is unfinished at header time; drain a clone so `end` marks real completion.
-                if (res.body) {
-                    const copy = res.clone();
-                    (async () => {
-                        try {
-                            const reader = copy.body.getReader();
-                            for (;;) {
-                                const { done } = await reader.read();
-                                if (done) break;
-                            }
-                        } catch {
-                            // aborted by a newer query; the partial timing still orders correctly
-                        }
-                        entry.end = performance.now();
-                    })();
-                } else {
-                    entry.end = performance.now();
-                }
-                return res;
-            };
-        });
-    }
-
-    async getSearchRequestTimeline() {
-        return await this.page.evaluate(() => /** @type {any} */ (window).__searchCalls || []);
-    }
-
     // The requested size is in the query string and the honoured size is hits.length — both sides of #10270.
     /** Record the `_around` responses in-page. */
     async captureAroundResponses() {
+        // search_around goes through axios, i.e. XHR — a fetch wrapper never sees it.
         await this.page.addInitScript(() => {
             const w = /** @type {any} */ (window);
             w.__aroundCalls = [];
-            const origFetch = w.fetch;
-            w.fetch = async (...args) => {
-                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
-                const res = await origFetch(...args);
-                if (!/_around/.test(url)) return res;
-                res
-                    .clone()
-                    .json()
-                    .then((body) => {
-                        w.__aroundCalls.push({
-                            requestedSize: Number(new URL(url, location.origin).searchParams.get('size')),
-                            hits: Array.isArray(body?.hits) ? body.hits.length : -1,
-                            total: Number(body?.total ?? -1),
-                        });
-                    })
-                    .catch(() => {
-                        // non-JSON error bodies are not the subject of this assertion
+            const origOpen = XMLHttpRequest.prototype.open;
+            const origSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+                this.__o2Url = String(url);
+                return origOpen.call(this, method, url, ...rest);
+            };
+            XMLHttpRequest.prototype.send = function (...args) {
+                if (/_around/.test(this.__o2Url || '')) {
+                    this.addEventListener('load', () => {
+                        try {
+                            const body = JSON.parse(this.responseText);
+                            w.__aroundCalls.push({
+                                requestedSize: Number(
+                                    new URL(this.__o2Url, location.origin).searchParams.get('size'),
+                                ),
+                                hits: Array.isArray(body?.hits) ? body.hits.length : -1,
+                                total: Number(body?.total ?? -1),
+                            });
+                        } catch {
+                            // non-JSON error bodies are not the subject of this assertion
+                        }
                     });
-                return res;
+                }
+                return origSend.apply(this, args);
             };
         });
     }
@@ -12476,6 +12461,9 @@ export class LogsPage {
     async getStreamSelectTooltipText() {
         const trigger = this.page.locator(this.indexDropDownTrigger).first();
         await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        // The tooltip opens on the anchor's mouseenter, which never re-fires if the
+        // pointer is already inside it — park the mouse elsewhere so the hover is real.
+        await this.page.mouse.move(0, 0);
         await trigger.hover();
         const bubble = this.page.locator('[data-test="o-tooltip-content"]:visible').first();
         const appeared = await bubble

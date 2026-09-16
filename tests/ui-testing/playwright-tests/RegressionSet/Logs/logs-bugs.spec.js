@@ -977,19 +977,19 @@ test.describe("Logs Regression Bug Fixes", () => {
   test("should have timestamp column selected by default for multi stream @bug-5894 @P2 @timestamp @multiStream @regression", async ({ page }) => {
     testLogger.info('Test: Verify timestamp default selected for multi stream (Bug #5894)');
 
+    // The stream select's options are fetched when the logs page loads, so the second
+    // stream must exist before that navigation or it never appears in the dropdown.
+    const secondStream = `e2e_multistream_${Date.now()}`;
+    fieldCacheStreamsToCleanup.push(secondStream);
+    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
+    await ingestTestData(page, secondStream);
+    await pm.logsPage.waitForStreamAvailable(secondStream, 90000, 3000);
+
     await pm.logsPage.clickMenuLinkLogsItem();
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     await pm.logsPage.selectStream('e2e_automate');
     await page.waitForTimeout(1000);
 
-    // Ingest data into a second stream for multi-stream testing
-    const secondStream = `e2e_multistream_${Date.now()}`;
-    fieldCacheStreamsToCleanup.push(secondStream);
-    testLogger.info(`Ingesting test data into second stream: ${secondStream}`);
-    await ingestTestData(page, secondStream);
-    await page.waitForTimeout(2000);
-
-    // Select second stream for multi-stream mode (without page navigation)
     testLogger.info('Selecting second stream for multi-stream mode');
     await pm.logsPage.addStreamToSelection(secondStream);
     await page.waitForTimeout(1000);

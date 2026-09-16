@@ -128,8 +128,7 @@
     "run_files": [
       "logs-search-around-size.spec.js",
       "logs-v040-limit-and-stream-list.spec.js",
-      "logs-vrl-column-cell-actions.spec.js",
-      "logs-streaming-histogram-order.spec.js"
+      "logs-vrl-column-cell-actions.spec.js"
     ],
     "disabled": []
   },

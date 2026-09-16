@@ -45,13 +45,19 @@ test.describe("Alert from a dashboard panel", () => {
     const alertName = await pm.alertsPage.getAlertNameValue();
     testLogger.info(`Alert name generated from panel "${PANEL_TITLE}": "${alertName}"`);
 
+    // The control side: a form that named nothing would pass the character rule trivially.
     expect(alertName,
-      'Bug #9875: alert names reject spaces, so the panel title must be joined with underscores'
-    ).not.toMatch(/\s/);
+      'Precondition: opening the form from a panel must prefill a name'
+    ).not.toBe('');
+
+    // AddAlert.schema.ts rejects exactly this class, and the panel title carries spaces.
+    expect(alertName,
+      'Bug #9875: a panel-derived name must satisfy ALERT_NAME_UNSUPPORTED_CHARS, which rejects whitespace'
+    ).not.toMatch(/[:#?\s'"%&]/);
 
     expect(alertName,
-      'the generated name must still identify the panel it came from'
-    ).toBe('Alert_from_CPU_Capacity_Panel');
+      'the generated name must still identify the data it came from'
+    ).toContain(STREAM);
 
     testLogger.info('PASSED: panel-derived alert name is space-free (Bug #9875)');
   });

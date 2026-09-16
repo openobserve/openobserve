@@ -82,7 +82,7 @@ test.describe("Logs v0.40.0 regressions", () => {
 
   test("the stream select must only show its tooltip once more than one stream is picked", {
     tag: ['@bug-10602', '@P2', '@regression', '@logsRegression', '@logsRegressionStreamList']
-  }, async () => {
+  }, async ({ page }) => {
     const singleSelection = await pm.logsPage.getStreamSelectTooltipText();
     testLogger.info(`Tooltip with one stream selected: "${singleSelection}"`);
 
@@ -93,6 +93,12 @@ test.describe("Logs v0.40.0 regressions", () => {
     const [second] = await pm.logsPage.seedLogStreams(`e2e_10602_${Math.random().toString(36).substring(2, 7)}_`, 1);
     seededStream = second;
     await pm.logsPage.waitForStreamAvailable(second, 90000, 3000);
+
+    // The select's options are fetched once at page load, so the stream just seeded is
+    // absent from the dropdown until a reload — without this the add silently no-ops.
+    await page.reload();
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    await pm.logsPage.selectStream(STREAM);
     await pm.logsPage.addStreamToSelection(second);
 
     // The control side: without it, a build that never renders the tooltip would pass.
