@@ -3468,6 +3468,54 @@ export class LogsPage {
         return last;
     }
 
+    async getSelectedStreamTriggerLabel() {
+        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        return await trigger.getAttribute('data-test-selected-label');
+    }
+
+    async getRenderedStreamNameStyles() {
+        // Assert computed text-transform, not textContent — o2-enterprise#1745 regresses via CSS capitalize, not the stored name.
+        return await this.page.evaluate(() => {
+            const out = [];
+            const record = (el) => {
+                const text = (el.textContent || '').trim();
+                if (text) out.push({ text, textTransform: getComputedStyle(el).textTransform });
+            };
+            const trigger = document.querySelector('[data-test="log-search-index-list-select-stream-trigger"]');
+            if (trigger) trigger.querySelectorAll('span').forEach(record);
+            document.querySelectorAll('.text-field-list-group-text').forEach(record);
+            return out;
+        });
+    }
+
+    async getResultHitsCount() {
+        const title = this.page.locator('[data-test="logs-search-result-title"]');
+        await title.waitFor({ state: 'attached', timeout: 15000 });
+        const raw = await title.getAttribute('data-hits-count');
+        return parseInt(raw ?? '0', 10);
+    }
+
+    async clearPersistedStreamSelection() {
+        const orgId = getOrgIdentifier();
+        await this.page.evaluate((id) => {
+            try {
+                localStorage.removeItem(`oo_selected_stream_logs_${id}`);
+                localStorage.removeItem(`oo_logs_stream_type_${id}`);
+            } catch (e) { /* storage unavailable in this context */ }
+        }, orgId);
+    }
+
+    async expectSelectStreamPrompt() {
+        await expect(this.page.locator(this.noStreamHero)).toBeVisible({ timeout: 20000 });
+        await expect(this.page.locator(this.selectStreamCard)).toBeVisible();
+        await expect(this.page.locator(this.queryGuideCard)).toBeVisible();
+    }
+
+    async isRunQueryButtonVisible(timeout = 3000) {
+        return await this.page.locator(this.searchBarRefreshButton).first().isVisible({ timeout }).catch(() => false);
+    }
+
     async clickLogTableColumnSource() {
         // Open the first result row's detail/search-around. With the FTS
         // default-column feature the first cell may be the generic "source"

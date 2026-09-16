@@ -308,7 +308,10 @@
       "searchpartition.spec.js",
       "indexquery.spec.js",
       "region.spec.js",
-      "timezoneDisplay.spec.js"
+      "timezoneDisplay.spec.js",
+      "logsResetFilters.spec.js",
+      "logsStreamNameNoCapitalize.spec.js",
+      "logs-no-stream-prompt.spec.js"
     ],
     "disabled": [
       {
