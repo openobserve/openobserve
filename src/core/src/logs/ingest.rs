@@ -22,10 +22,6 @@ use std::{
 
 use axum::http;
 use chrono::Utc;
-#[cfg(not(feature = "enterprise"))]
-use config::meta::self_reporting::usage::is_enterprise_only_usage_stream;
-#[cfg(feature = "cloud")]
-use config::meta::self_reporting::usage::is_reserved_internal_stream;
 use config::{
     ALL_VALUES_COL_NAME, ID_COL_NAME, ORIGINAL_DATA_COL_NAME, TIMESTAMP_COL_NAME,
     meta::{
@@ -140,28 +136,6 @@ pub async fn ingest(
     };
     if stream_name.is_empty() {
         return Err(Error::IngestionError("Stream name is empty".to_string()));
-    }
-
-    // Block user ingestion into reserved internal streams
-    // (usage/stats/triggers/errors/slo_slices/...). The internal job writes
-    // these via `IngestionRequest::Usage` (for which `should_report_usage()` is
-    // false → `need_usage_report == false`), so it is exempt; any other request
-    // targeting a reserved stream is a user write and is rejected. Cloud-only:
-    // OSS / self-hosted may legitimately use these stream names.
-    #[cfg(feature = "cloud")]
-    if need_usage_report && is_reserved_internal_stream(&stream_name) {
-        return Err(Error::IngestionError(format!(
-            "stream '{stream_name}' is reserved and cannot be ingested into"
-        )));
-    }
-
-    // The OSS build never writes these, so any write is external; blocking it keeps
-    // hand-written rows out of metering if the deployment later goes enterprise.
-    #[cfg(not(feature = "enterprise"))]
-    if is_enterprise_only_usage_stream(&stream_name) {
-        return Err(Error::IngestionError(format!(
-            "stream '{stream_name}' is reserved for enterprise usage reporting"
-        )));
     }
 
     // Block user ingestion into internal rollup streams (_o2_*,
