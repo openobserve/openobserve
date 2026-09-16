@@ -43,6 +43,8 @@ pub const LEARN_SAMPLE: u32 = 64;
 /// An offset further behind than this jumps to the present; there is no history backfill.
 pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * SECOND_MICRO_SECS;
 pub const PROCESSED_TIMESTAMP_STREAM: &str = "traces_service_graph_processed_timestamp";
+/// Ancestor levels the JOIN form of Q5/Q6 climbs to find the owning agent (design §4.2).
+pub const AGENT_INHERIT_DEPTH: usize = 4;
 
 /// Per-(org, stream) series state; only the stream's holder task touches an entry.
 pub(crate) static STREAM_STATES: LazyLock<DashMap<(String, String), StateRef>> =

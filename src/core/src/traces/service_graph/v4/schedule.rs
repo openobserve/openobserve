@@ -24,16 +24,18 @@ use config::{
 };
 use futures::StreamExt;
 use infra::{cluster::get_node_by_uuid, dist_lock};
+use serde_json::Value;
 use tokio::sync::{Mutex, RwLock};
 
 use super::{
     LEARN_INTERVAL_SECS, MAX_BACKLOG_MICROS, MAX_WINDOWS_PER_TICK, ORG_RETAINED, ORG_TABLES,
     RETAINED, SNAPSHOT_INTERVAL_SECS, STARTED_AT_WRITTEN, STREAM_STATES, Settings, TableRef,
     resolution::{ResolutionTable, read_snapshot_file, snapshot_path, write_snapshot_file},
-    resolve::{SeriesKey, Staging},
+    resolve::{CONNECTION_MODEL, CONNECTION_TOOL, SeriesKey, Staging},
     sql::{
-        Columns, PairingRow, Q1Row, Q2Row, Q3Row, SelfIdentityRow, WindowCounts,
-        build_pairing_query, build_q1, build_q2, build_q3, build_self_identity_query,
+        AgentEdgeRow, AgentForm, Columns, PairingRow, Q0Row, Q1Row, Q2Row, Q3Row, Q4Row,
+        SelfIdentityRow, WindowCounts, agent_form, build_pairing_query, build_q0, build_q1,
+        build_q2, build_q3, build_q4, build_q5, build_q6, build_self_identity_query,
         validate_stream_name,
     },
     state::{Batch, StreamState},
@@ -69,6 +71,9 @@ struct WindowRows {
     q1: Vec<Q1Row>,
     q2: Vec<Q2Row>,
     q3: Vec<Q3Row>,
+    q4: Vec<Q4Row>,
+    q5: Vec<AgentEdgeRow>,
+    q6: Vec<AgentEdgeRow>,
 }
 
 /// The four cases of design §8.3: unclaimed, ours, another live node's, a dead node's.
@@ -532,14 +537,15 @@ async fn process_window(
         log::warn!("[ServiceGraph] {org}/{stream}: window {end}: {report:?}");
     }
     update_retained(org, stream, state);
-    let batch = state.emit(end);
+    let mut batch = state.emit(end);
+    batch.instances = retained_instances(state, &rows.q4);
     if !deliver(org, stream, state, batch).await {
         return Err(anyhow::anyhow!("metrics write failed, batch kept pending"));
     }
     Ok(())
 }
 
-/// Q1/Q2 failures abort the window (offset untouched); a Q3 failure only loses consumer edges.
+/// Q1/Q2 failures abort the window (offset untouched); Q3 and Q4–Q6 only lose their own edges.
 async fn fetch_window(
     org: &str,
     stream: &str,
@@ -559,17 +565,106 @@ async fn fetch_window(
         .iter()
         .filter_map(Q2Row::parse)
         .collect();
-    let q3 = match build_q3(cols, stream, start, end) {
-        Some(sql) => match run_graph_search(org, sql, start, end).await {
-            Ok(hits) => hits.iter().filter_map(Q3Row::parse).collect(),
-            Err(e) => {
-                log::error!("[ServiceGraph] {org}/{stream}: Q3 failed for window {end}: {e}");
-                vec![]
-            }
-        },
-        None => vec![],
+    let q3 = run_optional(
+        org,
+        stream,
+        "Q3",
+        build_q3(cols, stream, start, end),
+        start,
+        end,
+    )
+    .await
+    .iter()
+    .filter_map(Q3Row::parse)
+    .collect();
+    let (q4, q5, q6) = fetch_agent_rows(org, stream, cols, start, end).await;
+    Ok(WindowRows {
+        q1,
+        q2,
+        q3,
+        q4,
+        q5,
+        q6,
+    })
+}
+
+/// No gen_ai spans → skip Q4–Q6; a failed Q0 leaves the orphan counts unknown → Flat form.
+async fn fetch_agent_rows(
+    org: &str,
+    stream: &str,
+    cols: &Columns,
+    start: i64,
+    end: i64,
+) -> (Vec<Q4Row>, Vec<AgentEdgeRow>, Vec<AgentEdgeRow>) {
+    let Some(q0_sql) = build_q0(cols, stream, start, end) else {
+        return (vec![], vec![], vec![]);
     };
-    Ok(WindowRows { q1, q2, q3 })
+    let q0 = match run_graph_search(org, q0_sql, start, end).await {
+        Ok(hits) => Some(hits.first().map(Q0Row::parse).unwrap_or_default()),
+        Err(e) => {
+            log::error!("[ServiceGraph] {org}/{stream}: Q0 failed for window {end}: {e}");
+            None
+        }
+    };
+    if q0.is_some_and(|q| q.gen_ai_spans == 0) {
+        return (vec![], vec![], vec![]);
+    }
+    let (orphan_tools, orphan_models) = q0
+        .map(|q| (q.orphan_tool_spans, q.orphan_model_spans))
+        .unwrap_or((0, 0));
+    let tool_form = agent_form(cols, orphan_tools);
+    let model_form = agent_form(cols, orphan_models);
+    if tool_form == AgentForm::Join || model_form == AgentForm::Join {
+        log::debug!(
+            "[ServiceGraph] {org}/{stream}: window {end}: Q5 {tool_form:?} ({orphan_tools} orphan tool spans), Q6 {model_form:?} ({orphan_models} orphan model spans)"
+        );
+    }
+    let q4 = run_optional(
+        org,
+        stream,
+        "Q4",
+        build_q4(cols, stream, start, end),
+        start,
+        end,
+    )
+    .await
+    .iter()
+    .filter_map(Q4Row::parse)
+    .collect();
+    let q5_sql = build_q5(cols, stream, start, end, tool_form);
+    let q5 = run_optional(org, stream, "Q5", q5_sql, start, end)
+        .await
+        .iter()
+        .filter_map(AgentEdgeRow::parse)
+        .collect();
+    let q6_sql = build_q6(cols, stream, start, end, model_form);
+    let q6 = run_optional(org, stream, "Q6", q6_sql, start, end)
+        .await
+        .iter()
+        .filter_map(AgentEdgeRow::parse)
+        .collect();
+    (q4, q5, q6)
+}
+
+/// An optional family's failure only empties that family: the offset advances with the window.
+async fn run_optional(
+    org: &str,
+    stream: &str,
+    name: &str,
+    sql: Option<String>,
+    start: i64,
+    end: i64,
+) -> Vec<Value> {
+    let Some(sql) = sql else {
+        return vec![];
+    };
+    match run_graph_search(org, sql, start, end).await {
+        Ok(hits) => hits,
+        Err(e) => {
+            log::error!("[ServiceGraph] {org}/{stream}: {name} failed for window {end}: {e}");
+            vec![]
+        }
+    }
 }
 
 fn window_contributions(
@@ -581,8 +676,8 @@ fn window_contributions(
     end: i64,
     max_windows: usize,
 ) -> (Vec<(SeriesKey, WindowCounts)>, usize) {
-    let WindowRows { q1, q2, q3 } = rows;
-    let mut out = Vec::with_capacity(q1.len() * 2 + q2.len() + q3.len());
+    let WindowRows { q1, q2, q3, .. } = rows;
+    let mut out = Vec::with_capacity(q1.len() * 2 + q2.len() + q3.len() + agent_rows(rows));
     for r in q1 {
         out.push((SeriesKey::node(&r.service_name), r.counts));
         if r.root_requests > 0 {
@@ -607,7 +702,44 @@ fn window_contributions(
     for r in q3 {
         out.push((SeriesKey::queue_edge(&r.client, &r.server), r.counts));
     }
+    agent_contributions(rows, &mut out);
     (out, staged)
+}
+
+fn agent_rows(rows: &WindowRows) -> usize {
+    rows.q4.len() + rows.q5.len() + rows.q6.len()
+}
+
+/// Agent edges are ordinary edge series: same baseline, TTL, cap and budget as Q1–Q3's.
+fn agent_contributions(rows: &WindowRows, out: &mut Vec<(SeriesKey, WindowCounts)>) {
+    for r in &rows.q4 {
+        out.push((agent_key(r), r.counts));
+    }
+    for (family, connection_type) in [(&rows.q5, CONNECTION_TOOL), (&rows.q6, CONNECTION_MODEL)] {
+        for r in family {
+            let key = SeriesKey::agent_call_edge(
+                r.agent_from.as_deref(),
+                &r.service_name,
+                &r.server,
+                connection_type,
+                r.agent_env.as_deref().unwrap_or(""),
+            );
+            out.push((key, r.counts));
+        }
+    }
+}
+
+fn agent_key(r: &Q4Row) -> SeriesKey {
+    SeriesKey::agent_edge(&r.client, &r.agent, r.agent_env.as_deref().unwrap_or(""))
+}
+
+/// The gauge rides only on a retained Q4 edge, so it can never outgrow the edge budget.
+fn retained_instances(state: &StreamState, q4: &[Q4Row]) -> Vec<(SeriesKey, u64)> {
+    q4.iter()
+        .filter(|r| r.instances > 0)
+        .map(|r| (agent_key(r), r.instances))
+        .filter(|(key, _)| state.series.contains_key(key))
+        .collect()
 }
 
 async fn deliver(org: &str, stream: &str, state: &mut StreamState, batch: Batch) -> bool {
@@ -722,6 +854,114 @@ mod tests {
             window_ends(0, 10_000 * SECOND_MICRO_SECS, flush, MAX_WINDOWS_PER_TICK).len(),
             MAX_WINDOWS_PER_TICK
         );
+    }
+
+    fn counts(n: u64) -> WindowCounts {
+        WindowCounts {
+            requests: n,
+            ..Default::default()
+        }
+    }
+
+    fn q4(client: &str, agent: &str, env: Option<&str>, instances: u64) -> Q4Row {
+        Q4Row {
+            client: client.into(),
+            agent: agent.into(),
+            agent_env: env.map(str::to_string),
+            instances,
+            counts: counts(1),
+        }
+    }
+
+    fn edge_row(
+        agent_from: Option<&str>,
+        service: &str,
+        server: &str,
+        env: Option<&str>,
+    ) -> AgentEdgeRow {
+        AgentEdgeRow {
+            agent_from: agent_from.map(str::to_string),
+            service_name: service.into(),
+            server: server.into(),
+            agent_env: env.map(str::to_string),
+            counts: counts(2),
+        }
+    }
+
+    #[test]
+    fn test_agent_contributions_mapping() {
+        let rows = WindowRows {
+            q1: vec![],
+            q2: vec![],
+            q3: vec![],
+            q4: vec![
+                q4("o2-ai", "sre-rca", Some("prod"), 2),
+                q4("svc", "planner", None, 0),
+            ],
+            q5: vec![
+                edge_row(Some("sre-rca"), "o2-ai", "search", Some("prod")),
+                edge_row(None, "o2-ai", "search", None),
+            ],
+            q6: vec![
+                edge_row(Some("sre-rca"), "o2-ai", "gpt-4o", None),
+                edge_row(None, "claude-code", "claude-opus-4-6", Some("dev")),
+            ],
+        };
+        let mut out = vec![];
+        agent_contributions(&rows, &mut out);
+        let keys: Vec<SeriesKey> = out.iter().map(|(k, _)| k.clone()).collect();
+        assert_eq!(
+            keys,
+            vec![
+                SeriesKey::agent_edge("o2-ai", "sre-rca", "prod"),
+                SeriesKey::agent_edge("svc", "planner", ""),
+                SeriesKey::agent_call_edge(Some("sre-rca"), "o2-ai", "search", "tool", "prod"),
+                SeriesKey::agent_call_edge(None, "o2-ai", "search", "tool", ""),
+                SeriesKey::agent_call_edge(Some("sre-rca"), "o2-ai", "gpt-4o", "model", ""),
+                SeriesKey::agent_call_edge(None, "claude-code", "claude-opus-4-6", "model", "dev"),
+            ]
+        );
+        assert!(matches!(
+            &keys[2],
+            SeriesKey::Edge { client, client_type, .. } if client == "sre-rca" && client_type == "agent"
+        ));
+        assert!(matches!(
+            &keys[3],
+            SeriesKey::Edge { client, client_type, .. } if client == "o2-ai" && client_type.is_empty()
+        ));
+        assert!(keys.iter().all(SeriesKey::is_edge));
+        assert_eq!(out[0].1.requests, 1);
+        assert_eq!(out[2].1.requests, 2);
+    }
+
+    #[test]
+    fn test_retained_instances_only_for_retained_keys() {
+        let mut state = StreamState::new();
+        let rows = vec![
+            q4("o2-ai", "sre-rca", Some("prod"), 3),
+            q4("o2-ai", "zero", None, 0),
+            q4("o2-ai", "dropped", None, 5),
+        ];
+        let end = 100 * SECOND_MICRO_SECS;
+        state.merge_window(
+            "o",
+            end,
+            end,
+            1,
+            vec![
+                (agent_key(&rows[0]), counts(1)),
+                (agent_key(&rows[1]), counts(1)),
+            ],
+        );
+        assert_eq!(
+            retained_instances(&state, &rows),
+            vec![(SeriesKey::agent_edge("o2-ai", "sre-rca", "prod"), 3)]
+        );
+        assert!(retained_instances(&StreamState::new(), &rows).is_empty());
+        let mut batch = state.emit(end);
+        batch.instances = retained_instances(&state, &rows);
+        state.mark_clean(&batch);
+        assert_eq!(state.retained(), (2, 0));
     }
 
     #[test]
