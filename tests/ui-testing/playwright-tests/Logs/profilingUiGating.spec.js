@@ -12,13 +12,12 @@ const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 async function mockProfilingEnabled(page, value = true) {
   await page.route('**/api/*/config', async (route) => {
     const response = await route.fetch();
+    // Pass a failed config fetch through untouched so flag-on tests don't
+    // "pass" against a forced-200 error envelope (expired token, 5xx).
+    if (!response.ok()) return route.fulfill({ response });
     const json = await response.json();
     json.profiling_enabled = value;
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(json),
-    });
+    await route.fulfill({ response, json });
   });
 }
 
@@ -68,7 +67,8 @@ test.describe('Profiling UI feature-flag gating testcases', () => {
   test('should hide the left-nav Profiles menu item when the flag is off', {
     tag: ['@profiling-ui-gating', '@logs', '@P1', '@all']
   }, async ({ page }) => {
-    testLogger.info('Asserting the left-nav Profiles item is absent');
+    testLogger.info('Asserting the nav rail is hydrated, then the Profiles item is absent');
+    await expect(pm.homePage.logsMenu).toBeVisible();
     await pm.homePage.expectProfilesMenuItemHidden();
     testLogger.info('Test completed');
   });
