@@ -1409,17 +1409,20 @@ describe("PanelContainer", () => {
       ["OSS build", "false"],
       ["undefined build flag", undefined],
       ["enterprise build", "true"],
-    ])("shows the refresh-without-cache item regardless of build type (%s)", (_label, isEnterprise) => {
-      (config as any).isEnterprise = isEnterprise;
+    ])(
+      "shows the refresh-without-cache item regardless of build type (%s)",
+      (_label, isEnterprise) => {
+        (config as any).isEnterprise = isEnterprise;
 
-      wrapper = createWrapper({ viewOnly: false }, dropdownStubs);
+        wrapper = createWrapper({ viewOnly: false }, dropdownStubs);
 
-      const item = wrapper
-        .findAllComponents({ name: "ODropdownItem" })
-        .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
+        const item = wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
 
-      expect(item).toBeTruthy();
-    });
+        expect(item).toBeTruthy();
+      },
+    );
 
     it("hides the refresh-without-cache item in simplified panel view, independent of build type", () => {
       (config as any).isEnterprise = "true";
