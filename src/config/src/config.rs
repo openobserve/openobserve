@@ -1111,16 +1111,12 @@ pub struct Synthetics {
         help = "Ceiling for one attempt of a non-browser check, in milliseconds."
     )]
     pub max_net_timeout_ms: u32,
-    /// How many steps one journey may hold.
-    ///
-    /// A soft policy, not a protocol invariant: the caps that protect the system
-    /// are the 256KB `config` payload and `max_check_budget_secs`, and both stay
-    /// enforced whatever this says. Clamped to `BROWSER_MAX_STEPS_CEILING`, past which
-    /// the payload cap binds first and the operator gets a confusing second error.
+    /// How many steps one browser journey may hold. The 256KB `config` payload
+    /// cap still binds above roughly 200, whatever this says.
     #[env_config(
         name = "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
         default = 50,
-        help = "How many steps one journey may hold. Clamped to 200."
+        help = "How many steps one browser journey may hold."
     )]
     pub browser_max_steps: usize,
     /// Comma-separated list of enabled browser engine names.
@@ -4638,17 +4634,6 @@ fn check_synthetics_config(cfg: &mut Config) {
         cfg.synthetics.max_net_timeout_ms = crate::meta::synthetics::DEFAULT_MAX_NET_TIMEOUT_MS;
     }
 
-    let ceiling = crate::meta::synthetics::BROWSER_MAX_STEPS_CEILING;
-    if cfg.synthetics.browser_max_steps == 0 || cfg.synthetics.browser_max_steps > ceiling {
-        log::error!(
-            "ZO_SYNTHETICS_BROWSER_MAX_STEPS ({}) is out of range, using {}: a journey needs at least one \
-             step, and past {ceiling} the 256KB config payload cap binds first",
-            cfg.synthetics.browser_max_steps,
-            crate::meta::synthetics::DEFAULT_BROWSER_MAX_STEPS,
-        );
-        cfg.synthetics.browser_max_steps = crate::meta::synthetics::DEFAULT_BROWSER_MAX_STEPS;
-    }
-
     // Every synthetics var now has exactly one name, in every build — which
     // means an OSS user can set a private-agent var and get silence back. One
     // line per var is the difference between "configured and ignored" and
@@ -4784,44 +4769,6 @@ mod tests {
         assert_eq!(cfg.synthetics.job_lease_secs, 600);
         assert_eq!(cfg.synthetics.max_check_budget_secs, 540);
         assert_eq!(cfg.synthetics.max_net_timeout_ms, 120_000);
-    }
-
-    /// The step cap is a separate knob from the three ceilings, so a bad value
-    /// must not drag the budget and the lease back to their defaults with it.
-    #[test]
-    fn an_out_of_range_step_cap_falls_back_on_its_own() {
-        for bad in [0, crate::meta::synthetics::BROWSER_MAX_STEPS_CEILING + 1] {
-            let mut cfg = Config::init().expect("config init");
-            cfg.synthetics = ceilings(900, 600, 120_000);
-            cfg.synthetics.browser_max_steps = bad;
-
-            check_synthetics_config(&mut cfg);
-
-            assert_eq!(
-                cfg.synthetics.browser_max_steps,
-                crate::meta::synthetics::DEFAULT_BROWSER_MAX_STEPS,
-                "{bad} is out of range and must fall back"
-            );
-            assert_eq!(
-                cfg.synthetics.max_check_budget_secs, 600,
-                "the operator's ceilings were valid and must survive"
-            );
-        }
-    }
-
-    #[test]
-    fn a_step_cap_inside_the_range_is_kept() {
-        let mut cfg = Config::init().expect("config init");
-        cfg.synthetics = ceilings(900, 600, 120_000);
-        cfg.synthetics.browser_max_steps = crate::meta::synthetics::BROWSER_MAX_STEPS_CEILING;
-
-        check_synthetics_config(&mut cfg);
-
-        assert_eq!(
-            cfg.synthetics.browser_max_steps,
-            crate::meta::synthetics::BROWSER_MAX_STEPS_CEILING,
-            "the ceiling itself is a legal value, not one past the edge"
-        );
     }
 
     /// Every `Synthetics` env var, in declaration order. Hand-written, as is

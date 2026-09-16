@@ -993,14 +993,6 @@ pub const DEFAULT_MAX_CHECK_BUDGET_SECS: i64 = 840;
 pub const DEFAULT_MAX_NET_TIMEOUT_MS: u32 = 300_000;
 const MIN_NET_TIMEOUT_MS: u32 = 1_000;
 
-/// How many steps one journey may hold.
-pub const DEFAULT_BROWSER_MAX_STEPS: usize = 50;
-
-/// The ceiling an operator cannot raise `ZO_SYNTHETICS_BROWSER_MAX_STEPS` past. A step
-/// serializes to roughly 1.2KB, so beyond this the 256KB `config` cap binds
-/// first and the operator would get a confusing second error instead.
-pub const BROWSER_MAX_STEPS_CEILING: usize = 200;
-
 // ── Deployment-shaped values ─────────────────────────────────────────────────
 //
 // Everything below is derived from `ZO_SYNTHETICS_*` and nothing else — no
