@@ -230,7 +230,7 @@ import {
   getImageURL,
   invalidateLoginData,
   shouldPaywallRoute,
-  emptyDataAllowedPaths,
+  isEmptyDataExempt,
 } from "../utils/zincutils";
 
 import {
@@ -455,6 +455,11 @@ export default defineComponent({
       return Boolean(store.state.zoConfig?.synthetics_enabled);
     });
 
+    // `ZO_FEATURE_PROFILING_ENABLED` is off by default while Profiles is early-stage.
+    const isProfilingEnabled = computed(() => {
+      return Boolean(store.state.zoConfig?.profiling_enabled);
+    });
+
     // Real entries carry `identifier`; the placeholder literal only sets label/value.
     const orgOptions = ref<Array<{ identifier?: string; [key: string]: unknown }>>([
       { label: Number, value: String },
@@ -491,12 +496,6 @@ export default defineComponent({
         icon: "account-tree",
         link: "/traces",
         name: "traces",
-      },
-      {
-        title: t("menu.profiles"),
-        icon: "account-tree",
-        link: "/profiles",
-        name: "profiles",
       },
       {
         title: raw("RUM"),
@@ -828,6 +827,28 @@ export default defineComponent({
       immediate: false,
     });
 
+    const updateProfilesMenu = () => {
+      const existingIndex = linksList.value.findIndex((l: any) => l.name === "profiles");
+
+      if (!isProfilingEnabled.value) {
+        if (existingIndex !== -1) linksList.value.splice(existingIndex, 1);
+        return;
+      }
+      if (existingIndex !== -1) return;
+
+      const tracesIndex = linksList.value.findIndex((l: any) => l.name === "traces");
+      const insertAt = tracesIndex === -1 ? linksList.value.length : tracesIndex + 1;
+
+      linksList.value.splice(insertAt, 0, {
+        title: t("menu.profiles"),
+        icon: "account-tree",
+        link: "/profiles",
+        name: "profiles",
+      });
+    };
+
+    watch(isProfilingEnabled, () => updateProfilesMenu(), { immediate: false });
+
     // On-call's Pages/Teams/Routing entries live entirely inside the
     // `reliability` flyout (navGroups.ts), gated there by `gate: "oncall"`.
     // A separate top-level rail item here would be a second gate to keep in
@@ -836,6 +857,7 @@ export default defineComponent({
       updateIncidentsMenu();
       updateWorkflowsMenu();
       updateSyntheticMenu();
+      updateProfilesMenu();
       updateAIObservabilityMenu();
 
       const disableMenus = new Set(
@@ -932,18 +954,7 @@ export default defineComponent({
         });
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
-          // IAM is org-setup, not data consumption — don't bounce out of IAM
-          // screens just because no streams exist yet. General Settings is exempt
-          // because it hosts the Danger Zone: switching to an empty org must still
-          // leave the admin able to delete it. Mirrors the routeGuard exemptions —
-          // General only, not the rest of the Settings tree.
-          const currentPath = router.currentRoute.value.path || "";
-          if (
-            currentPath.indexOf("/iam") !== -1 ||
-            emptyDataAllowedPaths.indexOf(currentPath.replace(/\/$/, "")) !== -1
-          ) {
-            return;
-          }
+          if (isEmptyDataExempt(router.currentRoute.value)) return;
           toast({
             variant: "warning",
             message: t("toastMessages.layouts.ingestionNotStarted"),

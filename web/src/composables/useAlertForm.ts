@@ -106,6 +106,7 @@ import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import { anomalyBudgetPerDay } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -213,6 +214,8 @@ export const defaultAnomalyConfig = () => ({
   training_window_days: 14,
   retrain_interval_days: 7,
   threshold: 97,
+  // Set only when the backend stored a budget; undefined/null = percentile mode.
+  alert_budget_per_day: undefined as number | undefined,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -1903,6 +1906,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     try {
+      const budgetPerDay = anomalyBudgetPerDay(c);
       const payload: any = {
         alert_type: "anomaly_detection",
         name: c.name,
@@ -1935,7 +1939,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_window_seconds: anomalyDetectionWindowSeconds.value,
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          threshold: c.threshold,
+          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+          ...(budgetPerDay !== null
+            ? { alert_budget_per_day: budgetPerDay }
+            : { threshold: c.threshold }),
           alert_enabled: c.alert_enabled,
         },
       };
@@ -2869,7 +2876,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
-          filters: data.filters ?? [],
+          filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,
           schedule_interval_value: sched.value,

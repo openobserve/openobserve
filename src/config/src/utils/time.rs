@@ -73,6 +73,14 @@ pub fn second_micros(n: i64) -> i64 {
         .unwrap()
 }
 
+/// The `YYYYMM` of a microsecond timestamp, UTC. One encoding, or a period compares against
+/// something that was written with another.
+#[inline(always)]
+pub fn month_of(micros: i64) -> i32 {
+    let at = DateTime::from_timestamp_micros(micros).unwrap_or_default();
+    at.year() * 100 + at.month() as i32
+}
+
 #[inline(always)]
 pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
     let n = if n > 0 {
@@ -355,6 +363,15 @@ pub fn parse_interval_to_minutes(s: &str) -> i64 {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn test_month_of_reads_the_utc_month() {
+        assert_eq!(month_of(1_788_800_853_300_917), 202609);
+        assert_eq!(month_of(0), 197001);
+        // A month boundary is the one place an off-by-one lands on the wrong grant.
+        assert_eq!(month_of(1_767_225_599_000_000), 202512);
+        assert_eq!(month_of(1_767_225_600_000_000), 202601);
+    }
+
     use super::*;
 
     #[test]

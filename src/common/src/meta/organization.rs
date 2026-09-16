@@ -193,7 +193,11 @@ pub struct AllOrgListDetails {
     #[cfg(feature = "cloud")]
     pub protocol_steps_used: u64,
     #[cfg(feature = "cloud")]
+    pub status_steps_used: u64,
+    #[cfg(feature = "cloud")]
     pub protocol_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -846,7 +850,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -910,7 +918,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -939,7 +951,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1023,7 +1039,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1062,7 +1082,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),

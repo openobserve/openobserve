@@ -42,9 +42,9 @@ pub const NODE_HARD_CAP: usize = 15_000;
 pub const LEARN_SAMPLE: u32 = 64;
 /// An offset further behind than this jumps to the present; there is no history backfill.
 pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * SECOND_MICRO_SECS;
-/// v1 stops once v4 has run and holds data for this long; a design §10 constant, not configurable.
-pub const V1_STOP_AFTER_MICROS: i64 = 7 * 24 * 3600 * SECOND_MICRO_SECS;
 pub const PROCESSED_TIMESTAMP_STREAM: &str = "traces_service_graph_processed_timestamp";
+/// Ancestor levels the JOIN form of Q5/Q6 climbs to find the owning agent (design §4.2).
+pub const AGENT_INHERIT_DEPTH: usize = 4;
 
 /// Per-(org, stream) series state; only the stream's holder task touches an entry.
 pub(crate) static STREAM_STATES: LazyLock<DashMap<(String, String), StateRef>> =
@@ -59,8 +59,6 @@ pub(crate) static ORG_RETAINED: LazyLock<DashMap<String, (usize, usize)>> =
     LazyLock::new(DashMap::new);
 /// `started_at` is write-once per process; this guard avoids a meta-db read on every window.
 pub(crate) static STARTED_AT_WRITTEN: AtomicBool = AtomicBool::new(false);
-/// `v1/stopped` is write-once, so a true reading never has to be repeated.
-pub(crate) static V1_STOPPED_SEEN: AtomicBool = AtomicBool::new(false);
 
 pub type StateRef = Arc<Mutex<StreamState>>;
 pub type TableRef = Arc<RwLock<ResolutionTable>>;
