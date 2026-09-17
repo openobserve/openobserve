@@ -936,7 +936,7 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
-import { spanWindowUs } from "@/utils/traces/spanWindow";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";

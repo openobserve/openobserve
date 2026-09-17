@@ -27,7 +27,7 @@ import {
   traceIdLookupVariants,
 } from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
-import { spanWindowUs } from "@/utils/traces/spanWindow";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
 import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
