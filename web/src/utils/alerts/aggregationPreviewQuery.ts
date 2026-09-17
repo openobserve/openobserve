@@ -211,8 +211,13 @@ export const withCompositeGroupLabel = (query: string, groupBy: string[]): strin
   }
   out = out.replace(/\bGROUP\s+BY\s+([^\s,]+)/i, `GROUP BY $1, ${GROUP_LABEL_ALIAS}`);
   // The severity ORDER BY references the aggregate, which is still present;
-  // but any trailing order on the raw columns is now dangling.
-  out = out.replace(/\s+ORDER\s+BY\s+[\s\S]*$/i, "");
+  // but any trailing order on the raw columns is now dangling. Cut on the
+  // masked text so a filter value containing "order by" can't be mistaken
+  // for the statement's own trailing clause.
+  const trailingOrderBy = maskStringLiterals(out).match(/\s+ORDER\s+BY\s+[\s\S]*$/i);
+  if (trailingOrderBy) {
+    out = out.slice(0, trailingOrderBy.index);
+  }
   return out.trim();
 };
 
