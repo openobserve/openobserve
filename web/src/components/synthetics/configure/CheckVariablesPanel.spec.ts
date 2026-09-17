@@ -21,15 +21,18 @@ import { nextTick } from "vue";
 import i18n from "@/locales";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
-import type { ResolvedVariable } from "@/components/synthetics/variables/resolved";
 
 vi.mock("@/utils/uuid", () => ({ getUUID: vi.fn(() => "uuid-123") }));
 
-const { resolvedVariablesGroupedMock } = vi.hoisted(() => ({
-  resolvedVariablesGroupedMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
+const { listEnvironmentsMock, listGlobalVariablesMock } = vi.hoisted(() => ({
+  listEnvironmentsMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
+  listGlobalVariablesMock: vi.fn(() => Promise.reject(new Error("no backend in specs"))),
 }));
 vi.mock("@/services/synthetics", () => ({
-  default: { resolvedVariablesGrouped: resolvedVariablesGroupedMock },
+  default: {
+    listEnvironments: listEnvironmentsMock,
+    listGlobalVariables: listGlobalVariablesMock,
+  },
 }));
 
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
@@ -136,8 +139,9 @@ const varToken = { id: "var-b", name: "TOKEN", value: "supersecret", secure: tru
 function checkWith(
   variables: NonNullable<BrowserCheck["variables"]>,
   journey: BrowserStep[] = [],
+  environments: string[] = [],
 ): BrowserCheck {
-  return { ...mockMonitorHttp, variables, journey };
+  return { ...mockMonitorHttp, variables, journey, environments };
 }
 
 function mountPanel(props: Record<string, unknown> = {}) {
@@ -542,61 +546,94 @@ describe("CheckVariablesPanel", () => {
 
   // ── Environment resolution ────────────────────────────────────────────────
   describe("environment resolution", () => {
-    function row(over: Partial<ResolvedVariable> = {}): ResolvedVariable {
+    function sharedVar(over: Record<string, unknown> = {}) {
       return {
+        id: "var-1",
         name: "ORG",
         kind: "plain",
-        scope: "global",
-        overridden: false,
-        example: "",
         description: "",
-        has_value: true,
+        example: "",
+        tags: [],
+        value: "acme",
+        used_by_checks: 0,
+        created_at: 0,
+        updated_at: 0,
         ...over,
       };
     }
 
-    const grouped = {
-      environments: ["staging", "qa"],
-      resolved: {
-        staging: [
-          row(),
-          row({ name: "BASE_URL", scope: "staging", overridden: true }),
-          row({ name: "BASE_URL", scope: "check" }),
-          row({ name: "TOKEN", scope: "check" }),
-        ],
-        qa: [
-          row(),
-          row({ name: "BASE_URL", scope: "check" }),
-          row({ name: "TOKEN", scope: "check" }),
-        ],
-      },
-    };
+    function env(name: string, variables: Record<string, unknown>[] = []) {
+      return {
+        id: `env-${name}`,
+        name,
+        description: "",
+        checks_count: 0,
+        created_at: 0,
+        updated_at: 0,
+        variables,
+      };
+    }
 
-    it("fetches once and offers the source filter over the check's environments", async () => {
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
-      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+    /** Both list calls, which is every request the panel makes. */
+    function mockShared(
+      environments: Record<string, unknown>[],
+      globals: Record<string, unknown>[],
+    ) {
+      listEnvironmentsMock.mockResolvedValueOnce({ data: environments } as never);
+      listGlobalVariablesMock.mockResolvedValueOnce({ data: globals } as never);
+    }
+
+    const environments = () => [
+      env("staging", [sharedVar({ id: "var-2", name: "BASE_URL", value: "https://stage" })]),
+      env("qa"),
+    ];
+    const selected = ["env-staging", "env-qa"];
+
+    it("fetches both tiers once and offers the source filter over the check's environments", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
       await flushPromises();
 
       const options = wrapper.find('[data-test="synthetics-inherited-filter"]').findAll("option");
       expect(options.map((o) => o.text())).toEqual(["All", "Global", "staging", "qa"]);
-      expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
+      expect(listGlobalVariablesMock).toHaveBeenCalledTimes(1);
+    });
+
+    /// The regression: the panel used to key its only fetch on the check id, so
+    /// ticking an environment changed nothing, and an unsaved check had no id to
+    /// resolve against at all.
+    it("re-resolves when an environment is ticked, with no further request", async () => {
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varToken], [], []) });
+      await flushPromises();
+
+      // Unscoped: the globals apply, and no environment is named.
+      expect(wrapper.find('[data-test="synthetics-inherited-filter"]').exists()).toBe(false);
+
+      await wrapper.setProps({ check: checkWith([varToken], [], ["env-staging"]) });
+      await nextTick();
+
+      expect(wrapper.text()).toContain("BASE_URL");
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
+      expect(listGlobalVariablesMock).toHaveBeenCalledTimes(1);
     });
 
     it("filters the union client-side, without a second fetch", async () => {
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
-      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
       await flushPromises();
 
       // The shadowed BASE_URL is staging-sourced, so the qa filter hides it.
       expect(wrapper.find("span.line-through").exists()).toBe(true);
       await wrapper.find('[data-test="synthetics-inherited-filter"]').setValue("qa");
       expect(wrapper.find("span.line-through").exists()).toBe(false);
-      expect(resolvedVariablesGroupedMock).toHaveBeenCalledTimes(1);
+      expect(listEnvironmentsMock).toHaveBeenCalledTimes(1);
     });
 
     it("counts distinct resolved names across local and inherited", async () => {
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
-      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
       await flushPromises();
 
       // ORG, BASE_URL (shadowed name counts once), TOKEN.
@@ -604,8 +641,8 @@ describe("CheckVariablesPanel", () => {
     });
 
     it("warns on the local row that shadows an inherited name", async () => {
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
-      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
       await flushPromises();
 
       expect(wrapper.find(sel("-overrides-0-badge")).exists()).toBe(true);
@@ -614,11 +651,11 @@ describe("CheckVariablesPanel", () => {
     });
 
     it("shows the cap once the resolved count approaches it", async () => {
-      const many = Array.from({ length: 41 }, (_, i) => row({ name: `VAR_${i}` }));
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({
-        data: { environments: ["staging"], resolved: { staging: many } },
-      } as never);
-      wrapper = mountPanel({ check: checkWith([]) });
+      const many = Array.from({ length: 41 }, (_, i) =>
+        sharedVar({ id: `var-${i}`, name: `VAR_${i}` }),
+      );
+      mockShared([env("staging")], many);
+      wrapper = mountPanel({ check: checkWith([], [], ["env-staging"]) });
       await flushPromises();
 
       expect(wrapper.find(sel("-count")).text()).toBe("41 of 50");
@@ -632,8 +669,8 @@ describe("CheckVariablesPanel", () => {
     });
 
     it("notes the fallback value when removing an override", async () => {
-      resolvedVariablesGroupedMock.mockResolvedValueOnce({ data: grouped } as never);
-      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]) });
+      mockShared(environments(), [sharedVar()]);
+      wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken], [], selected) });
       await flushPromises();
 
       // varBaseUrl shadows staging's BASE_URL — removing it falls back there.

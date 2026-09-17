@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { ResolvedVariable } from "./resolved";
 import {
   applyPlaceholder,
+  buildResolvedGrouped,
   coverageGaps,
   effectiveVariables,
   inheritedUnion,
@@ -253,5 +254,102 @@ describe("coverageGaps", () => {
       resolved: { staging: [v({ name: "ONLY_HERE", scope: "staging" })] },
     });
     expect(gaps.size).toBe(0);
+  });
+});
+
+// ── buildResolvedGrouped ────────────────────────────────────────────────────
+
+describe("buildResolvedGrouped", () => {
+  function shared(over: Record<string, unknown> = {}) {
+    return {
+      id: "var-1",
+      name: "ORG",
+      kind: "plain" as const,
+      description: "",
+      example: "",
+      tags: [],
+      value: "acme",
+      used_by_checks: 0,
+      created_at: 0,
+      updated_at: 0,
+      ...over,
+    };
+  }
+
+  function env(name: string, variables: ReturnType<typeof shared>[] = []) {
+    return {
+      id: `env-${name}`,
+      name,
+      description: "",
+      checks_count: 0,
+      created_at: 0,
+      updated_at: 0,
+      variables,
+    };
+  }
+
+  const staging = env("staging", [
+    shared({ id: "var-2", name: "BASE_URL", value: "https://stage" }),
+  ]);
+  const prod = env("prod", [
+    shared({ id: "var-3", name: "PASSWORD", kind: "secret", value: undefined, has_value: true }),
+  ]);
+  const globals = [shared(), shared({ id: "var-4", name: "BASE_URL", value: "https://shop" })];
+
+  it("resolves the unscoped tier when the check targets no environment", () => {
+    const grouped = buildResolvedGrouped([staging], globals, [], []);
+    expect(grouped.environments).toEqual([""]);
+    expect(grouped.resolved[""].map((r) => [r.name, r.scope])).toEqual([
+      ["BASE_URL", "global"],
+      ["ORG", "global"],
+    ]);
+  });
+
+  it("gives each selected environment its own set, keyed by name", () => {
+    const grouped = buildResolvedGrouped([staging, prod], globals, ["env-staging", "env-prod"], []);
+    expect(grouped.environments).toEqual(["staging", "prod"]);
+    expect(grouped.resolved.staging.map((r) => r.scope)).toEqual(["global", "staging", "global"]);
+    expect(grouped.resolved.prod.map((r) => r.name)).toEqual(["BASE_URL", "ORG", "PASSWORD"]);
+  });
+
+  it("marks a global as overridden only where an environment row shadows it", () => {
+    const grouped = buildResolvedGrouped([staging, prod], globals, ["env-staging", "env-prod"], []);
+    const globalIn = (key: string) =>
+      grouped.resolved[key].find((r) => r.name === "BASE_URL" && r.scope === "global");
+    // staging holds its own BASE_URL, prod does not.
+    expect(globalIn("staging")?.overridden).toBe(true);
+    expect(globalIn("prod")?.overridden).toBe(false);
+  });
+
+  it("marks every tier overridden by a check variable of the same name", () => {
+    const grouped = buildResolvedGrouped(
+      [staging],
+      globals,
+      ["env-staging"],
+      [{ name: "BASE_URL", value: "https://local" }],
+    );
+    const rows = grouped.resolved.staging.filter((r) => r.name === "BASE_URL");
+    expect(rows.map((r) => [r.scope, r.overridden])).toEqual([
+      ["check", false],
+      ["global", true],
+      ["staging", true],
+    ]);
+  });
+
+  it("reads presence from the shape each kind uses on the wire", () => {
+    const grouped = buildResolvedGrouped([prod], [], ["env-prod"], []);
+    const secret = grouped.resolved.prod[0];
+    expect(secret.kind).toBe("secret");
+    // A secret carries has_value and no value; a plain one carries the value.
+    expect(secret.has_value).toBe(true);
+    const empty = buildResolvedGrouped([], [shared({ value: "" })], [], []);
+    expect(empty.resolved[""][0].has_value).toBe(false);
+  });
+
+  it("skips an id that resolves to nothing, as the server does", () => {
+    // A deleted environment, or one this user cannot read.
+    const grouped = buildResolvedGrouped([staging], globals, ["env-gone"], []);
+    expect(grouped.environments).toEqual([]);
+    expect(grouped.resolved).toEqual({});
   });
 });

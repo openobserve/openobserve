@@ -15,10 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
+import type {
+  BrowserCheck,
+  BrowserStep,
+  SyntheticsEnvironment,
+  SyntheticsVariable,
+} from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -32,9 +37,9 @@ import syntheticsService from "@/services/synthetics";
 import SyntheticsInheritedVariables from "@/components/synthetics/variables/SyntheticsInheritedVariables.vue";
 import {
   RESOLVED_VARIABLE_CAP,
+  buildResolvedGrouped,
   coverageGaps,
   inheritedUnion,
-  type ResolvedVariablesGrouped,
 } from "@/components/synthetics/variables/resolved";
 
 type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
@@ -67,43 +72,48 @@ const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)
 // ── Resolution — the union of every selected environment plus globals ──────
 
 const store = useStore();
-/** Empty while the check is unsaved — there is nothing to resolve against yet. */
-const checkId = computed(() => ((props.check as { id?: string }).id ?? "") as string);
-const grouped = ref<ResolvedVariablesGrouped | null>(null);
+const sharedEnvironments = ref<SyntheticsEnvironment[]>([]);
+const sharedGlobals = ref<SyntheticsVariable[]>([]);
 
-async function fetchGrouped() {
-  if (!checkId.value) {
-    grouped.value = null;
-    return;
-  }
+/** Both shared tiers, as metadata. Fetched once: the merge below is local, so
+ *  ticking an environment costs no request and works before the first save. */
+async function fetchShared() {
   try {
     const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.resolvedVariablesGrouped(org, checkId.value);
-    grouped.value = res.data ?? null;
+    const [environments, globals] = await Promise.all([
+      syntheticsService.listEnvironments(org),
+      syntheticsService.listGlobalVariables(org),
+    ]);
+    sharedEnvironments.value = environments.data ?? [];
+    sharedGlobals.value = globals.data ?? [];
   } catch {
     // A failure here costs the author a hint, not their work — the panel and
     // the save path both stand on their own, so it stays silent.
-    grouped.value = null;
+    sharedEnvironments.value = [];
+    sharedGlobals.value = [];
   }
 }
 
-watch(checkId, fetchGrouped, { immediate: true });
+onMounted(fetchShared);
 
-const gaps = computed(() => (grouped.value ? coverageGaps(grouped.value) : new Map()));
+const grouped = computed(() =>
+  buildResolvedGrouped(
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    props.check.environments ?? [],
+    variables.value,
+  ),
+);
+
+const gaps = computed(() => coverageGaps(grouped.value));
 
 const localNames = computed(() => new Set(variables.value.map((v) => v.name.trim())));
-const unionRows = computed(() =>
-  grouped.value ? inheritedUnion(grouped.value, localNames.value) : [],
-);
+const unionRows = computed(() => inheritedUnion(grouped.value, localNames.value));
 const unionNames = computed(() => new Set(unionRows.value.map((row) => row.name)));
-const environmentNames = computed(() =>
-  (grouped.value?.environments ?? []).filter((env) => env !== ""),
-);
+const environmentNames = computed(() => grouped.value.environments.filter((env) => env !== ""));
 
 /** Distinct resolved names across local and inherited — a shadowed name counts once. */
-const headerCount = computed(() =>
-  grouped.value ? new Set([...localNames.value, ...unionNames.value]).size : variables.value.length,
-);
+const headerCount = computed(() => new Set([...localNames.value, ...unionNames.value]).size);
 
 /** Value on hover, per the 4b brief — masked when the author marked it secure. */
 function localValueTooltip(variable: CheckVariable): I18nText {

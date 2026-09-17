@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
+
 /** One name in a check's resolved set. Mirrors the server's ResolvedVariableView. */
 export interface ResolvedVariable {
   name: string;
@@ -191,4 +193,95 @@ export function coverageGaps(grouped: ResolvedVariablesGrouped): Map<string, str
     if (missing.length) gaps.set(name, missing);
   }
   return gaps;
+}
+
+/** A check-tier variable, as the editor holds one before it is saved. */
+export interface LocalVariable {
+  name: string;
+  value?: string;
+  example?: string;
+}
+
+/** Whether a row has a value, on the two shapes the wire uses for the two kinds. */
+function sharedHasValue(variable: SyntheticsVariable): boolean {
+  return variable.kind === "secret" ? Boolean(variable.has_value) : Boolean(variable.value);
+}
+
+/** One environment's resolved rows, mirroring the server's `resolved_rows`. */
+function rowsForEnvironment(
+  environment: SyntheticsEnvironment | null,
+  globals: SyntheticsVariable[],
+  local: LocalVariable[],
+): ResolvedVariable[] {
+  const localNames = new Set(local.map((v) => v.name.trim()));
+  const scoped = environment?.variables ?? [];
+  const scopedNames = new Set(scoped.map((v) => v.name));
+  const shared: ResolvedVariable[] = [
+    ...globals.map((v) => ({
+      name: v.name,
+      kind: v.kind,
+      scope: "global",
+      // A global is overridden by the check, and by an environment row of the
+      // same name that applies here - the shadowing rule, per environment.
+      overridden: localNames.has(v.name) || scopedNames.has(v.name),
+      example: v.example ?? "",
+      description: v.description ?? "",
+      has_value: sharedHasValue(v),
+    })),
+    ...scoped.map((v) => ({
+      name: v.name,
+      kind: v.kind,
+      scope: environment?.name ?? "",
+      overridden: localNames.has(v.name),
+      example: v.example ?? "",
+      description: v.description ?? "",
+      has_value: sharedHasValue(v),
+    })),
+  ];
+  const own: ResolvedVariable[] = local.map((v) => ({
+    name: v.name,
+    // The check tier keeps the old `secure` flag, which is a display hint
+    // rather than a storage property, so it is reported as plain.
+    kind: "plain" as const,
+    scope: "check",
+    overridden: false,
+    example: v.example ?? "",
+    description: "",
+    has_value: Boolean(v.value),
+  }));
+  return [...shared, ...own].sort(
+    (a, b) => a.name.localeCompare(b.name) || a.scope.localeCompare(b.scope),
+  );
+}
+
+/**
+ * The resolved set per environment, built from the two list endpoints.
+ *
+ * `GET /{org}/synthetics/{id}/resolved-variables` is keyed on a stored check,
+ * so it cannot answer for one that is still being created, and it does not
+ * re-run when the author ticks an environment. Both tiers already arrive as
+ * metadata through the environments and globals lists, so the merge runs here
+ * against whatever the editor holds, saved or not.
+ */
+export function buildResolvedGrouped(
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+  selectedIds: string[],
+  local: LocalVariable[],
+): ResolvedVariablesGrouped {
+  const selected = selectedIds
+    .map((id) => environments.find((env) => env.id === id))
+    .filter((env): env is SyntheticsEnvironment => Boolean(env));
+  // An id that resolves to nothing is a deleted environment, or one this user
+  // cannot read. Both are skipped rather than guessed at, as the server does.
+  const groups: (SyntheticsEnvironment | null)[] = selectedIds.length ? selected : [null];
+
+  const resolved: Record<string, ResolvedVariable[]> = {};
+  const names: string[] = [];
+  for (const environment of groups) {
+    const key = environment?.name ?? "";
+    names.push(key);
+    resolved[key] = rowsForEnvironment(environment, globals, local);
+  }
+  return { environments: names, resolved };
 }
