@@ -3392,7 +3392,8 @@
     "title": "首先，让我们连接您的第一个数据源。",
     "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
     "connectButton": "连接数据源",
-    "dismissLink": "我稍后再做"
+    "dismissLink": "我稍后再做",
+    "slackLink": "也欢迎加入我们的 Slack 社区"
   },
   "confirmDialog": {
     "continueFromWherePaused": "从暂停处继续",

@@ -3392,7 +3392,8 @@
     "title": "Pour commencer, connectons votre première source de données.",
     "description": "Nous avons beaucoup à vous montrer, mais nous devons d'abord connecter vos données. La plupart des équipes voient leurs premiers logs en environ une minute.",
     "connectButton": "Connecter une source de données",
-    "dismissLink": "Je le ferai plus tard"
+    "dismissLink": "Je le ferai plus tard",
+    "slackLink": "Rejoignez aussi notre communauté Slack"
   },
   "confirmDialog": {
     "continueFromWherePaused": "Reprendre là où il s'est arrêté",
