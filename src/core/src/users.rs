@@ -1222,7 +1222,7 @@ pub async fn list_user_invites(user_id: &str, only_pending: bool) -> Result<Resp
                     org_name: db::organization::get_org(&invite.org_id)
                         .await
                         .map(|org| org.name)
-                        .unwrap_or("default".to_string()),
+                        .unwrap_or_else(|_| "default".to_string()),
                     role: invite.role,
                     org_id: invite.org_id,
                     token: invite.token,

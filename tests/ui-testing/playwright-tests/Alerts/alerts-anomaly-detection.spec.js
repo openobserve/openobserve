@@ -221,7 +221,11 @@ test.describe('Anomaly Detection', () => {
 
       const hint = pm.anomalyDetectionPage.getSensitivityHintLocator();
       await expect(hint).toBeVisible();
-      await expect(hint).toContainText('p97');
+      await expect(hint).toContainText('97%');
+
+      // The number is interpolated, not baked into the string: a stale hint would keep 97.
+      await pm.anomalyDetectionPage.selectSensitivityTier(99);
+      await expect(hint).toContainText('99%');
     });
 
     // The hint deliberately states no flag rate: the bar is the p-mark of the model's own

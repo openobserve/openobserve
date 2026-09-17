@@ -511,8 +511,7 @@ pub async fn search_multi(
                                     .collect::<Vec<_>>();
                                 Some(serde_json::Value::Array(flattened_array))
                             } else {
-                                (!v.is_null())
-                                    .then_some(config::utils::flatten::flatten(v.clone()).unwrap())
+                                flatten_vrl_result(v.clone())
                             }
                         })
                         .collect()
@@ -535,8 +534,7 @@ pub async fn search_multi(
                             if let Some(e) = err {
                                 error = e;
                             }
-                            (!ret_val.is_null())
-                                .then_some(config::utils::flatten::flatten(ret_val).unwrap())
+                            flatten_vrl_result(ret_val)
                         })
                         .collect();
                     if !error.is_empty() {
@@ -1089,6 +1087,10 @@ pub fn check_search_allowed(_org_id: &str, _stream: Option<&str>) -> Result<(), 
     Ok(())
 }
 
+fn flatten_vrl_result(value: json::Value) -> Option<json::Value> {
+    (!value.is_null()).then(|| config::utils::flatten::flatten(value).unwrap())
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -1097,6 +1099,27 @@ mod tests {
     use hashbrown::HashMap;
 
     use super::*;
+
+    #[test]
+    fn test_flatten_vrl_result_filters_null_and_preserves_nested_records() {
+        assert_eq!(flatten_vrl_result(json::Value::Null), None);
+        assert_eq!(
+            flatten_vrl_result(json::json!({"nested": {"value": 42}})),
+            Some(json::json!({"nested_value": 42}))
+        );
+        let values = vec![
+            json::Value::Null,
+            json::json!({"nested": {"value": 42}}),
+            json::Value::Null,
+        ];
+        assert_eq!(
+            values
+                .into_iter()
+                .filter_map(flatten_vrl_result)
+                .collect::<Vec<_>>(),
+            vec![json::json!({"nested_value": 42})]
+        );
+    }
 
     #[test]
     fn test_generate_filter_from_equal_items_empty() {

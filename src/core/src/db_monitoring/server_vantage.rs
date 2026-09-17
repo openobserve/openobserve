@@ -841,6 +841,15 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
         .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
 }
 
+/// Whether a record carrying `key` could be touched by `canonicalize_dbm_record` at all.
+pub(crate) fn may_canonicalize_key(key: &str) -> bool {
+    key.starts_with("o2_")
+        || matches!(
+            key,
+            "postgresql_calls" | "postgresql_state" | "postgresql_query_id"
+        )
+}
+
 // ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
 //
 // Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …

@@ -460,7 +460,8 @@ pub async fn delete_function(org_id: &str, fn_name: &str) -> Result<(), Function
     }
     let pipeline_dep = get_dependencies(org_id, fn_name).await;
     if !pipeline_dep.is_empty() {
-        let pipeline_data = serde_json::to_string(&pipeline_dep).unwrap_or("[]".to_string());
+        let pipeline_data =
+            serde_json::to_string(&pipeline_dep).unwrap_or_else(|_| "[]".to_string());
         return Err(FunctionDeleteError::PipelineDependencies(format!(
             "Warning: Function '{}' has {} pipeline dependencies. Please remove these pipelines first: {}",
             fn_name,
