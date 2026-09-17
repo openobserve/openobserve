@@ -40,6 +40,9 @@ export type DepFocus = { kind: DepNodeKind; name?: string; alertId?: string };
 
 export type DepRelation = "usage" | "template" | "override";
 
+/** The three lists the graph is built from. */
+export type GraphInput = "alerts" | "destinations" | "templates";
+
 export interface DepNode {
   /** `${kind}:${name}` — stable across rebuilds; alerts key on their id. */
   id: string;
@@ -491,8 +494,14 @@ export function useDependencyGraph() {
     };
   };
 
-  const loadGraph = async (org: string) => {
-    if (graphCache && graphCache.org === org && Date.now() - graphCache.at < GRAPH_TTL_MS) {
+  /** `refetch` names the inputs a user refresh must re-read; the caller's own list is already fresh, so it is left out. */
+  const loadGraph = async (org: string, refetch: GraphInput[] = []) => {
+    if (
+      !refetch.length &&
+      graphCache &&
+      graphCache.org === org &&
+      Date.now() - graphCache.at < GRAPH_TTL_MS
+    ) {
       graph.value = graphCache.graph;
       loading.value = false;
       error.value = null;
@@ -505,10 +514,22 @@ export function useDependencyGraph() {
       // the page it was opened from already fetched. Calling the destination
       // service directly here used to download the destination list a second
       // time on the destinations page's own refresh.
+      const inputs = {
+        alerts: alertDependenciesQuery(org),
+        destinations: destinationsQuery(org, "alert"),
+        templates: templatesQuery(org),
+      };
+      for (const name of refetch) {
+        await queryClient.invalidateQueries({
+          queryKey: inputs[name].queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
       const [alerts, destinations, templates] = await Promise.all([
-        queryClient.fetchQuery(alertDependenciesQuery(org)),
-        queryClient.fetchQuery(destinationsQuery(org, "alert")),
-        queryClient.fetchQuery(templatesQuery(org)),
+        queryClient.fetchQuery(inputs.alerts),
+        queryClient.fetchQuery(inputs.destinations),
+        queryClient.fetchQuery(inputs.templates),
       ]);
 
       graph.value = buildGraph(alerts, destinations, templates);

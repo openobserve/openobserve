@@ -1264,7 +1264,7 @@ export default defineComponent({
           // force-refetch each involved folder so titles/owners are current.
           const org = store.state.selectedOrganization?.identifier;
           const userId = store.state.userInfo?.email;
-          if (org && userId) await loadFavorites(org, userId);
+          if (org && userId) await loadFavorites(org, userId, force);
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           const fetched = await Promise.all(
             favFolders.map((fid) =>

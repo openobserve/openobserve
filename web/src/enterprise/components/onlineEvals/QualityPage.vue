@@ -56,7 +56,7 @@
         :rows="configRows"
         :is-loading="isConfigsLoading || !!configsLoading || !!agentsLoading"
         @select="selectConfig"
-        @refresh="refreshAll"
+        @refresh="refreshAll(true)"
       />
     </div>
 
@@ -275,12 +275,13 @@ const numericRange = computed(() => {
   return { min: Number(r.min), max: Number(r.max) };
 });
 
-async function refreshAll() {
+async function refreshAll(reloadConfigs = false) {
   // The score-configs list arrives as a prop, so refreshing only the derived
   // aggregates leaves it untouched — and each of those bails out early when the
   // list is empty, which is why the button appeared to do nothing at all. Ask
   // the parent to re-read the list first, then recompute from it.
-  emit("reload-configs");
+  // Only a user refresh asks; mount, date and agent reloads reuse the list the parent holds.
+  if (reloadConfigs) emit("reload-configs");
   await Promise.all([refresh(), refreshConfigs(), refreshDetail(), refreshCharts(), refreshRuns()]);
 }
 

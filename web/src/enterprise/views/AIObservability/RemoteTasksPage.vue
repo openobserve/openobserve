@@ -423,9 +423,17 @@ function onEmptyAction(id?: string) {
 
 /** Best-effort: a task list that renders without its reference counts is far
  *  better than one that fails because a second, unrelated request did. */
-async function loadReferenceCounts() {
+async function loadReferenceCounts(force = false) {
   try {
-    const experiments = await queryClient.fetchQuery(experimentsListQuery(orgId.value));
+    const options = experimentsListQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const experiments = await queryClient.fetchQuery(options);
     const counts: Record<string, number> = {};
     for (const experiment of experiments) {
       if (experiment.task?.type !== "remote") continue;
@@ -463,7 +471,7 @@ async function refresh(force = false) {
   } finally {
     loading.value = false;
   }
-  await loadReferenceCounts();
+  await loadReferenceCounts(force);
 }
 
 async function removeTask(row: RemoteTask) {

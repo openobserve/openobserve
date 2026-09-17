@@ -198,7 +198,7 @@ the Free Software Foundation, either version 3 of the License, or
             :score-configs="scoreConfigs"
             :configs-loading="isLoading"
             @update:agent-key="onQualityAgentChange"
-            @ready="reloadQuality"
+            @ready="reloadQuality()"
             @reload-configs="reloadLists()"
           />
           <ScoreConfigList
@@ -682,7 +682,7 @@ const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
 const qualityPageRef = ref<{
-  refreshAll: () => Promise<void>;
+  refreshAll: (reloadConfigs?: boolean) => Promise<void>;
   isAnyLoading: boolean;
 } | null>(null);
 
@@ -707,12 +707,21 @@ const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
 // start of a reload instead of looking idle until the data queries kick in.
 const qualityAgentsLoading = ref(false);
 
-async function loadQualityAgents() {
+async function loadQualityAgents(force = false) {
   const { startUs, endUs } = qualityDateWindow.value;
   if (!orgId.value || !startUs || !endUs) return;
   qualityAgentsLoading.value = true;
   try {
-    const response = await queryClient.fetchQuery(genAiAgentsQuery(orgId.value, startUs, endUs));
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     qualityAgents.value = response.agents;
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&
@@ -752,7 +761,7 @@ function syncQualityDateWindow() {
 // unchanged) and is handled separately by onQualityAgentChange below.
 const qualityReloading = ref(false);
 
-async function reloadQuality() {
+async function reloadQuality(userRefresh = false) {
   qualityReloading.value = true;
   try {
     // On the @ready trigger this runs from QualityPage's onMounted; wait a
@@ -760,8 +769,8 @@ async function reloadQuality() {
     // call into it.
     await nextTick();
     syncQualityDateWindow();
-    await loadQualityAgents();
-    await qualityPageRef.value?.refreshAll?.();
+    await loadQualityAgents(userRefresh);
+    await qualityPageRef.value?.refreshAll?.(userRefresh);
   } finally {
     qualityReloading.value = false;
   }
@@ -770,7 +779,7 @@ async function reloadQuality() {
 // Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
 // to "now" via the shared reload path.
 function onQualityRefresh() {
-  void reloadQuality();
+  void reloadQuality(true);
 }
 
 // Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits

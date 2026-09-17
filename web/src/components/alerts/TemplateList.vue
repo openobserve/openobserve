@@ -498,10 +498,14 @@ watch(
   { once: true },
 );
 
+// Read by the watcher below: the rebuild after a forced read must also re-read the lists this page does not own.
+let graphInputsStale = false;
+
 const getTemplates = async (force = false) => {
   if (!force) return;
   // Rebuilding the graph costs three more list calls, so only a forced read pays for it.
   invalidateDependencyGraphCache();
+  graphInputsStale = true;
   await templatesList.refetch();
 };
 
@@ -729,7 +733,8 @@ watch(
   () => {
     if (!templatesList.data.value) return;
     updateRoute();
-    loadDepGraph(orgIdForList.value);
+    loadDepGraph(orgIdForList.value, graphInputsStale ? ["alerts", "destinations"] : []);
+    graphInputsStale = false;
   },
   { immediate: true },
 );

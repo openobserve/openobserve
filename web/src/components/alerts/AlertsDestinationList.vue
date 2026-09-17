@@ -656,7 +656,7 @@ export default defineComponent({
           // a plain mount leaves the graph's own cache to answer, and the
           // "Used by" counts still follow every write.
           if (force) invalidateDependencyGraphCache();
-          loadDepGraph(org);
+          loadDepGraph(org, force ? ["alerts", "templates"] : []);
         })
         .catch((err: any) => {
           forbidden.value = err?.response?.status === 403;

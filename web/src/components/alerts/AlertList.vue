@@ -2424,9 +2424,18 @@ export default defineComponent({
       handleActionQuery,
       { immediate: true }, // Run immediately to handle direct navigation
     );
-    const getDestinations = async () => {
-      queryClient
-        .fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"))
+    const getDestinations = async (force = false) => {
+      const options = destinationsQuery(store.state.selectedOrganization.identifier, "alert");
+      // A destination created in the form's new tab never expires this tab's cache, so refresh forces.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
         .then((list: any) => {
           destinations.value = list as any;
         })
@@ -2966,7 +2975,7 @@ export default defineComponent({
     };
 
     const refreshDestination = async () => {
-      await getDestinations();
+      await getDestinations(true);
     };
 
     const importAlert = () => {

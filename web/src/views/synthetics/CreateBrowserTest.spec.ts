@@ -166,6 +166,7 @@ vi.mock("@/components/synthetics/CreateBrowserTest.schema", () => {
 import CreateBrowserTest from "./CreateBrowserTest.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWizardUi";
+import destinationService from "@/services/alert_destination";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 const baseStubs = {
@@ -883,6 +884,21 @@ describe("CreateBrowserTest", () => {
   // back as `?folder=`, which the server treats as authoritative for both the
   // destination folder and the RBAC gate, so the save failed on a folder the
   // author never picked.
+  describe("destinations refresh", () => {
+    // A destination made in another tab never expires this tab's cache, so only a forced read shows it.
+    it("should re-read the destinations from the server when the picker asks for a refresh", async () => {
+      wrapper = await mountCreateAtConfigure();
+      expect(destinationService.list).toHaveBeenCalledTimes(1);
+
+      wrapper
+        .findComponent('[data-test="synthetics-check-configure"]')
+        .vm.$emit("refresh:destinations");
+      await flushPromises();
+
+      expect(destinationService.list).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe("create mode — preselected folder from ?folder=", () => {
     const folders = [
       { folderId: "default", name: "default" },

@@ -693,7 +693,7 @@ async function loadTraceStreams() {
 // on every tab toggle. Guarding on this kills a redundant /gen_ai/agents call
 // per toggle.
 let agentsLoadedWindow = "";
-async function loadAgents(startTime?: number, endTime?: number) {
+async function loadAgents(startTime?: number, endTime?: number, force = false) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
@@ -708,7 +708,16 @@ async function loadAgents(startTime?: number, endTime?: number) {
   const windowKey = `${start}-${end}`;
   if (agentsLoaded.value && agentsLoadedWindow === windowKey) return;
   try {
-    const agentList = await queryClient.fetchQuery(genAiAgentsQuery(orgId, start, end));
+    const options = genAiAgentsQuery(orgId, start, end);
+    // Past the window guard a user refresh must reach the server: the key buckets the window by the minute.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const agentList = await queryClient.fetchQuery(options);
     agents.value = agentList.agents;
     agentsLoadedWindow = windowKey;
     // Proactively seed the panel-cache stub for every selection at this window —
@@ -873,7 +882,7 @@ async function loadInsights(startTime?: number, endTime?: number, opts?: { force
       // Agent tab can't fetch until it knows the agent's source stream, so the
       // agents list must be loaded first — await it here. (Agents API is only
       // ever hit on the Agent tab.)
-      await loadAgents(start, end);
+      await loadAgents(start, end, force);
       // Seed the cascade from a carried-over agent NAME (URL `?agent=` deep-link,
       // else the persisted last selection) now that the list exists. On a match
       // this pins env→name→version so `selectedAgent` resolves; then clear it.

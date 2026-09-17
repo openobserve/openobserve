@@ -26,6 +26,8 @@ export const annotationKeys = {
   // Deliberately the whole dashboards root, matching the previous scope: an
   // annotation write invalidates the dashboards it can appear on.
   all: (org: string) => orgKey(org, "dashboards"),
+  dashboard: (org: string, dashboardId: string) =>
+    orgKey(org, "dashboards", "annotations", dashboardId),
   list: (org: string, dashboardId: string, params: unknown) =>
     orgKey(org, "dashboards", "annotations", dashboardId, params),
 };

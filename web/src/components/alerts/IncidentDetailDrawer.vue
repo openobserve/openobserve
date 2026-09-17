@@ -2132,7 +2132,7 @@ export default defineComponent({
           !correlationData.value?.traceStreams?.length
         ) {
           // No correlation data found - try building fallback correlation
-          await buildFallbackCorrelation(org, incidentDetails.value);
+          await buildFallbackCorrelation(org, incidentDetails.value, force);
         }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
@@ -2144,7 +2144,7 @@ export default defineComponent({
     };
 
     // Build fallback correlation using first alert's stream schema
-    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+    const buildFallbackCorrelation = async (org: string, incident: Incident, force = false) => {
       try {
         const groupValues: Record<string, string> = incident.group_values ?? {};
         // Get first alert to determine source stream
@@ -2159,7 +2159,16 @@ export default defineComponent({
         const streamName = firstAlert.stream_name || "default";
 
         // Step 1: Get stream schema (like logs page does)
-        const schema = await queryClient.fetchQuery(streamSchemaQuery(org, streamName, streamType));
+        const schemaOptions = streamSchemaQuery(org, streamName, streamType);
+        // Retry is the user asking again, so a field added since the last read must show up.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: schemaOptions.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        const schema = await queryClient.fetchQuery(schemaOptions);
 
         // Step 2: Extract schema fields (like logs page does)
         // CRITICAL FIX: Use uds_schema (user-defined schema) if available!

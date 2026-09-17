@@ -206,12 +206,18 @@ const forbidden = computed(() => {
 // we simply render no member counts.
 const roleUserCounts = ref<Record<string, number> | null>(null);
 
-const loadRoleUserCounts = async () => {
+const loadRoleUserCounts = async (force = false) => {
   if (config.isEnterprise !== "true" && config.isCloud !== "true") return;
   try {
-    const res = await queryClient.fetchQuery(
-      allUserRolesQuery(store.state.selectedOrganization.identifier),
-    );
+    const options = allUserRolesQuery(store.state.selectedOrganization.identifier);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res = await queryClient.fetchQuery(options);
     const counts: Record<string, number> = {};
     // Response is a map of user email -> role list.
     Object.values(res ?? {}).forEach((roles: any) => {
@@ -273,7 +279,11 @@ watch(rolesList.error, (err: any) => {
 // Only an explicit call reads: refresh, post-write reload, search. Mount and
 // invalidation-driven repaints come from the query itself.
 const setupRoles = async (force = false) => {
-  if (force) await rolesList.refetch();
+  if (!force) return;
+  await rolesList.refetch();
+  // Members are assigned from the Users page, and an unchanged roles list never re-fires the watcher.
+  await loadRoleUserCounts(true);
+  applyRoleUserCounts();
 };
 
 const orgId = useOrgId();

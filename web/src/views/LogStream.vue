@@ -901,11 +901,20 @@ export default defineComponent({
     } | null>(null);
     const summaryLoading = ref(true);
 
-    const getStreamSummary = () => {
+    const getStreamSummary = (force = false) => {
       if (!store.state.selectedOrganization?.identifier) return;
       summaryLoading.value = true;
-      queryClient
-        .fetchQuery(orgSummaryQuery(store.state.selectedOrganization.identifier))
+      const options = orgSummaryQuery(store.state.selectedOrganization.identifier);
+      // Ingestion moves these totals and no write expires them, so refresh must force.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      ready
+        .then(() => queryClient.fetchQuery(options))
         .then((data: any) => {
           streamSummary.value = data?.streams ?? null;
         })
@@ -990,7 +999,7 @@ export default defineComponent({
     // Refresh = rows + footprint. Pagination / sorting only re-fetch the rows.
     const refreshStreams = () => {
       getLogStream(true);
-      getStreamSummary();
+      getStreamSummary(true);
     };
 
     getStreamSummary();

@@ -808,7 +808,6 @@ const manualSearch = () => {
 };
 
 const fetchAlertHistory = async (force = false) => {
-  loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
 
@@ -877,8 +876,6 @@ const fetchAlertHistory = async (force = false) => {
       variant: "error",
       message: error.response?.data?.message || error.message || t("alerts.failedToFetchHistory"),
     });
-  } finally {
-    loading.value = false;
   }
 };
 

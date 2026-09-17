@@ -130,14 +130,19 @@ const workflowsEnabled = computed(
 );
 
 const workflowOptions = ref<{ label: I18nText; value: string }[]>([]);
-const fetchWorkflows = async () => {
+const fetchWorkflows = async (force = false) => {
   if (!workflowsEnabled.value) return;
   try {
-    // Shares the Workflows page's cache entry — the dropdown must not issue
-    // its own request on every form open.
-    const list = await queryClient.fetchQuery(
-      workflowsQuery(store.state.selectedOrganization.identifier),
-    );
+    const options = workflowsQuery(store.state.selectedOrganization.identifier);
+    // A workflow created in the new tab never expires this tab's cache, so refresh must force.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
     // Drafts aren't runnable/published, so they can't be linked to an alert —
     // only offer non-draft (published) workflows.
     workflowOptions.value = list
@@ -147,12 +152,12 @@ const fetchWorkflows = async () => {
     workflowOptions.value = [];
   }
 };
-onMounted(fetchWorkflows);
+onMounted(() => fetchWorkflows());
 
 // The combined field's single refresh reloads both lists.
 const refreshTargets = () => {
   emit("refresh");
-  fetchWorkflows();
+  fetchWorkflows(true);
 };
 
 // New tab, not navigation: leaving the form here would discard the alert

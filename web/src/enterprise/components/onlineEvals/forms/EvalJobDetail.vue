@@ -758,10 +758,19 @@ const selectedAgent = computed<AgentFilterSelection | null>(() => {
   return agents.value.find((agent) => agentFilterKey(agent) === agentKey.value) ?? null;
 });
 
-async function loadAgents() {
+async function loadAgents(force = false) {
   const { startUs, endUs } = dateWindow.value;
   try {
-    const response = await queryClient.fetchQuery(genAiAgentsQuery(orgId.value, startUs, endUs));
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     agents.value = response.agents;
     if (
       agentKey.value !== ALL_AGENTS_VALUE &&
@@ -834,6 +843,8 @@ function openEvaluationRun(run: JobRunRow) {
 // (KPI strip + Runs + Failures), since one picker drives the whole view.
 async function refreshAll() {
   syncDateWindow();
+  // The window watcher's own read is not forced, and does not run at all when the window is unchanged.
+  void loadAgents(true);
   await refreshRunsData();
 }
 

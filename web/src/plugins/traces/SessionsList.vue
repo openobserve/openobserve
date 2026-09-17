@@ -630,14 +630,23 @@ function formatTokens(n: number): string {
   return `${t.value}${t.unit}`;
 }
 
-async function loadAgents(startTime?: number, endTime?: number) {
+async function loadAgents(startTime?: number, endTime?: number, force = false) {
   const orgId = store.state.selectedOrganization?.identifier;
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!orgId || !start || !end) return;
   agentsLoaded.value = false;
   try {
-    const agentList = await queryClient.fetchQuery(genAiAgentsQuery(orgId, start, end));
+    const options = genAiAgentsQuery(orgId, start, end);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const agentList = await queryClient.fetchQuery(options);
     agents.value = agentList.agents;
     // The cascade selection is reconciled against the fresh list by
     // useAgentScope's watcher (invalid env/name/version fall back / clear), so
@@ -683,7 +692,13 @@ function clearSessionRows() {
   hasMore.value = false;
 }
 
-async function loadSessions(startTime?: number, endTime?: number, force = false) {
+// `forceAgents` is separate from `force`: search, paging and sorting force the rows but not the agent list.
+async function loadSessions(
+  startTime?: number,
+  endTime?: number,
+  force = false,
+  forceAgents = false,
+) {
   const start = startTime ?? props.startTime;
   const end = endTime ?? props.endTime;
   if (!start || !end) return;
@@ -725,7 +740,7 @@ async function loadSessions(startTime?: number, endTime?: number, force = false)
 
   // Agents API is only relevant in Agent mode — don't touch it in Stream mode.
   if (filterMode.value === "agent") {
-    await loadAgents(start, end);
+    await loadAgents(start, end, forceAgents);
     // Seeds the cascade now that the list exists (a no-op if the setup-time
     // call above already resolved it — see seedPendingCascade's own comment).
     seedPendingCascade();
@@ -860,7 +875,7 @@ async function refresh(startTime?: number, endTime?: number, force = true) {
   // Only snap back to page 1 when we're actually going to fetch. On the
   // non-forced mount replay we skip the fetch and keep the restored page.
   if (force) currentPage.value = 1;
-  await loadSessions(startTime, endTime, force);
+  await loadSessions(startTime, endTime, force, force);
 }
 
 defineExpose({ refresh, lastRunAt, loading });

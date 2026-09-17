@@ -61,7 +61,7 @@
         icon-left="refresh"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"
-        @click="refresh"
+        @click="refresh(true)"
       >
         <OTooltip side="bottom" :content="t('common.refresh')" />
       </OButton>
@@ -538,12 +538,18 @@ function openExperiment(row: { id: string }) {
 }
 
 /** Best-effort: an unreachable experiments list must not blank the task page. */
-async function loadUsedBy(name: string) {
+async function loadUsedBy(name: string, force = false) {
   loadingUsedBy.value = true;
   try {
-    const experiments: LlmExperiment[] = await queryClient.fetchQuery(
-      experimentsListQuery(orgId.value),
-    );
+    const options = experimentsListQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const experiments: LlmExperiment[] = await queryClient.fetchQuery(options);
     usedBy.value = experiments
       .filter(
         (experiment) =>
@@ -628,7 +634,8 @@ async function copyRef() {
   }
 }
 
-async function refresh() {
+// `force` is for the Refresh button: experiments made elsewhere never expire this tab's cached list.
+async function refresh(force = false) {
   if (!orgId.value || !entityId.value) return;
   loading.value = true;
   try {
@@ -638,7 +645,7 @@ async function refresh() {
     ]);
     task.value = head;
     versions.value = allVersions;
-    void loadUsedBy(head.name);
+    void loadUsedBy(head.name, force);
   } catch (error: any) {
     toast({
       variant: "error",

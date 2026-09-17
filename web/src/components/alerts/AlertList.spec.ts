@@ -513,6 +513,20 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
+  // A destination made in the form's new tab never expires this tab's cache, so only a forced read shows it.
+  it("re-reads destinations from the server when the form asks for a refresh", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await flushPromises();
+    const afterMount = destinationsSvc.list.mock.calls.length;
+    expect(afterMount).toBeGreaterThan(0);
+
+    await wrapper.vm.refreshDestination();
+    await flushPromises();
+
+    expect(destinationsSvc.list).toHaveBeenCalledTimes(afterMount + 1);
+  });
+
   // period, state, level, last_trained_at are intentionally absent (config
   // detail, or duplicate a neighbouring column); frequency remains — it is
   // the list's only visible cadence signal for non-realtime alerts.

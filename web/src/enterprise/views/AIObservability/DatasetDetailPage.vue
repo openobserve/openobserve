@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 icon-left="refresh"
                 :loading="loading"
                 data-test="ai-dataset-detail-refresh-btn"
-                @click="refresh"
+                @click="refresh(true)"
               >
                 <OTooltip side="bottom" :content="t('common.refresh')" />
               </OButton>
@@ -244,7 +244,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               compact
               @open-filtered="openExperiments"
-              @refresh="refreshExperiments"
+              @refresh="refreshExperiments(true)"
               @baseline-changed="onBaselineChanged"
             />
           </OContent>
@@ -535,7 +535,7 @@ function sourceVariant(source: LlmDatasetItemSource): BadgeVariant {
   return source === "trace" ? "blue-soft" : source === "annotation" ? "purple-soft" : "orange-soft";
 }
 
-async function refresh() {
+async function refresh(force = false) {
   if (!orgId.value || !datasetId.value) return;
   loading.value = true;
   try {
@@ -549,7 +549,7 @@ async function refresh() {
     dataset.value = ds;
     items.value = page.items;
     totalItems.value = page.total;
-    await refreshExperiments();
+    await refreshExperiments(force);
   } catch {
     toast({ variant: "error", message: t("aiObservability.datasets.detail.loadError") });
   } finally {
@@ -572,11 +572,18 @@ const saveItemWrite = useMutation(() =>
 const removeItemWrite = useMutation(() => removeDatasetItemMutation(orgId.value));
 const importItems = useMutation(() => importDatasetItemsMutation(orgId.value));
 
-async function refreshExperiments() {
+// `force` is for the Refresh buttons: experiments made elsewhere never expire this tab's cached list.
+async function refreshExperiments(force = false) {
   try {
-    experiments.value = await queryClient.fetchQuery(
-      experimentsListQuery(orgId.value, datasetId.value),
-    );
+    const options = experimentsListQuery(orgId.value, datasetId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    experiments.value = await queryClient.fetchQuery(options);
   } catch {
     experiments.value = [];
   }

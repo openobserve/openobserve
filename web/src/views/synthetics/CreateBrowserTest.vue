@@ -347,11 +347,18 @@ async function fetchLocations() {
   }
 }
 
-async function loadDestinations() {
+async function loadDestinations(force = false) {
   try {
-    const list = await queryClient.fetchQuery(
-      destinationsQuery(store.state.selectedOrganization.identifier),
-    );
+    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    // A destination created in another tab never expires this tab's cache, so refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
     destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
@@ -1169,7 +1176,7 @@ function onClearResults() {
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
               class="border-border-default w-full! border-t"
-              @refresh:destinations="loadDestinations"
+              @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"
