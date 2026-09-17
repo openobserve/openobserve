@@ -228,7 +228,17 @@ const failedStepNumber = computed(() => {
 const filterQuery = ref("");
 const expandedStepIds = ref<string[]>([]);
 const selectedStepIds = ref<string[]>([]);
-// A computed reads filteredSteps lazily, so declaring it here (before filteredSteps) is safe.
+const filteredSteps = computed<BrowserStep[]>(() => {
+  const q = filterQuery.value.trim().toLowerCase();
+  if (!q) return props.modelValue;
+  return props.modelValue.filter(
+    (step) =>
+      step.name?.toLowerCase().includes(q) ||
+      step.action.toLowerCase().includes(q) ||
+      step.selector?.toLowerCase().includes(q) ||
+      step.value?.toLowerCase().includes(q),
+  );
+});
 const filterActive = computed(() => filteredSteps.value.length < props.modelValue.length);
 
 // ── "Where did my new step go?" ────────────────────────────────────────────
@@ -579,7 +589,7 @@ const selectedIdsInModelOrder = computed(() => {
   return props.modelValue.filter((s) => set.has(s.id)).map((s) => s.id);
 });
 
-// Also keyed on the joined ids, so a same-size id swap still re-emits.
+// Keyed on the joined ids too, so a same-size id swap re-emits; immediate, so a remount resyncs the host.
 watch(
   [selectedCount, () => selectedIdsInModelOrder.value.join(","), isRecording],
   ([count, , recording]) => {
@@ -589,6 +599,7 @@ watch(
       ids: selectedIdsInModelOrder.value,
     });
   },
+  { immediate: true },
 );
 
 // ── Step validation (Continue button + save) ──────────────────────────────
@@ -1058,19 +1069,6 @@ onBeforeUnmount(() => {
   recorder.setOnExternalStop(null);
   recorder.cleanup();
   window.clearTimeout(flashTimer);
-});
-
-// ── Step list (single flat list — one journey, one start URL) ───────────────
-const filteredSteps = computed<BrowserStep[]>(() => {
-  const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return props.modelValue;
-  return props.modelValue.filter(
-    (step) =>
-      step.name?.toLowerCase().includes(q) ||
-      step.action.toLowerCase().includes(q) ||
-      step.selector?.toLowerCase().includes(q) ||
-      step.value?.toLowerCase().includes(q),
-  );
 });
 
 // ── Journey suggestions ────────────────────────────────────────────────────

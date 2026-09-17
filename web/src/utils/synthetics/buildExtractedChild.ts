@@ -84,7 +84,8 @@ export function buildExtractedChildCheck(input: ExtractedChildInput): BrowserChe
 }
 
 export function seedChildName(parentName: string, firstStepName: string): string {
-  const seed = parentName.trim() ? `${parentName}${NAME_SEPARATOR}${firstStepName}` : firstStepName;
+  const parent = parentName.trim();
+  const seed = parent ? `${parent}${NAME_SEPARATOR}${firstStepName}` : firstStepName;
   const bytes = new TextEncoder().encode(seed);
   if (bytes.length <= NAME_MAX_BYTES) return seed;
   let cut = NAME_MAX_BYTES;

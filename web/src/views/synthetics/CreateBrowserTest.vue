@@ -1722,7 +1722,7 @@ function onClearResults() {
           :range="extractRange"
           :anchor="extractAnchor"
           :authored-count="check.journey.length"
-          :executed-count="executedStepCount ?? check.journey.length"
+          :executed-count="executedStepCount"
           :parent-name="check.name"
           :default-folder="check.folder ?? 'default'"
           :folders="folders"

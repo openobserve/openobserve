@@ -46,7 +46,7 @@ const props = defineProps<{
   range: BrowserStep[];
   anchor: number;
   authoredCount: number;
-  executedCount: number;
+  executedCount?: number;
   parentName: string;
   defaultFolder: string;
   folders: SyntheticsFolder[];
@@ -146,9 +146,17 @@ const thisTestLine = computed(() =>
   }),
 );
 
+// Only the interval shapes the locale can phrase; a cron or day-based parent shows no row rather than a wrong one.
+const summarisableSchedule = computed(() => {
+  const { type, intervalValue, intervalUnit } = props.parentSchedule;
+  if (type !== "interval" || intervalValue === undefined) return null;
+  if (intervalUnit !== "minutes" && intervalUnit !== "hours") return null;
+  return { n: intervalValue, unit: intervalUnit };
+});
+
 const scheduleLine = computed(() => {
-  const n = props.parentSchedule.intervalValue ?? 0;
-  const unit = props.parentSchedule.intervalUnit ?? "minutes";
+  if (!summarisableSchedule.value) return "";
+  const { n, unit } = summarisableSchedule.value;
   const locations = props.parentLocations
     .map((id) => props.locationOptions.find((l) => l.id === id)?.label ?? id)
     .join(", ");
@@ -211,9 +219,11 @@ const scheduleLine = computed(() => {
       <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
         <dt class="text-text-secondary">{{ t("synthetics.journey.steps") }}</dt>
         <dd class="text-text-body m-0">{{ stepsLine }}</dd>
-        <dt class="text-text-secondary">{{ t("synthetics.journey.extract.labelThisTest") }}</dt>
-        <dd class="text-text-body m-0">{{ thisTestLine }}</dd>
-        <template v-if="!needsSchedule">
+        <template v-if="executedCount !== undefined">
+          <dt class="text-text-secondary">{{ t("synthetics.journey.extract.labelThisTest") }}</dt>
+          <dd class="text-text-body m-0">{{ thisTestLine }}</dd>
+        </template>
+        <template v-if="!needsSchedule && summarisableSchedule">
           <dt class="text-text-secondary">{{ t("synthetics.scheduleAlert.schedule") }}</dt>
           <dd class="text-text-body m-0">{{ scheduleLine }}</dd>
         </template>

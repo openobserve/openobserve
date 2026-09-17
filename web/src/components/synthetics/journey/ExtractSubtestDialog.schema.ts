@@ -15,6 +15,7 @@
 
 import { z } from "zod";
 import type { BrowserCheckSchedule } from "@/types/synthetics";
+import type { TranslateFn } from "@/types/i18n";
 import { NAME_MAX_BYTES } from "@/utils/synthetics/buildExtractedChild";
 
 /** The interval presets `CheckSchedule.vue` offers, keyed so `OSelect` can hold them. */
@@ -28,8 +29,6 @@ export const SCHEDULE_PRESETS = {
 
 export const DEFAULT_SCHEDULE_PRESET: SchedulePresetKey = "5min";
 
-type Translate = (_key: string, _params?: Record<string, unknown>) => string;
-
 export type SchedulePresetKey = keyof typeof SCHEDULE_PRESETS;
 
 /** What the host receives: the preset key already mapped to a schedule. */
@@ -40,7 +39,7 @@ export interface ExtractForm {
   schedule?: BrowserCheckSchedule;
 }
 
-export const makeExtractSubtestSchema = (t: Translate, needsSchedule: boolean) =>
+export const makeExtractSubtestSchema = (t: TranslateFn, needsSchedule: boolean) =>
   z.object({
     name: z
       .string()
