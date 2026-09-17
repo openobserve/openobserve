@@ -13,8 +13,6 @@ import logging
 import os
 import time
 
-import pytest
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -71,7 +69,6 @@ def _drop(session, base_url, stream):
     session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs")
 
 
-@pytest.mark.regression
 class TestQueryRegressions:
     def test_max_with_alias_returns_a_value(self, create_session, base_url, random_string):
         """#3864: MAX(_timestamp) aliased to latest_timestamp returned nothing."""

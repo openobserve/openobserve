@@ -19,8 +19,6 @@ import logging
 import os
 import time
 
-import pytest
-
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -75,7 +73,6 @@ def _delete_by_name(session, base_url, name):
             session.delete(f"{base_url}api/{ORG_ID}/pipelines/{p['pipeline_id']}")
 
 
-@pytest.mark.regression
 class TestRealtimePipelineExclusivity:
     def test_second_realtime_pipeline_on_same_stream_is_rejected(
         self, create_session, base_url, random_string

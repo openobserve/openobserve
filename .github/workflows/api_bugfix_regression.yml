@@ -1,10 +1,13 @@
 name: API Bug-Fix Regression Tests
 
-# Companion to playwright_bugfix_regression.yml, for the API side. Runs only the
-# tests marked `regression` (bug-fix cover for a closed issue), wherever they
-# live in the feature folders — see tests/api-testing/pyproject.toml. The PR
-# gate stays in api-testing.yml; this is the scheduled net that catches a
-# regression landing on main between PRs.
+# Companion to playwright_bugfix_regression.yml, for the API side. Runs
+# tests/api-testing/tests/regression/bugfix/ — bug-fix cover for closed issues.
+#
+# That path sits under tests/regression/, which api-testing.yml excludes with
+# --ignore=tests/regression (recursive), so these do not run on the PR gate.
+# That mirrors the UI split: RegressionSet is absent from ci_matrix.json and
+# present only in ci_matrix_regression.json. Targeting the directory rather than
+# a file list means a new test is picked up by adding the file.
 
 on:
   schedule:
@@ -183,7 +186,7 @@ jobs:
         run: rye sync
         working-directory: tests/api-testing/
 
-      - name: Run regression-marked API tests
+      - name: Run bug-fix regression tests
         run: |
           ${{ github.workspace }}/target/debug/openobserve > o2_api_regression.log 2>&1 &
           SERVER_PID=$!
@@ -193,7 +196,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest -m regression -v --junitxml=junit-api-regression.xml
+          rye run pytest tests/regression/bugfix/ -v --junitxml=junit-api-regression.xml
           kill $SERVER_PID || true
         working-directory: tests/api-testing/
 
