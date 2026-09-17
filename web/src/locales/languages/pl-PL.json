@@ -3572,7 +3572,8 @@
     "title": "Aby zacząć, połączmy Twoje pierwsze źródło danych.",
     "description": "Mamy Ci wiele do pokazania, ale najpierw musimy połączyć Twoje dane. Większość zespołów widzi swoje pierwsze logi w ciągu około minuty.",
     "connectButton": "Połącz źródło danych",
-    "dismissLink": "Zrobię to później"
+    "dismissLink": "Zrobię to później",
+    "slackLink": "Dołącz także do naszej społeczności na Slacku"
   },
   "confirmDialog": {
     "continueFromWherePaused": "Kontynuuj od miejsca, w którym przerwano",
