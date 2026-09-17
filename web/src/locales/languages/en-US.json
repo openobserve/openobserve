@@ -13891,6 +13891,38 @@
       "checks": "Checks"
     },
     "journey": {
+      "extract": {
+        "action": "Extract to subtest",
+        "title": "Extract {count} step to a new test | Extract {count} steps to a new test",
+        "subtitle": "The steps move to a new browser test, created now. This journey keeps a subtest reference in their place — save this test to keep it.",
+        "confirm": "Extract",
+        "nameLabel": "Test name",
+        "folderLabel": "Folder",
+        "labelThisTest": "This test",
+        "nameTooLong": "Keep the name under 256 bytes",
+        "steps": "Step {first} · starts at {path} | Steps {first} – {last} · starts at {path}",
+        "thisTest": "{authored} steps after extraction · runs the same {executed} steps",
+        "schedule": "{locations} · {frequency} (same as this test)",
+        "status": "Created paused. Runs only as part of this test until you enable it.",
+        "variablesCopied": "Copied to the new test: {names}.",
+        "variablesToDefine": "Define on the new test before running it alone: {names}.",
+        "every": "every {n} {unit}",
+        "unit": { "minutes": "minute | minutes", "hours": "hour | hours" },
+        "historyNotice": "Step history restarts. These steps get new ids in the new test, so per-step charts split at today.",
+        "created": "Created \"{name}\". Save this test to keep the reference.",
+        "orphan": "Created \"{name}\" but could not update this journey. Open the new test or delete it.",
+        "folderForbidden": "You can't create tests in \"{folder}\". Choose another folder.",
+        "reason": {
+          "not-contiguous": "Select steps that are next to each other",
+          "not-contiguous-filtered": "Select steps that are next to each other — clear the filter to see the full list",
+          "no-navigate-first": "Selection must start with a navigate step",
+          "contains-subtest": "A subtest cannot contain another subtest",
+          "referenced": "This test is used as a subtest by other tests and cannot hold one",
+          "referenced-pending": "Checking where this test is used…",
+          "referenced-unknown": "Could not check where this test is used",
+          "undefined-placeholder": "Define {name} under Variables before extracting"
+        }
+      },
       "actionLabels": {
         "navigate": "Navigate",
         "click": "Click",

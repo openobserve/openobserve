@@ -175,7 +175,7 @@ const emit = defineEmits<{
   "replay-up-to": [upTo: number];
   "stop-replay": [];
   "auto-record-consumed": [];
-  "selection-changed": [{ count: number; isRecording: boolean }];
+  "selection-changed": [{ count: number; isRecording: boolean; ids: string[] }];
   /**
    * The setup dialog's incognito ack was just given — the toggle reloads the
    * extension, so the owner of `extensionReady` must invalidate and re-probe.
@@ -230,6 +230,8 @@ const failedStepNumber = computed(() => {
 const filterQuery = ref("");
 const expandedStepIds = ref<string[]>([]);
 const selectedStepIds = ref<string[]>([]);
+// A computed reads filteredSteps lazily, so declaring it here (before filteredSteps) is safe.
+const filterActive = computed(() => filteredSteps.value.length < props.modelValue.length);
 
 // ── "Where did my new step go?" ────────────────────────────────────────────
 // Root element, so the row lookup in revealStep stays inside THIS journey's
@@ -432,6 +434,25 @@ function deleteSelectedSteps() {
   selectedStepIds.value = [];
 }
 
+/** Returns the reference step's id; clears the selection itself because a one-step range keeps the length. */
+function replaceRangeWithSubtest(
+  range: { anchor: number; count: number },
+  child: { id: string; name: string },
+): string {
+  const step: BrowserStep = {
+    id: getUUIDv7(true),
+    action: "subtest",
+    name: child.name,
+    subtest: { id: child.id, name: child.name },
+  };
+  const next = [...props.modelValue];
+  next.splice(range.anchor, range.count, step);
+  emit("update:modelValue", next);
+  selectedStepIds.value = [];
+  revealStep(step.id);
+  return step.id;
+}
+
 // Clear selection when the step list changes, filter changes, or replay starts.
 // Also clear replay banner when all steps are deleted so stale pass/fail banners
 // don't linger after the user removes every step.
@@ -554,10 +575,23 @@ watch(
   },
 );
 
-// Emit selection state changes for the parent's sticky footer
-watch([selectedCount, isRecording], ([count, recording]) => {
-  emit("selection-changed", { count, isRecording: recording });
+// Selected ids in model order; the host judges extract eligibility on these.
+const selectedIdsInModelOrder = computed(() => {
+  const set = new Set(selectedStepIds.value);
+  return props.modelValue.filter((s) => set.has(s.id)).map((s) => s.id);
 });
+
+// Also keyed on the joined ids, so a same-size id swap still re-emits.
+watch(
+  [selectedCount, () => selectedIdsInModelOrder.value.join(","), isRecording],
+  ([count, , recording]) => {
+    emit("selection-changed", {
+      count,
+      isRecording: recording,
+      ids: selectedIdsInModelOrder.value,
+    });
+  },
+);
 
 // ── Step validation (Continue button + save) ──────────────────────────────
 const selectorErrors = ref<Set<string>>(new Set());
@@ -721,7 +755,9 @@ function clearFirstStepError() {
 defineExpose({
   selectedCount,
   isRecording,
+  filterActive,
   deleteSelectedSteps,
+  replaceRangeWithSubtest,
   stopActiveRecording,
   stopActiveReplay,
   // Still imperative: both callers (Continue-to-Configure, the replay gate) run

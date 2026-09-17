@@ -20,6 +20,7 @@ export const COMPOSED_ID_DELIMITER = "_";
 export const COMPOSED_NAME_SEPARATOR = " › ";
 /** Actions whose `value` maps to a wire field (`text`, `options`, `files`) the server never scans. */
 const UNSCANNED_VALUE_ACTIONS = new Set(["assert", "select", "upload"]);
+const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 
 export interface ExpansionEntry {
   authoredStepId: string;
@@ -94,15 +95,21 @@ export function expandJourney(
   return { steps: out, map };
 }
 
-/** Mirrors the server's placeholder scan over `PLACEHOLDER_FIELDS`. */
+/** Mirrors the server's placeholder scan over `PLACEHOLDER_FIELDS`: names in text order, deduped. */
+export function placeholdersIn(steps: BrowserStep[]): string[] {
+  const found = new Set<string>();
+  for (const step of steps) {
+    if (UNSCANNED_VALUE_ACTIONS.has(step.action) || !step.value) continue;
+    for (const match of step.value.matchAll(PLACEHOLDER_RE)) found.add(match[1]);
+  }
+  return [...found];
+}
+
 export function undefinedPlaceholders(child: ChildJourney, defined: Iterable<string>): string[] {
   const known = new Set(defined);
-  const found = new Set<string>();
-  for (const step of child.steps) {
-    if (UNSCANNED_VALUE_ACTIONS.has(step.action) || !step.value) continue;
-    for (const match of step.value.matchAll(/\{\{\s*(\w+)\s*\}\}/g)) found.add(match[1]);
-  }
-  return [...found].filter((name) => !known.has(name)).sort();
+  return placeholdersIn(child.steps)
+    .filter((name) => !known.has(name))
+    .sort();
 }
 
 export function translateStepId(map: ExpansionMap, stepId: string): string {
