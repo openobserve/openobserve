@@ -381,6 +381,7 @@ def test_trigger_alert_returns_200(
         f"alert should still be retrievable after trigger: {resp_get.status_code}"
 
 
+@pytest.mark.regression
 def test_trigger_populates_last_triggered_at(
     client: OpenObserveClient, temp_alert: dict[str, Any]
 ):
@@ -405,10 +406,13 @@ def test_trigger_populates_last_triggered_at(
         f"#5745: last_triggered_at must be populated after a trigger, got {last!r} "
         f"(was {before!r} before)"
     )
-    assert isinstance(last, int) and last > 0, \
+    assert isinstance(last, int), \
+        f"#5745: last_triggered_at must be an epoch integer, got {last!r}"
+    assert last > 0, \
         f"#5745: last_triggered_at must be a positive epoch value, got {last!r}"
 
 
+@pytest.mark.regression
 def test_float_threshold_alert_does_not_panic(
     client: OpenObserveClient, temp_alert_prereqs: dict[str, str]
 ):

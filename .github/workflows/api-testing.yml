@@ -11,18 +11,10 @@ on:
     # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
-  schedule:
-    # Same cadence as playwright_bugfix_regression.yml, bracketing the IST
-    # workday: 11:00 PM IST (17:30 UTC) and 5:00 AM IST (23:30 UTC).
-    - cron: '30 17 * * *'  # 11:00 PM IST
-    - cron: '30 23 * * *'  # 5:00 AM IST
-  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
-  # Superseding a PR push is wanted; cancelling an in-flight scheduled or manual
-  # run because the next one fired is not.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 env:
   COLUMNS: 150
@@ -46,63 +38,26 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      actions: read  # `gh run list`, for the last scheduled run's head_sha
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
-      # Path classification needs a PR base, so schedule/dispatch decide here and
-      # skip the checkout entirely.
-      - id: non_pr
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Manual dispatch — running the full API suite."
-            exit 0
-          fi
-          # Re-running a SHA the previous scheduled run already covered is waste.
-          # Any query failure falls through to running rather than skipping.
-          LAST_SHA=$(gh run list \
-            --workflow "${{ github.workflow }}" \
-            --branch main \
-            --limit 50 \
-            --json databaseId,headSha,status,event \
-            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\" and .event == \"schedule\")] | .[0].headSha" \
-            2>/dev/null || echo "")
-          echo "Current main SHA: ${{ github.sha }}"
-          echo "Last scheduled:   ${LAST_SHA:-<none>}"
-          if [ -n "$LAST_SHA" ] && [ "${{ github.sha }}" = "$LAST_SHA" ]; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::main unchanged since the last scheduled API run — skipping."
-          else
-            echo "has_changes=true" >> "$GITHUB_OUTPUT"
-          fi
-
       # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
       - if: github.event_name == 'pull_request'
         run: sleep 60
-      - if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       # One shared classification for every suite (see .github/actions/classify-changes); a change to
       # this workflow file re-tests itself on top of it.
-      - if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        uses: ./.github/actions/classify-changes
+      - uses: ./.github/actions/classify-changes
         id: classify
       - id: check
         env:
-          EVENT: ${{ github.event_name }}
-          NON_PR: ${{ steps.non_pr.outputs.has_changes }}
           HAS_CHANGES: ${{ steps.classify.outputs.run_api }}
           CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          if [ "$EVENT" = "schedule" ] || [ "$EVENT" = "workflow_dispatch" ]; then
-            echo "has_changes=$NON_PR" >> "$GITHUB_OUTPUT"
-          elif [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' api-testing.yml '; then
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' api-testing.yml '; then
             echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_changes=false" >> "$GITHUB_OUTPUT"

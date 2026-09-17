@@ -19,6 +19,8 @@ import logging
 import os
 import time
 
+import pytest
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,7 @@ def _search_hits(session, base_url, stream):
     return resp.json().get("hits", [])
 
 
+@pytest.mark.regression
 class TestDeleteFieldsReservedColumns:
     def test_reserved_columns_are_rejected(self, create_session, base_url, random_string):
         session = create_session

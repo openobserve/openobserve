@@ -13,6 +13,8 @@ import logging
 import os
 import time
 
+import pytest
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -69,6 +71,7 @@ def _drop(session, base_url, stream):
     session.delete(f"{base_url}api/{ORG_ID}/streams/{stream}?type=logs")
 
 
+@pytest.mark.regression
 class TestQueryRegressions:
     def test_max_with_alias_returns_a_value(self, create_session, base_url, random_string):
         """#3864: MAX(_timestamp) aliased to latest_timestamp returned nothing."""
@@ -86,7 +89,10 @@ class TestQueryRegressions:
             assert len(hits) == 1, f"#3864: an aggregate must return exactly one row, got {hits}"
             assert "latest_timestamp" in hits[0], \
                 f"#3864: the alias must be projected, got keys {list(hits[0])}"
-            assert isinstance(hits[0]["latest_timestamp"], int) and hits[0]["latest_timestamp"] > 0, \
+            latest = hits[0]["latest_timestamp"]
+            assert isinstance(latest, int), \
+                f"#3864: the alias must carry an integer timestamp, got {hits[0]}"
+            assert latest > 0, \
                 f"#3864: the alias must carry the max timestamp, got {hits[0]}"
         finally:
             _drop(session, base_url, stream)

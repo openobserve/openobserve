@@ -1,0 +1,237 @@
+name: API Bug-Fix Regression Tests
+
+# Companion to playwright_bugfix_regression.yml, for the API side. Runs only the
+# tests marked `regression` (bug-fix cover for a closed issue), wherever they
+# live in the feature folders — see tests/api-testing/pyproject.toml. The PR
+# gate stays in api-testing.yml; this is the scheduled net that catches a
+# regression landing on main between PRs.
+
+on:
+  schedule:
+    # Same cadence as playwright_bugfix_regression.yml, bracketing the IST
+    # workday: 11:00 PM IST (17:30 UTC) and 5:00 AM IST (23:30 UTC).
+    - cron: '30 17 * * *'  # 11:00 PM IST
+    - cron: '30 23 * * *'  # 5:00 AM IST
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  COLUMNS: 150
+  ZO_ROOT_USER_EMAIL: root@example.com
+  ZO_ROOT_USER_PASSWORD: Complexpass#123
+  ZO_BASE_URL: http://localhost:5080/
+  ZO_BASE_URL_SC: http://localhost:5080/
+  WS_ZO_BASE_URL: ws://localhost:5080/
+  ZO_USAGE_PUBLISH_INTERVAL: 5
+  ZO_ALERT_SCHEDULE_INTERVAL: 3
+  ZO_SMTP_ENABLED: true
+  ZO_CREATE_ORG_THROUGH_INGESTION: true
+  ZO_INGEST_ALLOWED_UPTO: 48
+  # Alert-destination fixtures point at localhost; without this they fail on the
+  # SSRF guard rather than on anything under test.
+  ZO_SSRF_ALLOW_LOOPBACK: true
+
+jobs:
+  # Scheduled runs on an unchanged main would rebuild and re-test an identical
+  # commit. Manual dispatch always runs.
+  check_main_changed:
+    timeout-minutes: 5
+    name: check_main_changed
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read  # for `gh run list` (last run's head_sha)
+    outputs:
+      should_run: ${{ steps.decide.outputs.should_run }}
+    steps:
+      - id: decide
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Manual dispatch — running regardless of main changes."
+            exit 0
+          fi
+          CURRENT_SHA="${{ github.sha }}"
+          # On any query failure LAST_SHA stays empty and we run rather than skip.
+          LAST_SHA=$(gh run list \
+            --workflow "${{ github.workflow }}" \
+            --branch main \
+            --limit 50 \
+            --json databaseId,headSha,status \
+            --jq "[.[] | select(.databaseId != ${{ github.run_id }} and .status == \"completed\")] | .[0].headSha" \
+            2>/dev/null || echo "")
+          if [ -z "$LAST_SHA" ]; then
+            echo "::warning::Could not determine last run SHA — defaulting to run."
+          fi
+          echo "Current main SHA: ${CURRENT_SHA:-<none>}"
+          echo "Last run SHA:     ${LAST_SHA:-<none>}"
+          if [ -n "$LAST_SHA" ] && [ "$CURRENT_SHA" = "$LAST_SHA" ]; then
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::main unchanged since last API regression run ($CURRENT_SHA) — skipping."
+          else
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_api_binary:
+    timeout-minutes: 45
+    name: build_api_binary
+    needs: [check_main_changed]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubicloud-standard-4
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
+    permissions:
+      contents: read
+    steps:
+      - name: Remove unused tools
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - uses: ./.github/actions/github-auth
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
+        with:
+          toolchain: nightly-2026-05-20
+
+      - name: Setup Rust Cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      # Default features on purpose: the same OSS build api-testing.yml makes, so
+      # a test needing enterprise code fails here rather than passing quietly.
+      - name: Build OpenObserve debug binary
+        run: cargo build --features mimalloc
+
+      - name: Package OpenObserve debug binary
+        run: |
+          strip target/debug/openobserve
+          tar -C target/debug -czf openobserve-api-debug.tar.gz openobserve
+
+      - name: Upload OpenObserve debug binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-api-regression-${{ github.sha }}
+          path: openobserve-api-debug.tar.gz
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
+
+  api_regression_tests:
+    timeout-minutes: 30
+    name: api_regression_tests
+    needs: [check_main_changed, build_api_binary]
+    if: ${{ needs.check_main_changed.outputs.should_run == 'true' }}
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-regression-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        id: setup-python
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run regression-marked API tests
+        run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_api_regression.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest -m regression -v --junitxml=junit-api-regression.xml
+          kill $SERVER_PID || true
+        working-directory: tests/api-testing/
+
+      - name: Upload API junit (regression)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__api_bugfix_regression__main
+          path: tests/api-testing/junit-api-regression.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload server log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-api-regression-log
+          path: tests/api-testing/o2_api_regression.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  api_regression_summary:
+    name: api_regression_summary
+    needs: [check_main_changed, build_api_binary, api_regression_tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.check_main_changed.outputs.should_run }}" != "true" ]; then
+            echo "main unchanged since the last run — suite not required."
+            exit 0
+          fi
+          if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
+             [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
+            echo "API regression suite passed"
+            exit 0
+          fi
+          echo "API regression failed: build=${{ needs.build_api_binary.result }}, tests=${{ needs.api_regression_tests.result }}"
+          exit 1
