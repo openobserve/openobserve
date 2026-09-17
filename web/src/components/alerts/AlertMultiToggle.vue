@@ -32,7 +32,7 @@
 -->
 <template>
   <div
-    class="rounded-default text-compact flex items-start gap-3 px-3 py-2"
+    class="rounded-default text-compact flex items-start gap-3 px-3 py-2 max-md:flex-col max-md:gap-1"
     data-test="alerts-alertmultitoggle-row"
   >
     <span

@@ -27,15 +27,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   navigation identical from anywhere.
 -->
 <template>
-  <div class="flex items-start">
-    <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
+  <div class="flex items-start max-md:flex-col max-md:gap-1">
+    <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold max-md:w-auto">
       {{ required ? labelText + " *" : labelText }}
       <template v-if="tooltipText">
         <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
         <OTooltip :content="tooltipText" side="right" />
       </template>
     </div>
-    <div class="flex flex-col">
+    <div class="flex min-w-0 flex-col max-md:w-full">
       <AlertTargetsSelect
         :destinations="destinations"
         :workflows="workflows"

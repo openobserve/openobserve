@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #toolbar>
             <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
             <div
-              class="flex min-w-0 flex-1 items-center gap-2 max-lg:@container/synthetics-toolbar max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+              class="@container/synthetics-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
             >
               <!-- Type tabs -->
               <OToggleGroup
