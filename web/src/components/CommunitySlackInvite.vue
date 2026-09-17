@@ -30,13 +30,16 @@ const store = useStore();
 
 // ── Exit-intent invite (self-contained) ─────────────────────────────────────
 // Shown when the cursor heads toward the browser chrome (tab/window close),
-// capped at VISIT_CAP lifetime shows, and never again once dismissed or
-// joined. Cloud-only — never shown on self-hosted Enterprise or open source.
-// All trigger/persistence state lives here so the host layout stays clean.
+// up to VISIT_CAP lifetime shows unless the user joins Slack, which
+// suppresses it for good. Cloud-only — never shown on self-hosted Enterprise
+// or open source. All trigger/persistence state lives here so the host
+// layout stays clean.
 const isOpen = ref(false);
 
-// Per-user "seen" record — set permanently on every dismissal path (see
-// dismiss() below), independent of the visit cap.
+// Per-user "seen" record — set permanently only on Join Slack (see
+// joinSlack() below). A plain dismiss (×, Maybe later, overlay/Escape) does
+// NOT set this: the user may still be shown the invite again on a later
+// visit, up to VISIT_CAP.
 const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
 
 // Lifetime cap on how many qualifying sessions may trigger the dialog via
@@ -72,6 +75,11 @@ onMounted(() => {
   // captured, listened for, or shown there.
   if (config.isCloud !== "true") return;
   if (localStorage.getItem(seenKey) === "true") return;
+
+  // Never compete with ConnectDataSourcePopup during the user's first-login
+  // session — GetStarted clears this flag when onboarding completes, so the
+  // invite becomes eligible again from the next session onward.
+  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
   const currentCount = Number(localStorage.getItem(visitCountKey) ?? "0");
   if (currentCount >= VISIT_CAP) return;
@@ -118,20 +126,21 @@ const avatarBgClasses = [
   "bg-avatar-tint-4",
 ];
 
-// Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
-// closes the dialog and marks it seen so it never shows again for this user.
+// × / overlay / Escape / Maybe later: closes the dialog only. The visit cap
+// (not this) governs whether it can show again on a future visit.
 const dismiss = () => {
   isOpen.value = false;
-  localStorage.setItem(seenKey, "true");
 };
 
 const handleOpenChange = (open: boolean) => {
   if (!open) dismiss();
 };
 
+// Joining is the one action that suppresses the invite for good.
 const joinSlack = () => {
   window.open(slackUrl.value, "_blank", "noopener");
-  dismiss();
+  isOpen.value = false;
+  localStorage.setItem(seenKey, "true");
 };
 </script>
 
