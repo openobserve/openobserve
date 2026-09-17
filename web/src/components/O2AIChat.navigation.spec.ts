@@ -95,6 +95,25 @@ describe("generateNavigationFromToolResult", () => {
     expect(generateNavigationFromToolResult("listThings", { a: 1 }, { id: "x" }, t)).toBeNull();
   });
 
+  // A deleted resource has no page left to open, so a "View" link would lead to a missing record.
+  it("returns null for a delete tool even when the id is known", () => {
+    expect(
+      generateNavigationFromToolResult("deleteAlert", { alert_id: "a1" }, { alert_id: "a1" }, t),
+    ).toBeNull();
+    expect(
+      generateNavigationFromToolResult("DeleteDashboard", { dashboard_id: "d1" }, {}, t),
+    ).toBeNull();
+  });
+
+  it("still builds navigate_direct for get and update tools", () => {
+    expect(generateNavigationFromToolResult("getAlert", { alert_id: "a1" }, {}, t)?.action).toBe(
+      "navigate_direct",
+    );
+    expect(
+      generateNavigationFromToolResult("updateDashboard", { dashboard_id: "d1" }, {}, t)?.action,
+    ).toBe("navigate_direct");
+  });
+
   it("builds navigate_direct from a {resource}_id in the response", () => {
     const action = generateNavigationFromToolResult(
       "createAlert",

@@ -109,7 +109,7 @@ function searchNavigation(callArgs: any, t: TranslateFn): NavigationAction | nul
 
 /**
  * Maps a tool result to a navigation action: SQL-bearing search tools become a
- * `load_query`, create/get/update/delete tools carrying a `{resource}_id` become a
+ * `load_query`, create/get/update tools carrying a `{resource}_id` become a
  * `navigate_direct`. Returns null when neither pattern has the fields it needs.
  */
 export function generateNavigationFromToolResult(
@@ -125,7 +125,8 @@ export function generateNavigationFromToolResult(
   const searchAction = searchNavigation(callArgs, t);
   if (searchAction !== undefined) return searchAction;
 
-  const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
+  // No delete: a removed resource has no page left to open.
+  const resourceTypeMatch = toolName.match(/^(create|get|update)(.+)$/i);
   if (!resourceTypeMatch) return null;
 
   const resourceType = resourceTypeMatch[2].toLowerCase();
