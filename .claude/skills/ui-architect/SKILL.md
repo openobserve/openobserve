@@ -36,7 +36,9 @@ description: >-
   side panels become drawers that open from their own row, row actions fold into a
   kebab, and popups fit the viewport. It also settles the recurring
   structural decisions: use OTable for any tabular data, follow the
-  view → service → Vuex/local-ref layering for fetching list data, choose the
+  TanStack Query layering for server data (a declared queryOptions() per read
+  on its module's staleTime tier, mutationOptions() writes that invalidate,
+  refresh buttons that force every read on the view, no Vuex copies), choose the
   right form container (ConfirmDialog vs ODialog vs ODrawer vs a full in-page
   view) by the weight of the interaction, and build every validated form with
   OForm + a colocated Zod schema (single-source-of-truth name-bound fields, no
@@ -45,7 +47,7 @@ description: >-
   validate, or restyle any screen, component, header, table, list, dialog,
   drawer, form, field, or panel in the web frontend, asks to make any of them
   work on mobile / phone / tablet / small screens (responsive), or asks where a
-  form/table/fetch should live, how to validate a form, how to add a keyboard
+  form/table/fetch should live, how to cache or refresh server data, how to validate a form, how to add a keyboard
   shortcut, how to build a new reusable/common O2 component when nothing existing
   fits (create one in web/src/lib instead of assembling divs and classes),
   whether something belongs in a dialog or a drawer, or where a new page should be
@@ -557,14 +559,13 @@ and each domain has its own reference below.
 
 | Decision | The rule | Detail |
 | --- | --- | --- |
-| Fetching data for a page | Never call a service from a component. Declare a `queryOptions()` in `services/<domain>.queries.ts` and `useQuery` it — never a bare `staleTime` at a call site. | [references/data-fetching.md](references/data-fetching.md) · [inventory](references/data-fetching-inventory.md) |
+| **Server data (fetch & cache)** | Every read is a declared `queryOptions()` in `services/<domain>.queries.ts` (reuse the existing one if the list is already declared), keyed with `orgKey`, on its **module's** `staleTime` tier from `cachePolicy.ts`; components `useQuery` it (rows as a `computed`) — never `http`/axios, never a Vuex copy of a server list. Writes are `mutationOptions()` with `meta.invalidates`. A user refresh forces **every** read on the view; mount, paging and search read the cache. | [data-fetching](references/data-fetching.md) |
 | **Tabular data** | `OTable` + `OTableColumnDef[]`; client-side pagination unless the backend paginates a set too large to fetch whole | [core-controls-table](references/core-controls-table.md) |
 | **Charts / graphs** | **Every data chart renders through the shared dashboard engine — never mount a charting lib in a feature page.** Time-series, category, scatter, geo/map, gauge, pie → **`PanelSchemaRenderer`** (`web/src/components/dashboards/PanelSchemaRenderer.vue`) with a panel schema: it runs the query, applies the app's unit/theme/annotation formatting, and owns the loading/error ladder. **Banned in feature code:** `echarts.init` / a raw `<v-chart>` / ApexCharts / D3 / Chart.js / a hand-rolled `<canvas>` or `<svg>` plot. The low-level **`panels/ChartRenderer.vue`** (raw ECharts option) is the ONLY sanctioned escape hatch, and ONLY when you need chart-`@click` forwarding `PanelSchemaRenderer` doesn't re-emit — annotate the site with why, and convert once the schema renderer forwards clicks. **Not charts** (do NOT force these through the renderer): in-row trend lines are **`OSparkline`**, single-value share bars are **`OProgressBar`**, in-cell data bars are the table's **`ODataBarCell`**, and a decorative topology/diagram is bespoke SVG. | [core-display](references/core-display.md) |
 | **Whole-page layout** | **Every routed view is a `OPageLayout`.** It's the ONE page component — it owns the full-height column, the header (from `:title`/`:icon`/`:subtitle`/`:back` props + `#actions`/`#header-tabs`, the latter needing **`tabs-below`** to land in row 2 instead of inline), an optional `#subnav` strip, an optional `#sidebar` rail (fixed or `resizable`), and the body's inset. You plug in data; there's no place to hand-roll a padded `<div>`. Body is inset to the page-edge grid by default — pass **`bleed`** for a full-bleed body (an `OTable`, a chart, a `router-view` shell), or **`constrained`** for a centered reading column (forms). The `#header` slot is a rare escape hatch only. | [page-recipes](references/page-recipes.md) |
 | **Content inset** | `OPageLayout` already insets the body. Anywhere else (a panel, a dialog section, one tab's content) wrap it in **`OContent`** (bakes the one `px-page-edge` grid line, the primitive `OPageLayout` uses internally) instead of hand-picking `px-2`/`px-4`/`p-2.5`; pass `bleed` (or `bleed-x`/`bleed-y`) for full-bleed content that owns its own edge — same escape-hatch idea as `ODrawer`/`ODialog` `bleed`. Never hand-roll a content inset. | [conventions](references/conventions.md) |
 | **Tab strips** | an `OTabs` strip needs **no** horizontal wrapper padding — the first tab's label self-aligns to the `px-page-edge` grid, so it lines up with the `OContent` body below it. Put the strip's bottom divider on the strip (`border-b`) and give it no `px-*`; wrapping a tab strip in `px-page-edge` double-insets the labels. | [conventions](references/conventions.md) |
 | **Listing toolbar** | every list carries three affordances — search + filters (`#toolbar`), refresh (`#toolbar-trailing`), and the auto-injected column-visibility toggle; empty state is one `OEmptyState` with `:filtered`, in the `#empty` slot only, plus `:forbidden` on the table so a 403 shows "You don't have access" instead of "create your first…" | [page-recipes](references/page-recipes.md) |
-| **Data fetching** | view → domain service (`src/services`, via the `http.ts` wrapper) → Vuex (shared/cached) or local `ref` (ephemeral); never call `http`/axios from a component | [conventions](references/conventions.md) |
 | **Form container** | confirm → `ConfirmDialog`; short form → `ODialog`; tall or contextual form → `ODrawer`; primary multi-section flow → a full in-page view. Use `ODialog` / `ODrawer` for these | [conventions](references/conventions.md) |
 | **Form validation** | `OForm` + a colocated Zod `<Form>.schema.ts`; fields are `OForm*` bound **only by `name=`** (no `v-model`/`ref` mirror, no `formData`); submit + loading automatic; payload built with explicit keys; field arrays use `:key="index"` | [forms-validation](references/forms-validation.md) |
 | **New page in nav** | a route **+ exactly one** surface (rail item / flyout child / Settings / IAM sub-page) **+** an env/role gate — the route condition, the nav-entry gate, and the SectionRail `visible` all express the same rule | [navigation-menus](references/navigation-menus.md) |
@@ -657,10 +658,12 @@ considering the UI done:
 - [ ] Any data the page reads is a `queryOptions()` in
       `services/<domain>.queries.ts`, consumed with `useQuery` — not a service
       call with a hand-rolled `loading` ref. Durations come from
-      `cachePolicy.ts`, never a bare number. Writes are `mutationOptions()`
-      declaring `meta.invalidates`; a component never calls `invalidateQueries`
-      itself. Anything carrying a token or key material omits the `persister`.
-      See [references/data-fetching.md](references/data-fetching.md).
+      `cachePolicy.ts` (the module's tier), never a bare number; no `persister`,
+      no per-query `gcTime`. Writes are `mutationOptions()` declaring
+      `meta.invalidates`; a component never calls `invalidateQueries` itself.
+      Refresh (button, `r`, section icons, Retry) forces **every** read on the
+      view through a named handler. See
+      [references/data-fetching.md](references/data-fetching.md).
 - [ ] Every interactive control is an O2 component if one exists in
       `web/src/lib` — no bare HTML controls or third-party primitives with an O2 equivalent.
 - [ ] A self-contained/repeated UI element with no matching component was
@@ -705,8 +708,9 @@ considering the UI done:
       (`config.isEnterprise` / `config.isCloud` / `zoConfig.*`), with the route,
       nav-entry gate, and SectionRail `visible` all in sync
       (see [navigation-menus.md](references/navigation-menus.md)).
-- [ ] Data fetched through a domain service (`src/services`), not raw `http` in
-      the component; shared data in Vuex, ephemeral data in local refs.
+- [ ] Server data reaches the component through a declared query (never raw
+      `http`), and no server list is copied into Vuex or a load-once map;
+      ephemeral view state stays in local refs.
 - [ ] Form container matches weight: confirm → `ConfirmDialog`, short form →
       `ODialog`, large/contextual form → `ODrawer`, primary multi-section flow →
       full page.

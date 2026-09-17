@@ -237,8 +237,10 @@ Lay out a whole page from a recipe, not from scratch — full recipes in
     `:show-global-filter="false"`. Only a search-only list with no other filters
     uses the built-in `show-global-filter` + `v-model:global-filter`.
   - **Refresh** — an `OButton variant="outline" size="icon-sm" icon-left="refresh"
-:loading` in the `#toolbar-trailing` slot, wired to the fetch fn, with a
-    tooltip carrying the `r` shortcut.
+    :loading` in the `#toolbar-trailing` slot, with a tooltip carrying the `r`
+    shortcut. It calls a named handler that **forces** every read on the view
+    (never the plain mount fetch, which serves the cache) — see
+    [data-fetching.md § The refresh rule](data-fetching.md#the-refresh-rule).
   - **Column show/hide toggle** — `OTable` **auto-injects** it (between `#toolbar`
     and `#toolbar-trailing`) when `:persist-columns="true"` + a stable `table-id` +
     at least one non-action column marked `hideable: true` are all present. Omit
@@ -282,31 +284,37 @@ of that inconsistently and re-implements pagination you'd then have to retest.
 For a list/table screen the flow is:
 
 ```
-view (src/views)
-  → [optional] composable (src/composables/use*)  OR  helper (utils/commons.ts)
+view (src/views) / component
+  → useQuery / useMutation  (or queryClient.fetchQuery for imperative flows)
+  → declaration (src/services/<domain>.queries.ts + <domain>.querykeys.ts)
   → service (src/services/<domain>.ts, via the http.ts wrapper)
-  → Vuex store (shared/cacheable data)   +   local refs (ephemeral render data)
+  → TanStack Query cache (shared server data)   +   local refs (ephemeral view state)
 ```
 
-**How.**
+**How.** The full contract — keys, tiers, refresh and invalidation rules — is in
+[data-fetching.md](data-fetching.md). In short:
 
-- **Never call `http`/axios directly from a component.** Fetch through the
-  domain service in `src/services` (e.g. `dashboardService.list(...)`). Get
-  `org_identifier` from `store.state.selectedOrganization` — don't thread it down
-  through props.
-- **Composables (`use*`)** are optional thin wrappers that inject the org and
-  wrap service calls. Add one when 2+ components share the same fetch/transform;
-  otherwise calling the service straight from the view is the accepted norm here.
-- **State placement:** genuinely shared/cached org data (streams, dashboards,
-  folders, …) goes in a namespaced Vuex module. Per-screen table rows and column
-  defs stay in local `ref`/`computed` — don't push throwaway view state into
-  Vuex.
+- **Never call `http`/axios from a component**, and don't call the domain
+  service for a read either: read it through its declared query
+  (`useQuery(() => thingsQuery(orgId.value))`). Get the org from `useOrgId()`
+  (or `store.state.selectedOrganization` inside an imperative call) — don't
+  thread it down through props.
+- **Composables (`use*`)** wrap a query when 2+ components share the same
+  read/transform; they read through the declared query too, never a private
+  cache.
+- **State placement:** shared server data lives in the query cache, **not in
+  Vuex** — a Vuex copy never expires, so the query's freshness tier is never
+  consulted. Per-screen table rows derive from the query with a `computed`;
+  column defs and UI state stay in local `ref`/`computed`.
 - **Keep views thin:** fetch + wire only. Heavy transforms belong in the
-  service, composable, or a `utils` helper, not inline in the template's script.
+  query's `queryFn`, a composable, or a `utils` helper, not inline in the
+  template's script.
 
-**Why.** The layer boundary is what lets a second screen reuse a fetch, lets a
-test mock a service, and keeps the store from silting up with ephemeral state. A
-component that calls axios directly can't be reused or tested without a network.
+**Why.** The layer boundary is what lets a second screen reuse a read (and its
+cache entry), lets a write expire every screen that shows the data, and lets a
+test mock a service while exercising the real cache. A component that calls
+axios directly — or keeps its own copy — can't share, refresh or be tested
+consistently.
 
 ### The same figure must render identically everywhere
 

@@ -115,7 +115,6 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
-    "@tanstack/vue-query-devtools": "^6.1.38",
     "@types/d3-force": "^3.0.10",
     "@types/d3-scale": "^4.0.9",
     "@types/fs-extra": "^11.0.4",
