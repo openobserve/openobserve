@@ -120,7 +120,7 @@ const resolvedRowClass = computed(() => {
 });
 
 // < md columns scroll within the table rather than being crushed down to the name column.
-const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
+const { isMobile: isMobileViewport } = useBreakpoint();
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 const showColumnToggle = computed(
@@ -902,9 +902,8 @@ const allowHorizontalScroll = computed(() => {
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
     return fillMinSum() > containerWidth.value + 1;
   }
-  // < lg past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
-  if (!lgUp.value) return fillMinSum() > containerWidth.value + 1;
-  return false;
+  // Past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
+  return fillMinSum() > containerWidth.value + 1;
 });
 
 const SPACER_ID = "__spacer__";
