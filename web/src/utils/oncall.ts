@@ -415,12 +415,7 @@ const RENAMED_TIMEZONES = ["Asia/Kolkata", "Asia/Ho_Chi_Minh", "Europe/Kyiv", "A
 export function resolvableTimezones(preferred?: string): string[] {
   const canonical =
     typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
-  const wanted = [
-    "UTC",
-    ...canonical,
-    ...RENAMED_TIMEZONES,
-    ...(preferred ? [preferred] : []),
-  ];
+  const wanted = ["UTC", ...canonical, ...RENAMED_TIMEZONES, ...(preferred ? [preferred] : [])];
   const seen = new Set<string>();
   return wanted.filter((zone) => {
     if (!zone || seen.has(zone)) return false;
