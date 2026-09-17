@@ -189,11 +189,12 @@ mod tests {
         let guards = source.matches(&guard).count();
 
         assert_eq!(
-            publishes, 17,
+            publishes, 18,
             "expected 6 check publishes (create/update/delete/set_enabled/bulk-delete/move), 3 \
              location publishes (create/update/delete), 3 probe-token publishes \
-             (create/rotate/set_enabled) and 5 shared-variable publishes (variable put/delete, \
-             environment put/delete, batch)"
+             (create/rotate/set_enabled), 5 shared-variable publishes (variable put/delete, \
+             environment put/delete, batch) and the check update a promote writes through the \
+             table layer"
         );
         // `location_entry` reads the same flag without publishing anything — it
         // decides whether a location's missing agent rows are evidence or just

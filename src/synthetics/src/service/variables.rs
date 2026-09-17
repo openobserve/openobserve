@@ -897,9 +897,14 @@ pub async fn promote_check_variable(
     publish_variable_put(&record).await?;
 
     check.variables.remove(position);
-    synthetics_checks::update(conn, org_id, check_id, check)
+    synthetics_checks::update(conn, org_id, check_id, check.clone())
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    // The check lost a variable, and this writes through the table layer rather
+    // than `update_synthetic`, so nothing else broadcasts it. Without this the
+    // other regions keep the inline copy, which outranks the shared row, and
+    // the promote reads as a no-op everywhere but here.
+    publish_check_update(org_id, check_id, &check).await?;
     project_view(org_id, &record).await
 }
 
@@ -1239,6 +1244,37 @@ async fn publish_environment_delete(org_id: &str, id: &str) -> anyhow::Result<()
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = (org_id, id);
+    Ok(())
+}
+
+/// Broadcasts the check a promote just edited.
+///
+/// `promote_check_variable` writes through the table layer, so it bypasses the
+/// broadcast `update_synthetic` does.
+async fn publish_check_update(
+    org_id: &str,
+    check_id: &str,
+    check: &Synthetic,
+) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsCheckPayload};
+        let slug = folders::get_name_by_pk(&check.folder_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+            .unwrap_or_default();
+        queue::synthetics_check_update(
+            org_id,
+            check_id,
+            SyntheticsCheckPayload::for_wire(org_id, check, &slug).await?,
+        )
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, check_id, check);
     Ok(())
 }
 
