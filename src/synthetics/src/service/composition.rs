@@ -18,7 +18,7 @@
 use std::collections::{HashMap, HashSet};
 
 use config::meta::{
-    synthetics::{BrowserConfig, MAX_STEPS, Synthetic, SyntheticType, validate_expanded_steps},
+    synthetics::{BrowserConfig, Synthetic, SyntheticType, validate_expanded_steps},
     synthetics_composition::{
         ChildJourney, ExpansionError, expand_steps, placeholders_in, subtest_refs,
     },
@@ -192,14 +192,15 @@ fn check_rules(
         )),
         other => CompositionError::Invalid(format!("config.steps: {other}")),
     })?;
-    if expanded.len() > MAX_STEPS {
+    let max_steps = config::get_config().synthetics.browser_max_steps;
+    if expanded.len() > max_steps {
         let from_children: usize = refs
             .iter()
             .filter_map(|r| children.get(r))
             .map(|c| c.steps.len())
             .sum();
         return Err(CompositionError::Invalid(format!(
-            "config.steps: this test executes {} steps — {} of its own plus {} from {} subtest{}. The limit is {MAX_STEPS}.",
+            "config.steps: this test executes {} steps — {} of its own plus {} from {} subtest{}. The limit is {max_steps}.",
             expanded.len(),
             cfg.steps.len() - refs.len(),
             from_children,
