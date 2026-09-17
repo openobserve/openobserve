@@ -215,6 +215,44 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
+
+    it("marks the session as resolved when the org already has data, so a later mount skips the summary call", async () => {
+      let summaryCalls = 0;
+      global.server.use(
+        http.get(SUMMARY_URL, () => {
+          summaryCalls += 1;
+          return HttpResponse.json({ streams: { num_streams: 5 } });
+        }),
+      );
+
+      wrapper = buildWrapper();
+      await flushPromises();
+      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBe("true");
+      expect(summaryCalls).toBe(1);
+
+      wrapper.unmount();
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(summaryCalls).toBe(1);
+    });
+
+    it("skips the summary call entirely when isDataIngested is already known true", async () => {
+      let summaryCalls = 0;
+      global.server.use(
+        http.get(SUMMARY_URL, () => {
+          summaryCalls += 1;
+          return HttpResponse.json({ streams: { num_streams: 0 } });
+        }),
+      );
+      store.dispatch("setIsDataIngested", true);
+
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(summaryCalls).toBe(0);
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
   });
 
   // ── Session cap ──────────────────────────────────────────────────────────────
@@ -333,13 +371,12 @@ describe("ConnectDataSourcePopup", () => {
       );
     });
 
-    it("renders the dismiss link as a plain button, not OButton", () => {
+    it("renders the dismiss link as an OButton with the ghost-muted variant", () => {
       wrapper = buildWrapper();
 
       const dismissLink = wrapper.find('[data-test="connect-data-source-popup-dismiss-link"]');
-      expect(dismissLink.element.tagName).toBe("BUTTON");
-      // OButton marks its root with data-o2-btn; the dismiss link must not be one.
-      expect(dismissLink.attributes("data-o2-btn")).toBeUndefined();
+      expect(dismissLink.attributes("data-o2-btn")).toBeDefined();
+      expect(dismissLink.attributes("data-o2-variant")).toBe("ghost-muted");
     });
 
     it("passes size='sm' and show-close=false to ODialog", () => {
