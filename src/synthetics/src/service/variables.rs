@@ -117,6 +117,8 @@ pub async fn create_environment(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
+    publish_environment_put(&record).await?;
+
     if ofga_enabled() {
         set_ownership(org_id, &environment_object(&record.name), "", "").await;
     }
@@ -178,6 +180,7 @@ pub async fn duplicate_environment(
     synthetics_environments::add(&txn, &target)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let mut copies = Vec::with_capacity(rows.len());
     for row in &rows {
         let copy = SyntheticsVariableRecord {
             id: config::ider::uuid(),
@@ -203,9 +206,11 @@ pub async fn duplicate_environment(
         synthetics_variables::insert_row(&txn, &copy)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        copies.push(copy);
     }
     txn.commit().await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
+    publish_batch(org_id, Some(&target), &copies, &[]).await?;
 
     if ofga_enabled() {
         set_ownership(org_id, &environment_object(&target.name), "", "").await;
@@ -249,6 +254,7 @@ pub async fn update_environment(
     )
     .await
     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    publish_environment_put(&record).await?;
     Ok(Some(environment_view(record)))
 }
 
@@ -314,6 +320,7 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if deleted {
         synthetics_variables::invalidate_and_publish(org_id).await;
+        publish_environment_delete(org_id, &record.id).await?;
         if ofga_enabled() {
             remove_ownership(org_id, &environment_object(&record.name), "", "").await;
         }
@@ -508,6 +515,7 @@ pub async fn create_variable(
     synthetics_variables::add(conn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    publish_variable_put(&record).await?;
     project_view(org_id, &record).await
 }
 
@@ -561,6 +569,7 @@ pub async fn update_variable(
     synthetics_variables::update(conn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    publish_variable_put(&record).await?;
     Ok(Some(project_view(org_id, &record).await?))
 }
 
@@ -590,9 +599,13 @@ pub async fn delete_variable(
             users.join(", ")
         );
     }
-    synthetics_variables::delete(conn, org_id, id)
+    let deleted = synthetics_variables::delete(conn, org_id, id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    if deleted {
+        publish_variable_delete(org_id, id).await?;
+    }
+    Ok(deleted)
 }
 
 /// A check's resolved set, name by name, with the scope each name comes from.
@@ -881,6 +894,8 @@ pub async fn promote_check_variable(
 
     // Remove the check's copy only after the shared row exists, so a failure
     // leaves the value where it was rather than nowhere.
+    publish_variable_put(&record).await?;
+
     check.variables.remove(position);
     synthetics_checks::update(conn, org_id, check_id, check)
         .await
@@ -924,6 +939,7 @@ pub async fn promote_to_global(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     record.env = None;
+    publish_variable_put(&record).await?;
     project_view(org_id, &record).await
 }
 
@@ -1008,6 +1024,7 @@ pub async fn split_to_environments(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     txn.commit().await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
+    publish_batch(org_id, None, &created, std::slice::from_ref(&source.id)).await?;
 
     project_views(org_id, created.iter()).await
 }
@@ -1097,6 +1114,174 @@ pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootp
         own_names: check.variables.iter().map(|v| v.name.clone()).collect(),
         environments: check.environments.clone(),
     }
+}
+
+// ── Super-cluster replication ─────────────────────────────────────────────────
+//
+// Values go on the wire as PLAINTEXT and each region encrypts under its own
+// key. Sending ciphertext is the bug that shipped once for checks
+// (o2-enterprise#2451): a value encrypted here is unreadable there, and storing
+// it looks like success until a run injects rubbish. Publishing happens after
+// the local write, never inside a transaction.
+
+/// The wire copy of one row, with its value decrypted for the receiving region.
+#[cfg(feature = "enterprise")]
+async fn variable_payload(
+    record: &SyntheticsVariableRecord,
+) -> anyhow::Result<o2_enterprise::enterprise::super_cluster::queue::SyntheticsVariablePayload> {
+    // An unset secret stays unset: encrypting "" on the far side would report
+    // it as set.
+    let value = if record.value.starts_with("AESenc:") {
+        let dek = synthetics_dek(&record.org_id).await?;
+        decrypt_secret(&dek, &record.value)?
+    } else {
+        record.value.clone()
+    };
+    Ok(
+        o2_enterprise::enterprise::super_cluster::queue::SyntheticsVariablePayload {
+            id: record.id.clone(),
+            org_id: record.org_id.clone(),
+            env: record.env.clone(),
+            name: record.name.clone(),
+            value,
+            kind: record.kind.clone(),
+            description: record.description.clone(),
+            example: record.example.clone(),
+            tags: record.tags.clone(),
+            owner: record.owner.clone(),
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+        },
+    )
+}
+
+#[cfg(feature = "enterprise")]
+fn environment_payload(
+    record: &SyntheticsEnvironmentRecord,
+) -> o2_enterprise::enterprise::super_cluster::queue::SyntheticsEnvironmentPayload {
+    o2_enterprise::enterprise::super_cluster::queue::SyntheticsEnvironmentPayload {
+        id: record.id.clone(),
+        org_id: record.org_id.clone(),
+        name: record.name.clone(),
+        description: record.description.clone(),
+        owner: record.owner.clone(),
+        created_at: record.created_at,
+        updated_at: record.updated_at,
+    }
+}
+
+async fn publish_variable_put(record: &SyntheticsVariableRecord) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsVariablesMessage};
+        queue::synthetics_variables(SyntheticsVariablesMessage::VariablePut {
+            org_id: record.org_id.clone(),
+            payload: variable_payload(record).await?,
+        })
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = record;
+    Ok(())
+}
+
+async fn publish_variable_delete(org_id: &str, id: &str) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsVariablesMessage};
+        queue::synthetics_variables(SyntheticsVariablesMessage::VariableDelete {
+            org_id: org_id.to_string(),
+            id: id.to_string(),
+        })
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, id);
+    Ok(())
+}
+
+async fn publish_environment_put(record: &SyntheticsEnvironmentRecord) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsVariablesMessage};
+        queue::synthetics_variables(SyntheticsVariablesMessage::EnvironmentPut {
+            org_id: record.org_id.clone(),
+            payload: environment_payload(record),
+        })
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = record;
+    Ok(())
+}
+
+async fn publish_environment_delete(org_id: &str, id: &str) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsVariablesMessage};
+        queue::synthetics_variables(SyntheticsVariablesMessage::EnvironmentDelete {
+            org_id: org_id.to_string(),
+            id: id.to_string(),
+        })
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, id);
+    Ok(())
+}
+
+/// One transaction on the far side too: a split and a duplicate each write
+/// several rows at once, and a region holding half of one resolves a set no
+/// region ever had.
+async fn publish_batch(
+    org_id: &str,
+    environment: Option<&SyntheticsEnvironmentRecord>,
+    puts: &[SyntheticsVariableRecord],
+    deletes: &[String],
+) -> anyhow::Result<()> {
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled
+    {
+        use o2_enterprise::enterprise::super_cluster::queue::{
+            self, SyntheticsVariablesMessage, SyntheticsVariablesOp,
+        };
+        let mut ops = Vec::with_capacity(puts.len() + deletes.len() + 1);
+        if let Some(record) = environment {
+            ops.push(SyntheticsVariablesOp::EnvironmentPut(environment_payload(
+                record,
+            )));
+        }
+        for record in puts {
+            ops.push(SyntheticsVariablesOp::VariablePut(
+                variable_payload(record).await?,
+            ));
+        }
+        for id in deletes {
+            ops.push(SyntheticsVariablesOp::VariableDelete(id.clone()));
+        }
+        queue::synthetics_variables(SyntheticsVariablesMessage::Batch {
+            org_id: org_id.to_string(),
+            ops,
+        })
+        .await?;
+    }
+    #[cfg(not(feature = "enterprise"))]
+    let _ = (org_id, environment, puts, deletes);
+    Ok(())
 }
 
 /// Why a secret cannot join the unscoped tier.

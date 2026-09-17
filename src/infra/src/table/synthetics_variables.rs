@@ -28,7 +28,9 @@ use config::{
     RwHashMap,
     meta::synthetics_variables::{SyntheticsVariableView, VariableValueView},
 };
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Set, SqlErr,
+};
 
 use super::entity::synthetics_variables::{ActiveModel, Column, Entity, Model};
 use crate::errors::{self, DbError, Error};
@@ -309,6 +311,43 @@ pub async fn delete<C: ConnectionTrait>(
     let removed = delete_row(conn, org_id, id).await?;
     invalidate_and_publish(org_id).await;
     Ok(removed)
+}
+
+/// Writes a row exactly as another region has it, creating or replacing by id.
+///
+/// The super-cluster applier's entry point, and the reason it is here rather
+/// than in the service layer: a replicated write must not re-run validation,
+/// the reserved-prefix rule or the resolved-set cap. A region that refused a
+/// row the origin accepted would diverge with nobody told.
+pub async fn apply_upsert<C: ConnectionTrait>(
+    conn: &C,
+    record: &SyntheticsVariableRecord,
+) -> Result<(), errors::Error> {
+    let model = ActiveModel {
+        id: Set(record.id.clone()),
+        org_id: Set(record.org_id.clone()),
+        env: Set(record.env.clone()),
+        name: Set(record.name.clone()),
+        value: Set(record.value.clone()),
+        kind: Set(record.kind.clone()),
+        description: Set(record.description.clone()),
+        example: Set(record.example.clone()),
+        tags: Set(serde_json::to_value(&record.tags)?),
+        owner: Set(record.owner.clone()),
+        created_at: Set(record.created_at),
+        updated_at: Set(record.updated_at),
+    };
+    // Last write wins by primary key: the queue redelivers, so an apply has to
+    // be safe to run twice.
+    Entity::insert(model)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::Id)
+                .update_columns(<Entity as EntityTrait>::Column::iter())
+                .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Deletes a variable without touching the cache. The transactional twin of

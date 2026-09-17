@@ -20,7 +20,7 @@
 //! the secrets scoped to it.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr,
+    ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Set, SqlErr,
     TransactionTrait,
 };
 
@@ -146,6 +146,34 @@ pub async fn update<C: ConnectionTrait>(
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
         },
     }
+}
+
+/// Writes a row exactly as another region has it, creating or replacing by id.
+///
+/// The id is the origin's on purpose: a replicated check stores environment
+/// ids, so a locally minted one would leave that check resolving nothing.
+pub async fn apply_upsert<C: ConnectionTrait>(
+    conn: &C,
+    record: &SyntheticsEnvironmentRecord,
+) -> Result<(), errors::Error> {
+    let model = ActiveModel {
+        id: Set(record.id.clone()),
+        org_id: Set(record.org_id.clone()),
+        name: Set(record.name.clone()),
+        description: Set(record.description.clone()),
+        owner: Set(record.owner.clone()),
+        created_at: Set(record.created_at),
+        updated_at: Set(record.updated_at),
+    };
+    Entity::insert(model)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::Id)
+                .update_columns(<Entity as EntityTrait>::Column::iter())
+                .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
 }
 
 /// Deletes an environment and the variables scoped to it, in one transaction.
