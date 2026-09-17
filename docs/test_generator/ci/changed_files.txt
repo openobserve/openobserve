@@ -1,3 +1,0 @@
-tests/ui-testing/ci-matrix/ci_matrix.json
-tests/ui-testing/pages/tracesPages/tracesPage.js
-tests/ui-testing/playwright-tests/Traces/tracesCharts.spec.js

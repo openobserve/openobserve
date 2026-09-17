@@ -2555,12 +2555,13 @@ export class TracesPage {
     if (!(await canvas.isVisible({ timeout: 10000 }).catch(() => false))) return false;
     const box = await canvas.boundingBox();
     if (!box) return false;
-    const position = {
-      x: Math.floor(box.width / 2),
-      y: Math.floor(box.height / 2),
-    };
+    // ECharts stacks several canvas layers; a locator click on the first one is
+    // intercepted by the layer above, so right-click the shared center with the
+    // mouse (the topmost layer holds the series ink and the contextmenu handler).
     for (let attempt = 0; attempt < 3; attempt++) {
-      await canvas.click({ button: 'right', position });
+      await this.page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, {
+        button: 'right',
+      });
       if (await this.isMetricsContextMenuVisible()) break;
     }
     return true;
@@ -2636,9 +2637,14 @@ export class TracesPage {
       const errored = panels.filter((p) =>
         p.querySelector('[data-test="panel-schema-renderer-error-message"]')
       );
+      // The no-data empty-state overlays the panel and can coexist with the
+      // (empty) chart canvas, so count a panel as charting only when it has a
+      // canvas and no no-data overlay — keeps charts/noData mutually exclusive.
       return {
         panels: panels.length,
-        charts: panels.filter((p) => p.querySelector('canvas')).length,
+        charts: panels.filter(
+          (p) => p.querySelector('canvas') && !p.querySelector('[data-test="no-data"]')
+        ).length,
         noData: panels.filter((p) => p.querySelector('[data-test="no-data"]')).length,
         errors: errored.length,
         errorText: errored.length ? errored[0].textContent.trim().slice(0, 300) : '',
