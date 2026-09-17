@@ -59,3 +59,14 @@ message FileKey {
 message SimpleFileList {
     repeated string files = 1;
 }
+
+message SearchEventContext {
+    optional string alert_key = 1;
+    optional string derived_stream_key = 2;
+    optional string report_key = 3;
+    optional string dashboard_id = 4;
+    optional string dashboard_name = 5;
+    optional string dashboard_folder_id = 6;
+    optional string dashboard_folder_name = 7;
+    optional string alert_name = 8;
+}

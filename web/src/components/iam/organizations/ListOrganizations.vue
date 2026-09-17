@@ -515,8 +515,8 @@ export default defineComponent({
         query: {
           action: "update",
           org_identifier: store.state.selectedOrganization.identifier,
-          to_be_updated_org_id: props.row.identifier,
-          to_be_updated_org_name: props.row.name,
+          to_be_updated_org_id: row.identifier,
+          to_be_updated_org_name: row.name,
         },
       });
     };

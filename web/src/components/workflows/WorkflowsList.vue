@@ -50,6 +50,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <BetaBadge />
         </span>
       </template>
+      <template #sidebar>
+        <FolderList type="workflows" @update:activeFolderId="onFolderChange" />
+      </template>
       <template #actions>
         <!-- v1: only the Alert Fired trigger exists, so New Workflow goes
              straight to the editor (which pre-places the Alert Trigger). -->
@@ -63,7 +66,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </template>
 
-      <div class="min-h-0 flex-1 overflow-hidden">
+      <div class="h-full min-h-0 overflow-hidden">
         <div class="card-container h-full">
           <OTable
             ref="oTableRef"
@@ -89,6 +92,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <template #toolbar>
               <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+                <OToggleGroup
+                  :model-value="activeTab"
+                  mobile-dropdown
+                  data-test="workflow-list-tabs"
+                  @update:model-value="(v) => (activeTab = (v as string) || 'all')"
+                >
+                  <OToggleGroupItem
+                    v-for="tab in workflowTabs"
+                    :key="tab.value"
+                    :value="tab.value"
+                    size="sm"
+                    :data-test="`workflow-list-tab-${tab.value}`"
+                  >
+                    {{ tab.label }}
+                  </OToggleGroupItem>
+                </OToggleGroup>
                 <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     data-test="workflow-list-search-input"
@@ -98,6 +117,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   >
                     <template #icon-left>
                       <OIcon name="search" size="sm" />
+                    </template>
+                    <template #icon-right>
+                      <OToggleGroup
+                        :model-value="searchAcrossFolders ? 'all' : 'this'"
+                        type="single"
+                        class="me-1 self-center"
+                        @update:model-value="(v) => onFolderScopeChange(v as string)"
+                      >
+                        <OToggleGroupItem
+                          value="this"
+                          size="xs"
+                          icon-left="folder-outline"
+                          data-test="workflow-list-search-scope-current"
+                          :title="t('workflow.searchThisFolderTooltip')"
+                          ><span class="max-md:hidden">{{
+                            t("workflow.searchThisFolder")
+                          }}</span></OToggleGroupItem
+                        >
+                        <OToggleGroupItem
+                          value="all"
+                          size="xs"
+                          icon-left="search"
+                          data-test="workflow-list-search-across-folders-toggle"
+                          :title="t('workflow.searchAllFoldersTooltip')"
+                          ><span class="max-md:hidden">{{
+                            t("workflow.searchAllFolders")
+                          }}</span></OToggleGroupItem
+                        >
+                      </OToggleGroup>
                     </template>
                   </OInput>
                 </div>
@@ -125,6 +173,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-test="workflow-list-draft-tag"
                 />
               </div>
+            </template>
+
+            <template #cell-folder_name="{ row }">
+              {{ row.folder_name || t("common.defaultLabel") }}
             </template>
 
             <template #cell-updated_at="{ row }">
@@ -180,6 +232,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <OTooltip side="bottom" :content="t('workflow.edit')" />
                 </OButton>
+                <OButton
+                  v-if="!row.is_draft"
+                  :data-test="`workflow-list-${row.name}-move`"
+                  variant="ghost"
+                  size="icon-sm"
+                  icon-left="drive-file-move"
+                  :title="t('workflow.moveToFolder')"
+                  @click.stop="openMoveDialog(row)"
+                >
+                  <OTooltip side="bottom" :content="t('workflow.moveToFolder')" />
+                </OButton>
                 <ODropdown align="end">
                   <template #trigger>
                     <OButton
@@ -223,8 +286,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OEmptyState
                 size="hero"
                 preset="no-workflows"
-                :filtered="!!filterQuery"
-                @action="(id) => (id === 'clear-filters' ? (filterQuery = '') : openCreateEditor())"
+                :filtered="!!filterQuery || activeTab !== 'all'"
+                @action="(id) => (id === 'clear-filters' ? clearFilters() : openCreateEditor())"
               />
             </template>
 
@@ -251,6 +314,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <component :is="Component" @saved="onEditorSaved" />
   </router-view>
 
+  <MoveAcrossFolders
+    v-model:open="showMoveDialog"
+    :activeFolderId="activeFolderId"
+    :moduleId="workflowIdsToMove"
+    type="workflows"
+    @updated="onMoveUpdated"
+    data-test="workflow-move-to-another-folder-dialog"
+  />
+
   <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
@@ -261,16 +333,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useQuery } from "@tanstack/vue-query";
-import { workflowsQuery } from "@/services/workflows.queries";
 import { workflowKeys } from "@/services/workflows.querykeys";
 import { queryClient } from "@/composables/query/queryClient";
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { getFoldersListByType } from "@/utils/commons";
+const MoveAcrossFolders = defineAsyncComponent(
+  () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
+);
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
@@ -285,13 +362,49 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import WorkflowView from "@/components/workflows/WorkflowView.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { TABLE_INDEX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
+import { TABLE_INDEX_COL_SIZE, COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 
 import workflowService from "@/services/workflows";
 import { hydrateWorkflow, triggerDef } from "@/plugins/workflows/useWorkflowCanvas";
+import { DEFAULT_TRIGGER_KIND, enabledTriggers } from "@/plugins/workflows/triggers";
 
 const { t } = useI18nTyped();
 const router = useRouter();
+const route = useRoute();
+
+// The folder lives in the URL so a folder view is linkable and survives a reload.
+const activeFolderId = computed(() => (route.query.folder as string) || "default");
+
+// Tabs come from the trigger registry, so enabling another trigger kind adds its
+// tab without touching this file.
+const activeTab = ref("all");
+const workflowTabs = computed(() => [
+  { value: "all", label: t("workflow.tabAll") },
+  ...enabledTriggers().map((tr) => ({ value: tr.kind, label: t(tr.tabLabelKey ?? tr.labelKey) })),
+]);
+
+const searchAcrossFolders = ref(false);
+
+const showMoveDialog = ref(false);
+const workflowIdsToMove = ref<string[]>([]);
+
+const openMoveDialog = (row: any) => {
+  workflowIdsToMove.value = [row.id];
+  showMoveDialog.value = true;
+};
+
+const onMoveUpdated = () => {
+  showMoveDialog.value = false;
+  workflowIdsToMove.value = [];
+  invalidateWorkflowsCache();
+  getWorkflows();
+};
+
+const onFolderChange = (folderId: string) => {
+  router.push({
+    query: { ...route.query, org_identifier: orgId.value, folder: folderId },
+  });
+};
 const store = useStore();
 
 const currentRouteName = computed(() => router.currentRoute.value.name);
@@ -305,32 +418,60 @@ const shapeWorkflows = (list: any[]) =>
     updated_at_display: formatTs(wf.updated_at),
   }));
 
-const workflowsList = useQuery(() =>
-  Object.assign(workflowsQuery(orgId.value), { enabled: !!orgId.value }),
+const loading = ref(true);
+// Separate from `loading`, the cold-read skeleton: this spins the refresh button on every read.
+const fetching = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
+const forbidden = ref(false);
+const filterQuery = ref("");
+
+// Cross-folder is a search mode, not a browse mode: with an empty box the list
+// stays in the selected folder, matching the Alerts and Dashboards lists. That
+// also avoids pulling the org's entire set just because the toggle is on.
+const crossFolderActive = computed(
+  () => searchAcrossFolders.value && filterQuery.value.trim() !== "",
 );
 
-// The list is the query, not a copy of it: an invalidation anywhere repaints
-// these rows with no wiring here.
-const loading = workflowsList.isPending;
-// Request in flight, with rows still on screen — the refresh button's
-// spinner. `loading` stays for the skeleton, which only a cold read wants.
-const fetching = workflowsList.isFetching;
-// Epoch ms of the last successful read — drives the button's "1m ago" label.
-const lastUpdatedAt = workflowsList.dataUpdatedAt;
-// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
-const forbidden = computed(() => {
-  const e: any = workflowsList.error.value;
-  return e?.status === 403 || e?.response?.status === 403;
-});
-const filterQuery = ref("");
-const workflows = computed(() => shapeWorkflows(workflowsList.data.value ?? []));
-
-// The query owns its failure now, so this reports it once per error however the
-// read was triggered — mount, refetch, or an invalidation elsewhere.
-watch(workflowsList.error, (error) => {
-  if (error) console.error(error);
+// Driven off the URL, so it covers browser back/forward as well as rail clicks.
+// A cross-folder search would otherwise keep showing org-wide results under the
+// newly selected folder.
+watch(activeFolderId, (folderId) => {
+  if (searchAcrossFolders.value) {
+    searchAcrossFolders.value = false;
+    filterQuery.value = "";
+  }
+  getWorkflows(folderId);
 });
 
+// The type tab filters the table too, so it has to clear with the query.
+const clearFilters = () => {
+  filterQuery.value = "";
+  activeTab.value = "all";
+  // The toggle would otherwise stay lit on "All folders" while the list drops back
+  // to the current one. Refetched here because the query watcher then no-ops.
+  if (searchAcrossFolders.value) {
+    searchAcrossFolders.value = false;
+    getWorkflows();
+  }
+};
+
+const onFolderScopeChange = (v: string) => {
+  const across = v === "all";
+  if (across === searchAcrossFolders.value) return;
+  searchAcrossFolders.value = across;
+  getWorkflows();
+};
+
+// The cross-folder term is matched by the backend, so re-fetch as it changes
+// rather than on every keystroke.
+let searchDebounce: ReturnType<typeof setTimeout> | undefined;
+watch(filterQuery, () => {
+  if (!searchAcrossFolders.value) return;
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(() => getWorkflows(), 300);
+});
+
+const workflows = ref<any[]>([]);
 const oTableRef: any = ref(null);
 // Plain ref, not URL/store-backed: WorkflowsList stays mounted across create/edit/runs child-route navigation, so this alone survives the round trip.
 const currentPage = ref(1);
@@ -347,10 +488,13 @@ const restorePageIndex = () => {
 
 const filteredWorkflows = computed(() => {
   const q = filterQuery.value.trim().toLowerCase();
-  if (!q) return workflows.value;
-  return workflows.value.filter(
-    (w) => w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q),
-  );
+  const tab = activeTab.value;
+  return workflows.value.filter((w) => {
+    if (tab !== "all" && triggerKind(w) !== tab) return false;
+    // In cross-folder mode the backend already applied the same filter.
+    if (!q || crossFolderActive.value) return true;
+    return w.name?.toLowerCase().includes(q) || w.description?.toLowerCase().includes(q);
+  });
 });
 
 const resultTotal = computed(() => filteredWorkflows.value.length);
@@ -361,6 +505,12 @@ const resultTotal = computed(() => filteredWorkflows.value.length);
 // (NodeData::WorkflowTrigger, serde tag = "node_type", snake_case).
 // v1 has one kind (alert-fired); once B1 adds WorkflowTriggerParams.kind we can
 // map data.kind -> a per-kind label here.
+// The kind drives the type tabs; the label is only for display.
+const triggerKind = (wf: any): string => {
+  const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
+  return triggerNode?.data?.trigger_kind || triggerNode?.meta?.trigger_kind || DEFAULT_TRIGGER_KIND;
+};
+
 const triggerLabel = (wf: any): string => {
   const triggerNode = (wf.nodes || []).find((n: any) => n.data?.node_type === "workflow_trigger");
   if (!triggerNode) return "—";
@@ -377,7 +527,7 @@ const formatTs = (ts?: number): string => {
   return new Date(ms).toLocaleString();
 };
 
-const columns = computed(() => [
+const columns = computed<OTableColumnDef<any>[]>(() => [
   {
     id: "#",
     header: raw("#"),
@@ -432,32 +582,73 @@ const columns = computed(() => [
     header: t("workflow.actions"),
     sortable: false,
     isAction: true,
-    meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+    meta: { align: "center", cellClass: "actions-column", actionCount: 5 },
   },
 ]);
-const otableColumns = computed(() => columns.value);
+const otableColumns = computed(() => {
+  // The rail already names the folder when scoped to one, so the column only
+  // earns its width when rows can come from several.
+  if (!crossFolderActive.value) return columns.value;
+  const cols = [...columns.value];
+  cols.splice(2, 0, {
+    id: "folder_name",
+    header: t("workflow.folder"),
+    accessorKey: "folder_name",
+    sortable: true,
+    resizable: true,
+    hideable: true,
+    size: COL.folder,
+    meta: { align: "left" },
+  });
+  return cols;
+});
 
-// Bound to refresh / "saved" events: always hits the server.
-const refreshWorkflows = () => getWorkflows(true);
-
-// `force` is now only meaningful for an explicit refresh: any write that
-// invalidates the workflows scope repaints these rows on its own.
-const getWorkflows = async (force = false) => {
+const getWorkflows = async (folderId?: string) => {
+  loading.value = true;
+  fetching.value = true;
+  forbidden.value = false;
   try {
-    if (force) await workflowsList.refetch();
-  } catch (error) {
+    const across = crossFolderActive.value;
+    const response = await workflowService.listWorkflows(
+      orgId.value,
+      folderId ?? activeFolderId.value,
+      across,
+      across ? filterQuery.value.trim() : undefined,
+    );
+    // list handler returns a bare array of Workflow.
+    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
+    workflows.value = shapeWorkflows(list);
+    lastUpdatedAt.value = Date.now();
+  } catch (error: any) {
     console.error(error);
+    forbidden.value = error?.response?.status === 403;
+  } finally {
+    loading.value = false;
+    fetching.value = false;
   }
 };
 
+const refreshWorkflows = () => getWorkflows();
+
+// This list reads the service directly, but other pickers read the cached org list, so a write here must still expire it.
+const invalidateWorkflowsCache = () =>
+  queryClient.invalidateQueries({ queryKey: workflowKeys.all(orgId.value) });
+
 // --- navigation --------------------------------------------------------------
+// Every child route carries the folder. The list is the PARENT route, so pushing
+// a child replaces the whole query: drop `folder` and the list behind the editor
+// silently snaps back to the default folder, and so does the return trip.
+// A row's own folder wins over the one being browsed, which is what a
+// cross-folder search result needs.
+const folderFor = (row?: any) => row?.folder_id || activeFolderId.value;
+
 // New Workflow -> editor on an EMPTY canvas; the trigger is chosen there (the
 // canvas start node opens the trigger picker), so create carries no trigger
-// kind. The workflow is created on Save.
+// kind. The workflow is created on Save, into the folder in the URL.
 const openCreateEditor = () => {
   router.push({
     name: "createWorkflow",
-    query: { org_identifier: orgId.value },
+    query: { org_identifier: orgId.value, folder: activeFolderId.value },
   });
 };
 
@@ -467,7 +658,12 @@ const editWorkflow = (row: any) => {
   hydrateWorkflow(row);
   router.push({
     name: "workflowEditor",
-    query: { id: row.id, name: row.name, org_identifier: orgId.value },
+    query: {
+      id: row.id,
+      name: row.name,
+      org_identifier: orgId.value,
+      folder: folderFor(row),
+    },
   });
 };
 
@@ -484,7 +680,12 @@ const openRuns = (row: any) => {
   hydrateWorkflow(row);
   router.push({
     name: "workflowRuns",
-    query: { id: row.id, name: row.name, org_identifier: orgId.value },
+    query: {
+      id: row.id,
+      name: row.name,
+      org_identifier: orgId.value,
+      folder: folderFor(row),
+    },
   });
 };
 
@@ -506,7 +707,8 @@ const toggleWorkflow = (row: any) => {
           : t("workflow.pauseSuccess", { name: row.name }),
         variant: "success",
       });
-      getWorkflows(true);
+      invalidateWorkflowsCache();
+      getWorkflows();
     })
     .catch((error: any) => {
       if (error?.response?.status !== 403) {
@@ -551,12 +753,8 @@ const deleteWorkflow = async () => {
       draft: !!row.is_draft,
     });
     toast({ message: t("workflow.deleteSuccess"), variant: "success" });
-    // Drop the row from the cache first so it disappears now, not when the
-    // refetch lands; the forced reload re-persists the corrected list.
-    queryClient.setQueriesData({ queryKey: workflowKeys.all(orgId.value) }, (list: any) =>
-      Array.isArray(list) ? list.filter((w: any) => w.id !== row.id) : list,
-    );
-    await getWorkflows(true);
+    invalidateWorkflowsCache();
+    await getWorkflows();
   } catch (error: any) {
     if (error?.response?.status !== 403) {
       toast({
@@ -571,11 +769,16 @@ const deleteWorkflow = async () => {
 
 // Chained (not fire-and-forget) so restorePageIndex schedules its macrotask after the fetch's data update, not before.
 const onEditorSaved = async () => {
+  invalidateWorkflowsCache();
   await refreshWorkflows();
   restorePageIndex();
 };
 
 onMounted(async () => {
+  // FolderList reads the store, so the folders must be there before it renders.
+  await getFoldersListByType(store, "workflows").catch((err: unknown) =>
+    console.error("failed to load workflow folders", err),
+  );
   await getWorkflows();
   restorePageIndex();
 });

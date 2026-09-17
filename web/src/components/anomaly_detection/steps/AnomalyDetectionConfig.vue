@@ -186,6 +186,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("alerts.detectionFunction") }}
               <span class="text-status-error-text ms-1">*</span>
+              <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
+                <OTooltip
+                  side="right"
+                  align="center"
+                  max-width="18.75rem"
+                  :content="t('alerts.anomaly.detectionFunctionTooltip')"
+                />
+              </OIcon>
             </div>
             <!-- items-start, not items-center: the field select renders its
                  validation message inside its own column (OSelect's root is
@@ -550,7 +558,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 />
               </div>
             </div>
-            <div v-else class="flex items-start gap-3">
+            <div v-else class="flex items-center gap-3">
               <OFormToggleGroup
                 name="threshold"
                 :aria-label="t('alerts.sensitivity')"
@@ -568,16 +576,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ tier.label }}
                 </OToggleGroupItem>
               </OFormToggleGroup>
-              <OFormInput
-                name="threshold"
-                type="number"
-                :model-modifiers="{ number: true }"
-                :label="t('alerts.anomaly.percentile')"
-                class="max-w-21.75 min-w-21.75"
-                data-test="anomaly-sensitivity-percentile"
-              >
-                <template #error />
-              </OFormInput>
+              <!-- Inline, not OFormInput's `label` prop: a stacked label would push the
+                   whole control row a label-height below the Sensitivity heading. -->
+              <div class="flex items-center gap-2">
+                <span
+                  class="o-input-label text-compact text-input-label-text flex items-center gap-1 leading-tight font-medium whitespace-nowrap"
+                >
+                  {{ t("alerts.anomaly.percentile") }}
+                  <OIcon
+                    name="info-outline"
+                    size="sm"
+                    class="cursor-help"
+                    data-test="anomaly-sensitivity-percentile-info"
+                  >
+                    <OTooltip
+                      side="right"
+                      align="center"
+                      max-width="18.75rem"
+                      :content="t('alerts.anomaly.sensitivityNotDataPercentile')"
+                    />
+                  </OIcon>
+                </span>
+                <OFormInput
+                  name="threshold"
+                  type="number"
+                  :model-modifiers="{ number: true }"
+                  :aria-label="t('alerts.anomaly.percentile')"
+                  class="max-w-21.75 min-w-21.75"
+                  data-test="anomaly-sensitivity-percentile"
+                >
+                  <template #error />
+                </OFormInput>
+              </div>
             </div>
             <div
               v-if="sensitivityError"

@@ -538,7 +538,7 @@ describe("AnomalyDetectionConfig", () => {
 
       expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
       expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe("88");
-      expect(sensitivityHintText(wrapper)).toContain("p88");
+      expect(sensitivityHintText(wrapper)).toContain("88%");
     });
 
     it("typing a tier value lights that tier up", async () => {
@@ -594,7 +594,7 @@ describe("AnomalyDetectionConfig", () => {
 
       const hint = sensitivityHintText(wrapper);
       expect(hint).toBeDefined();
-      expect(hint).toContain("p97");
+      expect(hint).toContain("97%");
       expect(hint).toContain("training");
       for (const promise of ["per day", "per week", "about", "3%", "resolution"]) {
         expect(hint).not.toContain(promise);
@@ -764,6 +764,36 @@ describe("AnomalyDetectionConfig", () => {
 
     it("the schema default threshold is 97 when the config carries none", () => {
       expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
+    });
+  });
+
+  describe("sensitivity — percentile row alignment", () => {
+    it("keeps the toggle bar and the percentile box on one centred row", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // A stacked label here would push the whole row below the Sensitivity heading.
+      // Walk up from the input to the row that also holds the tier toggle: that
+      // shared ancestor is the one whose cross-axis alignment sets the row's top.
+      let row: HTMLElement | null = wrapper.find('[data-test="anomaly-sensitivity-percentile"]')
+        .element as HTMLElement;
+      while (row && !row.querySelector('[data-test="anomaly-sensitivity-tier"]')) {
+        row = row.parentElement;
+      }
+      expect(row).not.toBeNull();
+      expect(row?.className).toContain("items-center");
+      expect(row?.className).not.toContain("items-end");
+    });
+
+    it("keeps the percentile label out of the narrow numeric column", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The label renders as a sibling span, never inside OInput's own field column.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"] label').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-info"]').exists()).toBe(true);
     });
   });
 

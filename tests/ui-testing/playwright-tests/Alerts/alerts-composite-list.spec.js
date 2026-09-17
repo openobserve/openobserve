@@ -7,9 +7,9 @@
  * --------------------
  * The list row is assembled by a hand-maintained, field-by-field mapping, and a
  * field the mapping forgets is invisible no matter what the API returns. Two
- * live bugs are exactly that failure (o2-enterprise#2619 and #2620), so these
- * assertions are pinned to what the API demonstrably sends rather than to what
- * the table happens to render today.
+ * bugs were exactly that failure (#14459 and #14460), so these assertions are
+ * pinned to what the API demonstrably sends rather than to what the table
+ * happens to render today.
  *
  * The delete-conflict path gets first-class coverage because it is the only
  * thing preventing a user from dissolving a composite by deleting its children
@@ -80,18 +80,23 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.listRow(parent.id)).toContainText('--');
   });
 
-  test.fixme('A4 · a composite row shows its trigger expression (o2-enterprise#2620)', async ({ page }) => {
-    const { parent } = await seedComposite(page, 'a4');
+  test('A4 · a composite row shows its trigger expression', async ({ page }) => {
+    const { a, b, parent } = await seedComposite(page, 'a4');
 
     await pm.compositeAlertsPage.openList();
     await pm.compositeAlertsPage.openListTab('composite');
 
-    // The list response carries no expression under any key, so the cell's
-    // `v-if` suppresses it entirely. Un-fixme once the backend sends one.
-    await expect(pm.compositeAlertsPage.listExpression(parent.id)).toBeVisible();
+    // Name-resolved server-side: the list row carries no children, so the UI
+    // cannot turn `{id}` operands into names on its own.
+    const cell = pm.compositeAlertsPage.listExpression(parent.id);
+    await expect(cell).toBeVisible();
+    await expect(cell).toContainText(a.name);
+    await expect(cell).toContainText(b.name);
+    await expect(cell).toContainText('AND');
+    await expect(cell).not.toContainText(a.id);
   });
 
-  test.fixme('A5 · a referenced child shows a "referenced by" chip (o2-enterprise#2619)', async ({ page }) => {
+  test.fixme('A5 · a referenced child shows a "referenced by" chip (#14459)', async ({ page }) => {
     const { a } = await seedComposite(page, 'a5');
 
     await pm.compositeAlertsPage.openList();
@@ -106,8 +111,8 @@ test.describe('Composite alerts — list', {
   test('A5b · the API supplies the reference count the chip needs', async ({ page }) => {
     const { a, parent } = await seedComposite(page, 'a5b');
 
-    // Guards the contract behind #2619 so a backend regression cannot hide
-    // behind the front-end bug while that one is still open.
+    // Guards the API contract independently of the row mapping (#14459): a
+    // backend regression here must not be masked by a front-end one.
     const rows = await listAlerts(page);
     expect(rows.find((r) => r.alert_id === a.id).referenced_by_composite_count).toBe(1);
     expect(rows.find((r) => r.alert_id === parent.id).child_count).toBe(2);
@@ -169,7 +174,7 @@ test.describe('Composite alerts — list', {
     await expect(pm.compositeAlertsPage.referenceDrawer()).toBeHidden();
   });
 
-  test.fixme('A6b · opening the conflict drawer moves focus into it (o2-enterprise#2622)', async ({ page }) => {
+  test.fixme('A6b · opening the conflict drawer moves focus into it (#14461)', async ({ page }) => {
     const { a } = await seedComposite(page, 'a6b');
 
     await pm.compositeAlertsPage.openList();

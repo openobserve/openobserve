@@ -179,6 +179,14 @@ const router = useRouter();
 const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+// Carried on to the list and the editor: this view is a dead end for the folder
+// otherwise, and the return trip would land on `default`.
+const activeFolderId = computed(
+  () =>
+    (router.currentRoute.value.query.folder as string) ||
+    workflowObj.currentSelectedWorkflow?.folder_id ||
+    "default",
+);
 const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
 const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
 const selectedRunId = ref<string>("");
@@ -215,7 +223,10 @@ const togglePanel = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "workflows", query: { org_identifier: orgId.value } });
+  router.push({
+    name: "workflows",
+    query: { org_identifier: orgId.value, folder: activeFolderId.value },
+  });
 };
 
 // Dry-run the current graph without leaving to the editor. Deselect the historical
@@ -248,6 +259,7 @@ const onEditWorkflow = () => {
       id: workflowId.value,
       name: workflowName.value,
       org_identifier: orgId.value,
+      folder: activeFolderId.value,
     },
   });
 };
@@ -264,6 +276,7 @@ const onDebugInEditor = () => {
       name: workflowName.value,
       org_identifier: orgId.value,
       run_id: selectedRunId.value,
+      folder: activeFolderId.value,
     },
   });
 };

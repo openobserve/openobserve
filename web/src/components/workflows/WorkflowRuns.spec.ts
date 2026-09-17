@@ -232,7 +232,7 @@ describe("WorkflowRuns", () => {
     await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -262,7 +262,13 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default", run_id: "run-5" },
+      query: {
+        id: "wf-1",
+        name: "my flow",
+        org_identifier: "default",
+        run_id: "run-5",
+        folder: "default",
+      },
     });
   });
 
@@ -277,7 +283,7 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -302,7 +308,7 @@ describe("WorkflowRuns", () => {
     await wrapper.find(".back-btn").trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflows",
-      query: { org_identifier: "default" },
+      query: { org_identifier: "default", folder: "default" },
     });
   });
 });
