@@ -94,13 +94,14 @@ function parent(overrides: Partial<BrowserCheck> = {}): BrowserCheck {
 
 function input(overrides: Partial<ExtractedChildInput> = {}): ExtractedChildInput {
   const p = parent();
+  // Locations and schedule differ from the parent's so the input, not the parent, is what gets copied.
   return {
     parent: p,
     range,
     name: "Checkout — Open login",
     folder: "folder-2",
-    locations: p.locations,
-    schedule: p.schedule,
+    locations: ["eu-west"],
+    schedule: { type: "interval", intervalValue: 30, intervalUnit: "minutes" },
     ...overrides,
   };
 }
@@ -115,14 +116,14 @@ describe("buildExtractedChildCheck", () => {
       enabled: false,
       target: "https://app.test/login",
       folder_id: "folder-2",
-      locations: ["us-east", "eu-west"],
+      locations: ["eu-west"],
       tags: [],
       retries: 2,
       wait_before_retry_secs: 10,
       alert_if_fails: 3,
       cooldown_mins: 7,
       destinations: ["pagerduty"],
-      frequency: { type: "minutes", interval: 15 },
+      frequency: { type: "minutes", interval: 30 },
     });
     expect(payload).not.toHaveProperty("description");
     expect(payload).not.toHaveProperty("auth");
@@ -152,25 +153,23 @@ describe("buildExtractedChildCheck", () => {
 
   it("starts now even when the parent was scheduled for a past date", () => {
     const before = Date.now();
-    const payload = buildCreateBrowserTestPayload(
-      buildExtractedChildCheck(
-        input({
-          schedule: {
-            type: "interval",
-            intervalValue: 15,
-            intervalUnit: "minutes",
-            startType: "later",
-            startDate: "2020-01-01",
-            startTime: "09:00",
-            timezone: "UTC",
-          },
-        }),
-      ),
-    );
+    const schedule: BrowserCheck["schedule"] = {
+      type: "interval",
+      intervalValue: 15,
+      intervalUnit: "minutes",
+      startType: "later",
+      startDate: "2020-01-01",
+      startTime: "09:00",
+      timezone: "UTC",
+    };
+    const original = { ...schedule };
+    const payload = buildCreateBrowserTestPayload(buildExtractedChildCheck(input({ schedule })));
 
     // `start` is microseconds, truncated to the minute the payload was built in.
     expect(payload.start).toBeGreaterThanOrEqual((before - 60_000) * 1000);
     expect(payload.start).toBeLessThanOrEqual(Date.now() * 1000);
+    // The host hands over the live form's schedule by reference; it must not be mutated.
+    expect(schedule).toEqual(original);
   });
 
   it("does not copy a secure variable and lists it to define", () => {
@@ -203,8 +202,19 @@ describe("buildExtractedChildCheck", () => {
   });
 
   it("copies a plain variable the range uses, with its value", () => {
-    const split = splitVariablesForChild(parent(), range);
-    const child = buildExtractedChildCheck(input());
+    // `{{USER}}` twice in the range: copied once, not per occurrence.
+    const repeated: BrowserStep[] = [
+      ...range,
+      {
+        id: "s6",
+        action: "type",
+        name: "Email again",
+        value: "{{USER}}",
+        locator: { candidates: [{ kind: "css", value: "#email2" }] },
+      },
+    ];
+    const split = splitVariablesForChild(parent(), repeated);
+    const child = buildExtractedChildCheck(input({ range: repeated }));
 
     expect(split.copied).toEqual(["USER"]);
     expect(child.variables).toEqual([
@@ -267,5 +277,7 @@ describe("seedChildName", () => {
     expect(bytes.length).toBe(255);
     expect(new TextDecoder("utf-8", { fatal: true }).decode(bytes)).toBe(seed);
     expect(seed).toBe("€".repeat(85));
+    // ASCII fills the limit exactly, so the cap is 256 and not one short of it.
+    expect(seedChildName("", "a".repeat(300))).toBe("a".repeat(256));
   });
 });

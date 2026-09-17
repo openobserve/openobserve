@@ -82,6 +82,12 @@ describe("extractEligibility", () => {
     expect(
       extractEligibility(input({ selectedIds: new Set(["s1", "s3"]), filterActive: true })),
     ).toEqual({ ok: false, reason: "not-contiguous-filtered" });
+    // An active filter alone is not a refusal: a contiguous selection stays eligible.
+    expect(extractEligibility(input({ filterActive: true }))).toEqual({
+      ok: true,
+      range: [journey[0], journey[1]],
+      anchor: 0,
+    });
   });
 
   it("refuses a range that does not start with a navigate step", () => {
@@ -122,7 +128,7 @@ describe("extractEligibility", () => {
 
   it("refuses a placeholder the test does not define, naming the first missing one", () => {
     // Two missing names, in an order that differs from alphabetical: the first in text order wins.
-    const steps = [nav("s1"), typeStep("s2", "{{ZONE}}:{{USER}}@{{DOMAIN}}"), click("s3")];
+    const steps = [nav("s1"), typeStep("s2", "{{ ZONE }}:{{USER}}@{{DOMAIN}}"), click("s3")];
     expect(
       extractEligibility(
         input({ steps, selectedIds: new Set(["s1", "s2"]), definedNames: new Set(["DOMAIN"]) }),
@@ -202,5 +208,18 @@ describe("extractEligibility", () => {
         input({ steps, selectedIds: new Set(["s1", "s3"]), referencedBy: "some" }),
       ),
     ).toEqual({ ok: false, reason: "not-contiguous" });
+    // contains-subtest beats referenced; referenced beats the undefined placeholder.
+    const withSubtest = [nav("s1"), subtest("s2")];
+    expect(
+      extractEligibility(
+        input({ steps: withSubtest, selectedIds: new Set(["s1", "s2"]), referencedBy: "some" }),
+      ),
+    ).toEqual({ ok: false, reason: "contains-subtest" });
+    const withPlaceholder = [nav("s1", "{{BASE_URL}}"), click("s2")];
+    expect(
+      extractEligibility(
+        input({ steps: withPlaceholder, selectedIds: new Set(["s1", "s2"]), referencedBy: "some" }),
+      ),
+    ).toEqual({ ok: false, reason: "referenced" });
   });
 });
