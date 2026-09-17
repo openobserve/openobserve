@@ -93,8 +93,9 @@ test.describe("Traces Charts testcases", () => {
     ).toBeGreaterThan(0.75);
   });
 
-  // Skipped until #14534 lands — Insights forwards `duration <= '5.62s'` to SQL undecoded.
-  test.skip("P0: Duration zoom then Insights renders without a cast error (#14534)", {
+  // Regression guard for #14534, fixed by #14542: Insights now decodes the duration
+  // filter back to microseconds instead of forwarding `duration <= '5.62s'` to SQL.
+  test("P0: Duration zoom then Insights renders without a cast error (#14534)", {
     tag: ['@tracesCharts', '@traces', '@regression', '@P0', '@all']
   }, async ({ page }) => {
 
@@ -112,17 +113,17 @@ test.describe("Traces Charts testcases", () => {
     await pm.tracesPage.waitForAnalysisDashboardLoad();
     await page.waitForTimeout(5000);
 
-    // The cast error hits every dimension panel on every tab, so all three are checked.
+    // The cast error hit every dimension panel on every tab, so all three are checked.
+    // A zoomed band can match nothing, so this asserts on errors, not on chart counts.
     for (const tab of ANALYSIS_TABS) {
-      await pm.tracesPage.openAnalysisTab(tab);
-
-      const states = await pm.tracesPage.getAnalysisPanelStates();
+      const states = await pm.tracesPage.openAnalysisTab(tab);
       testLogger.info(`Insights ${tab} tab panels after duration zoom`, states);
 
       expect(states.errorText, `${tab} tab must not fail casting the duration filter`)
         .not.toMatch(CAST_ERROR_PATTERN);
       expect(states.errors, `${tab} tab must render no errored dimension panel`).toBe(0);
-      expect(states.charts, `${tab} tab must render a chart per dimension panel`)
+      // A narrow zoom can legitimately leave a dimension empty; an unresolved panel cannot.
+      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
         .toBe(states.panels);
     }
 
@@ -200,16 +201,19 @@ test.describe("Traces Charts testcases", () => {
     await pm.tracesPage.clickInsightsButton();
     await pm.tracesPage.waitForAnalysisDashboardLoad();
 
+    let charted = 0;
     for (const tab of ANALYSIS_TABS) {
-      await pm.tracesPage.openAnalysisTab(tab);
-
-      const states = await pm.tracesPage.getAnalysisPanelStates();
+      const states = await pm.tracesPage.openAnalysisTab(tab);
       testLogger.info(`Insights ${tab} tab panels`, states);
 
       expect(states.panels, `${tab} tab must render dimension panels`).toBeGreaterThan(0);
       expect(states.errors, `${tab} tab panel error: ${states.errorText}`).toBe(0);
-      expect(states.charts, `${tab} tab must draw a chart in every panel`).toBe(states.panels);
+      // The Errors tab is empty when the window holds no error spans; that is not a failure.
+      expect(states.charts + states.noData, `${tab} tab must resolve every panel`)
+        .toBe(states.panels);
+      charted += states.charts;
     }
+    expect(charted, 'At least one dimension must chart across the three tabs').toBeGreaterThan(0);
 
     await pm.tracesPage.closeAnalysisDashboard();
   });

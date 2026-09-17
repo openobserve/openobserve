@@ -2494,6 +2494,7 @@ export class TracesPage {
       return {
         panels: panels.length,
         charts: panels.filter((p) => p.querySelector('canvas')).length,
+        noData: panels.filter((p) => p.querySelector('[data-test="no-data"]')).length,
         errors: errored.length,
         errorText: errored.length ? errored[0].textContent.trim().slice(0, 300) : '',
       };
@@ -2507,7 +2508,29 @@ export class TracesPage {
   async openAnalysisTab(name) {
     await this.page.locator(`[data-test="traces-analysis-dashboard-${name}-tab"]`).click();
     await this.waitForAnalysisDashboardLoad();
-    await this.page.waitForTimeout(3000);
+    return await this.waitForAnalysisPanelsSettled();
+  }
+
+  /**
+   * Wait until every dimension panel has resolved and stopped changing, then report it.
+   * The previous tab's panels stay mounted for a beat after a tab switch, so a single
+   * resolved read can describe the old tab; two matching reads cannot.
+   * @returns {Promise<{ panels: number, charts: number, noData: number, errors: number, errorText: string }>}
+   */
+  async waitForAnalysisPanelsSettled(timeout = 45000) {
+    const deadline = Date.now() + timeout;
+    let previous = null;
+    while (Date.now() < deadline) {
+      const states = await this.getAnalysisPanelStates();
+      const resolved =
+        states.panels > 0 && states.charts + states.noData + states.errors === states.panels;
+      if (resolved && previous && JSON.stringify(previous) === JSON.stringify(states)) {
+        return states;
+      }
+      previous = resolved ? states : null;
+      await this.page.waitForTimeout(1000);
+    }
+    return await this.getAnalysisPanelStates();
   }
 
   /**
