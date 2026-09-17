@@ -69,7 +69,10 @@ function workflowPayload(
   description = 'folder automation workflow',
   triggerKind = 'alert_fired',
 ) {
-  const triggerType = TRIGGER_TYPE_BY_KIND[triggerKind] ?? 'AlertFired';
+  const triggerType = TRIGGER_TYPE_BY_KIND[triggerKind];
+  if (!triggerType) {
+    throw new Error(`workflowPayload: unmapped triggerKind "${triggerKind}"`);
+  }
   return {
     workflow: {
       id: '',

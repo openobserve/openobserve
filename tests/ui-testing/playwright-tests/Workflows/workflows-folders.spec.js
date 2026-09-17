@@ -290,6 +290,10 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     // Clear any search the visibility retry typed, so the incident workflow is
     // hidden by the trigger tab alone, never by the name filter.
     await pm.workflowFoldersPage.clearWorkflowSearch();
+    // The clear re-fires the slow list GET; re-assert the alert workflow is
+    // still shown so the list is known to have re-rendered before asserting the
+    // incident workflow is absent (a bare not.toBeVisible passes mid-reload).
+    await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
     await pm.workflowFoldersPage.expectWorkflowNotVisible(incidentWf.name);
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderA);
   });
