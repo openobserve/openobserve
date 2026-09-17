@@ -1432,13 +1432,13 @@ fn expand_journey(
         message: e.to_string(),
         guard_failure: true,
     })?;
-    if expanded.len() > config::meta::synthetics::MAX_STEPS {
+    let max_steps = config::get_config().synthetics.browser_max_steps;
+    if expanded.len() > max_steps {
         return Err(ConfigError {
             status_reason: REASON_CONFIG_STEPS_EXCEEDED,
             message: format!(
-                "this test now needs {} steps after expanding its subtests; the limit is {}",
+                "this test now needs {} steps after expanding its subtests; the limit is {max_steps}",
                 expanded.len(),
-                config::meta::synthetics::MAX_STEPS
             ),
             guard_failure: false,
         });
