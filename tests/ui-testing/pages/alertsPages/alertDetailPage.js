@@ -21,6 +21,10 @@ export class AlertDetailPage {
             groupStats: '[data-test="alerts-alertdetail-group-stats"]',
             groupsTab: '[data-test="alerts-alertdetail-tab-groups"]',
             groupsTable: '[data-test="alerts-alertgroupstable-table"]',
+            chart: '[data-test="alerts-alertgroupchart"]',
+            chartPanel: '[data-test="alerts-alertgroupchart-panel"]',
+            chartError: '[data-test="alerts-alertgroupchart-error"]',
+            chartEmpty: '[data-test="alerts-alertgroupchart-empty"]',
         };
     }
 
@@ -36,6 +40,48 @@ export class AlertDetailPage {
 
     async expectTitle(name) {
         await expect(this.page.locator(this.locators.title)).toContainText(name, { timeout: 15000 });
+    }
+
+    /**
+     * Capture the SQL the Evaluation chart sends while `action` runs.
+     *
+     * Asserting on the outgoing query rather than on pixels keeps this
+     * independent of whether the look-back window happens to contain data —
+     * the chart legitimately renders "No Data" on a quiet stream, but it must
+     * never send a malformed statement.
+     *
+     * @param {() => Promise<void>} action
+     * @returns {Promise<string|null>} the chart's SQL, or null if none was sent
+     */
+    async captureChartQuery(action) {
+        let sql = null;
+        const onRequest = (request) => {
+            if (!/\/_search(_stream)?\?/.test(request.url())) return;
+            try {
+                const body = JSON.parse(request.postData() || '{}');
+                const candidate = body?.query?.sql;
+                if (typeof candidate === 'string' && candidate.includes('zo_sql_key')) sql = candidate;
+            } catch {
+                // a non-JSON body on this route is not ours to interpret
+            }
+        };
+        this.page.on('request', onRequest);
+        try {
+            await action();
+            await this.page.waitForTimeout(2500);
+        } finally {
+            this.page.off('request', onRequest);
+        }
+        testLogger.info('Captured evaluation chart query', { sql });
+        return sql;
+    }
+
+    /** Assert the Evaluation chart did not fail to build or execute its query. */
+    async expectNoChartError() {
+        const error = this.page.locator(this.locators.chartError);
+        if (await error.count()) {
+            await expect(error, 'Evaluation chart reported an error').toBeHidden();
+        }
     }
 
     /** Assert the multi-alert layout is rendered: multi badge, stat strip, groups tab + table. */
