@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions-overflow>
-        <IacRegistryLinks data-test="alert-list-iac-registries" />
+        <IacRegistryLinks data-test="alert-list-iac-registries" :compact="isCompactToolbar" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"
