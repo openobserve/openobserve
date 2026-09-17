@@ -41,6 +41,7 @@ pub struct ColumnarBuckets {
     schema: Arc<Schema>,
     schema_key: String,
     time_level: PartitionTimeLevel,
+    bucket_micros: i64,
     /// A backfill can span any number of partitions, and foldhash keeps an i64 lookup cheap.
     buckets: hashbrown::HashMap<i64, ColumnarBucket>,
 }
@@ -48,10 +49,12 @@ pub struct ColumnarBuckets {
 impl ColumnarBuckets {
     pub fn new(stream_type: StreamType, schema: &Schema) -> Self {
         let schema = Arc::new(schema.clone().with_metadata(HashMap::new()));
+        let time_level = get_partition_time_level(stream_type);
         Self {
             schema_key: schema.hash_key(),
             schema,
-            time_level: get_partition_time_level(stream_type),
+            time_level,
+            bucket_micros: partition_bucket_micros(time_level),
             buckets: hashbrown::HashMap::with_capacity(1),
         }
     }
@@ -75,10 +78,11 @@ impl ColumnarBuckets {
             schema,
             schema_key,
             time_level,
+            bucket_micros,
             buckets,
         } = self;
         buckets
-            .entry(timestamp.div_euclid(partition_bucket_micros(*time_level)))
+            .entry(timestamp.div_euclid(*bucket_micros))
             .or_insert_with(|| ColumnarBucket::new(timestamp, *time_level, schema_key, schema))
     }
 

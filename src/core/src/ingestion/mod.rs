@@ -465,14 +465,6 @@ pub async fn resolve_batch_schema(
     Ok((evolution, Some(Schema::new(fields))))
 }
 
-/// The span of one write partition, which a record's time bucket is counted in.
-pub fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
-    match time_level {
-        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-    }
-}
-
 pub fn get_write_partition_key(
     timestamp: i64,
     partition_keys: &Vec<StreamPartition>,
@@ -806,6 +798,14 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+/// The span of one write partition, which a record's time bucket is counted in.
+fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
+    match time_level {
+        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
 }
 
 #[cfg(test)]
