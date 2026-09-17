@@ -93,6 +93,10 @@ pub fn claim_decision(node: &str, local: &str, node_alive: bool) -> ClaimDecisio
     }
 }
 
+pub(crate) async fn node_alive(node: &str) -> bool {
+    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
+}
+
 pub fn align_down(ts: i64, flush: i64) -> i64 {
     ts - ts.rem_euclid(flush.max(1))
 }
@@ -242,10 +246,6 @@ async fn claim_stream(org: &str, stream: &str) -> Option<i64> {
         ClaimDecision::Owned => Some(offset),
         ClaimDecision::Claim => claim_under_lock(org, stream).await,
     }
-}
-
-async fn node_alive(node: &str) -> bool {
-    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
 }
 
 /// Re-reads the offset inside the lock because another scheduler may have claimed it first.
