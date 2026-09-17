@@ -2495,6 +2495,14 @@ async fn handle_alert_triggers(
                         } else {
                             None
                         };
+                        // reset the next run time without silence, because this was never
+                        // delivered, simply pending
+                        new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
+                            true,
+                            alert.tz_offset,
+                            false,
+                            None,
+                        )?;
                         new_trigger.data = json::to_string(&trigger_data).unwrap();
                         db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                         // Condition matched; only the notification was
@@ -2523,6 +2531,11 @@ async fn handle_alert_triggers(
                             } else {
                                 None
                             };
+                            // reset the next run time without silence, because this was never
+                            // delivered, simply pending
+                            new_trigger.next_run_at = alert
+                                .trigger_condition
+                                .get_next_trigger_time(true, alert.tz_offset, false, None)?;
                             new_trigger.data = json::to_string(&trigger_data).unwrap();
                             db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
                                 .await?;
@@ -2553,6 +2566,14 @@ async fn handle_alert_triggers(
                 } else {
                     None
                 };
+                // reset the next run time without silence, because this was never delivered, simply
+                // pending
+                new_trigger.next_run_at = alert.trigger_condition.get_next_trigger_time(
+                    true,
+                    alert.tz_offset,
+                    false,
+                    None,
+                )?;
                 new_trigger.data = json::to_string(&trigger_data).unwrap();
                 db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
                 // Condition matched; only the notification was
