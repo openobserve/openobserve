@@ -30,7 +30,7 @@
         v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
-        :disabled="acting"
+        :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
       >
@@ -291,12 +291,13 @@
       @navigate="loadRowDetail"
       @retry="retryRowSlot"
       @trace="openTrace"
+      @score-trace="openScoreTrace"
     />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -325,6 +326,8 @@ import {
   retryExperimentMutation,
   retryExperimentSlotMutation,
 } from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, {
   type ExperimentDetail,
@@ -371,7 +374,11 @@ const sortByDispersion = ref(false);
 const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
+const slotRetryActive = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
+const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
+let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
+let slotRetryPollGeneration = 0;
 
 // Real browser back when there's history to pop — returns to the Experiments
 // list with whatever filter (e.g. a dataset) the user actually arrived
@@ -844,14 +851,30 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    await retrySlotWrite.mutateAsync({
+    const queued = await retrySlotWrite.mutateAsync({
       experimentId: experimentId.value,
       rowId: slot.rowId,
       trialIndex: slot.trialIndex,
       idempotencyKey: globalThis.crypto.randomUUID(),
     });
-    await loadRowDetail(slot.rowId);
-    await refresh();
+    if (selectedRowDetail.value?.rowId === slot.rowId) {
+      selectedRowDetail.value = {
+        ...selectedRowDetail.value,
+        trials: selectedRowDetail.value.trials.map((trial) =>
+          trial.trialIndex === slot.trialIndex
+            ? {
+                ...trial,
+                status: "pending",
+                taskStatus: "queued",
+                execution: queued,
+                scores: [],
+              }
+            : trial,
+        ),
+      };
+    }
+    startSlotRetryPolling(slot.rowId);
+    slotRetryActive.value = true;
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
     toast({
@@ -861,6 +884,75 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   } finally {
     retryingRow.value = false;
   }
+}
+
+function stopSlotRetryPolling() {
+  slotRetryPollGeneration += 1;
+  slotRetryActive.value = false;
+  if (slotRetryPollTimer !== null) {
+    globalThis.clearTimeout(slotRetryPollTimer);
+    slotRetryPollTimer = null;
+  }
+}
+
+function startSlotRetryPolling(rowId: string) {
+  stopSlotRetryPolling();
+  scheduleSlotRetryPoll(rowId, slotRetryPollGeneration);
+}
+
+function scheduleSlotRetryPoll(rowId: string, generation: number) {
+  slotRetryPollTimer = globalThis.setTimeout(() => {
+    slotRetryPollTimer = null;
+    void pollSlotRetry(rowId, generation);
+  }, SLOT_RETRY_POLL_INTERVAL_MS);
+}
+
+async function pollSlotRetry(rowId: string, generation: number) {
+  const refreshSelectedRow = selectedRowDetail.value?.rowId === rowId;
+
+  try {
+    const [nextDetail, rows, nextRowDetail] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+      refreshSelectedRow
+        ? llmExperimentsService.getRow(orgId.value, experimentId.value, rowId)
+        : Promise.resolve(null),
+    ]);
+
+    if (generation !== slotRetryPollGeneration) return;
+
+    detail.value = nextDetail;
+    resultRows.value = rows;
+    if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
+      selectedRowDetail.value = nextRowDetail;
+    }
+  } catch {
+    // Keep polling durable queued work after a transient refresh failure.
+  }
+
+  if (generation !== slotRetryPollGeneration) return;
+
+  const rowStillPending =
+    selectedRowDetail.value?.rowId === rowId &&
+    selectedRowDetail.value.trials.some(
+      (trial) =>
+        ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
+        trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
+    );
+  if (rowStillPending) {
+    scheduleSlotRetryPoll(rowId, generation);
+  } else {
+    slotRetryActive.value = false;
+    // The retry settled after the mutation expired the list, so a list read meanwhile still shows it running.
+    void queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+  }
+}
+
+function openScoreTrace(target: { traceId: string; timestamp: number }) {
+  openExperimentTrace(orgId.value, target, (location) => router.resolve(location), globalThis.open);
 }
 
 async function cancelExperiment() {
@@ -930,4 +1022,6 @@ async function runAction(
 watch([orgId, experimentId], refresh, { immediate: true });
 watch([sortByDispersion, highDispersionOnly], refreshRows);
 watch(orgId, loadScoreConfigs, { immediate: true });
+watch([orgId, experimentId], stopSlotRetryPolling);
+onUnmounted(stopSlotRetryPolling);
 </script>

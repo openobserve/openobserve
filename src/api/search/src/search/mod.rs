@@ -950,6 +950,8 @@ pub async fn build_search_request_per_field(
     };
 
     let size = req.query.size;
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
+    let keyword = keyword.replace('\'', "''");
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1048,9 +1050,10 @@ async fn values_inner(
         query_sql = sql;
     }
 
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
     let keyword = match query.get("keyword") {
         None => "".to_string(),
-        Some(v) => v.trim().to_string(),
+        Some(v) => v.trim().replace('\'', "''"),
     };
     let no_count = match query.get("no_count") {
         None => false,
