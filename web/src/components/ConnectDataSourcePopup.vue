@@ -15,16 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import organizationService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
+import {
+  getCommunitySlackUrl,
+  markSlackInviteOffered,
+  markSlackInviteResolved,
+  shouldOfferSlackInvite,
+} from "@/utils/slackCommunityInvite";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import SlackIcon from "@/components/icons/SlackIcon.vue";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -38,13 +45,19 @@ const router = useRouter();
 // host layout stays clean.
 const isOpen = ref(false);
 
+const userEmail = store.state.userInfo?.email ?? "anonymous";
+
 // sessionStorage (not localStorage): clears on tab close, which is exactly
 // the "new session" boundary the spec wants — re-show every session until
 // data exists, unlike the Slack popup's one-time-ever persistence.
-const sessionShownKey = `connectDataSourcePromptShown:${store.state.userInfo?.email ?? "anonymous"}`;
+const sessionShownKey = `connectDataSourcePromptShown:${userEmail}`;
 // Survives a reload mid-onboarding, before GetStarted dispatches its
 // completion event.
 const PENDING_KEY = "connectDataSourcePromptPending";
+
+// Rides along on this popup; CommunitySlackInvite.vue owns the day-2 follow-up if unclicked.
+const showSlackInviteButton = ref(false);
+const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
 let stopOrgWatch: (() => void) | null = null;
 
@@ -66,7 +79,11 @@ const checkAndMaybeShow = async () => {
   if (config.isCloud !== "true") return;
   if (sessionStorage.getItem(sessionShownKey) === "true") return;
   // Already known true elsewhere (MainLayout, useStreams, ...) — skip the summary call.
-  if (store.state.organizationData.isDataIngested) return;
+  if (store.state.organizationData.isDataIngested) {
+    // This popup won't open, so this is the account's day-1 touchpoint — starts the Slack day-2 clock silently.
+    markSlackInviteOffered(userEmail);
+    return;
+  }
 
   const orgIdentifier = store.state.selectedOrganization?.identifier;
   if (!orgIdentifier) {
@@ -94,6 +111,7 @@ const checkAndMaybeShow = async () => {
       store.dispatch("setIsDataIngested", true);
       // Mark this session resolved too, so a later mount skips the summary call.
       sessionStorage.setItem(sessionShownKey, "true");
+      markSlackInviteOffered(userEmail);
       return;
     }
   } catch (error) {
@@ -102,10 +120,17 @@ const checkAndMaybeShow = async () => {
     return;
   }
 
+  // Read before marking, so the button renders on the same open that starts the clock.
+  showSlackInviteButton.value = shouldOfferSlackInvite(userEmail);
+  markSlackInviteOffered(userEmail);
+
   isOpen.value = true;
   sessionStorage.setItem(sessionShownKey, "true");
   localStorage.removeItem(PENDING_KEY);
   track("onboarding_prompt_shown");
+  if (showSlackInviteButton.value) {
+    track("community_slack_prompt_shown", { source: "connect_data_popup" });
+  }
 };
 
 // GetStarted (full-screen onboarding) dispatches this when it completes; for
@@ -148,6 +173,14 @@ const connectDataSource = () => {
 const dismiss = () => {
   track("onboarding_prompt_dismissed");
   isOpen.value = false;
+};
+
+// Doesn't close this popup — connecting data stays the primary ask even if the user also joins Slack.
+const joinSlackFromPopup = () => {
+  window.open(slackUrl.value, "_blank", "noopener");
+  markSlackInviteResolved(userEmail);
+  showSlackInviteButton.value = false;
+  track("community_slack_prompt_joined", { source: "connect_data_popup" });
 };
 
 const handleOpenChange = (open: boolean) => {
@@ -198,6 +231,20 @@ const handleOpenChange = (open: boolean) => {
           {{ t("connectDataSourcePopup.dismissLink") }}
         </OButton>
       </div>
+
+      <OButton
+        v-if="showSlackInviteButton"
+        data-test="connect-data-source-popup-slack-link"
+        variant="ghost-subtle"
+        size="sm"
+        class="self-center"
+        @click="joinSlackFromPopup"
+      >
+        <template #icon-left>
+          <SlackIcon class="h-3.5 w-3.5" />
+        </template>
+        {{ t("connectDataSourcePopup.slackLink") }}
+      </OButton>
     </div>
   </ODialog>
 </template>
