@@ -37,7 +37,6 @@ export const INITIAL_POLICY: PasswordPolicy = {
     max_secs: 3600,
     backoff: "exponential",
   },
-  enforcement_mode: "hard_block",
   cookie_max_age_secs: 0,
   apply_to_root: false,
 };
@@ -61,7 +60,6 @@ export const policyBaseSchema = z.object({
     max_secs: nonNegativeInt,
     backoff: z.enum(["linear", "exponential"]),
   }),
-  enforcement_mode: z.enum(["hard_block", "restrict_writes"]),
   cookie_max_age_secs: nonNegativeInt,
   apply_to_root: z.boolean(),
 });
@@ -103,7 +101,6 @@ export const policyDefaults = (policy: PasswordPolicy): PolicyForm => ({
   history_count: policy.history_count,
   history_max_retained: policy.history_max_retained,
   lockout: { ...policy.lockout },
-  enforcement_mode: policy.enforcement_mode,
   cookie_max_age_secs: policy.cookie_max_age_secs,
   apply_to_root: policy.apply_to_root,
 });
@@ -133,7 +130,6 @@ export const buildPolicyPayload = (
     max_secs: Number(values.lockout.max_secs),
     backoff: values.lockout.backoff,
   },
-  enforcement_mode: values.enforcement_mode,
   cookie_max_age_secs: Number(values.cookie_max_age_secs),
   apply_to_root: values.apply_to_root,
 });

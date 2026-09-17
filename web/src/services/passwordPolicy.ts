@@ -43,7 +43,6 @@ export interface PasswordPolicy extends PasswordComplexity {
   history_count: number;
   history_max_retained: number;
   lockout: LockoutPolicy;
-  enforcement_mode: "hard_block" | "restrict_writes";
   /** `0` defers to the instance's `ZO_COOKIE_MAX_AGE`. */
   cookie_max_age_secs: number;
   apply_to_root: boolean;

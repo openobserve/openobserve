@@ -237,19 +237,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <OFormSection :title="t('passwordPolicy.enforcement')">
             <OSettingRow
-              :label="t('passwordPolicy.enforcementMode')"
-              :description="t('passwordPolicy.enforcementModeDesc')"
-              data-test="settings-password-policy-enforcement-mode"
-            >
-              <OFormSelect
-                name="enforcement_mode"
-                :options="enforcementOptions"
-                :searchable="false"
-                class="w-48"
-              />
-            </OSettingRow>
-
-            <OSettingRow
               :label="t('passwordPolicy.applyToRoot')"
               :description="t('passwordPolicy.applyToRootDesc')"
               data-test="settings-password-policy-apply-to-root"
@@ -390,10 +377,6 @@ const values = form.useStore((s: { values: PolicyForm }) => s.values);
 const backoffOptions = [
   { label: t("passwordPolicy.backoffExponential"), value: "exponential" },
   { label: t("passwordPolicy.backoffLinear"), value: "linear" },
-];
-const enforcementOptions = [
-  { label: t("passwordPolicy.enforcementHardBlock"), value: "hard_block" },
-  { label: t("passwordPolicy.enforcementRestrictWrites"), value: "restrict_writes" },
 ];
 
 const rotationOn = computed(() => Number(values.value.rotation_days) > 0);

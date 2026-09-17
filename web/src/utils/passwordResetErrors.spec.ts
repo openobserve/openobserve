@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { isPasswordResetError, isWriteRestrictedError } from "./passwordResetErrors";
+import { isPasswordResetError } from "./passwordResetErrors";
 
 const forbidden = (data: Record<string, unknown>) => ({ response: { status: 403, data } });
 
@@ -34,21 +34,5 @@ describe("isPasswordResetError", () => {
         response: { status: 400, data: { code: "password_reset_required" } },
       }),
     ).toBe(false);
-  });
-});
-
-describe("isWriteRestrictedError", () => {
-  it("keeps the two middleware codes apart", () => {
-    const restricted = forbidden({ code: "password_reset_required_for_writes" });
-    const blocked = forbidden({ code: "password_reset_required" });
-
-    expect(isWriteRestrictedError(restricted)).toBe(true);
-    expect(isPasswordResetError(restricted)).toBe(false);
-    expect(isWriteRestrictedError(blocked)).toBe(false);
-  });
-
-  it("is false for a plain 403 and for no error at all", () => {
-    expect(isWriteRestrictedError(forbidden({}))).toBe(false);
-    expect(isWriteRestrictedError(undefined)).toBe(false);
   });
 });

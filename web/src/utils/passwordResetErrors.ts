@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 const RESET_REQUIRED_CODE = "password_reset_required";
-const RESET_REQUIRED_FOR_WRITES_CODE = "password_reset_required_for_writes";
 
 interface RejectedResponse {
   response?: { status?: number; data?: { code?: unknown } };
@@ -28,7 +27,3 @@ const forbiddenCode = (error: unknown): unknown => {
 /** Whether a rejected response is the middleware refusing everything until the password changes. */
 export const isPasswordResetError = (error: unknown): boolean =>
   forbiddenCode(error) === RESET_REQUIRED_CODE;
-
-/** Whether a rejected response is the middleware refusing only this write. */
-export const isWriteRestrictedError = (error: unknown): boolean =>
-  forbiddenCode(error) === RESET_REQUIRED_FOR_WRITES_CODE;

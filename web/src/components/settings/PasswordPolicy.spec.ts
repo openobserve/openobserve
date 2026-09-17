@@ -68,7 +68,6 @@ const CONFIGURED_POLICY: PasswordPolicyType = {
     max_secs: 7200,
     backoff: "linear",
   },
-  enforcement_mode: "hard_block",
   cookie_max_age_secs: 0,
   apply_to_root: false,
 };
@@ -199,7 +198,6 @@ describe("PasswordPolicy", () => {
     expect(body.history_count).toBe(5);
     expect(body.history_max_retained).toBe(30);
     expect(body.lockout).toEqual(CONFIGURED_POLICY.lockout);
-    expect(body.enforcement_mode).toBe("hard_block");
   });
 
   it("reports the server's flagged count, not a locally predicted one", async () => {
@@ -301,7 +299,6 @@ describe("INITIAL_POLICY", () => {
         max_secs: 3600,
         backoff: "exponential",
       },
-      enforcement_mode: "hard_block",
       cookie_max_age_secs: 0,
       apply_to_root: false,
     });

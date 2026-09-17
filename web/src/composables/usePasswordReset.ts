@@ -17,10 +17,6 @@
 
 import { ref } from "vue";
 
-import { gt } from "@/types/i18n";
-
-import { useConfirmDialog } from "@/composables/useConfirmDialog";
-
 // The two server reasons, plus the advisory one the expiry banner opens the dialog with.
 export type PasswordResetReason = "policy_tightened" | "rotation_expired" | "rotation_warning";
 
@@ -38,8 +34,6 @@ const isOpen = ref(false);
 const reason = ref<PasswordResetReason | null>(null);
 // Only the blocked state is a trap; a user who opened the dialog voluntarily may close it.
 const dismissible = ref(false);
-// Module scope: N refused writes → one prompt.
-let restrictedPromptPending = false;
 
 const serverReason = (nextReason?: string): PasswordResetReason =>
   nextReason === "rotation_expired" || nextReason === "policy_tightened"
@@ -55,7 +49,7 @@ export function usePasswordReset() {
     isOpen.value = true;
   };
 
-  /** Open the same dialog with a way back out — ahead of expiry, or from the read-only prompt. */
+  /** Open the same dialog with a way back out, ahead of expiry. */
   const openVoluntarily = (nextReason: PasswordResetReason = "rotation_warning") => {
     if (isOpen.value) return;
     reason.value = nextReason;
@@ -69,25 +63,6 @@ export function usePasswordReset() {
     dismissible.value = false;
   };
 
-  /** A write was refused under restrict_writes: explain once, and offer the way out. */
-  const promptRestricted = async (nextReason?: string) => {
-    if (isOpen.value || restrictedPromptPending) return;
-    restrictedPromptPending = true;
-    const why = serverReason(nextReason);
-    try {
-      const go = await useConfirmDialog().confirm({
-        title: gt("passwordReset.restrictedTitle"),
-        message: gt("passwordReset.restrictedMessage"),
-        confirmLabel: gt("passwordReset.submit"),
-        cancelLabel: gt("passwordReset.restrictedLater"),
-        persistent: false,
-      });
-      if (go) openVoluntarily(why);
-    } finally {
-      restrictedPromptPending = false;
-    }
-  };
-
   return {
     isOpen,
     reason,
@@ -95,6 +70,5 @@ export function usePasswordReset() {
     open,
     openVoluntarily,
     close,
-    promptRestricted,
   };
 }
