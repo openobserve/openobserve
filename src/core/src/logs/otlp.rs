@@ -148,7 +148,7 @@ pub async fn handle_request(
     // check stream
     let stream_name = in_stream_name
         .map(|name| format_stream_name(name.to_string()))
-        .unwrap_or("default".to_string());
+        .unwrap_or_else(|| "default".to_string());
     check_ingestion_allowed(org_id, StreamType::Logs, Some(&stream_name)).await?;
 
     let cfg = get_config();

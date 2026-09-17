@@ -1045,7 +1045,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     value = json::to_value(event)?;
                     let local_val = value
                         .as_object_mut()
-                        .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
+                        .ok_or_else(|| anyhow::anyhow!("Error to convert Value to object"))?;
 
                     local_val.insert("requestId".to_owned(), request_id.into());
                     local_val.insert(
@@ -1093,22 +1093,21 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                 let timestamp = kfh_metric_data.timestamp;
 
                 let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
-                let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
-                    anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object"),
-                )?;
+                let local_parsed_metric_value =
+                    parsed_metric_value.as_object_mut().ok_or_else(|| {
+                        anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object")
+                    })?;
 
-                for (value_name, value_val) in values.as_object().ok_or(anyhow::anyhow!(
-                    "CloudWatch metrics failed to Metric Value Object"
-                ))? {
+                for (value_name, value_val) in values.as_object().ok_or_else(|| {
+                    anyhow::anyhow!("CloudWatch metrics failed to Metric Value Object")
+                })? {
                     local_parsed_metric_value.insert(value_name.to_owned(), value_val.to_owned());
                 }
                 local_parsed_metric_value.remove("value");
 
                 let metric_dimensions = dimensions
                     .as_object()
-                    .ok_or(anyhow::anyhow!(
-                        "CloudWatch metrics dimensions parsing failed"
-                    ))?
+                    .ok_or_else(|| anyhow::anyhow!("CloudWatch metrics dimensions parsing failed"))?
                     .iter()
                     .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
