@@ -817,6 +817,11 @@ export function useChatStream(options: UseChatStreamOptions) {
             currentSessionId.value,
             hasImages ? messagesToSend : undefined,
           );
+
+          // A Stop during the retry returns the cancelled envelope, which has no `ok` and would render as a server error.
+          if (response && response.cancelled) {
+            return;
+          }
         }
       }
 

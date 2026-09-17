@@ -1961,6 +1961,25 @@ describe("O2AIChat SSE protocol", () => {
       expect(fresh).not.toBe(dead);
       expect(vm.currentSessionId).toBe(fresh);
     });
+
+    // A Stop during the retry used to fall through to the !ok branch and render a server error.
+    it("stops quietly when the user cancels during the 409 retry", async () => {
+      mockFetchAiChat
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 409,
+          json: () => Promise.resolve({ code: "session_owner_unavailable" }),
+        })
+        .mockResolvedValueOnce({ cancelled: true });
+      vm.inputMessage = "hello";
+      await vm.sendMessage();
+      await flushPromises();
+
+      expect(mockFetchAiChat).toHaveBeenCalledTimes(2);
+      expect(vm.chatMessages).toHaveLength(1);
+      expect(vm.chatMessages[0].role).toBe("user");
+      expect(vm.isLoading).toBe(false);
+    });
   });
 
   describe("mid-stream state transitions", () => {
