@@ -3568,6 +3568,12 @@
     "joinSlack": "Únete a Slack",
     "maybeLater": "Quizá más tarde"
   },
+  "connectDataSourcePopup": {
+    "title": "Para empezar, conectemos tu primera fuente de datos.",
+    "description": "Tenemos mucho que mostrarte, pero primero necesitamos conectar tus datos. La mayoría de los equipos ven sus primeros registros en aproximadamente un minuto.",
+    "connectButton": "Conectar una fuente de datos",
+    "dismissLink": "Lo haré más tarde"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continuar desde donde se pausó",
     "startFromNow": "Comenzar desde ahora.",
