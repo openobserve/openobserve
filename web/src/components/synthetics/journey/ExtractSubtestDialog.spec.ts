@@ -36,9 +36,7 @@ const i18n = createI18n({
   messages: { "en-US": en as Record<string, unknown> },
 });
 
-// ODialog teleports to document.body; rendered inline so the body is inside the
-// wrapper. The footer state is the real ODialog's concern, so only open/close
-// and the header props are surfaced here.
+// Rendered inline (no teleport); the footer is ODialog's own concern.
 const ODialogStub = {
   name: "ODialog",
   props: [
@@ -56,8 +54,7 @@ const ODialogStub = {
   emits: ["update:open", "click:secondary"],
   template: '<div v-if="open" class="dialog-stub"><slot /></div>',
 };
-// The field wrappers stay real so the form wiring is what is under test; only
-// the leaf controls are stubbed, exposing the model they were handed.
+// Field wrappers stay real; only leaf controls are stubbed.
 const OInputStub = {
   name: "OInput",
   props: ["modelValue", "label", "error", "errorMessage"],
@@ -104,14 +101,15 @@ function mountDialog(props: Record<string, unknown> = {}) {
     props: {
       open: true,
       range,
-      anchor: 0,
-      authoredCount: 5,
-      executedCount: 5,
+      // Distinct values per prop, so no summary line can be right by coincidence.
+      anchor: 3,
+      authoredCount: 7,
+      executedCount: 11,
       parentName: "Checkout",
-      defaultFolder: "folder-1",
+      defaultFolder: "folder-2",
       folders,
       needsSchedule: false,
-      parentLocations: ["us-east", "eu-west"],
+      parentLocations: ["eu-west"],
       parentSchedule,
       locationOptions,
       variables: { copied: ["USER", "BASE_URL"], toDefine: ["PASSWORD"] },
@@ -122,7 +120,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
   }) as VueWrapper;
 }
 
-/** Every form field wrapper, in render order. */
+/** Every form field wrapper: inputs first, then selects. */
 function formFields(w: VueWrapper): VueWrapper<any>[] {
   return [...w.findAllComponents(OFormInput), ...w.findAllComponents(OFormSelect)];
 }
@@ -140,8 +138,7 @@ function fieldNames(w: VueWrapper): string[] {
   return formFields(w).map((c) => c.props("name") as string);
 }
 
-// Validation is async (zod through TanStack) and cold on a fresh module, so a fixed
-// number of flushes is not enough: wait until the handler has been reached.
+// Validation is async and cold on first run, so wait for the handler rather than a fixed flush count.
 async function submit(w: VueWrapper, onSubmit: ReturnType<typeof vi.fn>) {
   await w.find("form").trigger("submit");
   await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -159,7 +156,7 @@ describe("ExtractSubtestDialog", () => {
     wrapper = mountDialog();
 
     expect(field(wrapper, "name").props("modelValue")).toBe("Checkout — Open login");
-    expect(field(wrapper, "folder").props("modelValue")).toBe("folder-1");
+    expect(field(wrapper, "folder").props("modelValue")).toBe("folder-2");
     expect(fieldNames(wrapper)).toEqual(["name", "folder"]);
   });
 
@@ -180,16 +177,16 @@ describe("ExtractSubtestDialog", () => {
   it("summarises the range, this test, the schedule and the paused status, omitting the schedule line while asking for one", () => {
     wrapper = mountDialog();
     const text = wrapper.text();
-    expect(text).toContain("Steps 1 – 2 · starts at /login");
-    expect(text).toContain("4 steps after extraction · runs the same 5 steps");
-    expect(text).toContain("US East, EU West · every 5 minutes (same as this test)");
+    expect(text).toContain("Steps 4 – 5 · starts at /login");
+    expect(text).toContain("6 steps after extraction · runs the same 11 steps");
+    expect(text).toContain("EU West · every 5 minutes (same as this test)");
     expect(text).toContain("Created paused. Runs only as part of this test until you enable it.");
     expect(text).toContain("Step history restarts.");
     wrapper.unmount();
 
     wrapper = mountDialog({ needsSchedule: true, parentLocations: [] });
     expect(wrapper.text()).not.toContain("(same as this test)");
-    expect(wrapper.text()).toContain("Steps 1 – 2 · starts at /login");
+    expect(wrapper.text()).toContain("Steps 4 – 5 · starts at /login");
     expect(wrapper.text()).toContain("Created paused.");
   });
 
@@ -207,7 +204,7 @@ describe("ExtractSubtestDialog", () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     wrapper = mountDialog({ onSubmit });
     await submit(wrapper, onSubmit);
-    expect(onSubmit).toHaveBeenCalledWith({ name: "Checkout — Open login", folder: "folder-1" });
+    expect(onSubmit).toHaveBeenCalledWith({ name: "Checkout — Open login", folder: "folder-2" });
     expect(onSubmit.mock.calls[0][0].locations).toBeUndefined();
     expect(onSubmit.mock.calls[0][0].schedule).toBeUndefined();
     wrapper.unmount();
@@ -217,7 +214,7 @@ describe("ExtractSubtestDialog", () => {
     await submit(wrapper, askSubmit);
     expect(askSubmit).toHaveBeenCalledWith({
       name: "Checkout — Open login",
-      folder: "folder-1",
+      folder: "folder-2",
       locations: ["us-east", "eu-west"],
       schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
     });
@@ -276,7 +273,8 @@ describe("ExtractSubtestDialog", () => {
   it("uses the singular title for a one-step range", () => {
     wrapper = mountDialog({ range: [range[0]] });
     expect(wrapper.findComponent(ODialogStub).props("title")).toBe("Extract 1 step to a new test");
-    expect(wrapper.text()).toContain("Step 1 · starts at /login");
+    expect(wrapper.text()).toContain("Step 4 · starts at /login");
+    expect(wrapper.text()).toContain("7 steps after extraction · runs the same 11 steps");
     wrapper.unmount();
 
     wrapper = mountDialog();

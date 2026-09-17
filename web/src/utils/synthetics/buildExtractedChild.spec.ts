@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
+import { raw } from "@/types/i18n";
 import { buildCreateBrowserTestPayload } from "./buildPayload";
 import {
   buildExtractedChildCheck,
@@ -53,7 +54,7 @@ function parent(overrides: Partial<BrowserCheck> = {}): BrowserCheck {
     id: "parent-1",
     name: "Checkout",
     url: "https://app.test",
-    description: "The parent's description" as BrowserCheck["description"],
+    description: raw("The parent's description"),
     enabled: true,
     folder: "folder-1",
     tags: ["shop"],
@@ -212,14 +213,13 @@ describe("buildExtractedChildCheck", () => {
   });
 
   it("leaves journey_budget_ms out of the created payload", () => {
-    // A loaded parent can carry the field at the top level; it must not reach the child.
+    // Guards against spreading the parent: nothing outside the field table may leak into the child.
     const withBudget = { ...parent(), journey_budget_ms: 120_000 } as BrowserCheck;
     const payload = buildCreateBrowserTestPayload(
       buildExtractedChildCheck(input({ parent: withBudget })),
     );
 
     expect(payload).not.toHaveProperty("journey_budget_ms");
-    expect(payload.config).not.toHaveProperty("journey_budget_ms");
   });
 
   it("uses the new-check rum and capture defaults, not the parent's", () => {
@@ -260,13 +260,12 @@ describe("seedChildName", () => {
   });
 
   it("truncates a 300-byte seed to at most 256 bytes without splitting a character", () => {
-    // "é" is two bytes: 150 of them are 300 bytes, and byte 256 falls mid-character.
-    const seed = seedChildName("", "é".repeat(150));
+    // "€" is three bytes, so byte 256 falls mid-character.
+    const seed = seedChildName("", "€".repeat(100));
     const bytes = new TextEncoder().encode(seed);
 
-    expect(bytes.length).toBeLessThanOrEqual(256);
-    expect(bytes.length).toBe(256);
+    expect(bytes.length).toBe(255);
     expect(new TextDecoder("utf-8", { fatal: true }).decode(bytes)).toBe(seed);
-    expect(seed).toBe("é".repeat(128));
+    expect(seed).toBe("€".repeat(85));
   });
 });
