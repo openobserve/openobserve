@@ -137,7 +137,7 @@ pub fn settle_ql_trigger(
     }
 }
 
-/// No per-org data-age guard: v4 having run for 7 days is the whole condition.
+/// No per-org data-age guard: once auto-stop is enabled, 7 days of v4 is the whole condition.
 pub fn should_stop_v1(now: i64, started_at: Option<i64>) -> bool {
     started_at.is_some_and(|started_at| now - started_at >= V1_STOP_AFTER_MICROS)
 }
@@ -145,7 +145,9 @@ pub fn should_stop_v1(now: i64, started_at: Option<i64>) -> bool {
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    maybe_stop_v1(now).await;
+    if settings.v1_auto_stop {
+        maybe_stop_v1(now).await;
+    }
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
