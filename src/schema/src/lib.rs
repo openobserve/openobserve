@@ -34,6 +34,7 @@ use config::{
             VALUE_LABEL,
         },
         stream::{StreamSettings, StreamType},
+        traces::ALL_INFER_FIELDS,
     },
     metrics,
     utils::{
@@ -912,6 +913,8 @@ pub fn check_schema_for_defined_schema_fields(
             fields.insert("end_time".to_string());
             fields.insert("duration".to_string());
             fields.insert("events".to_string());
+            // ingest-derived join keys are not user attributes, so UDS keeps them
+            fields.extend(ALL_INFER_FIELDS.iter().map(|f| f.to_string()));
             // Automatically include all OTEL Gen-AI and LLM evaluation fields from the schema
             for field in schema.fields() {
                 let name = field.name();
@@ -1110,6 +1113,48 @@ mod tests {
         assert!(names.contains(&"field0".to_string()));
         assert!(names.contains(&"field1".to_string()));
         assert!(!names.contains(&"field2".to_string()));
+    }
+
+    #[test]
+    fn test_generate_schema_for_defined_schema_fields_keeps_infer_columns_for_traces() {
+        let mut fields = vec![Field::new(TIMESTAMP_COL_NAME, DataType::Int64, true)];
+        for name in ALL_INFER_FIELDS {
+            fields.push(Field::new(name, DataType::Utf8, true));
+        }
+        for i in 0..15 {
+            fields.push(Field::new(format!("field{i}"), DataType::Utf8, true));
+        }
+        let schema = SchemaCache::new(Schema::new(fields));
+        let defined_fields = vec!["field0".to_string()];
+
+        let names = |stream_type| {
+            generate_schema_for_defined_schema_fields(
+                stream_type,
+                &schema,
+                &defined_fields,
+                false,
+                false,
+                false,
+            )
+            .schema()
+            .fields()
+            .iter()
+            .map(|field| field.name().to_string())
+            .collect::<HashSet<_>>()
+        };
+
+        let traces = names(StreamType::Traces);
+        for name in ALL_INFER_FIELDS {
+            assert!(
+                traces.contains(name),
+                "{name} dropped from the traces UDS schema"
+            );
+        }
+        assert!(traces.contains("field0"));
+        assert!(!traces.contains("field1"));
+
+        let logs = names(StreamType::Logs);
+        assert!(ALL_INFER_FIELDS.iter().all(|name| !logs.contains(*name)));
     }
 
     #[test]
