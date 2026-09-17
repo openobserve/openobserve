@@ -23,9 +23,7 @@ import { orgKey } from "@/composables/query/keys";
  * `all` is the invalidation scope; the rest are entries beneath it.
  */
 export const annotationKeys = {
-  // Deliberately the whole dashboards root, matching the previous scope: an
-  // annotation write invalidates the dashboards it can appear on.
-  all: (org: string) => orgKey(org, "dashboards"),
+  all: (org: string) => orgKey(org, "dashboards", "annotations"),
   dashboard: (org: string, dashboardId: string) =>
     orgKey(org, "dashboards", "annotations", dashboardId),
   list: (org: string, dashboardId: string, params: unknown) =>

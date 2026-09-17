@@ -572,7 +572,7 @@ watch(
 // is a no-op unless all three are non-empty (usePanelCache), so we mint a
 // stable, scoped identity for our panels:
 //   folder      → one constant bucket for this whole page.
-//   dashboardId → stream + agent + exact time window, so a different selection
+//   dashboardId → org + stream + agent + time window, so a different selection
 //                 or a new window is a clean miss (fresh fetch) while the same
 //                 one is a hit. Built from the agent NAME, never the SQL filter,
 //                 so no query text leaks into ids/URLs.
@@ -588,7 +588,13 @@ const PANEL_CACHE_FOLDER = "ai-llm-insights";
 const panelCacheDashboardId = computed(() => {
   const agentKey =
     filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
-  return selectionKey(effectiveStream.value, agentKey, props.startTime, props.endTime);
+  return selectionKey(
+    store.state.selectedOrganization?.identifier ?? "",
+    effectiveStream.value,
+    agentKey,
+    props.startTime,
+    props.endTime,
+  );
 });
 // PanelSchemaRenderer (via its annotation composable) calls getDashboard() on
 // mount, which hits the network for any dashboardId not already in the Vuex
@@ -725,9 +731,9 @@ async function loadAgents(startTime?: number, endTime?: number, force = false) {
     // panels before the per-id sync watcher fires, so pre-seeding here (right
     // after the list resolves, before any switch) closes that race and keeps
     // getDashboard a store lookup in every case.
-    ensurePanelCacheStub(`${activeStream.value}::_stream::${start}-${end}`);
+    ensurePanelCacheStub(selectionKey(orgId, activeStream.value, "_stream", start, end));
     for (const agent of agents.value) {
-      ensurePanelCacheStub(`${agent.source_stream}::${agent.name}::${start}-${end}`);
+      ensurePanelCacheStub(selectionKey(orgId, agent.source_stream, agent.name, start, end));
     }
     // The cascade selection is reconciled against the fresh list by
     // useAgentScope's watcher (invalid env/name/version fall back / clear), so
@@ -858,7 +864,13 @@ const kpiCards = computed<KpiCard[]>(() => {
 function kpiCacheKey(start: number, end: number): string {
   const agentKey =
     filterMode.value === "agent" ? (effectiveAgent.value?.name ?? "_none") : "_stream";
-  return selectionKey(effectiveStream.value, agentKey, start, end);
+  return selectionKey(
+    store.state.selectedOrganization?.identifier ?? "",
+    effectiveStream.value,
+    agentKey,
+    start,
+    end,
+  );
 }
 
 // Single fetch entry point. Always pulls from the current props (which the

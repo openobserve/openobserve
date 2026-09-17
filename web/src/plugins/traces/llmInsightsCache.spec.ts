@@ -17,26 +17,37 @@ import { describe, it, expect } from "vitest";
 import { selectionKey, createSelectionCache } from "./llmInsightsCache";
 
 describe("selectionKey", () => {
-  it("composes stream + agent + the quantized window into a stable string", () => {
+  it("composes org + stream + agent + the quantized window into a stable string", () => {
     // The window is bucketed to the minute before it enters the key.
-    expect(selectionKey("default", "_stream", 60_000, 120_000)).toBe(
-      "default::_stream::60000-120000",
+    expect(selectionKey("acme", "default", "_stream", 60_000, 120_000)).toBe(
+      "acme::default::_stream::60000-120000",
     );
   });
 
   it("differs by selection and by window bucket", () => {
-    const a = selectionKey("s", "_stream", 60_000, 120_000);
-    const b = selectionKey("s", "o2-ai", 60_000, 120_000); // different agent
-    const c = selectionKey("s", "_stream", 60_000, 180_000); // different window bucket
+    const a = selectionKey("acme", "s", "_stream", 60_000, 120_000);
+    const b = selectionKey("acme", "s", "o2-ai", 60_000, 120_000); // different agent
+    const c = selectionKey("acme", "s", "_stream", 60_000, 180_000); // different window bucket
     expect(new Set([a, b, c]).size).toBe(3);
   });
 
   it("buckets two nearly-identical windows onto one key", () => {
     // The point of quantizing: a relative range re-anchors to `now` on every
     // mount, and keying on the raw anchors meant no visit could ever hit.
-    expect(selectionKey("s", "_stream", 60_000, 120_100)).toBe(
-      selectionKey("s", "_stream", 60_500, 120_900),
+    expect(selectionKey("acme", "s", "_stream", 60_000, 120_100)).toBe(
+      selectionKey("acme", "s", "_stream", 60_500, 120_900),
     );
+  });
+
+  it("never shares a key between orgs for the same stream, agent and window", () => {
+    const orgA = selectionKey("org-a", "default", "_stream", 60_000, 120_000);
+    const orgB = selectionKey("org-b", "default", "_stream", 60_500, 120_900);
+    expect(orgA).not.toBe(orgB);
+
+    const cache = createSelectionCache<number>();
+    cache.set(orgA, 42);
+    expect(cache.has(orgB)).toBe(false);
+    expect(cache.get(orgB)).toBeUndefined();
   });
 });
 

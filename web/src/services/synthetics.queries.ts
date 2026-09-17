@@ -59,7 +59,7 @@ export const setAgentTokenEnabledMutation = (org: string) =>
   });
 
 /**
- * Create or update a monitor. Invalidates the whole synthetics scope: the list
+ * Create or update a monitor. Invalidates every folder's monitor list: the list
  * is cache-first, so returning to it after a save must refetch rather than
  * repaint the pre-save rows.
  */
@@ -69,5 +69,5 @@ export const saveMonitorMutation = (org: string) =>
       vars.id
         ? syntheticsService.update(org, vars.id, vars.payload, vars.folderId)
         : syntheticsService.create(org, vars.payload, vars.folderId),
-    meta: { invalidates: [syntheticsKeys.all(org)], silentError: true },
+    meta: { invalidates: [syntheticsKeys.monitorsAll(org)], silentError: true },
   });

@@ -32,7 +32,7 @@ export const createAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotations: Record<string, unknown>[]) =>
       annotationService.create_timed_annotations(org, dashboardId, annotations),
-    meta: { invalidates: [annotationKeys.all(org)], silentError: true },
+    meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
 export const updateAnnotationMutation = (org: string, dashboardId: string) =>
@@ -44,12 +44,12 @@ export const updateAnnotationMutation = (org: string, dashboardId: string) =>
         vars.annotationId,
         vars.annotation,
       ),
-    meta: { invalidates: [annotationKeys.all(org)], silentError: true },
+    meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });
 
 export const deleteAnnotationMutation = (org: string, dashboardId: string) =>
   mutationOptions({
     mutationFn: (annotationIds: string[]) =>
       annotationService.delete_timed_annotations(org, dashboardId, annotationIds),
-    meta: { invalidates: [annotationKeys.all(org)], silentError: true },
+    meta: { invalidates: [annotationKeys.dashboard(org, dashboardId)], silentError: true },
   });

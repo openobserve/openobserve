@@ -20,7 +20,7 @@
  * table via `useLLMStreamQuery`). The chart panels reuse the dashboards'
  * own IndexedDB cache instead.
  *
- * Both caches key identically — stream + agent + time window — via
+ * Both caches key identically — org + stream + agent + time window — via
  * `selectionKey`, so a tab toggle back to the same selection is an instant hit
  * and a new selection/window is a clean miss that refetches.
  *
@@ -46,7 +46,7 @@ export interface KpiSnapshot {
 }
 
 /**
- * The shared cache key: `stream :: agent :: start-end`. `agent` is the current
+ * The shared cache key: `org :: stream :: agent :: start-end`. `agent` is the current
  * agent's NAME, or a placeholder when there isn't one — `_stream` on the Stream
  * tab, `_none` on the Agent tab before an agent resolves. The dashboard builds
  * this once (`panelCacheDashboardId`) and reuses it as the panel cache id, the
@@ -54,12 +54,19 @@ export interface KpiSnapshot {
  * identity per selection. (The KPI strip also calls this directly with the same
  * name/placeholder.)
  */
-export function selectionKey(stream: string, agent: string, start: number, end: number): string {
+export function selectionKey(
+  org: string,
+  stream: string,
+  agent: string,
+  start: number,
+  end: number,
+): string {
   // Relative windows re-anchor to `now` on every mount; keying on the raw
   // anchors meant no visit could ever hit the caches. Only the key buckets —
   // the queries still run with the caller's exact timestamps.
   const { start: s, end: e } = quantizeRange(start, end);
-  return `${stream}::${agent}::${s}-${e}`;
+  // The caches outlive an org switch, so orgs with same-named streams must never share an entry.
+  return `${org}::${stream}::${agent}::${s}-${e}`;
 }
 
 export function createSelectionCache<T>() {
