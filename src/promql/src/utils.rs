@@ -24,7 +24,7 @@ use datafusion::{
     common::ScalarValue,
     error::Result,
     functions::regex::regexp_like,
-    logical_expr::{expr_fn::cast, utils::disjunction},
+    logical_expr::utils::disjunction,
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
@@ -80,8 +80,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
         let column = col(mat.name.as_str());
         let literal = |value: String| -> Expr {
             match field_type {
-                // Explicitly type equality matcher literals to the label column;
-                // an untyped literal would become Utf8View == Utf8 at execution.
+                // the metrics_index pruner plans this without type coercion: literal must match
                 DataType::Utf8View => lit(ScalarValue::Utf8View(Some(value))),
                 DataType::LargeUtf8 => lit(ScalarValue::LargeUtf8(Some(value))),
                 _ => lit(value),
@@ -92,15 +91,7 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
-                // DataFusion 54 can lower a regex on Utf8View to a mixed-type
-                // equality/LIKE expression. Cast only regex matchers until that
-                // optimizer bug is fixed; equality matchers stay zero-copy views.
-                let value = if field_type == &DataType::Utf8View {
-                    cast(column, DataType::Utf8)
-                } else {
-                    column
-                };
-                let predicate = regexp_like().call(vec![value, lit(regex)]);
+                let predicate = regexp_like().call(vec![column, lit(regex)]);
                 if matches!(mat.op, MatchOp::NotRe(_)) {
                     predicate.not()
                 } else {
@@ -415,6 +406,28 @@ mod tests {
         assert_eq!(
             batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
             1
+        );
+    }
+
+    #[tokio::test]
+    async fn test_apply_matchers_prefix_regex_supports_utf8_view() {
+        use promql_parser::label::Matcher;
+
+        let (df, _) = make_string_view_df();
+        let matchers = Matchers::new(vec![Matcher {
+            op: MatchOp::Re(regex::Regex::new("api.*").unwrap()),
+            name: "service".to_string(),
+            value: "api.*".to_string(),
+        }]);
+        let batches = apply_matchers(df, &matchers)
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            2
         );
     }
 
