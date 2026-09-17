@@ -73,7 +73,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <template #toolbar>
                 <div
-                  class="flex w-full items-center gap-2 max-lg:min-w-0 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+                  class="@container/report-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
                   <div class="app-tabs-container">
                     <AppTabs
@@ -118,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="report-list-search-scope-current"
                             :title="t('reports.searchThisFolderTitle')"
-                            ><span class="max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
                               t("reports.searchThisFolder")
                             }}</span></OToggleGroupItem
                           >
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="report-list-search-across-folders-toggle"
                             :title="t('reports.searchAllFoldersTitle')"
-                            ><span class="max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
                               t("reports.searchAllFolders")
                             }}</span></OToggleGroupItem
                           >

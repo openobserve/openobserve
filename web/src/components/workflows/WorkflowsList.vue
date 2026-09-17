@@ -91,7 +91,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @row-click="openRuns"
           >
             <template #toolbar>
-              <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+              <div
+                class="@container/workflow-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+              >
                 <OToggleGroup
                   :model-value="activeTab"
                   mobile-dropdown
@@ -131,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="workflow-list-search-scope-current"
                           :title="t('workflow.searchThisFolderTooltip')"
-                          ><span class="max-md:hidden">{{
+                          ><span class="max-md:hidden @max-[34rem]/workflow-toolbar:hidden">{{
                             t("workflow.searchThisFolder")
                           }}</span></OToggleGroupItem
                         >
@@ -141,7 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="workflow-list-search-across-folders-toggle"
                           :title="t('workflow.searchAllFoldersTooltip')"
-                          ><span class="max-md:hidden">{{
+                          ><span class="max-md:hidden @max-[34rem]/workflow-toolbar:hidden">{{
                             t("workflow.searchAllFolders")
                           }}</span></OToggleGroupItem
                         >

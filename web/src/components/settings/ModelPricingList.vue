@@ -112,7 +112,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar: Built-in/Custom tabs + search -->
           <template #toolbar>
-            <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents md:max-lg:flex-wrap">
               <div class="app-tabs-container h-9">
                 <AppTabs
                   class="tabs-selection-container"
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSearchInput
                 v-model="filterQuery"
-                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
+                class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1 md:max-lg:ms-0 md:max-lg:w-full"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
