@@ -1005,7 +1005,7 @@ mod tests {
     async fn jobs_db() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, Database, Schema};
 
-        use crate::table::migration::m20260828_000001_add_env_to_synthetics_jobs::new_dedup_sql;
+        use crate::table::migration::m20260917_000001_add_env_to_synthetics_jobs::new_dedup_sql;
 
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);

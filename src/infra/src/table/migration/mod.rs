@@ -181,9 +181,7 @@ mod m20260824_000001_create_llm_playground_snapshots;
 mod m20260825_000001_add_alert_pending_period_col;
 mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
 mod m20260825_000001_create_status_page_custom_domains;
-mod m20260827_000001_create_synthetics_shared_variables;
 mod m20260827_000001_drop_table_action_scripts;
-pub(crate) mod m20260828_000001_add_env_to_synthetics_jobs;
 mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
@@ -194,7 +192,9 @@ mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
+pub(crate) mod m20260917_000001_add_env_to_synthetics_jobs;
 mod m20260917_000001_create_llm_experiment_slot_retries;
+mod m20260917_000001_create_synthetics_shared_variables;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -473,8 +473,8 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
-            Box::new(m20260827_000001_create_synthetics_shared_variables::Migration),
-            Box::new(m20260828_000001_add_env_to_synthetics_jobs::Migration),
+            Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
+            Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
         ]
     }
 }
@@ -516,6 +516,7 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+        (86, "m20260917_000001_create_synthetics_shared_variables"),
     ];
 
     #[test]
@@ -582,11 +583,11 @@ mod tests {
         for (earlier, later) in [
             (
                 "m20260707_000003_create_synthetics_jobs",
-                "m20260828_000001_add_env_to_synthetics_jobs",
+                "m20260917_000001_add_env_to_synthetics_jobs",
             ),
             (
-                "m20260827_000001_create_synthetics_shared_variables",
-                "m20260828_000001_add_env_to_synthetics_jobs",
+                "m20260917_000001_create_synthetics_shared_variables",
+                "m20260917_000001_add_env_to_synthetics_jobs",
             ),
             (
                 "m20260812_000001_create_composite_alerts",
