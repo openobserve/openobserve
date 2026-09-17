@@ -378,24 +378,14 @@ def test_move_does_not_leave_a_read_leak_in_the_source_folder(
 # --------------------------------------------------------------------------- WFF-RBAC-05
 
 
-@pytest.mark.xfail(
-    reason=(
-        "BUG: promote without ?folder= additionally requires AllowPost on the DEFAULT folder, "
-        "even though the draft lives elsewhere and the write correctly lands in its own folder. "
-        "Verified 2026-09-17 on an enterprise build: with folder-A grants alone the call 403s; "
-        "with default-POST alone it also 403s; only both together succeed. The explicit "
-        "?folder=A form succeeds with folder-A grants alone, so the own-folder resolution in "
-        "the `folder.is_none()` branch of promote_draft is the divergent path. "
-        "NOT a privilege escalation - a caller with no grant on the folder is still denied."
-    ),
-    strict=False,
-)
 def test_draft_in_a_granted_folder_is_reachable_and_promotable(rbac_env, base_url):
     """WFF-RBAC-05 — a draft gets its folder as authz parent, so an A-scoped role can promote it.
 
-    Drafts used to be registered with `Authz::new(id)` and no folder parent, so folder-scoped
-    grants never reached them and `promote` 403'd anything outside the default folder. This
-    asserts the INTENDED behaviour and currently xfails; it flips to XPASS when the bug is fixed.
+    Two regressions guarded here. Drafts used to be registered with `Authz::new(id)` and no
+    folder parent, so folder-scoped grants never reached them. And promote without `?folder=`
+    used to authorize against the DEFAULT folder rather than the draft's own, so a role holding
+    full grants on its own folder was denied unless it also held write on `default`
+    (o2-enterprise#2653). Requires that fix to be present.
     """
     user = rbac_env["session"]
     name = f"wf_auto_rbac_draft_{_suffix()}"
