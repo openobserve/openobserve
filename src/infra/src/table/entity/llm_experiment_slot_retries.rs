@@ -13,10 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pub mod aggregator;
-pub mod api;
-pub mod processor;
-pub use aggregator::write_agent_signals;
-pub use api::{compare_agent_versions, get_agent_signals};
-#[cfg(feature = "enterprise")]
-pub use processor::process_agent_signals;
+use sea_orm::entity::prelude::*;
+
+#[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+#[sea_orm(table_name = "llm_experiment_slot_retries")]
+pub struct Model {
+    #[sea_orm(primary_key, auto_increment = false)]
+    pub id: String,
+    pub org_id: String,
+    pub experiment_id: String,
+    pub row_id: String,
+    pub trial_index: i32,
+    pub idempotency_key: String,
+    pub state: String,
+    pub execution: Json,
+    pub active_marker: Option<String>,
+    pub projected_at: Option<i64>,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub expires_at: i64,
+}
+
+#[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+pub enum Relation {}
+
+impl ActiveModelBehavior for ActiveModel {}
