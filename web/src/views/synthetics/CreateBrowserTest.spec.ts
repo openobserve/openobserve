@@ -286,6 +286,8 @@ const baseStubs = {
       "ownStepCount",
       "class",
     ],
+    // Exposed by the real BrowserJourney as a computed; a plain field here so a test can flip it.
+    data: () => ({ filterActive: false }),
     methods: {
       revealCapNotice: mockRevealCapNotice,
       replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
@@ -1079,7 +1081,7 @@ describe("CreateBrowserTest", () => {
     const values = { name: "Checkout — Open login", folder: "folder-2" };
 
     /** Edit mode with a saved, eligible journey; the mapper is identity, so `journey` is the model. */
-    async function mountEdit() {
+    async function mountEdit(overrides: Record<string, unknown> = {}) {
       mockServiceGet.mockResolvedValue({
         data: {
           id: "check-123",
@@ -1091,6 +1093,7 @@ describe("CreateBrowserTest", () => {
           notifications: { destinations: [] },
           journey,
           variables: [{ name: "USER", value: "alice" }],
+          ...overrides,
         },
       });
       const w = mountPage({ editId: "check-123" });
@@ -1103,8 +1106,8 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
     }
 
-    async function openDialog(w: VueWrapper) {
-      await selectRange(w, ["s2", "s3"]);
+    async function openDialog(w: VueWrapper, ids = ["s2", "s3"]) {
+      await selectRange(w, ids);
       await w.find(OPEN_BTN).trigger("click");
       await flushPromises();
       expect(dialogStub(w).props("open")).toBe(true);
@@ -1138,6 +1141,40 @@ describe("CreateBrowserTest", () => {
       await btn.trigger("click");
       await flushPromises();
       expect(dialogOpen(wrapper)).toBe(false);
+
+      // The reason follows the journey's filter state for a gapped selection.
+      (journeyStub(wrapper).vm as { filterActive: boolean }).filterActive = true;
+      await selectRange(wrapper, ["s2", "s4"]);
+      expect(wrapper.find(REASON).text()).toContain("clear the filter to see the full list");
+      wrapper.unmount();
+
+      // An otherwise eligible range is refused while this test is used elsewhere.
+      mockServiceReferencedBy.mockResolvedValue({
+        data: { references: [{ id: "other", name: "Other" }], hidden_reference_count: 1 },
+      });
+      wrapper = await mountEdit();
+      await selectRange(wrapper, ["s2", "s3"]);
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("true");
+      expect(wrapper.find(REASON).text()).toContain(
+        "This test is used as a subtest by other tests and cannot hold one",
+      );
+      wrapper.unmount();
+
+      // …and while the lookup is still in flight, until it resolves.
+      let resolveLookup!: (value: unknown) => void;
+      mockServiceReferencedBy.mockReturnValue(
+        new Promise((resolve) => {
+          resolveLookup = resolve;
+        }),
+      );
+      wrapper = await mountEdit();
+      await selectRange(wrapper, ["s2", "s3"]);
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("true");
+      expect(wrapper.find(REASON).text()).toContain("Checking where this test is used");
+      resolveLookup({ data: { references: [], hidden_reference_count: 0 } });
+      await flushPromises();
+      expect(wrapper.find(REASON).exists()).toBe(false);
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("false");
     });
 
     it("offers a retry when the referenced-by lookup failed", async () => {
@@ -1164,6 +1201,23 @@ describe("CreateBrowserTest", () => {
 
     it("opens the dialog for an eligible selection", async () => {
       wrapper = await mountEdit();
+      // A cached child outside the range makes the executed count differ from the authored one.
+      ((wrapper.vm as any).childrenCache as Map<string, ChildJourney>).set("c", {
+        id: "c",
+        name: "Cleanup",
+        folderId: "shared",
+        steps: Array.from({ length: 3 }, (_, i) => ({
+          id: `c-${i + 1}`,
+          action: "click" as const,
+          name: `cleanup ${i + 1}`,
+          locator: { candidates: [{ kind: "css" as const, value: `#c${i + 1}` }] },
+        })),
+      });
+      (wrapper.vm as any).check.journey = [
+        ...journey,
+        { id: "s5", action: "subtest", name: "Cleanup", subtest: { id: "c", name: "Cleanup" } },
+      ];
+      await flushPromises();
       await selectRange(wrapper, ["s2", "s3"]);
 
       expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("false");
@@ -1181,16 +1235,19 @@ describe("CreateBrowserTest", () => {
       expect(dialog.props("defaultFolder")).toBe("folder-1");
       expect(dialog.props("needsSchedule")).toBe(false);
       expect(dialog.props("parentLocations")).toEqual(["us-east"]);
-      expect(dialog.props("authoredCount")).toBe(4);
-      expect(dialog.props("executedCount")).toBe(4);
+      expect(dialog.props("authoredCount")).toBe(5);
+      expect(dialog.props("executedCount")).toBe(7);
       expect(dialog.props("variables")).toEqual({ copied: ["USER"], toDefine: [] });
     });
 
     it("creates the child once, paused, in the chosen folder", async () => {
-      wrapper = await mountEdit();
+      // A parent without locations: the dialog supplies locations and schedule, and they must win.
+      wrapper = await mountEdit({ locations: [] });
       await openDialog(wrapper);
+      expect(dialogStub(wrapper).props("needsSchedule")).toBe(true);
 
-      await submit(wrapper, values);
+      const schedule = { type: "interval", intervalValue: 15, intervalUnit: "minutes" };
+      await submit(wrapper, { ...values, locations: ["eu-west"], schedule });
       await flushPromises();
 
       expect(mockServiceCreate).toHaveBeenCalledTimes(1);
@@ -1202,7 +1259,8 @@ describe("CreateBrowserTest", () => {
           enabled: false,
           folder: "folder-2",
           url: "https://shop.test/login",
-          locations: ["us-east"],
+          locations: ["eu-west"],
+          schedule: expect.objectContaining(schedule),
         }),
         "folder-2",
       );
@@ -1211,7 +1269,10 @@ describe("CreateBrowserTest", () => {
 
     it("seeds the children cache and splices the reference on success", async () => {
       wrapper = await mountEdit();
-      await openDialog(wrapper);
+      // Loading already dirtied the form (length watcher); reset so the splice has to dirty it itself.
+      (wrapper.vm as any).isDirty = false;
+      // One step: the length does not change, so no watcher fires on the host's behalf.
+      await openDialog(wrapper, ["s2"]);
 
       await submit(wrapper, values);
       await flushPromises();
@@ -1222,12 +1283,13 @@ describe("CreateBrowserTest", () => {
         name: "Checkout — Open login",
         folderId: "folder-2",
       });
-      expect(cache.get("new-check-1")?.steps.map((s) => s.action)).toEqual(["navigate", "type"]);
+      expect(cache.get("new-check-1")?.steps.map((s) => s.action)).toEqual(["navigate"]);
       expect(mockReplaceRangeWithSubtest).toHaveBeenCalledTimes(1);
       expect(mockReplaceRangeWithSubtest).toHaveBeenCalledWith(
-        { anchor: 1, count: 2 },
+        { anchor: 1, count: 1 },
         { id: "new-check-1", name: "Checkout — Open login" },
       );
+      expect((wrapper.vm as any).isDirty).toBe(true);
       expect(dialogOpen(wrapper)).toBe(false);
       expect(mockToast).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1238,6 +1300,7 @@ describe("CreateBrowserTest", () => {
     });
 
     it("leaves the model untouched and the dialog open when create fails", async () => {
+      mockGetFoldersListByType.mockResolvedValue([{ folderId: "folder-2", name: "Shared" }]);
       mockServiceCreate.mockRejectedValue({
         response: { status: 500, data: { message: "quota exceeded" } },
       });
@@ -1255,12 +1318,23 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceDelete).not.toHaveBeenCalled();
       expect(((wrapper.vm as any).childrenCache as Map<string, ChildJourney>).size).toBe(0);
       expect(dialogStub(wrapper).props("open")).toBe(true);
+
+      // A 403 is named after the folder the author cannot create in.
+      mockServiceCreate.mockRejectedValue({ response: { status: 403 } });
+      await expect(submit(wrapper, values)).rejects.toThrow(
+        'You can\'t create tests in "Shared". Choose another folder.',
+      );
+      await flushPromises();
+      expect((wrapper.vm as any).check.journey).toEqual(before);
+      expect(dialogStub(wrapper).props("open")).toBe(true);
     });
 
     it("deletes the created child when the splice throws", async () => {
       mockReplaceRangeWithSubtest.mockImplementation(() => {
         throw new Error("splice failed");
       });
+      // The compensation itself fails too, which is the one case the author must be told about.
+      mockServiceDelete.mockRejectedValue(new Error("gone"));
       wrapper = await mountEdit();
       await openDialog(wrapper);
 
@@ -1272,10 +1346,18 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceDelete).toHaveBeenCalledWith("default", "new-check-1", "folder-2");
       expect(dialogStub(wrapper).props("open")).toBe(true);
       expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "error",
+          message:
+            'Created "Checkout — Open login" but could not update this journey. Open the new test or delete it.',
+        }),
+      );
     });
 
     it("looks up referenced-by on load in edit mode and not in create mode", async () => {
-      wrapper = await mountEdit();
+      // The response id differs from the route id on purpose: the route id is the one to use.
+      wrapper = await mountEdit({ id: "stale-id" });
       expect(mockServiceReferencedBy).toHaveBeenCalledTimes(1);
       expect(mockServiceReferencedBy).toHaveBeenCalledWith("default", "check-123");
       wrapper.unmount();

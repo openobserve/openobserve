@@ -15,7 +15,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
-import { nextTick } from "vue";
+import { nextTick, type ComponentPublicInstance } from "vue";
 import { createI18n } from "vue-i18n";
 import type {
   BrowserCheck,
@@ -50,6 +50,9 @@ const ODialogStub = {
     "primaryButtonLabel",
     "secondaryButtonLabel",
     "secondaryButtonVariant",
+    "primaryButtonLoading",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
   ],
   emits: ["update:open", "click:secondary"],
   template: '<div v-if="open" class="dialog-stub"><slot /></div>',
@@ -121,17 +124,21 @@ function mountDialog(props: Record<string, unknown> = {}) {
 }
 
 /** Every form field wrapper: inputs first, then selects. */
-function formFields(w: VueWrapper): VueWrapper<any>[] {
+function formFields(w: VueWrapper): VueWrapper<ComponentPublicInstance>[] {
   return [...w.findAllComponents(OFormInput), ...w.findAllComponents(OFormSelect)];
 }
 
 /** The leaf control a named form field was rendered with. */
-function field(w: VueWrapper, name: string): VueWrapper<any> {
+function field(w: VueWrapper, name: string): VueWrapper<ComponentPublicInstance> {
   const wrapper = formFields(w).find((c) => c.props("name") === name);
   expect(wrapper, `field "${name}"`).toBeDefined();
   return wrapper!.findComponent(OInputStub).exists()
     ? wrapper!.findComponent(OInputStub)
     : wrapper!.findComponent(OSelectStub);
+}
+
+function optionValues(leaf: VueWrapper<ComponentPublicInstance>): unknown[] {
+  return (leaf.props("options") as { value: unknown }[]).map((o) => o.value);
 }
 
 function fieldNames(w: VueWrapper): string[] {
@@ -156,7 +163,9 @@ describe("ExtractSubtestDialog", () => {
     wrapper = mountDialog();
 
     expect(field(wrapper, "name").props("modelValue")).toBe("Checkout — Open login");
-    expect(field(wrapper, "folder").props("modelValue")).toBe("folder-2");
+    const folder = field(wrapper, "folder");
+    expect(folder.props("modelValue")).toBe("folder-2");
+    expect(optionValues(folder)).toEqual(["folder-1", "folder-2"]);
     expect(fieldNames(wrapper)).toEqual(["name", "folder"]);
   });
 
@@ -166,12 +175,12 @@ describe("ExtractSubtestDialog", () => {
     expect(fieldNames(wrapper)).toEqual(["name", "folder", "locations", "schedule"]);
     const locations = field(wrapper, "locations");
     expect(locations.props("multiple")).toBe(true);
+    expect(optionValues(locations)).toEqual(["us-east", "eu-west"]);
     expect(locations.props("modelValue")).toEqual(["us-east", "eu-west"]);
-    expect(field(wrapper, "schedule").props("modelValue")).toEqual({
-      type: "interval",
-      intervalValue: 5,
-      intervalUnit: "minutes",
-    });
+    // OSelect holds primitives only, so the field carries the preset key (R5).
+    const schedule = field(wrapper, "schedule");
+    expect(optionValues(schedule)).toEqual(["1min", "5min", "15min", "30min", "1hour"]);
+    expect(schedule.props("modelValue")).toBe("5min");
   });
 
   it("summarises the range, this test, the schedule and the paused status, omitting the schedule line while asking for one", () => {
@@ -253,6 +262,10 @@ describe("ExtractSubtestDialog", () => {
     await nextTick();
     expect(dialog.props("persistent")).toBe(true);
     expect(dialog.props("showClose")).toBe(false);
+    // ODialog derives the footer state from the form itself; no hand-kept flags.
+    expect(dialog.props("primaryButtonLoading")).toBeUndefined();
+    expect(dialog.props("primaryButtonDisabled")).toBeUndefined();
+    expect(dialog.props("secondaryButtonDisabled")).toBeUndefined();
 
     dialog.vm.$emit("update:open", false);
     await nextTick();
