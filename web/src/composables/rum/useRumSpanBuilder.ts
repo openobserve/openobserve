@@ -30,6 +30,11 @@ import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constant
 import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
+// A browser request starts before the trace but is stamped on completion, so the tail is longer.
+const BROWSER_REQUEST_LEAD_US = 60_000_000;
+const BROWSER_REQUEST_LAG_US = 300_000_000;
+// A page view outlives any trace started from it, so its rows are found around the request.
+const PAGE_VIEW_WINDOW_US = 3_600_000_000;
 
 export default function useRumSpanBuilder(
   logStreams: Ref<string[]>,
@@ -45,11 +50,6 @@ export default function useRumSpanBuilder(
   const getOrgId = () =>
     (router.currentRoute.value.query?.org_identifier as string) ||
     store.state.selectedOrganization.identifier;
-
-  // ±60s buffer around the trace time window for all RUM event queries,
-  // ensuring we capture RUM events that may have been ingested slightly
-  // before or after the backend trace spans.
-  const RUM_TIME_BUFFER_US = 60_000_000;
 
   /**
    * Fetch view events (type = 'view') for the given view IDs.
@@ -67,10 +67,8 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND type = 'view' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM events that may have
-              // been ingested slightly before or after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
               size: 10,
             },
@@ -102,10 +100,8 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE action_id IN (${actionId.map((id) => `'${sanitizeTraceId(id)}'`).join(",")}) and type='action' ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM action events that may
-              // have been ingested slightly before or after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
               size: 250,
             },
@@ -137,11 +133,8 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE ${sqlIn("view_id", viewIds)} AND (type = 'error' OR type = 'resource' OR type = 'long_task' OR type = 'action') ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture RUM leaf events (resource,
-              // error, long_task) that may have been ingested slightly before or
-              // after the backend trace spans
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: startTime,
+              end_time: endTime,
               from: 0,
               size: 250,
             },
@@ -157,11 +150,56 @@ export default function useRumSpanBuilder(
     }
   };
 
+  // Only a browser request can own a parent id that no span in the trace owns.
+  const hasDanglingParent = (spans: any[]): boolean => {
+    const ownedIds = new Set<string>();
+    for (const span of spans) {
+      if (span?.span_id) ownedIds.add(String(span.span_id));
+    }
+    for (const span of spans) {
+      const parentId = span?.reference_parent_span_id;
+      if (parentId && !ownedIds.has(String(parentId))) return true;
+    }
+    return false;
+  };
+
+  // Number("") is 0, so an empty string must not be read as a valid timestamp.
+  const toFiniteNumber = (value: unknown): number | null => {
+    if (typeof value === "string" && value.trim() === "") return null;
+    const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  // The details call returns up to 50 000 spans, so the window is folded rather than spread.
+  const deriveTraceWindowUs = (spans: any[]): { start: number; end: number } | null => {
+    let startNs = Infinity;
+    let endNs = -Infinity;
+    for (const span of spans) {
+      const start = toFiniteNumber(span?.start_time);
+      const end = toFiniteNumber(span?.end_time);
+      if (start === null || end === null) continue;
+      if (start < startNs) startNs = start;
+      if (end > endNs) endNs = end;
+    }
+    if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
+    return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
+  };
+
+  const parseActionIds = (actionId: unknown): string[] => {
+    if (typeof actionId !== "string" || !actionId) return [];
+    try {
+      const parsed = JSON.parse(actionId);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  };
+
   /**
    * Fetch RUM events that have the matching trace_id, plus the full view context.
    * Returns structured data for building the Session→View→Action→Resource hierarchy.
    */
-  const fetchRumEventsForTrace = async (traceId: string, startTime: number, endTime: number) => {
+  const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
     const empty = {
       tracedResources: [] as any[],
       viewEvents: [] as any[],
@@ -173,6 +211,9 @@ export default function useRumSpanBuilder(
       if (!logStreams.value.includes("_rumdata") || !traceId) {
         return empty;
       }
+      if (!hasDanglingParent(spans)) return empty;
+      const traceWindow = deriveTraceWindowUs(spans);
+      if (!traceWindow) return empty;
 
       const rumStream = await getStream("_rumdata", "logs", true);
       // Match the trace id under whichever spellings this stream actually carries.
@@ -198,10 +239,8 @@ export default function useRumSpanBuilder(
           query: {
             query: {
               sql: `SELECT * FROM "_rumdata" WHERE ${traceIdPredicate} ORDER BY ${store.state.zoConfig.timestamp_column} ASC`,
-              // +/- 60s around trace window to capture the RUM resource that bridges
-              // the trace to the RUM session (view/action hierarchy)
-              start_time: startTime - RUM_TIME_BUFFER_US,
-              end_time: endTime + RUM_TIME_BUFFER_US,
+              start_time: traceWindow.start - BROWSER_REQUEST_LEAD_US,
+              end_time: traceWindow.end + BROWSER_REQUEST_LAG_US,
               from: 0,
               size: 10,
             },
@@ -216,22 +255,16 @@ export default function useRumSpanBuilder(
 
       const viewIds = [...new Set(tracedResources.map((r: any) => r.view_id).filter(Boolean))];
 
-      // Parse action_id from traced resource (stringified JSON array)
-      let parsedActionIds: string[] = [];
-      try {
-        parsedActionIds = JSON.parse(tracedResources[0]?.action_id || "[]");
-      } catch {
-        parsedActionIds = [];
-      }
-      const primaryActionId = parsedActionIds || "";
+      // RUM `date` is milliseconds.
+      const anchorUs = (tracedResources[0]?.date || 0) * 1000;
+      const viewStart = anchorUs - PAGE_VIEW_WINDOW_US;
+      const viewEnd = anchorUs + PAGE_VIEW_WINDOW_US;
+      const actionIds = parseActionIds(tracedResources[0]?.action_id);
 
-      // Run all 3 queries in parallel
       const [viewEvents, actionEvents, allViewEvents] = await Promise.all([
-        fetchViewEvents(viewIds, startTime, endTime),
-        primaryActionId
-          ? fetchActionEvents(primaryActionId, startTime, endTime)
-          : Promise.resolve([]),
-        fetchAllViewEvents(viewIds, startTime, endTime),
+        fetchViewEvents(viewIds, viewStart, viewEnd),
+        actionIds.length ? fetchActionEvents(actionIds, viewStart, viewEnd) : Promise.resolve([]),
+        fetchAllViewEvents(viewIds, viewStart, viewEnd),
       ]);
 
       return { tracedResources, viewEvents, actionEvents, allViewEvents };

@@ -2220,8 +2220,8 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
         const traceSpans = traceRes.data.hits;
+        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
         const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
         const rumSpans = formatRumEventsAsSpans(
           tracedResources,
