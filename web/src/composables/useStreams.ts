@@ -86,85 +86,77 @@ const useStreams = (t: TranslateFn) => {
               ]);
             }
           }
-          if (!isStreamFetched(streamName || "all") || force) {
-            // Added adddtional check to fetch all streamstype separately if streamName is all
-            const dismiss = notify
+          // Always ask the query — it answers from cache while the list is fresh
+          // and refetches once it is not. The toast is only for a cold read,
+          // where there is nothing on screen to keep.
+          const cold = !isStreamFetched(streamName || "all");
+          const dismiss =
+            notify && cold
               ? toast({
                   variant: "loading",
                   message: t("toastMessages.composables.pleaseWaitWhileLoadingStreams"),
                   timeout: 0,
                 })
               : () => {};
-            if (streamName === "all") {
-              // As in RBAC there can be permission on certain types of streams
-              // So here added some additional logic to handle those
+          if (streamName === "all") {
+            // As in RBAC there can be permission on certain types of streams
+            // So here added some additional logic to handle those
 
-              const streamList = [
-                "logs",
-                "metrics",
-                "traces",
-                "enrichment_tables",
-                "index",
-                "metadata",
-              ];
+            const streamList = [
+              "logs",
+              "metrics",
+              "traces",
+              "enrichment_tables",
+              "index",
+              "metadata",
+            ];
 
-              // A forced read must not skip the types already in memory, or the invalidation above fetches nothing.
-              const streamsToFetch = force
-                ? streamList
-                : streamList.filter((_streamType) => !streamsCache[_streamType]?.value);
-
-              // One cached query per type: a hit resolves without a request.
-              Promise.allSettled(
-                [...streamsToFetch].map((streamType) =>
-                  queryClient.fetchQuery(
-                    streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
-                  ),
+            // Every type, every time: each is its own query, so a fresh one
+            // resolves from cache and only an expired one reaches the server.
+            Promise.allSettled(
+              streamList.map((streamType) =>
+                queryClient.fetchQuery(
+                  streamNameListQuery(store.state.selectedOrganization.identifier, streamType),
                 ),
-              )
-                .then((results: any) => {
-                  results.forEach((result: any, index: number) => {
-                    if (result.status === "fulfilled" && result.value?.length > 0) {
-                      setStreams(streamsToFetch[index], result.value, force);
-                    }
-                  });
-
-                  updateStreamsFetchedInStore(
-                    streamList.every((stream) => !!streamsCache[stream].value),
-                  );
-
-                  dismiss();
-                  resolve(getAllStreamsPayload());
-                })
-                .catch((e: any) => {
-                  dismiss();
-                  reject(withResponse(new Error(e.message), e));
+              ),
+            )
+              .then((results: any) => {
+                results.forEach((result: any, index: number) => {
+                  if (result.status === "fulfilled" && result.value?.length > 0) {
+                    setStreams(streamList[index], result.value);
+                  }
                 });
-            } else {
-              queryClient
-                .fetchQuery(
-                  streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
-                )
-                .then((list: any) => {
-                  setStreams(streamName, list, force);
-                  const streamData = {
-                    name: streamName,
-                    list,
-                    schema: false,
-                  };
-                  dismiss();
-                  resolve(streamData);
-                })
-                .catch((e: any) => {
-                  dismiss();
-                  reject(withResponse(new Error(e.message), e));
-                });
-            }
+
+                updateStreamsFetchedInStore(
+                  streamList.every((stream) => !!streamsCache[stream].value),
+                );
+
+                dismiss();
+                resolve(getAllStreamsPayload());
+              })
+              .catch((e: any) => {
+                dismiss();
+                reject(withResponse(new Error(e.message), e));
+              });
           } else {
-            if (streamName === "all") {
-              resolve(getAllStreamsPayload());
-            } else {
-              resolve(streamsCache[streamName].value || {});
-            }
+            queryClient
+              .fetchQuery(
+                streamNameListQuery(store.state.selectedOrganization.identifier, _streamName),
+              )
+              .then((list: any) => {
+                setStreams(streamName, list);
+                const streamData = {
+                  name: streamName,
+                  list,
+                  schema: false,
+                };
+                dismiss();
+                resolve(streamData);
+              })
+              .catch((e: any) => {
+                dismiss();
+                reject(withResponse(new Error(e.message), e));
+              });
           }
         } catch (e: any) {
           reject(withResponse(new Error(e.message), e));
@@ -256,15 +248,13 @@ const useStreams = (t: TranslateFn) => {
           resolve(null);
         }
 
-        // No global wait: the `getStreams` call below dedupes through the query
-        // cache, so a schema read no longer queues behind an unrelated type.
-        // If the stream is not fetched, and trying to fetch the specific stream. First fetch all streams
-        if (!isStreamFetched(streamType)) {
-          try {
-            await getStreams(streamType, false);
-          } catch (e: any) {
-            reject(withResponse(new Error(e.message), e));
-          }
+        // The type's list has to be in hand before indexing into it, and asking
+        // unconditionally is what lets a stream added since the last read be
+        // found — the query answers from cache while it is fresh.
+        try {
+          await getStreams(streamType, false);
+        } catch (e: any) {
+          reject(withResponse(new Error(e.message), e));
         }
 
         try {
@@ -408,13 +398,9 @@ const useStreams = (t: TranslateFn) => {
     return times.length ? Math.min(...times) : undefined;
   };
 
-  const setStreams = (
-    streamName: string = "all",
-    streamList: any[] = [],
-    force: boolean = false,
-  ) => {
-    if (isStreamFetched(streamName || "all") && !force) return;
-
+  // No "already fetched" bail-out: the caller only reaches here with a list the
+  // query just produced, and refusing to store it would discard a refetch.
+  const setStreams = (streamName: string = "all", streamList: any[] = []) => {
     if (!store.state.organizationData.isDataIngested && !!streamList.length)
       store.dispatch("setIsDataIngested", !!streamList.length);
 
@@ -766,7 +752,7 @@ const useStreams = (t: TranslateFn) => {
     });
 
     if (streamsToAdd.length > 0) {
-      setStreams(streamType, streamsToAdd, true);
+      setStreams(streamType, streamsToAdd);
     }
   };
 

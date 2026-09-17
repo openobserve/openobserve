@@ -331,14 +331,16 @@ describe("useSearchBar Composable", () => {
       expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
-    it("should not call getAllFunctions when already loaded", async () => {
+    /// Asking every time is the point: the query answers from cache while it is
+    /// fresh, so a populated store must not be what decides.
+    it("still calls getAllFunctions when the store already holds a list", async () => {
       store.state.organizationData.functions = [
         { name: "existing", num_args: 1, function: "fn() {}" },
       ];
       mockGetAllFunctions.mockResolvedValue(undefined);
 
       await wrapper.vm.getFunctions();
-      expect(mockGetAllFunctions).not.toHaveBeenCalled();
+      expect(mockGetAllFunctions).toHaveBeenCalled();
     });
 
     it("should show error notification on failure", async () => {

@@ -22,6 +22,7 @@ import router from "@/test/unit/helpers/router";
 import organizationsService from "@/services/organizations";
 import apiKeysService from "@/services/api_keys";
 import segment from "@/services/segment_analytics";
+import { queryClient } from "@/composables/query/queryClient";
 
 // Mock services with default resolved values
 vi.mock("@/services/organizations", async (importOriginal) => {
@@ -532,6 +533,9 @@ describe("Ingestion", () => {
       apiKeysService.listRUMTokens.mockResolvedValue(mockResponse);
       const dispatchSpy = vi.spyOn(wrapper.vm.store, "dispatch");
 
+      // Mounting already cached a token, and the read is a cache hit for an
+      // hour — drop it so the call under test reaches the mock above.
+      queryClient.clear();
       await wrapper.vm.getRUMToken();
 
       expect(apiKeysService.listRUMTokens).toHaveBeenCalledWith("default");

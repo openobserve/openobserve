@@ -414,15 +414,7 @@ export default defineComponent({
     });
 
     onMounted(async () => {
-      // if no folders in organization, get folders
-      if (
-        !store.state.organizationData.folders ||
-        (Array.isArray(store.state.organizationData.folders) &&
-          store.state.organizationData.folders.length === 0)
-      ) {
-        // get folders(will be api call)
-        await getFoldersListLoading.execute();
-      }
+      await getFoldersListLoading.execute();
 
       // get dashboard list
       // get tab list

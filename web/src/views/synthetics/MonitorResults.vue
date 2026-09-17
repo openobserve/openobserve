@@ -447,13 +447,10 @@ onMounted(() => {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
-  // On a deep link / refresh the folder list is not in the store yet, so the
-  // header subtitle would fall back to the raw folder ID. Cheap and cached.
-  if (!store.state.organizationData?.foldersByType?.synthetics?.length) {
-    getFoldersListByType(store, "synthetics").catch((err) =>
-      console.error("[synthetics] failed to load folders", err),
-    );
-  }
+  // Without the folder list the header subtitle falls back to the raw folder ID.
+  getFoldersListByType(store, "synthetics").catch((err) =>
+    console.error("[synthetics] failed to load folders", err),
+  );
   fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;

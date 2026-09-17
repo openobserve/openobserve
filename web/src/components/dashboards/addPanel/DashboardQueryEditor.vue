@@ -402,9 +402,7 @@ export default defineComponent({
 
     const getFunctions = async () => {
       try {
-        if (store.state.organizationData.functions.length == 0) {
-          await getAllFunctions();
-        }
+        await getAllFunctions();
 
         store.state.organizationData.functions.map((data: any) => {
           functionList.value.push({

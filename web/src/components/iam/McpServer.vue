@@ -49,22 +49,19 @@ const subs = computed<CardSubstitutions>(() => {
 });
 
 onMounted(() => {
-  // The card's Basic-auth token is the org ingestion passcode (masked in the
-  // snippet, copied in full). IAM can be opened without visiting Ingestion
-  // first, so fetch it if the store doesn't already have it.
-  if (!store.state.organizationData?.organizationPasscode) {
-    queryClient
-      .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
-      .then((res: any) => {
-        if (res.data?.passcode) {
-          store.dispatch("setOrganizationPasscode", res.data.passcode);
-          store.dispatch("setOrganizationPasscodeUser", res.data.user);
-        }
-      })
-      .catch(() => {
-        // Non-critical: the card still shows the endpoint + a placeholder token.
-      });
-  }
+  // Read every mount: Ingestion writes its selected token into the same slot,
+  // so a populated slot is no evidence the passcode is there.
+  queryClient
+    .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
+    .then((res: any) => {
+      if (res.data?.passcode) {
+        store.dispatch("setOrganizationPasscode", res.data.passcode);
+        store.dispatch("setOrganizationPasscodeUser", res.data.user);
+      }
+    })
+    .catch(() => {
+      // Non-critical: the card still shows the endpoint + a placeholder token.
+    });
 });
 </script>
 

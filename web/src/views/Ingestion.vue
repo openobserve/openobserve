@@ -345,9 +345,7 @@ export default defineComponent({
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
         fetchOrgTokens();
-        if (!store.state.organizationData.rumToken.rum_token) {
-          getRUMToken();
-        }
+        getRUMToken();
       }
     });
 
@@ -419,12 +417,14 @@ export default defineComponent({
         });
     };
 
+    // A read failure stays silent: the card falls back to its Generate action.
     const getRUMToken = () => {
       return queryClient
         .fetchQuery(rumTokensQuery(store.state.selectedOrganization.identifier))
         .then((res: any) => {
           store.dispatch("setRUMToken", res.data);
-        });
+        })
+        .catch(() => {});
     };
 
     const updatePasscode = () => {

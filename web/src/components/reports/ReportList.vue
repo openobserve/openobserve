@@ -673,11 +673,8 @@ const filterReports = () => {
 };
 
 onBeforeMount(async () => {
-  // Ensure report folders are in the store before FolderList renders
-  if (!store.state.organizationData.foldersByType?.["reports"]) {
-    // A folder-list 403 must not abort the load below, or the skeleton never clears.
-    await getFoldersListByType(store, "reports").catch(() => null);
-  }
+  // A folder-list 403 must not abort the load below, or the skeleton never clears.
+  await getFoldersListByType(store, "reports").catch(() => null);
   await loadReports(activeFolderId.value);
 });
 
