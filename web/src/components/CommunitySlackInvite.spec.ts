@@ -97,6 +97,8 @@ function dispatchExitIntent(clientY = 0) {
 //   - Cloud vs non-Cloud (isCloud !== "true" → nothing shown, no listener)
 //   - Already seen (seenKey = "true") → no listener registered, never shown
 //   - Visit cap (3) reached → no listener registered, never shown
+//   - First-time login (isFirstTimeLogin = "true") → no listener registered,
+//     defers entirely to ConnectDataSourcePopup for that session
 //   - Exit intent (mouseleave with clientY <= 0) → opens, increments visit count, removes listener
 //   - memberCount present/absent → different captionText
 // User interactions: close-btn click, join-btn click, maybe-later-btn click
@@ -284,6 +286,51 @@ describe("CommunitySlackInvite", () => {
     });
   });
 
+  // ── First-login gate ─────────────────────────────────────────────────────────
+  // Never compete with ConnectDataSourcePopup during the user's first-login
+  // session (see ConnectDataSourcePopup.vue, which owns that moment).
+
+  describe("first-login gate", () => {
+    it("does not add a mouseleave listener during first-time login", () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+      const addEventSpy = vi.spyOn(document, "addEventListener");
+
+      // Act
+      wrapper = buildWrapper();
+      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+
+      // Assert
+      expect(exitIntentListeners).toHaveLength(0);
+    });
+
+    it("does not open on exit intent during first-time login", async () => {
+      // Arrange
+      localStorage.setItem("isFirstTimeLogin", "true");
+
+      // Act
+      wrapper = buildWrapper();
+      dispatchExitIntent();
+      await nextTick();
+
+      // Assert
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+    });
+
+    it("adds the listener normally once isFirstTimeLogin is cleared (returning session)", () => {
+      // Arrange — GetStarted removes this flag when onboarding completes
+      localStorage.removeItem("isFirstTimeLogin");
+      const addEventSpy = vi.spyOn(document, "addEventListener");
+
+      // Act
+      wrapper = buildWrapper();
+      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+
+      // Assert
+      expect(exitIntentListeners).toHaveLength(1);
+    });
+  });
+
   // ── Exit-intent trigger ──────────────────────────────────────────────────────
 
   describe("exit-intent trigger", () => {
@@ -393,6 +440,25 @@ describe("CommunitySlackInvite", () => {
       // Assert
       expect(removals.length).toBeGreaterThanOrEqual(1);
     });
+
+    it("shows again on a later visit after a plain dismiss, under the visit cap", async () => {
+      // Arrange — visit 1: shown, dismissed via Maybe later (not Join Slack)
+      wrapper = buildWrapper();
+      dispatchExitIntent();
+      await nextTick();
+      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+      await laterBtn.trigger("click");
+      wrapper.unmount();
+
+      // Act — visit 2: fresh mount (new session), same user, not seen
+      wrapper = buildWrapper();
+      dispatchExitIntent();
+      await nextTick();
+
+      // Assert
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      expect(localStorage.getItem(VISIT_COUNT_KEY)).toBe("2");
+    });
   });
 
   // ── Interaction: Join Slack button ───────────────────────────────────────────
@@ -470,15 +536,16 @@ describe("CommunitySlackInvite", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("sets seen key in localStorage when Maybe later is clicked", async () => {
-      // Arrange
+    it("does NOT set seen key in localStorage when Maybe later is clicked", async () => {
+      // Arrange — Maybe later only closes the dialog; the visit cap (not the
+      // seen key) governs whether it can show again on a later visit.
       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       // Act
       await laterBtn.trigger("click");
 
       // Assert
-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+      expect(localStorage.getItem(SEEN_KEY)).toBeNull();
     });
 
     it("does NOT call window.open when Maybe later is clicked", async () => {
@@ -514,15 +581,16 @@ describe("CommunitySlackInvite", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("sets seen key in localStorage when close button is clicked", async () => {
-      // Arrange
+    it("does NOT set seen key in localStorage when close button is clicked", async () => {
+      // Arrange — the × only closes the dialog; the visit cap (not the seen
+      // key) governs whether it can show again on a later visit.
       const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
 
       // Act
       await closeBtn.trigger("click");
 
       // Assert
-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+      expect(localStorage.getItem(SEEN_KEY)).toBeNull();
     });
 
     it("does NOT call window.open when dismissed via close button", async () => {
@@ -536,7 +604,7 @@ describe("CommunitySlackInvite", () => {
       expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it("dismisses when ODialog emits update:open=false", async () => {
+    it("dismisses when ODialog emits update:open=false, without setting seen key", async () => {
       // Arrange — simulate Escape / overlay click paths inside real ODialog
       const dialogStub = wrapper.findComponent(ODialogStub);
 
@@ -545,7 +613,7 @@ describe("CommunitySlackInvite", () => {
 
       // Assert
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+      expect(localStorage.getItem(SEEN_KEY)).toBeNull();
     });
 
     it("does NOT dismiss when ODialog emits update:open=true", async () => {
@@ -738,29 +806,29 @@ describe("CommunitySlackInvite", () => {
 
   describe("per-user keys", () => {
     it("uses the user email from the store to build the seenKey", async () => {
-      // Arrange
+      // Arrange — only Join Slack sets the seen key
       wrapper = buildWrapper();
       dispatchExitIntent();
       await nextTick();
-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
 
       // Act
-      await closeBtn.trigger("click");
+      await joinBtn.trigger("click");
 
       // Assert — the exact keyed entry was written
       expect(localStorage.getItem(`communitySlackInviteSeen:${USER_EMAIL}`)).toBe("true");
     });
 
     it("uses 'anonymous' seenKey when userInfo has no email", async () => {
-      // Arrange — clear email before mounting
+      // Arrange — clear email before mounting; only Join Slack sets the seen key
       store.commit("setUserInfo", { email: undefined });
       wrapper = buildWrapper();
       dispatchExitIntent();
       await nextTick();
-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
 
       // Act
-      await closeBtn.trigger("click");
+      await joinBtn.trigger("click");
 
       // Assert — falls back to "anonymous"
       expect(localStorage.getItem("communitySlackInviteSeen:anonymous")).toBe("true");
