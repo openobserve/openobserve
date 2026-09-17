@@ -115,26 +115,46 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <OTooltip :content="t('panel.cancel')" />
           </OButton>
-          <OButton
-            v-else
-            v-show="store.state.printMode !== true"
-            :variant="isVariablesChanged ? 'warning' : 'outline'"
-            size="icon-toolbar"
-            @click="refreshData"
-            :disabled="arePanelsLoading"
-            :loading="arePanelsLoading"
-            data-test="dashboard-refresh-btn"
-            icon-left="refresh"
-          >
-            <OTooltip
-              :content="
-                isVariablesChanged
-                  ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                  : t('dashboard.viewDashboard.refresh')
-              "
-              shortcut-id="dashboardRefresh"
-            />
-          </OButton>
+          <OButtonGroup v-else v-show="store.state.printMode !== true">
+            <OButton
+              :variant="isVariablesChanged ? 'warning' : 'outline'"
+              size="icon-toolbar"
+              @click="refreshData()"
+              :disabled="arePanelsLoading"
+              :loading="arePanelsLoading"
+              data-test="dashboard-refresh-btn"
+              icon-left="refresh"
+            >
+              <OTooltip
+                :content="
+                  isVariablesChanged
+                    ? t('dashboard.viewDashboard.refreshToApplyVariables')
+                    : t('dashboard.viewDashboard.refresh')
+                "
+                shortcut-id="dashboardRefresh"
+              />
+            </OButton>
+            <ODropdown align="end" side="bottom">
+              <template #trigger>
+                <OButton
+                  :variant="isVariablesChanged ? 'warning' : 'outline'"
+                  size="icon-toolbar"
+                  class="w-5"
+                  :disabled="arePanelsLoading"
+                  :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                  data-test="dashboard-refresh-options-btn"
+                  icon-left="arrow-drop-down"
+                />
+              </template>
+              <ODropdownItem
+                data-test="dashboard-refresh-without-cache-btn"
+                icon-left="cached"
+                @select="refreshData(true)"
+              >
+                {{ t("dashboard.viewDashboard.refreshCacheReload") }}
+              </ODropdownItem>
+            </ODropdown>
+          </OButtonGroup>
         </template>
 
         <template #actions-overflow>
@@ -350,6 +370,9 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -392,6 +415,9 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OTooltip,
   },
@@ -1240,11 +1266,14 @@ export default defineComponent({
       });
     };
 
-    const refreshData = async () => {
+    const refreshData = async (withoutCache = false) => {
       if (!arePanelsLoading.value) {
         // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
         // This allows all panels to refresh, not just the one previously refreshed
         panelIdToBeRefreshed.value = null;
+
+        // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
+        shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
 
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
