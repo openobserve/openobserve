@@ -21,8 +21,8 @@
 //! placeholder translation ($N → ?) automatically per backend.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect,
-    Statement, Value, sea_query::Expr,
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Statement, Value, sea_query::Expr,
 };
 use serde::Serialize;
 use svix_ksuid::KsuidLike as _;
@@ -154,6 +154,34 @@ pub fn dead_letter_reason(
 }
 
 // ── Scheduler: enqueue ────────────────────────────────────────────────────────
+
+/// The unique index that makes `enqueue`'s `ON CONFLICT` target resolve.
+pub(crate) const DEDUP_UQ: &str = "synthetics_jobs_dedup_env_uq";
+
+/// The dedup key, with `env` COALESCEd.
+///
+/// Raw SQL because it indexes an expression, which the sea-orm builder
+/// cannot express. It lives here rather than in the migration that first
+/// created it, because it and `enqueue`'s `ON CONFLICT` above must agree
+/// forever, and one file is where that stays visible.
+///
+/// Same reason as `synthetics_variables`: PostgreSQL and SQLite both treat
+/// NULLs as distinct inside a unique index, and an unscoped job has `env` NULL.
+/// Without the COALESCE the key would stop deduplicating exactly the jobs it
+/// exists to deduplicate — every check that targets no environment, which is
+/// every check that exists today.
+pub(crate) fn dedup_index_sql(backend: DatabaseBackend) -> String {
+    match backend {
+        DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(
+            "CREATE UNIQUE INDEX IF NOT EXISTS {DEDUP_UQ} ON synthetics_jobs \
+             (synthetics_id, location, scheduled_ts, (COALESCE(env, '')))"
+        ),
+        DatabaseBackend::MySql => format!(
+            "CREATE UNIQUE INDEX {DEDUP_UQ} ON synthetics_jobs (synthetics_id, location, \
+             scheduled_ts, env)"
+        ),
+    }
+}
 
 /// Inserts one pending check row. ON CONFLICT DO NOTHING prevents double-scheduling.
 /// Returns the KSUID assigned to the new job (or empty string on conflict-skip).
@@ -937,6 +965,21 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
 mod tests {
     use super::*;
 
+    /// The COALESCE must survive review. Without it an unscoped job — which is
+    /// every job today — stops being deduplicated at all.
+    #[test]
+    fn the_dedup_key_coalesces_a_null_environment() {
+        for backend in [DatabaseBackend::Postgres, DatabaseBackend::Sqlite] {
+            let sql = dedup_index_sql(backend);
+            assert!(sql.contains("COALESCE(env, '')"), "{backend:?}: {sql}");
+            assert!(sql.contains("UNIQUE INDEX"), "{backend:?}: {sql}");
+            // The three original columns still have to be part of the key.
+            for col in ["synthetics_id", "location", "scheduled_ts"] {
+                assert!(sql.contains(col), "{backend:?} lost {col}: {sql}");
+            }
+        }
+    }
+
     #[test]
     fn test_enqueue_params_fields() {
         let p = EnqueueParams {
@@ -1005,8 +1048,6 @@ mod tests {
     async fn jobs_db() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, Database, Schema};
 
-        use crate::table::migration::m20260917_000001_add_env_to_synthetics_jobs::new_dedup_sql;
-
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
         let db = Database::connect(opts).await.unwrap();
@@ -1016,7 +1057,7 @@ mod tests {
             .await
             .unwrap();
         // The FK to `synthetics_runs` is absent on purpose: sqlite ignores FKs without the pragma.
-        db.execute_unprepared(&new_dedup_sql(backend))
+        db.execute_unprepared(&dedup_index_sql(backend))
             .await
             .unwrap();
         db

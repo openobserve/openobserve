@@ -37,20 +37,20 @@
 //! MySQL is not a supported meta store — `MetaStore` is `Sqlite | Nats |
 //! PostgreSQL`, and sea-orm is compiled with `sqlx-postgres` and `sqlx-sqlite`
 //! only — so no MySQL arm here is reachable. The index statements are still
-//! written to emit valid MySQL, but the arm in `new_dedup_sql` indexes bare
+//! written to emit valid MySQL, but the arm in `dedup_index_sql` indexes bare
 //! `env` and so would not dedup unscoped jobs, and `enqueue`'s `ON CONFLICT` is
 //! Postgres syntax MySQL cannot parse at all. Supporting MySQL is separate work.
 
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
+use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
+
+use crate::table::synthetics_jobs::{DEDUP_UQ, dedup_index_sql};
 
 #[derive(DeriveMigrationName)]
 pub struct Migration;
 
 /// The pre-existing three-column key, created by the jobs migration.
 const OLD_DEDUP_UQ: &str = "synthetics_jobs_dedup_uq";
-/// Its replacement, which also distinguishes environments.
-const NEW_DEDUP_UQ: &str = "synthetics_jobs_dedup_env_uq";
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -67,7 +67,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = db.get_database_backend();
         // The new key must exist before the old one goes, or a tick in the gap double-schedules.
-        db.execute(Statement::from_string(backend, new_dedup_sql(backend)))
+        db.execute(Statement::from_string(backend, dedup_index_sql(backend)))
             .await?;
         manager.drop_index(drop_dedup_idx(OLD_DEDUP_UQ)).await?;
         Ok(())
@@ -81,7 +81,7 @@ impl MigrationTrait for Migration {
     /// so it is written to be correct rather than made to succeed.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_index(create_old_dedup_uq()).await?;
-        manager.drop_index(drop_dedup_idx(NEW_DEDUP_UQ)).await?;
+        manager.drop_index(drop_dedup_idx(DEDUP_UQ)).await?;
         manager
             .alter_table(
                 Table::alter()
@@ -119,30 +119,6 @@ fn create_old_dedup_uq() -> IndexCreateStatement {
         .to_owned()
 }
 
-/// The dedup key, with `env` COALESCEd.
-///
-/// The only raw statement here, because it indexes an expression and the
-/// sea-orm builder has no way to express one — the drops and `down()`'s
-/// recreate are plain indexes and go through the builder instead.
-///
-/// Same reason as `synthetics_variables`: PostgreSQL and SQLite both treat
-/// NULLs as distinct inside a unique index, and an unscoped job has `env` NULL.
-/// Without the COALESCE the key would stop deduplicating exactly the jobs it
-/// exists to deduplicate — every check that targets no environment, which is
-/// every check that exists today.
-pub(crate) fn new_dedup_sql(backend: DatabaseBackend) -> String {
-    match backend {
-        DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(
-            "CREATE UNIQUE INDEX IF NOT EXISTS {NEW_DEDUP_UQ} ON synthetics_jobs \
-             (synthetics_id, location, scheduled_ts, (COALESCE(env, '')))"
-        ),
-        DatabaseBackend::MySql => format!(
-            "CREATE UNIQUE INDEX {NEW_DEDUP_UQ} ON synthetics_jobs (synthetics_id, location, \
-             scheduled_ts, env)"
-        ),
-    }
-}
-
 #[derive(DeriveIden)]
 enum SyntheticsJobs {
     Table,
@@ -175,7 +151,7 @@ mod tests {
             r#"DROP INDEX "synthetics_jobs_dedup_uq""#
         );
         assert_eq!(
-            drop_dedup_idx(NEW_DEDUP_UQ).to_string(SqliteQueryBuilder),
+            drop_dedup_idx(DEDUP_UQ).to_string(SqliteQueryBuilder),
             r#"DROP INDEX "synthetics_jobs_dedup_env_uq""#
         );
     }
@@ -241,20 +217,5 @@ mod tests {
             db.execute_unprepared(&insert("j5", "NULL")).await.is_err(),
             "two unscoped jobs at one tick must collide"
         );
-    }
-
-    /// The COALESCE must survive review. Without it an unscoped job — which is
-    /// every job today — stops being deduplicated at all.
-    #[test]
-    fn the_dedup_key_coalesces_a_null_environment() {
-        for backend in [DatabaseBackend::Postgres, DatabaseBackend::Sqlite] {
-            let sql = new_dedup_sql(backend);
-            assert!(sql.contains("COALESCE(env, '')"), "{backend:?}: {sql}");
-            assert!(sql.contains("UNIQUE INDEX"), "{backend:?}: {sql}");
-            // The three original columns still have to be part of the key.
-            for col in ["synthetics_id", "location", "scheduled_ts"] {
-                assert!(sql.contains(col), "{backend:?} lost {col}: {sql}");
-            }
-        }
     }
 }
