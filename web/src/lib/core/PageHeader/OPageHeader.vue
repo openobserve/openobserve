@@ -64,8 +64,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         class="flex h-full min-w-0 flex-1 items-center gap-3.25 max-lg:h-auto max-lg:self-stretch md:max-lg:min-w-40 @max-4xl/page:h-auto @max-4xl/page:self-stretch"
         :class="[
-          hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
-          hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
+          hasBack() ? 'max-md:min-w-40' : 'max-md:min-w-24',
+          hasTabs() && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
         ]"
       >
         <OButton
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Sub-page: the module-icon tile BECOMES a Back button (same 8×8
            footprint, so the title's X never shifts between list and add/edit). -->
-        <template v-if="hasBack">
+        <template v-if="hasBack()">
           <slot name="back">
             <button
               type="button"
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :class="
             titleOverflow === 'visible'
               ? ''
-              : hasTabs && !tabsBelow
+              : hasTabs() && !tabsBelow
                 ? 'shrink-0 max-md:shrink'
                 : 'md:max-lg:min-w-32'
           "
@@ -133,7 +133,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              the subtitle is present or not, so the title doesn't appear to shift
              when navigating between views. Content is vertically centered. -->
           <OText
-            v-if="hasSubtitle"
+            v-if="hasSubtitle()"
             variant="meta"
             as="div"
             class="-mt-0.5 flex h-5 min-w-0 items-center max-md:hidden"
@@ -154,7 +154,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Module tabs (Level-2 nav), inline to the right of the title.
            Two-row mode renders them as a full-width strip below instead. -->
         <div
-          v-if="hasTabs && !tabsBelow"
+          v-if="hasTabs() && !tabsBelow"
           class="flex h-full min-w-0 flex-1 items-center max-md:h-auto max-md:basis-full max-md:flex-wrap"
         >
           <slot name="tabs" />
@@ -163,13 +163,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- max-w-full + shrink let the group wrap within its row; shrink-0 alone runs it off-screen. -->
       <div
-        v-if="hasActions || hasActionsOverflow"
+        v-if="hasActions() || hasActionsOverflow()"
         class="flex shrink-0 items-center gap-2 max-lg:ms-auto max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end @max-4xl/page:ms-auto @max-4xl/page:max-w-full @max-4xl/page:shrink @max-4xl/page:flex-wrap @max-4xl/page:justify-end"
       >
-        <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
+        <slot v-if="hasActionsOverflow() && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
 
-        <template v-if="hasActionsOverflow">
+        <template v-if="hasActionsOverflow()">
           <slot v-if="!isMobile && !overflowFirst" name="actions-overflow" />
           <ODropdown v-else-if="isMobile" side="bottom" align="end">
             <template #trigger>
@@ -196,7 +196,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          bottom edge — so the underline lands exactly on that divider with no
          margin hacks and no consumer-drawn border. The -mt-2 pulls the tab row up
          into the title row's slack so the overall header height stays compact. -->
-    <div v-if="hasTabs && tabsBelow" class="-mt-2">
+    <div v-if="hasTabs() && tabsBelow" class="-mt-2">
       <slot name="tabs" />
     </div>
   </header>
@@ -305,11 +305,17 @@ const slotHasContent = (name: string): boolean => {
   });
 };
 
-const hasSubtitle = computed(() => Boolean(props.subtitle) || slotHasContent("subtitle"));
-const hasTabs = computed(() => slotHasContent("tabs"));
-const hasActions = computed(() => slotHasContent("actions"));
-const hasActionsOverflow = computed(() => slotHasContent("actions-overflow"));
-const hasBack = computed(() => Boolean(props.back) || slotHasContent("back"));
+// Plain functions, not computed: a slot's content can start absent and
+// arrive later (e.g. a subtitle gated on data that is still loading), but
+// `useSlots()` is not a tracked reactive dependency, so a `computed` here
+// would cache that first, empty answer and never re-run once the real
+// content shows up. Calling these from the template re-checks on every
+// render instead, which is exactly when the answer can have changed.
+const hasSubtitle = (): boolean => Boolean(props.subtitle) || slotHasContent("subtitle");
+const hasTabs = (): boolean => slotHasContent("tabs");
+const hasActions = (): boolean => slotHasContent("actions");
+const hasActionsOverflow = (): boolean => slotHasContent("actions-overflow");
+const hasBack = (): boolean => Boolean(props.back) || slotHasContent("back");
 const backLabel = computed(() =>
   props.back?.label ? t("common.backTo", { label: props.back.label }) : t("common.back"),
 );
