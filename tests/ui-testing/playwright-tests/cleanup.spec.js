@@ -171,6 +171,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up functions matching test patterns
     // Patterns from sanity/pipeline tests (default org only)
     const sanityFunctionPatterns = [
+      /^e2e_2812_/,                  // function-delete-confirm.spec.js (#2812)
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
@@ -298,6 +299,7 @@ test.describe("Pre-Test Cleanup", () => {
         /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
         /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
         /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
+        /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.

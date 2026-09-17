@@ -849,7 +849,7 @@ pub async fn build_search_request_per_field(
 
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
     let fields = req
         .fields
         .iter()
@@ -1161,7 +1161,7 @@ async fn values_inner(
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
 
     let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {

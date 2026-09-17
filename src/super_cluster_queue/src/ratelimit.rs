@@ -28,7 +28,7 @@ pub async fn process(msg: Message) -> Result<()> {
 
     let bytes = msg
         .value
-        .ok_or(Error::Message("Message missing value".to_string()))?;
+        .ok_or_else(|| Error::Message("Message missing value".to_string()))?;
     let rule = RuleEntry::try_from(&bytes).map_err(|e| Error::Message(e.to_string()))?;
 
     match msg.message_type {

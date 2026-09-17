@@ -1126,7 +1126,7 @@ impl ExecutablePipeline {
             .filter_map(|exec_node| {
                 if exec_node.children.is_empty() {
                     if let NodeData::Stream(stream_params) = &exec_node.node_data {
-                        (!stream_params.stream_name.contains("{")).then_some(stream_params.clone())
+                        (!stream_params.stream_name.contains("{")).then(|| stream_params.clone())
                     } else {
                         None
                     }
@@ -1966,7 +1966,7 @@ async fn process_function_node(
     let stream_name = metadata
         .stream_name
         .clone()
-        .unwrap_or("pipeline".to_string());
+        .unwrap_or_else(|| "pipeline".to_string());
     let mut result_array_records = Vec::new();
     while let Some(pipeline_item) = channels.receiver.recv().await {
         channels

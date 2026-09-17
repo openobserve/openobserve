@@ -67,6 +67,7 @@ use crate::{
     },
 };
 
+pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
 
@@ -87,15 +88,11 @@ pub struct PartitionMemo<'a> {
 
 impl<'a> PartitionMemo<'a> {
     pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
-        let bucket_micros = match time_level {
-            PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-            PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-        };
         Self {
             partition_keys,
             time_level,
             keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
-            bucket_micros,
+            bucket_micros: partition_bucket_micros(time_level),
             last: None,
         }
     }
@@ -801,6 +798,14 @@ pub fn refactor_map(
     }
 
     new_map
+}
+
+/// The span of one write partition, which a record's time bucket is counted in.
+fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
+    match time_level {
+        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
 }
 
 #[cfg(test)]
