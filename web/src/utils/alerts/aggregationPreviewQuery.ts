@@ -26,6 +26,57 @@ const maskStringLiterals = (sql: string): string =>
   );
 
 /**
+ * Blank out SQL line and block comments, quote-aware in both directions: a
+ * comment marker inside a string literal isn't mistaken for a real comment,
+ * and a quote inside a comment isn't mistaken for the start of a string
+ * literal. Run before maskStringLiterals — a regex pass can't safely tell
+ * the two apart in one direction only.
+ */
+const maskComments = (sql: string): string => {
+  let out = "";
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    if (ch === "'" || ch === '"') {
+      out += ch;
+      i++;
+      while (i < sql.length) {
+        out += sql[i];
+        if (sql[i] === ch) {
+          if (sql[i + 1] === ch) {
+            out += sql[i + 1];
+            i += 2;
+            continue;
+          }
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (ch === "-" && sql[i + 1] === "-") {
+      let j = i;
+      while (j < sql.length && sql[j] !== "\n") j++;
+      out += "x".repeat(j - i);
+      i = j;
+      continue;
+    }
+    if (ch === "/" && sql[i + 1] === "*") {
+      let j = i + 2;
+      while (j < sql.length && !(sql[j] === "*" && sql[j + 1] === "/")) j++;
+      j = Math.min(j + 2, sql.length);
+      out += "x".repeat(j - i);
+      i = j;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+};
+
+/**
  * Blank out everything inside parentheses, nesting-aware, so a keyword used
  * inside a function call or subquery — e.g. the FROM in EXTRACT(EPOCH FROM
  * now()) — can't be mistaken for the statement's own FROM/GROUP BY/etc. Run
@@ -165,7 +216,7 @@ export default cleanAggregationQuery;
  */
 export const buildCountChartQuery = (query: string): string | null => {
   if (!query) return null;
-  const masked = maskForKeywordSearch(query);
+  const masked = maskForKeywordSearch(maskComments(query));
   if (!/^\s*SELECT\b/i.test(masked)) return null;
   const fromMatch = masked.match(/\bFROM\b/i);
   if (!fromMatch) return null;
@@ -176,6 +227,11 @@ export const buildCountChartQuery = (query: string): string | null => {
   const maskedTail = masked.slice(fromIndex);
   const cutMatch = maskedTail.match(/\s+(?:ORDER\s+BY|LIMIT|GROUP\s+BY|HAVING)\b/i);
   const cutIndex = cutMatch ? fromIndex + (cutMatch.index as number) : undefined;
+  const maskedRowQuery = masked.slice(0, cutIndex);
+  // UNION/JOIN change what a single "count of matching rows" even means —
+  // rewriting the projection around them would either fail to parse or chart
+  // something other than the alert's own row count. No chart beats a wrong one.
+  if (/\b(?:UNION|JOIN)\b/i.test(maskedRowQuery)) return null;
   const tail = query.slice(fromIndex, cutIndex).trim();
   if (!tail) return null;
 
