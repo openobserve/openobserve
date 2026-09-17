@@ -3388,6 +3388,12 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
+  "connectDataSourcePopup": {
+    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
+    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
+    "connectButton": "Een gegevensbron verbinden",
+    "dismissLink": "Dat doe ik later"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",

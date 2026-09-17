@@ -3388,6 +3388,12 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "稍後再說"
   },
+  "connectDataSourcePopup": {
+    "title": "首先，讓我們連接您的第一個資料來源。",
+    "description": "我們有很多內容想向您展示，但首先需要連接您的資料。大多數團隊大約一分鐘內就能看到第一批日誌。",
+    "connectButton": "連接資料來源",
+    "dismissLink": "我稍後再做"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "從暫停處繼續",
     "startFromNow": "從現在開始。",
