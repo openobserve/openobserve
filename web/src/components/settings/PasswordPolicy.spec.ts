@@ -100,6 +100,10 @@ const editField = async (wrapper: any, row: string, value: string) => {
   await flushPromises();
 };
 const editMinLength = (wrapper: any, value: string) => editField(wrapper, "min-length", value);
+const lockoutControl = (wrapper: any, row: string, selector: string) =>
+  wrapper.find(`[data-test="settings-password-policy-lockout-${row}"] ${selector}`);
+const pair = (wrapper: any, name: string) =>
+  wrapper.find(`[data-test="settings-password-policy-pair-${name}"]`);
 
 // A DOM `trigger("submit")` returns before the awaited onSubmit settles, so the assertions would race it.
 const submit = async (wrapper: any) => {
@@ -255,6 +259,129 @@ describe("PasswordPolicy", () => {
     await submit(wrapper);
 
     expect(passwordPolicyService.updatePolicy).toHaveBeenCalled();
+  });
+
+  it("accepts start above max while lockout is off, since the durations are inert", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, "lockout-threshold", "0");
+    await editField(wrapper, "lockout-start-secs", "7201");
+    await submit(wrapper);
+
+    expect(passwordPolicyService.updatePolicy).toHaveBeenCalled();
+  });
+
+  it("disables every lockout control while the threshold is 0", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    const controls = () => [
+      lockoutControl(wrapper, "bucket-size", "input"),
+      lockoutControl(wrapper, "start-secs", "input"),
+      lockoutControl(wrapper, "max-secs", "input"),
+      lockoutControl(wrapper, "backoff", "button[role='combobox']"),
+    ];
+    expect(controls().map((c) => c.attributes("disabled"))).toEqual(Array(4).fill(undefined));
+
+    await editField(wrapper, "lockout-threshold", "0");
+
+    expect(controls().every((c) => c.attributes("disabled") !== undefined)).toBe(true);
+    expect(lockoutControl(wrapper, "threshold", "input").attributes("disabled")).toBeUndefined();
+    expect(wrapper.find('[data-test="settings-password-policy-lockout-preview"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("lays the settings out in the planned pairs", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    const plan: [string, string[]][] = [
+      ["length", ["min-length", "max-length"]],
+      ["case", ["require-uppercase", "require-lowercase"]],
+      ["digit-special", ["require-digit", "require-special"]],
+      ["rotation", ["rotation-days", "rotation-warning-days"]],
+      ["history", ["history-count", "history-max-retained"]],
+      ["lockout-duration", ["lockout-start-secs", "lockout-max-secs"]],
+      ["lockout-escalation", ["lockout-bucket-size", "lockout-backoff"]],
+      ["session-enforcement", ["cookie-max-age", "apply-to-root"]],
+    ];
+    for (const [name, rows] of plan) {
+      expect(pair(wrapper, name).exists()).toBe(true);
+      for (const row of rows) {
+        expect(
+          pair(wrapper, name).find(`[data-test="settings-password-policy-${row}"]`).exists(),
+        ).toBe(true);
+      }
+    }
+
+    await wrapper
+      .find('[data-test="settings-password-policy-require-special"] button[role="switch"]')
+      .trigger("click");
+    await flushPromises();
+
+    // VTU has no ancestor query, so the singles are checked through the DOM.
+    for (const row of ["lockout-threshold", "special-char-set"]) {
+      const el = wrapper.find(`[data-test="settings-password-policy-${row}"]`).element;
+      expect(el.closest('[data-test^="settings-password-policy-pair-"]')).toBeNull();
+    }
+  });
+
+  it("renders a cross-field message under the pair, not inside the narrow field", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, "max-length", "4");
+    await submit(wrapper);
+
+    expect(passwordPolicyService.updatePolicy).not.toHaveBeenCalled();
+    const error = wrapper.find('[data-test="settings-password-policy-max-length-error"]');
+    expect(error.exists()).toBe(true);
+    expect(error.text()).toBe(
+      "Maximum length must be at least the minimum length, or 0 for unbounded.",
+    );
+    expect(
+      pair(wrapper, "length")
+        .find('[data-test="settings-password-policy-max-length-error"]')
+        .exists(),
+    ).toBe(true);
+    const field = wrapper.find('[data-test="settings-password-policy-max-length"]');
+    expect(field.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
+      false,
+    );
+    expect(field.find(".text-input-error-text").exists()).toBe(false);
+  });
+
+  it("clears the footer once the values are valid again", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    await editField(wrapper, "max-length", "4");
+    await submit(wrapper);
+    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
+      true,
+    );
+
+    await editField(wrapper, "max-length", "64");
+
+    expect(wrapper.find('[data-test="settings-password-policy-max-length-error"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("uses one card for session and enforcement", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Session & enforcement");
+    expect(wrapper.findAll(".text-compact.font-semibold").map((n) => n.text())).toEqual([
+      "Complexity",
+      "Rotation",
+      "Reuse prevention",
+      "Account lockout",
+      "Session & enforcement",
+    ]);
   });
 
   it("returns the root switch to off when the acknowledgement is dismissed", async () => {

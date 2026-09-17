@@ -188,22 +188,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSettingRow
               :label="t('passwordPolicy.lockoutStartSecs')"
               :description="t('passwordPolicy.lockoutStartSecsDesc')"
+              :disabled="!lockoutOn"
               data-test="settings-password-policy-lockout-start-secs"
             >
-              <OFormInput name="lockout.start_secs" type="number" :min="0" class="w-24" />
+              <OFormInput
+                name="lockout.start_secs"
+                type="number"
+                :min="0"
+                class="w-24"
+                :disabled="!lockoutOn"
+              />
             </OSettingRow>
 
             <OSettingRow
               :label="t('passwordPolicy.lockoutMaxSecs')"
               :description="t('passwordPolicy.lockoutMaxSecsDesc')"
+              :disabled="!lockoutOn"
               data-test="settings-password-policy-lockout-max-secs"
             >
-              <OFormInput name="lockout.max_secs" type="number" :min="0" class="w-24" />
+              <OFormInput
+                name="lockout.max_secs"
+                type="number"
+                :min="0"
+                class="w-24"
+                :disabled="!lockoutOn"
+              />
             </OSettingRow>
 
             <OSettingRow
               :label="t('passwordPolicy.lockoutBackoff')"
               :description="t('passwordPolicy.lockoutBackoffDesc')"
+              :disabled="!lockoutOn"
               data-test="settings-password-policy-lockout-backoff"
             >
               <OFormSelect
@@ -211,6 +226,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="backoffOptions"
                 :searchable="false"
                 class="w-40"
+                :disabled="!lockoutOn"
               />
             </OSettingRow>
 

@@ -82,7 +82,8 @@ export const makePolicySchema = (t: TranslateFn) =>
     if (val.history_max_retained < val.history_count) {
       issue(["history_max_retained"], t("passwordPolicy.historyRetainedTooSmall"));
     }
-    if (val.lockout.start_secs > val.lockout.max_secs) {
+    // Threshold 0 switches lockout off, so the durations are inert; the rule fires again once it is re-enabled.
+    if (val.lockout.threshold !== 0 && val.lockout.start_secs > val.lockout.max_secs) {
       issue(["lockout", "start_secs"], t("passwordPolicy.lockoutStartTooLong"));
     }
   });
