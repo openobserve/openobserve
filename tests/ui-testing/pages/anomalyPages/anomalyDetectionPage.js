@@ -56,7 +56,12 @@ class AnomalyDetectionPage {
             customSqlRequiredError: '[data-test="anomaly-custom-sql-required-error"]',
             customSqlTimestampError: '[data-test="anomaly-custom-sql-timestamp-alias-error"]',
             detectionFunction: '[data-test="anomaly-detection-function"]',
-            detectionFunctionInfo: '[data-test="anomaly-detection-function-info"]',
+            // The Detection Function info icon renders as a bare OIcon (no data-test,
+            // unlike the sensitivity info icon), so anchor on the label and take the
+            // cursor-pointer icon span — the OTooltip's hidden anchor span (also
+            // aria-hidden) has no cursor-pointer class and is excluded.
+            detectionFunctionInfo:
+              'div.font-semibold:has-text("Detection Function") span[aria-hidden="true"].cursor-pointer',
             detectionFunctionField: '[data-test="anomaly-detection-function-field"]',
             histogramIntervalValue: '[data-test="anomaly-histogram-interval-value"]',
             histogramIntervalUnit: '[data-test="anomaly-histogram-interval-unit"]',
@@ -754,6 +759,18 @@ class AnomalyDetectionPage {
 
     getRow(name) {
         return this.page.locator(this.selectors.rowName(name));
+    }
+
+    /**
+     * The row's two-state pause/start control.
+     *
+     * Its data-row-action reflects the row's enabled state — 'pause' while
+     * enabled (the action on offer is to pause it), 'resume' while paused. That
+     * attribute, not the row's own visibility (which is invariant across both
+     * states), is the only UI proof a toggle actually took effect.
+     */
+    getPauseButtonLocator(name) {
+        return this.page.locator(this.selectors.rowPause(name));
     }
 
     /** OInput puts the real <input> behind a -field suffix; the wrapper is a div. */

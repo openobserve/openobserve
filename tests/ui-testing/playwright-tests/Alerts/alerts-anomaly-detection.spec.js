@@ -591,11 +591,22 @@ test.describe('Anomaly Detection', () => {
         tag: ['@anomaly', '@P1', '@functional', '@all'],
       }, async ({ page }) => {
         const name = await ownAnomaly(page, 'pause');
+        const pauseBtn = pm.anomalyDetectionPage.getPauseButtonLocator(name);
+
+        // The row starts enabled (createAnomalyViaApi hardcodes enabled: true),
+        // so the two-state control offers "pause" before the first click.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
+
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getToastLocator(/success/i)).toBeVisible();
+        // Pause must actually flip the state: the control now offers "resume".
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'resume');
 
         await pm.anomalyDetectionPage.togglePause(name);
         await expect(pm.anomalyDetectionPage.getRow(name)).toBeVisible();
+        // Resume must flip it back. The row's own visibility is invariant across
+        // both states, so this state-flip is what proves the resume took effect.
+        await expect(pauseBtn).toHaveAttribute('data-row-action', 'pause');
       });
 
       test('detection can be triggered from the row menu', {
