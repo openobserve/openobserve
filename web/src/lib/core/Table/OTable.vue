@@ -1080,10 +1080,20 @@ const computedTableWidth = computed<string | undefined>(() => {
 });
 
 // < md the column sizes' sum is the table's floor, so the container scrolls instead of crushing them.
-const mobileMinTableWidth = computed<string | undefined>(() => {
-  if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
-  const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);
-  return sum > 0 ? `${sum}px` : undefined;
+const minTableWidth = computed<string | undefined>(() => {
+  if (props.horizontalScroll || props.defaultColumns) return undefined;
+  const cols = table.getVisibleLeafColumns();
+  if (isMobileViewport.value) {
+    const sum = cols.reduce((a, c) => a + c.getSize(), 0);
+    return sum > 0 ? `${sum}px` : undefined;
+  }
+  if (useComputedWidth.value || containerWidth.value <= 0) return undefined;
+  if (fillMinSum() <= containerWidth.value + 1) return undefined;
+  // table-fixed hands a filler column 0px once the fixed columns alone overflow.
+  const fillers = cols
+    .filter((c) => (c.columnDef.meta as any)?.flex || (c.columnDef.meta as any)?.autoWidth)
+    .reduce((a, c) => a + c.getSize(), 0);
+  return `${nonFlexFixedSum() + fillers}px`;
 });
 
 // Virtual measureElement callback — wraps the virtualizer's measure.
@@ -1384,7 +1394,7 @@ defineExpose({
             ...measuredColumnSizeVars,
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
-            ...(mobileMinTableWidth ? { minWidth: mobileMinTableWidth } : {}),
+            ...(minTableWidth ? { minWidth: minTableWidth } : {}),
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`
