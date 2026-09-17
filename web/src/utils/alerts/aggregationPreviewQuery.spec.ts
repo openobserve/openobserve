@@ -56,7 +56,7 @@ describe("cleanAggregationQuery", () => {
 
     expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
     expect(cleaned).toContain("AS zo_sql_num");
-    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
+    expect(cleaned).toMatch(/GROUP BY 1, svc\b/);
     expect(cleaned).not.toContain("HAVING");
     expect(cleaned).not.toContain("zo_sql_min_time");
   });
@@ -91,7 +91,49 @@ describe("cleanAggregationQuery", () => {
     expect(cleaned).toContain("'zo_sql_key is here'");
     // ...and the chart must still get its own real time axis.
     expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
-    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
+    expect(cleaned).toMatch(/GROUP BY 1, svc\b/);
+  });
+
+  // Regression for a stream that has a real column literally named
+  // "zo_sql_key" (or "zo_sql_num"): DataFusion resolves a bare GROUP BY
+  // identifier against a real base-table column of the same name before it
+  // considers the SELECT list's own alias, so `GROUP BY zo_sql_key` bound to
+  // the real column instead of the injected histogram bucket, leaving
+  // histogram's `_timestamp` argument ungrouped and the query rejected by the
+  // planner. Referencing the bucket by its SELECT-list position instead of by
+  // name sidesteps that name resolution entirely.
+  it("groups the injected time bucket positionally, not by the zo_sql_key name", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "collidetest" WHERE ("k8s_cluster" = \'production\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toMatch(/GROUP BY 1, svc\b/);
+    expect(cleaned).not.toMatch(/GROUP BY zo_sql_key\b/);
+  });
+
+  it("groups positionally even with no group-by columns at all", () => {
+    const sql =
+      'SELECT count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "collidetest" WHERE ("k8s_cluster" = \'production\') HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toMatch(/GROUP BY 1\b/);
+    expect(cleaned).not.toMatch(/GROUP BY zo_sql_key\b/);
+  });
+});
+
+describe("buildCountChartQuery", () => {
+  it("groups the time bucket positionally so a real zo_sql_key column can't collide", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT * FROM "collidetest" WHERE ("k8s_cluster" = \'production\')',
+    );
+
+    expect(chartQuery).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(chartQuery).toMatch(/GROUP BY 1$/);
+    expect(chartQuery).not.toMatch(/GROUP BY zo_sql_key\b/);
   });
 });
 

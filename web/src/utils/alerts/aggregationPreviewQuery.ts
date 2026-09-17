@@ -173,7 +173,13 @@ export const cleanAggregationQuery = (query: string): string => {
   });
   // If zo_sql_key is still absent, inject histogram(_timestamp) AS zo_sql_key.
   // Checked on the masked text so a filter value spelling "zo_sql_key" can't
-  // be mistaken for the real alias and suppress the injection.
+  // be mistaken for the real alias and suppress the injection. The injected
+  // column is always the first SELECT list entry, so the GROUP BY below
+  // references it positionally ("1") rather than by that name: if the stream
+  // itself has a real column literally named zo_sql_key, naming it in GROUP
+  // BY would resolve to that real column instead of this alias, leaving
+  // histogram's own _timestamp argument ungrouped and the query rejected by
+  // the planner.
   if (!/\bzo_sql_key\b/i.test(maskStringLiterals(cleaned))) {
     cleaned = cleaned.replace(/\bSELECT\s+/i, "SELECT histogram(_timestamp) AS zo_sql_key, ");
     // Locate GROUP BY / ORDER BY / LIMIT on a masked copy so a WHERE-clause
@@ -181,9 +187,9 @@ export const cleanAggregationQuery = (query: string): string => {
     // actual clause.
     const groupByMatch = maskForKeywordSearch(cleaned).match(/\bGROUP\s+BY\s+/i);
     if (groupByMatch && groupByMatch.index !== undefined) {
-      // Existing GROUP BY — prepend zo_sql_key to it
+      // Existing GROUP BY — prepend the new column to it, positionally
       const end = groupByMatch.index + groupByMatch[0].length;
-      cleaned = cleaned.slice(0, groupByMatch.index) + "GROUP BY zo_sql_key, " + cleaned.slice(end);
+      cleaned = cleaned.slice(0, groupByMatch.index) + "GROUP BY 1, " + cleaned.slice(end);
     } else {
       // No GROUP BY at all — append one before ORDER BY / LIMIT or at end
       const orderByMatch = maskForKeywordSearch(cleaned).match(/\bORDER\s+BY\b/i);
@@ -191,15 +197,12 @@ export const cleanAggregationQuery = (query: string): string => {
       if (orderByMatch && orderByMatch.index !== undefined) {
         const end = orderByMatch.index + orderByMatch[0].length;
         cleaned =
-          cleaned.slice(0, orderByMatch.index) +
-          "GROUP BY zo_sql_key ORDER BY" +
-          cleaned.slice(end);
+          cleaned.slice(0, orderByMatch.index) + "GROUP BY 1 ORDER BY" + cleaned.slice(end);
       } else if (limitMatch && limitMatch.index !== undefined) {
         const end = limitMatch.index + limitMatch[0].length;
-        cleaned =
-          cleaned.slice(0, limitMatch.index) + "GROUP BY zo_sql_key LIMIT" + cleaned.slice(end);
+        cleaned = cleaned.slice(0, limitMatch.index) + "GROUP BY 1 LIMIT" + cleaned.slice(end);
       } else {
-        cleaned += " GROUP BY zo_sql_key";
+        cleaned += " GROUP BY 1";
       }
     }
   }
@@ -256,7 +259,10 @@ export const buildCountChartQuery = (query: string): string | null => {
   const tail = query.slice(fromIndex, cutIndex).trim();
   if (!tail) return null;
 
-  return `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ${tail} GROUP BY zo_sql_key`;
+  // GROUP BY references the bucket by position, not by the "zo_sql_key" name:
+  // if the stream itself has a real column with that name, naming it here
+  // would bind to that real column instead of the histogram alias above.
+  return `SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ${tail} GROUP BY 1`;
 };
 
 /** Separator between the parts of a composite group label. */
