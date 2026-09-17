@@ -15,11 +15,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
+import segment from "@/services/segment_analytics";
+import {
+  getCommunitySlackUrl,
+  markSlackInviteResolved,
+  shouldShowStandaloneSlackInvite,
+} from "@/utils/slackCommunityInvite";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -28,67 +34,39 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// ── Exit-intent invite (self-contained) ─────────────────────────────────────
-// Shown when the cursor heads toward the browser chrome (tab/window close),
-// up to VISIT_CAP lifetime shows unless the user joins Slack, which
-// suppresses it for good. Cloud-only — never shown on self-hosted Enterprise
-// or open source. All trigger/persistence state lives here so the host
-// layout stays clean.
+// Day-2 follow-up for a user who didn't act on ConnectDataSourcePopup's embedded offer — clock is shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
-// Per-user "seen" record — set permanently only on Join Slack (see
-// joinSlack() below). A plain dismiss (×, Maybe later, overlay/Escape) does
-// NOT set this: the user may still be shown the invite again on a later
-// visit, up to VISIT_CAP.
-const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
+const userEmail = store.state.userInfo?.email ?? "anonymous";
 
-// Lifetime cap on how many qualifying sessions may trigger the dialog via
-// exit intent, regardless of whether the user interacts with it — a backstop
-// for a user who sees it and closes the tab without dismissing.
-const VISIT_CAP = 3;
-const visitCountKey = `communitySlackInviteVisitCount:${store.state.userInfo?.email ?? "anonymous"}`;
+const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
-// Community Slack URL — enterprise can override it via backend config.
-const slackUrl = computed(() => {
-  if (config.isEnterprise == "true" && store.state.zoConfig?.custom_slack_url) {
-    return store.state.zoConfig.custom_slack_url;
+const track = (event: string, properties: Record<string, any> = {}) => {
+  try {
+    segment.track(event, {
+      org_id: store.state.selectedOrganization?.identifier,
+      user_id: store.state.userInfo?.email,
+      source: "standalone_day2",
+      ...properties,
+    });
+  } catch {
+    // Telemetry must never break the page.
   }
-  return "https://short.openobserve.ai/community";
-});
-
-const onExitIntent = (event: MouseEvent) => {
-  // Cursor exiting toward the browser chrome/tab bar, not moving between
-  // in-page elements.
-  if (event.clientY > 0) return;
-  if (localStorage.getItem(seenKey) === "true") return;
-
-  const currentCount = Number(localStorage.getItem(visitCountKey) ?? "0");
-  if (currentCount >= VISIT_CAP) return;
-
-  localStorage.setItem(visitCountKey, String(currentCount + 1));
-  isOpen.value = true;
-  document.removeEventListener("mouseleave", onExitIntent);
 };
 
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
-  // captured, listened for, or shown there.
+  // captured or shown there.
   if (config.isCloud !== "true") return;
-  if (localStorage.getItem(seenKey) === "true") return;
 
-  // Never compete with ConnectDataSourcePopup during the user's first-login
-  // session — GetStarted clears this flag when onboarding completes, so the
-  // invite becomes eligible again from the next session onward.
+  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
+  // first-login session — the day-2 clock only starts once that session ends.
   if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
-  const currentCount = Number(localStorage.getItem(visitCountKey) ?? "0");
-  if (currentCount >= VISIT_CAP) return;
-
-  document.addEventListener("mouseleave", onExitIntent);
-});
-
-onBeforeUnmount(() => {
-  document.removeEventListener("mouseleave", onExitIntent);
+  if (shouldShowStandaloneSlackInvite(userEmail)) {
+    isOpen.value = true;
+    track("community_slack_prompt_shown");
+  }
 });
 
 // Real member count, sourced from the backend `/config` response
@@ -126,9 +104,11 @@ const avatarBgClasses = [
   "bg-avatar-tint-4",
 ];
 
-// × / overlay / Escape / Maybe later: closes the dialog only. The visit cap
-// (not this) governs whether it can show again on a future visit.
+// × / overlay / Escape / Maybe later: this is the day-2 ask, the last one —
+// declining it stops the invite for good, same as joining does.
 const dismiss = () => {
+  markSlackInviteResolved(userEmail);
+  track("community_slack_prompt_dismissed");
   isOpen.value = false;
 };
 
@@ -136,11 +116,11 @@ const handleOpenChange = (open: boolean) => {
   if (!open) dismiss();
 };
 
-// Joining is the one action that suppresses the invite for good.
 const joinSlack = () => {
   window.open(slackUrl.value, "_blank", "noopener");
+  markSlackInviteResolved(userEmail);
+  track("community_slack_prompt_joined");
   isOpen.value = false;
-  localStorage.setItem(seenKey, "true");
 };
 </script>
 
