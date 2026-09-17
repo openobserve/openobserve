@@ -97,6 +97,21 @@ def fast_eval(alert: dict, stream: str) -> dict:
     return alert
 
 
+def pending_silence_alert(name: str, stream: str, *, pending_sec: int, silence_min: int, period_min: int = 5) -> dict:
+    """A single-level scheduled alert with an explicit pending ('for') window and a
+    silence far longer than it, so arming silence during pending is observable (#14556):
+    the fix keeps evaluating and fires at ~pending_sec, the bug defers to ~silence_min."""
+    a = simple_alert(name)
+    a["stream_name"] = stream
+    a["trigger_condition"]["frequency"] = 1
+    a["trigger_condition"]["period"] = period_min
+    a["trigger_condition"]["threshold"] = 1
+    a["trigger_condition"]["silence"] = silence_min
+    a["trigger_condition"]["align_time"] = False
+    a["pending_period_sec"] = pending_sec
+    return a
+
+
 class AlertsClient:
     """Per-org wrapper exposing the v1/v2 alert API (mirror of the JS helper)."""
 
@@ -230,6 +245,23 @@ class AlertsClient:
             return wait_until(_check, timeout=timeout_s, interval=poll_s, msg=f"alert {name} level={level}")
         except AssertionError:
             return last["item"]
+
+    def track_last_outcome(self, name: str, stop, timeout_s: float, poll_s: float = 5) -> tuple[dict | None, float, list]:
+        """Poll the alert list until stop(last_outcome) or timeout, returning the last
+        item seen, elapsed seconds, and the de-duplicated sequence of last_outcome
+        values observed (so a test can assert both what it reached and the path there)."""
+        start = time.time()
+        item = None
+        seen: list = []
+        while time.time() - start < timeout_s:
+            item = next((a for a in self.list_alerts() if a.get("name") == name), None)
+            outcome = item.get("last_outcome") if item else None
+            if not seen or seen[-1] != outcome:
+                seen.append(outcome)
+            if item and stop(outcome):
+                break
+            time.sleep(poll_s)
+        return item, time.time() - start, seen
 
 
 def is_firing_outcome(outcome: Any) -> bool:
