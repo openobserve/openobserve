@@ -18,14 +18,19 @@
 //! Daemon-based service graph that queries traces periodically.
 //! No inline processing during trace ingestion.
 
-/// Default window (in minutes) used when no explicit time range is provided.
-/// The UI has its own time range picker, so this only applies as the server-side fallback.
-pub const DEFAULT_QUERY_WINDOW_MINUTES: i64 = 60;
-
 // OSS modules
 pub mod aggregator;
 pub mod api;
 pub mod processor;
+pub mod v4;
+
+use std::sync::atomic::Ordering;
+
+use config::meta::stream::StreamType;
+
+/// Default window (in minutes) used when no explicit time range is provided.
+/// The UI has its own time range picker, so this only applies as the server-side fallback.
+pub const DEFAULT_QUERY_WINDOW_MINUTES: i64 = 60;
 
 // Re-export API handler for router
 // Re-export aggregator function (used by processor)
@@ -45,8 +50,80 @@ pub use o2_enterprise::enterprise::service_graph::{
 };
 // Re-export processor for compactor
 pub use processor::process_service_graph;
-#[cfg(feature = "enterprise")]
-pub(crate) use processor::run_graph_search;
+
+/// Where the topology API reads from; decided per request by `pick_source`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Source {
+    V1,
+    V4,
+}
+
+/// An org without a v1 stream (fresh install, collector-only) reads the metrics right away.
+pub fn pick_source(stopped: bool, v1_exists: bool) -> Source {
+    if stopped || !v1_exists {
+        Source::V4
+    } else {
+        Source::V1
+    }
+}
+
+/// `v1/stopped` is write-once, so a true reading is cached for the process lifetime.
+pub async fn use_v4_source(org: &str) -> bool {
+    if v4::V1_STOPPED_SEEN.load(Ordering::Relaxed) {
+        return true;
+    }
+    let stopped = crate::db::service_graph::is_v1_stopped().await;
+    if stopped {
+        v4::V1_STOPPED_SEEN.store(true, Ordering::Relaxed);
+    }
+    let v1_exists =
+        !stopped && infra::schema::exists(org, StreamType::ServiceGraph, "_o2_service_graph").await;
+    pick_source(stopped, v1_exists) == Source::V4
+}
+
+/// Runs a pre-aggregated graph query against a trace stream and returns the raw hits.
+pub(crate) async fn run_graph_search(
+    org_id: &str,
+    sql: String,
+    start_time: i64,
+    end_time: i64,
+) -> Result<Vec<serde_json::Value>, anyhow::Error> {
+    let req = config::meta::search::Request {
+        query: config::meta::search::Query {
+            sql,
+            from: 0,
+            size: 100000,
+            start_time,
+            end_time,
+            quick_mode: false,
+            query_type: "".to_string(),
+            track_total_hits: false,
+            uses_zo_fn: false,
+            query_fn: None,
+            skip_wal: false,
+            histogram_interval: 0,
+            streaming_id: None,
+            streaming_output: false,
+            sampling_config: None,
+            sampling_ratio: None,
+            timezone: None,
+        },
+        encoding: config::meta::search::RequestEncoding::Empty,
+        regions: vec![],
+        clusters: vec![],
+        timeout: 300, // 5 minute timeout for large queries
+        search_type: None,
+        search_event_context: None,
+        use_cache: false,
+        clear_cache: false,
+        local_mode: Some(false),
+        agent_options: None,
+    };
+
+    let trace_id = config::ider::generate();
+    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
+    Ok(resp.hits)
+}
 
 #[cfg(test)]
 mod tests {
@@ -60,5 +137,13 @@ mod tests {
     #[test]
     fn test_default_query_window_minutes_positive() {
         const { assert!(DEFAULT_QUERY_WINDOW_MINUTES > 0) };
+    }
+
+    #[test]
+    fn test_pick_source_four_cases() {
+        assert_eq!(pick_source(false, true), Source::V1);
+        assert_eq!(pick_source(false, false), Source::V4);
+        assert_eq!(pick_source(true, true), Source::V4);
+        assert_eq!(pick_source(true, false), Source::V4);
     }
 }

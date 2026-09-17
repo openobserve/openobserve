@@ -120,6 +120,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @click="go('ingestLogs')"
           >{{ t("home.noDataState.shippers") }}</EmptyStateIngestionChip
         >
+        <EmptyStateIngestionChip
+          v-if="store.state.zoConfig?.profiling_enabled"
+          icon="bar-chart"
+          data-test="home-no-data-profiles-btn"
+          @click="go('profiles')"
+        >
+          {{ t("home.noDataState.profiles") }}
+        </EmptyStateIngestionChip>
       </div>
     </template>
   </OEmptyState>

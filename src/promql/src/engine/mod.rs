@@ -292,6 +292,7 @@ pub(crate) mod tests {
             regions: vec![],
             clusters: vec![],
             is_super_cluster: false,
+            search_event_context: None,
         })
     }
 

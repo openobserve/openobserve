@@ -84,6 +84,22 @@ pub mod incidents;
 pub mod slack_oauth;
 pub mod templates;
 
+/// Stripped on export: re-importing this state would claim a model the destination never trained.
+#[cfg(feature = "enterprise")]
+const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
+    "is_trained",
+    "training_started_at",
+    "training_completed_at",
+    "last_processed_timestamp",
+    "current_model_version",
+    "status",
+    "last_error",
+    "retries",
+    "last_failed_at",
+    "last_alert_fired_at",
+    "last_recovery_notified_at",
+];
+
 /// Reject an `oncall_team` that names no on-call team in this organization.
 ///
 /// A mistyped or cross-org team id is not a loud failure later: routing takes
@@ -163,6 +179,14 @@ fn validate_runbook_url(url: Option<&str>) -> Result<(), Response> {
     config::meta::alerts::alert::normalize_runbook_url(url)
         .map(|_| ())
         .map_err(MetaHttpResponse::bad_request)
+}
+
+/// Removes the runtime/training keys from an anomaly config's export payload, in place.
+#[cfg(feature = "enterprise")]
+fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
+    for &key in ANOMALY_EXPORT_STRIPPED_KEYS {
+        obj.remove(key);
+    }
 }
 
 /// CreateAlert
@@ -638,6 +662,7 @@ fn composite_list_item(
         groups_firing_is_lower_bound: None,
         child_count: None,
         referenced_by_composite_count: None,
+        expression_summary: None,
     })
 }
 
@@ -1267,6 +1292,7 @@ async fn create_anomaly_alert(
         training_window_days: anomaly_fields.training_window_days,
         retrain_interval_days: anomaly_fields.retrain_interval_days,
         percentile: anomaly_fields.percentile,
+        alert_budget_per_day: anomaly_fields.alert_budget_per_day,
         rcf_num_trees: anomaly_fields.rcf_num_trees,
         rcf_tree_size: anomaly_fields.rcf_tree_size,
         rcf_shingle_size: anomaly_fields.rcf_shingle_size,
@@ -1290,6 +1316,10 @@ async fn create_anomaly_alert(
             if e.downcast_ref::<config::meta::alerts::tags::TagError>()
                 .is_some() =>
         {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        // A rejected config shape is the caller's to fix, not a server fault.
+        Err(e) if e.to_string().contains("validation error") => {
             MetaHttpResponse::bad_request(e.to_string())
         }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
@@ -1637,19 +1667,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
                                 "alert_type".to_string(),
                                 serde_json::Value::String("anomaly_detection".to_string()),
                             );
-                            // Strip runtime/training state from the export payload
-                            for key in &[
-                                "is_trained",
-                                "training_started_at",
-                                "training_completed_at",
-                                "last_processed_timestamp",
-                                "current_model_version",
-                                "status",
-                                "last_error",
-                                "retries",
-                            ] {
-                                obj.remove(*key);
-                            }
+                            strip_anomaly_runtime_state(obj);
                         }
                         MetaHttpResponse::json(v)
                     }
@@ -2057,6 +2075,8 @@ async fn build_and_run_anomaly_update(
         detection_window_seconds: fields.detection_window_seconds,
         training_window_days: fields.training_window_days,
         percentile: fields.percentile,
+        // Set-only mapping: this endpoint's partial semantics cannot express "clear".
+        alert_budget_per_day: fields.alert_budget_per_day.map(Some),
         retrain_interval_days: fields.retrain_interval_days,
         alert_enabled: fields.alert_enabled,
         alert_destinations: Some(alert.destinations),
@@ -2079,6 +2099,10 @@ async fn build_and_run_anomaly_update(
             if e.downcast_ref::<config::meta::alerts::tags::TagError>()
                 .is_some() =>
         {
+            MetaHttpResponse::bad_request(e.to_string())
+        }
+        // A rejected config shape is the caller's to fix, not a server fault.
+        Err(e) if e.to_string().contains("validation error") => {
             MetaHttpResponse::bad_request(e.to_string())
         }
         Err(e) => MetaHttpResponse::internal_error(e.to_string()),
@@ -2895,6 +2919,34 @@ async fn permitted_alert_visibility(
     Some((is_all_permitted, permitted.into_iter().collect()))
 }
 
+/// Render a stored `{id}` expression with child IDs replaced by names; `None`
+/// when any operand is missing from `names`.
+fn name_resolved_expression(
+    expression: &str,
+    names: &hashbrown::HashMap<String, String>,
+) -> Option<String> {
+    let mut out = String::with_capacity(expression.len());
+    let mut rest = expression;
+    while let Some(open) = rest.find('{') {
+        let close = rest[open..].find('}')? + open;
+        out.push_str(&rest[..open]);
+        out.push_str(names.get(&rest[open + 1..close])?);
+        rest = &rest[close + 1..];
+    }
+    out.push_str(rest);
+
+    // Match the operator wording the detail page already renders, so the two
+    // views read the same for the same composite.
+    // `!` takes a TRAILING space only, exactly as the front-end helper does:
+    // a leading one turns `(!x)` into `( NOT x)`, which the detail page never
+    // renders, and the two views must read identically for one composite.
+    let spaced = out
+        .replace("&&", " AND ")
+        .replace("||", " OR ")
+        .replace('!', "NOT ");
+    Some(spaced.split_whitespace().collect::<Vec<_>>().join(" "))
+}
+
 fn visible_alert(
     visibility: &Option<(bool, hashbrown::HashSet<String>)>,
     id: &str,
@@ -2956,6 +3008,58 @@ async fn enrich_with_composite_metadata(
     .await
     .unwrap_or_default();
 
+    // Two more bulk resolutions for the expression summary: the composites'
+    // own definitions (for the stored `{id}` expression), then every operand
+    // those expressions mention, for the names. Operands come from the
+    // expression itself rather than a children query, so this needs no
+    // per-composite round trip.
+    let mut composite_expressions: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    let mut operand_ids: Vec<String> = Vec::new();
+    if !composite_ids.is_empty() {
+        let definitions = infra::table::alert_composites::resolve_many(db, org_id, &composite_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in definitions {
+            if let infra::table::alert_composites::Resolution::Composite(composite) = resolution {
+                operand_ids.extend(
+                    composite
+                        .expression
+                        .split(['{', '}'])
+                        .skip(1)
+                        .step_by(2)
+                        .map(str::to_string),
+                );
+                composite_expressions.insert(id, composite.expression.clone());
+            }
+        }
+        operand_ids.sort_unstable();
+        operand_ids.dedup();
+    }
+
+    let mut visible_child_names: hashbrown::HashMap<String, String> = hashbrown::HashMap::new();
+    if !operand_ids.is_empty() {
+        let operands = infra::table::alert_composites::resolve_many(db, org_id, &operand_ids)
+            .await
+            .unwrap_or_default();
+        for (id, resolution) in operands {
+            let (name, folder_id) = match resolution {
+                infra::table::alert_composites::Resolution::Alert(alert) => {
+                    (alert.name.clone(), alert.folder_id.clone())
+                }
+                infra::table::alert_composites::Resolution::Composite(composite) => {
+                    (composite.name.clone(), composite.folder_id.clone())
+                }
+                _ => continue,
+            };
+            // Same gate as the reference counts above: a child the caller
+            // cannot read is left out, which drops the whole summary for any
+            // composite that mentions it.
+            if visible_alert(visibility, &id, &folder_id, &name) {
+                visible_child_names.insert(id, name);
+            }
+        }
+    }
+
     for item in list.iter_mut() {
         if !matches!(item.alert_type.as_str(), "scheduled" | "slo" | "composite") {
             continue;
@@ -2965,6 +3069,9 @@ async fn enrich_with_composite_metadata(
             // Every listed composite exists; a composite with no child rows
             // still reports zero, matching the old per-row `children.len()`.
             item.child_count = Some(child_counts.get(&id).copied().unwrap_or(0));
+            item.expression_summary = composite_expressions
+                .get(&id)
+                .and_then(|expression| name_resolved_expression(expression, &visible_child_names));
         }
         let parents = if item.alert_type == "composite" {
             &parents_for_composites
@@ -3850,6 +3957,38 @@ mod tests {
 
     use super::resolve_generate_sql;
 
+    /// Exporting `last_failed_at` hands an importer a backoff anchor for a model it never ran.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn test_export_strips_last_failed_at_with_the_rest_of_the_runtime_state() {
+        let mut config = serde_json::json!({
+            "anomaly_id": "a1",
+            "name": "keep me",
+            "threshold": 95,
+            "is_trained": true,
+            "training_started_at": 1_700_000_000_000_000i64,
+            "training_completed_at": 1_700_000_000_000_000i64,
+            "last_processed_timestamp": 1_700_000_000_000_000i64,
+            "current_model_version": 7,
+            "status": 3,
+            "last_error": "boom",
+            "retries": 4,
+            "last_failed_at": 1_700_000_000_000_000i64,
+            "last_alert_fired_at": 1_700_000_000_000_000i64,
+            "last_recovery_notified_at": 1_700_000_000_000_000i64,
+        });
+
+        super::strip_anomaly_runtime_state(config.as_object_mut().unwrap());
+
+        let left: Vec<&str> = config
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert_eq!(left, vec!["anomaly_id", "name", "threshold"]);
+    }
+
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
     }
@@ -4162,6 +4301,70 @@ mod tests {
                 "rejected for the wrong reason"
             );
             assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
+    }
+
+    mod name_resolved_expression {
+        use super::super::name_resolved_expression;
+
+        fn names(pairs: &[(&str, &str)]) -> hashbrown::HashMap<String, String> {
+            pairs
+                .iter()
+                .map(|(id, name)| (id.to_string(), name.to_string()))
+                .collect()
+        }
+
+        #[test]
+        fn resolves_operands_and_spells_out_operators() {
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && {b2})", &map).unwrap(),
+                // Parens stay tight against the operand, matching the
+                // front-end's nameResolvedExpression for the same input.
+                "(checkout_errors AND db_latency)"
+            );
+            assert_eq!(
+                name_resolved_expression("{a1} || !{b2}", &map).unwrap(),
+                "checkout_errors OR NOT db_latency"
+            );
+        }
+
+        #[test]
+        fn a_negated_operand_inside_a_group_reads_cleanly() {
+            // The backend canonicalises `a && !b` into a nested form, so this
+            // shape is what the list actually renders, not a synthetic case.
+            let map = names(&[("a1", "checkout_errors"), ("b2", "db_latency")]);
+            assert_eq!(
+                name_resolved_expression("({a1} && (!{b2}))", &map).unwrap(),
+                "(checkout_errors AND (NOT db_latency))"
+            );
+        }
+
+        #[test]
+        fn drops_the_summary_when_any_child_is_not_readable() {
+            // The whole string is withheld rather than partially rendered: a
+            // summary naming one of two children is worse than none, and a
+            // placeholder would still confirm the hidden alert exists.
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1} && {b2}", &map).is_none());
+        }
+
+        #[test]
+        fn leaves_a_malformed_expression_alone_instead_of_panicking() {
+            let map = names(&[("a1", "checkout_errors")]);
+            assert!(name_resolved_expression("{a1", &map).is_none());
+        }
+
+        #[test]
+        fn a_name_containing_braces_cannot_break_the_next_operand() {
+            // Substitution walks the source once and never re-scans what it
+            // wrote, so a brace inside a name is inert rather than being
+            // treated as the start of another operand.
+            let map = names(&[("a1", "weird{b2}name"), ("b2", "second")]);
+            assert_eq!(
+                name_resolved_expression("{a1} && {b2}", &map).unwrap(),
+                "weird{b2}name AND second"
+            );
         }
     }
 }

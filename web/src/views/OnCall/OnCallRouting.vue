@@ -238,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :conflict="conflict"
       :ladder="ladder"
       :saving="saving"
+      :allow-remove="false"
       @update:open="(v: boolean) => (dialogOpen = v)"
       @save="saveRule"
       @preview="previewConflict"
@@ -322,8 +323,11 @@ const loaded = ref(false);
 const loadError = ref("");
 const unavailable = ref(false);
 const signalsError = ref(false);
-const loadingRules = ref(false);
-const loadingSignals = ref(false);
+// True from mount, not false: the content div renders before `fetchAll`'s
+// first await resolves, and a false start here would show the table's empty
+// state for a frame before the skeleton loader ever appears.
+const loadingRules = ref(true);
+const loadingSignals = ref(true);
 const testing = ref(false);
 const sendingTest = ref(false);
 const saving = ref(false);

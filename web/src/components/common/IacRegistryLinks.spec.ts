@@ -23,12 +23,17 @@ import IacRegistryLinks from "./IacRegistryLinks.vue";
 const i18n = createI18n({
   locale: "en",
   messages: {
-    en: { common: { openProviderOnRegistry: "OpenObserve provider on the {registry}" } },
+    en: {
+      common: {
+        openProviderOnRegistry: "OpenObserve provider on the {registry}",
+      },
+    },
   },
 });
 
-function mountLinks(theme: "light" | "dark") {
+function mountLinks(theme: "light" | "dark", props: { compact?: boolean } = {}) {
   return mount(IacRegistryLinks, {
+    props,
     global: { plugins: [createStore({ state: { theme } }), i18n] },
   });
 }
@@ -80,5 +85,55 @@ describe("IacRegistryLinks", () => {
 
     expect(src("light")).toContain("%234040b2");
     expect(src("dark")).toBe(src("light"));
+  });
+
+  // The affordance gap this component shipped with: the marks carried an
+  // aria-label and a tooltip, so nothing was visible until you hovered.
+  it("labels each link visibly, without hovering", () => {
+    const wrapper = mountLinks("light");
+    const text = wrapper.text();
+
+    expect(text).toContain("Terraform");
+    expect(text).toContain("OpenTofu");
+  });
+
+  // Must be visually identical to the Import button it sits beside, which is
+  // variant="outline" — anything else reads as stray text next to a real control.
+  it("renders each registry as an outline button, matching Import", () => {
+    const wrapper = mountLinks("light");
+    const tf = wrapper.find('[data-test="iac-registry-links-terraform"]');
+
+    expect(tf.exists()).toBe(true);
+    expect(tf.element.tagName).toBe("A");
+    expect(tf.classes().join(" ")).toContain("border-button-outline-border");
+    expect(tf.classes().join(" ")).not.toContain("bg-button-secondary");
+  });
+
+  it("derives each link's data-test from dataTest", () => {
+    const wrapper = mount(IacRegistryLinks, {
+      props: { dataTest: "slos-slolist-iac-registries" },
+      global: { plugins: [createStore({ state: { theme: "light" } }), i18n] },
+    });
+
+    expect(wrapper.find('[data-test="slos-slolist-iac-registries-terraform"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="slos-slolist-iac-registries-opentofu"]').exists()).toBe(true);
+  });
+
+  it("drops the button text when compact, keeping both links", () => {
+    const wrapper = mountLinks("light", { compact: true });
+
+    expect(wrapper.text()).not.toContain("Terraform");
+    expect(wrapper.findAll("a")).toHaveLength(2);
+  });
+
+  // The caption is an addition, never a replacement: hover-free labelling must
+  // not cost the per-destination name each link already carried.
+  it("keeps each link's per-registry aria-label alongside the caption", () => {
+    const links = mountLinks("light").findAll("a");
+
+    expect(links[0].attributes("aria-label")).toBe(
+      "OpenObserve provider on the Terraform Registry",
+    );
+    expect(links[1].attributes("aria-label")).toBe("OpenObserve provider on the OpenTofu Registry");
   });
 });

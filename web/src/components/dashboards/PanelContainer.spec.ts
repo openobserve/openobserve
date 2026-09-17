@@ -194,7 +194,7 @@ describe("PanelContainer", () => {
     }
   });
 
-  const createWrapper = (props = {}) => {
+  const createWrapper = (props = {}, extraStubs = {}) => {
     return mount(PanelContainer, {
       props: {
         ...defaultProps,
@@ -291,6 +291,7 @@ describe("PanelContainer", () => {
               "viewOnly",
             ],
           },
+          ...extraStubs,
         },
         mocks: {
           $t: (key: string) => key,
@@ -1393,17 +1394,56 @@ describe("PanelContainer", () => {
   });
 
   describe("Refresh Without Cache", () => {
-    it("should show refresh without cache option in enterprise mode", () => {
-      // Mock config
+    // Regression coverage for GH #14488: this item must not be gated behind
+    // enterprise, since the backend supports clear_cache in OSS too.
+    const dropdownStubs = {
+      ODropdown: {
+        name: "ODropdown",
+        template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
+      },
+      ODropdownItem: {
+        name: "ODropdownItem",
+        template:
+          '<div class="o-dropdown-item-stub" v-bind="$attrs" @click="$emit(\'select\')"><slot /></div>',
+        emits: ["select"],
+      },
+    };
+
+    const originalIsEnterprise = config.isEnterprise;
+
+    afterEach(() => {
+      (config as any).isEnterprise = originalIsEnterprise;
+    });
+
+    it.each([
+      ["OSS build", "false"],
+      ["undefined build flag", undefined],
+      ["enterprise build", "true"],
+    ])(
+      "shows the refresh-without-cache item regardless of build type (%s)",
+      (_label, isEnterprise) => {
+        (config as any).isEnterprise = isEnterprise;
+
+        wrapper = createWrapper({ viewOnly: false }, dropdownStubs);
+
+        const item = wrapper
+          .findAllComponents({ name: "ODropdownItem" })
+          .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
+
+        expect(item).toBeTruthy();
+      },
+    );
+
+    it("hides the refresh-without-cache item in simplified panel view, independent of build type", () => {
       (config as any).isEnterprise = "true";
 
-      wrapper = createWrapper();
+      wrapper = createWrapper({ viewOnly: false, simplifiedPanelView: true }, dropdownStubs);
 
-      // Check config value instead of DOM
-      expect(config.isEnterprise).toBe("true");
+      const item = wrapper
+        .findAllComponents({ name: "ODropdownItem" })
+        .find((c) => c.attributes("data-test") === "dashboard-refresh-without-cache");
 
-      // Reset
-      (config as any).isEnterprise = undefined;
+      expect(item).toBeFalsy();
     });
 
     it("should handle refresh without cache click", async () => {
