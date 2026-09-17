@@ -183,4 +183,24 @@ describe("undefinedPlaceholders", () => {
     expect(undefinedPlaceholders(child, ["USER"])).toEqual([]);
     expect(undefinedPlaceholders(child, [])).toEqual(["USER"]);
   });
+
+  // Regression guards for the delegation to `placeholdersIn`: same answer both ways.
+  it("still reports a placeholder in a type value", () => {
+    const child: ChildJourney = {
+      id: "login-test",
+      name: "Login",
+      steps: [typeStep("c1", "{{USER}}")],
+    };
+    expect(undefinedPlaceholders(child, [])).toEqual(["USER"]);
+    expect(undefinedPlaceholders(child, ["USER"])).toEqual([]);
+  });
+
+  it("still ignores a placeholder in an assert value", () => {
+    const child: ChildJourney = {
+      id: "login-test",
+      name: "Login",
+      steps: [{ id: "c1", action: "assert", name: "Landed", value: "{{TOKEN}}" }],
+    };
+    expect(undefinedPlaceholders(child, [])).toEqual([]);
+  });
 });

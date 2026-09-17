@@ -3445,3 +3445,117 @@ describe("BrowserJourney — a restore that never reached the recording point", 
     expect(lastCommand()?.action).toBe("stopReplay");
   });
 });
+
+// Extract-to-subtest (§14): the host owns the dialog and the create request; this
+// component only exposes the range splice and reports the selection's ids.
+describe("BrowserJourney extract range", () => {
+  let wrapper: VueWrapper;
+  let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
+
+  const journey: BrowserStep[] = [
+    { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.test" },
+    { id: "s2", action: "navigate", name: "Open login", value: "https://shop.test/login" },
+    {
+      id: "s3",
+      action: "click",
+      name: "Sign in",
+      locator: { candidates: [{ kind: "css", value: "#sign-in" }] },
+    },
+    {
+      id: "s4",
+      action: "click",
+      name: "Cart",
+      locator: { candidates: [{ kind: "css", value: "#cart" }] },
+    },
+  ];
+
+  beforeEach(() => {
+    originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+  });
+
+  // The parent writes the emit back so the post-splice reveal finds the new row.
+  function mountWithModel(initial: BrowserStep[]) {
+    const w = mount(BrowserJourney, {
+      props: {
+        modelValue: initial,
+        "onUpdate:modelValue": (steps: BrowserStep[]) => w.setProps({ modelValue: steps }),
+      },
+      global: { stubs: STUBS },
+    }) as VueWrapper;
+    return w;
+  }
+
+  function currentSteps(w: VueWrapper): BrowserStep[] {
+    return (w.props() as Record<string, unknown>).modelValue as BrowserStep[];
+  }
+
+  function lastSelection(w: VueWrapper) {
+    const emitted = w.emitted("selection-changed");
+    expect(emitted).toBeTruthy();
+    return emitted![emitted!.length - 1][0] as { count: number; ids: string[] };
+  }
+
+  async function select(w: VueWrapper, ids: string[]) {
+    w.findComponent(JourneyStepsStub).vm.$emit("update:selected-ids", ids);
+    await flushPromises();
+  }
+
+  it("replaces the range with one subtest reference at the anchor", async () => {
+    wrapper = mountWithModel(journey);
+    await select(wrapper, ["s2", "s3"]);
+
+    const newId = (wrapper.vm as any).replaceRangeWithSubtest(
+      { anchor: 1, count: 2 },
+      { id: "child-1", name: "Login" },
+    ) as string;
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(journey.length - 2 + 1);
+    expect(steps.map((s) => s.id)).toEqual(["s1", newId, "s4"]);
+    expect(steps[1]).toEqual({
+      id: newId,
+      action: "subtest",
+      name: "Login",
+      subtest: { id: "child-1", name: "Login" },
+    });
+    expect(steps[0]).toEqual(journey[0]);
+    expect(steps[2]).toEqual(journey[3]);
+    expect((wrapper.vm as any).selectedCount).toBe(0);
+    expect(lastSelection(wrapper)).toMatchObject({ count: 0, ids: [] });
+  });
+
+  // The length watcher clears selection only when the length changes; a
+  // one-step range keeps the length, so the splice has to clear it itself.
+  it("clears the selection after the emit even when the range is one step", async () => {
+    wrapper = mountWithModel(journey);
+    await select(wrapper, ["s2"]);
+    expect((wrapper.vm as any).selectedCount).toBe(1);
+
+    const newId = (wrapper.vm as any).replaceRangeWithSubtest(
+      { anchor: 1, count: 1 },
+      { id: "child-1", name: "Login" },
+    ) as string;
+    await flushPromises();
+
+    const steps = currentSteps(wrapper);
+    expect(steps).toHaveLength(journey.length);
+    expect(steps[1]).toMatchObject({ id: newId, action: "subtest", subtest: { id: "child-1" } });
+    expect((wrapper.vm as any).selectedCount).toBe(0);
+    expect(lastSelection(wrapper)).toMatchObject({ count: 0, ids: [] });
+  });
+
+  it("reports the selected ids in model order on selection-changed", async () => {
+    wrapper = mountWithModel(journey);
+    await select(wrapper, ["s3", "s1"]);
+
+    expect(lastSelection(wrapper)).toEqual({ count: 2, isRecording: false, ids: ["s1", "s3"] });
+  });
+});

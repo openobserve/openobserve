@@ -30,6 +30,7 @@ const {
   mockServiceGet,
   mockServiceListEnvironments,
   mockServiceListGlobalVariables,
+  mockServiceDelete,
   mockServiceReferencedBy,
   mockRouterPush,
   mockRouterReplace,
@@ -52,6 +53,8 @@ const {
   // The shared tiers replay resolves against; empty unless a case fills them.
   mockServiceListEnvironments: vi.fn().mockResolvedValue({ data: [] }),
   mockServiceListGlobalVariables: vi.fn().mockResolvedValue({ data: [] }),
+  // Only reached by the extract flow's compensation after a failed splice.
+  mockServiceDelete: vi.fn().mockResolvedValue({}),
   // Only reached when the loaded check carries an `id`; nothing references it by default.
   mockServiceReferencedBy: vi.fn().mockResolvedValue({
     data: { references: [], hidden_reference_count: 0 },
@@ -119,6 +122,7 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
       create: mockServiceCreate,
       update: mockServiceUpdate,
       get: mockServiceGet,
+      delete: mockServiceDelete,
       listEnvironments: mockServiceListEnvironments,
       listGlobalVariables: mockServiceListGlobalVariables,
       referencedBy: mockServiceReferencedBy,
@@ -200,6 +204,8 @@ import destinationService from "@/services/alert_destination";
 // ── Stubs ────────────────────────────────────────────────────────────────
 // Exposed by the real BrowserJourney; the host calls it after a refused save.
 const mockRevealCapNotice = vi.fn();
+// Exposed by the real BrowserJourney; the host calls it once the child is created.
+const mockReplaceRangeWithSubtest = vi.fn();
 
 const baseStubs = {
   OPageHeader: {
@@ -280,7 +286,31 @@ const baseStubs = {
       "ownStepCount",
       "class",
     ],
-    methods: { revealCapNotice: mockRevealCapNotice },
+    methods: {
+      revealCapNotice: mockRevealCapNotice,
+      replaceRangeWithSubtest: (...args: unknown[]) => mockReplaceRangeWithSubtest(...args),
+    },
+  },
+  // Renders nothing of its own: the host's orchestration is driven through the `onSubmit` prop.
+  ExtractSubtestDialog: {
+    template: '<div data-test="synthetics-extract-dialog-stub" :data-open="open" />',
+    props: [
+      "open",
+      "range",
+      "anchor",
+      "authoredCount",
+      "executedCount",
+      "parentName",
+      "defaultFolder",
+      "folders",
+      "needsSchedule",
+      "parentLocations",
+      "parentSchedule",
+      "locationOptions",
+      "variables",
+      "onSubmit",
+    ],
+    emits: ["update:open"],
   },
   CheckConfigure: {
     template: '<div data-test="synthetics-check-configure" />',
@@ -380,9 +410,11 @@ describe("CreateBrowserTest", () => {
     mockServiceCreate.mockResolvedValue({ data: { id: "new-check-1" } });
     mockServiceUpdate.mockResolvedValue({});
     mockServiceGet.mockResolvedValue({ data: {} });
+    mockServiceDelete.mockResolvedValue({});
     mockServiceReferencedBy.mockResolvedValue({
       data: { references: [], hidden_reference_count: 0 },
     });
+    mockReplaceRangeWithSubtest.mockReset();
     mockGetFoldersListByType.mockResolvedValue([]);
     // Re-primed here because clearAllMocks keeps implementations — a test that
     // resolves the probe true must not leak into the next one.
@@ -1013,6 +1045,240 @@ describe("CreateBrowserTest", () => {
     });
   });
 
+  // ── Extract to subtest (§14) ─────────────────────────────────────────────
+  describe("extract to subtest", () => {
+    const OPEN_BTN = '[data-test="synthetics-extract-open-btn"]';
+    const REASON = '[data-test="synthetics-extract-reason"]';
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+    const dialogStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-extract-dialog-stub"]') as VueWrapper<any>;
+    // Tolerates a dialog that is not rendered at all while closed.
+    const dialogOpen = (w: VueWrapper) =>
+      dialogStub(w).exists() && dialogStub(w).props("open") === true;
+    const submit = (w: VueWrapper, values: Record<string, unknown>) =>
+      (dialogStub(w).props("onSubmit") as (v: unknown) => Promise<void>)(values);
+
+    const journey: BrowserStep[] = [
+      { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.test" },
+      { id: "s2", action: "navigate", name: "Open login", value: "https://shop.test/login" },
+      {
+        id: "s3",
+        action: "type",
+        name: "Email",
+        value: "{{USER}}",
+        locator: { candidates: [{ kind: "css", value: "#email" }] },
+      },
+      {
+        id: "s4",
+        action: "click",
+        name: "Cart",
+        locator: { candidates: [{ kind: "css", value: "#cart" }] },
+      },
+    ];
+    const values = { name: "Checkout — Open login", folder: "folder-2" };
+
+    /** Edit mode with a saved, eligible journey; the mapper is identity, so `journey` is the model. */
+    async function mountEdit() {
+      mockServiceGet.mockResolvedValue({
+        data: {
+          id: "check-123",
+          name: "Checkout",
+          url: "https://shop.test",
+          folder: "folder-1",
+          locations: ["us-east"],
+          journey,
+          variables: [{ name: "USER", value: "alice" }],
+        },
+      });
+      const w = mountPage({ editId: "check-123" });
+      await flushPromises();
+      return w;
+    }
+
+    async function selectRange(w: VueWrapper, ids: string[]) {
+      journeyStub(w).vm.$emit("selection-changed", { count: ids.length, isRecording: false, ids });
+      await flushPromises();
+    }
+
+    async function openDialog(w: VueWrapper) {
+      await selectRange(w, ["s2", "s3"]);
+      await w.find(OPEN_BTN).trigger("click");
+      await flushPromises();
+      expect(dialogStub(w).props("open")).toBe(true);
+    }
+
+    it("hides the button when composition is disabled", async () => {
+      store.state.zoConfig.synthetics_composition_enabled = false;
+      try {
+        wrapper = await mountEdit();
+        await selectRange(wrapper, ["s2", "s3"]);
+
+        expect(wrapper.find('[data-test="synthetics-journey-delete-selected-btn"]').exists()).toBe(
+          true,
+        );
+        expect(wrapper.find(OPEN_BTN).exists()).toBe(false);
+        expect(wrapper.find(REASON).exists()).toBe(false);
+      } finally {
+        store.state.zoConfig.synthetics_composition_enabled = true;
+      }
+    });
+
+    it("marks the button aria-disabled and says why for an ineligible selection", async () => {
+      wrapper = await mountEdit();
+      await selectRange(wrapper, ["s3", "s4"]);
+
+      const btn = wrapper.find(OPEN_BTN);
+      expect(btn.attributes("aria-disabled")).toBe("true");
+      expect(btn.attributes("disabled")).toBeUndefined();
+      expect(wrapper.find(REASON).text()).toContain("Selection must start with a navigate step");
+
+      await btn.trigger("click");
+      await flushPromises();
+      expect(dialogOpen(wrapper)).toBe(false);
+    });
+
+    it("offers a retry when the referenced-by lookup failed", async () => {
+      mockServiceReferencedBy.mockRejectedValue(new Error("network down"));
+      wrapper = await mountEdit();
+      await selectRange(wrapper, ["s2", "s3"]);
+
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("true");
+      const reason = wrapper.find(REASON);
+      expect(reason.text()).toContain("Could not check where this test is used");
+      const retry = reason.findAll("button").find((b) => b.text() === "Retry");
+      expect(retry).toBeDefined();
+
+      mockServiceReferencedBy.mockResolvedValue({
+        data: { references: [], hidden_reference_count: 0 },
+      });
+      await retry!.trigger("click");
+      await flushPromises();
+
+      expect(mockServiceReferencedBy).toHaveBeenCalledTimes(2);
+      expect(wrapper.find(REASON).exists()).toBe(false);
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("false");
+    });
+
+    it("opens the dialog for an eligible selection", async () => {
+      wrapper = await mountEdit();
+      await selectRange(wrapper, ["s2", "s3"]);
+
+      expect(wrapper.find(OPEN_BTN).attributes("aria-disabled")).toBe("false");
+      expect(wrapper.find(REASON).exists()).toBe(false);
+      expect(dialogOpen(wrapper)).toBe(false);
+
+      await wrapper.find(OPEN_BTN).trigger("click");
+      await flushPromises();
+
+      const dialog = dialogStub(wrapper);
+      expect(dialog.props("open")).toBe(true);
+      expect(dialog.props("anchor")).toBe(1);
+      expect((dialog.props("range") as BrowserStep[]).map((s) => s.id)).toEqual(["s2", "s3"]);
+      expect(dialog.props("parentName")).toBe("Checkout");
+      expect(dialog.props("defaultFolder")).toBe("folder-1");
+      expect(dialog.props("needsSchedule")).toBe(false);
+      expect(dialog.props("parentLocations")).toEqual(["us-east"]);
+      expect(dialog.props("authoredCount")).toBe(4);
+      expect(dialog.props("executedCount")).toBe(4);
+      expect(dialog.props("variables")).toEqual({ copied: ["USER"], toDefine: [] });
+    });
+
+    it("creates the child once, paused, in the chosen folder", async () => {
+      wrapper = await mountEdit();
+      await openDialog(wrapper);
+
+      await submit(wrapper, values);
+      await flushPromises();
+
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      // The payload builder is identity here, so the child check itself is what is posted.
+      expect(mockServiceCreate).toHaveBeenCalledWith(
+        "default",
+        expect.objectContaining({
+          name: "Checkout — Open login",
+          enabled: false,
+          folder: "folder-2",
+          url: "https://shop.test/login",
+        }),
+        "folder-2",
+      );
+      expect(mockServiceUpdate).not.toHaveBeenCalled();
+    });
+
+    it("seeds the children cache and splices the reference on success", async () => {
+      wrapper = await mountEdit();
+      await openDialog(wrapper);
+
+      await submit(wrapper, values);
+      await flushPromises();
+
+      const cache = (wrapper.vm as any).childrenCache as Map<string, ChildJourney>;
+      expect(cache.get("new-check-1")).toMatchObject({
+        id: "new-check-1",
+        name: "Checkout — Open login",
+        folderId: "folder-2",
+      });
+      expect(cache.get("new-check-1")?.steps.map((s) => s.action)).toEqual(["navigate", "type"]);
+      expect(mockReplaceRangeWithSubtest).toHaveBeenCalledTimes(1);
+      expect(mockReplaceRangeWithSubtest).toHaveBeenCalledWith(
+        { anchor: 1, count: 2 },
+        { id: "new-check-1", name: "Checkout — Open login" },
+      );
+      expect(dialogOpen(wrapper)).toBe(false);
+      expect(mockToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variant: "success",
+          message: 'Created "Checkout — Open login". Save this test to keep the reference.',
+        }),
+      );
+    });
+
+    it("leaves the model untouched and the dialog open when create fails", async () => {
+      mockServiceCreate.mockRejectedValue({
+        response: { status: 500, data: { message: "quota exceeded" } },
+      });
+      wrapper = await mountEdit();
+      await openDialog(wrapper);
+
+      await expect(submit(wrapper, values)).rejects.toThrow("quota exceeded");
+      await flushPromises();
+
+      expect((wrapper.vm as any).check.journey).toEqual(journey);
+      expect(mockReplaceRangeWithSubtest).not.toHaveBeenCalled();
+      expect(mockServiceDelete).not.toHaveBeenCalled();
+      expect(((wrapper.vm as any).childrenCache as Map<string, ChildJourney>).size).toBe(0);
+      expect(dialogStub(wrapper).props("open")).toBe(true);
+    });
+
+    it("deletes the created child when the splice throws", async () => {
+      mockReplaceRangeWithSubtest.mockImplementation(() => {
+        throw new Error("splice failed");
+      });
+      wrapper = await mountEdit();
+      await openDialog(wrapper);
+
+      await expect(submit(wrapper, values)).rejects.toThrow("splice failed");
+      await flushPromises();
+
+      expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      expect(mockServiceDelete).toHaveBeenCalledTimes(1);
+      expect(mockServiceDelete).toHaveBeenCalledWith("default", "new-check-1", "folder-2");
+    });
+
+    it("looks up referenced-by on load in edit mode and not in create mode", async () => {
+      wrapper = await mountEdit();
+      expect(mockServiceReferencedBy).toHaveBeenCalledTimes(1);
+      expect(mockServiceReferencedBy).toHaveBeenCalledWith("default", "check-123");
+      wrapper.unmount();
+
+      mockServiceReferencedBy.mockClear();
+      wrapper = mountPage();
+      await flushPromises();
+      expect(mockServiceReferencedBy).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Executed step cap (Phase D) ──────────────────────────────────────────
   // The host already computes the executed count, so Save refuses before any request is sent.
   describe("edit mode — executed step cap", () => {
@@ -1086,6 +1352,8 @@ describe("CreateBrowserTest", () => {
       // Precondition: the seeded composition really is 3 + 31 + 17 executed steps.
       expect(executedCount(wrapper)).toBe(51);
 
+      // The load-time extract-eligibility lookup is not the save-time usage check.
+      mockServiceReferencedBy.mockClear();
       await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
       await flushPromises();
 
