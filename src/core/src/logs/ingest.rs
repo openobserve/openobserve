@@ -202,10 +202,7 @@ pub async fn ingest(
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = parse_json_body(&req)?;
             (
                 "/api/org/ingest/logs/_json",
                 UsageType::Json,
@@ -248,10 +245,7 @@ pub async fn ingest(
             IngestionData::Multi(req),
         ),
         IngestionRequest::Usage(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = parse_json_body(&req)?;
             (
                 "/api/org/ingest/logs/_usage",
                 UsageType::Json,
@@ -702,6 +696,14 @@ pub fn prepare_record(
     match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
         Ok(ts) => Ok((res, ts)),
         Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+/// A body is an array of records or a single record.
+fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
+    match json::from_slice(body) {
+        Ok(records) => Ok(records),
+        Err(_) => Ok(vec![json::from_slice(body)?]),
     }
 }
 
@@ -1587,5 +1589,18 @@ mod tests {
             extract_resource_id_from_amazon_resource_number(arn),
             "resource-id"
         );
+    }
+
+    #[test]
+    fn test_parse_json_body_takes_an_array_or_a_single_record() {
+        assert_eq!(
+            parse_json_body(br#"[{"a":1},{"b":2}]"#).unwrap(),
+            vec![json::json!({"a": 1}), json::json!({"b": 2})]
+        );
+        assert_eq!(
+            parse_json_body(br#"{"a":1}"#).unwrap(),
+            vec![json::json!({"a": 1})]
+        );
+        assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 }
