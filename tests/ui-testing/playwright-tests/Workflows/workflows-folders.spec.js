@@ -208,8 +208,7 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     await pm.workflowFoldersPage.expectWorkflowVisible(wf.name);
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
-    await page.locator(`[data-test="workflow-list-${wf.name}-edit"]`).click();
-    await expect(page.locator('[data-test="workflow-editor-page"]')).toBeVisible({ timeout: 30000 });
+    await pm.workflowFoldersPage.openEditorFromRow(wf.name);
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
     await page.goBack();
@@ -227,15 +226,11 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
 
     await pm.workflowFoldersPage.goToList(ctx.folderB);
     await pm.workflowFoldersPage.expectWorkflowVisible(wf.name);
-    await page.locator(`[data-test="workflow-list-${wf.name}-edit"]`).click();
-    await expect(page.locator('[data-test="workflow-editor-page"]')).toBeVisible({ timeout: 30000 });
+    await pm.workflowFoldersPage.openEditorFromRow(wf.name);
 
-    const editorUrl = page.url();
-    await page.goto(editorUrl, { timeout: 60000 });
-    await expect(page.locator('[data-test="workflow-editor-page"]')).toBeVisible({ timeout: 30000 });
-    await expect(page.locator('[data-test="workflow-editor-name-value"]')).toContainText(wf.name, {
-      timeout: 30000,
-    });
+    await pm.workflowFoldersPage.reloadCurrentUrl();
+    await pm.workflowFoldersPage.expectEditorVisible();
+    await pm.workflowFoldersPage.expectEditorNameContains(wf.name);
   });
 
   // ===== P1 =====

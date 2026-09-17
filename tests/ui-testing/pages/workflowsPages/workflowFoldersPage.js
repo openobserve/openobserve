@@ -17,6 +17,7 @@ const { getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js
 
 const LIST_TIMEOUT_MS = 45000;   // K10: the workflows list GET is slow
 const DIALOG_TIMEOUT_MS = 10000;
+const EDITOR_TIMEOUT_MS = 30000; // the editor mounts a canvas; slower than a dialog
 
 class WorkflowFoldersPage {
   constructor(page) {
@@ -74,6 +75,13 @@ class WorkflowFoldersPage {
     );
     this.listRefreshBtn = page.locator('[data-test="workflow-list-refresh"]');
     this.listTabs = page.locator('[data-test="workflow-list-tabs"]');
+    this.draftTag = page.locator('[data-test="workflow-list-draft-tag"]');
+    // Prefix match: folder tabs are keyed by folderId, so a count needs the family, not one id.
+    this.anyFolderTab = page.locator('button[data-test^="dashboard-folder-tab-"]');
+
+    // ---------- editor (reached from a folder's list) ----------
+    this.editorPage = page.locator('[data-test="workflow-editor-page"]');
+    this.editorNameValue = page.locator('[data-test="workflow-editor-name-value"]');
 
     // ---------- editor folder picker (create only) ----------
     this.editorFolderDropdown = page.locator('[data-test="workflow-editor-folder"]');
@@ -265,7 +273,7 @@ class WorkflowFoldersPage {
   }
 
   async folderTabCount() {
-    return await this.page.locator('button[data-test^="dashboard-folder-tab-"]').count();
+    return await this.anyFolderTab.count();
   }
 
   // ---------- move ----------
@@ -285,7 +293,14 @@ class WorkflowFoldersPage {
     const option = this.page.locator(
       `[data-test="workflows-index-dropdown-stream_type-option"][data-test-value="${folderId}"]`
     );
-    await option.waitFor({ state: 'visible', timeout: 5000 });
+    // This select is NOT searchable, and OSelect virtualizes its options, so a destination
+    // below the fold is simply absent from the DOM. Page the list down until it renders
+    // rather than waiting on an element that will never appear on its own.
+    for (let i = 0; i < 20; i += 1) {
+      if (await option.isVisible().catch(() => false)) break;
+      await this.moveFolderSelectPopover.press('PageDown').catch(() => {});
+    }
+    await option.waitFor({ state: 'visible', timeout: DIALOG_TIMEOUT_MS });
     await option.click();
     await this.moveFolderSelectPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
   }
@@ -386,9 +401,7 @@ class WorkflowFoldersPage {
 
   async expectDraftTagOnRow(workflowName) {
     await expect(this.workflowRowAnchor(workflowName)).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
-    await expect(this.page.locator('[data-test="workflow-list-draft-tag"]').first()).toBeVisible({
-      timeout: DIALOG_TIMEOUT_MS,
-    });
+    await expect(this.draftTag.first()).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
   }
 
   // Moving a DRAFT between folders is not supported — move_workflows only touches the
@@ -397,18 +410,53 @@ class WorkflowFoldersPage {
     await expect(this.moveWorkflowBtn(workflowName)).toHaveCount(0);
   }
 
+  // ---------- editor, entered from a folder's list ----------
+
+  // The row's edit control is the way into the editor from a folder listing; owning it here
+  // keeps the folder-round-trip specs (WFF-UI-11/12) free of raw selectors.
+  editWorkflowBtn(workflowName) {
+    return this.page.locator(`[data-test="workflow-list-${workflowName}-edit"]`);
+  }
+
+  async openEditorFromRow(workflowName) {
+    await this.editWorkflowBtn(workflowName).click();
+    await this.expectEditorVisible();
+  }
+
+  async expectEditorVisible() {
+    await expect(this.editorPage).toBeVisible({ timeout: EDITOR_TIMEOUT_MS });
+  }
+
+  async expectEditorNameContains(workflowName) {
+    await expect(this.editorNameValue).toContainText(workflowName, { timeout: EDITOR_TIMEOUT_MS });
+  }
+
+  // Re-enter the editor by its own URL — the cold-load path a refresh takes.
+  async reloadCurrentUrl() {
+    await this.page.goto(this.page.url(), { timeout: 60000 });
+  }
+
   // ---------- editor folder picker ----------
 
+  // OSelect VIRTUALIZES its option list — only the visible window is in the DOM — so an
+  // option below the fold never becomes visible and the click times out. Orgs accumulate
+  // folders, so this fails as a function of how many folders exist, not of the code under
+  // test. This select is `searchable`, so filter by name first: that collapses the list to
+  // one row regardless of how many folders there are.
   async selectFolderInEditor(folderName) {
-    await this.inlineFolderTrigger.click();
     const folderId = await this.resolveFolderIdByName(folderName);
     if (!folderId) {
       throw new Error(`selectFolderInEditor: could not resolve folderId for "${folderName}"`);
     }
+    await this.inlineFolderTrigger.click();
+    const search = this.page.locator('[data-test="inline-select-folder-dropdown-search"]');
+    if (await search.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await search.fill(folderName);
+    }
     const option = this.page.locator(
       `[data-test="inline-select-folder-dropdown-option"][data-test-value="${folderId}"]`
     );
-    await option.waitFor({ state: 'visible', timeout: 5000 });
+    await option.waitFor({ state: 'visible', timeout: DIALOG_TIMEOUT_MS });
     await option.click();
   }
 
