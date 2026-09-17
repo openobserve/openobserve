@@ -129,7 +129,6 @@ pub struct AuditContext {
 pub enum SortStrategy {
     SqlOrderBy,
     FallbackColumn(String, OrderBy),
-    AutoDetermine(String, bool), // (column, is_string)
     NoSort,
 }
 

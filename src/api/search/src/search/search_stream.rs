@@ -524,7 +524,7 @@ pub async fn search_http2_stream(
         _ => {}
     }
 
-    let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+    let req_order_by = search_service::cache::cacher::time_direction(&sql).unwrap_or_default();
 
     if req.search_type.is_none() {
         req.search_type = Some(SearchEventType::Other);
