@@ -29,7 +29,7 @@ use config::{
 use dashmap::DashMap;
 use tokio::sync::OnceCell;
 
-// Stable per-org cells keep failures retryable and make successful initialization a node-lifetime no-op.
+// Stable org cells keep failures retryable and make success a node-lifetime no-op.
 static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
 
 #[derive(Default)]
@@ -60,7 +60,7 @@ fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
     LlmScoreRecord::schema_for_reflection()
 }
 
-/// Persist the canonical `_llm_scores` schema and settings once per org while the existing watcher handles cache convergence.
+/// Initialize the canonical `_llm_scores` schema once per org; the watcher converges caches.
 pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
     INITIALIZATION_CACHE
         .run(org_id, || async {
