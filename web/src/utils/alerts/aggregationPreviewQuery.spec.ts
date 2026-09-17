@@ -124,6 +124,15 @@ describe("buildCountChartQuery", () => {
     });
   });
 
+  // A CTE is not a shape this can rewrite, and returning null is the documented
+  // contract — the component then shows "No chart available for this alert's
+  // query." rather than a wrong chart. Active, because that behaviour is correct.
+  it("declines a CTE rather than rewriting it", () => {
+    expect(
+      buildCountChartQuery('WITH x AS (SELECT _timestamp FROM "default") SELECT _timestamp FROM x'),
+    ).toBeNull();
+  });
+
   // ── o2-enterprise#2635. SQL comments are not masked, so a comment mentioning
   // "from" is mistaken for the real FROM. Un-skip when that issue is fixed.
   // ── o2-enterprise#2635. SQL comments are not masked, so a comment mentioning
@@ -141,6 +150,25 @@ describe("buildCountChartQuery", () => {
     it("ignores a block comment that mentions from", () => {
       const out = buildCountChartQuery(`SELECT _timestamp /* from here */ FROM "default"`);
       expect(out).toBe(EXPECTED);
+    });
+
+    // UNION and JOIN are multi-source shapes this cannot honestly reduce to one
+    // bucketed count. Today it emits a statement the backend rejects; the
+    // contract says return null so the caller shows the unavailable message.
+    it("declines a UNION rather than emitting a statement the backend rejects", () => {
+      expect(
+        buildCountChartQuery(
+          'SELECT _timestamp FROM "default" UNION ALL SELECT _timestamp FROM "other"',
+        ),
+      ).toBeNull();
+    });
+
+    it("declines a JOIN rather than emitting a statement the backend rejects", () => {
+      expect(
+        buildCountChartQuery(
+          'SELECT a._timestamp FROM "default" a JOIN "other" b ON a.svc = b.svc',
+        ),
+      ).toBeNull();
     });
   });
 });

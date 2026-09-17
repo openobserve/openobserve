@@ -33,7 +33,7 @@ const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
 const {
   uniq, simpleAlert, createAlert, findAlertId, deleteAlertsCascade,
-  seedAlertFixturesOnce, STREAM,
+  seedAlertFixturesOnce, STREAM, api, urls, ingest,
 } = require('../utils/alerts-api-helpers.js');
 
 /** Quote count must stay even, or the backend hits "Unterminated string literal". */
@@ -218,6 +218,56 @@ test.describe('Alert detail — Evaluation chart query', {
     const chartSql = await chartQueryFor(page, id);
 
     expect(chartSql, 'the chart must filter on what the user typed').toContain(`'${value}'`);
+  });
+
+  // o2-enterprise#2634: zo_sql_key / zo_sql_num are the aliases the chart
+  // builds for its own axes. A stream carrying a real field of that name makes
+  // `GROUP BY zo_sql_key` bind to the column instead of the alias, so the time
+  // bucket is left ungrouped and the backend rejects the plan — for EVERY
+  // aggregation alert on that stream, whatever it filters on.
+  test.skip('aggregation alert: a stream field named zo_sql_key does not break the chart (o2-enterprise#2634)', async ({ page }) => {
+    const stream = uniq('evalchart_collide').toLowerCase();
+    await ingest(page, stream, [
+      { city: 'bangalore', latency: 890, status: 500, zo_sql_key: 'x' },
+      { city: 'mumbai', latency: 950, status: 500, zo_sql_key: 'y' },
+    ]);
+    try {
+      const alert = aggAlert(uniq('evalchart_collide_alert'), 'bangalore');
+      alert.stream_name = stream;
+      const id = await seed(page, alert);
+
+      // The query itself is well formed here — the failure is name resolution
+      // in the backend, so the assertion is on what the panel renders once the
+      // search comes back, not on the SQL.
+      await pm.alertDetailPage.openWithChartSettled(id);
+      await pm.alertDetailPage.expectNoChartError();
+    } finally {
+      await api(page, 'delete', `${urls().v1}/streams/${stream}?type=logs`).catch(() => {});
+    }
+  });
+
+  // o2-enterprise#2632: the backend pastes a filter value straight into the SQL
+  // without escaping, so an apostrophe produces a statement that never parses.
+  // The alert saves, looks healthy, and silently never evaluates.
+  test.skip('aggregation alert: an apostrophe in a filter value still yields runnable SQL (o2-enterprise#2632)', async ({ page }) => {
+    const value = "it's production";
+    const name = uniq('evalchart_apostrophe');
+    const id = await seed(page, aggAlert(name, value));
+
+    // Asserted at the source: generate_sql is what both the scheduler and the
+    // chart consume, so a malformed statement here breaks evaluation itself,
+    // not just the picture.
+    const response = await api(page, 'post', `${urls().v2}/alerts/generate_sql`, {
+      stream_name: STREAM,
+      stream_type: 'logs',
+      query_condition: aggAlert(name, value).query_condition,
+    });
+    expect(response.status(), 'generate_sql should succeed').toBeLessThan(400);
+    const { sql } = await response.json();
+    expect(quotesBalanced(sql), `backend emitted unbalanced quotes: ${sql}`).toBe(true);
+
+    await pm.alertDetailPage.openWithChartSettled(id);
+    await pm.alertDetailPage.expectNoChartError();
   });
 
   // o2-enterprise#2635: SQL comments are not masked, so a comment mentioning
