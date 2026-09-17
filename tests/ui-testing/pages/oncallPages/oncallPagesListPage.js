@@ -506,9 +506,34 @@ export class OnCallPagesListPage {
 
   // ---------------------------------------------------------------- assertions
 
+  /**
+   * The list screen has drawn its table.
+   *
+   * The table is NOT unconditional: with nothing ever paged in the org the
+   * product deliberately replaces it with the setup checklist — "an empty table
+   * under the checklist would offer 'no pages yet' as though that were the
+   * healthy answer" (OnCallResponses.spec.ts). So a caller that has not yet made
+   * a page see this screen gets the checklist, and waiting on the table is
+   * waiting for something that is correctly absent. Say which of the two is on
+   * screen rather than timing out on the one we expected.
+   */
   async expectListVisible() {
     await expect(this.page.locator(this.locators.root)).toBeVisible({ timeout: 30000 });
-    await expect(this.page.locator(this.locators.table)).toBeVisible({ timeout: 30000 });
+    const table = this.page.locator(this.locators.table);
+    const checklist = this.page.locator('[data-test="oncall-setup-checklist"]');
+    await expect
+      .poll(async () => (await table.count()) > 0 || (await checklist.count()) > 0,
+        { timeout: 30000, intervals: [500], message: 'the pages screen drew neither a table nor a checklist' })
+      .toBe(true);
+    if (await table.count()) {
+      await expect(table).toBeVisible({ timeout: 30000 });
+      return;
+    }
+    throw new Error(
+      'the pages list is showing the setup checklist, not the table: nothing has paged in this '
+      + 'org yet. Seed a page before asserting on the list — on a used instance this passes by '
+      + 'accident because an earlier test left one behind.',
+    );
   }
 
   /**

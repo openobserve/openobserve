@@ -291,7 +291,12 @@ test.describe('On-call dry runs', {
     await pm.oncallPagesListPage.goto(ORG);
     await pm.oncallPagesListPage.expectAvailable();
     await pm.oncallPagesListPage.filterByTeam(f.team.id);
-    await pm.oncallPagesListPage.expectListVisible();
+
+    // NOT expectListVisible() here. This test's whole point is that a test page
+    // opens no record, so on an org where nothing has ever paged the product
+    // draws the setup checklist INSTEAD of the table — correctly, and there is
+    // then no table to wait for. On a used instance it only renders because some
+    // other test left a page behind. Both shapes are the same answer: no row.
     expect(
       await pm.oncallPagesListPage.countRowsOnPage(),
       'the Pages list is what still needs somebody — a test page never does',

@@ -258,18 +258,29 @@ test.describe('On-call onboarding', {
 
     // Each step's rendered state must follow from the configuration, not from
     // anything the component kept.
-    for (const [key, satisfied] of [
-      ['team', hasTeam],
-      ['routing', hasRouting],
-      ['rotation', hasStaffedRotation],
-    ]) {
-      const state = await stateOf(key);
-      expect(state, `the "${key}" step must render its state as data, not only as a colour`)
+    // The snapshot above was taken BEFORE the screen rendered, and the org is
+    // shared with every other worker — one of them creating a team between the
+    // two reads makes the checklist right and the snapshot stale. So each step is
+    // compared against a configuration re-read alongside it, bounded: the
+    // assertion still requires the rendered state to follow from the
+    // configuration, it just does not require the org to hold still.
+    const satisfiedNow = async (key) => {
+      const teamsNow = (await listTeams(page)) ?? [];
+      if (key === 'team') return teamsNow.length > 0;
+      if (key === 'routing') return ((await listOwnershipRules(page)) ?? []).length > 0;
+      const g = await getCoverageGaps(page);
+      const n = Array.isArray(g) ? g.length : (g?.total ?? g?.teams?.length ?? 0);
+      return teamsNow.length > 0 && n < teamsNow.length;
+    };
+
+    for (const key of ['team', 'routing', 'rotation']) {
+      expect(await stateOf(key), `the "${key}" step must render its state as data, not only as a colour`)
         .toBeTruthy();
-      expect(
-        state === 'done',
-        `the "${key}" step must read done exactly when the live configuration satisfies it`,
-      ).toBe(satisfied);
+      await expect.poll(
+        async () => (await stateOf(key)) === 'done' === (await satisfiedNow(key)),
+        { timeout: 20000, intervals: [1000],
+          message: `the "${key}" step must read done exactly when the live configuration satisfies it` },
+      ).toBe(true);
     }
 
     // Nothing was clicked and nothing was stored, so a reload must recompute

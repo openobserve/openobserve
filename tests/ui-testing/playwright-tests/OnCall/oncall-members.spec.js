@@ -123,9 +123,15 @@ test.describe('On-call team staffing', {
 
     // Auto-staffing: two slots, two DIFFERENT people. One person in both slots
     // means the secondary is decorative, which is the failure this case exists for.
+    // Auto-staffing lands a moment AFTER the team row appears, so a single read
+    // races it — on a fast runner this returned 0 slots and passed only on retry.
+    await expect.poll(
+      async () => (await whoIsOnCall(page, created.id)).length,
+      { timeout: 60000, intervals: [1000],
+        message: 'a new team resolves a primary and a secondary' },
+    ).toBe(2);
     const onCall = await whoIsOnCall(page, created.id);
     testLogger.info('TS-03.01 auto-staffed slots', { onCall });
-    expect(onCall.length, 'a new team resolves a primary and a secondary').toBe(2);
     const holders = onCall.map((slot) => slot.user_email);
     expect(new Set(holders).size, 'the two slots must resolve to two different people').toBe(2);
     for (const holder of holders) {
