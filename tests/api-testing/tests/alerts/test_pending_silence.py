@@ -23,8 +23,6 @@ These are wall-clock tests: ~2-4 min each at the 1-minute minimum frequency.
 
 from __future__ import annotations
 
-import time
-
 from .multialert_helpers import is_firing_outcome, pending_silence_alert, uniq
 
 
@@ -72,20 +70,22 @@ def test_recovery_during_pending_is_observed_and_never_fires(alerts):
     assert alerts.create_alert(a).status_code == 200, "alert saves"
     alerts.created.append(alerts.find_alert_id(name))
 
-    # Keep the condition true just long enough to establish pending, then stop so
-    # the 1-min period empties and the condition recovers well before pending_sec.
-    for _ in range(3):
-        time.sleep(15)
+    def feed():
         alerts.ingest(stream, _rows(3))
 
-    item, elapsed, seen = alerts.track_last_outcome(name, lambda oc: oc == "normal", timeout_s=240, poll_s=5)
-    assert "pending" in seen, f"must enter pending first, else the test proves nothing; seen={seen}"
+    # Phase 1: feed until pending is established (so the test can't pass vacuously).
+    _, _, s1 = alerts.track_last_outcome(name, lambda oc: oc == "pending", timeout_s=90, on_poll=feed)
+    assert "pending" in s1, f"must enter pending first, else the test proves nothing; seen={s1}"
+
+    # Phase 2: stop feeding — the 1-min window empties and the condition recovers to
+    # normal well before the 210s pending elapses, so it must never fire.
+    item, elapsed, seen = alerts.track_last_outcome(name, lambda oc: oc == "normal", timeout_s=240)
     assert item, f"alert must be evaluated within the poll window; seen={seen}"
     assert item.get("last_outcome") == "normal", (
         f"recovery must be observed (normal) once the window empties; outcomes seen={seen} after {round(elapsed)}s"
     )
-    fired = {"firing", "notify_failed"} & set(seen)
-    assert not fired, f"a condition that recovered inside pending must never page; seen={seen}"
+    fired = {"firing", "notify_failed"} & (set(s1) | set(seen))
+    assert not fired, f"a condition that recovered inside pending must never page; seen={s1 + seen}"
 
 
 def test_multi_level_alert_with_pending_fires_at_for_window(alerts):

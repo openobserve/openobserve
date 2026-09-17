@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Callable
 from typing import Any
 
 import requests
@@ -247,27 +248,41 @@ class AlertsClient:
             return last["item"]
 
     def track_last_outcome(
-        self, name: str, stop, timeout_s: float, poll_s: float = 5, on_poll=None
+        self,
+        name: str,
+        stop: Callable[[Any], bool],
+        timeout_s: float,
+        poll_s: float = 5,
+        on_poll: Callable[[], None] | None = None,
     ) -> tuple[dict | None, float, list]:
         """Poll the alert list until stop(last_outcome) or timeout, returning the last
         item seen, elapsed seconds, and the de-duplicated sequence of last_outcome
         values observed (so a test can assert both what it reached and the path there).
         on_poll (if given) runs each cycle — e.g. to keep feeding the stream so the
-        condition stays true while waiting for a transition."""
-        start = time.time()
-        item = None
+        condition stays true while waiting for a transition.
+
+        Mirrors `wait_for_alert_outcome`: built on `wait_until`, swallowing the
+        timeout so the caller can assert on the returned path even when `stop`
+        was never reached."""
+        last = {"item": None}
         seen: list = []
-        while time.time() - start < timeout_s:
+
+        def _check():
             if on_poll is not None:
                 on_poll()
             item = next((a for a in self.list_alerts() if a.get("name") == name), None)
+            last["item"] = item
             outcome = item.get("last_outcome") if item else None
             if not seen or seen[-1] != outcome:
                 seen.append(outcome)
-            if item and stop(outcome):
-                break
-            time.sleep(poll_s)
-        return item, time.time() - start, seen
+            return item if (item and stop(outcome)) else None
+
+        start = time.monotonic()
+        try:
+            wait_until(_check, timeout=timeout_s, interval=poll_s, msg=f"alert {name} outcome path")
+        except AssertionError:
+            pass
+        return last["item"], time.monotonic() - start, seen
 
 
 def is_firing_outcome(outcome: Any) -> bool:
