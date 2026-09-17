@@ -1376,7 +1376,8 @@ pub async fn retry_experiment_slot(
         }
         Err(
             error @ (ExperimentSlotRetryError::InvalidLifecycle(_)
-            | ExperimentSlotRetryError::LatestExecutionNotError),
+            | ExperimentSlotRetryError::ActiveConflict
+            | ExperimentSlotRetryError::IdempotencyConflict),
         ) => MetaHttpResponse::conflict(error),
         Err(ExperimentSlotRetryError::Runtime(error)) => {
             log::error!("[Experiment] failed to retry selected slot: {error}");

@@ -127,7 +127,7 @@ export interface ExperimentApplicability {
 }
 
 export type ExperimentExecutionStatus =
-  "pending" | "running" | "retrying" | "completed" | "failed" | "cancelled";
+  "pending" | "running" | "completed" | "failed" | "cancelled";
 
 export type ExperimentStatus =
   ExperimentExecutionStatus | "scoring" | "execution_failed" | "scoring_failed";

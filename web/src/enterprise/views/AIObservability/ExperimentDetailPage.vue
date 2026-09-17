@@ -27,10 +27,7 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="
-          detail?.experiment.executionStatus !== 'retrying' &&
-          (detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0)
-        "
+        v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -862,16 +859,6 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
         ),
       };
     }
-    if (detail.value) {
-      detail.value = {
-        ...detail.value,
-        experiment: {
-          ...detail.value.experiment,
-          status: "running",
-          executionStatus: "retrying",
-        },
-      };
-    }
     startSlotRetryPolling(slot.rowId);
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
@@ -939,11 +926,7 @@ async function pollSlotRetry(rowId: string, generation: number) {
         ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
         trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
     );
-  if (
-    detail.value?.experiment.executionStatus === "retrying" ||
-    detail.value?.experiment.status === "scoring" ||
-    rowStillPending
-  ) {
+  if (rowStillPending) {
     scheduleSlotRetryPoll(rowId, generation);
   }
 }

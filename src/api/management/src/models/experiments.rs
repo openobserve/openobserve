@@ -927,7 +927,6 @@ impl From<ExperimentPreview> for ExperimentPreviewResponseBody {
 pub enum ExperimentStatusBody {
     Pending,
     Running,
-    Retrying,
     Completed,
     Failed,
     Cancelled,
@@ -938,7 +937,6 @@ impl From<ExperimentStatus> for ExperimentStatusBody {
         match value {
             ExperimentStatus::Pending => Self::Pending,
             ExperimentStatus::Running => Self::Running,
-            ExperimentStatus::Retrying => Self::Retrying,
             ExperimentStatus::Completed => Self::Completed,
             ExperimentStatus::Failed => Self::Failed,
             ExperimentStatus::Cancelled => Self::Cancelled,

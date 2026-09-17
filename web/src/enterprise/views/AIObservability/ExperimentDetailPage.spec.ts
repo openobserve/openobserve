@@ -612,7 +612,7 @@ describe("ExperimentDetailPage", () => {
     wrapper.unmount();
   });
 
-  it("shows an accepted slot retry as queued without refetching the experiment", async () => {
+  it("shows an accepted slot retry as queued without changing experiment lifecycle", async () => {
     vi.useFakeTimers();
     const experiment = makeExperiment({
       id: "exp-1",
@@ -690,8 +690,8 @@ describe("ExperimentDetailPage", () => {
       scores: [],
     });
     expect(state.detail?.experiment).toMatchObject({
-      status: "running",
-      executionStatus: "retrying",
+      status: "execution_failed",
+      executionStatus: "failed",
     });
     expect(get).toHaveBeenCalledTimes(initialGetCalls);
     expect(listRows).toHaveBeenCalledTimes(initialListCalls);
@@ -724,8 +724,8 @@ describe("ExperimentDetailPage", () => {
         makeExperimentDetail(
           makeExperiment({
             id: "exp-1",
-            status: "completed",
-            executionStatus: "completed",
+            status: "execution_failed",
+            executionStatus: "failed",
           }),
         ),
       )
@@ -733,8 +733,8 @@ describe("ExperimentDetailPage", () => {
         makeExperimentDetail(
           makeExperiment({
             id: "exp-1",
-            status: "scoring",
-            executionStatus: "completed",
+            status: "execution_failed",
+            executionStatus: "failed",
           }),
         ),
       )
@@ -742,8 +742,8 @@ describe("ExperimentDetailPage", () => {
         makeExperimentDetail(
           makeExperiment({
             id: "exp-1",
-            status: "completed",
-            executionStatus: "completed",
+            status: "execution_failed",
+            executionStatus: "failed",
           }),
         ),
       );
@@ -767,7 +767,7 @@ describe("ExperimentDetailPage", () => {
     expect(get).toHaveBeenCalledTimes(initialGetCalls + 1);
     expect(listRows).toHaveBeenCalledTimes(initialListCalls + 1);
     expect(getRow).toHaveBeenCalledWith("acme", "exp-1", "row-1");
-    expect(state.detail?.experiment.executionStatus).toBe("completed");
+    expect(state.detail?.experiment.executionStatus).toBe("failed");
     expect(state.selectedRowDetail?.trials[0]).toMatchObject({
       taskStatus: "ok",
       scores: [scoringScore],
@@ -776,16 +776,12 @@ describe("ExperimentDetailPage", () => {
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
     expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
-    expect(state.detail?.experiment.status).toBe("scoring");
-
-    await vi.advanceTimersByTimeAsync(2_000);
-    await flushPromises();
-    expect(get).toHaveBeenCalledTimes(initialGetCalls + 3);
+    expect(state.detail?.experiment.status).toBe("execution_failed");
     expect(state.selectedRowDetail?.trials[0].scores).toEqual([finalScore]);
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
-    expect(get).toHaveBeenCalledTimes(initialGetCalls + 3);
+    expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
     wrapper.unmount();
   });
 
