@@ -1,0 +1,6 @@
+[
+  { "title": "P1: Right-click Duration opens the gte/lte context menu and dismisses on Escape", "action": "append", "verifies": "right-clicking the Duration panel opens the gte/lte context menu with both items and Escape closes it" },
+  { "title": "P1: Right-click Duration then gte writes a single-sided duration >= filter", "action": "append", "verifies": "selecting the gte item writes a single-sided duration >= bound into the query editor with no panel error" },
+  { "title": "P1: Right-click Duration then lte writes a single-sided duration <= filter", "action": "append", "verifies": "selecting the lte item writes a single-sided duration <= bound into the query editor with no panel error" },
+  { "title": "P2: Right-click Rate does not open the gte/lte context menu", "action": "append", "verifies": "right-clicking a non-Duration panel is a no-op and never opens the context menu" }
+]

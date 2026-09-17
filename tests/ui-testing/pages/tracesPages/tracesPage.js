@@ -136,6 +136,14 @@ export class TracesPage {
     // Metrics dashboard container
     // Source: web/src/plugins/traces/metrics/TracesMetricsDashboard.vue
     this.tracesMetricsDashboard = '[data-test="traces-metrics-dashboard"]';
+    // No-stream prompt rendered before a stream is selected
+    // Source: web/src/plugins/traces/TracesNoStreamState.vue
+    this.tracesNoStreamCard = '[data-test="traces-no-stream-select-stream-card"]';
+    // Right-click Duration gte/lte context menu
+    // Source: web/src/plugins/traces/metrics/TracesMetricsContextMenu.vue
+    this.metricsContextMenu = '[data-test="traces-metrics-context-menu"]';
+    this.metricsContextMenuGte = '[data-test="context-menu-gte"]';
+    this.metricsContextMenuLte = '[data-test="context-menu-lte"]';
     // Analysis Dashboard Tabs — source: web/src/plugins/traces/metrics/TracesAnalysisDashboard.vue
     // Tabs render as <OTab data-test="traces-analysis-dashboard-${name}-tab"> where name ∈ {volume,duration,error}
     this.analysisDashboardTabs = '[data-test="traces-analysis-dashboard-drawer"]';
@@ -477,6 +485,19 @@ export class TracesPage {
     await this.page.locator(this.searchToggle).click();
   }
 
+  // Switch the search mode to spans and verify the toggle actually flipped, so a
+  // silently-failed click cannot produce a false green on downstream assertions.
+  async switchToSpansMode() {
+    await this.page.locator(this.spansToggle).click();
+    await this.expectSpansModeActive();
+  }
+
+  // The active search-mode toggle carries data-state="on" (OToggleGroupItem).
+  async expectSpansModeActive() {
+    await expect(this.page.locator(this.spansToggle))
+      .toHaveAttribute('data-state', 'on', { timeout: 10000 });
+  }
+
   async expectServiceGraphVisible() {
     await expect(this.page.locator(this.serviceGraphChart)).toBeVisible({ timeout: 10000 });
   }
@@ -573,6 +594,12 @@ export class TracesPage {
   async verifyTimeSetTo30Seconds() {
     // Verify that the time filter displays "Past 30 Seconds"
     await expect(this.page.locator(this.dateTimeButton)).toContainText(Past30SecondsValue);
+  }
+
+  // Text of the date-time button (e.g. "Past 1 Hour") — used to guard that a
+  // time-range change actually took effect before asserting downstream re-renders.
+  async getTimeRangeLabel() {
+    return (await this.page.locator(this.dateTimeButton).textContent().catch(() => '')) || '';
   }
 
   async setDateTime() {
@@ -2100,6 +2127,19 @@ export class TracesPage {
     await this.page.waitForTimeout(1000);
   }
 
+  /**
+   * Whether the error-only filter is currently active. The badge (SearchResult.vue)
+   * swaps its fill class when showErrorOnly is true, so this reads that class as the
+   * state guard for the toggle.
+   * @returns {Promise<boolean>}
+   */
+  async isErrorOnlyFilterActive() {
+    const badge = this.page.locator(this.errorOnlyToggle);
+    if (!(await badge.isVisible({ timeout: 3000 }).catch(() => false))) return false;
+    const cls = (await badge.getAttribute('class').catch(() => '')) || '';
+    return cls.includes('bg-badge-error-solid-bg');
+  }
+
   // --- Metrics Dashboard ---
 
   /**
@@ -2191,6 +2231,24 @@ export class TracesPage {
       if (ok) rendered.push(title);
     }
     return rendered;
+  }
+
+  /**
+   * Assert the no-stream prompt is shown before a stream has been selected.
+   */
+  async expectNoStreamCardVisible() {
+    await expect(this.page.locator(this.tracesNoStreamCard))
+      .toBeVisible({ timeout: 15000 });
+  }
+
+  /**
+   * Count of rendered metric panel canvases under the metrics dashboard.
+   * @returns {Promise<number>}
+   */
+  async countMetricsPanelCanvases() {
+    return await this.page
+      .locator(`${this.tracesMetricsDashboard} [data-test-panel-title] canvas`)
+      .count();
   }
 
   /**
@@ -2414,6 +2472,7 @@ export class TracesPage {
       .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
       .first();
     for (let attempt = 0; attempt < QUERY_CLEAR_ATTEMPTS; attempt++) {
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
       await input.click({ force: true });
       await this.page.waitForTimeout(250);
       await this.page.keyboard.press('ControlOrMeta+A');
@@ -2437,6 +2496,7 @@ export class TracesPage {
       const input = this.page
         .locator(`${this.queryEditor} .inputarea, ${this.queryEditor} textarea`)
         .first();
+      // Monaco's .inputarea is intentionally non-actionable — force focus to type real keystrokes.
       await input.click({ force: true });
       await this.page.keyboard.type(query, { delay: 25 });
       await this.page.waitForTimeout(600);
@@ -2477,6 +2537,91 @@ export class TracesPage {
       .first()
       .isVisible({ timeout: 10000 })
       .catch(() => false);
+  }
+
+  // --- Right-click Context Menu (TracesMetricsContextMenu.vue) ---
+
+  /**
+   * Right-click a data point on a metrics panel chart to open the Duration-only
+   * gte/lte context menu. Aiming at the canvas center targets the p50 percentile
+   * line's ink so the ECharts contextmenu handler emits a real data-point value.
+   * Retries because ECharts arms its contextmenu handler a beat after the panel
+   * data resolves.
+   * @param {string} title - Panel title ('Duration', 'Rate', 'Errors')
+   * @returns {Promise<boolean>} true when the right-click landed on the canvas
+   */
+  async openMetricsContextMenu(title = 'Duration') {
+    const canvas = this.metricsPanelLocator(title).locator('canvas').first();
+    if (!(await canvas.isVisible({ timeout: 10000 }).catch(() => false))) return false;
+    const box = await canvas.boundingBox();
+    if (!box) return false;
+    const position = {
+      x: Math.floor(box.width / 2),
+      y: Math.floor(box.height / 2),
+    };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await canvas.click({ button: 'right', position });
+      if (await this.isMetricsContextMenuVisible()) break;
+    }
+    return true;
+  }
+
+  /**
+   * Whether the metrics context menu is currently open.
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuVisible() {
+    return await this.page.locator(this.metricsContextMenu).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Assert the metrics context menu is visible.
+   */
+  async expectMetricsContextMenuVisible() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeVisible({ timeout: 10000 });
+  }
+
+  /**
+   * Assert the metrics context menu is hidden.
+   */
+  async expectMetricsContextMenuHidden() {
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 5000 });
+  }
+
+  /**
+   * Assert the metrics context menu never opens. A right-click on a non-Duration
+   * panel must be a no-op, so settle briefly (a buggy late render is caught) then
+   * assert the menu is still absent.
+   */
+  async expectMetricsContextMenuStaysHidden() {
+    await this.page.waitForTimeout(600);
+    await expect(this.page.locator(this.metricsContextMenu)).toBeHidden({ timeout: 1000 });
+  }
+
+  /**
+   * Whether a context menu item is visible.
+   * @param {'gte'|'lte'} condition
+   * @returns {Promise<boolean>}
+   */
+  async isMetricsContextMenuItemVisible(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    return await this.page.locator(selector).isVisible({ timeout: 3000 }).catch(() => false);
+  }
+
+  /**
+   * Click a context menu item to write a single-sided duration bound.
+   * @param {'gte'|'lte'} condition
+   */
+  async selectMetricsContextMenuItem(condition) {
+    const selector = condition === 'gte' ? this.metricsContextMenuGte : this.metricsContextMenuLte;
+    await this.page.locator(selector).click();
+  }
+
+  /**
+   * Dismiss the metrics context menu with Escape.
+   */
+  async dismissMetricsContextMenu() {
+    await this.page.keyboard.press('Escape');
   }
 
   /**

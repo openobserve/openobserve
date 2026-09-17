@@ -375,6 +375,11 @@ test.describe("Pre-Test Cleanup", () => {
     // Custom traces stream uses "stream-name" header (ZO_GRPC_STREAM_HEADER_KEY config).
     // Since streams are re-used with fresh timestamps each test run, cleanup is not strictly required.
 
+    // tracesCharts.spec.js beforeAll seeds RED-metrics traces into the shared
+    // `default` traces stream (protected above). The seeded spans are timestamped
+    // "now", so they fall out of any future query window naturally and no
+    // stream-level teardown is needed — the shared stream is reused across runs.
+
     // Clean up all service accounts matching pattern "email*@gmail.com"
     await pm.apiCleanup.cleanupServiceAccounts();
 

@@ -1,0 +1,10 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/tracesCharts.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/tracesCharts.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/tracesAnalyzeDimensions.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev-authored tracesCharts.spec.js (already in the diff and on disk) covers nearly every WIRED behavior: RED panel render (Rate/Errors/Duration), charts toggle, Insights open + per-tab dimension panels, duration-zoom -> filter -> Insights cast-error regression (#14534), reset, time-range re-render, error-only filter, spans-mode switch, and the negative suite (no-stream, empty results, rejected query). It also already parks the two UNWIRED behaviors as test.skip (#14533 zoom grey-out and o2-enterprise#2643 charts-return-after-clear). The dimension-selector behaviors (sidebar collapse/expand, search filter, checkbox toggle) are covered by the sibling tracesAnalyzeDimensions.spec.js (tests at lines 209/241/277), so re-planning them would duplicate. The ONLY genuinely missing WIRED behavior is Workflow 3 — the right-click Duration -> gte/lte context menu (handleChartContextMenu / handleContextMenuSelect in TracesMetricsDashboard.vue:448-566). No Playwright spec touches traces-metrics-context-menu / context-menu-gte / context-menu-lte anywhere under tests/ui-testing. Append new test() cases for that workflow into the existing spec rather than creating a new file."
+}
