@@ -92,7 +92,8 @@ pub async fn organizations(
 
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
@@ -190,7 +191,8 @@ pub async fn all_organizations(
     let mut org_names = HashSet::new();
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
 
