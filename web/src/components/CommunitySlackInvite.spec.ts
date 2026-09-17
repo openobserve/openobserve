@@ -269,7 +269,9 @@ describe("CommunitySlackInvite", () => {
 
       // Act
       wrapper = buildWrapper();
-      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+      const exitIntentListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "mouseleave",
+      );
 
       // Assert
       expect(exitIntentListeners).toHaveLength(0);
@@ -298,7 +300,9 @@ describe("CommunitySlackInvite", () => {
 
       // Act
       wrapper = buildWrapper();
-      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+      const exitIntentListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "mouseleave",
+      );
 
       // Assert
       expect(exitIntentListeners).toHaveLength(0);
@@ -324,7 +328,9 @@ describe("CommunitySlackInvite", () => {
 
       // Act
       wrapper = buildWrapper();
-      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+      const exitIntentListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "mouseleave",
+      );
 
       // Assert
       expect(exitIntentListeners).toHaveLength(1);
@@ -374,7 +380,9 @@ describe("CommunitySlackInvite", () => {
 
       // Act
       wrapper = buildWrapper();
-      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+      const exitIntentListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "mouseleave",
+      );
 
       // Assert
       expect(exitIntentListeners).toHaveLength(0);
@@ -422,7 +430,9 @@ describe("CommunitySlackInvite", () => {
 
       // Act
       wrapper = buildWrapper();
-      const exitIntentListeners = addEventSpy.mock.calls.filter(([event]) => event === "mouseleave");
+      const exitIntentListeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "mouseleave",
+      );
 
       // Assert
       expect(exitIntentListeners).toHaveLength(0);
