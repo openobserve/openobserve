@@ -139,14 +139,14 @@ describe("useChatStream", () => {
     await turn;
   });
 
-  it("CURRENT BEHAVIOR (BUG): a fetch throw skips teardown, leaving loading and the controller set", async () => {
+  it("runs teardown when the fetch throws, clearing loading and the controller", async () => {
     mockFetchAiChat.mockRejectedValue(new Error("network"));
     const { stream } = makeStream();
 
     await stream.runTurn(false, []);
 
-    expect(stream.isLoading.value).toBe(true);
-    expect(stream.currentAbortController.value).not.toBeNull();
+    expect(stream.isLoading.value).toBe(false);
+    expect(stream.currentAbortController.value).toBeNull();
   });
 
   it("disposeRenderFlush drops a pending trailing render", async () => {

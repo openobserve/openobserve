@@ -1825,20 +1825,19 @@ describe("O2AIChat SSE protocol", () => {
       expect(vm.isLoading).toBe(false);
     });
 
-    it("CURRENT BEHAVIOR (BUG): leaves isLoading true forever when fetchAiChat rejects", async () => {
+    it("clears loading and the controller when fetchAiChat rejects", async () => {
       mockFetchAiChat.mockRejectedValueOnce(new Error("network down"));
       vm.inputMessage = "hello";
       await vm.sendMessage();
       await flushPromises();
 
-      // The catch at sendMessage returns from inside the try with no finally, so
-      // the teardown below it never runs.
-      expect(vm.isLoading).toBe(true);
-      expect(vm.currentAbortController).not.toBeNull();
+      // Teardown sits in a finally, so the early return inside the try still runs it.
+      expect(vm.isLoading).toBe(false);
+      expect(vm.currentAbortController).toBeNull();
       expect(vm.chatMessages).toHaveLength(1);
     });
 
-    it("CURRENT BEHAVIOR (BUG): a cancelled response renders nothing and leaves isLoading true", async () => {
+    it("a cancelled response renders nothing and clears loading", async () => {
       mockFetchAiChat.mockResolvedValueOnce({ cancelled: true });
       vm.inputMessage = "hello";
       await vm.sendMessage();
@@ -1847,7 +1846,7 @@ describe("O2AIChat SSE protocol", () => {
       // Without the early return the cancelled envelope falls into the !ok
       // branch and a raw JS TypeError is rendered as the assistant reply.
       expect(vm.chatMessages).toHaveLength(1);
-      expect(vm.isLoading).toBe(true);
+      expect(vm.isLoading).toBe(false);
     });
   });
 

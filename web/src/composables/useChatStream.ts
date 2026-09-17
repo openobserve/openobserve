@@ -755,6 +755,8 @@ export function useChatStream(options: UseChatStreamOptions) {
     sessionStreamingState[streamSessionId] = true;
 
     currentAbortController.value = new AbortController();
+    // Captured now: a detach during the request nulls currentAbortController, but cleanup still needs this turn's controller.
+    const turnController = currentAbortController.value;
 
     // At most one restore attempt per turn; the notice shows only once the replacement request succeeds.
     let hasReseeded = false;
@@ -847,7 +849,6 @@ export function useChatStream(options: UseChatStreamOptions) {
 
       const reader = response.body.getReader();
 
-      const streamController = currentAbortController.value;
       const streamMsgs = chatMessages.value;
 
       await processStream(reader);
@@ -858,7 +859,7 @@ export function useChatStream(options: UseChatStreamOptions) {
         streamOwnerUnavailable.value = false;
         hasReseeded = true;
 
-        if (streamController) backgroundStreams.delete(streamController);
+        backgroundStreams.delete(turnController);
         if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
 
         // The streaming registry must follow the new id, or a re-attaching instance never sees this stream finish.
@@ -893,9 +894,6 @@ export function useChatStream(options: UseChatStreamOptions) {
       }
       streamOwnerUnavailable.value = false;
 
-      if (streamController) backgroundStreams.delete(streamController);
-      if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
-
       // Only update UI/store if stream was NOT detached (session is still the same)
       const wasDetached = chatMessages.value !== streamMsgs;
       if (!wasDetached) {
@@ -916,18 +914,25 @@ export function useChatStream(options: UseChatStreamOptions) {
         content: raw(errorMessage),
       });
       await saveToHistory();
+    } finally {
+      // finally, not after the catch: the early returns and a throw must not leave the spinner or the registry behind.
+      backgroundStreams.delete(turnController);
+      // Only this turn's entry; a re-attach or restore may have replaced it with another controller.
+      if (backgroundStreamMap.get(streamSessionId)?.controller === turnController) {
+        backgroundStreamMap.delete(streamSessionId);
+      }
+
+      isLoading.value = false;
+      activeToolCall.value = null;
+      stopAnalyzingRotation();
+
+      // Clear by the id captured before the request, not currentSessionId, which may belong to another chat by an early failure.
+      sessionStreamingState[streamSessionId] = false;
+
+      currentAbortController.value = null;
+
+      await scrollToBottom();
     }
-
-    isLoading.value = false;
-    activeToolCall.value = null;
-    stopAnalyzingRotation();
-
-    // Clear by the id captured before the request, not currentSessionId, which may belong to another chat by an early failure.
-    sessionStreamingState[streamSessionId] = false;
-
-    currentAbortController.value = null;
-
-    await scrollToBottom();
   };
 
   // Throttle the reactive write: each one re-parses and re-highlights the whole markdown, which is O(n^2) at typewriter tick rate.

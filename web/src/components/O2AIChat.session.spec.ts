@@ -890,6 +890,47 @@ describe("O2AIChat session, persistence and lifecycle", () => {
   // ── 7. Cross-instance stream registry ──────────────────────────────────────
 
   describe("background stream registry", () => {
+    // runTurn's cleanup used to sit after try/catch, so a return or throw inside the try skipped it.
+    it("clears the spinner when the chat request itself throws", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      mockFetchAiChat.mockRejectedValueOnce(new Error("context build failed"));
+      vm.inputMessage = "anything";
+      await vm.sendMessage();
+      await flushPromises();
+
+      expect(vm.isLoading).toBe(false);
+      expect(vm.currentAbortController).toBeNull();
+    });
+
+    it("loads the saved chat instead of re-attaching when the request failed after the user left", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      let resolveFetch!: (r: unknown) => void;
+      mockFetchAiChat.mockReturnValueOnce(new Promise((r) => (resolveFetch = r)));
+      vm.inputMessage = "slow question";
+      void vm.sendMessage();
+      await flushPromises();
+
+      vm.addNewChat();
+      await flushPromises();
+
+      resolveFetch({ ok: false, status: 500, json: async () => ({ message: "boom" }) });
+      await flushPromises();
+
+      // The saved chat has the finished answer; a dead stream's in-memory array does not.
+      const saved = [
+        { role: "user", content: "slow question" },
+        { role: "assistant", content: "answer saved before the failure" },
+      ];
+      // loadChat publishes the chat id and a store watcher calls it again, so answer every call.
+      mockLoadChat.mockResolvedValue({ id: 42, sessionId: "uuid-1", title: "T", messages: saved });
+      await vm.loadChat(42);
+      await flushPromises();
+
+      expect(vm.chatMessages).toEqual(saved);
+      expect(vm.currentAbortController).toBeNull();
+      expect(vm.isLoading).toBe(false);
+    });
+
     it("evicts the oldest background stream past the cap of three", async () => {
       const signals: any[] = [];
       for (let i = 0; i < 4; i++) {

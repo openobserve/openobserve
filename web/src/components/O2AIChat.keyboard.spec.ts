@@ -352,9 +352,8 @@ describe("prompt history (ArrowUp / ArrowDown)", () => {
     vm.handleKeyDown(down);
     expect(down.defaultPrevented).toBe(false);
 
-    // A rejected fetchAiChat returns before teardown, so isLoading is left true.
-    expect(vm.isLoading).toBe(true);
-    vm.isLoading = false;
+    // A rejected fetchAiChat still runs teardown, so the next send is not blocked.
+    expect(vm.isLoading).toBe(false);
     vm.inputMessage = "fresh";
     await vm.sendMessage();
     await flushPromises();
