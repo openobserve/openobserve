@@ -65,6 +65,12 @@ export default class LogsVisualise {
     });
   }
 
+  // Visualize tab's root element. Rendered under v-show (Index.vue), so it is
+  // always attached but only *visible* when the Visualize tab is actually active.
+  getPanelEditorContainer() {
+    return this.page.locator('[data-test="panel-editor-container"]');
+  }
+
   // Open visualise tab and ensure table chart is selected when VRL is present
   async openVisualiseTabWithVrl() {
     await this.openVisualiseTab();
