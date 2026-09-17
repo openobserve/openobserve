@@ -15,7 +15,7 @@
 
 import DOMPurify from "dompurify";
 import hljs from "highlight.js";
-import { marked, type MarkedOptions } from "marked";
+import { marked } from "marked";
 
 import type { TranslateFn } from "@/types/i18n";
 import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
@@ -23,26 +23,8 @@ import { UNAUTHORIZED_MESSAGE_KEY } from "@/utils/authErrors";
 // Register VRL as a JavaScript alias (type assertion)
 hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
 
-// Configure marked options with custom language support
-const markedOptions = {
-  breaks: true,
-  gfm: true,
-  langPrefix: "hljs language-",
-  headerIds: false,
-  mangle: false,
-  sanitize: false, // Allow HTML in markdown
-  highlight: (code: string, lang: string) => {
-    if (lang === "vrl") {
-      return hljs.highlight(code, { language: "javascript" }).value;
-    }
-    if (lang && hljs.getLanguage(lang)) {
-      return hljs.highlight(code, { language: lang }).value;
-    }
-    return hljs.highlightAuto(code).value;
-  },
-} as MarkedOptions;
-
-marked.setOptions(markedOptions);
+// Highlighting and sanitizing happen in processTextBlock and processHtmlBlock, not in marked.
+marked.setOptions({ breaks: true, gfm: true });
 
 const LANGUAGE_DISPLAY_NAMES: { [key: string]: string } = {
   js: "JavaScript",
@@ -102,11 +84,7 @@ export function processTextBlock(text: string): RenderedBlock[] {
 
   for (const token of tokens) {
     if (token.type === "code") {
-      // Remove comments at the beginning of code blocks
-      let codeText = token.text.trim();
-      while (codeText.startsWith("--") || codeText.startsWith("//") || codeText.startsWith("#")) {
-        codeText = codeText.split("\n").slice(1).join("\n").trim();
-      }
+      const codeText = token.text.trim();
 
       const highlightedContent =
         token.lang && hljs.getLanguage(token.lang)

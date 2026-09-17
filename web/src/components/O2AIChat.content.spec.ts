@@ -70,9 +70,17 @@ describe("processTextBlock", () => {
     expect(blocks[0].highlightedContent).toContain("hljs-keyword");
   });
 
-  it("strips leading comment lines from a code block", () => {
-    const blocks = processTextBlock("```sql\n-- a note\n-- another\nSELECT 1\n```");
-    expect(blocks[0].content).toBe("SELECT 1");
+  // Stripping them removed real code, and the copy button then copied a broken snippet.
+  it("keeps leading comment lines in a code block", () => {
+    expect(processTextBlock("```sql\n-- a note\nSELECT 1\n```")[0].content).toBe(
+      "-- a note\nSELECT 1",
+    );
+    expect(processTextBlock("```bash\n#!/bin/bash\necho hi\n```")[0].content).toBe(
+      "#!/bin/bash\necho hi",
+    );
+    expect(processTextBlock("```js\n// setup\nconst a = 1;\n```")[0].content).toBe(
+      "// setup\nconst a = 1;",
+    );
   });
 
   it("still highlights a code block with an unknown language", () => {
