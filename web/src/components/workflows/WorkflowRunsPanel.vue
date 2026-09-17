@@ -70,7 +70,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :last-run-at="workflowObj.runsHistory.fetchedAt || null"
           :loading="loading"
           data-test="workflow-runs-refresh"
-          @click="fetchHistory"
+          @click="fetchHistory(true)"
         />
       </div>
     </div>
@@ -115,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-if="loadError"
                 preset="load-error"
                 data-test="workflow-runs-load-error"
-                @action="fetchHistory"
+                @action="fetchHistory(true)"
               />
               <NoData v-else />
             </div>
@@ -370,13 +370,15 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-const fetchHistory = async () => {
+// `force` for the refresh and retry buttons; a mount or window change reads the cache.
+const fetchHistory = async (force = false) => {
   if (!props.workflowId) return;
   const res = await loadRunsHistory({
     orgId: props.orgId,
     workflowId: props.workflowId,
     start: dateTimeValues.value.startTime,
     end: dateTimeValues.value.endTime,
+    force,
   });
   if (res.ok) {
     loadError.value = false;

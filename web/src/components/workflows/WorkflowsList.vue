@@ -334,6 +334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { workflowKeys } from "@/services/workflows.querykeys";
+import { workflowFolderQuery, workflowSearchQuery } from "@/services/workflows.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -603,34 +604,57 @@ const otableColumns = computed(() => {
   return cols;
 });
 
-const getWorkflows = async (folderId?: string) => {
-  loading.value = true;
+// The list on screen, and the newest read: a slower earlier read must not overwrite a later folder or search.
+let shownListKey = "";
+let latestRead = 0;
+
+const getWorkflows = async (folderId?: string, force = false) => {
+  const options = crossFolderActive.value
+    ? workflowSearchQuery(orgId.value, filterQuery.value.trim())
+    : workflowFolderQuery(orgId.value, folderId ?? activeFolderId.value);
+  const read = ++latestRead;
+  const listKey = JSON.stringify(options.queryKey);
+  // Only a switch to another list repaints up front: a reload of the same list keeps its rows, including an in-place toggle.
+  if (listKey !== shownListKey) {
+    shownListKey = listKey;
+    const cached = queryClient.getQueryData<any[]>(options.queryKey);
+    workflows.value = cached ? shapeWorkflows(cached) : [];
+    lastUpdatedAt.value = cached
+      ? (queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null)
+      : null;
+    loading.value = !cached;
+  }
   fetching.value = true;
   forbidden.value = false;
   try {
-    const across = crossFolderActive.value;
-    const response = await workflowService.listWorkflows(
-      orgId.value,
-      folderId ?? activeFolderId.value,
-      across,
-      across ? filterQuery.value.trim() : undefined,
-    );
-    // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    if (read !== latestRead) return;
     workflows.value = shapeWorkflows(list);
-    lastUpdatedAt.value = Date.now();
+    // The cache records the fetch time; fetchQuery does not hand it back.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
+    if (read !== latestRead) return;
     console.error(error);
     forbidden.value = error?.response?.status === 403;
   } finally {
-    loading.value = false;
-    fetching.value = false;
+    if (read === latestRead) {
+      loading.value = false;
+      fetching.value = false;
+    }
   }
 };
 
-const refreshWorkflows = () => getWorkflows();
+// Named handler: binding getWorkflows straight to @click would put the MouseEvent in `folderId`.
+const refreshWorkflows = () => getWorkflows(undefined, true);
 
-// This list reads the service directly, but other pickers read the cached org list, so a write here must still expire it.
+// Every workflow read shares this scope, so a write here expires the folder lists, searches and the alert form's picker.
 const invalidateWorkflowsCache = () =>
   queryClient.invalidateQueries({ queryKey: workflowKeys.all(orgId.value) });
 
@@ -775,11 +799,13 @@ const onEditorSaved = async () => {
 };
 
 onMounted(async () => {
+  // Started first: the list does not need the folders, and a cached one should paint without waiting on them.
+  const listRead = getWorkflows();
   // FolderList reads the store, so the folders must be there before it renders.
   await getFoldersListByType(store, "workflows").catch((err: unknown) =>
     console.error("failed to load workflow folders", err),
   );
-  await getWorkflows();
+  await listRead;
   restorePageIndex();
 });
 </script>

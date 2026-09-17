@@ -118,6 +118,15 @@ describe("FunctionPicker", () => {
     expect(opts).not.toContain("js_fn");
   });
 
+  it("reuses the cached functions list when the picker opens again", async () => {
+    createWrapper().unmount();
+    await flushPromises();
+    const again = createWrapper({ language: "javascript" });
+    await flushPromises();
+    expect(mockList).toHaveBeenCalledTimes(1);
+    expect(again.find(".o-select-options").text()).toContain("js_fn");
+  });
+
   it("language='vrl' (pipeline): offers only VRL functions", async () => {
     const wrapper = createWrapper({ language: "vrl" });
     await flushPromises();

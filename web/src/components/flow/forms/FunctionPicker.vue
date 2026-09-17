@@ -355,8 +355,8 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import functionsService from "@/services/jstransform";
-import { saveFunctionMutation } from "@/services/jstransform.queries";
+import { functionsQuery, saveFunctionMutation } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
 import { isJsFunction } from "@/utils/functionLanguage";
@@ -500,20 +500,16 @@ const wantsJs = computed(() => props.language === "javascript");
 const matchesHostLanguage = (func: any) =>
   wantsJs.value ? isJsFunction(func) : !isJsFunction(func);
 
+// A function save anywhere goes through saveFunctionMutation, which expires this list, so the post-save reload reads fresh.
 const getFunctions = async () => {
   loading.value = true;
   try {
-    const res = await functionsService.list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
+    const list = await queryClient.fetchQuery(
+      functionsQuery(store.state.selectedOrganization.identifier),
     );
     const names: string[] = [];
     const defs: Record<string, string> = {};
-    (res.data?.list || []).forEach((func: any) => {
+    (list || []).forEach((func: any) => {
       if (matchesHostLanguage(func)) {
         names.push(func.name);
         defs[func.name] = func.function;

@@ -17,14 +17,56 @@ import { queryOptions } from "@tanstack/vue-query";
 import workflows from "./workflows";
 import { workflowKeys } from "./workflows.querykeys";
 import { NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { quantizeRange } from "@/composables/query/queryClient";
+
+// The list handler returns a bare array; older builds wrapped it in `list`.
+const rowsOf = (data: any): any[] => (Array.isArray(data) ? data : (data?.list ?? []));
 
 export const workflowsQuery = (org: string) =>
   queryOptions({
     queryKey: workflowKeys.list(org),
-    queryFn: async (): Promise<any[]> => {
-      // The list handler returns a bare array; older builds wrapped it in `list`.
-      const data = (await workflows.listWorkflows(org)).data;
-      return Array.isArray(data) ? data : ((data as any)?.list ?? []);
-    },
+    queryFn: async (): Promise<any[]> => rowsOf((await workflows.listWorkflows(org)).data),
     staleTime: NORMAL_STALE_TIME,
   });
+
+export const workflowFolderQuery = (org: string, folderId: string) =>
+  queryOptions({
+    queryKey: workflowKeys.folder(org, folderId),
+    queryFn: async (): Promise<any[]> =>
+      rowsOf((await workflows.listWorkflows(org, folderId)).data),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** Every folder, matched server-side; `all_folders` overrides any folder, so the term alone keys it. */
+export const workflowSearchQuery = (org: string, term: string) =>
+  queryOptions({
+    queryKey: workflowKeys.search(org, term),
+    queryFn: async (): Promise<any[]> =>
+      rowsOf((await workflows.listWorkflows(org, undefined, true, term)).data),
+    staleTime: NORMAL_STALE_TIME,
+  });
+
+/** The key buckets the window to the minute; the request keeps the exact range, so a run from the last minute is still in it. */
+export const workflowRunsQuery = (
+  org: string,
+  workflowId: string,
+  startTime: number,
+  endTime: number,
+) => {
+  const { start, end } = quantizeRange(startTime, endTime);
+  return queryOptions({
+    queryKey: workflowKeys.runs(org, workflowId, start, end),
+    queryFn: async (): Promise<any[]> =>
+      rowsOf(
+        (
+          await workflows.getWorkflowHistory({
+            org_identifier: org,
+            id: workflowId,
+            start_time: startTime,
+            end_time: endTime,
+          })
+        ).data,
+      ),
+    staleTime: NORMAL_STALE_TIME,
+  });
+};
