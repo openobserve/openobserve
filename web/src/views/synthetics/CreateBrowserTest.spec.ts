@@ -1056,6 +1056,8 @@ describe("CreateBrowserTest", () => {
           url: "https://shop.test",
           folder: "folder-1",
           locations: ["us-east"],
+          schedule: { type: "interval", intervalValue: 5, intervalUnit: "minutes" },
+          notifications: { destinations: [] },
           journey,
           variables: [{ name: "USER", value: "alice" }],
         },
@@ -1169,6 +1171,7 @@ describe("CreateBrowserTest", () => {
           enabled: false,
           folder: "folder-2",
           url: "https://shop.test/login",
+          locations: ["us-east"],
         }),
         "folder-2",
       );
@@ -1209,11 +1212,14 @@ describe("CreateBrowserTest", () => {
       });
       wrapper = await mountEdit();
       await openDialog(wrapper);
+      // The identity mapper aliases `journey` into the model, so compare against a copy.
+      const before = journey.map((step) => ({ ...step }));
 
       await expect(submit(wrapper, values)).rejects.toThrow("quota exceeded");
       await flushPromises();
 
-      expect((wrapper.vm as any).check.journey).toEqual(journey);
+      expect((wrapper.vm as any).check.journey).toHaveLength(4);
+      expect((wrapper.vm as any).check.journey).toEqual(before);
       expect(mockReplaceRangeWithSubtest).not.toHaveBeenCalled();
       expect(mockServiceDelete).not.toHaveBeenCalled();
       expect(((wrapper.vm as any).childrenCache as Map<string, ChildJourney>).size).toBe(0);
@@ -1233,6 +1239,8 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceCreate).toHaveBeenCalledTimes(1);
       expect(mockServiceDelete).toHaveBeenCalledTimes(1);
       expect(mockServiceDelete).toHaveBeenCalledWith("default", "new-check-1", "folder-2");
+      expect(dialogStub(wrapper).props("open")).toBe(true);
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
     });
 
     it("looks up referenced-by on load in edit mode and not in create mode", async () => {

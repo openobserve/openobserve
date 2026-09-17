@@ -121,12 +121,13 @@ describe("extractEligibility", () => {
   });
 
   it("refuses a placeholder the test does not define, naming the first missing one", () => {
-    const steps = [nav("s1"), typeStep("s2", "{{USER}}@{{DOMAIN}}"), click("s3")];
+    // Two missing names, in an order that differs from alphabetical: the first in text order wins.
+    const steps = [nav("s1"), typeStep("s2", "{{ZONE}}:{{USER}}@{{DOMAIN}}"), click("s3")];
     expect(
       extractEligibility(
         input({ steps, selectedIds: new Set(["s1", "s2"]), definedNames: new Set(["DOMAIN"]) }),
       ),
-    ).toEqual({ ok: false, reason: "undefined-placeholder", placeholder: "USER" });
+    ).toEqual({ ok: false, reason: "undefined-placeholder", placeholder: "ZONE" });
   });
 
   it("accepts the whole journey as a range", () => {
@@ -145,14 +146,15 @@ describe("extractEligibility", () => {
 
   it("ignores optional and alwaysRun flags", () => {
     const steps = [
+      click("s0"),
       { ...nav("s1"), optional: true },
       { ...click("s2"), alwaysRun: true },
       click("s3"),
     ];
     expect(extractEligibility(input({ steps, selectedIds: new Set(["s1", "s2"]) }))).toEqual({
       ok: true,
-      range: [steps[0], steps[1]],
-      anchor: 0,
+      range: [steps[1], steps[2]],
+      anchor: 1,
     });
   });
 
@@ -188,11 +190,17 @@ describe("extractEligibility", () => {
 
   it("reports the earlier rule when two rules fail", () => {
     // navigate-first, contains-subtest and referenced all fail; precedence says the earliest wins.
-    const steps = [nav("s1"), click("s2"), subtest("s3")];
+    const steps = [nav("s1", "{{BASE_URL}}"), click("s2"), subtest("s3")];
     expect(
       extractEligibility(
         input({ steps, selectedIds: new Set(["s2", "s3"]), referencedBy: "some" }),
       ),
     ).toEqual({ ok: false, reason: "no-navigate-first" });
+    // A gap beats contains-subtest, referenced and the undefined placeholder alike.
+    expect(
+      extractEligibility(
+        input({ steps, selectedIds: new Set(["s1", "s3"]), referencedBy: "some" }),
+      ),
+    ).toEqual({ ok: false, reason: "not-contiguous" });
   });
 });

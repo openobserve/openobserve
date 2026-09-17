@@ -3446,23 +3446,23 @@ describe("BrowserJourney — a restore that never reached the recording point", 
   });
 });
 
-// Extract-to-subtest (§14): the host owns the dialog and the create request; this
-// component only exposes the range splice and reports the selection's ids.
+// The host owns the dialog and the create request; this file covers only the splice and the ids.
 describe("BrowserJourney extract range", () => {
   let wrapper: VueWrapper;
   let originalScrollIntoView: typeof Element.prototype.scrollIntoView;
 
+  // Ids deliberately out of lexical order so model order is distinguishable from a sort.
   const journey: BrowserStep[] = [
-    { id: "s1", action: "navigate", name: "Open shop", value: "https://shop.test" },
-    { id: "s2", action: "navigate", name: "Open login", value: "https://shop.test/login" },
+    { id: "zeta", action: "navigate", name: "Open shop", value: "https://shop.test" },
+    { id: "alpha", action: "navigate", name: "Open login", value: "https://shop.test/login" },
     {
-      id: "s3",
+      id: "mid",
       action: "click",
       name: "Sign in",
       locator: { candidates: [{ kind: "css", value: "#sign-in" }] },
     },
     {
-      id: "s4",
+      id: "beta",
       action: "click",
       name: "Cart",
       locator: { candidates: [{ kind: "css", value: "#cart" }] },
@@ -3509,7 +3509,7 @@ describe("BrowserJourney extract range", () => {
 
   it("replaces the range with one subtest reference at the anchor", async () => {
     wrapper = mountWithModel(journey);
-    await select(wrapper, ["s2", "s3"]);
+    await select(wrapper, ["alpha", "mid"]);
 
     const newId = (wrapper.vm as any).replaceRangeWithSubtest(
       { anchor: 1, count: 2 },
@@ -3519,7 +3519,7 @@ describe("BrowserJourney extract range", () => {
 
     const steps = currentSteps(wrapper);
     expect(steps).toHaveLength(journey.length - 2 + 1);
-    expect(steps.map((s) => s.id)).toEqual(["s1", newId, "s4"]);
+    expect(steps.map((s) => s.id)).toEqual(["zeta", newId, "beta"]);
     expect(steps[1]).toEqual({
       id: newId,
       action: "subtest",
@@ -3530,13 +3530,14 @@ describe("BrowserJourney extract range", () => {
     expect(steps[2]).toEqual(journey[3]);
     expect((wrapper.vm as any).selectedCount).toBe(0);
     expect(lastSelection(wrapper)).toMatchObject({ count: 0, ids: [] });
+    // Revealed like any created step; the plain stub renders no scroll anchor, so expansion is the evidence.
+    expect(wrapper.findComponent(JourneyStepsStub).props("expandedIds")).toContain(newId);
   });
 
-  // The length watcher clears selection only when the length changes; a
-  // one-step range keeps the length, so the splice has to clear it itself.
+  // A one-step range keeps the length, so the length watcher never fires and the splice must clear.
   it("clears the selection after the emit even when the range is one step", async () => {
     wrapper = mountWithModel(journey);
-    await select(wrapper, ["s2"]);
+    await select(wrapper, ["alpha"]);
     expect((wrapper.vm as any).selectedCount).toBe(1);
 
     const newId = (wrapper.vm as any).replaceRangeWithSubtest(
@@ -3554,8 +3555,8 @@ describe("BrowserJourney extract range", () => {
 
   it("reports the selected ids in model order on selection-changed", async () => {
     wrapper = mountWithModel(journey);
-    await select(wrapper, ["s3", "s1"]);
+    await select(wrapper, ["mid", "zeta"]);
 
-    expect(lastSelection(wrapper)).toEqual({ count: 2, isRecording: false, ids: ["s1", "s3"] });
+    expect(lastSelection(wrapper)).toEqual({ count: 2, isRecording: false, ids: ["zeta", "mid"] });
   });
 });
