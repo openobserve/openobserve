@@ -424,7 +424,7 @@ impl Engine {
                 let match_sample = if end_index > 0 {
                     metric.samples.get(end_index - 1).and_then(|sample| {
                         let adjusted_ts = sample.timestamp + offset_modifier;
-                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                        if adjusted_ts > start && adjusted_ts <= eval_ts {
                             Some(sample)
                         } else {
                             None
@@ -1350,6 +1350,20 @@ fn get_offset_modifier(offset: Option<Offset>) -> i64 {
 mod tests {
     use std::sync::Arc;
 
+    use config::{
+        TIMESTAMP_COL_NAME,
+        meta::{
+            promql::{HASH_LABEL, VALUE_LABEL},
+            search::ScanStats,
+        },
+    };
+    use datafusion::{
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+            datatypes::{DataType, Field, Schema},
+        },
+        prelude::SessionContext,
+    };
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{
@@ -1360,6 +1374,38 @@ mod tests {
     };
 
     use super::*;
+
+    struct BoundarySamplesProvider;
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for BoundarySamplesProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: Matchers,
+            _label_selector: HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+            ]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![1_060_000_000, 1_160_000_000])),
+                    Arc::new(UInt64Array::from(vec![7, 7])),
+                    Arc::new(Float64Array::from(vec![9.0, 24.0])),
+                ],
+            )?;
+            let ctx = SessionContext::new();
+            ctx.register_batch(stream_name, batch)?;
+            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+        }
+    }
 
     // Test extension struct for testing
     #[derive(Debug)]
@@ -3014,6 +3060,41 @@ mod tests {
         assert!(matchers.matchers.iter().all(|m| m.name != NAME_LABEL));
         assert_eq!(matchers.matchers.len(), 1);
         assert_eq!(matchers.matchers[0].name, "env");
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_excludes_left_boundary_with_offsets() {
+        for offset in [-20_i64, 0, 20] {
+            let start = (1_070 + offset) * 1_000_000;
+            let end = (1_160 + offset) * 1_000_000;
+            let eval_ctx = EvalContext::new(start, end, 45_000_000, "test_trace".into());
+            let mut ctx = PromqlContext::new(
+                create_test_query_ctx("test_trace", "test_org", 30),
+                BoundarySamplesProvider,
+                vec![],
+            );
+            ctx.start = start;
+            ctx.end = end;
+            ctx.lookback_delta = 10_000_000;
+            let mut engine = Engine::new("test_trace", Arc::new(ctx), eval_ctx);
+            let query = if offset == 0 {
+                "test_metric".to_string()
+            } else {
+                format!("test_metric offset {offset}s")
+            };
+            let PromExpr::VectorSelector(selector) = promql_parser::parser::parse(&query).unwrap()
+            else {
+                panic!("expected vector selector");
+            };
+            let values = engine.eval_vector_selector(&selector).await.unwrap();
+            assert_eq!(values.len(), 1, "{query}");
+            let samples: Vec<_> = values[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect();
+            assert_eq!(samples, vec![(end, 24.0)], "{query}");
+        }
     }
 
     #[tokio::test]
