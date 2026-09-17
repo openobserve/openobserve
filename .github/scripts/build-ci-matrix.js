@@ -335,6 +335,9 @@ const matrix = emitted.map((s) => ({
   run_files: s.run_files,
   quick_mode_enabled:
     s.quick_mode_enabled === true || s.quick_mode_enabled === "true" ? "true" : "false",
+  // Same rule: ZO_SYNTHETICS_ENABLED registers the /synthetics routes once at start.
+  synthetics_enabled:
+    s.synthetics_enabled === true || s.synthetics_enabled === "true" ? "true" : "false",
   ingest_allowed_upto:
     s.ingest_allowed_upto === undefined || s.ingest_allowed_upto === null
       ? ""

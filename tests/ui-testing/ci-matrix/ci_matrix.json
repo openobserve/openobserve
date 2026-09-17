@@ -465,6 +465,26 @@
     "disabled": []
   },
   {
+    "testfolder": "Synthetics",
+    "_comment": "Own shard because the synthetics routes only exist when the server runs with ZO_SYNTHETICS_ENABLED=true (router registers /api/{org}/synthetics* conditionally). The flag is read once at process start, so it cannot vary between tests sharing a backend — each shard gets its own OpenObserve process; every other shard omits synthetics_enabled and keeps the default (false). Pinned to 3 workers: every create/list test writes a check and 5 concurrent writers trip SQLite's 'database is locked' (SLO shard precedent). Results/run-detail pages are fed by seeding the synthetics_results streams in beforeAll — no probe runs on CI. status-pages-enterprise-gating lives here because the status-page routes sit inside the same gate.",
+    "actual_folder": "Synthetics",
+    "browser": "chrome",
+    "synthetics_enabled": "true",
+    "workers": 3,
+    "run_files": [
+      "synthetics-list.spec.js",
+      "synthetics-create-http.spec.js",
+      "synthetics-create-protocol.spec.js",
+      "synthetics-create-browser.spec.js",
+      "synthetics-results.spec.js",
+      "synthetics-run-detail.spec.js",
+      "synthetics-settings.spec.js",
+      "synthetics-oss-gating.spec.js",
+      "status-pages-enterprise-gating.spec.js"
+    ],
+    "disabled": []
+  },
+  {
     "testfolder": "SLO-Measurement",
     "_comment": "SEPARATE SHARD ON PURPOSE. These two specs seed 8 days of history and wait for the backfill job (ZO_SCHEDULER_SLO_BACKFILL_CONCURRENCY=1, so its 3 backfilled SLOs queue strictly one at a time). slo_backfill_chunk_secs is bumped from the 86400 (1-day) server default to the full 604800 (7-day) window each of those SLOs uses, so each finishes in 1 chunk instead of 7 -- no test here asserts on per-chunk timing or partial coverage, only on the final measured state. Any spec creating SLOs on the same instance queues behind them and starves the wait, so they must not share a runner with the SLO shard. Both specs are mode:serial and pay the backfill once in beforeAll.",
     "actual_folder": "SLO",

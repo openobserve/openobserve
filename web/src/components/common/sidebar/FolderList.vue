@@ -17,7 +17,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full flex-col border-e pb-1">
+  <!-- Fragment root (dialogs are siblings), so consumer attrs must be bound explicitly. -->
+  <div
+    v-bind="$attrs"
+    class="bg-surface-panel border-border-default flex h-full flex-col border-e pb-1"
+  >
     <div class="folder-header bg-transparent">
       <div
         class="text-text-heading ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 text-sm font-semibold"
@@ -163,6 +167,7 @@ import { useReo } from "@/services/reodotdev_analytics";
 
 export default defineComponent({
   name: "FolderList",
+  inheritAttrs: false,
   components: {
     OIcon,
     FolderIcon,

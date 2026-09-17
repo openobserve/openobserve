@@ -411,6 +411,9 @@ test.describe("Pre-Test Cleanup", () => {
       screenshotDir
     );
 
+    // Sweep the Synthetics shard's checks, folders, per-worker locations and agent tokens
+    await pm.apiCleanup.cleanupSynthetics(['synth_e2e_']);
+
     // Clean up model pricing test records (mp_* names and cloned built-in "(Copy)" org models)
     await pm.apiCleanup.cleanupModelPricingModels([
       'mp_',                                // all test models created by model-pricing.spec.js

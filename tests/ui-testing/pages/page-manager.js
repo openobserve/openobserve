@@ -35,6 +35,10 @@ import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
 import { SloAlertsPage } from "./sloPages/sloAlertsPage.js";
+import { SyntheticsListPage } from "./syntheticsPages/syntheticsListPage.js";
+import { SyntheticsCreatePage } from "./syntheticsPages/syntheticsCreatePage.js";
+import { SyntheticsResultsPage } from "./syntheticsPages/syntheticsResultsPage.js";
+import { SyntheticsSettingsPage } from "./syntheticsPages/syntheticsSettingsPage.js";
 
 // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
 import { LogsPage } from "./logsPages/logsPage.js";
@@ -170,6 +174,12 @@ class PageManager {
     this.sloFormPage = new SloFormPage(page);
     this.sloDetailPage = new SloDetailPage(page);
     this.sloAlertsPage = new SloAlertsPage(page);
+
+    // ===== SYNTHETICS PAGE OBJECTS =====
+    this.syntheticsListPage = new SyntheticsListPage(page);
+    this.syntheticsCreatePage = new SyntheticsCreatePage(page);
+    this.syntheticsResultsPage = new SyntheticsResultsPage(page);
+    this.syntheticsSettingsPage = new SyntheticsSettingsPage(page);
 
     // ===== API CLEANUP =====
     this.apiCleanup = new APICleanup(page);

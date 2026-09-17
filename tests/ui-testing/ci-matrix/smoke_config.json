@@ -191,6 +191,16 @@
       "web/src/views/slos/**",
       "web/src/services/slos.*",
       "tests/ui-testing/pages/sloPages/**"
+    ],
+    "Synthetics": [
+      "web/src/views/synthetics/**",
+      "web/src/views/SyntheticMonitoring.vue",
+      "web/src/components/synthetics/**",
+      "web/src/components/synthetic-monitoring/**",
+      "web/src/components/settings/*Synthetics*",
+      "web/src/components/iam/SyntheticsTokens.vue",
+      "web/src/services/synthetics.ts",
+      "tests/ui-testing/pages/syntheticsPages/**"
     ]
   }
 }

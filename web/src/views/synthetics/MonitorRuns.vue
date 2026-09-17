@@ -584,6 +584,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :key="so.key"
                     :value="so.key"
                     size="sm"
+                    :data-test="`monitor-runs-status-filter-${so.key}`"
                   >
                     <template #icon-left>
                       <span

@@ -436,6 +436,10 @@ jobs:
         # tests/ui-testing/ci-matrix/ci_matrix.json; shards that omit it get "false".
         env:
           ZO_QUICK_MODE_ENABLED: ${{ matrix.quick_mode_enabled || 'false' }}
+          # Same per-shard rule: the /api/{org}/synthetics* routes are registered
+          # only when this is true, read once at start. Set via "synthetics_enabled"
+          # in ci-matrix/ci_matrix.json; shards that omit it get "false".
+          ZO_SYNTHETICS_ENABLED: ${{ matrix.synthetics_enabled || 'false' }}
           # Same per-shard rule: how far back (hours) ingestion accepts a record.
           # The workflow default of 5 DROPS older rows while still answering 200,
           # so a suite that seeds history (SLO measures a rolling 7-day window)
