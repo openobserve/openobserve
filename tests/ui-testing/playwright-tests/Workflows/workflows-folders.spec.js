@@ -34,9 +34,11 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   let pm;
   let ctx; // ids seeded once for the whole file
 
+  // Seeding only — `page.request` carries explicit Basic auth headers, so this needs no UI
+  // navigation. navigateToBase() must NOT be used here: it calls page.waitHelpers, which the
+  // custom test fixture attaches to the fixture-provided page and a raw newPage() lacks.
   test.beforeAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await navigateToBase(page);
     const destName = `wf_auto_fld_dest_${RUN}`;
     await seed.createPipelineDestination(page, destName);
     ctx = {
@@ -57,7 +59,6 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    await navigateToBase(page);
     for (const folderId of [ctx.folderA, ctx.folderB]) {
       await seed.purgeFolder(page, folderId).catch(() => {});
     }

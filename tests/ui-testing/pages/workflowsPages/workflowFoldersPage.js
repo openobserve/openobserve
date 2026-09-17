@@ -89,8 +89,10 @@ class WorkflowFoldersPage {
   }
 
   workflowRowAnchor(workflowName) {
-    // The pause/start control is the one per-row element every row has, draft or published.
-    return this.page.locator(`[data-test="workflow-list-${workflowName}-pause-start-action"]`);
+    // The view control is the only per-row element rendered unconditionally. Pause/start and
+    // move are both `v-if="!row.is_draft"` — drafts aren't runnable and can't be moved — so
+    // anchoring on either silently breaks every draft assertion.
+    return this.page.locator(`[data-test="workflow-list-${workflowName}-view"]`);
   }
 
   listTab(value) {
