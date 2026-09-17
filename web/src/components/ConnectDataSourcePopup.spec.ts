@@ -39,6 +39,7 @@ import segment from "@/services/segment_analytics";
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
 const PENDING_KEY = "connectDataSourcePromptPending";
 const SESSION_SHOWN_KEY = `connectDataSourcePromptShown:${USER_EMAIL}`;
+const SLACK_STATE_KEY = `slackCommunityInvite:${USER_EMAIL}`;
 const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
 
 // ── ODialog stub ──────────────────────────────────────────────────────────────
@@ -371,19 +372,86 @@ describe("ConnectDataSourcePopup", () => {
       );
     });
 
-    it("renders the dismiss link as an OButton with the ghost-muted variant", () => {
+    it("renders the dismiss link as an OButton with the ghost-muted variant", async () => {
       wrapper = buildWrapper();
+      // Settle the in-flight summary check before the test ends, so it can't
+      // resolve mid-way through a later test and race its localStorage state.
+      await flushPromises();
 
       const dismissLink = wrapper.find('[data-test="connect-data-source-popup-dismiss-link"]');
       expect(dismissLink.attributes("data-o2-btn")).toBeDefined();
       expect(dismissLink.attributes("data-o2-variant")).toBe("ghost-muted");
     });
 
-    it("passes size='sm' and show-close=false to ODialog", () => {
+    it("passes size='sm' and show-close=false to ODialog", async () => {
       wrapper = buildWrapper();
+      await flushPromises();
 
       const dialog = wrapper.find('[data-test="o-dialog-stub"]');
       expect(dialog.attributes("data-size")).toBe("sm");
+    });
+  });
+
+  // ── Embedded Slack invite ─────────────────────────────────────────────────────
+
+  describe("embedded Slack invite", () => {
+    it("renders the Slack link and starts the day-2 clock when the popup opens with no prior invite record", async () => {
+      mockSummary(0);
+      wrapper = buildWrapper();
+      await flushPromises();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(true);
+      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
+      expect(record.status).toBe("pending_day2");
+      expect(segment.track).toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.objectContaining({ source: "connect_data_popup" }),
+      );
+    });
+
+    it("does not render the Slack link once the invite is already resolved", async () => {
+      localStorage.setItem(SLACK_STATE_KEY, JSON.stringify({ status: "resolved", shownAt: null }));
+      mockSummary(0);
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(false);
+    });
+
+    it("starts the day-2 clock silently (no button, no track) when the org already has data", async () => {
+      mockSummary(5);
+      wrapper = buildWrapper();
+      await flushPromises();
+
+      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
+      expect(record.status).toBe("pending_day2");
+      expect(segment.track).not.toHaveBeenCalledWith(
+        "community_slack_prompt_shown",
+        expect.anything(),
+      );
+    });
+
+    it("clicking the Slack link opens Slack, marks resolved, and does not close the popup", async () => {
+      mockSummary(0);
+      wrapper = buildWrapper();
+      await flushPromises();
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      const slackLink = wrapper.find('[data-test="connect-data-source-popup-slack-link"]');
+      await slackLink.trigger("click");
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://short.openobserve.ai/community",
+        "_blank",
+        "noopener",
+      );
+      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
+      expect(record.status).toBe("resolved");
+      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
+        false,
+      );
     });
   });
 });
