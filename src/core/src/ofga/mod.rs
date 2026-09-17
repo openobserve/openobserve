@@ -70,6 +70,7 @@ struct PendingMigrations {
     oncall: bool,
     annotation_queues_datasets: bool,
     llm_workbench: bool,
+    workflow_folders: bool,
     synthetics_umbrella: bool,
 }
 
@@ -347,6 +348,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         }
                     }
                 }
+                if pending.workflow_folders {
+                    match migrations::migrate_workflow_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
                 if pending.report_folders {
                     match migrations::migrate_report_folders().await {
                         Ok(_) => {
@@ -495,6 +508,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.annotation_queues_datasets {
         keys.extend(["annotation_queues", "datasets"]);
     }
+    if pending.workflow_folders {
+        keys.push("workflow_folder");
+    }
     // The two new types only. `synthetic_folder` gains a parent in the model,
     // but its parent tuples are injected at check time rather than persisted,
     // so there is nothing to backfill and no existing tuple to rewrite.
@@ -537,6 +553,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
     let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
+    let v0_0_48 = version_compare::Version::from("0.0.48").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -633,10 +650,14 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] on-call permissions migration needed");
         pending.oncall = true;
     }
-    // 0.0.47 because on-call took 0.0.46. Gating on 0.0.46 would skip every
-    // install that already upgraded through on-call, leaving the umbrella and
-    // environment types with no ownership tuple.
     if existing_model_version < v0_0_47 {
+        log::info!("[OFGA:Local] workflow folders permissions migration needed");
+        pending.workflow_folders = true;
+    }
+    // 0.0.48 because on-call took 0.0.46 and workflow folders took 0.0.47.
+    // Gating on either would skip every install that already upgraded through
+    // them, leaving the umbrella and environment types with no ownership tuple.
+    if existing_model_version < v0_0_48 {
         log::info!("[OFGA:Local] synthetics umbrella permissions migration needed");
         pending.synthetics_umbrella = true;
     }

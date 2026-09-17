@@ -308,6 +308,76 @@ class APICleanup {
     }
 
     /**
+     * Create a dashboard carrying one single-query SQL panel.
+     * @param {string} title - Dashboard title
+     * @param {string} panelTitle - Panel title, used verbatim in the generated alert name
+     * @param {string} streamName - Logs stream the panel queries
+     * @param {string} [folderId] - Folder to create in
+     * @returns {Promise<{dashboardId: string, folderId: string}>}
+     */
+    async createDashboardWithPanel(title, panelTitle, streamName, folderId = 'default') {
+        const payload = {
+            version: 5,
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [
+                {
+                    tabId: 'default',
+                    name: 'Default',
+                    panels: [
+                        {
+                            id: `Panel_ID${Date.now()}`,
+                            type: 'bar',
+                            title: panelTitle,
+                            description: '',
+                            config: { show_legends: false, decimals: 2, drilldown: [] },
+                            queryType: 'sql',
+                            queries: [
+                                {
+                                    query: `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "${streamName}" GROUP BY x_axis_1`,
+                                    vrlFunctionQuery: '',
+                                    customQuery: false,
+                                    fields: {
+                                        stream: streamName,
+                                        stream_type: 'logs',
+                                        x: [{ label: 'Timestamp', alias: 'x_axis_1', column: '_timestamp', color: null, aggregationFunction: 'histogram' }],
+                                        y: [{ label: 'Count', alias: 'y_axis_1', column: '_timestamp', color: '#5960b2', aggregationFunction: 'count' }],
+                                        z: [],
+                                        breakdown: [],
+                                        filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+                                    },
+                                    config: { promql_legend: '', layer_type: 'scatter', weight_fixed: 1, limit: 0, min: 0, max: 100 },
+                                },
+                            ],
+                            layout: { x: 0, y: 0, w: 24, h: 9, i: 1 },
+                        },
+                    ],
+                },
+            ],
+            variables: {},
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createDashboardWithPanel: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const inner = result[`v${result.version}`] || result;
+        const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
+        testLogger.info('Created dashboard with panel', { dashboardId, panelTitle, folderId });
+        return { dashboardId, folderId };
+    }
+
+    /**
      * Delete a single dashboard
      * @param {string} dashboardId - The dashboard ID
      * @param {string} folderId - The folder ID
@@ -509,6 +579,27 @@ class APICleanup {
             testLogger.error('Failed to fetch functions', { org, error: error.message });
             return [];
         }
+    }
+
+    /**
+     * Create a VRL function via API.
+     * @param {string} functionName
+     * @param {string} vrlCode - Function body; must end with a trailing `.`
+     * @param {string} [org] - Organization identifier
+     */
+    async createFunction(functionName, vrlCode, org = null) {
+        const targetOrg = org || this.org;
+        const response = await this._fetch(`${this.baseUrl}/api/${targetOrg}/functions`, {
+            method: 'POST',
+            headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: functionName, function: vrlCode, params: 'row', transType: 0 })
+        });
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createFunction: HTTP ${response.status} — ${body}`);
+        }
+        testLogger.info('Created function via API', { functionName, org: targetOrg });
+        return await response.json().catch(() => ({}));
     }
 
     /**

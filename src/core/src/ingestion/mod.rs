@@ -22,7 +22,7 @@ use std::{
     },
 };
 
-use arrow_schema::DataType;
+use arrow_schema::{DataType, FieldRef, Schema};
 use chrono::{TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
@@ -47,10 +47,11 @@ use db::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::STREAM_RECORD_ID_GENERATOR,
+    schema::{STREAM_RECORD_ID_GENERATOR, SchemaCache},
 };
 use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
+use schema::{check_for_schema, check_request_columns_limit};
 use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
@@ -60,9 +61,13 @@ use super::{
 };
 use crate::{
     alerts::alert::AlertExt,
-    common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
+    common::{
+        infra::config::STREAM_ALERTS,
+        meta::stream::{SchemaEvolution, SchemaRecords},
+    },
 };
 
+pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
 
@@ -83,15 +88,11 @@ pub struct PartitionMemo<'a> {
 
 impl<'a> PartitionMemo<'a> {
     pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
-        let bucket_micros = match time_level {
-            PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-            PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-        };
         Self {
             partition_keys,
             time_level,
             keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
-            bucket_micros,
+            bucket_micros: partition_bucket_micros(time_level),
             last: None,
         }
     }
@@ -326,6 +327,142 @@ pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
                 | (DataType::UInt64, DataType::Int64)
                 | (DataType::LargeUtf8, DataType::Utf8)
         )
+}
+
+/// The evolving-record filter behind `resolve_batch_schema`, for writers that use the whole stream
+/// schema.
+pub async fn check_batch_schema<'r>(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &'r [(i64, Map<String, Value>)],
+    is_derived: bool,
+    has_uds: bool,
+) -> Result<(
+    SchemaEvolution,
+    Option<Schema>,
+    Option<hashbrown::HashSet<&'r str>>,
+)> {
+    let min_timestamp = records.iter().map(|(ts, _)| *ts).min().unwrap_or_default();
+    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
+    if has_uds {
+        let (evolution, inferred) = check_for_schema(
+            org_id,
+            stream_name,
+            stream_type,
+            stream_schema_map,
+            records.iter().map(|(_, record)| record).collect(),
+            min_timestamp,
+            is_derived,
+        )
+        .await?;
+        return Ok((evolution, inferred, None));
+    }
+    // probed once per field of every record, so it takes foldhash rather than SipHash
+    let schema_fields: hashbrown::HashMap<&str, &DataType> = stream_schema_map
+        .get(stream_name)
+        .map(|schema| {
+            schema
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| (f.name().as_str(), f.data_type()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let schema_columns = schema_fields.len();
+    let mut seen: hashbrown::HashSet<&str> = hashbrown::HashSet::default();
+    let mut evolving: Vec<&Map<String, Value>> = Vec::new();
+    for (_, record) in records {
+        let mut evolves = false;
+        for (key, value) in record.iter() {
+            let Some(inferred) = inferred_column_type(key, value) else {
+                continue;
+            };
+            seen.insert(key.as_str());
+            evolves |= !schema_fields
+                .get(key.as_str())
+                .is_some_and(|existing| column_accepts(existing, &inferred));
+        }
+        if evolves {
+            evolving.push(record);
+        }
+    }
+    // the map has drop glue, so its borrow of stream_schema_map only ends with an explicit drop
+    drop(schema_fields);
+    // check_for_schema skips the limit only when the batch carries exactly the stream schema
+    if !(evolving.is_empty() && seen.len() == schema_columns) {
+        check_request_columns_limit(org_id, stream_type, stream_name, seen.len())?;
+    }
+    if evolving.is_empty() {
+        let evolution = SchemaEvolution {
+            is_schema_changed: false,
+            types_delta: None,
+        };
+        return Ok((evolution, None, Some(seen)));
+    }
+    let (evolution, inferred) = check_for_schema(
+        org_id,
+        stream_name,
+        stream_type,
+        stream_schema_map,
+        evolving,
+        min_timestamp,
+        is_derived,
+    )
+    .await?;
+    // the whole stream schema already covers every record in the batch
+    let seen = inferred.is_some().then_some(seen);
+    Ok((evolution, inferred, seen))
+}
+
+/// One schema check per batch, plus the batch schema: the seen columns typed from the stream
+/// schema.
+pub async fn resolve_batch_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &[(i64, Map<String, Value>)],
+    is_derived: bool,
+    has_uds: bool,
+) -> Result<(SchemaEvolution, Option<Schema>)> {
+    let (evolution, inferred, seen) = check_batch_schema(
+        org_id,
+        stream_name,
+        stream_type,
+        stream_schema_map,
+        records,
+        is_derived,
+        has_uds,
+    )
+    .await?;
+    let Some(seen) = seen else {
+        return Ok((evolution, inferred));
+    };
+    // batch schema = the evolving records' inferred fields plus every other seen field
+    let inferred_names: hashbrown::HashSet<&str> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter())
+        .map(|f| f.name().as_str())
+        .collect();
+    let latest = stream_schema_map.get(stream_name).unwrap().schema();
+    let mut fields: Vec<FieldRef> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter().cloned())
+        .collect();
+    fields.extend(
+        latest
+            .fields()
+            .iter()
+            .filter(|f| {
+                seen.contains(f.name().as_str()) && !inferred_names.contains(f.name().as_str())
+            })
+            .cloned(),
+    );
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    Ok((evolution, Some(Schema::new(fields))))
 }
 
 pub fn get_write_partition_key(
@@ -663,8 +800,18 @@ pub fn refactor_map(
     new_map
 }
 
+/// The span of one write partition, which a record's time bucket is counted in.
+fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
+    match time_level {
+        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use arrow_schema::Field;
+    use config::get_config;
     use infra::schema::unwrap_stream_settings;
     use transform::compile_vrl_function;
 
@@ -1219,5 +1366,81 @@ mod tests {
         assert!(!column_accepts(&DataType::Boolean, &DataType::Int64));
         assert!(!column_accepts(&DataType::Int64, &DataType::Boolean));
         assert!(!column_accepts(&DataType::Utf8, &DataType::Null));
+    }
+
+    fn log_record(value: Value) -> (i64, Map<String, Value>) {
+        let Value::Object(value) = value else {
+            unreachable!()
+        };
+        (1, value)
+    }
+
+    fn cached_schema<S: Into<String>>(fields: Vec<(S, DataType)>) -> HashMap<String, SchemaCache> {
+        let fields = fields
+            .into_iter()
+            .map(|(name, ty)| Field::new(name, ty, true))
+            .collect::<Vec<_>>();
+        HashMap::from([("s".to_string(), SchemaCache::new(Schema::new(fields)))])
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_known_columns_skip_the_schema_check() {
+        let mut map = cached_schema(vec![
+            (TIMESTAMP_COL_NAME, DataType::Int64),
+            ("a", DataType::Utf8),
+            ("b", DataType::Float64),
+            ("c", DataType::Boolean),
+        ]);
+        let records = vec![
+            log_record(json!({"_timestamp": 1, "a": "x", "b": 2})),
+            log_record(json!({"_timestamp": 2, "a": "y", "c": null})),
+        ];
+        // no DB is reachable here, so a call into check_for_schema would fail
+        let (evolution, batch_schema) =
+            resolve_batch_schema("o", "s", StreamType::Logs, &mut map, &records, false, false)
+                .await
+                .unwrap();
+        assert!(!evolution.is_schema_changed);
+        assert!(evolution.types_delta.is_none());
+        let names = batch_schema
+            .unwrap()
+            .fields()
+            .iter()
+            .map(|f| (f.name().clone(), f.data_type().clone()))
+            .collect::<Vec<_>>();
+        // only the present non-null columns, sorted, typed from the stream schema
+        assert_eq!(
+            names,
+            vec![
+                (TIMESTAMP_COL_NAME.to_string(), DataType::Int64),
+                ("a".to_string(), DataType::Utf8),
+                ("b".to_string(), DataType::Float64),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_over_the_column_limit_is_rejected() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        // one more column than the batch carries, so this is not the exact-schema fast path
+        let mut map = cached_schema(
+            (0..=limit + 1)
+                .map(|i| (format!("f{i}"), DataType::Int64))
+                .collect(),
+        );
+        let mut value = Map::new();
+        for i in 0..limit {
+            value.insert(format!("f{i}"), Value::from(i));
+        }
+        let records = vec![log_record(Value::Object(value.clone())), {
+            value.insert(format!("f{limit}"), Value::from(1));
+            log_record(Value::Object(value))
+        }];
+        let err =
+            resolve_batch_schema("o", "s", StreamType::Logs, &mut map, &records, false, false)
+                .await
+                .err()
+                .expect("over the limit");
+        assert!(err.to_string().contains("columns"), "{err}");
     }
 }

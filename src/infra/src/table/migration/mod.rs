@@ -188,10 +188,14 @@ mod m20260831_000001_add_exhausted_at_to_oncall_responses;
 mod m20260901_000001_reset_anomaly_detection_retries;
 mod m20260903_000001_add_anomaly_last_failed_at;
 mod m20260906_000001_add_anomaly_last_alert_fired_at;
+mod m20260910_000001_add_folder_id_to_workflows;
 mod m20260911_000001_add_splunk_token_to_org_ingestion_tokens;
 mod m20260912_000001_add_anomaly_alert_budget;
 mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
+mod m20260916_000001_add_folder_id_to_workflow_drafts;
+/// Shared body of the two `folder_id` migrations above; not a migration itself.
+mod workflow_folder_id;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -461,10 +465,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20260901_000001_reset_anomaly_detection_retries::Migration),
             Box::new(m20260903_000001_add_anomaly_last_failed_at::Migration),
             Box::new(m20260906_000001_add_anomaly_last_alert_fired_at::Migration),
+            Box::new(m20260910_000001_add_folder_id_to_workflows::Migration),
             Box::new(m20260911_000001_add_splunk_token_to_org_ingestion_tokens::Migration),
             Box::new(m20260912_000001_add_anomaly_alert_budget::Migration),
             Box::new(m20260912_000002_add_anomaly_last_recovery_notified_at::Migration),
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
+            Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260827_000001_create_synthetics_shared_variables::Migration),
             Box::new(m20260828_000001_add_env_to_synthetics_jobs::Migration),
         ]
@@ -505,6 +511,8 @@ mod tests {
             82,
             "m20260915_000001_add_profiles_streams_to_service_streams",
         ),
+        (83, "m20260910_000001_add_folder_id_to_workflows"),
+        (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
     ];
 
     #[test]

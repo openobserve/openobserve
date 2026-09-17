@@ -841,6 +841,15 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
         .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
 }
 
+/// Whether a record carrying `key` could be touched by `canonicalize_dbm_record` at all.
+pub(crate) fn may_canonicalize_key(key: &str) -> bool {
+    key.starts_with("o2_")
+        || matches!(
+            key,
+            "postgresql_calls" | "postgresql_state" | "postgresql_query_id"
+        )
+}
+
 // ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
 //
 // Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …
@@ -1226,6 +1235,11 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    canonicalize_dbm_record(local_val);
+}
+
+/// `apply_to_record` without the config read, for callers that already hold the DBM flag.
+pub(crate) fn canonicalize_dbm_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83

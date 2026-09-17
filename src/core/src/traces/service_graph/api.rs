@@ -64,8 +64,6 @@ pub async fn get_current_topology(
     axum::extract::Path(org_id): axum::extract::Path<String>,
     axum::extract::Query(query): axum::extract::Query<ServiceGraphQuery>,
 ) -> HttpResponse {
-    use config::meta::service_graph::ServiceGraphData;
-
     // Resolve the current window boundaries
     let (start_time, end_time) =
         if let (Some(start), Some(end)) = (query.start_time, query.end_time) {
@@ -76,6 +74,60 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
+    if super::use_v4_source(&org_id).await {
+        return MetaHttpResponse::json(topology_v4(&org_id, &query, start_time, end_time).await);
+    }
+    MetaHttpResponse::json(topology_v1(&org_id, &query, start_time, end_time).await)
+}
+
+#[cfg(feature = "enterprise")]
+async fn topology_v4(
+    org_id: &str,
+    query: &ServiceGraphQuery,
+    start_time: i64,
+    end_time: i64,
+) -> config::meta::service_graph::ServiceGraphData {
+    use config::meta::service_graph::ServiceGraphData;
+
+    use super::v4::read::fetch_topology;
+
+    let filter = v4_read_filter(query);
+    match fetch_topology(org_id, &filter, start_time, end_time).await {
+        Ok((input, meta)) => {
+            let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology_v4(input);
+            ServiceGraphData {
+                nodes,
+                edges,
+                meta: Some(meta),
+            }
+        }
+        Err(e) => {
+            log::warn!("[ServiceGraph] v4 topology read failed for org '{org_id}': {e}");
+            empty_graph("v4")
+        }
+    }
+}
+
+/// `stream_name=all` is the front end's "every stream" choice, not a stream.
+#[cfg(feature = "enterprise")]
+fn v4_read_filter(query: &ServiceGraphQuery) -> super::v4::read::ReadFilter {
+    super::v4::read::ReadFilter {
+        trace_stream: query
+            .stream_name
+            .clone()
+            .filter(|s| !s.is_empty() && s != "all"),
+        agent_env: query.agent_env.clone().filter(|s| !s.is_empty()),
+    }
+}
+
+/// Stream-backed topology (`_o2_service_graph`); removed together with v1 at N+2.
+#[cfg(feature = "enterprise")]
+async fn topology_v1(
+    org_id: &str,
+    query: &ServiceGraphQuery,
+    start_time: i64,
+    end_time: i64,
+) -> config::meta::service_graph::ServiceGraphData {
     // Build the optional agent predicate (ENV-ONLY, version-agnostic).
     // When no env is selected, `agent_pred` is None and the emitted SQL is
     // byte-identical to the pre-B4 query (backward compatible). The
@@ -88,7 +140,7 @@ pub async fn get_current_topology(
 
     // 1. Query current window
     let edges = match query_edges_from_stream_internal(
-        &org_id,
+        org_id,
         query.stream_name.as_deref(),
         Some(start_time),
         Some(end_time),
@@ -102,22 +154,13 @@ pub async fn get_current_topology(
                 "[ServiceGraph] Stream query failed (likely stream doesn't exist yet): {}",
                 e
             );
-            return MetaHttpResponse::json(ServiceGraphData {
-                nodes: vec![],
-                edges: vec![],
-            });
+            return empty_graph("v1");
         }
     };
 
     if edges.is_empty() {
-        log::debug!(
-            "[ServiceGraph] No edges found for org '{}'",
-            org_id.as_str()
-        );
-        return MetaHttpResponse::json(ServiceGraphData {
-            nodes: vec![],
-            edges: vec![],
-        });
+        log::debug!("[ServiceGraph] No edges found for org '{org_id}'");
+        return empty_graph("v1");
     }
 
     // 2. Query previous slot (same duration, one slot older) for baselines
@@ -133,7 +176,7 @@ pub async fn get_current_topology(
     );
 
     let prev_edges = query_edges_from_stream_internal(
-        &org_id,
+        org_id,
         query.stream_name.as_deref(),
         Some(prev_start),
         Some(prev_end),
@@ -169,7 +212,25 @@ pub async fn get_current_topology(
 
     let (nodes, edges) = o2_enterprise::enterprise::service_graph::build_topology(edges, baselines);
 
-    MetaHttpResponse::json(ServiceGraphData { nodes, edges })
+    config::meta::service_graph::ServiceGraphData {
+        nodes,
+        edges,
+        ..empty_graph("v1")
+    }
+}
+
+#[cfg(feature = "enterprise")]
+fn empty_graph(source: &str) -> config::meta::service_graph::ServiceGraphData {
+    use config::meta::service_graph::{ServiceGraphData, TopologyMeta};
+
+    ServiceGraphData {
+        nodes: vec![],
+        edges: vec![],
+        meta: Some(TopologyMeta {
+            source: source.to_string(),
+            ..Default::default()
+        }),
+    }
 }
 
 /// Aggregate raw edge records from a slot into a per-(client,server) weighted-average
@@ -710,5 +771,27 @@ mod tests {
         assert_eq!(p50, 50);
         assert_eq!(p95, 100);
         assert_eq!(p99, 150);
+    }
+
+    #[test]
+    fn test_v4_read_filter_maps_stream_and_env_only() {
+        let query = |stream: Option<&str>, env: Option<&str>| ServiceGraphQuery {
+            start_time: None,
+            end_time: None,
+            filter: None,
+            stream_name: stream.map(str::to_string),
+            agent_id: Some("id".to_string()),
+            agent_name: Some("name".to_string()),
+            agent_env: env.map(str::to_string),
+        };
+        let f = v4_read_filter(&query(None, None));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some("all"), Some("")));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some(""), None));
+        assert!(f.is_empty());
+        let f = v4_read_filter(&query(Some("default"), Some("prod")));
+        assert_eq!(f.trace_stream.as_deref(), Some("default"));
+        assert_eq!(f.agent_env.as_deref(), Some("prod"));
     }
 }

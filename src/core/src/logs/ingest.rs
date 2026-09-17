@@ -56,7 +56,10 @@ use opentelemetry_proto::tonic::{
 use prost::Message;
 use transform::TRANSFORM_FAILED;
 
-use super::{IngestJsonData, bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
+use super::{
+    IngestJsonData, bulk::TS_PARSE_FAILED, columnar::JsonColumnar, ingestion_log_enabled,
+    log_failed_record,
+};
 use crate::{
     ingestion::check_ingestion_allowed, logs::handle_timestamp_for_value,
     service::get_formatted_stream_name,
@@ -83,6 +86,7 @@ struct FinalizeRecordContext<'a> {
     streams_need_all_values_map: &'a HashMap<String, bool>,
     need_usage_report: bool,
     log_ingestion_errors: bool,
+    dbm_enabled: bool,
     stream_status: &'a mut StreamStatus,
     json_data_by_stream: &'a mut LogDataByStream,
 }
@@ -198,13 +202,31 @@ pub async fn ingest(
 
     let flatten_level = get_flatten_level(org_id, &stream_name, stream_type).await;
 
+    let needs_json_records = !executable_pipelines.is_empty()
+        || extend_json.is_some()
+        || matches!(user_defined_schema_map.get(&stream_name), Some(Some(_)))
+        || streams_need_original_map
+            .get(&stream_name)
+            .is_some_and(|v| *v)
+        || streams_need_all_values_map
+            .get(&stream_name)
+            .is_some_and(|v| *v);
+    let mut columnar = if matches!(in_req, IngestionRequest::JSON(_)) && !needs_json_records {
+        JsonColumnar::plan(org_id, &stream_name, flatten_level, (min_ts, max_ts)).await
+    } else {
+        None
+    };
+
     let json_req: Vec<json::Value>; // to hold json request because of borrow checker
     let (endpoint, usage_type, data) = match in_req {
         IngestionRequest::JSON(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = match columnar.as_mut().and_then(|c| c.parse(&req)) {
+                Some(unaccepted) => unaccepted,
+                None => {
+                    columnar = None;
+                    parse_json_body(&req)?
+                }
+            };
             (
                 "/api/org/ingest/logs/_json",
                 UsageType::Json,
@@ -247,10 +269,7 @@ pub async fn ingest(
             IngestionData::Multi(req),
         ),
         IngestionRequest::Usage(req) => {
-            json_req = json::from_slice(&req).unwrap_or({
-                let val: json::Value = json::from_slice(&req)?;
-                vec![val]
-            });
+            json_req = parse_json_body(&req)?;
             (
                 "/api/org/ingest/logs/_usage",
                 UsageType::Json,
@@ -321,6 +340,7 @@ pub async fn ingest(
                 streams_need_all_values_map: &streams_need_all_values_map,
                 need_usage_report,
                 log_ingestion_errors,
+                dbm_enabled: cfg.db_monitoring.enabled,
                 stream_status: &mut stream_status,
                 json_data_by_stream: &mut json_data_by_stream,
             },
@@ -328,6 +348,13 @@ pub async fn ingest(
             continue;
         }
         tokio::task::coop::consume_budget().await;
+    }
+
+    if let Some(columnar) = columnar.as_ref().filter(|c| c.rows() > 0) {
+        *size_by_stream.entry(stream_name.clone()).or_insert(0) += columnar.input_bytes();
+        json_data_by_stream
+            .entry(stream_name.clone())
+            .or_insert_with(|| (Vec::new(), need_usage_report.then_some(0)));
     }
 
     // batch process records through pipeline
@@ -563,6 +590,7 @@ pub async fn ingest(
                         streams_need_all_values_map: &streams_need_all_values_map,
                         need_usage_report,
                         log_ingestion_errors,
+                        dbm_enabled: cfg.db_monitoring.enabled,
                         stream_status: &mut stream_status,
                         json_data_by_stream: &mut json_data_by_stream,
                     },
@@ -625,6 +653,7 @@ pub async fn ingest(
             json_data_by_stream,
             size_by_stream,
             derived_streams,
+            columnar,
         )
         .await;
         match status {
@@ -699,6 +728,14 @@ pub fn prepare_record(
     match handle_timestamp_for_value(&mut res, min_ts, max_ts) {
         Ok(ts) => Ok((res, ts)),
         Err(e) => Err(PrepareRecordError::Timestamp(res, e)),
+    }
+}
+
+/// A body is an array of records or a single record.
+fn parse_json_body(body: &[u8]) -> Result<Vec<json::Value>> {
+    match json::from_slice(body) {
+        Ok(records) => Ok(records),
+        Err(_) => Ok(vec![json::from_slice(body)?]),
     }
 }
 
@@ -802,7 +839,9 @@ fn finalize_and_buffer_record(
     // Client-supplied `o2_dbm_*` keys are dropped first — the logs path flattens
     // user keys directly, so without this a caller could spoof a deadlock event
     // (the same exposure D1 condition 1 closes for spans).
-    crate::db_monitoring::server_vantage::apply_to_record(&mut local_val);
+    if ctx.dbm_enabled {
+        crate::db_monitoring::server_vantage::canonicalize_dbm_record(&mut local_val);
+    }
 
     if let Some(Some(fields)) = ctx.user_defined_schema_map.get(ctx.stream_name) {
         local_val = crate::ingestion::refactor_map(local_val, fields);
@@ -1038,7 +1077,7 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                     value = json::to_value(event)?;
                     let local_val = value
                         .as_object_mut()
-                        .ok_or(anyhow::anyhow!("Error to convert Value to object"))?;
+                        .ok_or_else(|| anyhow::anyhow!("Error to convert Value to object"))?;
 
                     local_val.insert("requestId".to_owned(), request_id.into());
                     local_val.insert(
@@ -1086,22 +1125,21 @@ fn deserialize_aws_record_from_vec(data: Vec<u8>, request_id: &str) -> Result<Ve
                 let timestamp = kfh_metric_data.timestamp;
 
                 let mut parsed_metric_value = json::to_value(kfh_metric_data)?;
-                let local_parsed_metric_value = parsed_metric_value.as_object_mut().ok_or(
-                    anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object"),
-                )?;
+                let local_parsed_metric_value =
+                    parsed_metric_value.as_object_mut().ok_or_else(|| {
+                        anyhow::anyhow!("CloudWatch metrics failed to parse Metric Object")
+                    })?;
 
-                for (value_name, value_val) in values.as_object().ok_or(anyhow::anyhow!(
-                    "CloudWatch metrics failed to Metric Value Object"
-                ))? {
+                for (value_name, value_val) in values.as_object().ok_or_else(|| {
+                    anyhow::anyhow!("CloudWatch metrics failed to Metric Value Object")
+                })? {
                     local_parsed_metric_value.insert(value_name.to_owned(), value_val.to_owned());
                 }
                 local_parsed_metric_value.remove("value");
 
                 let metric_dimensions = dimensions
                     .as_object()
-                    .ok_or(anyhow::anyhow!(
-                        "CloudWatch metrics dimensions parsing failed"
-                    ))?
+                    .ok_or_else(|| anyhow::anyhow!("CloudWatch metrics dimensions parsing failed"))?
                     .iter()
                     .map(|(k, v)| format!("{k}=[{v}]"))
                     .collect::<Vec<_>>()
@@ -1582,5 +1620,18 @@ mod tests {
             extract_resource_id_from_amazon_resource_number(arn),
             "resource-id"
         );
+    }
+
+    #[test]
+    fn test_parse_json_body_takes_an_array_or_a_single_record() {
+        assert_eq!(
+            parse_json_body(br#"[{"a":1},{"b":2}]"#).unwrap(),
+            vec![json::json!({"a": 1}), json::json!({"b": 2})]
+        );
+        assert_eq!(
+            parse_json_body(br#"{"a":1}"#).unwrap(),
+            vec![json::json!({"a": 1})]
+        );
+        assert!(parse_json_body(br#"[{"a":1}"#).is_err());
     }
 }
