@@ -7,14 +7,18 @@ alert stopped evaluating for the whole silence window. Two failure modes followe
 a sustained condition paged at T+silence instead of T+for, and a condition that
 recovered mid-pending was never observed.
 
-Both tests use a silence far LONGER than the pending window so the bug is
+The firing tests use a silence far LONGER than the pending window so the bug is
 observable behaviourally, with no dependence on scheduler internals: the fixed
 build keeps evaluating each frequency cycle through pending, so it reaches its
 outcome in ~pending_period; the bugged build would defer to ~silence. Assertions
 are on last_outcome + timing (the run-state the scheduler persists every
 evaluation), not on the usage stream, so they hold regardless of usage flush lag.
 
-These are wall-clock tests: ~2-3 min each at the 1-minute minimum frequency.
+Coverage spans every sub-path through the fixed block: single-level, multi-level
+(warning+critical), cron frequency, first breach, recovery, and re-arm after a
+normal period.
+
+These are wall-clock tests: ~2-4 min each at the 1-minute minimum frequency.
 """
 
 from __future__ import annotations
@@ -42,13 +46,13 @@ def test_sustained_condition_fires_at_for_window_not_silence(alerts):
     assert alerts.create_alert(a).status_code == 200, "alert saves"
     alerts.created.append(alerts.find_alert_id(name))
 
+    # The discriminator: timeout (240s) is far under silence (900s). A build that
+    # armed silence during pending would not evaluate again until ~900s, so it can
+    # never reach firing within this window — this assert fails on the bug (#14556).
     item, elapsed, seen = alerts.track_last_outcome(name, is_firing_outcome, timeout_s=240, poll_s=5)
     assert item, f"alert must be evaluated within the poll window; seen={seen}"
     assert is_firing_outcome(item.get("last_outcome")), (
-        f"must fire within the for-window; outcomes seen={seen} after {round(elapsed)}s"
-    )
-    assert elapsed < 300, (
-        f"fired at {round(elapsed)}s (<< the 15m silence): silence must not arm during pending (#14556)"
+        f"must fire within the for-window, not defer to the 15m silence; seen={seen} after {round(elapsed)}s"
     )
     assert "pending" in seen, f"must pass through pending before firing; seen={seen}"
 
@@ -82,3 +86,91 @@ def test_recovery_during_pending_is_observed_and_never_fires(alerts):
     )
     fired = {"firing", "notify_failed"} & set(seen)
     assert not fired, f"a condition that recovered inside pending must never page; seen={seen}"
+
+
+def test_multi_level_alert_with_pending_fires_at_for_window(alerts):
+    """A warning+critical (multi-level) alert with pending fires at the for-window.
+
+    Multi-level alerts are is_multi_alert=False, so they DO run through the fixed
+    pending block — this guards that the reset does not break the warning/critical
+    path (it must still evaluate through pending and fire at the right band).
+    """
+    stream = uniq("pending_multilevel")
+    alerts.ingest(stream, _rows(3))  # count 3 -> warning band (>= 2, < 5)
+
+    name = uniq("pending_multilevel")
+    a = pending_silence_alert(name, stream, pending_sec=90, silence_min=15, period_min=5)
+    a["trigger_condition"]["threshold"] = 5
+    a["trigger_condition"]["warning_threshold"] = 2
+    a["trigger_condition"]["notify_on_warning"] = True
+    assert alerts.create_alert(a).status_code == 200, "alert saves"
+    alerts.created.append(alerts.find_alert_id(name))
+
+    # timeout (240s) << silence (900s): a build that armed silence during pending
+    # could not reach firing here, so this fails on the bug.
+    item, elapsed, seen = alerts.track_last_outcome(name, is_firing_outcome, timeout_s=240, poll_s=5)
+    assert item, f"alert must be evaluated within the poll window; seen={seen}"
+    assert is_firing_outcome(item.get("last_outcome")), (
+        f"multi-level alert must fire at the for-window, not defer to silence; seen={seen} after {round(elapsed)}s"
+    )
+    assert item.get("level") == "warning", (
+        f"a count of 3 sits in the warning band (>= 2, < 5); item level={item.get('level')}"
+    )
+    assert "pending" in seen, f"must pass through pending before firing; seen={seen}"
+
+
+def test_cron_frequency_alert_with_pending_fires_at_for_window(alerts):
+    """A cron-scheduled alert with pending fires at the for-window, not at silence.
+
+    Cron alerts take the Schedule::from_str branch of get_next_trigger_time; the fix
+    calls it with apply_silence=false during pending, so this guards that the cron
+    path keeps evaluating through pending instead of jumping to the silence horizon.
+    """
+    stream = uniq("pending_cron")
+    alerts.ingest(stream, _rows(3))
+
+    name = uniq("pending_cron")
+    a = pending_silence_alert(name, stream, pending_sec=90, silence_min=15, period_min=5)
+    a["trigger_condition"]["frequency_type"] = "cron"
+    a["trigger_condition"]["cron"] = "0 * * * * *"  # every minute (6-field: seconds first)
+    assert alerts.create_alert(a).status_code == 200, "alert saves"
+    alerts.created.append(alerts.find_alert_id(name))
+
+    item, elapsed, seen = alerts.track_last_outcome(name, is_firing_outcome, timeout_s=300, poll_s=5)
+    assert item, f"alert must be evaluated within the poll window; seen={seen}"
+    assert is_firing_outcome(item.get("last_outcome")), (
+        f"cron alert must fire at the for-window; outcomes seen={seen} after {round(elapsed)}s"
+    )
+    assert "pending" in seen, f"must pass through pending before firing; seen={seen}"
+
+
+def test_pending_rearms_after_recovery(alerts):
+    """After a condition recovers to normal, a fresh breach re-enters pending.
+
+    Exercises the Normal->Pending branch: the alert must not skip pending on a
+    subsequent breach. Drives the full pending -> normal -> pending cycle.
+    """
+    stream = uniq("pending_rearm")
+    alerts.ingest(stream, _rows(3))
+
+    name = uniq("pending_rearm")
+    a = pending_silence_alert(name, stream, pending_sec=120, silence_min=15, period_min=1)
+    assert alerts.create_alert(a).status_code == 200, "alert saves"
+    alerts.created.append(alerts.find_alert_id(name))
+
+    # Phase 1: the seeded breach puts it in pending.
+    _, _, s1 = alerts.track_last_outcome(name, lambda oc: oc == "pending", timeout_s=90, poll_s=5)
+    assert "pending" in s1, f"must enter pending on the first breach; seen={s1}"
+
+    # Phase 2: stop feeding so the 1-min window empties and it recovers to normal
+    # (well before the 120s pending elapses, so it recovers rather than fires).
+    _, _, s2 = alerts.track_last_outcome(name, lambda oc: oc == "normal", timeout_s=150, poll_s=5)
+    assert "normal" in s2, f"must recover to normal once the window empties; seen={s2}"
+
+    # Phase 3: feed again — a fresh breach must re-enter pending, not skip it.
+    def feed():
+        alerts.ingest(stream, _rows(3))
+
+    item, _, s3 = alerts.track_last_outcome(name, lambda oc: oc == "pending", timeout_s=120, poll_s=5, on_poll=feed)
+    assert item, f"alert must be evaluated within the poll window; seen={s3}"
+    assert item.get("last_outcome") == "pending", f"a fresh breach after normal must re-enter pending; seen={s3}"

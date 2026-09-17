@@ -246,14 +246,20 @@ class AlertsClient:
         except AssertionError:
             return last["item"]
 
-    def track_last_outcome(self, name: str, stop, timeout_s: float, poll_s: float = 5) -> tuple[dict | None, float, list]:
+    def track_last_outcome(
+        self, name: str, stop, timeout_s: float, poll_s: float = 5, on_poll=None
+    ) -> tuple[dict | None, float, list]:
         """Poll the alert list until stop(last_outcome) or timeout, returning the last
         item seen, elapsed seconds, and the de-duplicated sequence of last_outcome
-        values observed (so a test can assert both what it reached and the path there)."""
+        values observed (so a test can assert both what it reached and the path there).
+        on_poll (if given) runs each cycle — e.g. to keep feeding the stream so the
+        condition stays true while waiting for a transition."""
         start = time.time()
         item = None
         seen: list = []
         while time.time() - start < timeout_s:
+            if on_poll is not None:
+                on_poll()
             item = next((a for a in self.list_alerts() if a.get("name") == name), None)
             outcome = item.get("last_outcome") if item else None
             if not seen or seen[-1] != outcome:
