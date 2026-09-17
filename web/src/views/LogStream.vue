@@ -78,7 +78,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- Toolbar inside the table frame: stream-type filter + search. -->
           <template #toolbar>
-            <div class="flex w-full items-center justify-between gap-2 max-md:contents">
+            <div
+              class="flex w-full min-w-0 flex-wrap items-center justify-between gap-2 gap-y-1.5 max-md:contents"
+            >
               <OToggleGroup
                 mobile-dropdown
                 :model-value="streamActiveTab"
