@@ -93,6 +93,10 @@ pub fn claim_decision(node: &str, local: &str, node_alive: bool) -> ClaimDecisio
     }
 }
 
+pub(crate) async fn node_alive(node: &str) -> bool {
+    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
+}
+
 pub fn align_down(ts: i64, flush: i64) -> i64 {
     ts - ts.rem_euclid(flush.max(1))
 }
@@ -133,7 +137,7 @@ pub fn settle_ql_trigger(
     }
 }
 
-/// No per-org data-age guard: v4 having run for 7 days is the whole condition.
+/// No per-org data-age guard: once auto-stop is enabled, 7 days of v4 is the whole condition.
 pub fn should_stop_v1(now: i64, started_at: Option<i64>) -> bool {
     started_at.is_some_and(|started_at| now - started_at >= V1_STOP_AFTER_MICROS)
 }
@@ -141,7 +145,9 @@ pub fn should_stop_v1(now: i64, started_at: Option<i64>) -> bool {
 pub async fn run_tick(settings: &Settings) {
     let now = now_micros();
     let discovered = discover().await;
-    maybe_stop_v1(now).await;
+    if settings.v1_auto_stop {
+        maybe_stop_v1(now).await;
+    }
 
     let mut jobs = vec![];
     for (org, streams) in discovered {
@@ -242,10 +248,6 @@ async fn claim_stream(org: &str, stream: &str) -> Option<i64> {
         ClaimDecision::Owned => Some(offset),
         ClaimDecision::Claim => claim_under_lock(org, stream).await,
     }
-}
-
-async fn node_alive(node: &str) -> bool {
-    !node.is_empty() && node != LOCAL_NODE.uuid && get_node_by_uuid(node).await.is_some()
 }
 
 /// Re-reads the offset inside the lock because another scheduler may have claimed it first.
