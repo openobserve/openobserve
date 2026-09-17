@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :rateFilter="analysisRateFilter"
       :durationFilter="analysisDurationFilter"
       :errorFilter="analysisErrorFilter"
-      :baseFilter="effectiveFilter"
+      :baseFilter="parsedEffectiveFilter"
       :streamFields="streamFields"
       :analysisType="defaultAnalysisTab"
       :availableAnalysisTypes="['volume', 'error', 'duration']"
@@ -117,6 +117,26 @@ const { t } = useI18nTyped();
 // Vue has re-rendered SearchResult and propagated the new prop). Reading from the
 // composable — the same object buildSearch() reads — guarantees the latest value.
 const effectiveFilter = computed(() => searchObj.data.editorValue);
+
+// Query editor text may contain human-readable duration/span_kind literals
+// (e.g. duration <= '1.64s') for display; decode them back to raw SQL values
+// (microseconds, numeric OTEL keys) before use in any generated query.
+const parseEffectiveFilter = (): string => {
+  const trimmed = effectiveFilter.value?.trim();
+  if (!trimmed) return "";
+  const parsed = parseDurationWhereClause(
+    trimmed,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
+  return parseSpanKindWhereClause(
+    typeof parsed === "string" ? parsed : trimmed,
+    tracesParser.value,
+    searchObj.data.stream.selectedStream.value,
+  );
+};
+const parsedEffectiveFilter = computed(() => parseEffectiveFilter());
+
 const effectiveTimeRange = computed<TimeRange>(() => ({
   startTime: searchObj.data.datetime.startTime,
   endTime: searchObj.data.datetime.endTime,
@@ -228,23 +248,8 @@ const getBaseFilters = () => {
     }
   });
 
-  // Add user-provided filters from query editor, parsing any human-readable
-  // duration values (e.g. '1.50ms') back to raw microseconds for SQL,
-  // and span_kind labels (e.g. 'Server') back to numeric OTEL keys (e.g. '2').
-  if (effectiveFilter.value?.trim().length) {
-    const parsed = parseDurationWhereClause(
-      effectiveFilter.value.trim(),
-      tracesParser.value,
-      searchObj.data.stream.selectedStream.value,
-    );
-    baseFilters.push(
-      parseSpanKindWhereClause(
-        typeof parsed === "string" ? parsed : effectiveFilter.value.trim(),
-        tracesParser.value,
-        searchObj.data.stream.selectedStream.value,
-      ),
-    );
-  }
+  const parsedFilter = parseEffectiveFilter();
+  if (parsedFilter) baseFilters.push(parsedFilter);
 
   return baseFilters;
 };
@@ -273,22 +278,8 @@ const loadDashboard = async () => {
         // Special handling for "Errors" panel - always filter by error status
         if (panel.title === "Errors") {
           const errorFilters = ["span_status = 'ERROR'"];
-          if (effectiveFilter.value?.trim().length) {
-            // Parse human-readable duration values back to raw µs for SQL,
-            // and span_kind labels back to numeric OTEL keys.
-            const parsedFilter = parseDurationWhereClause(
-              effectiveFilter.value.trim(),
-              tracesParser.value,
-              searchObj.data.stream.selectedStream.value,
-            );
-            errorFilters.push(
-              parseSpanKindWhereClause(
-                typeof parsedFilter === "string" ? parsedFilter : effectiveFilter.value.trim(),
-                tracesParser.value,
-                searchObj.data.stream.selectedStream.value,
-              ),
-            );
-          }
+          const parsedFilter = parseEffectiveFilter();
+          if (parsedFilter) errorFilters.push(parsedFilter);
 
           if (baseFilters.length) {
             errorFilters.push(...baseFilters);
