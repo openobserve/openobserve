@@ -54,6 +54,7 @@ import {
   parseRoutingReason,
   promoteSeverityFloor,
   promoteSeverityOptions,
+  resolvableTimezones,
   resolveHolder,
   resolveLadder,
   resolveNextHolder,
@@ -928,6 +929,30 @@ describe("resolveNextHolder", () => {
 
   it("is null when nobody is on call", () => {
     expect(resolveNextHolder(rota("P", []), ANCHOR, IST)).toBeNull();
+  });
+});
+
+describe("resolvableTimezones", () => {
+  it("includes UTC and the zones the runtime reports", () => {
+    const zones = resolvableTimezones();
+    expect(zones).toContain("UTC");
+    expect(zones).toContain("America/New_York");
+  });
+
+  it.each(["Asia/Kolkata", "Asia/Ho_Chi_Minh", "Europe/Kyiv", "America/Nuuk"])(
+    "offers the modern name %s even though it isn't in the canonical list",
+    (zone) => {
+      expect(resolvableTimezones()).toContain(zone);
+    },
+  );
+
+  it("still offers the pre-rename id, so old data keeps resolving", () => {
+    expect(resolvableTimezones()).toContain("Asia/Calcutta");
+  });
+
+  it("adds a preferred zone missing from the list, without duplicating one already in it", () => {
+    expect(resolvableTimezones("US/Eastern")).toContain("US/Eastern");
+    expect(resolvableTimezones("UTC").filter((z) => z === "UTC")).toHaveLength(1);
   });
 });
 
