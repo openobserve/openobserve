@@ -2026,6 +2026,13 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         &[]
     };
     let rows = vec![manual_trigger_row(&alert)];
+    // The same condition the scheduled path pages on: triggering by hand is how
+    // somebody checks a new on-call alert pages before trusting it, and it only
+    // answers that question if it pages.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+        crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
+    }
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2580,7 +2587,12 @@ impl AlertExt for Alert {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
             })
-        } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
+        // Non-empty: with no workflows either, "every workflow failed" is vacuously true, and an
+        // alert that pages an on-call team and nothing else answered a blank 500.
+        } else if self.destinations.is_empty()
+            && !self.workflows.is_empty()
+            && workflow_error == self.workflows.len()
+        {
             Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
             })

@@ -1635,9 +1635,10 @@ pub(crate) async fn page_blast_radius(
     }
 }
 
-/// Shared by the scheduled-alert and composite producers so `creates_incident` cannot drift.
+/// Shared by the scheduled-alert, composite and manual-trigger producers so `creates_incident`
+/// cannot drift.
 #[cfg(feature = "enterprise")]
-async fn page_for_alert_firing(
+pub(crate) async fn page_for_alert_firing(
     trace_id: &str,
     alert: &config::meta::alerts::alert::Alert,
     rows: &[config::utils::json::Map<String, config::utils::json::Value>],
