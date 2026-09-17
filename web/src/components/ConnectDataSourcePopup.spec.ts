@@ -133,7 +133,9 @@ describe("ConnectDataSourcePopup", () => {
       const addEventSpy = vi.spyOn(window, "addEventListener");
 
       wrapper = buildWrapper();
-      const listeners = addEventSpy.mock.calls.filter(([event]) => event === "o2:onboarding-complete");
+      const listeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "o2:onboarding-complete",
+      );
 
       expect(listeners).toHaveLength(0);
     });
@@ -156,7 +158,9 @@ describe("ConnectDataSourcePopup", () => {
       const addEventSpy = vi.spyOn(window, "addEventListener");
 
       wrapper = buildWrapper();
-      const listeners = addEventSpy.mock.calls.filter(([event]) => event === "o2:onboarding-complete");
+      const listeners = addEventSpy.mock.calls.filter(
+        ([event]) => event === "o2:onboarding-complete",
+      );
 
       expect(listeners).toHaveLength(1);
     });
@@ -186,10 +190,7 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
       expect(store.state.organizationData.isDataIngested).toBe(true);
-      expect(segment.track).not.toHaveBeenCalledWith(
-        "onboarding_prompt_shown",
-        expect.anything(),
-      );
+      expect(segment.track).not.toHaveBeenCalledWith("onboarding_prompt_shown", expect.anything());
     });
   });
 
