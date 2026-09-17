@@ -48,6 +48,12 @@ impl JsonBytesExt for f64 {
     }
 }
 
+impl JsonBytesExt for bool {
+    fn json_bytes(&self) -> usize {
+        if *self { 4 } else { 5 }
+    }
+}
+
 impl JsonBytesExt for str {
     fn json_bytes(&self) -> usize {
         json_string_bytes(self)
@@ -174,8 +180,7 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             };
         }
         Value::Bool(b) => {
-            // true for 4 bytes, false for 5 bytes
-            size += if *b { 4 } else { 5 };
+            size += b.json_bytes();
         }
         Value::Null => {
             size += 4;

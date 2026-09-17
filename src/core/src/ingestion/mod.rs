@@ -87,15 +87,11 @@ pub struct PartitionMemo<'a> {
 
 impl<'a> PartitionMemo<'a> {
     pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
-        let bucket_micros = match time_level {
-            PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-            PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-        };
         Self {
             partition_keys,
             time_level,
             keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
-            bucket_micros,
+            bucket_micros: partition_bucket_micros(time_level),
             last: None,
         }
     }
@@ -466,6 +462,14 @@ pub async fn resolve_batch_schema(
     );
     fields.sort_by(|a, b| a.name().cmp(b.name()));
     Ok((evolution, Some(Schema::new(fields))))
+}
+
+/// The span of one write partition, which a record's time bucket is counted in.
+pub fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
+    match time_level {
+        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
 }
 
 pub fn get_write_partition_key(

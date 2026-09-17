@@ -744,6 +744,7 @@ pub async fn handle_request(
         json_data_by_stream,
         size_by_stream,
         derived_streams,
+        None,
     )
     .await
     {
