@@ -55,6 +55,15 @@ import {
   mapResponseToBrowserCheck,
 } from "@/utils/synthetics/buildPayload";
 import {
+  extractEligibility,
+  type ExtractEligibility,
+  type ReferencedByState,
+} from "@/utils/synthetics/extractEligibility";
+import {
+  buildExtractedChildCheck,
+  splitVariablesForChild,
+} from "@/utils/synthetics/buildExtractedChild";
+import {
   makeBrowserCheckGateSchema,
   makeBrowserCheckSaveSchema,
 } from "@/components/synthetics/CreateBrowserTest.schema";
@@ -74,6 +83,8 @@ import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import BrowserJourney from "@/components/synthetics/journey/BrowserJourney.vue";
+import ExtractSubtestDialog from "@/components/synthetics/journey/ExtractSubtestDialog.vue";
+import type { ExtractForm } from "@/components/synthetics/journey/ExtractSubtestDialog.schema";
 import CheckConfigure from "@/components/synthetics/configure/CheckConfigure.vue";
 import CheckVariablesPanel from "@/components/synthetics/configure/CheckVariablesPanel.vue";
 import useCheckWizardUi, {
@@ -392,6 +403,7 @@ async function loadForEdit(id: string) {
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
+    void loadReferencedBy(id);
   } catch (err) {
     console.error("[synthetics] failed to load check for edit", err);
     if ((err as any)?.response?.status === 404) {
@@ -933,8 +945,125 @@ const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
  * assignment in `persist`.
  */
 const journeyFieldIssues = ref<{ path: PropertyKey[]; message: string }[]>([]);
-const journeySelectionState = ref({ count: 0, isRecording: false });
+const journeySelectionState = ref<{ count: number; isRecording: boolean; ids: string[] }>({
+  count: 0,
+  isRecording: false,
+  ids: [],
+});
 const showBulkDeleteDialog = ref(false);
+
+// ── Extract to subtest (§14) ───────────────────────────────────────────────
+// `=== true` so an unknown flag hides the action — the journey editor's stance for its Subtest option.
+const isCompositionEnabled = computed(
+  () => store.state.zoConfig?.synthetics_composition_enabled === true,
+);
+
+/** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
+const referencedByState = ref<ReferencedByState>("none");
+const showExtractDialog = ref(false);
+
+async function loadReferencedBy(id: string) {
+  referencedByState.value = "pending";
+  try {
+    const org = store.state.selectedOrganization.identifier;
+    const res = await syntheticsService.referencedBy(org, id);
+    const count = (res.data?.references?.length ?? 0) + (res.data?.hidden_reference_count ?? 0);
+    referencedByState.value = count > 0 ? "some" : "none";
+  } catch (err) {
+    console.error("[synthetics] referencedBy lookup failed", err);
+    referencedByState.value = "unknown";
+  }
+}
+
+function retryReferencedBy() {
+  if (props.editId) void loadReferencedBy(props.editId);
+}
+
+const extractEligibilityResult = computed<ExtractEligibility>(() =>
+  extractEligibility({
+    steps: check.value.journey,
+    selectedIds: new Set(journeySelectionState.value.ids),
+    filterActive: journeyRef.value?.filterActive ?? false,
+    referencedBy: props.editId ? referencedByState.value : "none",
+    definedNames: new Set(
+      [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
+    ),
+  }),
+);
+const extractRange = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.range : [],
+);
+const extractAnchor = computed(() =>
+  extractEligibilityResult.value.ok ? extractEligibilityResult.value.anchor : 0,
+);
+const extractVariables = computed(() => splitVariablesForChild(check.value, extractRange.value));
+
+function openExtractDialog() {
+  if (extractEligibilityResult.value.ok) showExtractDialog.value = true;
+}
+
+function extractCreateError(err: unknown, folderId: string): Error {
+  const response = (err as { response?: { status?: number; data?: { message?: string } } })
+    .response;
+  if (response?.status === 403) {
+    const folder = folders.value.find((f) => f.folderId === folderId)?.name ?? folderId;
+    return new Error(t("synthetics.journey.extract.folderForbidden", { folder }));
+  }
+  return new Error(raw(response?.data?.message) || t("synthetics.newCheck.saveFailed"));
+}
+
+/** Rejects so the dialog shows the message and stays open; the parent is only touched after the child exists. */
+async function onExtractSubmit(values: ExtractForm) {
+  const elig = extractEligibilityResult.value;
+  if (!elig.ok) return;
+  const org = store.state.selectedOrganization.identifier;
+  const child = buildExtractedChildCheck({
+    parent: check.value,
+    range: elig.range,
+    name: values.name,
+    folder: values.folder,
+    locations: values.locations ?? check.value.locations,
+    schedule: values.schedule ?? check.value.schedule,
+  });
+  let id: string;
+  try {
+    const res = await syntheticsService.create(
+      org,
+      buildCreateBrowserTestPayload(child),
+      values.folder,
+    );
+    id = res.data.id;
+  } catch (err) {
+    throw extractCreateError(err, values.folder);
+  }
+  childrenCache.value.set(id, {
+    id,
+    name: child.name,
+    folderId: values.folder,
+    steps: child.journey,
+  });
+  try {
+    journeyRef.value!.replaceRangeWithSubtest(
+      { anchor: elig.anchor, count: elig.range.length },
+      { id, name: child.name },
+    );
+  } catch (err) {
+    await syntheticsService.delete(org, id, values.folder).catch(() => {
+      toast({
+        variant: "error",
+        message: t("synthetics.journey.extract.orphan", { name: child.name }),
+      });
+    });
+    throw err;
+  }
+  // The length watcher misses a one-step range, whose splice keeps the length.
+  isDirty.value = true;
+  toast({
+    variant: "success",
+    message: t("synthetics.journey.extract.created", { name: child.name }),
+  });
+  showExtractDialog.value = false;
+}
 
 function onDeleteSelected() {
   journeyRef.value?.deleteSelectedSteps();
@@ -1481,6 +1610,38 @@ function onClearResults() {
                 <template #icon-left><OIcon name="delete" size="sm" /></template>
                 {{ t("synthetics.journey.delete") }}
               </OButton>
+              <template v-if="isCompositionEnabled">
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  :aria-disabled="!extractEligibilityResult.ok"
+                  data-test="synthetics-extract-open-btn"
+                  @click="openExtractDialog"
+                >
+                  <template #icon-left><OIcon name="git-branch" size="sm" /></template>
+                  {{ t("synthetics.journey.extract.action") }}
+                </OButton>
+                <span
+                  v-if="!extractEligibilityResult.ok"
+                  class="text-text-secondary text-xs"
+                  data-test="synthetics-extract-reason"
+                >
+                  {{
+                    t(`synthetics.journey.extract.reason.${extractEligibilityResult.reason}`, {
+                      name: extractEligibilityResult.placeholder,
+                    })
+                  }}
+                  <OButton
+                    v-if="extractEligibilityResult.reason === 'referenced-unknown'"
+                    variant="ghost"
+                    size="sm"
+                    data-test="synthetics-extract-retry-btn"
+                    @click="retryReferencedBy"
+                  >
+                    {{ t("common.retry") }}
+                  </OButton>
+                </span>
+              </template>
             </template>
             <span class="flex-1" aria-hidden="true" />
 
@@ -1554,6 +1715,24 @@ function onClearResults() {
             </OButton>
           </template>
         </div>
+
+        <ExtractSubtestDialog
+          v-if="isCompositionEnabled && extractEligibilityResult.ok"
+          v-model:open="showExtractDialog"
+          :range="extractRange"
+          :anchor="extractAnchor"
+          :authored-count="check.journey.length"
+          :executed-count="executedStepCount ?? check.journey.length"
+          :parent-name="check.name"
+          :default-folder="check.folder ?? 'default'"
+          :folders="folders"
+          :needs-schedule="check.locations.length === 0"
+          :parent-locations="check.locations"
+          :parent-schedule="check.schedule"
+          :location-options="locations"
+          :variables="extractVariables"
+          :on-submit="onExtractSubmit"
+        />
 
         <!-- Bulk delete confirmation dialog — moved from BrowserJourney -->
         <ODialog
