@@ -65,6 +65,8 @@ const track = (event: string, properties: Record<string, any> = {}) => {
 const checkAndMaybeShow = async () => {
   if (config.isCloud !== "true") return;
   if (sessionStorage.getItem(sessionShownKey) === "true") return;
+  // Already known true elsewhere (MainLayout, useStreams, ...) — skip the summary call.
+  if (store.state.organizationData.isDataIngested) return;
 
   const orgIdentifier = store.state.selectedOrganization?.identifier;
   if (!orgIdentifier) {
@@ -90,6 +92,8 @@ const checkAndMaybeShow = async () => {
     const hasData = !!response.data?.streams?.num_streams;
     if (hasData) {
       store.dispatch("setIsDataIngested", true);
+      // Mark this session resolved too, so a later mount skips the summary call.
+      sessionStorage.setItem(sessionShownKey, "true");
       return;
     }
   } catch (error) {
@@ -186,14 +190,13 @@ const handleOpenChange = (open: boolean) => {
         >
           {{ t("connectDataSourcePopup.connectButton") }}
         </OButton>
-        <button
-          type="button"
+        <OButton
           data-test="connect-data-source-popup-dismiss-link"
-          class="text-text-secondary hover:text-text-heading rounded-default cursor-pointer border-0 bg-transparent p-0 text-sm hover:underline"
+          variant="ghost-muted"
           @click="dismiss"
         >
           {{ t("connectDataSourcePopup.dismissLink") }}
-        </button>
+        </OButton>
       </div>
     </div>
   </ODialog>
