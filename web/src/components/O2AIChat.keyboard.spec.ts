@@ -19,6 +19,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
 import { nextTick } from "vue";
 import store from "@/test/unit/helpers/store";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import i18n from "@/locales";
 
 vi.mock("highlight.js", () => ({
@@ -76,8 +77,25 @@ vi.mock("@/composables/contextProviders", () => ({
 
 import O2AIChat from "./O2AIChat.vue";
 
-const HISTORY_KEY = "ai-chat-query-history";
-const AUTO_NAV_KEY = "ai-chat-auto-navigation";
+// Both stores are scoped to the signed-in user and org, the same hash chat history uses.
+const scopedKey = async (prefix: string) =>
+  `${prefix}:${await computeUserOrgKey(
+    store.state.userInfo.email ?? "",
+    store.state.selectedOrganization?.identifier ?? "",
+  )}`;
+// The key hash comes from WebCrypto, which resolves after flushPromises; awaiting the same digest lets the stores load.
+const settleScope = async () => {
+  await flushPromises();
+  await scopedKey("");
+  await flushPromises();
+};
+let HISTORY_KEY = "";
+let AUTO_NAV_KEY = "";
+
+beforeEach(async () => {
+  HISTORY_KEY = await scopedKey("ai-chat-query-history");
+  AUTO_NAV_KEY = await scopedKey("ai-chat-auto-navigation");
+});
 
 const stubs = {
   RichTextInput: {
@@ -101,7 +119,7 @@ const mountChat = async () => {
     props: { isOpen: true, headerHeight: 0, aiChatInputContext: "", appendMode: true },
     attachTo: document.body,
   });
-  await flushPromises();
+  await settleScope();
   return wrapper.vm as any;
 };
 
@@ -171,6 +189,31 @@ afterEach(() => {
 });
 
 describe("prompt history (ArrowUp / ArrowDown)", () => {
+  // Regression: one unscoped key meant the next user or org recalled the previous one's prompts.
+  it("does not recall the previous org's prompts after switching organization", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["org A incident query"]));
+    const vm = await mountChat();
+    const original = { ...store.state.selectedOrganization };
+    try {
+      vm.handleKeyDown(key("ArrowUp", editableAt("")));
+      expect(vm.inputMessage).toBe("org A incident query");
+
+      store.dispatch("setSelectedOrganization", { ...original, identifier: "org-b" });
+      await settleScope();
+      vm.inputMessage = "";
+      vm.handleKeyDown(key("ArrowUp", editableAt("")));
+      expect(vm.inputMessage).toBe("");
+
+      store.dispatch("setSelectedOrganization", original);
+      await settleScope();
+      vm.handleKeyDown(key("ArrowUp", editableAt("")));
+      expect(vm.inputMessage).toBe("org A incident query");
+    } finally {
+      store.dispatch("setSelectedOrganization", original);
+      await flushPromises();
+    }
+  });
+
   // Regression: the handler required target.tagName === "TEXTAREA", so recall was dead in the app.
   it("recalls prompts when the target is the contenteditable composer, not a textarea", async () => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(["newest", "older"]));

@@ -21,6 +21,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import store from "@/test/unit/helpers/store";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import i18n from "@/locales";
 
 // ── Module mocks (hoisted) ───────────────────────────────────────────────────
@@ -110,6 +111,19 @@ vi.mock("@/composables/contextProviders", () => ({
 
 // Component import must come after all vi.mock() declarations.
 import O2AIChat from "./O2AIChat.vue";
+
+// The key hash comes from WebCrypto, which resolves after flushPromises; awaiting the same digest lets the stores load.
+const settleScope = async () => {
+  await flushPromises();
+  await autoNavKey();
+  await flushPromises();
+};
+
+const autoNavKey = async () =>
+  `ai-chat-auto-navigation:${await computeUserOrgKey(
+    store.state.userInfo.email ?? "",
+    store.state.selectedOrganization?.identifier ?? "",
+  )}`;
 
 // ── Stubs ────────────────────────────────────────────────────────────────────
 
@@ -384,31 +398,34 @@ describe("O2AIChat session, persistence and lifecycle", () => {
     });
 
     it("persists the auto navigation preference under the newly adopted chat id", async () => {
+      await settleScope();
       await turn(vm);
 
-      expect(JSON.parse(localStorage.getItem("ai-chat-auto-navigation") || "{}")).toEqual({
+      expect(JSON.parse(localStorage.getItem(await autoNavKey()) || "{}")).toEqual({
         "42": true,
       });
     });
 
     it("carries an explicit opt-out of auto navigation onto the new chat id", async () => {
+      await settleScope();
       vm.isAutoNavigationEnabled = false;
 
       await turn(vm);
 
-      expect(JSON.parse(localStorage.getItem("ai-chat-auto-navigation") || "{}")).toEqual({
+      expect(JSON.parse(localStorage.getItem(await autoNavKey()) || "{}")).toEqual({
         "42": false,
       });
       expect(vm.isAutoNavigationEnabled).toBe(false);
     });
 
     it("does not rewrite the preference once the chat already has an id", async () => {
+      await settleScope();
       await turn(vm, [], "first");
-      localStorage.removeItem("ai-chat-auto-navigation");
+      localStorage.removeItem(await autoNavKey());
 
       await turn(vm, [], "second");
 
-      expect(localStorage.getItem("ai-chat-auto-navigation")).toBeNull();
+      expect(localStorage.getItem(await autoNavKey())).toBeNull();
     });
 
     it("swallows a persistence failure and leaves the chat usable", async () => {
@@ -419,7 +436,7 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       expect(vm.currentChatId).toBeNull();
       expect(vm.saveHistoryLoading).toBe(false);
       // No chat id was adopted, so no preference row was written either.
-      expect(localStorage.getItem("ai-chat-auto-navigation")).toBeNull();
+      expect(localStorage.getItem(await autoNavKey())).toBeNull();
     });
   });
 

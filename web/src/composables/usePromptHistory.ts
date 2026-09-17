@@ -13,19 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { ref, type Ref } from "vue";
+import { ref, watch, type Ref } from "vue";
 
-// Not namespaced by organization: prompts recalled in one org show up in another.
-const HISTORY_KEY = "ai-chat-query-history";
+const HISTORY_KEY_PREFIX = "ai-chat-query-history";
 const MAX_HISTORY_SIZE = 10;
 
 /**
- * Arrow-key recall of previously sent chat prompts, persisted to localStorage.
- * `inputMessage` is the composer model the recalled prompt is written into.
+ * Arrow-key recall of sent prompts, stored per user and org under `scopeKey`, which is null until its hash resolves.
  */
-export function usePromptHistory(inputMessage: Ref<string>) {
+export function usePromptHistory(inputMessage: Ref<string>, scopeKey: Ref<string | null>) {
   const queryHistory = ref<string[]>([]);
   const historyIndex = ref(-1);
+
+  const storageKey = () => (scopeKey.value ? `${HISTORY_KEY_PREFIX}:${scopeKey.value}` : null);
 
   // The composer is a contenteditable div, so a textarea-only check never fires.
   const isOnFirstLine = (el: HTMLTextAreaElement | HTMLElement | null) => {
@@ -72,10 +72,16 @@ export function usePromptHistory(inputMessage: Ref<string>) {
     }
   };
 
-  // Load query history from localStorage
+  // Always clears first, so a previous user's or org's prompts never survive a scope change.
   const loadQueryHistory = () => {
+    queryHistory.value = [];
+    historyIndex.value = -1;
+    const key = storageKey();
+    if (!key) return;
     try {
-      const stored = localStorage.getItem(HISTORY_KEY);
+      // The old unscoped key cannot be attributed to any user, so it is dropped rather than migrated.
+      localStorage.removeItem(HISTORY_KEY_PREFIX);
+      const stored = localStorage.getItem(key);
       if (stored) {
         queryHistory.value = JSON.parse(stored);
       }
@@ -85,14 +91,17 @@ export function usePromptHistory(inputMessage: Ref<string>) {
     }
   };
 
-  // Save query history to localStorage
   const saveQueryHistory = () => {
+    const key = storageKey();
+    if (!key) return;
     try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
+      localStorage.setItem(key, JSON.stringify(queryHistory.value));
     } catch (error) {
       console.error("Error saving query history:", error);
     }
   };
+
+  watch(scopeKey, loadQueryHistory);
 
   // Add query to history
   const addToHistory = (query: string) => {

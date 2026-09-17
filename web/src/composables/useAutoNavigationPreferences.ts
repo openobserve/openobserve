@@ -13,24 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { computed, ref, type Ref } from "vue";
+import { computed, ref, watch, type Ref } from "vue";
 
-const AUTO_NAV_KEY = "ai-chat-auto-navigation";
+const AUTO_NAV_KEY_PREFIX = "ai-chat-auto-navigation";
 
 /**
- * Per-chat auto-navigation preference, persisted to localStorage, with a pending
- * value for a new chat that has no id yet.
+ * Per-chat auto-navigation preference, stored per user and org under `scopeKey`, with a pending value for a chat that has no id yet.
  */
-export function useAutoNavigationPreferences(currentChatId: Ref<number | null>) {
+export function useAutoNavigationPreferences(
+  currentChatId: Ref<number | null>,
+  scopeKey: Ref<string | null>,
+) {
   // Stores chat ID -> boolean mapping for auto navigation preference
   const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
 
   // Pending auto navigation preference for new chats (before chat ID is created)
   const pendingAutoNavigation = ref(true);
 
+  const storageKey = () => (scopeKey.value ? `${AUTO_NAV_KEY_PREFIX}:${scopeKey.value}` : null);
+
+  // Chat ids are per user and org, so another scope's map would apply to unrelated chats.
   const loadAutoNavigationPreferences = () => {
+    autoNavigationPreferences.value = new Map();
+    const key = storageKey();
+    if (!key) return;
     try {
-      const stored = localStorage.getItem(AUTO_NAV_KEY);
+      localStorage.removeItem(AUTO_NAV_KEY_PREFIX);
+      const stored = localStorage.getItem(key);
       if (stored) {
         const data = JSON.parse(stored);
         autoNavigationPreferences.value = new Map(
@@ -44,9 +53,11 @@ export function useAutoNavigationPreferences(currentChatId: Ref<number | null>) 
   };
 
   const saveAutoNavigationPreferences = () => {
+    const key = storageKey();
+    if (!key) return;
     try {
       const data = Object.fromEntries(autoNavigationPreferences.value);
-      localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
+      localStorage.setItem(key, JSON.stringify(data));
     } catch (error) {
       console.error("Error saving auto navigation preferences:", error);
     }
@@ -68,6 +79,8 @@ export function useAutoNavigationPreferences(currentChatId: Ref<number | null>) 
       }
     },
   });
+
+  watch(scopeKey, loadAutoNavigationPreferences);
 
   return {
     autoNavigationPreferences,

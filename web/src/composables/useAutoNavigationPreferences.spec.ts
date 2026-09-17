@@ -14,19 +14,60 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ref } from "vue";
+import { nextTick, ref } from "vue";
 
 import { useAutoNavigationPreferences } from "@/composables/useAutoNavigationPreferences";
 
-const KEY = "ai-chat-auto-navigation";
+const LEGACY_KEY = "ai-chat-auto-navigation";
+const KEY = `${LEGACY_KEY}:scope-a`;
+const scope = (value: string | null = "scope-a") => ref<string | null>(value);
 
 beforeEach(() => localStorage.clear());
 afterEach(() => vi.restoreAllMocks());
 
 describe("useAutoNavigationPreferences", () => {
+  describe("user and org scope", () => {
+    it("persists under the scoped key and never under the old unscoped key", () => {
+      const p = useAutoNavigationPreferences(ref<number | null>(4), scope("user-a"));
+      p.isAutoNavigationEnabled.value = false;
+      expect(localStorage.getItem(`${LEGACY_KEY}:user-a`)).toBe('{"4":false}');
+      expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    });
+
+    it("does not apply one user's choice to another user's chat with the same id", async () => {
+      localStorage.setItem(`${LEGACY_KEY}:user-a`, '{"7":false}');
+      const key = scope("user-a");
+      const p = useAutoNavigationPreferences(ref<number | null>(7), key);
+      p.loadAutoNavigationPreferences();
+      expect(p.isAutoNavigationEnabled.value).toBe(false);
+
+      key.value = "user-b";
+      await nextTick();
+      expect(p.autoNavigationPreferences.value.size).toBe(0);
+      expect(p.isAutoNavigationEnabled.value).toBe(true);
+    });
+
+    it("neither reads nor writes storage while the scope hash is unresolved", () => {
+      localStorage.setItem(LEGACY_KEY, '{"2":false}');
+      const p = useAutoNavigationPreferences(ref<number | null>(2), scope(null));
+      p.loadAutoNavigationPreferences();
+      expect(p.isAutoNavigationEnabled.value).toBe(true);
+      p.isAutoNavigationEnabled.value = false;
+      expect(Object.keys(localStorage).filter((k) => k.startsWith(`${LEGACY_KEY}:`))).toEqual([]);
+    });
+
+    it("drops the old unscoped map on load", () => {
+      localStorage.setItem(LEGACY_KEY, '{"1":false}');
+      const p = useAutoNavigationPreferences(ref<number | null>(1), scope("user-a"));
+      p.loadAutoNavigationPreferences();
+      expect(p.isAutoNavigationEnabled.value).toBe(true);
+      expect(localStorage.getItem(LEGACY_KEY)).toBeNull();
+    });
+  });
+
   it("follows the pending value while the chat has no id, without persisting", () => {
     const chatId = ref<number | null>(null);
-    const p = useAutoNavigationPreferences(chatId);
+    const p = useAutoNavigationPreferences(chatId, scope());
     expect(p.isAutoNavigationEnabled.value).toBe(true);
     p.isAutoNavigationEnabled.value = false;
     expect(p.pendingAutoNavigation.value).toBe(false);
@@ -35,14 +76,14 @@ describe("useAutoNavigationPreferences", () => {
   });
 
   it("treats chat id 0 as no chat", () => {
-    const p = useAutoNavigationPreferences(ref<number | null>(0));
+    const p = useAutoNavigationPreferences(ref<number | null>(0), scope());
     p.pendingAutoNavigation.value = false;
     expect(p.isAutoNavigationEnabled.value).toBe(false);
   });
 
   it("defaults a known chat to on regardless of the pending value, and persists writes", () => {
     const chatId = ref<number | null>(3);
-    const p = useAutoNavigationPreferences(chatId);
+    const p = useAutoNavigationPreferences(chatId, scope());
     p.pendingAutoNavigation.value = false;
     expect(p.isAutoNavigationEnabled.value).toBe(true);
     p.isAutoNavigationEnabled.value = false;
@@ -52,7 +93,7 @@ describe("useAutoNavigationPreferences", () => {
 
   it("re-reads the shared chat id ref and a Map replaced by load", () => {
     const chatId = ref<number | null>(null);
-    const p = useAutoNavigationPreferences(chatId);
+    const p = useAutoNavigationPreferences(chatId, scope());
     localStorage.setItem(KEY, '{"9":false}');
     p.loadAutoNavigationPreferences();
     chatId.value = 9;
@@ -61,7 +102,7 @@ describe("useAutoNavigationPreferences", () => {
   });
 
   it("persists a direct Map write through the returned save", () => {
-    const p = useAutoNavigationPreferences(ref<number | null>(null));
+    const p = useAutoNavigationPreferences(ref<number | null>(null), scope());
     p.autoNavigationPreferences.value.set(42, false);
     p.saveAutoNavigationPreferences();
     expect(localStorage.getItem(KEY)).toBe('{"42":false}');
@@ -69,7 +110,7 @@ describe("useAutoNavigationPreferences", () => {
 
   it("logs and resets on a corrupt store, logs on a refused write", () => {
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    const p = useAutoNavigationPreferences(ref<number | null>(1));
+    const p = useAutoNavigationPreferences(ref<number | null>(1), scope());
     p.autoNavigationPreferences.value.set(1, false);
     localStorage.setItem(KEY, "{x");
     p.loadAutoNavigationPreferences();

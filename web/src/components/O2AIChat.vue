@@ -367,6 +367,7 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { copyToClipboard } from "@/utils/clipboard";
+import { computeUserOrgKey } from "@/utils/userOrgKey";
 import {
   createPreview,
   formatLogEntryContent,
@@ -486,6 +487,21 @@ export default defineComponent({
       t,
     );
 
+    const userEmail = () => store.state.userInfo.email ?? "";
+    const orgIdentifier = () => store.state.selectedOrganization?.identifier ?? "";
+    // Local prompt history and auto-navigation are keyed by this hash, the same scope as chat history.
+    const userOrgKey = ref<string | null>(null);
+    watch(
+      () => `${userEmail()}:${orgIdentifier()}`,
+      async (scope) => {
+        userOrgKey.value = null;
+        const key = await computeUserOrgKey(userEmail(), orgIdentifier());
+        // A slower hash from the previous user or org must not overwrite the current one.
+        if (scope === `${userEmail()}:${orgIdentifier()}`) userOrgKey.value = key;
+      },
+      { immediate: true },
+    );
+
     const currentChatTimestamp = ref<string | null>(null);
     const {
       shouldAutoScroll,
@@ -501,9 +517,8 @@ export default defineComponent({
       autoNavigationPreferences,
       pendingAutoNavigation,
       isAutoNavigationEnabled,
-      loadAutoNavigationPreferences,
       saveAutoNavigationPreferences,
-    } = useAutoNavigationPreferences(currentChatId);
+    } = useAutoNavigationPreferences(currentChatId, userOrgKey);
 
     const {
       currentAnalyzingMessage,
@@ -626,8 +641,10 @@ export default defineComponent({
     // Set in onUnmounted so the chatUpdated watch can't re-attach a just-detached stream to this dying instance.
     const isUnmounting = ref(false);
 
-    const { historyIndex, isOnFirstLine, navigateHistory, loadQueryHistory, addToHistory } =
-      usePromptHistory(inputMessage);
+    const { historyIndex, isOnFirstLine, navigateHistory, addToHistory } = usePromptHistory(
+      inputMessage,
+      userOrgKey,
+    );
 
     const capabilities = [
       "1. Create a SQL query for me",
@@ -992,10 +1009,6 @@ export default defineComponent({
           }, 100);
         });
       }
-
-      loadQueryHistory();
-
-      loadAutoNavigationPreferences();
 
       window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
