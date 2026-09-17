@@ -13,18 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{borrow::Cow, collections::HashMap, fmt, hash::BuildHasher, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, fmt, hash::BuildHasher};
 
-use arrow::array::{
-    Array, ArrayRef, BooleanBuilder, Float64Builder, Int64Builder, LargeStringBuilder,
-    StringBuilder, UInt64Builder, new_null_array,
-};
 use arrow_schema::{DataType, FieldRef, Schema};
 use config::{
     TIMESTAMP_COL_NAME, get_config,
     meta::{
         promql::HASH_LABEL,
-        stream::{PartitionTimeLevel, StreamParams, StreamType},
+        stream::{StreamParams, StreamType},
     },
     utils::{
         flatten::{TOKEN_NUMBER, push_formatted_key},
@@ -32,40 +28,34 @@ use config::{
             self, JsonBytesExt, estimate_json_bytes, estimate_json_entry_bytes,
             is_size_excluded_column,
         },
-        schema_ext::SchemaExt,
         time::{
             parse_timestamp_micro_from_integer, parse_timestamp_micro_from_str,
             parse_timestamp_micro_from_value,
         },
     },
 };
-use infra::{
-    errors::{Error, Result},
-    schema::{get_partition_time_level, unwrap_stream_settings},
-};
+use infra::{errors::Result, schema::unwrap_stream_settings};
 use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::value::RawValue;
 
 use crate::{
     db_monitoring::server_vantage::may_canonicalize_key,
-    ingestion::{column_accepts, get_write_partition_key, partition_bucket_micros},
+    ingestion::{
+        column_accepts,
+        columnar::{ColumnBuilder, ColumnKind, ColumnarBuckets},
+    },
 };
-
-const BUILDER_START_ROWS: usize = 16;
 
 /// Builds a `_json` request's records straight into Arrow columns of the stream's current schema.
 pub struct JsonColumnar {
     stream_name: String,
-    schema: Arc<Schema>,
-    schema_key: String,
+    buckets: ColumnarBuckets,
     col_index: hashbrown::HashMap<String, usize>,
     columns: Vec<ColumnMeta>,
     ts_col: usize,
     flatten_level: u32,
     time_range: (i64, i64),
     dbm_enabled: bool,
-    time_level: PartitionTimeLevel,
-    buckets: hashbrown::HashMap<i64, Bucket>,
     input_bytes: usize,
 }
 
@@ -113,7 +103,7 @@ impl JsonColumnar {
     }
 
     pub fn rows(&self) -> usize {
-        self.buckets.values().map(|bucket| bucket.rows).sum()
+        self.buckets.rows()
     }
 
     /// What `estimate_json_bytes` counts over the accepted records as the client sent them.
@@ -159,44 +149,11 @@ impl JsonColumnar {
     }
 
     pub fn into_entries(self, org_id: &str) -> Result<Vec<ingester::Entry>> {
-        let mut cols: Vec<usize> = (0..self.columns.len())
-            .filter(|col| {
-                self.buckets
-                    .values()
-                    .any(|bucket| bucket.builders[*col].is_some())
-            })
-            .collect();
-        cols.sort_by(|a, b| {
-            self.schema
-                .field(*a)
-                .name()
-                .cmp(self.schema.field(*b).name())
-        });
-        let schema = Arc::new(
-            self.schema
-                .project(&cols)
-                .map_err(|e| Error::IngestionError(e.to_string()))?,
-        );
-        let mut entries = Vec::with_capacity(self.buckets.len());
-        for mut bucket in self.buckets.into_values() {
-            let arrays: Vec<ArrayRef> = cols
-                .iter()
-                .map(|col| bucket.finish_column(*col, &self.columns[*col].data_type))
-                .collect();
-            let batch = arrow::record_batch::RecordBatch::try_new(schema.clone(), arrays)
-                .map_err(|e| Error::IngestionError(e.to_string()))?;
-            entries.push(ingester::Entry {
-                org_id: Arc::from(org_id),
-                stream: Arc::from(self.stream_name.as_str()),
-                schema: Some(schema.clone()),
-                schema_key: Arc::from(self.schema_key.as_str()),
-                partition_key: Arc::from(bucket.partition_key.as_str()),
-                data: Vec::new(),
-                data_size: bucket.json_size,
-                batch: Some(batch),
-            });
-        }
-        Ok(entries)
+        let schema = self.buckets.schema();
+        let mut columns = self.buckets.filled_columns();
+        columns.sort_by(|a, b| schema.field(*a).name().cmp(schema.field(*b).name()));
+        self.buckets
+            .into_entries(org_id, &self.stream_name, Some(columns))
     }
 
     fn for_schema(
@@ -214,49 +171,36 @@ impl JsonColumnar {
         let ts_col = fields
             .iter()
             .position(|f| f.name() == TIMESTAMP_COL_NAME && f.data_type() == &DataType::Int64)?;
-        let schema = Arc::new(schema.clone().with_metadata(HashMap::new()));
-        let col_index = schema
-            .fields()
+        let col_index = fields
             .iter()
             .enumerate()
             .map(|(idx, f)| (f.name().clone(), idx))
             .collect();
         Some(Self {
             stream_name: stream_name.to_string(),
-            schema_key: schema.hash_key(),
-            columns: schema.fields().iter().map(ColumnMeta::new).collect(),
-            schema,
+            buckets: ColumnarBuckets::new(StreamType::Logs, schema),
+            columns: fields.iter().map(ColumnMeta::new).collect(),
             col_index,
             ts_col,
             flatten_level,
             time_range,
             dbm_enabled,
-            time_level: get_partition_time_level(StreamType::Logs),
-            buckets: hashbrown::HashMap::new(),
             input_bytes: 0,
         })
     }
 
     fn append(&mut self, timestamp: i64, leaves: &[(usize, Leaf<'_>, usize)], json_size: usize) {
-        let Self {
-            schema_key,
-            columns,
-            buckets,
-            ts_col,
-            time_level,
-            ..
-        } = self;
-        let bucket = buckets
-            .entry(timestamp.div_euclid(partition_bucket_micros(*time_level)))
-            .or_insert_with(|| Bucket::new(timestamp, *time_level, schema_key, columns.len()));
+        let bucket = self.buckets.bucket(timestamp);
         for (col, leaf, _) in leaves {
-            bucket.column(*col, columns[*col].kind).append(leaf);
+            let kind = self.columns[*col]
+                .kind
+                .expect("an accepted leaf has a column kind");
+            leaf.append_to(bucket.column(*col, kind));
         }
         bucket
-            .column(*ts_col, Some(ColumnKind::Int64))
-            .append(&Leaf::Num(Num::I64(timestamp)));
-        bucket.rows += 1;
-        bucket.json_size += json_size;
+            .column(self.ts_col, ColumnKind::Int64)
+            .append_i64(timestamp);
+        bucket.finish_row(json_size);
     }
 }
 
@@ -277,152 +221,6 @@ impl ColumnMeta {
             entry_bytes: (!is_size_excluded_column(name))
                 .then(|| estimate_json_entry_bytes(name, 0)),
             dbm_key: may_canonicalize_key(name),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-enum ColumnKind {
-    Utf8,
-    LargeUtf8,
-    Boolean,
-    Int64,
-    UInt64,
-    Float64,
-}
-
-impl ColumnKind {
-    fn of(data_type: &DataType) -> Option<Self> {
-        Some(match data_type {
-            DataType::Utf8 => Self::Utf8,
-            DataType::LargeUtf8 => Self::LargeUtf8,
-            DataType::Boolean => Self::Boolean,
-            DataType::Int64 => Self::Int64,
-            DataType::UInt64 => Self::UInt64,
-            DataType::Float64 => Self::Float64,
-            _ => return None,
-        })
-    }
-}
-
-enum ColumnBuilder {
-    Utf8(StringBuilder),
-    LargeUtf8(LargeStringBuilder),
-    Boolean(BooleanBuilder),
-    Int64(Int64Builder),
-    UInt64(UInt64Builder),
-    Float64(Float64Builder),
-}
-
-impl ColumnBuilder {
-    fn new(kind: ColumnKind, rows: usize) -> Self {
-        let rows = BUILDER_START_ROWS.max(rows);
-        match kind {
-            ColumnKind::Utf8 => Self::Utf8(StringBuilder::with_capacity(rows, rows * 16)),
-            ColumnKind::LargeUtf8 => {
-                Self::LargeUtf8(LargeStringBuilder::with_capacity(rows, rows * 16))
-            }
-            ColumnKind::Boolean => Self::Boolean(BooleanBuilder::with_capacity(rows)),
-            ColumnKind::Int64 => Self::Int64(Int64Builder::with_capacity(rows)),
-            ColumnKind::UInt64 => Self::UInt64(UInt64Builder::with_capacity(rows)),
-            ColumnKind::Float64 => Self::Float64(Float64Builder::with_capacity(rows)),
-        }
-    }
-
-    fn append_nulls(&mut self, n: usize) {
-        match self {
-            Self::Utf8(b) => b.append_nulls(n),
-            Self::LargeUtf8(b) => b.append_nulls(n),
-            Self::Boolean(b) => b.append_nulls(n),
-            Self::Int64(b) => b.append_nulls(n),
-            Self::UInt64(b) => b.append_nulls(n),
-            Self::Float64(b) => b.append_nulls(n),
-        }
-    }
-
-    /// Converts as `convert_json_to_record_batch` does; `column_accepts` has vetted the pairing.
-    fn append(&mut self, leaf: &Leaf<'_>) {
-        match (self, leaf) {
-            (Self::Utf8(b), Leaf::Str(s)) => b.append_value(s),
-            (Self::LargeUtf8(b), Leaf::Str(s)) => b.append_value(s),
-            (Self::Boolean(b), Leaf::Bool(v)) => b.append_value(*v),
-            (Self::Int64(b), Leaf::Num(n)) => b.append_value(
-                n.as_i64()
-                    .or_else(|| n.as_u64().map(|u| u as i64))
-                    .unwrap_or_else(|| n.as_f64().unwrap_or(0.0) as i64),
-            ),
-            (Self::UInt64(b), Leaf::Num(n)) => b.append_value(
-                n.as_u64()
-                    .or_else(|| n.as_i64().map(|i| i as u64))
-                    .unwrap_or_else(|| n.as_f64().unwrap_or(0.0) as u64),
-            ),
-            (Self::Float64(b), Leaf::Num(n)) => b.append_value(n.as_f64().unwrap_or(0.0)),
-            _ => unreachable!("column_accepts admitted a leaf its column cannot hold"),
-        }
-    }
-
-    fn finish(self) -> ArrayRef {
-        // `finish` hands over the whole capacity, which the memtable then holds until flush
-        match self {
-            Self::Utf8(mut b) => shrunk(b.finish()),
-            Self::LargeUtf8(mut b) => shrunk(b.finish()),
-            Self::Boolean(mut b) => shrunk(b.finish()),
-            Self::Int64(mut b) => shrunk(b.finish()),
-            Self::UInt64(mut b) => shrunk(b.finish()),
-            Self::Float64(mut b) => shrunk(b.finish()),
-        }
-    }
-}
-
-struct Bucket {
-    partition_key: String,
-    builders: Vec<Option<ColumnBuilder>>,
-    /// Rows a column's builder already holds, values and nulls; the gap is padded lazily.
-    filled: Vec<usize>,
-    rows: usize,
-    json_size: usize,
-}
-
-impl Bucket {
-    fn new(
-        timestamp: i64,
-        time_level: PartitionTimeLevel,
-        schema_key: &str,
-        columns: usize,
-    ) -> Self {
-        Self {
-            partition_key: get_write_partition_key(
-                timestamp,
-                &Vec::new(),
-                time_level,
-                &json::Map::new(),
-                Some(schema_key),
-            ),
-            builders: (0..columns).map(|_| None).collect(),
-            filled: vec![0; columns],
-            rows: 0,
-            json_size: 0,
-        }
-    }
-
-    /// The builder for `col`, padded with nulls up to the current row.
-    fn column(&mut self, col: usize, kind: Option<ColumnKind>) -> &mut ColumnBuilder {
-        let rows = self.rows;
-        let builder = self.builders[col].get_or_insert_with(|| {
-            ColumnBuilder::new(kind.expect("an accepted leaf has a column kind"), rows)
-        });
-        builder.append_nulls(rows - self.filled[col]);
-        self.filled[col] = rows + 1;
-        builder
-    }
-
-    fn finish_column(&mut self, col: usize, data_type: &DataType) -> ArrayRef {
-        match self.builders[col].take() {
-            Some(mut builder) => {
-                builder.append_nulls(self.rows - self.filled[col]);
-                builder.finish()
-            }
-            None => new_null_array(data_type, self.rows),
         }
     }
 }
@@ -454,6 +252,27 @@ impl Leaf<'_> {
             Self::Str(Cow::Owned(s)) => s.json_bytes(),
             Self::Bool(b) => b.json_bytes(),
             Self::Num(n) => n.json_bytes(),
+        }
+    }
+
+    /// Converts as `convert_json_to_record_batch` does; `column_accepts` has vetted the pairing.
+    fn append_to(&self, builder: &mut ColumnBuilder) {
+        match self {
+            Self::Str(s) => builder.append_str(s),
+            Self::Bool(v) => builder.append_bool(*v),
+            Self::Num(n) => match builder.kind() {
+                ColumnKind::Int64 => builder.append_i64(
+                    n.as_i64()
+                        .or_else(|| n.as_u64().map(|u| u as i64))
+                        .unwrap_or_else(|| n.as_f64().unwrap_or(0.0) as i64),
+                ),
+                ColumnKind::UInt64 => builder.append_u64(
+                    n.as_u64()
+                        .or_else(|| n.as_i64().map(|i| i as u64))
+                        .unwrap_or_else(|| n.as_f64().unwrap_or(0.0) as u64),
+                ),
+                _ => builder.append_f64(n.as_f64().unwrap_or(0.0)),
+            },
         }
     }
 
@@ -973,11 +792,6 @@ fn skip_entries<'de, A: MapAccess<'de>>(mut map: A) -> std::result::Result<(), A
     Ok(())
 }
 
-fn shrunk<A: Array + 'static>(mut array: A) -> ArrayRef {
-    array.shrink_to_fit();
-    Arc::new(array)
-}
-
 /// JSON number grammar, so a literal `TOKEN_NUMBER` key cannot pass off text as a number.
 fn is_json_number(s: &str) -> bool {
     let b = s.as_bytes();
@@ -1016,6 +830,8 @@ fn is_json_number(s: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use arrow::record_batch::RecordBatch;
     use arrow_schema::Field;
     use config::utils::record_batch_ext::convert_json_to_record_batch;

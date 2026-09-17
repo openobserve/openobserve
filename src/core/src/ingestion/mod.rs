@@ -67,6 +67,7 @@ use crate::{
     },
 };
 
+pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
 
