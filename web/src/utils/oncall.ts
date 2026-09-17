@@ -386,6 +386,10 @@ export function describeTarget(
 ): string {
   if (target.kind === "user") return target.email;
   if (target.kind === "whole_team") return t("oncall.target_whole_team");
+  // A mixed-version deployment or an unmigrated policy can still carry one of
+  // the six retired kinds this build no longer types. That is not a deleted
+  // rotation — it is a kind this screen was never taught to read.
+  if (target.kind !== "rotation") return t("oncall.target_unrecognized");
   if (!rotationName) return t("oncall.target_rotation_deleted");
   return target.mode === "all"
     ? t("oncall.target_rotation_all", { rotation: rotationName })

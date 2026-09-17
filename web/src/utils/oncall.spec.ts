@@ -15,7 +15,13 @@
 
 import { describe, expect, it } from "vitest";
 
-import type { EscalationLevel, Rotation, ShiftRule, TimeWindow } from "@/ts/interfaces/oncall";
+import type {
+  EscalationLevel,
+  EscalationTarget,
+  Rotation,
+  ShiftRule,
+  TimeWindow,
+} from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY, MICROS_PER_HOUR, MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import {
   CHANNEL_WAKES,
@@ -318,6 +324,15 @@ describe("describeTarget", () => {
   it("says a rotation is gone rather than printing its id", () => {
     expect(describeTarget({ kind: "rotation", rotation_id: "rot_gone" }, t, null)).toBe(
       "oncall.target_rotation_deleted",
+    );
+  });
+
+  /// A retired kind from an unmigrated policy or a mixed-version deployment is
+  /// not a rotation at all, so it must not be told apart from "deleted" — that
+  /// is a specific, wrong claim about something the screen never identified.
+  it("says a target is unrecognized rather than guessing it is a deleted rotation", () => {
+    expect(describeTarget({ kind: "next_on_call" } as unknown as EscalationTarget, t, null)).toBe(
+      "oncall.target_unrecognized",
     );
   });
 });
