@@ -511,6 +511,7 @@ mod tests {
         ),
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
+        (85, "m20260917_000001_create_llm_experiment_slot_retries"),
     ];
 
     #[test]

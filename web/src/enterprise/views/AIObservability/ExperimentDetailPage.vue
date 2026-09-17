@@ -30,7 +30,7 @@
         v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
-        :disabled="acting"
+        :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
       >
@@ -365,6 +365,7 @@ const sortByDispersion = ref(false);
 const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
+const slotRetryActive = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
 const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
 let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -860,6 +861,7 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
       };
     }
     startSlotRetryPolling(slot.rowId);
+    slotRetryActive.value = true;
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
     toast({
@@ -873,6 +875,7 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
 
 function stopSlotRetryPolling() {
   slotRetryPollGeneration += 1;
+  slotRetryActive.value = false;
   if (slotRetryPollTimer !== null) {
     globalThis.clearTimeout(slotRetryPollTimer);
     slotRetryPollTimer = null;
@@ -928,6 +931,8 @@ async function pollSlotRetry(rowId: string, generation: number) {
     );
   if (rowStillPending) {
     scheduleSlotRetryPoll(rowId, generation);
+  } else {
+    slotRetryActive.value = false;
   }
 }
 

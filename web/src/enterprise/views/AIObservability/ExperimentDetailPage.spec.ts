@@ -682,6 +682,7 @@ describe("ExperimentDetailPage", () => {
     const initialListCalls = listRows.mock.calls.length;
 
     await state.retryRowSlot(failedSlot);
+    await flushPromises();
 
     expect(state.selectedRowDetail?.trials[0]).toMatchObject({
       status: "pending",
@@ -693,6 +694,7 @@ describe("ExperimentDetailPage", () => {
       status: "execution_failed",
       executionStatus: "failed",
     });
+    expect(wrapper.get('[data-test="ai-experiment-detail-retry"]').attributes("disabled")).toBeDefined();
     expect(get).toHaveBeenCalledTimes(initialGetCalls);
     expect(listRows).toHaveBeenCalledTimes(initialListCalls);
     expect(getRow).not.toHaveBeenCalled();

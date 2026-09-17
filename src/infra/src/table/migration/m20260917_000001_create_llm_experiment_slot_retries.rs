@@ -24,8 +24,9 @@ impl MigrationTrait for Migration {
         manager.create_table(create_statement()).await?;
         manager.create_index(unique_request_index()).await?;
         manager.create_index(unique_active_slot_index()).await?;
-        manager.create_index(state_index()).await?;
-        manager.create_index(projection_index()).await
+        manager.create_index(active_index()).await?;
+        manager.create_index(projection_index()).await?;
+        manager.create_index(expiry_index()).await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -109,11 +110,22 @@ fn create_statement() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
+        .foreign_key(
+            ForeignKey::create()
+                .name("fk_llm_experiment_slot_retries_experiment")
+                .from(
+                    LlmExperimentSlotRetries::Table,
+                    LlmExperimentSlotRetries::ExperimentId,
+                )
+                .to(LlmExperiments::Table, LlmExperiments::Id)
+                .on_delete(ForeignKeyAction::Cascade),
+        )
         .to_owned()
 }
 
 fn unique_request_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("uq_llm_experiment_slot_retries_request")
         .table(LlmExperimentSlotRetries::Table)
         .col(LlmExperimentSlotRetries::OrgId)
@@ -125,6 +137,7 @@ fn unique_request_index() -> IndexCreateStatement {
 
 fn unique_active_slot_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("uq_llm_experiment_slot_retries_active_slot")
         .table(LlmExperimentSlotRetries::Table)
         .col(LlmExperimentSlotRetries::OrgId)
@@ -136,21 +149,33 @@ fn unique_active_slot_index() -> IndexCreateStatement {
         .to_owned()
 }
 
-fn state_index() -> IndexCreateStatement {
+fn active_index() -> IndexCreateStatement {
     Index::create()
-        .name("idx_llm_experiment_slot_retries_state")
+        .if_not_exists()
+        .name("idx_llm_experiment_slot_retries_active")
         .table(LlmExperimentSlotRetries::Table)
-        .col(LlmExperimentSlotRetries::State)
+        .col(LlmExperimentSlotRetries::ActiveMarker)
         .col(LlmExperimentSlotRetries::CreatedAt)
         .to_owned()
 }
 
 fn projection_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name("idx_llm_experiment_slot_retries_projection")
         .table(LlmExperimentSlotRetries::Table)
+        .col(LlmExperimentSlotRetries::State)
         .col(LlmExperimentSlotRetries::ProjectedAt)
         .col(LlmExperimentSlotRetries::UpdatedAt)
+        .to_owned()
+}
+
+fn expiry_index() -> IndexCreateStatement {
+    Index::create()
+        .if_not_exists()
+        .name("idx_llm_experiment_slot_retries_expiry")
+        .table(LlmExperimentSlotRetries::Table)
+        .col(LlmExperimentSlotRetries::ExpiresAt)
         .to_owned()
 }
 
@@ -172,6 +197,12 @@ enum LlmExperimentSlotRetries {
     ExpiresAt,
 }
 
+#[derive(DeriveIden)]
+enum LlmExperiments {
+    Table,
+    Id,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,6 +215,7 @@ mod tests {
         assert!(sql.contains("\"execution\" json NOT NULL"));
         assert!(sql.contains("\"active_marker\" varchar(16)"));
         assert!(sql.contains("\"projected_at\" bigint"));
+        assert!(sql.contains("ON DELETE CASCADE"));
     }
 
     #[test]
@@ -197,5 +229,12 @@ mod tests {
         assert!(active_sql.contains(
             "\"org_id\", \"experiment_id\", \"row_id\", \"trial_index\", \"active_marker\""
         ));
+
+        let active_lookup_sql = active_index().to_string(PostgresQueryBuilder);
+        assert!(active_lookup_sql.contains("\"active_marker\", \"created_at\""));
+        let projection_sql = projection_index().to_string(PostgresQueryBuilder);
+        assert!(projection_sql.contains("\"state\", \"projected_at\", \"updated_at\""));
+        let expiry_sql = expiry_index().to_string(PostgresQueryBuilder);
+        assert!(expiry_sql.contains("\"expires_at\""));
     }
 }
