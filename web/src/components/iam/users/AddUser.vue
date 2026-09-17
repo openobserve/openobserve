@@ -614,7 +614,6 @@ export default defineComponent({
 
     onBeforeMount(() => {
       setOrganizationOptions();
-      loadPasswordComplexity();
     });
 
     watch(
@@ -681,6 +680,7 @@ export default defineComponent({
       (isOpen, wasOpen) => {
         if (isOpen && !wasOpen) {
           resetFormFromModelValue(props.modelValue);
+          loadPasswordComplexity();
         }
       },
       { immediate: true },

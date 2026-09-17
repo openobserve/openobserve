@@ -21,7 +21,7 @@ import passwordPolicy, { type PasswordComplexity } from "@/services/passwordPoli
 import { useI18nTyped } from "@/types/i18n";
 import { buildPasswordRequirements, DEFAULT_COMPLEXITY } from "@/utils/passwordComplexity";
 
-// Cached across mounts: a blocked user meets this on every page.
+// Module scope so the last answer stays visible while a reopen refetches.
 const complexity = ref<PasswordComplexity | null>(null);
 let inFlight: Promise<void> | null = null;
 
@@ -32,8 +32,8 @@ export function usePasswordComplexity() {
   const error = ref(false);
   const loading = ref(false);
 
-  const load = async (force = false) => {
-    if (complexity.value && !force) return;
+  // Always refetch: the policy can change in Settings within the same session.
+  const load = async () => {
     if (inFlight) return inFlight;
 
     loading.value = true;
