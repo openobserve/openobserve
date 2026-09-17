@@ -234,7 +234,7 @@ pub(super) fn parse_event_key<'a>(
 ) -> Result<(&'a str, &'a str), anyhow::Error> {
     let item_key = event_key
         .strip_prefix(prefix)
-        .ok_or(anyhow::anyhow!("event key missing prefix"))?;
+        .ok_or_else(|| anyhow::anyhow!("event key missing prefix"))?;
     let mut keys = item_key.split('/');
     let org_id = keys
         .next()

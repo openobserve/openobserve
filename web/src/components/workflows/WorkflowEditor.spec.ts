@@ -388,7 +388,7 @@ describe("WorkflowEditor", () => {
       wrapper = mountEditor();
       await flushPromises();
 
-      expect(listWorkflows).toHaveBeenCalledWith("default");
+      expect(listWorkflows).toHaveBeenCalledWith("default", undefined, true);
       expect(workflowObj.isEditWorkflow).toBe(true);
       expect(wf().name).toBe("my workflow");
       // hydrate derives the VueFlow render template from node_type
@@ -1053,7 +1053,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1069,7 +1069,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1084,7 +1084,7 @@ describe("WorkflowEditor", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1100,7 +1100,7 @@ describe("WorkflowEditor", () => {
       expect(linkDialog(wrapper).exists()).toBe(false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1165,7 +1165,7 @@ describe("WorkflowEditor", () => {
       expect(wrapper.emitted("saved")).toHaveLength(1);
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
       // no link-alerts prompt on update
       expect(linkDialog(wrapper).exists()).toBe(false);
@@ -1600,7 +1600,7 @@ describe("WorkflowEditor", () => {
       // before push) so the unsaved-changes route guard can still read dirtyFlag.
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
 
       wrapper.unmount();
@@ -1616,7 +1616,7 @@ describe("WorkflowEditor", () => {
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflows",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -1808,6 +1808,7 @@ describe("WorkflowEditor", () => {
           id: "wf-1",
           name: "my workflow",
           org_identifier: "default",
+          folder: "default",
         },
       });
     });

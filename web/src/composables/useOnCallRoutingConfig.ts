@@ -41,8 +41,11 @@ const config = ref<RoutingConfig | null>(null);
 let loadedFor: string | null = null;
 /** In-flight read, so simultaneous callers share one request rather than racing. */
 let inFlight: Promise<void> | null = null;
+/** True until the first read for the current org settles, shared so every caller can tell an unset config apart from one that hasn't loaded yet. */
+const loading = ref(false);
 
 async function read(orgId: string): Promise<void> {
+  loading.value = true;
   try {
     const res = await oncallService.getRoutingConfig({ org_identifier: orgId });
     config.value = res.data ?? null;
@@ -53,6 +56,7 @@ async function read(orgId: string): Promise<void> {
   } finally {
     loadedFor = orgId;
     inFlight = null;
+    loading.value = false;
   }
 }
 
@@ -72,7 +76,7 @@ export function useOnCallRoutingConfig() {
     return inFlight;
   }
 
-  return { config: readonly(config), load, refresh };
+  return { config: readonly(config), loading: readonly(loading), load, refresh };
 }
 
 /** Test seam — resets the module cache between cases. */
@@ -80,4 +84,5 @@ export function __resetOnCallRoutingConfig() {
   config.value = null;
   loadedFor = null;
   inFlight = null;
+  loading.value = false;
 }

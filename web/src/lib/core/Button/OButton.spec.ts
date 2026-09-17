@@ -216,6 +216,15 @@ describe("OButton", () => {
     expect(wrapper.element.tagName.toLowerCase()).toBe("a");
   });
 
+  // base-elements.css underlines every a:hover, which would make a link-button
+  // read as prose text rather than a control.
+  it('never underlines when as="a"', () => {
+    const wrapper = mount(OButton, { props: { as: "a" } });
+    const classes = wrapper.classes().join(" ");
+    expect(classes).toContain("no-underline");
+    expect(classes).toContain("hover:no-underline");
+  });
+
   it('does not set type attribute when as="a"', () => {
     const wrapper = mount(OButton, { props: { as: "a" } });
     expect(wrapper.attributes("type")).toBeUndefined();

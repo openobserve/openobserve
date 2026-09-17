@@ -57,6 +57,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       row-key="id"
       :frame="false"
       :loading="loading"
+      show-index
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-unrouted-queue"

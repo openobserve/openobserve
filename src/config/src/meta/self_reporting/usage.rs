@@ -30,72 +30,8 @@ pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
-/// The reserved self-reporting stream names. These are written only by internal
-/// self-reporting jobs (usage/stats/triggers/errors/data-retention). Users must
-/// not be able to create, ingest into, or delete them — doing so would corrupt
-/// billing/usage accounting.
-pub const RESERVED_SELF_REPORTING_STREAMS: [&str; 5] = [
-    USAGE_STREAM,
-    STATS_STREAM,
-    TRIGGERS_STREAM,
-    ERROR_STREAM,
-    DATA_RETENTION_USAGE_STREAM,
-];
-
-/// Returns true if `stream_name` is a reserved self-reporting stream that users
-/// are not allowed to create, ingest into, or delete. Internal self-reporting
-/// writes bypass this via the `IngestionRequest::Usage` channel.
-pub fn is_reserved_self_reporting_stream(stream_name: &str) -> bool {
-    RESERVED_SELF_REPORTING_STREAMS.contains(&stream_name)
-}
-
-/// Every reserved internal stream, self-reporting or otherwise.
-///
-/// `slo_slices` is not self-reporting — it is measurement data for Feature 5 —
-/// but it needs the identical protection, and for the identical reason: a user
-/// write into it would corrupt the numbers an SLO reports. It is listed
-/// separately rather than folded into [`RESERVED_SELF_REPORTING_STREAMS`] so
-/// that array keeps meaning what its name says.
-pub const RESERVED_INTERNAL_STREAMS: [&str; 6] = [
-    USAGE_STREAM,
-    STATS_STREAM,
-    TRIGGERS_STREAM,
-    ERROR_STREAM,
-    DATA_RETENTION_USAGE_STREAM,
-    crate::meta::slo::stream::SLO_SLICES_STREAM,
-];
-
-/// Returns true if `stream_name` is reserved for internal writes of any kind.
-///
-/// This is the predicate the create/delete/ingest guards should use. Internal
-/// writers bypass it the same way self-reporting does — via the
-/// `IngestionRequest::Usage` channel, for which `should_report_usage()` is
-/// false.
-pub fn is_reserved_internal_stream(stream_name: &str) -> bool {
-    RESERVED_INTERNAL_STREAMS.contains(&stream_name)
-}
-
-/// True for a usage stream name that only the enterprise build is allowed to write, in any org.
-pub fn is_enterprise_only_usage_stream(stream_name: &str) -> bool {
-    matches!(stream_name, USAGE_STREAM | DATA_RETENTION_USAGE_STREAM)
-}
-
-/// Returns true if `stream_name` is an internal rollup stream written only by
-/// OpenObserve's own aggregation jobs — the `_o2_` family (`_o2_service_graph`,
-/// `_o2_db_stats`, future `_o2_dep_stats` siblings) plus the pre-prefix-era
-/// `_agent_signals`. User ingestion into these would poison what the topology,
-/// agent-signals, and Database Monitoring APIs serve, so user-initiated writes
-/// are rejected in ALL editions; the platform's own writers are exempt (they
-/// arrive through the internal gRPC channel as a `SystemJob` user and/or with
-/// `is_derived` set — see the guard in `openobserve_core::logs::ingest`).
-///
-/// Mechanism decision (design §5.3): this is deliberately a PREFIX guard, not
-/// an extension of the named [`RESERVED_INTERNAL_STREAMS`] list. The `_o2_`
-/// family grows with every new rollup job, and a forgotten list entry would
-/// silently reopen the tamper hole; the named list keeps meaning what its name
-/// says (self-reporting + SLO streams, cloud-gated) while this predicate owns
-/// the rollup-stream namespace, un-gated. The two are documented here so they
-/// don't read as half-overlapping accidents.
+/// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
+/// are rejected.
 pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }
@@ -1499,37 +1435,6 @@ mod run_outcome_tests {
 }
 
 #[cfg(test)]
-mod reserved_stream_tests {
-    use super::*;
-
-    #[test]
-    fn slo_slices_is_reserved() {
-        // Not self-reporting, but it needs the identical protection: a user
-        // write into it would corrupt the numbers an SLO reports.
-        assert!(is_reserved_internal_stream(
-            crate::meta::slo::stream::SLO_SLICES_STREAM
-        ));
-        assert!(!is_reserved_self_reporting_stream(
-            crate::meta::slo::stream::SLO_SLICES_STREAM
-        ));
-    }
-
-    #[test]
-    fn every_self_reporting_stream_is_also_an_internal_stream() {
-        for s in RESERVED_SELF_REPORTING_STREAMS {
-            assert!(is_reserved_internal_stream(s), "{s} lost its protection");
-        }
-    }
-
-    #[test]
-    fn an_ordinary_stream_name_is_not_reserved() {
-        for s in ["logs", "default", "slo", "slices", "slo_slice"] {
-            assert!(!is_reserved_internal_stream(s), "{s} wrongly reserved");
-        }
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use crate::meta::{
@@ -1544,35 +1449,6 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Search), "Search");
         assert_eq!(format!("{}", UsageEvent::Functions), "Functions");
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
-    }
-
-    #[test]
-    fn test_is_reserved_self_reporting_stream() {
-        // All self-reporting streams are reserved.
-        assert!(is_reserved_self_reporting_stream(USAGE_STREAM));
-        assert!(is_reserved_self_reporting_stream(STATS_STREAM));
-        assert!(is_reserved_self_reporting_stream(TRIGGERS_STREAM));
-        assert!(is_reserved_self_reporting_stream(ERROR_STREAM));
-        assert!(is_reserved_self_reporting_stream(
-            DATA_RETENTION_USAGE_STREAM
-        ));
-        assert!(is_reserved_self_reporting_stream("usage"));
-
-        // Ordinary user streams are not.
-        assert!(!is_reserved_self_reporting_stream("my_logs"));
-        assert!(!is_reserved_self_reporting_stream("usage_production"));
-        assert!(!is_reserved_self_reporting_stream("_usage"));
-        assert!(!is_reserved_self_reporting_stream(""));
-    }
-
-    #[test]
-    fn test_is_enterprise_only_usage_stream() {
-        assert!(is_enterprise_only_usage_stream(USAGE_STREAM));
-        assert!(is_enterprise_only_usage_stream(DATA_RETENTION_USAGE_STREAM));
-        assert!(!is_enterprise_only_usage_stream(TRIGGERS_STREAM));
-        assert!(!is_enterprise_only_usage_stream(ERROR_STREAM));
-        assert!(!is_enterprise_only_usage_stream(STATS_STREAM));
-        assert!(!is_enterprise_only_usage_stream("my_usage_stream"));
     }
 
     #[test]

@@ -103,7 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   /></template>
                   {{ t("logStream.labelTraces") }}
                 </OToggleGroupItem>
-                <OToggleGroupItem value="profiles" size="sm">
+                <OToggleGroupItem
+                  v-if="store.state.zoConfig?.profiling_enabled"
+                  value="profiles"
+                  size="sm"
+                >
                   <template #icon-left
                     ><OIcon name="bar-chart" size="xs" class="shrink-0"
                   /></template>
