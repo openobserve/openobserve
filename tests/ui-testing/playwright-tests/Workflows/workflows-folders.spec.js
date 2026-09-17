@@ -46,6 +46,9 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
       folderA: await seed.createFolder(page, FOLDER_A),
       folderB: await seed.createFolder(page, FOLDER_B),
       workflows: [],
+      // Inline-created folders (UI rename/create, delete-guard) are swept here
+      // too, so a test that fails mid-run cannot leak them.
+      folders: [],
     };
     await page.close();
   });
@@ -59,7 +62,7 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
 
   test.afterAll(async ({ browser }) => {
     const page = await browser.newPage();
-    for (const folderId of [ctx.folderA, ctx.folderB]) {
+    for (const folderId of [ctx.folderA, ctx.folderB, ...ctx.folders]) {
       await seed.purgeFolder(page, folderId).catch(() => {});
     }
     // Anything that ended up back in default has to be swept by id.
@@ -71,15 +74,22 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   });
 
   // Seed a workflow and remember it for teardown.
-  const seedWorkflow = async (page, { folderId, draft = false, name }) => {
+  const seedWorkflow = async (page, { folderId, draft = false, name, triggerKind }) => {
     const wf = await seed.createWorkflow(page, {
       name: name ?? `wf_auto_fld_${uniq()}`,
       destName: ctx.destName,
       folderId,
       draft,
+      triggerKind,
     });
     ctx.workflows.push(wf);
     return wf;
+  };
+
+  // Register a folder created inside a test so afterAll sweeps it even when the
+  // test fails between creation and its inline deleteFolder.
+  const trackFolder = (folderId) => {
+    ctx.folders.push(folderId);
   };
 
   // ===== P0 =====
@@ -108,7 +118,12 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     await pm.workflowFoldersPage.expectFolderTabVisible(name);
 
     const folderId = await pm.workflowFoldersPage.resolveFolderIdByName(name);
-    expect(folderId).toBeTruthy();
+    trackFolder(folderId);
+    // The tab is real, not a phantom store entry: clicking it navigates the
+    // list into the folder that was just created.
+    await pm.workflowFoldersPage.clickFolderTab(name);
+    await pm.workflowFoldersPage.expectFolderInUrl(folderId);
+
     await seed.deleteFolder(page, folderId);
   });
 
@@ -171,6 +186,7 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   }, async ({ page }) => {
     const doomed = `wf_auto_fld_del_${uniq()}`;
     const doomedId = await seed.createFolder(page, doomed);
+    trackFolder(doomedId);
     const wf = await seedWorkflow(page, { folderId: doomedId });
 
     await pm.workflowFoldersPage.goToList(doomedId);
@@ -209,6 +225,8 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
     await pm.workflowFoldersPage.openEditorFromRow(wf.name);
+    // Editing: the create-only folder picker is absent and the folder renders as static text.
+    await pm.workflowFoldersPage.expectEditorFolderPickerHidden();
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
     await page.goBack();
@@ -255,12 +273,24 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   test('WFF-UI-08: the trigger-type tab filters inside the active folder', {
     tag: ['@workflowFolders', '@P1'],
   }, async ({ page }) => {
-    const wf = await seedWorkflow(page, { folderId: ctx.folderA });
+    // Two different trigger kinds live in the same folder, so the concrete
+    // trigger tab must keep one and hide the other — filtering, not just showing.
+    const alertWf = await seedWorkflow(page, { folderId: ctx.folderA });
+    const incidentWf = await seedWorkflow(page, {
+      folderId: ctx.folderA,
+      triggerKind: 'incident_event',
+    });
 
     await pm.workflowFoldersPage.goToList(ctx.folderA);
-    await pm.workflowFoldersPage.expectWorkflowVisible(wf.name);
-    await pm.workflowFoldersPage.selectListTab('all');
-    await pm.workflowFoldersPage.expectWorkflowVisible(wf.name);
+    await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
+    await pm.workflowFoldersPage.expectWorkflowVisible(incidentWf.name);
+
+    await pm.workflowFoldersPage.selectListTab('alert_fired');
+    await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
+    // Clear any search the visibility retry typed, so the incident workflow is
+    // hidden by the trigger tab alone, never by the name filter.
+    await pm.workflowFoldersPage.clearWorkflowSearch();
+    await pm.workflowFoldersPage.expectWorkflowNotVisible(incidentWf.name);
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderA);
   });
 
@@ -269,6 +299,7 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   }, async ({ page }) => {
     const original = `wf_auto_fld_ren_${uniq()}`;
     const folderId = await seed.createFolder(page, original);
+    trackFolder(folderId);
     const renamed = `${original}_renamed`;
 
     await pm.workflowFoldersPage.goToList();

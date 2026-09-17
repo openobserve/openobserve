@@ -1,0 +1,28 @@
+{
+  "feature_slug": "workflow-folders",
+  "feature_title": "Workflow Folders",
+  "area": "Workflows",
+  "edition": "enterprise",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "workflows-folders.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Workflows/workflows-folders.spec.js",
+  "playwright_group": "Workflows",
+  "source_files": [
+    "tests/ui-testing/playwright-tests/Workflows/workflows-folders.spec.js",
+    "tests/ui-testing/pages/workflowsPages/workflowFoldersPage.js",
+    "tests/ui-testing/pages/workflowsPages/workflowFolderSeed.js",
+    "tests/ui-testing/pages/page-manager.js"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All six changed paths live under the shared tests/ tree (tests/api-testing/tests/workflows/* and tests/ui-testing/**) — none are under enterprise/, o2_enterprise/, or src/enterprise/. However the change exercises only enterprise-gated modules: the E2E spec is tagged @enterprise and documents 'Enterprise-only, like the rest of the Workflows suite', the API fixture gates on /workflows (403/404 unless the enterprise feature is enabled), and the filename test_workflow_folders_rbac.py carries the RBAC enterprise keyword. Classified enterprise because it only touches the enterprise-gated Workflows feature, corroborated by the Workflows/RBAC keywords.",
+    "skip": "Not skipped. feature_hint.txt and trigger_comment.txt are empty and there is no tests-added label or skip comment, so there is no explicit opt-out. The diff is test-only, but it adds a Playwright E2E spec (workflows-folders.spec.js), which per the triage rules is NOT an automatic skip — route to 'enhance' instead.",
+    "e2e": "E2E is warranted. The dev-authored spec covers a user-facing Workflow Folders UI flow — folder rail with default folder, create-folder with empty-name validation, per-folder workflow listing/scoping, and move-workflow-between-folders (WFF-UI-01..13). The Architect should review and potentially extend these tests rather than skip the pipeline.",
+    "area": "Workflows. The spec sits at tests/ui-testing/playwright-tests/Workflows/ and the page objects at tests/ui-testing/pages/workflowsPages/, matching the existing Workflows E2E area and its sibling workflows-*.spec.js specs.",
+    "group": "playwright_group 'Workflows' because ci_matrix.ent.json already defines a Workflows shard (testfolder 'Workflows', actual_folder 'Workflows') running workflows-crud.spec.js, workflows-negative.spec.js and other sibling specs; the new workflows-folders.spec.js belongs alongside them.",
+    "existing_tests": "The diff adds one Playwright E2E spec — tests/ui-testing/playwright-tests/Workflows/workflows-folders.spec.js — and it DOES cover the new Workflow Folders feature (folder rail, create/rename, per-folder scoping, move-between-folders). The Python files (test_workflow_folders.py, test_workflow_folders_rbac.py) are API tests and the pages/*.js files are page-object helpers, not E2E specs, so they do not count toward E2E coverage on their own."
+  }
+}
