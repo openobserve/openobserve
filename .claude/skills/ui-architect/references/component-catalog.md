@@ -44,6 +44,7 @@ markup — don't guess a prop name.
 | Show an icon | `OIcon` (`name` from the icon registry) | core-display |
 | A divider / hairline | `OSeparator` | core-display |
 | A labelled setting with its control on the right | `OSettingRow` | core-display |
+| Two related settings sharing one row | `OSettingRowPair` | core-display |
 | Show code / a code block | `OCode`, `OCodeBlock` | core-display |
 | Expand/collapse a section | `OCollapsible` | core-display |
 | Empty "no data" state | `OEmptyState` | core-display |

@@ -48,53 +48,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OForm id="password-policy-form" :form="form" v-slot="{ isSubmitting }">
         <div class="flex flex-col gap-4">
           <OFormSection :title="t('passwordPolicy.complexity')">
-            <OSettingRow
-              :label="t('passwordPolicy.minLength')"
-              :description="t('passwordPolicy.minLengthDesc')"
-              data-test="settings-password-policy-min-length"
-            >
-              <OFormInput name="min_length" type="number" :min="1" class="w-24" />
-            </OSettingRow>
+            <OSettingRowPair data-test="settings-password-policy-pair-length">
+              <OSettingRow
+                :label="t('passwordPolicy.minLength')"
+                :description="t('passwordPolicy.minLengthDesc')"
+                data-test="settings-password-policy-min-length"
+              >
+                <OFormInput name="min_length" type="number" :min="1" width="xs" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.maxLength')"
+                :description="t('passwordPolicy.maxLengthDesc')"
+                data-test="settings-password-policy-max-length"
+              >
+                <OFormInput name="max_length" type="number" :min="0" width="xs">
+                  <template #error />
+                </OFormInput>
+              </OSettingRow>
+              <template v-if="maxLengthError" #footer>
+                <p
+                  class="text-input-error-text text-xs"
+                  role="alert"
+                  data-test="settings-password-policy-max-length-error"
+                >
+                  {{ maxLengthError }}
+                </p>
+              </template>
+            </OSettingRowPair>
 
-            <OSettingRow
-              :label="t('passwordPolicy.maxLength')"
-              :description="t('passwordPolicy.maxLengthDesc')"
-              data-test="settings-password-policy-max-length"
-            >
-              <OFormInput name="max_length" type="number" :min="0" class="w-24" />
-            </OSettingRow>
+            <OSettingRowPair data-test="settings-password-policy-pair-case">
+              <OSettingRow
+                :label="t('passwordPolicy.requireUppercase')"
+                :description="t('passwordPolicy.requireUppercaseDesc')"
+                data-test="settings-password-policy-require-uppercase"
+              >
+                <OFormSwitch name="require_uppercase" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.requireLowercase')"
+                :description="t('passwordPolicy.requireLowercaseDesc')"
+                data-test="settings-password-policy-require-lowercase"
+              >
+                <OFormSwitch name="require_lowercase" />
+              </OSettingRow>
+            </OSettingRowPair>
 
-            <OSettingRow
-              :label="t('passwordPolicy.requireUppercase')"
-              :description="t('passwordPolicy.requireUppercaseDesc')"
-              data-test="settings-password-policy-require-uppercase"
-            >
-              <OFormSwitch name="require_uppercase" />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.requireLowercase')"
-              :description="t('passwordPolicy.requireLowercaseDesc')"
-              data-test="settings-password-policy-require-lowercase"
-            >
-              <OFormSwitch name="require_lowercase" />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.requireDigit')"
-              :description="t('passwordPolicy.requireDigitDesc')"
-              data-test="settings-password-policy-require-digit"
-            >
-              <OFormSwitch name="require_digit" />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.requireSpecial')"
-              :description="t('passwordPolicy.requireSpecialDesc')"
-              data-test="settings-password-policy-require-special"
-            >
-              <OFormSwitch name="require_special" />
-            </OSettingRow>
+            <OSettingRowPair data-test="settings-password-policy-pair-digit-special">
+              <OSettingRow
+                :label="t('passwordPolicy.requireDigit')"
+                :description="t('passwordPolicy.requireDigitDesc')"
+                data-test="settings-password-policy-require-digit"
+              >
+                <OFormSwitch name="require_digit" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.requireSpecial')"
+                :description="t('passwordPolicy.requireSpecialDesc')"
+                data-test="settings-password-policy-require-special"
+              >
+                <OFormSwitch name="require_special" />
+              </OSettingRow>
+            </OSettingRowPair>
 
             <OSettingRow
               v-if="values.require_special"
@@ -102,37 +116,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :description="t('passwordPolicy.specialCharSetDesc')"
               data-test="settings-password-policy-special-char-set"
             >
-              <OFormInput name="special_char_set" class="w-56" :placeholder="raw('!@#$%^&*()')" />
+              <OFormInput name="special_char_set" width="sm" :placeholder="raw('!@#$%^&*()')" />
             </OSettingRow>
           </OFormSection>
 
           <OFormSection :title="t('passwordPolicy.rotation')">
-            <OSettingRow
-              :label="t('passwordPolicy.rotationDays')"
-              :description="t('passwordPolicy.rotationDaysDesc')"
-              data-test="settings-password-policy-rotation-days"
-            >
-              <OFormInput name="rotation_days" type="number" :min="0" class="w-24" />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.rotationWarningDays')"
-              :description="t('passwordPolicy.rotationWarningDaysDesc')"
-              :disabled="!rotationOn"
-              data-test="settings-password-policy-rotation-warning-days"
-            >
-              <OFormInput
-                name="rotation_warning_days"
-                type="number"
-                :min="0"
-                class="w-24"
+            <OSettingRowPair data-test="settings-password-policy-pair-rotation">
+              <OSettingRow
+                :label="t('passwordPolicy.rotationDays')"
+                :description="t('passwordPolicy.rotationDaysDesc')"
+                data-test="settings-password-policy-rotation-days"
+              >
+                <OFormInput name="rotation_days" type="number" :min="0" width="xs" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.rotationWarningDays')"
+                :description="t('passwordPolicy.rotationWarningDaysDesc')"
                 :disabled="!rotationOn"
-              />
-            </OSettingRow>
+                data-test="settings-password-policy-rotation-warning-days"
+              >
+                <OFormInput
+                  name="rotation_warning_days"
+                  type="number"
+                  :min="0"
+                  width="xs"
+                  :disabled="!rotationOn"
+                >
+                  <template #error />
+                </OFormInput>
+              </OSettingRow>
+              <template v-if="warningDaysError" #footer>
+                <p
+                  class="text-input-error-text text-xs"
+                  role="alert"
+                  data-test="settings-password-policy-rotation-warning-days-error"
+                >
+                  {{ warningDaysError }}
+                </p>
+              </template>
+            </OSettingRowPair>
 
             <p
               v-if="rotationOn"
-              class="text-text-secondary py-3 text-xs"
+              class="text-text-secondary px-3 py-3 text-xs"
               data-test="settings-password-policy-rotation-preview"
             >
               {{ rotationPreview }}
@@ -140,23 +166,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OFormSection>
 
           <OFormSection :title="t('passwordPolicy.reuse')">
-            <OSettingRow
-              :label="t('passwordPolicy.historyCount')"
-              :description="t('passwordPolicy.historyCountDesc')"
-              data-test="settings-password-policy-history-count"
-            >
-              <OFormInput name="history_count" type="number" :min="0" class="w-24" />
-            </OSettingRow>
+            <OSettingRowPair data-test="settings-password-policy-pair-history">
+              <OSettingRow
+                :label="t('passwordPolicy.historyCount')"
+                :description="t('passwordPolicy.historyCountDesc')"
+                data-test="settings-password-policy-history-count"
+              >
+                <OFormInput name="history_count" type="number" :min="0" width="xs" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.historyMaxRetained')"
+                :description="t('passwordPolicy.historyMaxRetainedDesc')"
+                data-test="settings-password-policy-history-max-retained"
+              >
+                <OFormInput name="history_max_retained" type="number" :min="0" width="xs">
+                  <template #error />
+                </OFormInput>
+              </OSettingRow>
+              <template v-if="historyRetainedError" #footer>
+                <p
+                  class="text-input-error-text text-xs"
+                  role="alert"
+                  data-test="settings-password-policy-history-max-retained-error"
+                >
+                  {{ historyRetainedError }}
+                </p>
+              </template>
+            </OSettingRowPair>
 
-            <OSettingRow
-              :label="t('passwordPolicy.historyMaxRetained')"
-              :description="t('passwordPolicy.historyMaxRetainedDesc')"
-              data-test="settings-password-policy-history-max-retained"
-            >
-              <OFormInput name="history_max_retained" type="number" :min="0" class="w-24" />
-            </OSettingRow>
-
-            <p class="text-text-secondary py-3 text-xs">
+            <p class="text-text-secondary px-3 py-3 text-xs">
               {{ t("passwordPolicy.reuseExplainer") }}
             </p>
           </OFormSection>
@@ -167,98 +205,110 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :description="t('passwordPolicy.lockoutThresholdDesc')"
               data-test="settings-password-policy-lockout-threshold"
             >
-              <OFormInput name="lockout.threshold" type="number" :min="0" class="w-24" />
+              <OFormInput name="lockout.threshold" type="number" :min="0" width="xs" />
             </OSettingRow>
 
-            <OSettingRow
-              :label="t('passwordPolicy.lockoutBucketSize')"
-              :description="t('passwordPolicy.lockoutBucketSizeDesc')"
-              :disabled="!lockoutOn"
-              data-test="settings-password-policy-lockout-bucket-size"
-            >
-              <OFormInput
-                name="lockout.bucket_size"
-                type="number"
-                :min="0"
-                class="w-24"
+            <OSettingRowPair data-test="settings-password-policy-pair-lockout-duration">
+              <OSettingRow
+                :label="t('passwordPolicy.lockoutStartSecs')"
+                :description="t('passwordPolicy.lockoutStartSecsDesc')"
                 :disabled="!lockoutOn"
-              />
-            </OSettingRow>
+                data-test="settings-password-policy-lockout-start-secs"
+              >
+                <OFormInput
+                  name="lockout.start_secs"
+                  type="number"
+                  :min="0"
+                  width="xs"
+                  :disabled="!lockoutOn"
+                >
+                  <template #error />
+                </OFormInput>
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.lockoutMaxSecs')"
+                :description="t('passwordPolicy.lockoutMaxSecsDesc')"
+                :disabled="!lockoutOn"
+                data-test="settings-password-policy-lockout-max-secs"
+              >
+                <OFormInput
+                  name="lockout.max_secs"
+                  type="number"
+                  :min="0"
+                  width="xs"
+                  :disabled="!lockoutOn"
+                />
+              </OSettingRow>
+              <template v-if="lockoutStartError" #footer>
+                <p
+                  class="text-input-error-text text-xs"
+                  role="alert"
+                  data-test="settings-password-policy-lockout-start-secs-error"
+                >
+                  {{ lockoutStartError }}
+                </p>
+              </template>
+            </OSettingRowPair>
 
-            <OSettingRow
-              :label="t('passwordPolicy.lockoutStartSecs')"
-              :description="t('passwordPolicy.lockoutStartSecsDesc')"
-              :disabled="!lockoutOn"
-              data-test="settings-password-policy-lockout-start-secs"
-            >
-              <OFormInput
-                name="lockout.start_secs"
-                type="number"
-                :min="0"
-                class="w-24"
+            <OSettingRowPair data-test="settings-password-policy-pair-lockout-escalation">
+              <OSettingRow
+                :label="t('passwordPolicy.lockoutBucketSize')"
+                :description="t('passwordPolicy.lockoutBucketSizeDesc')"
                 :disabled="!lockoutOn"
-              />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.lockoutMaxSecs')"
-              :description="t('passwordPolicy.lockoutMaxSecsDesc')"
-              :disabled="!lockoutOn"
-              data-test="settings-password-policy-lockout-max-secs"
-            >
-              <OFormInput
-                name="lockout.max_secs"
-                type="number"
-                :min="0"
-                class="w-24"
+                data-test="settings-password-policy-lockout-bucket-size"
+              >
+                <OFormInput
+                  name="lockout.bucket_size"
+                  type="number"
+                  :min="0"
+                  width="xs"
+                  :disabled="!lockoutOn"
+                />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.lockoutBackoff')"
+                :description="t('passwordPolicy.lockoutBackoffDesc')"
                 :disabled="!lockoutOn"
-              />
-            </OSettingRow>
-
-            <OSettingRow
-              :label="t('passwordPolicy.lockoutBackoff')"
-              :description="t('passwordPolicy.lockoutBackoffDesc')"
-              :disabled="!lockoutOn"
-              data-test="settings-password-policy-lockout-backoff"
-            >
-              <OFormSelect
-                name="lockout.backoff"
-                :options="backoffOptions"
-                :searchable="false"
-                class="w-40"
-                :disabled="!lockoutOn"
-              />
-            </OSettingRow>
+                data-test="settings-password-policy-lockout-backoff"
+              >
+                <OFormSelect
+                  name="lockout.backoff"
+                  :options="backoffOptions"
+                  :searchable="false"
+                  width="sm"
+                  :disabled="!lockoutOn"
+                />
+              </OSettingRow>
+            </OSettingRowPair>
 
             <p
               v-if="lockoutOn"
-              class="text-text-secondary py-3 text-xs"
+              class="text-text-secondary px-3 py-3 text-xs"
               data-test="settings-password-policy-lockout-preview"
             >
               {{ lockoutPreview }}
             </p>
           </OFormSection>
 
-          <OFormSection :title="t('passwordPolicy.session')">
-            <OSettingRow
-              :label="t('passwordPolicy.cookieMaxAge')"
-              :description="
-                t('passwordPolicy.cookieMaxAgeDesc', { envVar: raw('ZO_COOKIE_MAX_AGE') })
-              "
-              data-test="settings-password-policy-cookie-max-age"
-            >
-              <OFormInput name="cookie_max_age_secs" type="number" :min="0" class="w-24" />
-            </OSettingRow>
-          </OFormSection>
-
-          <OFormSection :title="t('passwordPolicy.enforcement')">
-            <OSettingRow
-              :label="t('passwordPolicy.applyToRoot')"
-              :description="t('passwordPolicy.applyToRootDesc')"
-              data-test="settings-password-policy-apply-to-root"
-            >
-              <OFormSwitch name="apply_to_root" @update:model-value="onApplyToRootChange" />
-            </OSettingRow>
+          <OFormSection :title="t('passwordPolicy.sessionEnforcement')">
+            <OSettingRowPair data-test="settings-password-policy-pair-session-enforcement">
+              <OSettingRow
+                :label="t('passwordPolicy.cookieMaxAge')"
+                :description="
+                  t('passwordPolicy.cookieMaxAgeDesc', { envVar: raw('ZO_COOKIE_MAX_AGE') })
+                "
+                data-test="settings-password-policy-cookie-max-age"
+              >
+                <OFormInput name="cookie_max_age_secs" type="number" :min="0" width="xs" />
+              </OSettingRow>
+              <OSettingRow
+                :label="t('passwordPolicy.applyToRoot')"
+                :description="t('passwordPolicy.applyToRootDesc')"
+                data-test="settings-password-policy-apply-to-root"
+              >
+                <OFormSwitch name="apply_to_root" @update:model-value="onApplyToRootChange" />
+              </OSettingRow>
+            </OSettingRowPair>
 
             <!-- Standing, not one-off: a warning shown once is one the next administrator never sees. -->
             <OBanner
@@ -273,7 +323,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OFormSection>
         </div>
 
-        <div class="mt-4 flex justify-end gap-2">
+        <!-- Sticky offsets ignore the scrollport's py-3, so the bar bleeds and pins 0.75rem past it to sit flush. -->
+        <div
+          class="border-border-default bg-surface-base shadow-sticky-footer sticky -bottom-3 z-10 -mx-4 mt-4 -mb-3 flex justify-end gap-2 border-t px-4 py-3"
+        >
           <OButton
             data-test="settings-password-policy-cancel-btn"
             variant="outline"
@@ -337,10 +390,12 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import { OEmptyState } from "@/lib/core/EmptyState";
 import OFormSection from "@/lib/core/FormSection/OFormSection.vue";
 import OSettingRow from "@/lib/core/SettingRow/OSettingRow.vue";
+import OSettingRowPair from "@/lib/core/SettingRow/OSettingRowPair.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -389,6 +444,16 @@ const form = useOForm<PolicyForm>({
 });
 
 const values = form.useStore((s: { values: PolicyForm }) => s.values);
+
+// The four cross-field messages are shown by the pair, not the field, so both cells stay aligned.
+const fieldError = (path: string) =>
+  form.useStore((s: { fieldMeta?: Record<string, { errors?: unknown[] }> }) =>
+    firstFieldError(s.fieldMeta?.[path]?.errors ?? []),
+  );
+const maxLengthError = fieldError("max_length");
+const warningDaysError = fieldError("rotation_warning_days");
+const historyRetainedError = fieldError("history_max_retained");
+const lockoutStartError = fieldError("lockout.start_secs");
 
 const backoffOptions = [
   { label: t("passwordPolicy.backoffExponential"), value: "exponential" },

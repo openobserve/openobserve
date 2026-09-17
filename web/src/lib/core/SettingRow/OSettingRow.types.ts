@@ -1,5 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
+import type { InjectionKey } from "vue";
+
 import type { I18nText } from "@/types/i18n";
 
 export interface SettingRowProps {
@@ -16,3 +18,6 @@ export interface SettingRowSlots {
   /** The control on the right. */
   default?: () => unknown;
 }
+
+/** Provided by OSettingRowPair; a row inside one leaves the rule and padding to the pair. */
+export const SETTING_ROW_PAIR_KEY: InjectionKey<true> = Symbol("SettingRowPair");
