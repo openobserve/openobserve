@@ -13,6 +13,12 @@ const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/uti
 const api = () => `${process.env.ZO_BASE_URL}/api`;
 const SINK_URL = 'http://example.com/sink';
 
+// Maps the trigger registry's per-node kind to the top-level backend enum value.
+const TRIGGER_TYPE_BY_KIND = {
+  alert_fired: 'AlertFired',
+  incident_event: 'IncidentEvent',
+};
+
 async function jsonOrThrow(resp, what) {
   if (!resp.ok()) {
     throw new Error(`${what} failed: ${resp.status()} ${(await resp.text()).slice(0, 300)}`);
@@ -57,7 +63,13 @@ async function deleteDestination(page, name) {
   );
 }
 
-function workflowPayload(name, destName, description = 'folder automation workflow') {
+function workflowPayload(
+  name,
+  destName,
+  description = 'folder automation workflow',
+  triggerKind = 'alert_fired',
+) {
+  const triggerType = TRIGGER_TYPE_BY_KIND[triggerKind] ?? 'AlertFired';
   return {
     workflow: {
       id: '',
@@ -72,6 +84,9 @@ function workflowPayload(name, destName, description = 'folder automation workfl
         {
           id: 'trigger-1',
           data: { node_type: 'workflow_trigger' },
+          // NodeData::WorkflowTrigger is a backend unit variant, so the kind
+          // survives only in meta (strings) — the same field the editor serializes.
+          meta: { trigger_kind: triggerKind },
           position: { x: 100, y: 100 },
           io_type: 'input',
         },
@@ -84,20 +99,23 @@ function workflowPayload(name, destName, description = 'folder automation workfl
       ],
       edges: [{ id: 'etrigger-1-dest-1', source: 'trigger-1', target: 'dest-1' }],
     },
-    trigger_type: 'AlertFired',
+    trigger_type: triggerType,
   };
 }
 
 // The backend lowercases and trims the name on save, so the caller's name is not
 // necessarily the one the row (and therefore the row's data-test) carries.
-async function createWorkflow(page, { name, destName, folderId, draft = false }) {
+async function createWorkflow(
+  page,
+  { name, destName, folderId, draft = false, triggerKind = 'alert_fired' },
+) {
   const params = new URLSearchParams();
   if (folderId) params.set('folder', folderId);
   if (draft) params.set('draft', 'true');
   const qs = params.toString() ? `?${params}` : '';
   const resp = await page.request.post(`${api()}/${getOrgIdentifier()}/workflows${qs}`, {
     headers: getAuthHeaders(),
-    data: workflowPayload(name, destName),
+    data: workflowPayload(name, destName, 'folder automation workflow', triggerKind),
   });
   const body = await jsonOrThrow(resp, `create workflow "${name}"`);
   return { id: body.id, name: name.trim().toLowerCase() };

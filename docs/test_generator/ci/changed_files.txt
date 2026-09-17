@@ -1,0 +1,6 @@
+tests/api-testing/tests/workflows/test_workflow_folders.py
+tests/api-testing/tests/workflows/test_workflow_folders_rbac.py
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/pages/workflowsPages/workflowFolderSeed.js
+tests/ui-testing/pages/workflowsPages/workflowFoldersPage.js
+tests/ui-testing/playwright-tests/Workflows/workflows-folders.spec.js
