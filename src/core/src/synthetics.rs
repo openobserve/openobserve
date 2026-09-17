@@ -71,11 +71,6 @@ pub struct CheckNotification {
     /// still down".
     pub passing_locations: Vec<String>,
     /// Environments that did not pass, worst first.
-    ///
-    /// Empty for a check that targets none, which is every check that pre-dates
-    /// fan-out — so the message shape is unchanged for them. Once a check runs
-    /// against staging and production together, "the check is failing" no
-    /// longer tells the reader whether production is affected.
     pub failing_environments: Vec<String>,
 }
 
@@ -268,11 +263,6 @@ fn run_url(n: &CheckNotification) -> String {
 
 #[cfg(feature = "enterprise")]
 /// The environments a message should name, or None when there is nothing to add.
-///
-/// Absent for a check that targets no environment, which keeps every existing
-/// notification byte-identical. Present the moment a check fans out, because
-/// then "the check is failing" leaves the reader unable to tell whether
-/// production is affected — the one thing they need before deciding to act.
 fn environments_line(n: &CheckNotification) -> Option<String> {
     if n.failing_environments.is_empty() {
         return None;

@@ -36,10 +36,6 @@ pub async fn get_environment(
 }
 
 /// The name a grant is written against, for an environment held by id.
-///
-/// The check stores environment ids; OpenFGA objects are named by the
-/// environment's name, so a permission check on a check's `environments` has to
-/// cross that gap.
 pub async fn get_environment_name(org_id: &str, id: &str) -> anyhow::Result<Option<String>> {
     let conn = get_orm_client_ro().await;
     Ok(synthetics_environments::get_by_id(conn, org_id, id)
@@ -49,10 +45,6 @@ pub async fn get_environment_name(org_id: &str, id: &str) -> anyhow::Result<Opti
 }
 
 /// Every environment in the org with its variables inline.
-///
-/// One call renders the whole Environments tab. Values are never included, so
-/// the payload is bounded by metadata no matter how many secrets an environment
-/// holds. The caller filters by permission — this is the unfiltered set.
 pub async fn list_environments(org_id: &str) -> anyhow::Result<Vec<SyntheticsEnvironmentView>> {
     let conn = get_orm_client_ro().await;
     let envs = synthetics_environments::list(conn, org_id)
@@ -127,17 +119,6 @@ pub async fn create_environment(
 }
 
 /// Copies an environment's variables into a new environment.
-///
-/// **Plain values are copied; secret values are not.** Copying a secret's
-/// ciphertext would be trivial — both scopes share the org DEK — and it is
-/// exactly the wrong thing. The claim this whole feature rests on is that
-/// sharing is a net gain *because it cuts the copies of a credential from N to
-/// one*; a button that silently doubles them undoes that, and the duplicate is
-/// the one nobody knows to rotate. Secrets arrive named and unset.
-///
-/// Checks are not copied: a check belongs to whatever it targets, and pointing
-/// a second one at a new environment would change what is monitored without
-/// anyone asking.
 pub async fn duplicate_environment(
     org_id: &str,
     source: &str,
@@ -219,11 +200,6 @@ pub async fn duplicate_environment(
 }
 
 /// Updates an environment's description.
-///
-/// A rename is refused rather than applied. The name is the OpenFGA object id,
-/// so renaming would orphan every grant written against the old one — silently,
-/// and in the direction that removes access from whoever was administering the
-/// environment's secrets.
 pub async fn update_environment(
     org_id: &str,
     name: &str,
@@ -259,15 +235,6 @@ pub async fn update_environment(
 }
 
 /// Deletes an environment and every plain variable scoped to it.
-///
-/// Three guards, in descending severity:
-///
-/// - **A secret refuses outright**, with no `force`. Its value is write-only, so a delete is
-///   unrecoverable by anyone — there is no copy to restore from and no one who can read it back.
-/// - **A pinned check refuses**, or the check would keep naming an environment that no longer
-///   exists and its next run would resolve a different variable set than it was written against.
-/// - **Plain variables need `force`**, which is the confirmation the UI collects after listing
-///   them.
 pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow::Result<bool> {
     let conn = get_orm_client_rw().await;
     let Some(record) = synthetics_environments::get_by_name(conn, org_id, name)
@@ -329,10 +296,6 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
 }
 
 /// Variable name → names of the checks whose definition references `{{NAME}}`.
-///
-/// One pass over the org's checks, because every list endpoint needs the count
-/// for every row at once. `target` and `config` together carry every place a
-/// placeholder can appear — steps, headers, URLs all live inside `config`.
 async fn placeholder_usage(org_id: &str) -> anyhow::Result<HashMap<String, Vec<String>>> {
     let conn = get_orm_client_ro().await;
     let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
@@ -352,14 +315,6 @@ async fn placeholder_usage(org_id: &str) -> anyhow::Result<HashMap<String, Vec<S
 }
 
 /// Projects records to views, decrypting the plain ones.
-///
-/// **One `get_dek` call for the whole batch**, hoisted above the loop — the same
-/// rule `resolve` follows, and the reason this lives here rather than in the
-/// table layer, which holds no key.
-///
-/// A plain row that will not decrypt becomes an empty value rather than an
-/// error: one corrupt row must not fail the list it appears in. A secret is
-/// never decrypted at all — the view has nowhere to put it.
 async fn project_views(
     org_id: &str,
     rows: impl Iterator<Item = &SyntheticsVariableRecord>,
@@ -454,9 +409,6 @@ pub async fn list_environment_variables(
 }
 
 /// Rejects a check that names an environment which does not exist.
-///
-/// Whether the caller may *use* the environment is a separate question, asked in
-/// the handler — it needs the caller's identity, which nothing down here has.
 pub async fn validate_environments(org_id: &str, ids: &[String]) -> anyhow::Result<()> {
     if ids.is_empty() {
         return Ok(());
@@ -574,10 +526,6 @@ pub async fn update_variable(
 }
 
 /// Deletes a variable, refusing while checks still reference it.
-///
-/// `force` is the confirmation the UI collects after showing the list. The
-/// names travel in the error rather than behind a second endpoint, so the
-/// caller cannot render the guard without having been told what it guards.
 pub async fn delete_variable(
     org_id: &str,
     env: Option<&SyntheticsEnvironmentRecord>,
@@ -609,10 +557,6 @@ pub async fn delete_variable(
 }
 
 /// A check's resolved set, name by name, with the scope each name comes from.
-///
-/// The check editor's Inherited group and the `{{` autocomplete both read this.
-/// Values never appear — the merge is over metadata, so this is safe to hand to
-/// anyone who may edit the check.
 pub async fn resolved_variables(
     org_id: &str,
     check_id: &str,
@@ -639,11 +583,6 @@ pub async fn resolved_variables(
 }
 
 /// Every environment's resolved set, keyed by environment name.
-///
-/// Same reads as [`resolved_variables`], the merge run once per environment, so
-/// the editor can switch environments without a request per flip. A stored
-/// environment id that no longer resolves is skipped — a deleted environment,
-/// not an error, matching the update path's reconcile behaviour.
 pub async fn resolved_variables_grouped(
     org_id: &str,
     check_id: &str,
@@ -684,9 +623,6 @@ pub async fn resolved_variables_grouped(
 }
 
 /// One environment's resolved rows, from already-loaded data.
-///
-/// Pure so the per-environment `overridden` semantics stay unit-testable: a
-/// check variable shadows a shared row only where that row applies.
 fn resolved_rows(
     shared: &[SyntheticsVariableRecord],
     envs: &[SyntheticsEnvironmentRecord],
@@ -753,16 +689,6 @@ pub struct ReplaySecret {
 }
 
 /// Decrypted shared secrets a check's steps reference, for replay auto-fill.
-///
-/// **This is the one path that releases a shared secret's plaintext**, and it
-/// exists only because replay substitutes in the browser: any value replay can
-/// use is a value the page can read. Three things bound it, and all three are
-/// the caller's to enforce except the last:
-///
-/// - the org opted in (off by default),
-/// - the caller holds write on each secret's environment,
-/// - only secrets the steps actually reference are returned, which is this function's job —
-///   releasing every secret in the environment would make one replay a bulk credential read.
 pub async fn replay_secrets(
     org_id: &str,
     check_id: &str,
@@ -831,10 +757,6 @@ pub async fn replay_secrets(
 }
 
 /// Moves a check-scoped variable up into the shared tier.
-///
-/// The ciphertext moves as-is. Both tiers are encrypted under the same org DEK,
-/// so no plaintext has to materialise to promote a value — which also means a
-/// caller who cannot read the value can still promote it.
 pub async fn promote_check_variable(
     org_id: &str,
     check_id: &str,
@@ -900,10 +822,8 @@ pub async fn promote_check_variable(
     synthetics_checks::update(conn, org_id, check_id, check.clone())
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    // The check lost a variable, and this writes through the table layer rather
-    // than `update_synthetic`, so nothing else broadcasts it. Without this the
-    // other regions keep the inline copy, which outranks the shared row, and
-    // the promote reads as a no-op everywhere but here.
+    // The check lost a variable, and this writes through the table layer rather than
+    // `update_synthetic`, so nothing else broadcasts it.
     publish_check_update(org_id, check_id, &check).await?;
     project_view(org_id, &record).await
 }
@@ -949,15 +869,6 @@ pub async fn promote_to_global(
 }
 
 /// Splits one unscoped variable into per-environment rows.
-///
-/// No variable-cap gate, and it does not need one: the tiers merge by name, so
-/// a check targeting a split environment swaps the global for the env row at
-/// the same name, and a check targeting none of them loses the name outright.
-/// Neither direction can raise a resolved count.
-///
-/// A split, not a move: one row becomes N, each with its own value. Values
-/// arrive with the request rather than being filled in afterwards, because the
-/// half-finished state is one where checks have already stopped resolving.
 pub async fn split_to_environments(
     org_id: &str,
     id: &str,
@@ -1034,11 +945,8 @@ pub async fn split_to_environments(
     project_views(org_id, created.iter()).await
 }
 
-/// The shared tier for one job: every unscoped variable, plus the ones scoped to
-/// the environment the check runs against, decrypted.
-///
-/// Takes the DEK rather than fetching one so `resolve` keeps making exactly one
-/// `cipher::get_dek` call for both tiers.
+/// The shared tier for one job: every unscoped variable, plus the ones scoped to the environment
+/// the check runs against, decrypted.
 pub async fn resolve_shared_variables(
     org_id: &str,
     env_id: Option<&str>,
@@ -1062,10 +970,6 @@ pub async fn resolve_shared_variables(
 }
 
 /// Whether an org has any shared variable at all.
-///
-/// `resolve` asks before fetching a DEK: a check with no inline secrets and no
-/// shared variables must not pay for a key it will not use, and one with only
-/// shared variables must not skip the key it does.
 pub async fn org_has_shared_variables(org_id: &str) -> bool {
     let conn = get_orm_client_ro().await;
     match synthetics_variables::list_cached(conn, org_id).await {
@@ -1078,15 +982,6 @@ pub async fn org_has_shared_variables(org_id: &str) -> bool {
 }
 
 /// The org's checks and shared rows, as the write-time cap gate reads them.
-///
-/// A full pass over the org's checks on every variable write. That is the price
-/// of catching the overflow at the call that causes it rather than at every
-/// check's next run.
-///
-/// Read through the RO client while the write that follows uses RW, so on a
-/// replica this measures a slightly stale org and two concurrent writes can both
-/// pass. The gate is an early, attributable error, not a guarantee — the
-/// resolve-time check in `merge_variable_tiers` is what holds the line.
 pub(crate) async fn org_variable_state(org_id: &str) -> anyhow::Result<OrgVariableState> {
     let conn = get_orm_client_ro().await;
     let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
@@ -1108,10 +1003,6 @@ pub(crate) async fn org_variable_state(org_id: &str) -> anyhow::Result<OrgVariab
 }
 
 /// One check reduced to what the cap needs: what it defines and where it runs.
-///
-/// `id` is taken separately because an update carries it in the URL, not always
-/// in the body — and a footprint that cannot be matched to the stored check is
-/// counted as a second check rather than replacing it.
 pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootprint {
     CheckVariableFootprint {
         id: id.to_string(),
@@ -1121,13 +1012,8 @@ pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootp
     }
 }
 
-// ── Super-cluster replication ─────────────────────────────────────────────────
-//
-// Values go on the wire as PLAINTEXT and each region encrypts under its own
-// key. Sending ciphertext is the bug that shipped once for checks
-// (o2-enterprise#2451): a value encrypted here is unreadable there, and storing
-// it looks like success until a run injects rubbish. Publishing happens after
-// the local write, never inside a transaction.
+// ── Super-cluster replication ───────────────────────────────────────────────── Values go on the
+// wire as PLAINTEXT and each region encrypts under its own key.
 
 /// The wire copy of one row, with its value decrypted for the receiving region.
 #[cfg(feature = "enterprise")]
@@ -1248,9 +1134,6 @@ async fn publish_environment_delete(org_id: &str, id: &str) -> anyhow::Result<()
 }
 
 /// Broadcasts the check a promote just edited.
-///
-/// `promote_check_variable` writes through the table layer, so it bypasses the
-/// broadcast `update_synthetic` does.
 async fn publish_check_update(
     org_id: &str,
     check_id: &str,
@@ -1321,9 +1204,6 @@ async fn publish_batch(
 }
 
 /// Why a secret cannot join the unscoped tier.
-///
-/// Deliberately offers no way to demote: kind is fixed once created, so telling
-/// the user to "make it plain first" would be advice nobody can follow.
 fn secret_cannot_be_global(name: &str) -> String {
     format!(
         "'{name}' is a secret, and a secret's environment is its access boundary — it cannot be \
@@ -1332,9 +1212,6 @@ fn secret_cannot_be_global(name: &str) -> String {
 }
 
 /// `var.env IS NULL OR var.env = <the environment being run>` — §4 of the design.
-///
-/// An environment filters; it never overrides. A variable with no environment
-/// applies to every run, including an unscoped one.
 fn applies_to(var: &SyntheticsVariableRecord, env_id: Option<&str>) -> bool {
     match (&var.env, env_id) {
         (None, _) => true,
@@ -1344,19 +1221,12 @@ fn applies_to(var: &SyntheticsVariableRecord, env_id: Option<&str>) -> bool {
 }
 
 /// Globals first, environment rows after, stable order within each half.
-///
-/// The runtime merge folds into a name-keyed map where the last writer wins,
-/// so this ordering IS the env-beats-global rule — remove it and the winner
-/// becomes whatever the store listed last.
 fn order_for_merge(mut rows: Vec<SyntheticsVariableRecord>) -> Vec<SyntheticsVariableRecord> {
     rows.sort_by_key(|v| v.env.is_some());
     rows
 }
 
 /// Split targets minus the environments that already define the name (S7).
-///
-/// An env with its own row keeps its value — inserting a second row would trip
-/// the same-scope unique index mid-transaction.
 fn split_targets_without_own_row(
     name: &str,
     targets: Vec<(SyntheticsEnvironmentRecord, String)>,
@@ -1406,10 +1276,6 @@ fn environment_view(record: SyntheticsEnvironmentRecord) -> SyntheticsEnvironmen
 }
 
 /// Loads a variable and asserts it lives in the scope the URL addressed.
-///
-/// Without this, `DELETE /environments/staging/variables/{id}` would delete a
-/// production variable for anyone holding staging — the route resolves its
-/// permission from the path segment, so the row has to be checked against it.
 async fn scoped_variable<C: sea_orm::ConnectionTrait>(
     conn: &C,
     org_id: &str,

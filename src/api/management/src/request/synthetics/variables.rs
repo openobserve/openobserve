@@ -475,11 +475,9 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
     .into_response()
 }
 
-// ── Scope moves (design §9.6) ────────────────────────────────────────────────
-//
-// All three only ever touch plain variables: a secret already carries an
-// environment by construction, so it can never become global, and its value is
-// write-only so there is nothing to copy between environments.
+// ── Scope moves (design §9.6) ──────────────────────────────────────────────── All three only ever
+// touch plain variables: a secret already carries an environment by construction, so it can never
+// become global, and its value is write-only so there is nothing to copy between environments.
 
 #[utoipa::path(
     get,
@@ -685,10 +683,6 @@ pub async fn split_synthetics_variable(
 }
 
 /// Write permission on the scope a variable is moving into.
-///
-/// `None` means the unscoped tier, which the module umbrella governs. Scope
-/// moves cross an authorization boundary that no single route can express, so
-/// the destination is always checked in the handler.
 #[cfg(feature = "enterprise")]
 async fn require_scope_write(
     org_id: &str,

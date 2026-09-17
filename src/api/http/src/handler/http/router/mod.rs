@@ -1479,11 +1479,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/agent-tokens/rotate", post(synthetics::rotate_agent_token))
             .route("/{org_id}/synthetics/agent-tokens/{name}", patch(synthetics::set_agent_token_enabled))
             .route("/{org_id}/synthetics/locations/{id}", get(synthetics::get_location).put(synthetics::update_location).delete(synthetics::delete_location))
-            // Shared variables and environments. Registered before the generic
-            // "{id}" entry to match the order the OpenFGA route table needs —
-            // there, a "{placeholder}" matches a literal segment and the first
-            // structural match wins, so "variables" would authorize against a
-            // per-check object instead of its own resource.
+            // Shared variables and environments.
             .route("/{org_id}/synthetics/variables", get(synthetics::list_synthetics_variables).post(synthetics::create_synthetics_variable))
             .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
             .route("/{org_id}/synthetics/variables/{id}/split", post(synthetics::split_synthetics_variable))

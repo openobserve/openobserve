@@ -166,11 +166,6 @@ pub struct Synthetic {
     #[serde(default)]
     pub variables: Vec<SyntheticVariable>,
     /// Environments this check runs against, by id.
-    ///
-    /// Empty means one unscoped run, which is every check that existed before
-    /// shared variables — so there is nothing to migrate. Capped at one entry
-    /// until fan-out lands; more than one would multiply job volume today with
-    /// no way to tell the resulting runs apart.
     #[serde(default)]
     pub environments: Vec<String>,
     /// Unix epoch microseconds — when to first run the check ("schedule later").
@@ -1361,11 +1356,6 @@ const MAX_TAGS: usize = 20;
 pub const MAX_VARIABLES: usize = 50;
 
 /// Environments one check may fan out over.
-///
-/// Bounded because job volume is `environments × locations × browser-devices`:
-/// at 3 × 6 × 2 a one-minute check already enqueues 36 jobs a minute. The cap
-/// is on the multiplier a single save can introduce, not on how many
-/// environments an org may have.
 pub const MAX_ENVIRONMENTS_PER_CHECK: usize = 5;
 const MAX_BROWSER_DEVICE_COMBOS: usize = 12;
 /// Minimum schedule interval (seconds) for protocol checks (http/tcp/tls/ssh).
@@ -1377,19 +1367,9 @@ const MIN_INTERVAL_SECS: i64 = 1;
 const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 
 /// Stand-in for a placeholder while validating a templated URL's shape.
-///
-/// Deliberately boring: a bare token that is legal in a host, a path and a
-/// query alike, so the substituted string parses wherever the author put the
-/// placeholder rather than only in the cases we happened to think of.
 const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
 
 /// Validates a URL that may be templated.
-///
-/// A templated target cannot be resolved here — the values belong to an
-/// environment and are only known at run time — so the shape is checked against
-/// a substituted stand-in instead. The real URL is SSRF-checked by the probe,
-/// against the address it actually resolves to, which is the only check that
-/// can be right for a value that differs per environment.
 fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
     if value.contains("{{") {
         if value.chars().any(char::is_whitespace) {
@@ -1407,13 +1387,8 @@ fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
             rest = &after[close + 2..];
         }
         probe.push_str(rest);
-        // A target starting with a placeholder has no scheme to parse until the
-        // placeholder supplies one, so assume the one it must resolve to.
-        //
-        // Only when there is no scheme at all: prefixing unconditionally turned
-        // `ftp://{{HOST}}/x` into `https://ftp://placeholder/x`, which parses
-        // with host `ftp` and let a rejected scheme through. A templated scheme
-        // is therefore rejected too, which is the safe direction.
+        // A target starting with a placeholder has no scheme to parse until the placeholder
+        // supplies one, so assume the one it must resolve to.
         let candidate = if probe.contains("://") {
             probe
         } else {
@@ -1694,6 +1669,16 @@ impl Synthetic {
                 return Err(format!(
                     "variables: invalid name '{}' (must match [A-Za-z_][A-Za-z0-9_]*)",
                     v.name
+                ));
+            }
+            // `resolve` injects the probe's own credentials under this prefix, so a
+            // check variable claiming one would overwrite its own auth.
+            if v.name
+                .starts_with(crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX)
+            {
+                return Err(format!(
+                    "variables: '{}' is reserved for credentials the probe injects itself",
+                    crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX
                 ));
             }
             if !seen_vars.insert(v.name.as_str()) {
@@ -2777,6 +2762,22 @@ mod tests {
             config: serde_json::json!({ "port": 5432, "timeout_ms": 10000 }),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
+        // The shared tier has always refused it; an inline variable of the same
+        // name silently overwrote the check's own auth at resolve time.
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_tcp_synthetic();
+        s.variables = vec![SyntheticVariable {
+            name: "_AUTH_COOKIES".to_string(),
+            value: "x".to_string(),
+            secure: false,
+            example: String::new(),
+        }];
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("reserved"), "{err}");
     }
 
     #[test]

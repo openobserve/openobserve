@@ -149,9 +149,6 @@ pub async fn update<C: ConnectionTrait>(
 }
 
 /// Writes a row exactly as another region has it, creating or replacing by id.
-///
-/// The id is the origin's on purpose: a replicated check stores environment
-/// ids, so a locally minted one would leave that check resolving nothing.
 pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsEnvironmentRecord,
@@ -177,11 +174,6 @@ pub async fn apply_upsert<C: ConnectionTrait>(
 }
 
 /// Deletes an environment and the variables scoped to it, in one transaction.
-///
-/// The variables go first because of the foreign key, and both go together
-/// because the alternative — refusing to delete a non-empty environment —
-/// leaves the caller no way to remove one without emptying it by hand, and a
-/// half-completed delete would strand rows the FK then blocks forever.
 pub async fn delete<C: TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -198,8 +190,7 @@ pub async fn delete<C: TransactionTrait>(
     Ok(res.rows_affected > 0)
 }
 
+/// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
-    Error::DbError(DbError::SeaORMError(format!(
-        "environment '{name}' already exists in this org"
-    )))
+    Error::Message(format!("environment '{name}' already exists in this org"))
 }

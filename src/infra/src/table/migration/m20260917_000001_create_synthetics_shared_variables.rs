@@ -172,10 +172,7 @@ fn create_variables_table() -> TableCreateStatement {
                 .big_integer()
                 .not_null(),
         )
-        // A secret's access boundary IS its environment: an unscoped secret
-        // would be governed by the module umbrella, which is the broadest grant
-        // in the feature. Enforced here rather than in the handler so no code
-        // path can create one.
+        // A secret's access boundary IS its environment: an unscoped secret would be governed by the module umbrella, which is the broadest grant in the feature.
         .check(Expr::cust("kind <> 'secret' OR env IS NOT NULL"))
         .foreign_key(
             ForeignKey::create()
@@ -199,16 +196,6 @@ fn create_variables_org_idx() -> IndexCreateStatement {
 }
 
 /// The uniqueness rule, as an expression index.
-///
-/// **`COALESCE(env, '')` is load-bearing.** PostgreSQL and SQLite both treat
-/// NULLs as *distinct* inside a unique index, so a plain composite index over
-/// `(org_id, env, name)` permits two unscoped `BASE_URL` rows — and then a run
-/// resolves whichever the query planner returns first. `system_settings` has
-/// exactly this defect; follow its table shape, not its index.
-///
-/// MySQL is not a supported meta store (`MetaStore` is `Sqlite | Nats |
-/// PostgreSQL`), so its arm is the plain composite index rather than an
-/// expression index its older versions cannot build.
 fn unique_index_sql(backend: DatabaseBackend) -> String {
     match backend {
         DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(

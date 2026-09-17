@@ -46,11 +46,8 @@ pub async fn emit_tokens_changed(org_id: &str) -> Result<(), Error> {
     emit_put(&format!("{SYNTHETICS_WATCHER_PREFIX}{KIND_TOKEN}/{org_id}")).await
 }
 
-/// An org's shared variables changed — created, edited, deleted, or removed
-/// alongside their environment.
-///
-/// Delivery latency is how long a rotated credential keeps resolving to its old
-/// value on other nodes, bounded by the cache TTL either way.
+/// An org's shared variables changed — created, edited, deleted, or removed alongside their
+/// environment.
 pub async fn emit_variables_changed(org_id: &str) -> Result<(), Error> {
     emit_put(&format!(
         "{SYNTHETICS_WATCHER_PREFIX}{KIND_VARIABLE}/{org_id}"

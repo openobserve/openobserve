@@ -51,9 +51,6 @@ pub enum SyntheticsVariableKind {
 }
 
 /// Create/update body for a shared variable.
-///
-/// `value` is optional so an update can leave a write-only secret alone: the
-/// client holds `has_value`, never the value, so it has nothing to send back.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SyntheticsVariableRequest {
     pub name: String,
@@ -73,15 +70,6 @@ pub struct SyntheticsVariableRequest {
 }
 
 /// A variable's value as a read path may carry it.
-///
-/// **The `Secret` variant has no value field**, which is the whole point. A
-/// single `value: Option<String>` would serve the list just as well and would
-/// quietly lose the guarantee: `None` for a secret is a convention, and a
-/// convention is something a later call site can forget. This makes a secret's
-/// plaintext on a read path a compile error instead.
-///
-/// Tagged `kind` because that is what it replaces — the wire shape stays
-/// `{"kind": "plain", "value": "…"}` and clients read `kind` unchanged.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum VariableValueView {
@@ -103,10 +91,6 @@ impl Default for VariableValueView {
 }
 
 /// What every read path returns for a shared variable.
-///
-/// A plain value is carried; a secret's cannot be — see [`VariableValueView`].
-/// `example` stands in for the value wherever the UI needs to show the shape of
-/// one it may not read.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct SyntheticsVariableView {
     pub id: String,
@@ -117,10 +101,6 @@ pub struct SyntheticsVariableView {
     pub example: String,
     pub tags: Vec<String>,
     /// Checks whose definition references `{{NAME}}`.
-    ///
-    /// Answers "what breaks if I change this?", and is the safety check before
-    /// a delete — which is why it is on the list row rather than behind a
-    /// second call.
     #[serde(default)]
     pub used_by_checks: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -130,9 +110,6 @@ pub struct SyntheticsVariableView {
 }
 
 /// One name in a check's resolved set, and where it comes from.
-///
-/// Drives the check editor's Inherited group and the `{{` autocomplete. Metadata
-/// only — like every read path here, it carries no value.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ResolvedVariableView {
     pub name: String,
@@ -148,11 +125,6 @@ pub struct ResolvedVariableView {
 }
 
 /// Every environment's resolved set in one response, keyed by environment name.
-///
-/// One entry per environment the check targets (`""` for an unscoped check), so
-/// the editor switches environments without a request per flip. The merge runs
-/// server-side per environment — `overridden` genuinely varies by environment,
-/// so a client cannot reconstruct this from declarations.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, ToSchema)]
 pub struct ResolvedVariablesGrouped {
     /// Environment names in the check's stored order; a single `""` when unscoped.
@@ -176,10 +148,6 @@ pub struct SplitTarget {
 }
 
 /// Splitting a global variable into per-environment rows.
-///
-/// Values are collected up front rather than filled in afterwards: the failure
-/// mode is silent, because scoping `BASE_URL` to production alone means every
-/// check running against staging stops resolving it.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SplitVariableRequest {
     pub targets: Vec<SplitTarget>,
@@ -194,10 +162,6 @@ pub struct SyntheticsEnvironmentRequest {
 }
 
 /// One environment with its variables inline.
-///
-/// The list endpoint returns this shape, which renders the whole Environments
-/// tab in one call. `variables` is metadata only, so the payload stays bounded
-/// no matter how many secrets an environment holds.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SyntheticsEnvironmentView {
     pub id: String,
@@ -234,10 +198,6 @@ pub struct CheckVariableFootprint {
 }
 
 /// The org's checks and shared rows together.
-///
-/// Neither half alone can answer how many variables a check resolves, which is
-/// why the write-time gate takes a whole state rather than the row being
-/// written.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrgVariableState {
     pub checks: Vec<CheckVariableFootprint>,
@@ -245,11 +205,6 @@ pub struct OrgVariableState {
 }
 
 /// Every `{{NAME}}` a piece of text references, as written.
-///
-/// Case is preserved rather than normalised, because substitution is an exact
-/// key lookup on both sides (`envVars[k]` in the probe, `vars[k]` in the
-/// editor). `{{base_url}}` does not resolve a variable stored as `BASE_URL`, so
-/// counting it as a use would report a binding that does not exist.
 pub fn placeholder_names(text: &str) -> BTreeSet<String> {
     let bytes = text.as_bytes();
     let mut found = BTreeSet::new();
@@ -281,11 +236,6 @@ pub fn placeholder_names(text: &str) -> BTreeSet<String> {
 }
 
 /// Substitutes `{{NAME}}` from a resolved map, leaving unbound names verbatim.
-///
-/// The Rust twin of the probe's `substituteSecretsV2` and the editor's
-/// `substituteVariables`, and it makes the same choice for the same reason:
-/// `{{...}}` is not necessarily a variable reference, so an unbound name is
-/// text rather than an empty string.
 pub fn substitute_placeholders(text: &str, values: &HashMap<String, String>) -> String {
     if !text.contains("{{") {
         return text.to_string();
@@ -320,9 +270,6 @@ pub fn substitute_placeholders(text: &str, values: &HashMap<String, String>) -> 
 }
 
 /// Upper-cases a variable name, which is how every name is stored.
-///
-/// Form-level upper-casing is a convenience; this is the enforcement, because an
-/// API client can `POST` `base_url` directly and `{{base_url}}` must then bind.
 pub fn normalize_variable_name(name: &str) -> String {
     name.trim().to_ascii_uppercase()
 }
@@ -357,10 +304,6 @@ pub fn validate_variable_name(name: &str) -> Result<(), String> {
 }
 
 /// Validates an environment name.
-///
-/// Stricter than a variable name because the name becomes an OpenFGA object id:
-/// `_` is reserved for OpenFGA's own `_all_{org}` wildcards, and a name carrying
-/// one would collide with them.
 pub fn validate_environment_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("name: must not be empty".to_string());
@@ -389,15 +332,6 @@ pub fn validate_environment_name(name: &str) -> Result<(), String> {
 }
 
 /// Validates a create/update body against what is already stored.
-///
-/// `has_stored_value` is what makes an update legal without a value: a secret's
-/// value cannot be round-tripped, so an omitted one means "leave it alone" —
-/// but only when there is something to leave alone. `stored_kind` is `None` on
-/// a create and the stored kind on an update, which is what makes kind
-/// immutable: both kinds hold the same encrypted value, so `kind` is the entire
-/// difference between a write-only secret and one any reader with GET can
-/// fetch, and an update that rewrote it would turn write access into read
-/// access permanently.
 pub fn validate_variable_request(
     req: &SyntheticsVariableRequest,
     env: Option<&str>,
@@ -462,17 +396,6 @@ pub fn validate_environment_request(req: &SyntheticsEnvironmentRequest) -> Resul
 }
 
 /// Rejects a write that would push a check past `MAX_VARIABLES`.
-///
-/// The cap has always been enforced at resolve time, which is too late to point
-/// at a cause: an unscoped variable merges into every check in the org, so one
-/// call that returned 200 breaks every check at its next scheduled run. This is
-/// the same arithmetic run before the write instead.
-///
-/// Compared rather than absolute, because an org can be pushed over the limit by
-/// an upgrade and must still be able to edit and delete its way back under. A
-/// check is refused when it gains an over-cap environment, or when its worst
-/// over-cap environment gets worse — so narrowing is always allowed and
-/// spreading never is.
 pub fn variable_cap_error(before: &OrgVariableState, after: &OrgVariableState) -> Option<String> {
     let was = over_cap_counts(before);
     let now = over_cap_counts(after);
@@ -499,12 +422,6 @@ pub fn variable_cap_error(before: &OrgVariableState, after: &OrgVariableState) -
 }
 
 /// Each check's resolved-set sizes that exceed the cap, one per environment.
-///
-/// Kept per environment rather than collapsed to the check's maximum: a check
-/// with one environment already over the cap would otherwise shield every other
-/// environment it targets, which could then climb to that same figure unnoticed.
-/// The tiers merge by name, so a name a check redefines resolves once — counting
-/// rows rather than names would refuse writes that are actually fine.
 fn over_cap_counts(state: &OrgVariableState) -> HashMap<String, Vec<usize>> {
     let mut over: HashMap<String, Vec<usize>> = HashMap::new();
     for check in &state.checks {

@@ -22,9 +22,6 @@ pub struct Model {
     pub id: String,
     pub org_id: String,
     /// `synthetics_environments.id`, or None for "every environment".
-    ///
-    /// A `kind = 'secret'` row can never be None — the table's CHECK constraint
-    /// enforces it, because the environment is a secret's access boundary.
     pub env: Option<String>,
     /// Stored upper-cased, so `{{base_url}}` and `{{BASE_URL}}` bind the same row.
     pub name: String,

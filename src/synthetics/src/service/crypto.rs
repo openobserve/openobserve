@@ -227,10 +227,6 @@ pub(crate) fn encrypt_secret(dek: &[u8], value: &str) -> anyhow::Result<String> 
 }
 
 /// Encrypts a value for storage, keeping an empty one empty.
-///
-/// "Unset" is stored as an empty column and read back as `has_value: false`.
-/// Encrypting an empty string yields a non-empty ciphertext, so routing it
-/// through [`encrypt_secret`] would make an unset secret report as set.
 pub(crate) fn store_value(dek: &[u8], value: &str) -> anyhow::Result<String> {
     if value.is_empty() {
         return Ok(String::new());

@@ -81,14 +81,6 @@ pub struct MoveSyntheticsRequestBody {
 // ── Environment access for checks ─────────────────────────────────────────────
 
 /// Refuses a check that pins itself to an environment the caller cannot use.
-///
-/// The only synthetics route whose authorization target is not in the path: a
-/// check's `environments` arrives in the request *body*, so route middleware has
-/// nothing to resolve. Without this, folder access alone would let someone aim a
-/// check at production credentials they may not read.
-///
-/// `GET` rather than a write verb — referencing an environment is using it, and
-/// the check's own `PUT` already covers editing the check.
 #[cfg(feature = "enterprise")]
 async fn require_env_access(
     org_id: &str,
@@ -107,12 +99,6 @@ async fn require_env_access(
 }
 
 /// Reconciles a check's environments on update against what the caller reaches.
-///
-/// Additions are validated; a stored environment the caller cannot reach is
-/// re-attached rather than treated as removed, because a body without it means a
-/// client that never rendered it far more often than a deliberate removal and the
-/// two are indistinguishable here. One the caller *can* reach stays removed —
-/// that omission is intent. Design §9.8.
 #[cfg(feature = "enterprise")]
 async fn reconcile_environments(
     org_id: &str,

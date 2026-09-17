@@ -1034,10 +1034,6 @@ pub struct AckResponse {
     #[serde(skip)]
     pub usage_events: Vec<UsageData>,
     /// Environments of this run that did not pass, worst first, by name.
-    ///
-    /// Empty for a check targeting no environment. Once a check runs against
-    /// staging and production together, "the check is failing" no longer tells
-    /// the reader whether production is affected.
     pub failing_environments: Vec<String>,
 }
 
@@ -1112,10 +1108,9 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     // check: with fan-out a check produces jobs for several environments at
     // once, so the check no longer knows which one this job is.
     let env_id = check.env.clone();
-    // Widened past the check's own fields: a check whose variables all live in
-    // the shared tier has an empty `variables` vec, and computing `needs_dek`
-    // without this skipped the whole decrypt block, so it resolved nothing at
-    // all and the probe typed empty strings into every field.
+    // Widened past the check's own fields: a check whose variables all live in the shared tier has
+    // an empty `variables` vec, and computing `needs_dek` without this skipped the whole decrypt
+    // block, so it resolved nothing at all and the probe typed empty strings into every field.
     let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
 
@@ -1191,12 +1186,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     }
 
     // Resolve a templated target before it leaves the control plane.
-    //
-    // Done here rather than in the probe so the probe receives a concrete URL:
-    // its SSRF guard then checks the address the check actually reaches, per
-    // environment, and an older probe needs no change to navigate correctly.
-    // An unbound placeholder stays literal, so the failure names itself in the
-    // navigation error rather than becoming a silent request to nowhere.
     synthetic.target = substitute_placeholders(&synthetic.target, &env_inject);
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
@@ -1318,13 +1307,6 @@ fn needs_dek(
 }
 
 /// The two variable tiers merged into what the probe receives.
-///
-/// Narrowest last: the shared tier goes in first so a name the check also
-/// defines overwrites it. Merging is per name rather than per set, so a check
-/// that overrides `BASE_URL` still inherits every other shared variable.
-///
-/// The cap is enforced here because here is the only place the resolved set
-/// exists — neither tier alone knows what the other contributes to this check.
 fn merge_variable_tiers(
     shared: Vec<(String, String)>,
     check_variables: &[SyntheticVariable],
@@ -1682,9 +1664,6 @@ pub(crate) async fn environment_display_name(org_id: &str, env_id: &str) -> Stri
 }
 
 /// Failing environment IDs for a run, mapped to the names a reader recognises.
-///
-/// A failure here costs the notification one detail, so it degrades to an empty
-/// list rather than failing the ack — the ack is what completes the run.
 async fn environment_names(org_id: &str, run_id: &str) -> Vec<String> {
     let conn = get_orm_client_rw().await;
     let ids = match synthetics_jobs::failing_environments(conn, run_id).await {

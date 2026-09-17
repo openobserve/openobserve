@@ -16,20 +16,6 @@
 import type { SyntheticsVariable } from "@/types/synthetics";
 
 /**
- * How a value renders in the list.
- *
- * A secret has no value to render - the server never sends one - so the column
- * carries presence instead. Returning a discriminated shape rather than a
- * pre-formatted string keeps the "never display a secret" rule in one place
- * instead of at every call site.
- */
-export type ValueDisplay = { kind: "secret"; isSet: boolean } | { kind: "plain"; isSet: boolean };
-
-export function valueDisplay(variable: SyntheticsVariable): ValueDisplay {
-  return { kind: variable.kind, isSet: variable.has_value ?? false };
-}
-
-/**
  * Relative time from a microsecond timestamp.
  *
  * Microseconds, not milliseconds: every synthetics timestamp on the wire is

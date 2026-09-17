@@ -327,13 +327,7 @@ pub async fn list_referencing_location<C: ConnectionTrait>(
     Ok(out)
 }
 
-/// How many checks in an org are pinned to each environment, keyed by
-/// environment id.
-///
-/// One pass over the org's settings blobs rather than one query per
-/// environment: the environments list needs every count at once, and JSON
-/// containment syntax differs across Postgres and SQLite. Same reasoning as
-/// `count_referencing_location`.
+/// How many checks in an org are pinned to each environment, keyed by environment id.
 pub async fn count_by_environment<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,

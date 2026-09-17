@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { SyntheticsVariable } from "@/types/synthetics";
-import { environmentDeleteBlock, filterVariables, relativeTime, valueDisplay } from "./usage";
+import { environmentDeleteBlock, filterVariables, relativeTime } from "./usage";
 
 function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
   return {
@@ -32,26 +32,6 @@ function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
     ...over,
   };
 }
-
-describe("valueDisplay", () => {
-  it("never carries a value, for either kind", () => {
-    // The guarantee the whole feature rests on: there is no value to render,
-    // because the server's read DTO has no value field to send.
-    const secret = valueDisplay(variable({ kind: "secret" }));
-    const plain = valueDisplay(variable({ kind: "plain" }));
-
-    expect(Object.keys(secret).sort()).toEqual(["isSet", "kind"]);
-    expect(Object.keys(plain).sort()).toEqual(["isSet", "kind"]);
-  });
-
-  it("reports presence, not content", () => {
-    expect(valueDisplay(variable({ has_value: false }))).toEqual({ kind: "plain", isSet: false });
-    expect(valueDisplay(variable({ kind: "secret", has_value: true }))).toEqual({
-      kind: "secret",
-      isSet: true,
-    });
-  });
-});
 
 describe("relativeTime", () => {
   // Every synthetics timestamp on the wire is now_micros(). Reading one as

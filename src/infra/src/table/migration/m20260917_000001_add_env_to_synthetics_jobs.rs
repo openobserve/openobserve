@@ -73,12 +73,9 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    /// One-way in practice: the recreated three-column key is unique, and the
-    /// jobs table keeps completed rows, so the first `CREATE UNIQUE INDEX`
-    /// fails as soon as any check has run against two environments. It fails on
-    /// the first statement and leaves nothing half-applied, and nothing calls
-    /// this path — `table::down` has no callers and there is no CLI command —
-    /// so it is written to be correct rather than made to succeed.
+    /// One-way in practice: the recreated three-column key is unique, and the jobs table keeps
+    /// completed rows, so the first `CREATE UNIQUE INDEX` fails as soon as any check has run
+    /// against two environments.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_index(create_old_dedup_uq()).await?;
         manager.drop_index(drop_dedup_idx(DEDUP_UQ)).await?;
@@ -94,10 +91,6 @@ impl MigrationTrait for Migration {
 }
 
 /// Drops a plain index by name, the way every other migration here does.
-///
-/// `if_exists` is deliberately absent: sea-query panics on it for MySQL, and
-/// both keys are created unconditionally — the old one by
-/// `m20260707_000003_create_synthetics_jobs`, the new one just above.
 fn drop_dedup_idx(name: &str) -> IndexDropStatement {
     sea_query::Index::drop()
         .name(name)
@@ -167,10 +160,6 @@ mod tests {
     }
 
     /// The statements are only half the migration; this runs it.
-    ///
-    /// Without it, swapping the two index constants at the call sites in `up()`
-    /// leaves every string assertion above green while production keeps the
-    /// three-column key — and every fan-out insert then fails.
     #[tokio::test]
     async fn up_swaps_the_key_so_two_environments_are_two_jobs() {
         use sea_orm::Database;

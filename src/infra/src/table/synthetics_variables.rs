@@ -41,16 +41,6 @@ pub const KIND_SECRET: &str = "secret";
 pub const KIND_PLAIN: &str = "plain";
 
 /// `org_id` → every shared variable in the org, with the time it was loaded.
-///
-/// `resolve` reads this set once per job, on the busiest endpoint the feature
-/// has, and a variable changes only when someone edits one. The whole org is
-/// cached rather than one entry per `(org, env)`: an environment filter is a
-/// predicate over the same rows, so splitting the key would multiply entries
-/// and give invalidation more places to miss.
-///
-/// The TTL only covers a write made on a *different* node; every write path here
-/// invalidates eagerly and publishes to the rest of the cluster. Without that, a
-/// rotated password appears to do nothing for as long as the TTL.
 static VARIABLE_CACHE: LazyLock<RwHashMap<String, (Vec<SyntheticsVariableRecord>, Instant)>> =
     LazyLock::new(Default::default);
 
@@ -99,10 +89,6 @@ impl SyntheticsVariableRecord {
     }
 
     /// The read projection, given the plaintext for a plain variable.
-    ///
-    /// `plain_value` is `None` for a secret, and for a plain row whose
-    /// ciphertext would not decrypt. Decryption happens in the service, which
-    /// owns the org DEK; this layer holds no key and must not grow one.
     pub fn to_view(&self, plain_value: Option<String>) -> SyntheticsVariableView {
         SyntheticsVariableView {
             id: self.id.clone(),
@@ -136,9 +122,6 @@ pub fn invalidate_cache(org_id: &str) {
 }
 
 /// Every shared variable in an org, served from [`VARIABLE_CACHE`] when fresh.
-///
-/// Callers filter by environment themselves; the set is bounded by the
-/// resolved-variable cap, so filtering in memory costs less than a second key.
 pub async fn list_cached<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -193,11 +176,6 @@ pub async fn add<C: ConnectionTrait>(
 }
 
 /// Inserts a variable without touching the cache.
-///
-/// What transactional callers use. [`add`] publishes a cluster-wide
-/// invalidation, and doing that inside a transaction is wrong twice: it fires
-/// once per row, and it announces a change that has not been committed and may
-/// yet roll back. Callers publish once, after the commit.
 pub async fn insert_row<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
@@ -226,10 +204,6 @@ pub async fn insert_row<C: ConnectionTrait>(
 }
 
 /// Overwrites the mutable fields of one variable.
-///
-/// `env` is not among them: moving a variable between scopes changes which
-/// OpenFGA object governs it, so it is its own operation with its own
-/// permission check rather than a field on a save.
 pub async fn update<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
@@ -263,12 +237,6 @@ pub async fn update<C: ConnectionTrait>(
 }
 
 /// Moves one variable to a different scope.
-///
-/// Separate from [`update`] on purpose: `env` decides which OpenFGA object
-/// governs the row, so changing it is a permission-relevant operation with its
-/// own checks on both the scope being left and the one being entered. Folding
-/// it into the ordinary save would let a field on a form change who can read a
-/// credential.
 pub async fn set_env<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -293,11 +261,9 @@ pub async fn set_env<C: ConnectionTrait>(
             Ok(true)
         }
         Err(e) => match e.sql_err() {
-            Some(SqlErr::UniqueConstraintViolation(_)) => {
-                Err(Error::DbError(DbError::SeaORMError(
-                    "a variable with that name already exists in the destination scope".to_string(),
-                )))
-            }
+            Some(SqlErr::UniqueConstraintViolation(_)) => Err(Error::Message(
+                "a variable with that name already exists in the destination scope".to_string(),
+            )),
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
         },
     }
@@ -314,11 +280,6 @@ pub async fn delete<C: ConnectionTrait>(
 }
 
 /// Writes a row exactly as another region has it, creating or replacing by id.
-///
-/// The super-cluster applier's entry point, and the reason it is here rather
-/// than in the service layer: a replicated write must not re-run validation,
-/// the reserved-prefix rule or the resolved-set cap. A region that refused a
-/// row the origin accepted would diverge with nobody told.
 pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
@@ -382,10 +343,6 @@ pub async fn delete_by_env<C: ConnectionTrait>(
 }
 
 /// Invalidates locally **and** tells every other node.
-///
-/// A failed emit is logged rather than propagated: the write has committed, and
-/// the cache TTL is the backstop. Failing a save because a cache hint did not
-/// send would be the worse trade.
 pub async fn invalidate_and_publish(org_id: &str) {
     invalidate_cache(org_id);
     if let Err(e) = crate::coordinator::synthetics::emit_variables_changed(org_id).await {
@@ -393,10 +350,9 @@ pub async fn invalidate_and_publish(org_id: &str) {
     }
 }
 
+/// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
-    Error::DbError(DbError::SeaORMError(format!(
-        "variable '{name}' already exists in this scope"
-    )))
+    Error::Message(format!("variable '{name}' already exists in this scope"))
 }
 
 #[cfg(test)]

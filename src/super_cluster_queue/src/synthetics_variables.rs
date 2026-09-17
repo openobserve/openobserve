@@ -143,10 +143,6 @@ fn environment_record(payload: SyntheticsEnvironmentPayload) -> SyntheticsEnviro
 }
 
 /// The wire payload with its plaintext value encrypted under this region's key.
-///
-/// An empty value stays empty: "unset" is stored as an empty column and read
-/// back as `has_value: false`, so encrypting it would report an unset secret as
-/// set.
 async fn variable_record(
     org_id: &str,
     payload: SyntheticsVariablePayload,

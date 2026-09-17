@@ -489,13 +489,9 @@ pub async fn run() {
                     .collect()
             };
 
-            // Built eagerly rather than as a lazy chain: the loop body awaits,
-            // and a closure capturing the borrow across those awaits does not
-            // satisfy the higher-ranked bound the async block needs.
-            //
-            // The gate runs per (environment, location) because that is what an
-            // enqueued job is: a check on three environments dispatches three
-            // times the work and reserves three times the grant.
+            // Built eagerly rather than as a lazy chain: the loop body awaits, and a closure
+            // capturing the borrow across those awaits does not satisfy the higher-ranked bound the
+            // async block needs.
             let mut fanout: Vec<(Option<&str>, &String)> = Vec::new();
             for env in &environments {
                 for location in &synthetic.locations {

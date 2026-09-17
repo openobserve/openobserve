@@ -159,17 +159,6 @@ pub fn dead_letter_reason(
 pub(crate) const DEDUP_UQ: &str = "synthetics_jobs_dedup_env_uq";
 
 /// The dedup key, with `env` COALESCEd.
-///
-/// Raw SQL because it indexes an expression, which the sea-orm builder
-/// cannot express. It lives here rather than in the migration that first
-/// created it, because it and `enqueue`'s `ON CONFLICT` above must agree
-/// forever, and one file is where that stays visible.
-///
-/// Same reason as `synthetics_variables`: PostgreSQL and SQLite both treat
-/// NULLs as distinct inside a unique index, and an unscoped job has `env` NULL.
-/// Without the COALESCE the key would stop deduplicating exactly the jobs it
-/// exists to deduplicate — every check that targets no environment, which is
-/// every check that exists today.
 pub(crate) fn dedup_index_sql(backend: DatabaseBackend) -> String {
     match backend {
         DatabaseBackend::Postgres | DatabaseBackend::Sqlite => format!(
@@ -834,15 +823,6 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
 }
 
 /// Environments of a run that did not pass, worst first.
-///
-/// Once a check fans out, "the check is failing" stops being enough: with
-/// staging and production on one check the reader needs to know which one broke
-/// before deciding whether to get out of bed. An unscoped job contributes
-/// nothing here — it has no environment to name — which is why this can be
-/// empty on a perfectly ordinary failing run.
-///
-/// Returns environment IDs; the caller maps them to names, because that lookup
-/// belongs to the layer that already reads the environments table.
 pub async fn failing_environments<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,

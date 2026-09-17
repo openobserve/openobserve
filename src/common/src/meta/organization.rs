@@ -540,14 +540,7 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
-    /// Let replay auto-fill shared synthetics secrets for users who may write
-    /// them. **Off by default, and deliberately so.**
-    ///
-    /// Every other path treats a shared secret as write-only. This one hands
-    /// the plaintext to a browser, which is a read capability nothing else in
-    /// the product grants — so it is opt-in per org, still requires write
-    /// permission on the environment that governs the secret, and every release
-    /// is audited. Leaving it off costs an author one prompt per session.
+    /// Let replay auto-fill shared synthetics secrets for users who may write them.
     #[serde(default)]
     pub synthetics_replay_autofill: bool,
 }

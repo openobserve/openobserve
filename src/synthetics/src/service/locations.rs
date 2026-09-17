@@ -682,10 +682,6 @@ pub(crate) async fn validate_against_capabilities(
 }
 
 /// Refuses a check whose environments would push its resolved set past the cap.
-///
-/// The same gate `create_variable` runs, from the other side: a check gains an
-/// environment's shared rows the moment it targets one, so pointing an existing
-/// check at a new environment can overflow it without any variable being written.
 async fn validate_variable_cap(
     org_id: &str,
     check_id: &str,
