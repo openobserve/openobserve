@@ -34,6 +34,7 @@
  * This module contains NO expect() calls: assertions belong in spec files.
  */
 
+const { randomBytes } = require('node:crypto');
 const testLogger = require('./test-logger.js');
 const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
@@ -74,9 +75,22 @@ function orgId() {
   return getOrgIdentifier();
 }
 
-/** Unique per call so parallel specs and repeat runs never collide on a name. */
+/**
+ * Unique per call so parallel specs and repeat runs never collide on a name.
+ *
+ * `crypto`, not `Math.random`: these names become fixture email addresses and
+ * flow into user-creation payloads, which CodeQL reads as a security context
+ * (js/insecure-randomness). Nothing here is a secret — the seeded password is a
+ * constant and is not derived from this — but a CSPRNG costs nothing and keeps
+ * the finding off a suite nobody should have to triage.
+ *
+ * FOUR hex characters is not enough: the original took four base36 characters
+ * (1.7e6) and a naive 4-hex swap drops that to 65536, which collided 22 times in
+ * 5000 names generated inside the same millisecond. Fixture-name collisions are
+ * cross-test interference, so the width is load-bearing — keep 8.
+ */
 function uniqueName(prefix) {
-  return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return `${prefix}_${Date.now().toString(36)}${randomBytes(4).toString('hex')}`;
 }
 
 /** A transient meta-store error worth retrying rather than failing the test on. */

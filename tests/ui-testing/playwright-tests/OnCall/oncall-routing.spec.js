@@ -36,6 +36,7 @@
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const { randomBytes } = require('node:crypto');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const {
@@ -519,7 +520,9 @@ test.describe('On-call routing rules', {
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_valid`);
     const team = await createTeam(page, { name });
-    const unique = () => `${name}_${Math.random().toString(36).slice(2, 8)}`;
+    // crypto, not Math.random — see uniqueName in oncall-seed.js; these become
+    // fixture identifiers and CodeQL flags the weak generator as a security sink.
+    const unique = () => `${name}_${randomBytes(4).toString('hex')}`;
 
     const attempt = async (body) => await createOwnershipRuleExpectingStatus(page, body);
 
