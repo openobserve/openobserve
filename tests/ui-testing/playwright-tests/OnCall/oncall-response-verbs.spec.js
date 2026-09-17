@@ -56,6 +56,7 @@ const {
 const {
   createOrgUsers,
   createOrgUser,
+  nonAdminRolesAvailable,
   oncallUserEmail,
   shortenPolicyForSpeed,
   acknowledgeResponse,
@@ -429,6 +430,12 @@ test.describe('On-call response verbs', {
   }, async ({ browser, page }, testInfo) => {
     const f = await seedOpenPage(page, testInfo, 'viewer', { delaysSeconds: [0, 600] });
     const id = f.record.id;
+
+    test.skip(
+      !(await nonAdminRolesAvailable(page)),
+      'this deployment refuses non-admin roles (OpenFGA is off in the Playwright CI lane), '
+      + 'so a viewer cannot be created here; the RBAC contract itself is covered by the API suite',
+    );
 
     const viewerEmail = oncallUserEmail(uniqueName(`${workerPrefix(testInfo)}_v`), 'viewer');
     const viewer = await createOrgUser(page, { email: viewerEmail, role: 'viewer' });

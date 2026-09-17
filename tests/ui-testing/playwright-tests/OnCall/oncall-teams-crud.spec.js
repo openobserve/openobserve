@@ -253,7 +253,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
    * filter on this screen and is not one — a spec that treated it as one would
    * pass on an empty list forever.
    */
-  test('the policies button leaves the teams list for the policies screen', {
+  test.fixme('the policies button leaves the teams list for the policies screen — not wired: the button was deleted in f6ad43986f (#14502) and nothing replaced it; the oncall/policies route still registers and renders but no component links to it, so the screen is reachable only by typing the URL. o2-enterprise#2481', {
     tag: ['@P2'],
   }, async ({ page }) => {
     await pm.oncallTeamsPage.goto(ORG);

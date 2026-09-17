@@ -136,6 +136,31 @@ async function createOrgUsers(page, prefix, count, { role = 'admin' } = {}) {
   return users.map((u) => u.email);
 }
 
+
+let _nonAdminRoles = null;
+
+/**
+ * Whether this deployment will accept a non-admin role at all.
+ *
+ * Creating one answers `400 "Non-admin roles require open-fga enabled"` where
+ * OpenFGA is off, which is the case in the Playwright CI lane — `playwright.yml`
+ * keeps `O2_OPENFGA_ENABLED` commented out with a TODO about starting the
+ * container. The API lane does enable it, so the RBAC contract is covered there;
+ * what is skipped here is only the UI's rendering of it. Probed once per worker.
+ */
+async function nonAdminRolesAvailable(page) {
+  if (_nonAdminRoles !== null) return _nonAdminRoles;
+  const email = oncallUserEmail(`rbacprobe_${Date.now().toString(36)}`, 'viewer');
+  const { status, text } = await call(page, 'post', '/users', {
+    email, password: SEED_USER_PASSWORD, first_name: 'RBAC', last_name: 'Probe',
+    role: 'viewer', organization: orgId(),
+  });
+  _nonAdminRoles = status === 200 || /already exist/i.test(text || '');
+  if (_nonAdminRoles) await deleteOrgUser(page, email);
+  testLogger.info('Non-admin roles probe', { available: _nonAdminRoles, status });
+  return _nonAdminRoles;
+}
+
 /** Best-effort: teardown must never mask a test result. */
 async function deleteOrgUser(page, email) {
   await call(page, 'delete', `/users/${encodeURIComponent(email)}`).catch(() => null);
@@ -615,6 +640,7 @@ module.exports = {
   SEED_MAIL_DOMAIN,
   RESOLUTION_CAUSES,
   oncallUserEmail,
+  nonAdminRolesAvailable,
   createOrgUser,
   createOrgUsers,
   deleteOrgUser,
