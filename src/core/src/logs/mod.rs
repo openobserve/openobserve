@@ -50,11 +50,13 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema, write_file,
+        PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
+        schema_records_to_entries, write_entries,
     },
 };
 
 pub mod bulk;
+pub mod columnar;
 pub mod hec;
 pub mod ingest;
 pub mod loki;
@@ -204,6 +206,7 @@ async fn write_logs_by_stream(
     json_data_by_stream: HashMap<String, IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
+    mut columnar: Option<columnar::JsonColumnar>,
 ) -> Result<bool> {
     let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
@@ -251,6 +254,7 @@ async fn write_logs_by_stream(
             &stream_name,
             status,
             json_data,
+            columnar.take_if(|c| c.stream_name() == stream_name),
             derived_streams.contains(&stream_name),
         )
         .await?;
@@ -311,6 +315,7 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    columnar: Option<columnar::JsonColumnar>,
     is_derived: bool,
 ) -> Result<RequestStats> {
     let cfg = get_config();
@@ -538,14 +543,16 @@ async fn write_logs(
         }
     }
 
-    // write data to wal
+    let mut entries = schema_records_to_entries(org_id, stream_name, write_buf);
+    if let Some(columnar) = columnar {
+        entries.extend(columnar_entries(org_id, status, columnar)?);
+    }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
-    let req_stats = write_file(
+    let req_stats = write_entries(
         &writer,
-        org_id,
         stream_name,
-        write_buf,
+        entries,
         !cfg.common.wal_fsync_disabled,
     )
     .await?;
@@ -556,6 +563,17 @@ async fn write_logs(
     }
 
     Ok(req_stats)
+}
+
+fn columnar_entries(
+    org_id: &str,
+    status: &mut IngestionStatus,
+    columnar: columnar::JsonColumnar,
+) -> Result<Vec<ingester::Entry>> {
+    if let IngestionStatus::Record(status) = status {
+        status.successful += columnar.rows() as u32;
+    }
+    columnar.into_entries(org_id)
 }
 
 async fn ingestion_log_enabled() -> bool {
@@ -584,12 +602,30 @@ fn handle_timestamp_for_map(
     min_ts: i64,
     max_ts: i64,
 ) -> Result<i64, anyhow::Error> {
-    let (mut timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
-        Some(v) if !v.is_null() => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
-        _ => (0, false),
+    let parsed = val
+        .get(TIMESTAMP_COL_NAME)
+        .filter(|v| !v.is_null())
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, rewrite) = resolve_timestamp(parsed, min_ts, max_ts)?;
+    if rewrite {
+        val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            Value::Number(timestamp.into()),
+        );
+    }
+    Ok(timestamp)
+}
+
+/// A record's timestamp from its parsed non-null `_timestamp`, and whether it must be rewritten.
+fn resolve_timestamp(
+    parsed: Option<Result<(i64, bool), anyhow::Error>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<(i64, bool), anyhow::Error> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(Ok(t)) => t,
+        Some(Err(_)) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+        None => (0, false),
     };
     // check ingestion time
     if timestamp > 0 && timestamp < min_ts {
@@ -598,18 +634,15 @@ fn handle_timestamp_for_map(
     if timestamp > max_ts {
         return Err(get_future_discard_error());
     }
-    if !has_valid_timestamp {
-        timestamp = if timestamp > 0 {
-            timestamp
-        } else {
-            Utc::now().timestamp_micros()
-        };
-        val.insert(
-            TIMESTAMP_COL_NAME.to_string(),
-            Value::Number(timestamp.into()),
-        );
+    if has_valid_timestamp {
+        return Ok((timestamp, false));
     }
-    Ok(timestamp)
+    let timestamp = if timestamp > 0 {
+        timestamp
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    Ok((timestamp, true))
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {
