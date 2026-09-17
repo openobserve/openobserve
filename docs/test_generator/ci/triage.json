@@ -1,0 +1,31 @@
+{
+  "feature_slug": "anomaly-detection-sensitivity",
+  "feature_title": "Anomaly Detection Sensitivity Labeling",
+  "area": "Alerts",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "alerts-anomaly-detection.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue",
+    "web/src/components/anomaly_detection/AnomalyDataPreview.vue",
+    "web/src/components/common/IacRegistryLinks.vue",
+    "web/src/components/alerts/AlertList.vue",
+    "web/src/views/slos/SloList.vue",
+    "web/src/utils/alerts/anomalySqlBuilder.ts",
+    "web/src/lib/core/Button/OButton.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 32 changed paths live under web/src/** (anomaly_detection, alerts, common, lib/core/Button, views/slos), tests/ui-testing/playwright-tests/Alerts, and scripts/translations + web/src/locales. None are under enterprise/, o2_enterprise/, or src/enterprise/, and the paths carry none of the enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management). The anomaly-detection backend does live in o2_enterprise/src/enterprise/anomaly_detection, but this diff touches only the shared OSS frontend/test trees, not that backend, so edition=oss.",
+    "skip": "Not skipping: trigger_comment.txt and feature_hint.txt are empty (no tests-added label or skip request), and the change is user-facing — it edits frontend components under web/src. A Playwright E2E spec is modified in the diff, which is not an auto-skip; it instead sets existing_tests_in_diff=true and routes to enhance.",
+    "e2e": "Warranted: the diff changes user-exercisable UI in the anomaly-detection alert config — the sensitivity hint reworded from 'p97' to an interpolated '97%'/'99%', the 'Percentile' label renamed to 'Level' with a new info tooltip, a new Detection Function tooltip, a new caption under the preview chart, and IacRegistryLinks now rendered as visible outline buttons. These flows need browser verification.",
+    "area": "Alerts — the bulk of the UI changes are in the anomaly-detection alert config (web/src/components/anomaly_detection/**), and the existing spec lives in tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js, so Alerts is where the sibling specs live.",
+    "group": "Alerts — the modified spec alerts-anomaly-detection.spec.js is registered to the Alerts shard (it appears under append.Alerts in tests/ui-testing/ci-matrix/ci_matrix.ent.json, joined to the OSS Alerts group), so new or updated cases belong in that run_files shard.",
+    "existing_tests": "The diff modifies tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js — a real Playwright E2E spec — adding coverage for the interpolated sensitivity hint (97%/99%). It covers the new hint behavior but not the new tooltips, preview caption, or IacRegistryLinks button-label changes. The many web/src/**/*.spec.ts files are Vitest unit tests and do not count as E2E coverage."
+  }
+}

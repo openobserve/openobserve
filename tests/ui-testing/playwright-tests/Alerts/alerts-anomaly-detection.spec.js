@@ -259,6 +259,24 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.setSensitivityPercentile(49);
       await expect(pm.anomalyDetectionPage.getSensitivityHintLocator()).toBeHidden();
     });
+
+    test('the percentile control is labeled Level and disowns the detection-function meaning', {
+      tag: ['@anomaly', '@P0', '@smoke', '@all'],
+    }, async () => {
+      const label = pm.anomalyDetectionPage.getSensitivityPercentileLabelLocator();
+      await expect(label).toBeVisible();
+      await expect(label).toHaveText('Level');
+      await expect(label).not.toContainText('Percentile');
+
+      const info = pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator();
+      await expect(info).toBeVisible();
+
+      await info.hover();
+      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText('confidence');
+      await expect(tooltip).toContainText('Detection Function');
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -322,6 +340,20 @@ test.describe('Anomaly Detection', () => {
       await pm.anomalyDetectionPage.selectQueryMode('custom_sql');
       await expect(pm.anomalyDetectionPage.getSqlPreviewLocator()).toBeHidden();
     });
+
+    test('the Detection Function label explains p50/p95/p99 measure a field, not sensitivity', {
+      tag: ['@anomaly', '@P2', '@functional', '@all'],
+    }, async () => {
+      const info = pm.anomalyDetectionPage.getDetectionFunctionInfoLocator();
+      await expect(info).toBeVisible();
+
+      await info.hover();
+      const tooltip = pm.anomalyDetectionPage.getTooltipContentLocator();
+      await expect(tooltip).toBeVisible();
+      await expect(tooltip).toContainText('p95');
+      await expect(tooltip).toContainText('field');
+      await expect(tooltip).not.toContainText('sensitivity');
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════════
@@ -357,6 +389,23 @@ test.describe('Anomaly Detection', () => {
       // canPreview goes false, which blocks the query but must not tear the
       // chart down — the empty state means "nothing to preview", not "invalid".
       await expect(pm.anomalyDetectionPage.getDataPreviewChartLocator()).toBeVisible();
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('the preview caption appears once a stream is chosen and points at Detection results', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async () => {
+      await pm.anomalyDetectionPage.openAddAnomalyWizard();
+      // The empty state is the "nothing to preview" hint, never a caption.
+      await expect(pm.anomalyDetectionPage.getDataPreviewCaptionLocator()).toBeHidden();
+
+      await pm.anomalyDetectionPage.fillBasicSetup(anomalyName('caption'), 'logs', testStreamName);
+      await pm.anomalyDetectionPage.waitForDataPreview();
+
+      const caption = pm.anomalyDetectionPage.getDataPreviewCaptionLocator();
+      await expect(caption).toBeVisible();
+      await expect(caption).toContainText('Detection results');
 
       await pm.anomalyDetectionPage.cancel();
     });
@@ -1103,6 +1152,20 @@ test.describe('Anomaly Detection', () => {
 
       expect(await pm.anomalyDetectionPage.getBudgetCount()).toBe('1');
       expect(await pm.anomalyDetectionPage.getBudgetPeriod()).toBe('day');
+
+      await pm.anomalyDetectionPage.cancel();
+    });
+
+    test('budget mode does not render the percentile info tooltip', {
+      tag: ['@anomaly', '@P1', '@functional', '@all'],
+    }, async ({ page }) => {
+      const name = await ownConfig(page, 'budgetinfo', 4);
+      await pm.anomalyDetectionPage.openEdit(name);
+      await pm.anomalyDetectionPage.openConfigTab();
+
+      // The Level label + its info icon belong to percentile mode only.
+      await expect(pm.anomalyDetectionPage.getBudgetTiersLocator()).toBeVisible();
+      await expect(pm.anomalyDetectionPage.getSensitivityPercentileInfoLocator()).toBeHidden();
 
       await pm.anomalyDetectionPage.cancel();
     });
