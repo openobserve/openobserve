@@ -500,6 +500,7 @@ impl LlmScoreRecord {
         }
     }
 
+    /// Infer the flattened `_llm_scores` Arrow schema used to initialize the stream.
     pub fn schema_for_reflection() -> anyhow::Result<arrow_schema::Schema> {
         let sample = crate::utils::json::to_value(Self::init_for_reflection())?;
         // Match log ingestion by flattening before schema inference.
