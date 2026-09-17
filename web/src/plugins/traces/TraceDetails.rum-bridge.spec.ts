@@ -74,6 +74,42 @@ function makeDetailsResponse(rootParentId: string) {
   return { hits, new_start_time: WIDE_NEW_START_US, new_end_time: WIDE_NEW_END_US };
 }
 
+const STUBS = {
+  "chart-renderer": {
+    template: '<div data-test="chart-renderer">Chart</div>',
+    props: ["data", "id"],
+    emits: ["updated:chart"],
+  },
+  "trace-tree": {
+    template: '<div data-test="trace-tree">Trace Tree</div>',
+    props: [
+      "collapseMapping",
+      "spans",
+      "baseTracePosition",
+      "spanDimensions",
+      "spanMap",
+      "leftWidth",
+      "searchQuery",
+      "spanList",
+    ],
+    emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
+    methods: {
+      nextMatch: vi.fn(),
+      prevMatch: vi.fn(),
+    },
+  },
+  "trace-header": {
+    template: '<div data-test="trace-header">Trace Header</div>',
+    props: ["baseTracePosition", "splitterWidth"],
+    emits: ["resize-start"],
+  },
+  "trace-details-sidebar": {
+    template: '<div data-test="trace-details-sidebar">Sidebar</div>',
+    props: ["span", "baseTracePosition", "searchQuery"],
+    emits: ["view-logs", "close", "open-trace"],
+  },
+};
+
 describe("TraceDetails - RUM bridge gate and windows", () => {
   let wrapper: any;
   let rumRequests: any[];
@@ -98,49 +134,17 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
       ),
     );
 
+    return mountTraceDetails({ traceId: "test-trace-id" });
+  }
+
+  function mountTraceDetails(props: Record<string, unknown>) {
     return mount(TraceDetails, {
       attachTo: "#app",
-      props: {
-        traceId: "test-trace-id",
-      },
+      props,
       global: {
         plugins: [i18n, router],
         provide: { store },
-        stubs: {
-          "chart-renderer": {
-            template: '<div data-test="chart-renderer">Chart</div>',
-            props: ["data", "id"],
-            emits: ["updated:chart"],
-          },
-          "trace-tree": {
-            template: '<div data-test="trace-tree">Trace Tree</div>',
-            props: [
-              "collapseMapping",
-              "spans",
-              "baseTracePosition",
-              "spanDimensions",
-              "spanMap",
-              "leftWidth",
-              "searchQuery",
-              "spanList",
-            ],
-            emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
-            methods: {
-              nextMatch: vi.fn(),
-              prevMatch: vi.fn(),
-            },
-          },
-          "trace-header": {
-            template: '<div data-test="trace-header">Trace Header</div>',
-            props: ["baseTracePosition", "splitterWidth"],
-            emits: ["resize-start"],
-          },
-          "trace-details-sidebar": {
-            template: '<div data-test="trace-details-sidebar">Sidebar</div>',
-            props: ["span", "baseTracePosition", "searchQuery"],
-            emits: ["view-logs", "close", "open-trace"],
-          },
-        },
+        stubs: STUBS,
       },
     });
   }
@@ -194,5 +198,43 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     expect(rumRequests).toHaveLength(1);
     expect(rumRequests[0].start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
     expect(rumRequests[0].end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+  });
+
+  it("derives the header trace window from the spans with a usable pair of timestamps", async () => {
+    const consoleSpy = vi.spyOn(console, "error");
+    const details = makeDetailsResponse("");
+    // The earliest-starting span has no end, so it must not lower the header start.
+    details.hits[0].end_time = "";
+    wrapper = mountWithDetails(details);
+    await flushPromises();
+
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBe(3), { timeout: 5000 });
+    await flushPromises();
+
+    const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
+    expect(selected.trace_start_time).toBe(TRACE_START_US + 100_000);
+    expect(selected.trace_end_time).toBe(TRACE_END_US - 100_000);
+    expect(consoleSpy).not.toHaveBeenCalled();
+  });
+
+  it("floors the start and ceils the end of the embedded header window", async () => {
+    // +512 ns is exact in a double at this magnitude (granularity 256); +999 would round to +1024.
+    wrapper = mountTraceDetails({
+      mode: "embedded",
+      traceIdProp: "test-trace-id",
+      streamNameProp: "test-stream",
+      spanListProp: [
+        {
+          ...makeDetailsResponse("").hits[0],
+          start_time: TRACE_START_NS + 512,
+          end_time: TRACE_END_NS + 512,
+        },
+      ],
+    });
+    await flushPromises();
+
+    const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
+    expect(selected.trace_start_time).toBe(TRACE_START_US);
+    expect(selected.trace_end_time).toBe(TRACE_END_US + 1);
   });
 });

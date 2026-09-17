@@ -587,6 +587,38 @@ describe("useRumSpanBuilder", () => {
       expect(Number.isInteger(query.start_time)).toBe(true);
       expect(Number.isInteger(query.end_time)).toBe(true);
     });
+
+    it("should skip a span with a blank-string end_time whole when deriving the window", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan(),
+        makeTraceSpan({
+          span_id: "span-blank-end",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS - 500_000_000,
+          end_time: "",
+        }),
+      ]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+    });
+
+    it("should not search _rumdata when every span is malformed even with a dangling parent", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ start_time: "", end_time: TRACE_END_NS }),
+        makeTraceSpan({ span_id: "span-b", start_time: TRACE_START_NS, end_time: undefined }),
+      ]);
+
+      expect(searchCalls("_rumdata")).toHaveLength(0);
+      expect(result.tracedResources).toEqual([]);
+    });
   });
 
   // =========================================================================

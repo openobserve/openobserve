@@ -27,6 +27,7 @@ import {
   traceIdLookupVariants,
 } from "@/utils/rum/fields";
 import { SPAN_KIND_CLIENT, SPAN_KIND_UNSPECIFIED } from "@/utils/traces/constants";
+import { spanWindowUs } from "@/utils/traces/spanWindow";
 import { sqlIn } from "@/utils/query/sqlFilterBuilder";
 
 const ACTION_PROXIMITY_MS = 10_000; // ±10s — actions beyond this are collapsed
@@ -163,28 +164,6 @@ export default function useRumSpanBuilder(
     return false;
   };
 
-  // Number("") is 0, so an empty string must not be read as a valid timestamp.
-  const toFiniteNumber = (value: unknown): number | null => {
-    if (typeof value === "string" && value.trim() === "") return null;
-    const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
-    return Number.isFinite(parsed) ? parsed : null;
-  };
-
-  // The details call returns up to 50 000 spans, so the window is folded rather than spread.
-  const deriveTraceWindowUs = (spans: any[]): { start: number; end: number } | null => {
-    let startNs = Infinity;
-    let endNs = -Infinity;
-    for (const span of spans) {
-      const start = toFiniteNumber(span?.start_time);
-      const end = toFiniteNumber(span?.end_time);
-      if (start === null || end === null) continue;
-      if (start < startNs) startNs = start;
-      if (end > endNs) endNs = end;
-    }
-    if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
-    return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
-  };
-
   const parseActionIds = (actionId: unknown): string[] => {
     if (typeof actionId !== "string" || !actionId) return [];
     try {
@@ -212,7 +191,7 @@ export default function useRumSpanBuilder(
         return empty;
       }
       if (!hasDanglingParent(spans)) return empty;
-      const traceWindow = deriveTraceWindowUs(spans);
+      const traceWindow = spanWindowUs(spans);
       if (!traceWindow) return empty;
 
       const rumStream = await getStream("_rumdata", "logs", true);
