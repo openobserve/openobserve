@@ -39,13 +39,19 @@ impl MigrationTrait for Migration {
         manager
             .drop_index(
                 Index::drop()
+                    .if_exists()
                     .name(EMAIL_CREATED_AT_IDX)
                     .table(UserPasswordHistory::Table)
                     .to_owned(),
             )
             .await?;
         manager
-            .drop_table(Table::drop().table(UserPasswordHistory::Table).to_owned())
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(UserPasswordHistory::Table)
+                    .to_owned(),
+            )
             .await
     }
 }
@@ -108,6 +114,7 @@ fn create_table_statement() -> TableCreateStatement {
 /// separate single-column index on `email` is needed.
 fn create_email_created_at_index() -> IndexCreateStatement {
     Index::create()
+        .if_not_exists()
         .name(EMAIL_CREATED_AT_IDX)
         .table(UserPasswordHistory::Table)
         .col(UserPasswordHistory::Email)
