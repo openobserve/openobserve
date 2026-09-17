@@ -436,22 +436,24 @@ test.describe('On-call page lifecycle', {
     // it because it installs a prebuilt frontend artifact. Anything else, including
     // a 404 raised by an on-call route's own API, still fails this test: those are
     // collected separately in `notFound` and asserted above.
-    const sharedShellAsset = (text) =>
-      /Failed to load resource/.test(text) && shellAsset404.some((u) => u.includes('/web/src/assets/'));
-    const shellAsset404 = [];
-    page.on('response', (r) => {
-      if (r.status() === 404 && r.url().includes('/web/src/assets/')) shellAsset404.push(r.url());
-    });
+    // The failing message's OWN location decides this, never a sighting of some
+    // other shell 404 elsewhere on the page — that suppresses every resource
+    // error on the route the moment one logo 404s.
+    const sharedShellAsset = (message) =>
+      /Failed to load resource/.test(message.text())
+      && (message.location()?.url ?? '').includes('/web/src/assets/');
 
     page.on('console', (message) => {
       const text = message.text();
-      if (message.type() === 'error' && !sharedShellAsset(text)) consoleErrors.push(text);
+      if (message.type() === 'error' && !sharedShellAsset(message)) consoleErrors.push(text);
       if (/\[Vue warn\]/.test(text)) vueWarnings.push(text);
     });
     page.on('pageerror', (error) => consoleErrors.push(`uncaught: ${error.message}`));
+    let apiCallsHere = 0;
     page.on('response', (response) => {
       const url = response.url();
-      if (!/\/oncall\//.test(url)) return;
+      if (!/\/api\/.*\/oncall\//.test(url)) return;
+      apiCallsHere += 1;
       if (response.status() === 404) notFound.push(`${response.status()} ${url}`);
       // G24: the Pages list once called a count endpoint that does not exist,
       // 404ing on every single load without anybody noticing.
@@ -468,18 +470,27 @@ test.describe('On-call page lifecycle', {
       `/web/oncall/routing?org_identifier=${ORG}`,
     ];
 
+    // ANCHOR FIRST. Every assertion below is an absence, and a route that drew
+    // nothing and called nothing satisfies all four — "no 404" is free if there
+    // was no request. Each route must be shown to have reached its own API
+    // before its silence counts as evidence.
+    const silent = [];
     for (const route of routes) {
+      apiCallsHere = 0;
       await page.goto(route);
       await page.waitForLoadState('domcontentloaded');
       // Give the screen's own fetches time to land — a 404 that arrives after
       // the assertion is a 404 nobody catches, which is exactly how G24 lived.
       await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+      if (apiCallsHere === 0) silent.push(route);
     }
 
     testLogger.info('TS-29.07 hygiene sweep', {
-      routes: routes.length, consoleErrors, vueWarnings, notFound, countCalls,
+      routes: routes.length, consoleErrors, vueWarnings, notFound, countCalls, silent,
     });
 
+    expect(silent, 'every on-call route must reach its own API — a route that asks for nothing passes the checks below for free')
+      .toEqual([]);
     expect(notFound, 'no on-call screen may 404 on its own API — G24 hid here for a whole release')
       .toEqual([]);
     expect(countCalls, 'the retired /oncall/responses/count endpoint must not be called again')

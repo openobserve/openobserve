@@ -243,6 +243,18 @@ test.describe('On-call dry runs', {
       .toContain(stand_in);
 
     // Previewing sends nothing and opens nothing.
+    //
+    // Positive control first: `0 records for this team` is also what a wrong team
+    // id, or a filter that matches nothing for an unrelated reason, looks like. The
+    // same helper and the same session must be shown capable of returning rows
+    // before its emptiness means anything. (A broken endpoint now throws rather
+    // than reading as empty, but a silently-wrong filter still would not.)
+    const anyRecords = await listResponses(page, { includeResolved: true, limit: 5 });
+    expect(anyRecords.length,
+      'the pages endpoint returned nothing at all, so the per-team count below would '
+      + 'be zero whatever the preview did')
+      .toBeGreaterThan(0);
+
     const records = await listResponses(page, { teamId: f.team.id, includeResolved: true });
     expect(records.length, 'previewing must not open a record').toBe(0);
 
@@ -297,6 +309,9 @@ test.describe('On-call dry runs', {
     // draws the setup checklist INSTEAD of the table — correctly, and there is
     // then no table to wait for. On a used instance it only renders because some
     // other test left a page behind. Both shapes are the same answer: no row.
+    // The screen has to have drawn SOMETHING before "no rows" is evidence: an
+    // error state and an unmounted route both count zero too.
+    await pm.oncallPagesListPage.expectScreenSettled();
     expect(
       await pm.oncallPagesListPage.countRowsOnPage(),
       'the Pages list is what still needs somebody — a test page never does',

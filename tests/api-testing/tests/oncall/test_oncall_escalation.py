@@ -162,7 +162,15 @@ def test_reached_equals_the_delivered_rows_in_the_ledger(
             f"rung {rung.get('after_micros')}: progress says {sorted(reached)}, "
             f"the ledger says {sorted(expected)}")
 
-    assert reached_overall == delivered_recipients(ledger), (
+    # Positive control FIRST. `set() == set()` satisfies the comparison below, and
+    # `wait_for_deliveries` waits for ledger ROWS, not `delivered: true` rows — so a
+    # delivery outage reproduces the very defect this guards and passes silently.
+    landed = delivered_recipients(ledger)
+    assert landed, (
+        "no delivery landed at all, so the comparison below would pass on two empty "
+        f"sets and prove nothing about the defect: {ledger}")
+
+    assert reached_overall == landed, (
         "the union of every rung's `reached` must be the whole set of landed "
         "deliveries — the defect made this empty while the ledger was full")
 
@@ -180,8 +188,12 @@ def test_a_rung_that_landed_is_not_reported_as_reaching_nobody(
     oncall.wait_for_deliveries(page_id)
     ledger = ledger_of(oncall, page_id)
     landed = delivered_recipients(ledger)
-    if not landed:
-        pytest.skip("no delivery landed on this deployment; §2.3 covers that case")
+    # NOT a skip: `ladders["delivers"]` posts to the instance's own ingest endpoint,
+    # so delivery is hermetic. Nothing landing means the pipeline broke, and skipping
+    # it lets a build with a dead delivery ledger report no failures at all.
+    assert landed, (
+        "no delivery landed, and this fixture's destination is the instance's own "
+        f"ingest endpoint — so this is the delivery pipeline, not the environment: {ledger}")
 
     fired = progress_of(oncall, page_id).get("fired") or []
     landed_rungs = [r for r in fired if r.get("reached")]

@@ -91,9 +91,20 @@ async function call(page, method, path, data) {
   return { status: res.status(), ok: res.ok(), body, text };
 }
 
+/**
+ * GET and return the body, or throw.
+ *
+ * It used to answer `null` on any non-OK, and twelve call sites turn that into
+ * `[]` or `{}` with `??`. A 403, a 500 or a typo'd path then read as "nothing
+ * there", so every emptiness assertion built on one passed the moment the API
+ * stopped answering. An error is not an empty result.
+ */
 async function read(page, path) {
-  const { ok, body } = await call(page, 'get', path);
-  return ok ? body : null;
+  const { ok, status, body, text } = await call(page, 'get', path);
+  if (!ok) {
+    throw new Error(`GET ${path} failed: ${status} ${String(text ?? '').slice(0, 200)}`);
+  }
+  return body;
 }
 
 // ----------------------------------------------------------------- org users

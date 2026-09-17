@@ -122,8 +122,13 @@ def require_oncall(create_session, base_url, org_id):
     resp = create_session.get(f"{base_url}api/{org_id}/oncall/teams")
     if resp.status_code == 404:
         pytest.skip("this build does not serve the on-call routes")
-    if resp.status_code not in (200, 403):
-        pytest.skip(f"cannot confirm on-call is served (oncall/teams -> {resp.status_code})")
+    # 404 above is the only legitimate skip: the routes are genuinely absent. Any
+    # OTHER unexpected status is the server being broken, and skipping on it takes
+    # all 42 cases in this file with it — a 500 would have retired the whole ack
+    # surface silently.
+    assert resp.status_code in (200, 403), (
+        f"on-call is registered but `oncall/teams` answered {resp.status_code}, so the "
+        f"server is not healthy enough to measure the ack route against: {resp.text[:200]}")
 
 
 @pytest.fixture
@@ -238,6 +243,18 @@ def assert_handler_refused(resp):
         "a WWW-Authenticate challenge means the auth middleware answered, so the "
         "ack route is no longer unauthenticated"
     )
+    # The challenge header is NOT sufficient on its own: this build attaches it to
+    # nothing, guarded routes included, so asserting its absence is true everywhere
+    # and discriminates nothing. What separates the two answers is the MESSAGE —
+    # the middleware says "Unauthorized Access" for every route it turns away, and
+    # the handler says something about the link. `test_the_middleware_refusal_is
+    # _distinguishable` pins that the two really do differ, so this assertion is
+    # measuring a property that is observable rather than one that is always true.
+    assert MIDDLEWARE_REFUSAL not in resp.text, (
+        f"this 401 carries the auth middleware's own wording ({MIDDLEWARE_REFUSAL!r}), "
+        "so the request never reached the ack handler — the route has drifted behind "
+        "auth_middleware"
+    )
     try:
         body = resp.json()
     except ValueError:
@@ -249,9 +266,40 @@ def assert_handler_refused(resp):
     assert_did_not_act(resp)
 
 
+MIDDLEWARE_REFUSAL = "Unauthorized Access"
+
+
 # =============================================================================
 # The route itself
 # =============================================================================
+
+def test_the_middleware_refusal_is_distinguishable_from_the_handler_refusal(base_url, org_id):
+    """The positive control for every `assert_handler_refused` in this file.
+
+    Those assertions are absences — the refusal must NOT be the middleware's. An
+    absence proves nothing unless the thing can be present, so this shows a
+    guarded route really does answer with the middleware's own wording, and that
+    the ack route answers with something else. If the two ever converge, every
+    other refusal assertion here silently stops discriminating, and this fails
+    first and says so.
+    """
+    guarded = requests.get(f"{base_url}api/{org_id}/oncall/teams", timeout=30)
+    assert guarded.status_code == 401, (
+        f"a guarded route with no credentials must be refused, got {guarded.status_code}"
+    )
+    assert MIDDLEWARE_REFUSAL in guarded.text, (
+        "the auth middleware no longer answers with its own wording, so the rest of "
+        f"this file can no longer tell the two refusals apart: {guarded.text[:200]}"
+    )
+
+    handler = get_ack(base_url, org_id, "not-a-token")
+    assert handler.status_code == 401, (
+        f"the ack route must refuse a malformed token, got {handler.status_code}"
+    )
+    assert MIDDLEWARE_REFUSAL not in handler.text, (
+        "the ack route answered with the middleware's wording, so it is no longer "
+        f"reached unauthenticated: {handler.text[:200]}"
+    )
 
 def test_the_ack_route_is_registered_on_both_verbs(base_url, org_id):
     """GET and POST are both served here, and neither is the auth middleware.
@@ -486,7 +534,9 @@ def test_a_get_with_a_valid_token_does_not_acknowledge(create_session, base_url,
 
     record = create_session.get(f"{base_url}api/{org_id}/oncall/responses/{response_id}")
     assert record.status_code == 200, record.text
-    assert record.json().get("status") != "acknowledged", (
+    # The record is nested under `response` and its field is `state`; a top-level
+    # `status` read is always None, so the comparison could never fail.
+    assert record.json()["response"].get("state") != "acknowledged", (
         "a GET acknowledged the page — any mail client that prefetches links now "
         "answers pages on the responder's behalf"
     )

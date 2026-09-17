@@ -30,6 +30,8 @@ from __future__ import annotations
 
 import logging
 
+import json
+
 import pytest
 
 from support.client import OpenObserveClient
@@ -329,9 +331,15 @@ def test_a_single_delivery_failure_does_not_bench_a_responder(
 
     ledger = oncall.wait_for_deliveries(failing_team["page"]["id"])
     mine = [r for r in failures_in(ledger) if r and rota_member.lower() in r.lower()]
-    if len(mine) != 1:
-        pytest.skip("this deployment did not record exactly one failure against "
-                    f"the member ({len(mine)}); the threshold cannot be isolated")
+    # NOT a skip. `failing_team` routes through DEAD_DEST, a destination that
+    # cannot be reached, so exactly one recorded failure is deterministic by
+    # construction — nothing about a deployment changes it. Skipping here turns a
+    # broken delivery ledger into a green run, which is the failure this whole
+    # section exists to catch.
+    assert len(mine) == 1, (
+        f"expected exactly one recorded failure against {rota_member}, got {len(mine)}. "
+        "The destination is unreachable by construction, so this is the delivery "
+        f"ledger not recording failures, not an environment difference: {ledger}")
 
     verdict = member_verdict(oncall, failing_team["team"], rota_member)
     assert verdict.get("would_a_page_land") is True, (
@@ -363,9 +371,11 @@ def test_two_consecutive_failures_drop_a_responder_out_of_reachable(
     except WaitTimeout:
         ledger = oncall.deliveries(failing_team["page"]["id"]).json()
     mine = [r for r in failures_in(ledger) if r and rota_member.lower() in r.lower()]
-    if len(mine) < DEGRADE_AFTER:
-        pytest.skip(f"only {len(mine)} recorded failure(s); the threshold is "
-                    f"{DEGRADE_AFTER} and cannot be reached on this deployment")
+    # NOT a skip, for the same reason as above: DEAD_DEST guarantees the failures.
+    assert len(mine) >= DEGRADE_AFTER, (
+        f"expected at least {DEGRADE_AFTER} recorded failures against {rota_member}, "
+        f"got {len(mine)}. The destination is unreachable by construction, so a short "
+        f"count means the ledger stopped recording failures: {ledger}")
 
     verdict = member_verdict(oncall, failing_team["team"], rota_member)
     assert verdict.get("would_a_page_land") is False, (
@@ -373,7 +383,15 @@ def test_two_consecutive_failures_drop_a_responder_out_of_reachable(
 
     risks = oncall.config_risks(failing_team["team"])
     assert risks.status_code == 200, risks.text
-    assert risks.json(), "a benched responder must raise a config risk"
+    # `{"risks": []}` is truthy, so asserting the payload alone passes when NO risk
+    # was raised — the opposite of what the name claims. Name the member: a risk
+    # about somebody else is not this one.
+    body = risks.json()
+    raised = body.get("risks") if isinstance(body, dict) else body
+    assert raised, f"a benched responder must raise a config risk, got none: {body}"
+    assert any(rota_member in json.dumps(r) for r in raised), (
+        f"a risk was raised but none of them names the benched responder "
+        f"{rota_member}: {raised}")
 
 
 def test_a_cover_moves_who_is_on_call(oncall: OnCallClient, rota_team: str,

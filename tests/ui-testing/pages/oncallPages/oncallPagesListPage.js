@@ -507,6 +507,29 @@ export class OnCallPagesListPage {
   // ---------------------------------------------------------------- assertions
 
   /**
+   * The screen finished rendering one of its two legitimate shapes.
+   *
+   * Use this before counting rows when zero is an acceptable answer. "No rows" is
+   * also what an error state, a route that never mounted and a screen still
+   * loading all look like, so a count alone is not evidence. This does not care
+   * WHICH shape drew — the table, or the setup checklist the product shows when
+   * nothing has ever paged — only that the screen settled into one of them.
+   */
+  async expectScreenSettled() {
+    await expect(this.page.locator(this.locators.root)).toBeVisible({ timeout: 30000 });
+    const table = this.page.locator(this.locators.table);
+    const checklist = this.page.locator('[data-test="oncall-setup-checklist"]');
+    await expect
+      .poll(async () => (await table.count()) > 0 || (await checklist.count()) > 0, {
+        timeout: 30000,
+        intervals: [500],
+        message: 'the pages screen drew neither its table nor the setup checklist, so a row '
+          + 'count of zero says nothing about what is on it',
+      })
+      .toBe(true);
+  }
+
+  /**
    * The list screen has drawn its table.
    *
    * The table is NOT unconditional: with nothing ever paged in the org the
