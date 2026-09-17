@@ -180,7 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OToggleGroup
                 :model-value="formData.is_real_time"
                 :disabled="beingUpdated || anomalyEditMode"
-                class="shrink-0"
+                class="min-w-0"
                 data-test="add-alert-type-tabs"
                 @update:model-value="onAlertTypeChange"
               >
