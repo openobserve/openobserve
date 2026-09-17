@@ -17,7 +17,7 @@ import { ref, type Ref } from "vue";
 
 import type { TranslateFn } from "@/types/i18n";
 
-const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
+const TYPEWRITER_SPEED = 8;
 
 /**
  * The three animated surfaces of the chat: the rotating "analyzing…" label, the

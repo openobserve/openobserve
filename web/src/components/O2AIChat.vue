@@ -888,6 +888,13 @@ export default defineComponent({
       });
     };
 
+    // RichTextInput ignores modelValue while focused, so a recalled prompt must be pushed in.
+    const applyRecalledPrompt = () => {
+      if (chatInput.value && typeof chatInput.value.setContent === "function") {
+        chatInput.value.setContent(inputMessage.value);
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -895,15 +902,15 @@ export default defineComponent({
       } else if (e.key === "Backspace") {
         handleImageReferenceBackspace(e);
       } else if (e.key === "ArrowUp") {
-        const target = e.target as HTMLElement;
-        const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
-        if (textarea && isOnFirstLine(textarea)) {
+        if (isOnFirstLine(e.target as HTMLElement)) {
           e.preventDefault();
           navigateHistory("up");
+          applyRecalledPrompt();
         }
       } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
         e.preventDefault();
         navigateHistory("down");
+        applyRecalledPrompt();
       }
     };
 

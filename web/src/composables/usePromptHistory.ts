@@ -27,15 +27,29 @@ export function usePromptHistory(inputMessage: Ref<string>) {
   const queryHistory = ref<string[]>([]);
   const historyIndex = ref(-1);
 
-  // Check if cursor is on the first line of textarea
-  const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
-    if (!textarea) return false;
+  // The composer is a contenteditable div, so a textarea-only check never fires.
+  const isOnFirstLine = (el: HTMLTextAreaElement | HTMLElement | null) => {
+    if (!el) return false;
 
-    const cursorPosition = textarea.selectionStart;
-    const textBeforeCursor = textarea.value.substring(0, cursorPosition);
+    if (el instanceof HTMLTextAreaElement) {
+      return !el.value.substring(0, el.selectionStart).includes("\n");
+    }
 
-    // Check if there are any newlines before cursor position
-    return !textBeforeCursor.includes("\n");
+    if (!el.isContentEditable) return false;
+
+    const selection = el.ownerDocument?.defaultView?.getSelection();
+    if (!selection || selection.rangeCount === 0) return false;
+
+    const caret = selection.getRangeAt(0);
+    if (!el.contains(caret.startContainer)) return false;
+
+    const before = caret.cloneRange();
+    before.selectNodeContents(el);
+    before.setEnd(caret.startContainer, caret.startOffset);
+
+    // Line breaks render as <br>, which Range.toString() drops, so check the nodes too.
+    if (before.cloneContents().querySelector("br")) return false;
+    return !before.toString().includes("\n");
   };
 
   // Navigate through query history

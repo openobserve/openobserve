@@ -27,8 +27,28 @@ const ta = (value: string, cursor = value.length) => {
   return el;
 };
 
+const ce = (html: string, caretNode = 0, caretOffset?: number) => {
+  const el = document.createElement("div");
+  el.setAttribute("contenteditable", "true");
+  Object.defineProperty(el, "isContentEditable", { value: true, configurable: true });
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  const node = el.childNodes[caretNode];
+  const range = document.createRange();
+  const offset = caretOffset ?? (node?.textContent?.length || 0);
+  range.setStart(node, offset);
+  range.collapse(true);
+  const sel = window.getSelection()!;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return el;
+};
+
 beforeEach(() => localStorage.clear());
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  document.body.innerHTML = "";
+});
 
 describe("usePromptHistory", () => {
   it("writes the recalled prompt into the shared input ref", () => {
@@ -104,5 +124,58 @@ describe("usePromptHistory", () => {
     expect(isOnFirstLine(ta("abc\ndef", 3))).toBe(true);
     expect(isOnFirstLine(ta("abc\ndef", 4))).toBe(false);
     expect(isOnFirstLine(null as any)).toBe(false);
+  });
+
+  // The composer is a contenteditable div, never a textarea; a tagName check disabled recall entirely.
+  describe("contenteditable caret, the shape the chat composer actually uses", () => {
+    it("treats a caret in a single-line contenteditable as the first line", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      expect(isOnFirstLine(ce("hello"))).toBe(true);
+    });
+
+    it("recognises a contenteditable that is not a textarea", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      const el = ce("hello");
+      expect(el.tagName).not.toBe("TEXTAREA");
+      expect(isOnFirstLine(el)).toBe(true);
+    });
+
+    it("returns false once a <br> sits before the caret", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      // "one<br>two" with the caret inside "two"
+      expect(isOnFirstLine(ce("one<br>two", 2))).toBe(false);
+    });
+
+    it("stays true on the first line of a multi-line contenteditable", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      expect(isOnFirstLine(ce("one<br>two", 0, 3))).toBe(true);
+    });
+
+    it("returns false for an element that is not editable", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      const div = document.createElement("div");
+      div.textContent = "plain";
+      document.body.appendChild(div);
+      expect(isOnFirstLine(div)).toBe(false);
+    });
+
+    it("returns false when the caret sits outside the element", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      const inside = ce("hello");
+      const outside = document.createElement("div");
+      Object.defineProperty(outside, "isContentEditable", { value: true, configurable: true });
+      outside.textContent = "elsewhere";
+      document.body.appendChild(outside);
+      // selection is still inside `inside`, so `outside` must not claim the caret
+      expect(isOnFirstLine(outside)).toBe(false);
+      expect(isOnFirstLine(inside)).toBe(true);
+    });
+
+    it("returns false when there is no selection at all", () => {
+      const { isOnFirstLine } = usePromptHistory(ref(""));
+      const el = ce("hello");
+      window.getSelection()!.removeAllRanges();
+      expect(isOnFirstLine(el)).toBe(false);
+    });
   });
 });

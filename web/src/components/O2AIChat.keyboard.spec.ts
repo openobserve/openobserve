@@ -85,6 +85,11 @@ const stubs = {
     template: '<div data-test="rich-text-input" />',
     props: ["modelValue", "placeholder", "disabled", "theme", "references", "borderless"],
     emits: ["update:modelValue", "keydown", "submit", "update:references"],
+    methods: {
+      setContent(text: string) {
+        (this as any).lastSetContent = text;
+      },
+    },
   },
 };
 
@@ -104,6 +109,23 @@ const key = (k: string, target: EventTarget) => {
   const e = new KeyboardEvent("keydown", { key: k, cancelable: true });
   Object.defineProperty(e, "target", { value: target });
   return e;
+};
+
+// The real composer is RichTextInput, a contenteditable div. A textarea never appears.
+const editableAt = (html: string, caretNode = 0, caretOffset?: number) => {
+  const el = document.createElement("div");
+  el.setAttribute("contenteditable", "true");
+  Object.defineProperty(el, "isContentEditable", { value: true, configurable: true });
+  el.innerHTML = html;
+  document.body.appendChild(el);
+  const node = el.childNodes[caretNode] ?? el;
+  const range = document.createRange();
+  range.setStart(node, caretOffset ?? (node.textContent?.length || 0));
+  range.collapse(true);
+  const sel = window.getSelection()!;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return el;
 };
 
 const textareaAt = (value: string, cursor = value.length) => {
@@ -149,6 +171,48 @@ afterEach(() => {
 });
 
 describe("prompt history (ArrowUp / ArrowDown)", () => {
+  // Regression: the handler required target.tagName === "TEXTAREA", so recall was dead in the app.
+  it("recalls prompts when the target is the contenteditable composer, not a textarea", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["newest", "older"]));
+    const vm = await mountChat();
+    const editable = editableAt("");
+    expect(editable.tagName).not.toBe("TEXTAREA");
+
+    const up = key("ArrowUp", editable);
+    vm.handleKeyDown(up);
+    expect(up.defaultPrevented).toBe(true);
+    expect(vm.inputMessage).toBe("newest");
+
+    vm.handleKeyDown(key("ArrowUp", editable));
+    expect(vm.inputMessage).toBe("older");
+
+    vm.handleKeyDown(key("ArrowDown", editable));
+    expect(vm.inputMessage).toBe("newest");
+  });
+
+  it("pushes the recalled prompt into the editor, which ignores modelValue while focused", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["recalled prompt"]));
+    const vm = await mountChat();
+    const editable = editableAt("");
+
+    vm.handleKeyDown(key("ArrowUp", editable));
+
+    const input = wrapper!.findComponent({ name: "RichTextInput" });
+    expect((input.vm as any).lastSetContent).toBe("recalled prompt");
+  });
+
+  it("leaves the caret alone when it is below the first line of the composer", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["newest"]));
+    const vm = await mountChat();
+    // caret inside "two", after the <br>
+    const editable = editableAt("one<br>two", 2);
+
+    const up = key("ArrowUp", editable);
+    vm.handleKeyDown(up);
+    expect(up.defaultPrevented).toBe(false);
+    expect(vm.inputMessage).toBe("");
+  });
+
   it("recalls stored prompts newest-first and walks back down to an empty input", async () => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(["newest", "older", "oldest"]));
     const vm = await mountChat();
