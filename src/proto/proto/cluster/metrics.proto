@@ -25,6 +25,7 @@ message MetricsQueryRequest {
     repeated string  regions = 11;
     repeated string clusters = 12;
     bool    is_super_cluster = 13;
+    optional SearchEventContext search_event_context = 14;
 
 }
 

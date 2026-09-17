@@ -32,7 +32,11 @@ const TEAMS = [{ id: "team_1", name: "Platform" }];
 
 const stubs = {
   OText: { name: "OText", template: "<span><slot /></span>" },
-  OButton: { name: "OButton", props: ["variant"], template: "<button><slot /></button>" },
+  OButton: {
+    name: "OButton",
+    props: ["variant", "loading"],
+    template: "<button><slot /></button>",
+  },
   OSelect: {
     name: "OSelect",
     props: ["modelValue", "options"],
@@ -86,6 +90,27 @@ describe("OnCallDefaultTeamCard", () => {
     );
   });
 
+  /// The unset warning is a claim about the org; the trigger must not make it
+  /// before the read that would justify it has come back.
+  it("shows the trigger as loading, not as unset, while the read is in flight", async () => {
+    let resolveRead!: (value: { data: { default_team_id: string | null } }) => void;
+    service.getRoutingConfig.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRead = resolve;
+      }) as any,
+    );
+
+    const wrapper = render({ dialog: true });
+    const trigger = wrapper.findComponent({ name: "OButton" });
+    expect(trigger.props("loading")).toBe(true);
+    expect(trigger.props("variant")).not.toBe("warning");
+
+    resolveRead({ data: { default_team_id: null } });
+    await flushPromises();
+    expect(trigger.props("loading")).toBe(false);
+    expect(trigger.props("variant")).toBe("warning");
+  });
+
   it("saves the nomination from the modal and closes it", async () => {
     const wrapper = render({ dialog: true });
     await flushPromises();
@@ -117,7 +142,7 @@ describe("OnCallDefaultTeamCard", () => {
     await flushPromises();
 
     await wrapper.find('[data-test="oncall-default-team-open"]').trigger("click");
-    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBe("");
+    expect(wrapper.findComponent({ name: "OSelect" }).props("modelValue")).toBeNull();
   });
 
   /// The card is still the team-less default: hosts that have room for it are

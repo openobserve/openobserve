@@ -20,19 +20,18 @@ use std::{
 };
 
 use config::{
-    TIMESTAMP_COL_NAME, get_config,
+    get_config,
     meta::{
         alerts::alert,
         pipeline::PipelineKind,
-        promql::HASH_LABEL,
         self_reporting::usage::UsageType,
-        stream::{PartitionTimeLevel, StreamPartition, StreamType},
+        stream::{StreamPartition, StreamType},
     },
     metrics,
     utils::{
         json::{self, estimate_json_bytes},
         schema_ext::SchemaExt,
-        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS, now_micros},
+        time::now_micros,
     },
 };
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -45,8 +44,9 @@ use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
     ingestion::{
-        TriggerAlertData, evaluate_trigger, get_stream_partition_keys, get_thread_id,
-        get_write_partition_key, refactor_map, schema_records_to_entries, write_entries,
+        PartitionMemo, TriggerAlertData, evaluate_trigger, get_stream_partition_keys,
+        get_thread_id, inferred_column_type, refactor_map, schema_records_to_entries,
+        write_entries,
     },
     pipeline::batch_execution::ExecutablePipeline,
 };
@@ -233,13 +233,7 @@ pub(super) async fn buffer_stream_records(
 ) -> Option<TriggerAlertData> {
     let partition_keys = partition_keys.unwrap_or(&NO_PARTITION_KEYS);
     let partition_time_level = infra::schema::get_partition_time_level(StreamType::Metrics);
-    // without an enabled partition key the key is a function of the time bucket alone
-    let keyed_by_time_only = partition_keys.iter().all(|key| key.disabled);
-    let bucket_micros = match partition_time_level {
-        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
-        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
-    };
-    let mut last_partition: Option<(i64, String)> = None;
+    let mut partition_memo = PartitionMemo::new(partition_keys, partition_time_level);
     let alert_keys: Vec<String> = alerts
         .map(|alerts| {
             alerts
@@ -270,30 +264,14 @@ pub(super) async fn buffer_stream_records(
             .await;
         }
 
-        let bucket = timestamp.div_euclid(bucket_micros);
-        let partition = match &last_partition {
-            Some((last_bucket, key)) if *last_bucket == bucket => partitions.get_mut(key).unwrap(),
-            _ => {
-                let partition_key = get_write_partition_key(
-                    timestamp,
-                    partition_keys,
-                    partition_time_level,
-                    &record,
-                    Some(schema_key),
-                );
-                if keyed_by_time_only {
-                    last_partition = Some((bucket, partition_key.clone()));
-                }
-                partitions
-                    .entry(partition_key)
-                    .or_insert_with(|| SchemaRecords {
-                        schema_key: schema_key.to_string(),
-                        schema: schema.clone(),
-                        records: vec![],
-                        records_size: 0,
-                    })
+        let partition = partition_memo.buffer(timestamp, &record, schema_key, partitions, || {
+            SchemaRecords {
+                schema_key: schema_key.to_string(),
+                schema: schema.clone(),
+                records: vec![],
+                records_size: 0,
             }
-        };
+        });
         let record = json::Value::Object(record);
         partition.records_size += estimate_json_bytes(&record);
         partition.records.push(Arc::new(record));
@@ -460,26 +438,6 @@ fn record_evolves_schema(
     })
 }
 
-/// The column type this value infers to, `None` for a null, which contributes no field at all.
-fn inferred_column_type(key: &str, value: &json::Value) -> Option<DataType> {
-    match value {
-        json::Value::Null => None,
-        json::Value::String(_) => Some(DataType::Utf8),
-        json::Value::Bool(_) => Some(DataType::Boolean),
-        json::Value::Number(n) => Some(match key {
-            // `fix_schema` pins these two whatever the record carries
-            TIMESTAMP_COL_NAME => DataType::Int64,
-            HASH_LABEL => DataType::UInt64,
-            _ if n.is_i64() => DataType::Int64,
-            _ if n.is_u64() => DataType::UInt64,
-            _ if n.is_f64() => DataType::Float64,
-            _ => DataType::Utf8,
-        }),
-        // a nested value cannot be inferred at all, so it must reach check_for_schema
-        _ => Some(DataType::Null),
-    }
-}
-
 /// The fields of a stream's user-defined schema, if it has one.
 pub(super) fn defined_schema<'a>(
     user_defined_schema_map: &'a HashMap<String, Option<HashSet<String>>>,
@@ -543,9 +501,13 @@ async fn evaluate_record_alerts(
 
 #[cfg(test)]
 mod tests {
-    use config::meta::promql::{NAME_LABEL, VALUE_LABEL};
+    use config::{
+        TIMESTAMP_COL_NAME,
+        meta::promql::{HASH_LABEL, NAME_LABEL, VALUE_LABEL},
+    };
 
     use super::*;
+    use crate::ingestion::get_write_partition_key;
 
     fn record_with(columns: usize) -> json::Map<String, json::Value> {
         let mut record = json::Map::new();

@@ -242,7 +242,7 @@ pub async fn report_request_usage_stats(
     return;
 
     let now = DateTime::from_timestamp_micros(timestamp).unwrap();
-    let request_body = stats.request_body.unwrap_or(usage_type.to_string());
+    let request_body = stats.request_body.unwrap_or_else(|| usage_type.to_string());
     let user_email = stats.user_email.unwrap_or_default();
     let mut usages = Vec::with_capacity(if num_functions > 0 { 2 } else { 1 });
 

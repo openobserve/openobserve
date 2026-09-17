@@ -2479,10 +2479,10 @@ impl AlertExt for Alert {
         if !self.workflows.is_empty() {
             let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
 
-            let source_id = self
-                .id
-                .as_ref()
-                .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
+            let source_id = self.id.as_ref().map_or_else(
+                || format!("{}/{}", self.org_id, self.name),
+                |v| v.to_string(),
+            );
 
             let metadata: HashMap<String, Value> = vec![
                 ("org_id", self.org_id.clone().into()),
