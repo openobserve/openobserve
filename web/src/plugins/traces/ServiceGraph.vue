@@ -1,7 +1,7 @@
 ﻿<template>
   <OCard class="flex h-full flex-col">
     <!-- Top toolbar: [stream-selector] [search-input]  ···spacer···  [legends] -->
-    <div class="flex items-center gap-2 p-1.5 pb-0 max-lg:flex-wrap max-lg:gap-y-1">
+    <div class="flex flex-wrap items-center gap-2 gap-y-1 p-1.5 pb-0">
       <!-- Stream selector (hidden when a parent drives selection, e.g. the
            Agent Graph page which selects by agent). -->
       <div
@@ -39,11 +39,11 @@
       <!-- Legends (horizontal) -->
       <div
         data-test="service-graph-legends"
-        class="rounded-default border-card-glass-border! flex flex-row items-center gap-3 border p-[0.325rem] max-lg:max-w-full max-lg:flex-wrap max-lg:gap-y-1.5"
+        class="rounded-default border-card-glass-border! flex max-w-full flex-row flex-wrap items-center gap-3 gap-y-1.5 border p-[0.325rem]"
       >
         <div
           data-test="sg-legend"
-          class="flex min-w-0 flex-row items-center gap-3 max-lg:flex-wrap max-lg:gap-y-1"
+          class="flex min-w-0 flex-row flex-wrap items-center gap-3 gap-y-1"
           :title="
             isMobile
               ? `${t('traces.serviceGraph.borderColor')} | ${t('traces.serviceGraph.borderColorMetric')}`
@@ -56,7 +56,7 @@
               >| {{ t("traces.serviceGraph.borderColorMetric") }}</span
             >
           </div>
-          <div class="flex! flex-row gap-2 max-lg:flex-wrap max-lg:gap-y-1">
+          <div class="flex! flex-row flex-wrap gap-2 gap-y-1">
             <div
               v-for="level in healthLevels"
               :key="level.key"

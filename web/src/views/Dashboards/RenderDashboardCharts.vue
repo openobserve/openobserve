@@ -1853,6 +1853,20 @@ export default defineComponent({
   .displayDiv :deep(.grid-stack > .grid-stack-item > .ui-resizable-handle) {
     display: none !important;
   }
+  /* A fixed-height strip host cannot grow, so its panels swipe sideways instead of stacking. */
+  .dashboard-strip .displayDiv :deep(.grid-stack) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    height: 9.5rem !important;
+    scroll-snap-type: x mandatory;
+  }
+  .dashboard-strip .displayDiv :deep(.grid-stack > .grid-stack-item) {
+    width: 85% !important;
+    min-width: 85% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    scroll-snap-align: start;
+  }
 }
 
 .displayDiv :deep(.grid-stack .grid-stack-item.ui-draggable-dragging) {
