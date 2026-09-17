@@ -608,7 +608,7 @@ watch(
 
     <div
       v-else-if="face === 'undetected'"
-      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
+      class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
       data-test="curated-setup-state"
     >
       <OText tag="h2" class="text-xl font-semibold">{{ t("infra.workload.setupHeadline") }}</OText>
@@ -638,7 +638,7 @@ watch(
          face names the outage instead and offers no setup CTA. -->
     <div
       v-else-if="face === 'dormant'"
-      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
+      class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
       data-test="curated-dormant-state"
     >
       <OText tag="h2" class="text-xl font-semibold">{{

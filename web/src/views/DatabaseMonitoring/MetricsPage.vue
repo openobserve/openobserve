@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-else
-              class="grid gap-2.5 p-3 pt-1"
+              class="grid grid-cols-1 gap-2.5 p-3 pt-1"
               :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
             >
               <DbmMetricPanel
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="loading && !hasMetricStreams">
             <div
-              class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+              class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
               data-test="dbm-metrics-skeleton"
             >
               <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-55 w-full" />
