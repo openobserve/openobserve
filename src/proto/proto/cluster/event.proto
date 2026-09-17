@@ -11,6 +11,7 @@ import "cluster/common.proto";
 service Event {
     rpc SendFileList (FileList) returns (EmptyResponse) {}
     rpc GetFiles (SimpleFileList) returns (stream FileContentResponse) {}
+    rpc PreCacheFiles (PreCacheRequest) returns (EmptyResponse) {}
 }
 
 message FileContentResponse {
@@ -20,4 +21,17 @@ message FileContentResponse {
 message FileContent {
     bytes  content  = 1;  // The actual parquet file content
     string filename = 2;  // The name of the file
+}
+
+message PreCacheRequest {
+    string trace_id = 1;
+    repeated PreCacheFileEntry files = 2;
+}
+
+message PreCacheFileEntry {
+    int64  file_id   = 1;
+    string account   = 2;
+    string file_path = 3;
+    int64  file_size = 4;
+    int64  max_ts    = 5;
 }

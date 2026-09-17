@@ -23,7 +23,8 @@ use config::{
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
 use proto::cluster_rpc::{
-    EmptyResponse, FileContent, FileContentResponse, FileList, SimpleFileList, event_server::Event,
+    EmptyResponse, FileContent, FileContentResponse, FileList, PreCacheRequest, SimpleFileList,
+    event_server::Event,
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, codegen::tokio_stream};
@@ -202,6 +203,88 @@ impl Event for Eventer {
         });
 
         Ok(Response::new(ReceiverStream::new(rx)))
+    }
+
+    async fn pre_cache_files(
+        &self,
+        req: Request<PreCacheRequest>,
+    ) -> Result<Response<EmptyResponse>, Status> {
+        let start = std::time::Instant::now();
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
+        let _ = tracing::Span::current().set_parent(parent_cx);
+
+        let req = req.get_ref();
+        let trace_id = &req.trace_id;
+        let cfg = get_config();
+
+        let mut queued = 0u64;
+        let mut skipped = 0u64;
+
+        for entry in &req.files {
+            // Skip if already cached in memory or disk
+            if infra::cache::file_data::memory::exist(&entry.file_path).await
+                || infra::cache::file_data::disk::exist(&entry.file_path).await
+            {
+                skipped += 1;
+                continue;
+            }
+
+            // Determine cache type: memory if enabled and file fits, else disk
+            let cache_type = if cfg.memory_cache.enabled
+                && entry.file_size < cfg.memory_cache.max_size as i64
+                && entry.file_size < (cfg.memory_cache.skip_size as i64 * cfg.limit.cpu_num as i64)
+            {
+                CacheType::Memory
+            } else {
+                CacheType::Disk
+            };
+
+            if let Err(e) = crate::job::queue_download(
+                trace_id.to_string(),
+                entry.file_id,
+                entry.account.clone(),
+                entry.file_path.clone(),
+                entry.file_size,
+                entry.max_ts,
+                cache_type,
+            )
+            .await
+            {
+                log::debug!(
+                    "[PRE-CACHE trace_id {trace_id}] Failed to queue download for {}: {e}",
+                    entry.file_path
+                );
+                metrics::SEARCH_PREFETCH_FILES_TOTAL
+                    .with_label_values(&["error"])
+                    .inc();
+                continue;
+            }
+            queued += 1;
+        }
+
+        log::info!(
+            "[PRE-CACHE trace_id {trace_id}] queued: {queued}, skipped_cached: {skipped}, total: {}",
+            req.files.len()
+        );
+
+        metrics::SEARCH_PREFETCH_FILES_TOTAL
+            .with_label_values(&["queued"])
+            .inc_by(queued);
+        metrics::SEARCH_PREFETCH_FILES_TOTAL
+            .with_label_values(&["skipped_cached"])
+            .inc_by(skipped);
+
+        // metrics
+        let time = start.elapsed().as_secs_f64();
+        metrics::GRPC_RESPONSE_TIME
+            .with_label_values(&["/event/pre_cache_files", "200", "", "", "", ""])
+            .observe(time);
+        metrics::GRPC_INCOMING_REQUESTS
+            .with_label_values(&["/event/pre_cache_files", "200", "", "", "", ""])
+            .inc();
+
+        Ok(Response::new(EmptyResponse {}))
     }
 }
 

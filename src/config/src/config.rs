@@ -1696,6 +1696,24 @@ pub struct Limit {
     )]
     pub search_mini_partition_duration_secs: u64,
     #[env_config(
+        name = "ZO_SEARCH_PREFETCH_ENABLED",
+        default = false,
+        help = "Enable pre-fetching files for upcoming partitions during search"
+    )]
+    pub search_prefetch_enabled: bool,
+    #[env_config(
+        name = "ZO_SEARCH_PREFETCH_LOOKAHEAD",
+        default = 3,
+        help = "Number of partitions to look ahead for pre-fetching"
+    )]
+    pub search_prefetch_lookahead: usize,
+    #[env_config(
+        name = "ZO_SEARCH_PREFETCH_MAX_FILES",
+        default = 1024,
+        help = "Maximum number of files per pre-fetch batch"
+    )]
+    pub search_prefetch_max_files: usize,
+    #[env_config(
         name = "ZO_HISTOGRAM_ENABLED",
         help = "Show histogram for logs page",
         default = true

@@ -15,13 +15,17 @@
 
 use std::time::Instant;
 
-use config::meta::{
-    search::{
-        PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
-        SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+use config::{
+    get_config,
+    meta::{
+        cluster::RoleGroup,
+        search::{
+            PARTIAL_ERROR_RESPONSE_MESSAGE, Response, SearchEventType, SearchPartitionRequest,
+            SearchPartitionResponse, StreamResponses, TimeOffset, ValuesEventContext,
+        },
+        sql::OrderBy,
+        stream::StreamType,
     },
-    sql::OrderBy,
-    stream::StreamType,
 };
 use log;
 #[cfg(feature = "enterprise")]
@@ -37,7 +41,7 @@ use super::{
 use crate::service::search::cache::cacher::delete_cache;
 use crate::{
     common::meta::search::{QueryDelta, SearchResultType},
-    service::search::{self as SearchService},
+    service::search::{self as SearchService, prefetch},
 };
 
 /// Do partitioned search without cache
@@ -130,6 +134,29 @@ pub async fn do_partitioned_search(
         &partitions
     );
 
+    // Pre-fetch files for upcoming partitions
+    let cfg = get_config();
+    let role_group = req.search_type.map(RoleGroup::from);
+    // Handles are kept alive until the loop ends; dropping one cancels its
+    // outstanding pre-cache requests.
+    let mut prefetch_handles: Vec<prefetch::PrefetchHandle> = Vec::new();
+    if cfg.limit.search_prefetch_enabled && partitions.len() > 1 {
+        let lookahead = cfg.limit.search_prefetch_lookahead;
+        let end = std::cmp::min(1 + lookahead, partitions.len());
+        if let Some(h) = prefetch::prefetch_partitions(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            &partitions[1..end],
+            role_group,
+        )
+        .await
+        {
+            prefetch_handles.push(h);
+        }
+    }
+
     let partition_num = partitions.len();
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         let mut req = req.clone();
@@ -161,6 +188,24 @@ pub async fn do_partitioned_search(
             is_multi_stream_search,
         )
         .await?;
+
+        // Slide the prefetch window: pre-fetch the partition that just entered
+        if cfg.limit.search_prefetch_enabled {
+            let next = idx + 1 + cfg.limit.search_prefetch_lookahead;
+            if next < partitions.len()
+                && let Some(h) = prefetch::prefetch_partitions(
+                    &trace_id,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    &[partitions[next]],
+                    role_group,
+                )
+                .await
+            {
+                prefetch_handles.push(h);
+            }
+        }
 
         let mut total_hits = search_res.total as i64;
 
@@ -470,6 +515,27 @@ pub async fn process_delta(
         partitions.sort_by(|a, b| b[0].cmp(&a[0]));
     }
 
+    // Pre-fetch files for upcoming partitions in delta search
+    let cfg = get_config();
+    let delta_role_group = req.search_type.map(RoleGroup::from);
+    let mut delta_prefetch_handles: Vec<prefetch::PrefetchHandle> = Vec::new();
+    if cfg.limit.search_prefetch_enabled && partitions.len() > 1 {
+        let lookahead = cfg.limit.search_prefetch_lookahead;
+        let end = std::cmp::min(1 + lookahead, partitions.len());
+        if let Some(h) = prefetch::prefetch_partitions(
+            trace_id,
+            org_id,
+            stream_type,
+            stream_name,
+            &partitions[1..end],
+            delta_role_group,
+        )
+        .await
+        {
+            delta_prefetch_handles.push(h);
+        }
+    }
+
     for (idx, &[start_time, end_time]) in partitions.iter().enumerate() {
         let mut req = req.clone();
         req.query.start_time = start_time;
@@ -491,6 +557,24 @@ pub async fn process_delta(
             is_multi_stream_search,
         )
         .await?;
+
+        // Slide the prefetch window for delta search
+        if cfg.limit.search_prefetch_enabled {
+            let next = idx + 1 + cfg.limit.search_prefetch_lookahead;
+            if next < partitions.len()
+                && let Some(h) = prefetch::prefetch_partitions(
+                    &trace_id,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    &[partitions[next]],
+                    delta_role_group,
+                )
+                .await
+            {
+                delta_prefetch_handles.push(h);
+            }
+        }
 
         let total_hits = search_res.total as i64;
 

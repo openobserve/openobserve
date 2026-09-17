@@ -17,8 +17,8 @@ use std::collections::HashMap;
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    CounterVec, Encoder, HistogramOpts, HistogramVec, IntCounterVec, IntGauge, IntGaugeVec, Opts,
-    Registry, TextEncoder,
+    CounterVec, Encoder, Histogram, HistogramOpts, HistogramVec, IntCounterVec, IntGauge,
+    IntGaugeVec, Opts, Registry, TextEncoder,
 };
 
 pub const NAMESPACE: &str = "zo";
@@ -987,6 +987,45 @@ pub static QUERY_CANCELED_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// search prefetch metrics
+pub static SEARCH_PREFETCH_FILES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "search_prefetch_files_total",
+            "Total number of files processed by search pre-fetch",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status"], // queued, skipped_cached, error
+    )
+    .expect("Metric created")
+});
+
+pub static SEARCH_PREFETCH_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "search_prefetch_requests_total",
+            "Total number of pre-fetch gRPC requests",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status"], // sent, failed, cancelled
+    )
+    .expect("Metric created")
+});
+
+pub static SEARCH_PREFETCH_DURATION_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    Histogram::with_opts(
+        HistogramOpts::new(
+            "search_prefetch_duration_seconds",
+            "Time spent initiating search pre-fetch requests",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 // This corresponds to pgsql queries, not sqlite as that is local and can be ignored
 pub static DB_QUERY_NUMS: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
@@ -1720,6 +1759,17 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(QUERY_CANCELED_NUMS.clone()))
+        .expect("Metric registered");
+
+    // search prefetch stats
+    registry
+        .register(Box::new(SEARCH_PREFETCH_FILES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SEARCH_PREFETCH_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SEARCH_PREFETCH_DURATION_SECONDS.clone()))
         .expect("Metric registered");
 
     // compactor stats

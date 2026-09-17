@@ -110,6 +110,7 @@ pub(crate) mod grpc_search;
 pub(crate) mod index;
 pub(crate) mod inspector;
 pub(crate) mod partition;
+pub(crate) mod prefetch;
 pub(crate) mod sql;
 pub(crate) mod streaming;
 #[cfg(feature = "enterprise")]
