@@ -738,13 +738,55 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OTable>
 
-    <ConfirmDialog
-      v-model="confirmBulkResolve"
+    <ODialog
+      :open="confirmBulkResolve"
+      @update:open="(v: boolean) => (confirmBulkResolve = v)"
       :title="t('oncall.bulkResolveTitle')"
-      :message="t('oncall.bulkResolveConfirm', { count: selectedIds.length })"
-      @update:ok="bulkResolve"
-      @update:cancel="confirmBulkResolve = false"
-    />
+      data-test="oncall-bulk-resolve-dialog"
+    >
+      <div class="flex flex-col gap-3">
+        <p class="text-text-secondary text-sm">
+          {{ t("oncall.bulkResolveConfirm", { count: selectedIds.length }) }}
+        </p>
+
+        <div class="flex flex-col gap-1">
+          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
+          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
+          <OSelect
+            v-model="bulkResolveCause"
+            :options="resolveCauseOptions"
+            clearable
+            :placeholder="t('oncall.resolveCausePlaceholder')"
+            data-test="oncall-bulk-resolve-cause"
+          />
+        </div>
+
+        <OTextarea
+          v-model="bulkResolveNote"
+          :label="t('oncall.resolveCauseNote')"
+          :placeholder="t('oncall.resolveCauseNotePlaceholder')"
+          :rows="2"
+          data-test="oncall-bulk-resolve-cause-note"
+        />
+      </div>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <OButton variant="outline" size="sm-action" @click="confirmBulkResolve = false">
+            {{ t("oncall.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="bulkBusy"
+            data-test="oncall-bulk-resolve-confirm"
+            @click="bulkResolve"
+          >
+            {{ t("oncall.resolve") }}
+          </OButton>
+        </div>
+      </template>
+    </ODialog>
   </OPageLayout>
 </template>
 
@@ -753,7 +795,6 @@ import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
@@ -764,11 +805,13 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -926,6 +969,8 @@ const causeFilter = ref<ResolutionCause | "">("");
 const busyId = ref("");
 const bulkBusy = ref(false);
 const confirmBulkResolve = ref(false);
+const bulkResolveCause = ref<ResolutionCause | "">("");
+const bulkResolveNote = ref("");
 
 // Only after the first fetch, so the checklist never flashes while loading.
 const loaded = ref(false);
@@ -1231,6 +1276,11 @@ const causeOptions = computed(() => [
   ...RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
 ]);
 
+// No "any" entry: this feeds the bulk-resolve picker, not a filter.
+const resolveCauseOptions = computed(() =>
+  RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
+);
+
 function onCauseFilter(value: unknown) {
   causeFilter.value = (value as ResolutionCause) || "";
   void fetchResponses();
@@ -1531,12 +1581,22 @@ async function bulkSnooze(minutes: number) {
 
 async function bulkResolve() {
   confirmBulkResolve.value = false;
+  const cause = bulkResolveCause.value || undefined;
+  const cause_note = bulkResolveNote.value.trim() || undefined;
   await runBulk(
     selectedRecords((r) => r.firings.filter((f) => f.state !== "resolved")),
-    (id) => oncallService.resolveResponse({ org_identifier: orgId.value, response_id: id }),
+    (id) =>
+      oncallService.resolveResponse({
+        org_identifier: orgId.value,
+        response_id: id,
+        cause,
+        cause_note,
+      }),
     "bulkResolveDone",
     "bulkResolvePartial",
   );
+  bulkResolveCause.value = "";
+  bulkResolveNote.value = "";
 }
 
 /// Which run a row belongs to. Asked of the row rather than the record so a
