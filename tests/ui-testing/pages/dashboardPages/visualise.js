@@ -67,18 +67,66 @@ export default class LogsVisualise {
 
   // Open visualise tab and ensure table chart is selected when VRL is present
   async openVisualiseTabWithVrl() {
+    // Started before the toggle is clicked so the requests it fires cannot be missed.
+    const pipelineIdle = this.waitForVisualizePipelineIdle();
     await this.openVisualiseTab();
+    await pipelineIdle;
+    await this.ensureTableChartSelected();
+  }
 
-    // Ensure table chart is selected (VRL only works with table chart type)
-    const tableChartItem = this.page.locator('[data-test="selected-chart-table-item"]');
+  // Opening the visualise tab decides the chart type asynchronously off the result_schema response (auto-selection first, then the VRL table override), so nothing may touch the panel until that traffic has finished and stayed quiet, or the chart type still changes under the test.
+  async waitForVisualizePipelineIdle(quietMs = 2500, timeout = 60000) {
+    const isPipelineUrl = (url) =>
+      url.includes("/result_schema") || url.includes("/_search");
+    let inFlight = 0;
+    let sawRequest = false;
+    let lastEvent = Date.now();
+
+    const onRequest = (request) => {
+      if (!isPipelineUrl(request.url())) return;
+      inFlight += 1;
+      sawRequest = true;
+      lastEvent = Date.now();
+    };
+    const onRequestSettled = (request) => {
+      if (!isPipelineUrl(request.url())) return;
+      inFlight = Math.max(inFlight - 1, 0);
+      lastEvent = Date.now();
+    };
+
+    this.page.on("request", onRequest);
+    this.page.on("requestfinished", onRequestSettled);
+    this.page.on("requestfailed", onRequestSettled);
+
+    try {
+      const deadline = Date.now() + timeout;
+      // A visualize tab that reuses cached results issues no request at all, so stop waiting for one.
+      const firstRequestDeadline = Date.now() + 15000;
+      while (Date.now() < deadline) {
+        const idle = inFlight === 0 && Date.now() - lastEvent >= quietMs;
+        if (idle && (sawRequest || Date.now() >= firstRequestDeadline)) return;
+        await this.page.waitForTimeout(250);
+      }
+    } finally {
+      this.page.off("request", onRequest);
+      this.page.off("requestfinished", onRequestSettled);
+      this.page.off("requestfailed", onRequestSettled);
+    }
+  }
+
+  // The chart-type auto-selection above wins over a table click issued while it is still running, so re-select until the selection holds (VRL only works with the table chart type).
+  async ensureTableChartSelected(timeout = 30000) {
+    const tableChartItem = this.getChartTypeItem("table");
     await tableChartItem.waitFor({ state: "visible", timeout: 10000 });
 
-    const isTableSelected = await tableChartItem.getAttribute("data-selected");
-    if (isTableSelected !== "true") {
-      await tableChartItem.click();
-    }
-    // The chart-type switch is reactive and lags the click; gate on it actually applying so downstream steps don't run against the wrong chart type.
-    await expect(tableChartItem).toHaveAttribute("data-selected", "true", { timeout: 10000 });
+    await expect(async () => {
+      if ((await tableChartItem.getAttribute("data-selected")) !== "true") {
+        await tableChartItem.click();
+      }
+      await expect(tableChartItem).toHaveAttribute("data-selected", "true", {
+        timeout: 5000,
+      });
+    }).toPass({ timeout, intervals: [500, 1000, 2000] });
   }
 
   //Apply: Logs
