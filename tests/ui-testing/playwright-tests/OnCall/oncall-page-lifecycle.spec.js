@@ -264,7 +264,7 @@ test.describe('On-call page lifecycle', {
    * acknowledgement is forged, and nothing is delivered afterwards — so it goes
    * green the moment the recovery is acted on.
    */
-  test.fixme('a recovery closes the record without a human, and says nobody answered — not wired: the record collects repeated `recovery` events and stays triggered, verified 15 Sep on :5090', {
+  test.fixme('a recovery closes the record without a human, and says nobody answered — not wired: the record collects repeated `recovery` events and stays triggered, verified 15 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     test.setTimeout(15 * 60 * 1000);
@@ -325,7 +325,7 @@ test.describe('On-call page lifecycle', {
    * rest of the golden path works, which is why it is asserted green above and
    * this is a separate fixme rather than a failure hung on the whole case.
    */
-  test.fixme('the record header names the team the page belongs to and links to it — not wired: the whole subtitle slot renders zero elements, verified 15 Sep on :5090', {
+  test.fixme('the record header names the team the page belongs to and links to it — not wired: the whole subtitle slot renders zero elements, verified 15 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const f = await seedRoutedAlert(page, testInfo, 'header');

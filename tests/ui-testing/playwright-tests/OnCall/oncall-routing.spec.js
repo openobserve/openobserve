@@ -370,7 +370,7 @@ test.describe('On-call routing rules', {
    * endpoint validates, and weakening it to assert the 200 would pin the defect
    * as correct.
    */
-  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — W-03: POST /oncall/ownership accepts {"totally_made_up_dim":"x"} with 200, verified 15 Sep on :5090', {
+  test.fixme('TS-12.10 an ownership rule on a dimension outside the semantic group list is refused — W-03: POST /oncall/ownership accepts {"totally_made_up_dim":"x"} with 200, verified 15 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const team = await createTeam(page, { name: uniqueName(`${workerPrefix(testInfo)}_w03`) });

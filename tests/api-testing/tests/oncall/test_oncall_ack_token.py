@@ -93,6 +93,11 @@ UNSIGNED_SIGNATURE = "not-a-real-signature"
 
 # Shapes a hostile or broken link can arrive in. Each must be refused, and
 # refused the same way: 401 from the claims check.
+# The whole feature needs an enterprise build with `O2_ONCALL_ENABLED`; the
+# marker lets CI hold this directory separately, and the session-scoped gate
+# in conftest skips it rather than failing when the flag is off.
+pytestmark = pytest.mark.enterprise
+
 MALFORMED_TOKENS = [
     pytest.param("", id="empty"),
     pytest.param("not-a-token", id="opaque-garbage"),

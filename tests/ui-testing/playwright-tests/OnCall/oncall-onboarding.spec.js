@@ -121,7 +121,7 @@ test.describe('On-call onboarding', {
    * flips green the moment the handler is wired, and weakening it to assert the
    * no-op would pin the defect as correct.
    */
-  test.fixme('applying a Quick start preset issues a real schedule write, not a silent no-op — not wired: Apply is enabled, issues no request and reports no error, verified 15 Sep on :5090', {
+  test.fixme('applying a Quick start preset issues a real schedule write, not a silent no-op — not wired: Apply is enabled, issues no request and reports no error, verified 15 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_preset`);
@@ -442,7 +442,7 @@ test.describe('On-call onboarding', {
    * declaration on the `h1` fixes it. Kept as a failing expectation so it goes
    * green when that lands.
    */
-  test.fixme('TS-16.06 the acknowledge landing page is usable at a phone viewport — not wired: the ack page h1 has no word-break, so a long record title overflows a 390px viewport by 159px and can push the Acknowledge button off screen (ack_confirm_page, request/oncall/mod.rs), verified 16 Sep on :5090', {
+  test.fixme('TS-16.06 the acknowledge landing page is usable at a phone viewport — not wired: the ack page h1 has no word-break, so a long record title overflows a 390px viewport by 159px and can push the Acknowledge button off screen (ack_confirm_page, request/oncall/mod.rs), verified 16 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page, browser }, testInfo) => {
     // A real firing has to clear ingestion, the scheduler and the ladder; the

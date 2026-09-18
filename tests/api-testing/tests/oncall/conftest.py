@@ -5,8 +5,14 @@ template and the two Alert Destinations already provisioned, and a teardown
 sweep of every team, alert, ownership rule and user the module registered on it.
 
 Everything here is **enterprise-gated**: `_require_oncall` skips the whole
-directory when the server's `/config` says `oncall_enabled` is not true, so an
-OSS build reports skips rather than a wall of 404s.
+directory when on-call is not served, so an OSS build reports skips rather than
+a wall of 404s.
+
+It decides that by PROBING `GET {org}/oncall/teams` — 200/403 served, 404 absent
+— not by reading `oncall_enabled` off `/config`. That key is what the original
+issue quoted, and a current enterprise build does not publish it on the public
+`/config`, so gating on it skipped all 104 tests against a server that was
+serving on-call perfectly well. See `oncall_helpers.oncall_enabled`.
 
 Scope is `module`, not `function`: a page only exists once the alert scheduler
 has evaluated a rule, which costs the better part of a minute, and a per-test

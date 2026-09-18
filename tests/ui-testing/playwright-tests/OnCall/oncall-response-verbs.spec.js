@@ -745,7 +745,7 @@ test.describe('On-call response verbs', {
    * expectation: it goes green when bulk resolve asks for a cause the way the
    * single-record dialog does.
    */
-  test.fixme('TS-15.07b bulk resolve captures a cause the way resolving one page does — not wired: OnCallResponses.vue bulkResolve calls resolveResponse with no cause, and ResolveRequest.cause is Option<_> with serde(default), so every bulk-resolved record stores a null cause and is dropped from cause analytics, verified 16 Sep on :5090', {
+  test.fixme('TS-15.07b bulk resolve captures a cause the way resolving one page does — not wired: OnCallResponses.vue bulkResolve calls resolveResponse with no cause, and ResolveRequest.cause is Option<_> with serde(default), so every bulk-resolved record stores a null cause and is dropped from cause analytics, verified 16 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const f = await seedOpenPage(page, testInfo, 'bulkcause');

@@ -355,7 +355,7 @@ test.describe('On-call pages list', {
    * paired o2-enterprise change. Everything up to that assertion — the page
    * opening teamless, the row reading "Unrouted" — passes.
    */
-  test.fixme('§11.6 a teamless page reads Unrouted and blames nothing on a deletion', {
+  test.fixme('§11.6 a teamless page reads Unrouted and blames nothing on a deletion. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     test.setTimeout(480_000);

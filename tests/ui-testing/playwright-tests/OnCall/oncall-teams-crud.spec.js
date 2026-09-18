@@ -418,7 +418,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
    * Left as a failing expectation on purpose: it goes green the day the team
    * write propagates the zone (or the UI stops claiming it has).
    */
-  test.fixme('TS-03.04b changing a team\'s timezone re-evaluates its restriction windows in the new zone — not wired: PUT /oncall/teams/{id} changes the team zone but leaves the schedule at its own stored zone, so the engine keeps evaluating restrictions in the old one while the UI renders the new one, verified 16 Sep on :5090', {
+  test.fixme('TS-03.04b changing a team\'s timezone re-evaluates its restriction windows in the new zone — not wired: PUT /oncall/teams/{id} changes the team zone but leaves the schedule at its own stored zone, so the engine keeps evaluating restrictions in the old one while the UI renders the new one, verified 16 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     const name = uniqueName(`${workerPrefix(testInfo)}_tz`);
@@ -475,7 +475,7 @@ test.describe('On-call teams CRUD', { tag: ['@oncall', '@oncallTeams', '@enterpr
    * neither, verified 16 Sep on :5090. The body is left intact so it goes green
    * the day one of the two is implemented.
    */
-  test.fixme('TS-03.05 a team with a live page cannot be deleted into a dangling reference — not wired: delete_team (o2-enterprise oncall/service.rs:183) refuses only for the org default team and never queries oncall_responses, so DELETE /oncall/teams/{id} returns 200 while an open page stays triggered against a team, schedule and policy that no longer exist, with no timeline entry, verified 16 Sep on :5090', {
+  test.fixme('TS-03.05 a team with a live page cannot be deleted into a dangling reference — not wired: delete_team (o2-enterprise oncall/service.rs:183) refuses only for the org default team and never queries oncall_responses, so DELETE /oncall/teams/{id} returns 200 while an open page stays triggered against a team, schedule and policy that no longer exist, with no timeline entry, verified 16 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page }, testInfo) => {
     // A real firing has to clear ingestion, the scheduler and the ladder; the

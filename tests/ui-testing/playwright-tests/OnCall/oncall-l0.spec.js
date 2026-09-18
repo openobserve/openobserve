@@ -326,7 +326,7 @@ test.describe('On-call L0 / AI SRE', {
    * alert-backed page instead is how the documented split gets misread as a
    * product bug (o2-enterprise#2481, open P1).
    */
-  test.fixme('§9.1b a parallel agent attaches its verdict on an incident-backed page', {
+  test.fixme('§9.1b a parallel agent attaches its verdict on an incident-backed page. o2-enterprise#2481.', {
     tag: ['@P1', '@oncall-l0'],
   }, async ({ page }, testInfo) => {
     const { team } = await seedTeamWithL0(page, testInfo);

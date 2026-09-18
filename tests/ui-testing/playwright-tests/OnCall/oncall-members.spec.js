@@ -235,7 +235,7 @@ test.describe('On-call team staffing', {
    * green the moment the risk is derived, and weakening it to assert the gap
    * would pin the gap as correct.
    */
-  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — not wired: config-risks derives no such kind, verified 15 Sep on :5090', {
+  test.fixme('a member on no rotation is named as a config risk rather than silently stranded — not wired: config-risks derives no such kind, verified 15 Sep on :5090. o2-enterprise#2481.', {
     tag: ['@P0'],
   }, async ({ page }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_strand`);

@@ -334,7 +334,7 @@ test.describe('On-call — my duty, my inbox, my history', {
    * reading it back as the same person is true by construction, which is what the
    * original stub here did.
    */
-  test.fixme('TS-19.03b one responder\'s read markers are invisible to another — not wired: no seeding shape found that puts ONE page in TWO inboxes, see the note above', {
+  test.fixme('TS-19.03b one responder\'s read markers are invisible to another — not wired: no seeding shape found that puts ONE page in TWO inboxes, see the note above. o2-enterprise#2481.', {
     tag: ['@P1'],
   }, async ({ page, browser }, testInfo) => {
     const prefix = uniqueName(`${workerPrefix(testInfo)}_iso`);
