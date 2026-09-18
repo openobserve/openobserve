@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Deze variabele geldt alleen in {env}.",
       "scopeGlobal": "Deze variabele geldt in elke omgeving.",
       "searchPlaceholder": "Zoek variabelen",
-      "secretNeedsEnvironment": "Een geheim moet bij een omgeving horen. Maak het in plaats daarvan vanuit die omgeving aan.",
+      "secretNeedsEnvironment": "Global bevat geen secrets. Maak het secret aan in de omgeving die het moet beveiligen.",
       "title": "Variabelen",
       "updated": "Variabele bijgewerkt",
       "usedBy": "Gebruikt door",

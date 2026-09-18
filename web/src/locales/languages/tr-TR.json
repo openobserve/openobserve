@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Bu değişken yalnızca {env} ortamında geçerlidir.",
       "scopeGlobal": "Bu değişken her ortamda geçerlidir.",
       "searchPlaceholder": "Değişken ara",
-      "secretNeedsEnvironment": "Bir gizli değişken bir ortama ait olmalıdır. Bunun yerine onu o ortamdan oluşturun.",
+      "secretNeedsEnvironment": "Global hiçbir gizli bilgi tutmaz. Gizli bilgiyi, onu koruması gereken ortamda oluşturun.",
       "title": "Değişkenler",
       "updated": "Değişken güncellendi",
       "usedBy": "Kullananlar",

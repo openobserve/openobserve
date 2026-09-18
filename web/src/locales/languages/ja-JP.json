@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "この変数は {env} のみに適用されます。",
       "scopeGlobal": "この変数はすべての環境に適用されます。",
       "searchPlaceholder": "変数を検索",
-      "secretNeedsEnvironment": "シークレットは環境に属している必要があります。代わりにその環境から作成してください。",
+      "secretNeedsEnvironment": "グローバルにはシークレットが保持されません。シークレットは、それを保護すべき環境で作成してください。",
       "title": "変数",
       "updated": "変数を更新しました",
       "usedBy": "使用元",

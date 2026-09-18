@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "此变量仅适用于 {env}。",
       "scopeGlobal": "此变量适用于所有环境。",
       "searchPlaceholder": "搜索变量",
-      "secretNeedsEnvironment": "机密变量必须属于某个环境。请在该环境中创建。",
+      "secretNeedsEnvironment": "全局不存储密钥。请在应保护该密钥的环境中创建密钥。",
       "title": "变量",
       "updated": "变量已更新",
       "usedBy": "使用方",

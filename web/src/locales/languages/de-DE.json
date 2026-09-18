@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Diese Variable gilt nur in {env}.",
       "scopeGlobal": "Diese Variable gilt in jeder Umgebung.",
       "searchPlaceholder": "Variablen suchen",
-      "secretNeedsEnvironment": "Ein Secret muss zu einer Umgebung gehören. Erstellen Sie es stattdessen in dieser Umgebung.",
+      "secretNeedsEnvironment": "Global enthält keine Secrets. Erstellen Sie das Secret in der Umgebung, die es schützen soll.",
       "title": "Variablen",
       "updated": "Variable aktualisiert",
       "usedBy": "Verwendet von",

@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Ta zmienna obowiązuje wyłącznie w środowisku {env}.",
       "scopeGlobal": "Ta zmienna obowiązuje we wszystkich środowiskach.",
       "searchPlaceholder": "Szukaj zmiennych",
-      "secretNeedsEnvironment": "Zmienna sekretna musi należeć do środowiska. Utwórz ją w tym środowisku.",
+      "secretNeedsEnvironment": "Zakres globalny nie przechowuje sekretów. Utwórz sekret w środowisku, które powinno go chronić.",
       "title": "Zmienne",
       "updated": "Zaktualizowano zmienną",
       "usedBy": "Używana przez",

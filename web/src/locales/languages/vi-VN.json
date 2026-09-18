@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Biến này chỉ áp dụng trong {env}.",
       "scopeGlobal": "Biến này áp dụng trong mọi môi trường.",
       "searchPlaceholder": "Tìm kiếm biến",
-      "secretNeedsEnvironment": "Biến bí mật phải thuộc về một môi trường. Thay vào đó, hãy tạo nó từ môi trường đó.",
+      "secretNeedsEnvironment": "Global không lưu secret. Hãy tạo secret trong môi trường sẽ bảo vệ nó.",
       "title": "Biến",
       "updated": "Đã cập nhật biến",
       "usedBy": "Được sử dụng bởi",

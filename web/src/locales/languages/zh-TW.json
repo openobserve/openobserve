@@ -13511,7 +13511,7 @@
       "scopeEnvironment": "此變數僅適用於 {env}。",
       "scopeGlobal": "此變數適用於每個環境。",
       "searchPlaceholder": "搜尋變數",
-      "secretNeedsEnvironment": "密鑰必須屬於某個環境；請改從該環境建立。",
+      "secretNeedsEnvironment": "全域不儲存任何密鑰。請在應負責保護該密鑰的環境中建立密鑰。",
       "title": "變數",
       "updated": "變數已更新",
       "usedBy": "被使用於",

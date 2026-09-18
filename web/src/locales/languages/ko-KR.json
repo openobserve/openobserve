@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "이 변수는 {env} 환경에서만 적용됩니다.",
       "scopeGlobal": "이 변수는 모든 환경에 적용됩니다.",
       "searchPlaceholder": "변수 검색",
-      "secretNeedsEnvironment": "비밀 변수는 환경에 속해야 합니다. 해당 환경에서 생성하세요.",
+      "secretNeedsEnvironment": "Global에는 시크릿이 없습니다. 시크릿을 보호해야 하는 환경에서 시크릿을 생성하세요.",
       "title": "변수",
       "updated": "변수가 업데이트되었습니다",
       "usedBy": "사용처",

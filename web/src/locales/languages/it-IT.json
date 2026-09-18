@@ -13516,7 +13516,7 @@
       "scopeEnvironment": "Questa variabile si applica solo in {env}.",
       "scopeGlobal": "Questa variabile si applica in ogni ambiente.",
       "searchPlaceholder": "Cerca variabili",
-      "secretNeedsEnvironment": "Un segreto deve appartenere a un ambiente. Crealo da quell'ambiente, invece.",
+      "secretNeedsEnvironment": "Global non contiene segreti. Crea il segreto nell'ambiente che deve proteggerlo.",
       "title": "Variabili",
       "updated": "Variabile aggiornata",
       "usedBy": "Usata da",
