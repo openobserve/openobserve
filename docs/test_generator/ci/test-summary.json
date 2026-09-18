@@ -1,8 +1,0 @@
-[
-  { "title": "should render the ingestion-window warning banner as an alert naming both setting keys", "action": "new", "verifies": "the warning banner is visible with role=alert and names ZO_INGEST_ALLOWED_UPTO and ZO_INGEST_ALLOWED_IN_FUTURE" },
-  { "title": "should render the endpoint URL root-mounted with no org or base-uri", "action": "new", "verifies": "the endpoint snippet equals origin + /services/collector with no org, /api/, or /web/ segment" },
-  { "title": "should navigate to the org-scoped Ingestion Tokens page from the tokens link", "action": "new", "verifies": "the tokens link routes to /iam/ingestionTokens carrying the current org_identifier" },
-  { "title": "should render all three warning banners (window, edge processor, TLS)", "action": "new", "verifies": "the window, Splunk Edge Processor (useACK) and Use-HTTPS (ZO_HTTP_TLS_ENABLED) banners are all visible" },
-  { "title": "should copy all four snippets and show the success toast", "action": "new", "verifies": "all 4 copy buttons show the 'Copied Successfully' toast" },
-  { "title": "should render a live fractional payload time and omit time from the curl example", "action": "new", "verifies": "the payload time is a fractional epoch near now while the curl example omits time" }
-]

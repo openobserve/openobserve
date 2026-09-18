@@ -1,6 +1,0 @@
-{
-  "group": "GeneralTests",
-  "spec_filename": "splunk-hec-ingestion-window.spec.js",
-  "create_group": false,
-  "browser": "chrome"
-}
