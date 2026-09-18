@@ -16,6 +16,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { ref, shallowRef } from "vue";
+import { useI18n } from "vue-i18n";
 import RunDetail from "./RunDetail.vue";
 import StepPageActivity from "@/components/synthetics/results/StepPageActivity.vue";
 import EvidencePanel from "@/components/synthetics/results/EvidencePanel.vue";
@@ -576,5 +577,149 @@ describe("RunDetail — id-less error override (quota / reaper rows)", () => {
 
     expect(w.find('[data-test="protocol-run-summary-stub"]').exists()).toBe(false);
     expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+  });
+});
+
+// `startLoad` is a sibling of the steps array: row 0 has no number and no place in any count.
+describe("RunDetail — start load (row 0)", () => {
+  const startLoad = (overrides: Record<string, unknown> = {}) => ({
+    step_id: "_start",
+    status: "ok",
+    duration_ms: 420,
+    error: "",
+    screenshot_key: null,
+    url: "https://app.test/",
+    ...overrides,
+  });
+
+  const withStartLoad = (overrides: Record<string, unknown> = {}) => ({
+    ...mockRunDetail,
+    recordedSteps: [
+      { id: "s1", action: "click", name: "Click Sign In", selector: "[data-test=signin]", url: "" },
+    ],
+    lastAttemptSteps: [
+      { step_id: "s1", status: "ok", duration_ms: 300, error: "", screenshot_key: null },
+    ],
+    startLoad: startLoad(),
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    // The label interpolates the URL; a `t` that only echoes the key would hide it.
+    vi.mocked(useI18n).mockImplementation(
+      () =>
+        ({
+          t: (key: string, params?: Record<string, unknown>) =>
+            params && typeof params.url === "string" ? `${key} ${params.url}` : key,
+        }) as any,
+    );
+  });
+
+  afterEach(() => {
+    vi.mocked(useI18n).mockImplementation(() => ({ t: (key: string) => key }) as any);
+    mockRunDetailRef.value = { ...mockRunDetail };
+  });
+
+  async function mountWithRun(detail: Record<string, unknown>) {
+    mockRunDetailRef.value = null;
+    const w = mountComponent();
+    await flushPromises();
+    mockRunDetailRef.value = detail;
+    await flushPromises();
+    return w;
+  }
+
+  /** Whether `a` comes before `b` in document order. */
+  function precedes(a: Element, b: Element): boolean {
+    return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }
+
+  it("renders row 0 above Step 1 with the Open label and its timing, and no step number", async () => {
+    const w = await mountWithRun(withStartLoad());
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    const step1 = w.find('[data-test="o2-table-row-0"]');
+    expect(step1.exists()).toBe(true);
+    expect(precedes(row0.element, step1.element)).toBe(true);
+    expect(row0.text()).toContain("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(row0.text()).toContain("420ms");
+    expect(row0.text()).not.toMatch(/^\s*\d/);
+    // Step 1 keeps its number: row 0 shifted nothing.
+    expect(step1.text()).toContain("1");
+    expect(step1.text()).toContain("Click Sign In");
+    w.unmount();
+  });
+
+  it("excludes row 0 from the Steps badge", async () => {
+    const w = await mountWithRun(withStartLoad());
+
+    const tab = w.find('[data-test="synthetics-run-detail-tab-steps"]');
+    expect(tab.find(".obadge-stub").text()).toBe("1");
+    expect(
+      w
+        .findAll("[data-test]")
+        .filter((el) => /^o2-table-row-\d+$/.test(el.attributes("data-test")!)),
+    ).toHaveLength(1);
+    w.unmount();
+  });
+
+  it("names the start load, not a Step, when the run failed opening the Starting URL", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        error: "net::ERR_NAME_NOT_RESOLVED",
+        startLoad: startLoad({ status: "fail", error: "net::ERR_NAME_NOT_RESOLVED" }),
+        failureDetail: {
+          stepId: "_start",
+          stepName: "",
+          stepIndex: 0,
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          candidatesTried: [],
+          settleSignals: [],
+          settleMs: null,
+          cls: 0,
+          ttfbMs: 0,
+        },
+      }),
+    );
+
+    const infoBar = w.find('[data-test="synthetics-run-detail-info-bar"]');
+    expect(infoBar.text()).toContain("synthetics.runDetail.failedAtStartLoad");
+    expect(infoBar.text()).not.toContain("synthetics.runDetail.failedAtStep");
+    expect(w.text()).not.toContain("_start");
+    w.unmount();
+  });
+
+  it("shows the start load's error and screenshot on row 0", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        startLoad: startLoad({
+          status: "fail",
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          screenshot_key: "shots/_start.png",
+        }),
+      }),
+    );
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+    expect(row0.find("img").exists()).toBe(true);
+    w.unmount();
+  });
+
+  it("renders a run with no start load exactly as before", async () => {
+    const w = await mountWithRun(withStartLoad({ startLoad: null }));
+
+    expect(w.find('[data-test="synthetics-journey-start-row"]').exists()).toBe(false);
+    expect(
+      w.find('[data-test="synthetics-run-detail-tab-steps"]').find(".obadge-stub").text(),
+    ).toBe("1");
+    expect(w.find('[data-test="o2-table-row-0"]').text()).toContain("Click Sign In");
+    w.unmount();
   });
 });
