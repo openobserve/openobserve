@@ -2852,7 +2852,7 @@ async fn process_destination_node(
                     node.id.to_string(),
                     node.node_type(),
                     format!(
-                        "destination {} is an alert destination and not not supported in workflows",
+                        "destination {} is an alert destination and is not supported in workflows",
                         destination.destination_id
                     ),
                     None,
