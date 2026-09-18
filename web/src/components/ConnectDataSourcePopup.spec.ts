@@ -326,10 +326,10 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("closes and fires the dismissed event when the text link is clicked", async () => {
-      const dismissLink = wrapper.find('[data-test="connect-data-source-popup-dismiss-link"]');
+    it("closes and fires the dismissed event when the dialog's close button is clicked", async () => {
+      const closeBtn = wrapper.find('[data-test="o-dialog-close-btn"]');
 
-      await dismissLink.trigger("click");
+      await closeBtn.trigger("click");
 
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_dismissed",
@@ -367,23 +367,9 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="connect-data-source-popup-connect-btn"]').text()).toContain(
         "Connect a data source",
       );
-      expect(wrapper.find('[data-test="connect-data-source-popup-dismiss-link"]').text()).toBe(
-        "I'll do this later",
-      );
     });
 
-    it("renders the dismiss link as an OButton with the ghost-muted variant", async () => {
-      wrapper = buildWrapper();
-      // Settle the in-flight summary check before the test ends, so it can't
-      // resolve mid-way through a later test and race its localStorage state.
-      await flushPromises();
-
-      const dismissLink = wrapper.find('[data-test="connect-data-source-popup-dismiss-link"]');
-      expect(dismissLink.attributes("data-o2-btn")).toBeDefined();
-      expect(dismissLink.attributes("data-o2-variant")).toBe("ghost-muted");
-    });
-
-    it("passes size='sm' and show-close=false to ODialog", async () => {
+    it("passes size='sm' to ODialog", async () => {
       wrapper = buildWrapper();
       await flushPromises();
 
