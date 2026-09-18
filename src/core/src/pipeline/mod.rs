@@ -61,6 +61,16 @@ async fn validate_no_javascript_functions(pipeline: &Pipeline) -> Result<(), Pip
     Ok(())
 }
 
+/// An absent source org_id would slip past the realtime exclusivity check and never
+/// match the execution cache key, both of which compare fully-qualified StreamParams.
+fn default_source_org(pipeline: &mut Pipeline) {
+    if let PipelineSource::Realtime(stream) = &mut pipeline.source
+        && stream.org_id.is_empty()
+    {
+        stream.org_id = pipeline.org.clone().into();
+    }
+}
+
 #[tracing::instrument(skip(pipeline))]
 pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
     // check if id is missing
@@ -69,6 +79,8 @@ pub async fn save_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> 
             "Missing pipeline ID".to_string(),
         ));
     }
+    default_source_org(&mut pipeline);
+
     // User pipelines: only one realtime pipeline per stream
     // Evaluation pipelines: any number allowed, no exclusivity check
     if pipeline.is_user()
@@ -127,6 +139,8 @@ pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineEr
 
 #[tracing::instrument(skip(pipeline))]
 pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
+    default_source_org(&mut pipeline);
+
     let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
         return Err(PipelineError::NotFound(pipeline.id));
     };
