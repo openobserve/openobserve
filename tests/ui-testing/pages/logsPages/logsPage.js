@@ -227,6 +227,11 @@ export class LogsPage {
         // Always-visible first sentence of the error (carries the field/function name).
         // Hero layout: error-detail-summary · Block layout: query-error-summary
         this.searchErrorSummary = '[data-test="error-detail-summary"], [data-test="query-error-summary"]';
+        // Stream-not-found filter error (Index.vue filterErrMsg branch). The summary line
+        // carries the exact `Stream "…" does not exist` text and is scoped to the filter-error
+        // container so it never collides with a backend query error panel.
+        this.streamNotFoundError = '[data-test="logs-search-filter-error-message"]';
+        this.streamNotFoundSummary = '[data-test="logs-search-filter-error-message"] [data-test="error-detail-summary"]';
 
         // Download locators (SearchBar.vue more-options dropdown + custom-download ODialog)
         this.moreOptionsBtn = '[data-test="logs-search-bar-more-options-btn"]';
@@ -2819,7 +2824,8 @@ export class LogsPage {
                 if (!host || !window.monaco?.editor?.getEditors) return false;
                 const ed = window.monaco.editor.getEditors().find((e) => host.contains(e.getDomNode()));
                 if (!ed) return false;
-                return (ed.getValue() || '').includes(expected);
+                const value = ed.getValue() || '';
+                return expected === '' ? value === '' : value.includes(expected);
             },
             { selector: this.queryEditor, expected: substring },
             { timeout }
@@ -3944,6 +3950,40 @@ export class LogsPage {
             `[data-test="logs-search-error-state"], [data-test="logs-search-filter-error-message"]`
         ).first();
         return await expect(errorLocator).toBeVisible({ timeout: 30000 });
+    }
+
+    /**
+     * Asserts the stream-not-found message shows the exact `Stream "<name>" does not
+     * exist` text, scoped to the filter-error container's summary line so it never
+     * collides with a backend query error panel.
+     * @param {string} streamName
+     */
+    async expectStreamNotFoundMessage(streamName) {
+        const summary = this.page.locator(this.streamNotFoundSummary);
+        await expect(summary, `Stream-not-found message should name "${streamName}"`).toContainText(
+            `Stream "${streamName}" does not exist`,
+            { timeout: 30000 },
+        );
+        testLogger.info(`Stream-not-found message shown for ${streamName}`);
+    }
+
+    /**
+     * Asserts the stream-not-found error state is no longer visible.
+     */
+    async expectStreamNotFoundMessageNotVisible() {
+        const errorState = this.page.locator(this.streamNotFoundError);
+        await expect(errorState, 'Stream-not-found message should be dismissed').not.toBeVisible({ timeout: 30000 });
+        testLogger.info('Stream-not-found message is not visible');
+    }
+
+    /**
+     * Asserts the generic "pick a stream" empty state is NOT visible — the regression
+     * this feature fixes is the empty state shadowing the stream-not-found message.
+     */
+    async expectNoStreamSelectedTextNotVisible() {
+        const emptyState = this.page.locator(this.noStreamHero);
+        await expect(emptyState, 'Generic no-stream-selected state should not be visible').not.toBeVisible({ timeout: 10000 });
+        testLogger.info('Generic no-stream-selected state is not visible');
     }
 
     async expectSqlErrorStateNotVisible(timeout = 5000) {
