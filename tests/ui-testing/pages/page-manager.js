@@ -48,6 +48,7 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -190,6 +191,7 @@ class PageManager {
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
+    this.splunkHecPage = new SplunkHecPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
