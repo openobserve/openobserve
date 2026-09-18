@@ -24,10 +24,14 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
+const TableRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/TableRenderer.vue"),
 );
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
@@ -90,17 +94,22 @@ const cols = computed((): string[] => {
     ...keys.filter((k) => k !== "_timestamp" && !k.startsWith("_")),
   ];
 });
-// OTable column defs for the results grid (same table component as the alert list).
-const resultColumns = computed<OTableColumnDef[]>(() => [
-  ...(cols.value.length ? cols.value : ["_timestamp", "source"]).map((c) => ({
-    id: c,
-    header: c === "_timestamp" ? t("panel.logExplorer.timestamp") : raw(c),
-    accessorKey: c,
-  })),
-  // Right-pinned so the INSIGHTS affordance stays visible past the horizontal scroll.
-  { id: "__nav", header: raw(""), accessorKey: "__nav", pinned: "right", size: 48, minSize: 48 },
-]);
-const resultPageSizeOptions = [50, 100, 250, 500];
+// Feed the dashboard table-panel renderer so results match native table panels.
+const tableData = computed(() => ({
+  columns: [
+    ...(cols.value.length ? cols.value : ["_timestamp", "source"]).map((f) => ({
+      name: f,
+      field: f,
+      label: f === "_timestamp" ? t("panel.logExplorer.timestamp") : f,
+      align: "left",
+      ...(f === "_timestamp" ? { format: (v: any) => fmtTs(v) } : {}),
+    })),
+    // Trailing right-pinned open-insights affordance (rendered via #cell-__action).
+    { name: "__action", field: "__action", label: "", pinned: "right", size: 48, minSize: 48 },
+  ],
+  rows: events.value,
+}));
+const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 const customSql = ref("");
@@ -771,56 +780,71 @@ function openInLogs() {
         }}</code>
       </div>
 
-      <!-- ── Results — same OTable as the alert list (sticky header, loading
-         skeleton, server pagination); no hand-rolled table/header gap ── -->
-      <OTable
+      <!-- ── Results — rendered by the dashboard table-panel renderer for parity ── -->
+      <div
         v-else
-        class="min-h-0 flex-1"
-        :frame="false"
-        :data="events"
-        :columns="resultColumns"
-        :loading="loading"
-        :horizontal-scroll="true"
-        :row-class="(row: any) => (selectedEvent === row ? 'dld-row--active' : '')"
-        pagination="server"
-        :current-page="page + 1"
-        :total-count="total"
-        :page-size="pageSize"
-        :page-size-options="resultPageSizeOptions"
-        width="100%"
-        :show-global-filter="false"
-        :default-columns="false"
+        class="relative flex min-h-0 flex-1 flex-col"
         data-test="log-explorer-results-table"
-        @update:current-page="(p: number) => goToPage(p - 1)"
-        @update:page-size="(n: number) => (pageSize = n)"
-        @row-click="(row: any) => openEventDetail(row)"
       >
-        <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>
-        <template #cell-__nav="{ row }">
-          <div class="flex w-full justify-end">
-            <OButton
-              size="icon-sm"
-              variant="ghost"
-              icon-left="chevron-right"
-              :aria-label="t('panel.logExplorer.detail.insights')"
-              data-test="log-explorer-row-open"
-              @click.stop="openEventDetail(row)"
-            >
-              <OTooltip :content="t('panel.logExplorer.detail.insights')" />
-            </OButton>
-          </div>
-        </template>
-        <template #empty>
-          <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
-            <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
-            <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
-            <code
-              class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-              >{{ customSql }}</code
-            >
-          </div>
-        </template>
-      </OTable>
+        <OInnerLoading :showing="loading" size="sm" :label="t('common.loading')" />
+        <TableRenderer
+          :data="tableData"
+          :show-pagination="false"
+          class="min-h-0 flex-1"
+          @row-click="(_evt: any, row: any) => openEventDetail(row)"
+        >
+          <!-- Plain clickable icon (16px) — visible chevron that stays under the 22px row height. -->
+          <template #cell-__action="{ row }">
+            <div class="flex h-full w-full items-center justify-end">
+              <span
+                class="text-text-secondary hover:text-accent flex cursor-pointer"
+                data-test="log-explorer-row-open"
+                @click.stop="openEventDetail(row)"
+              >
+                <OIcon name="chevron-right" size="sm" />
+                <OTooltip :content="t('panel.logExplorer.detail.insights')" />
+              </span>
+            </div>
+          </template>
+          <!-- Always render a container so TableRenderer's default "No Data" fallback
+               never triggers; the loader overlay covers this while fetching. -->
+          <template #empty>
+            <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
+              <template v-if="!loading">
+                <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
+                <span class="text-text-secondary text-sm">{{
+                  t("panel.logExplorer.noEvents")
+                }}</span>
+                <code
+                  class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
+                  >{{ customSql }}</code
+                >
+              </template>
+            </div>
+          </template>
+        </TableRenderer>
+
+        <!-- Server pagination: TableRenderer shows one loaded page; controls fetch the next. -->
+        <div
+          v-if="total > 0"
+          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
+        >
+          <div class="flex-1" />
+          <TablePaginationControls
+            :show-pagination="true"
+            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
+            :total-rows="total"
+            :pages-number="resultTotalPages"
+            :is-first-page="page === 0"
+            :is-last-page="page >= resultTotalPages - 1"
+            @update:rows-per-page="(n: number) => (pageSize = n)"
+            @first-page="goToPage(0)"
+            @prev-page="goToPage(page - 1)"
+            @next-page="goToPage(page + 1)"
+            @last-page="goToPage(resultTotalPages - 1)"
+          />
+        </div>
+      </div>
     </div>
 
     <!-- ── DETAIL MODE: pushed in place of the list (single surface, no stacked drawer) ── -->
@@ -1351,14 +1375,6 @@ function openInLogs() {
 .dld-editor__body :deep(textarea:focus) {
   border-left-color: color-mix(in srgb, var(--color-accent) 90%, transparent);
   outline: none;
-}
-
-/* Active results row (selected event) — applied to OTable's row via :row-class. */
-.dld-row--active {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
-.dld-row--active:hover {
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
 }
 
 /* ── Insight sections ────────────────────────────────────────────────────── */
