@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { cleanAggregationQuery, withCompositeGroupLabel } from "./aggregationPreviewQuery";
+import {
+  buildCountChartQuery,
+  cleanAggregationQuery,
+  withCompositeGroupLabel,
+} from "./aggregationPreviewQuery";
 
 describe("cleanAggregationQuery", () => {
   it("drops the HAVING clause on a plain query", () => {
@@ -120,5 +124,65 @@ describe("withCompositeGroupLabel", () => {
     expect(out).toContain("'sort order by name'");
     expect(out).toContain("zo_group_label");
     expect(out).toMatch(/GROUP BY zo_sql_key, zo_group_label/i);
+  });
+});
+
+describe("buildCountChartQuery", () => {
+  it("rewrites a plain custom SQL query into a count-over-time query", () => {
+    const chartQuery = buildCountChartQuery('SELECT _timestamp FROM "bugtest"');
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("does not mistake a line comment's 'from' for the statement's real FROM", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT _timestamp -- pick the from column\nFROM "bugtest"',
+    );
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("does not mistake a block comment's 'from' for the statement's real FROM", () => {
+    const chartQuery = buildCountChartQuery('SELECT _timestamp /* from here */ FROM "bugtest"');
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("returns null rather than a broken query for a query that starts with a CTE", () => {
+    const chartQuery = buildCountChartQuery(
+      'WITH x AS (SELECT _timestamp FROM "bugtest") SELECT _timestamp FROM x',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("returns null rather than a broken query for a UNION", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT _timestamp FROM "bugtest" UNION ALL SELECT _timestamp FROM "bugtest"',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("returns null rather than a broken query for a JOIN", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT a._timestamp FROM "bugtest" a JOIN "bugtest" b ON a.svc = b.svc',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("still ignores a quoted filter value containing a real comment marker", () => {
+    const chartQuery = buildCountChartQuery(
+      "SELECT _timestamp FROM \"bugtest\" WHERE (note = '-- not a comment')",
+    );
+
+    expect(chartQuery).toContain("WHERE (note = '-- not a comment')");
   });
 });
