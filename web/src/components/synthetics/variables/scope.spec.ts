@@ -16,12 +16,15 @@
 import { describe, expect, it } from "vitest";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import {
-  GLOBAL_SCOPE,
+  canDeleteEnvironment,
   crossTierShadow,
   duplicateNameFor,
   duplicateSummary,
   duplicatePrefill,
   duplicateVariableNameFor,
+  globalEnvironment,
+  namedEnvironments,
+  railOrder,
   resolveScope,
 } from "./scope";
 import { ENVIRONMENT_NAME_RE, VARIABLE_NAME_RE } from "./SyntheticsVariableForm.schema";
@@ -46,6 +49,7 @@ function environment(name: string, variables: SyntheticsVariable[] = []): Synthe
     id: `id-${name}`,
     name,
     description: "",
+    is_global: false,
     created_at: 0,
     updated_at: 0,
     checks_count: 0,
@@ -53,25 +57,53 @@ function environment(name: string, variables: SyntheticsVariable[] = []): Synthe
   };
 }
 
-describe("GLOBAL_SCOPE", () => {
-  it("cannot collide with an environment name", () => {
-    // Environment names may not begin with `_` — that prefix is reserved
-    // because names become OpenFGA object ids — so this sentinel is safe.
-    expect(GLOBAL_SCOPE.startsWith("_")).toBe(true);
-    expect(ENVIRONMENT_NAME_RE.test(GLOBAL_SCOPE)).toBe(false);
+function globalEnv(variables: SyntheticsVariable[] = []): SyntheticsEnvironment {
+  return { ...environment("global", variables), id: "global_acme", is_global: true };
+}
+
+describe("the global environment", () => {
+  const envs = [environment("prod"), globalEnv(), environment("staging")];
+
+  it("is found by its flag, not by its name", () => {
+    expect(globalEnvironment(envs)?.id).toBe("global_acme");
+    expect(globalEnvironment([environment("prod")])).toBeNull();
+  });
+
+  it("is pinned first in the rail, exactly once", () => {
+    const names = railOrder(envs).map((e) => e.name);
+    expect(names).toEqual(["global", "prod", "staging"]);
+    expect(names.filter((n) => n === "global")).toHaveLength(1);
+  });
+
+  it("is left out of the tier that overrides it", () => {
+    expect(namedEnvironments(envs).map((e) => e.name)).toEqual(["prod", "staging"]);
+  });
+
+  it("offers no delete, while every other environment does", () => {
+    expect(canDeleteEnvironment(globalEnv())).toBe(false);
+    expect(canDeleteEnvironment(environment("prod"))).toBe(true);
   });
 });
 
 describe("resolveScope", () => {
-  const envs = [environment("prod", [variable({ id: "p1" })]), environment("staging")];
+  const global = globalEnv([variable({ id: "inline" })]);
+  const envs = [global, environment("prod", [variable({ id: "p1" })]), environment("staging")];
   const globals = [variable({ id: "g1" }), variable({ id: "g2" })];
 
-  it("shows the globals for the global scope", () => {
-    const scope = resolveScope(GLOBAL_SCOPE, envs, globals);
+  it("shows the globals from /variables when global is selected", () => {
+    const scope = resolveScope("global", envs, globals);
 
     expect(scope.isGlobal).toBe(true);
-    expect(scope.environment).toBeNull();
+    expect(scope.environment?.id).toBe("global_acme");
     expect(scope.variables.map((v) => v.id)).toEqual(["g1", "g2"]);
+  });
+
+  it("starts on global before anything is selected", () => {
+    expect(resolveScope("", envs, globals).isGlobal).toBe(true);
+    // Before the list loads there is no global row yet, only its variables.
+    const unloaded = resolveScope("", [], globals);
+    expect(unloaded.isGlobal).toBe(true);
+    expect(unloaded.environment).toBeNull();
   });
 
   it("shows one environment's own variables", () => {
@@ -198,5 +230,12 @@ describe("crossTierShadow", () => {
 
   it("an unshadowed global reports nothing", () => {
     expect(crossTierShadow("ORG", null, envs, globals)).toBeNull();
+  });
+  it("never counts the global environment as overriding itself", () => {
+    const withGlobal = [
+      ...envs,
+      { id: "g", name: "global", is_global: true, variables: [{ name: "ORG" }] },
+    ];
+    expect(crossTierShadow("ORG", null, withGlobal, globals)).toBeNull();
   });
 });

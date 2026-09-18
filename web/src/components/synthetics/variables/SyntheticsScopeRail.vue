@@ -14,10 +14,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-The scope selector. Global sits above the environments with its own icon,
-because "applies everywhere" is a different kind of thing from "applies in
-staging" - but it is still just a filter over the same list, edited with the
-same drawer.
+The scope selector. Global is the org's reserved environment, pinned first.
 -->
 
 <template>
@@ -59,36 +56,23 @@ same drawer.
         @update:model-value="$emit('update:modelValue', String($event))"
       >
         <OTab
-          v-if="globalMatches"
-          :name="GLOBAL_SCOPE"
-          class="min-h-6"
-          data-test="synthetics-scope-global"
-        >
-          <div class="flex w-full flex-nowrap items-center gap-2">
-            <OIcon name="public" size="sm" class="shrink-0" />
-            <span class="min-w-0 flex-1 truncate text-left">{{
-              t("synthetics.variables.global")
-            }}</span>
-            <span class="text-text-secondary shrink-0 tabular-nums">{{ globalCount }}</span>
-          </div>
-        </OTab>
-
-        <OTab
           v-for="env in filteredEnvironments"
           :key="env.id"
           :name="env.name"
           class="min-h-6"
-          :data-test="`synthetics-scope-${env.name}`"
+          :data-test="env.is_global ? 'synthetics-scope-global' : `synthetics-scope-${env.name}`"
         >
           <div class="group/row flex w-full flex-nowrap items-center gap-2">
-            <OIcon name="layers" size="sm" class="shrink-0" />
-            <span class="min-w-0 flex-1 truncate text-left" :title="env.name">{{ env.name }}</span>
+            <OIcon :name="env.is_global ? 'public' : 'layers'" size="sm" class="shrink-0" />
+            <span class="min-w-0 flex-1 truncate text-left" :title="env.name">{{
+              labelFor(env)
+            }}</span>
 
             <!-- The count yields to the menu rather than sitting beside it, so
                  the row does not reflow when the pointer enters it. -->
             <span
               class="text-text-secondary shrink-0 tabular-nums group-hover/row:hidden group-has-[[data-state=open]]/row:hidden"
-              >{{ env.variables.length }}</span
+              >{{ env.is_global ? globalCount : env.variables.length }}</span
             >
 
             <div
@@ -121,12 +105,13 @@ same drawer.
                   {{ t("synthetics.duplicate.action") }}
                 </ODropdownItem>
 
-                <ODropdownSeparator />
+                <ODropdownSeparator v-if="canDeleteEnvironment(env)" />
 
                 <!-- Checks and secrets are blocks the server refuses even with
                      force, so the item carries the reason instead of a tooltip:
                      a disabled item dispatches no hover to open one. -->
                 <ODropdownItem
+                  v-if="canDeleteEnvironment(env)"
                   variant="destructive"
                   :disabled="Boolean(deleteBlockFor(env))"
                   :data-test="`synthetics-scope-delete-${env.name}`"
@@ -161,11 +146,11 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
-import { GLOBAL_SCOPE } from "./scope";
+import { canDeleteEnvironment, railOrder } from "./scope";
 import { environmentDeleteBlock } from "./usage";
 
 const props = defineProps<{
-  /** `GLOBAL_SCOPE` or an environment NAME. */
+  /** The selected environment's NAME. */
   modelValue: string;
   environments: SyntheticsEnvironment[];
   globalCount: number;
@@ -185,14 +170,15 @@ const searchQuery = ref("");
 // one either. The selection is held by the parent and survives being filtered
 // out, which is what keeps the pane rendering while the rail is narrowed.
 const needle = computed(() => searchQuery.value.trim().toLowerCase());
-const globalMatches = computed(
-  () => !needle.value || t("synthetics.variables.global").toLowerCase().includes(needle.value),
-);
 const filteredEnvironments = computed(() =>
-  needle.value
-    ? props.environments.filter((e) => e.name.toLowerCase().includes(needle.value))
-    : props.environments,
+  railOrder(props.environments).filter(
+    (env) => !needle.value || labelFor(env).toLowerCase().includes(needle.value),
+  ),
 );
+
+function labelFor(env: SyntheticsEnvironment): string {
+  return env.is_global ? t("synthetics.variables.global") : env.name;
+}
 
 // Pure, so the rail can answer this without a request and stay presentational.
 function deleteBlockFor(env: SyntheticsEnvironment) {

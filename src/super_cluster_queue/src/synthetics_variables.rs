@@ -79,6 +79,7 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
         }
         SyntheticsVariablesMessage::VariablePut { org_id, payload } => {
             let record = variable_record(&org_id, payload).await?;
+            ensure_global_parent(conn, &record).await?;
             synthetics_variables::apply_upsert(conn, &record).await?;
         }
         SyntheticsVariablesMessage::VariableDelete { org_id, id } => {
@@ -121,13 +122,32 @@ async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
             Write::Environment(record) => {
                 synthetics_environments::apply_upsert(&txn, record).await?
             }
-            Write::Variable(record) => synthetics_variables::apply_upsert(&txn, record).await?,
+            Write::Variable(record) => {
+                ensure_global_parent(&txn, record).await?;
+                synthetics_variables::apply_upsert(&txn, record).await?
+            }
             Write::Delete(id) => {
                 synthetics_variables::delete_row(&txn, org_id, id).await?;
             }
         }
     }
     txn.commit().await?;
+    Ok(())
+}
+
+/// Mints this region's global environment before a variable that points at it.
+async fn ensure_global_parent<C: ConnectionTrait>(
+    conn: &C,
+    record: &SyntheticsVariableRecord,
+) -> Result<()> {
+    if record.env == synthetics_environments::global_environment_id(&record.org_id) {
+        synthetics_environments::get_or_create_global(
+            conn,
+            &record.org_id,
+            config::utils::time::now_micros(),
+        )
+        .await?;
+    }
     Ok(())
 }
 
@@ -145,6 +165,7 @@ fn environment_record(payload: SyntheticsEnvironmentPayload) -> SyntheticsEnviro
         name: payload.name,
         description: payload.description,
         owner: payload.owner,
+        is_global: payload.is_global,
         created_at: payload.created_at,
         updated_at: payload.updated_at,
     }
@@ -165,7 +186,10 @@ async fn variable_record(
     Ok(SyntheticsVariableRecord {
         id: payload.id,
         org_id: payload.org_id,
-        env: payload.env,
+        // The wire keeps `env` optional; an absent one can only mean the global environment.
+        env: payload
+            .env
+            .unwrap_or_else(|| synthetics_environments::global_environment_id(org_id)),
         name: payload.name,
         value,
         kind: payload.kind,
@@ -264,11 +288,9 @@ mod tests {
         .unwrap();
         // The same uniqueness the migration creates, which is what the second
         // write in the batch below collides with.
-        db.execute_unprepared(
-            "CREATE UNIQUE INDEX u ON synthetics_variables (org_id, (COALESCE(env,'')), name)",
-        )
-        .await
-        .unwrap();
+        db.execute_unprepared("CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)")
+            .await
+            .unwrap();
 
         let mut first = variable_record("org1", variable("")).await.unwrap();
         first.id = "var-1".to_string();
@@ -291,6 +313,57 @@ mod tests {
         assert!(left.is_empty(), "the first write must have rolled back");
     }
 
+    #[tokio::test]
+    async fn a_global_variable_lands_in_a_region_that_has_no_global_environment_yet() {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database, EntityTrait, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        db.execute_unprepared("PRAGMA foreign_keys = ON")
+            .await
+            .unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(
+            &schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
+        ))
+        .await
+        .unwrap();
+        let mut vars =
+            schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity);
+        vars.foreign_key(
+            sea_orm::sea_query::ForeignKey::create()
+                .from(
+                    infra::table::entity::synthetics_variables::Entity,
+                    infra::table::entity::synthetics_variables::Column::Env,
+                )
+                .to(
+                    infra::table::entity::synthetics_environments::Entity,
+                    infra::table::entity::synthetics_environments::Column::Id,
+                ),
+        );
+        db.execute(backend.build(&vars)).await.unwrap();
+
+        let payload = SyntheticsVariablePayload {
+            env: None,
+            kind: "plain".to_string(),
+            ..variable("")
+        };
+        let record = variable_record("org1", payload).await.unwrap();
+        apply_ops(&db, "org1", &[Write::Variable(record)])
+            .await
+            .expect("the global parent must be minted before the variable");
+
+        let envs = infra::table::entity::synthetics_environments::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(envs.len(), 1);
+        assert!(envs[0].is_global);
+        assert_eq!(envs[0].id, "global_org1");
+    }
+
     #[test]
     fn an_environment_crosses_with_the_origin_id() {
         // A replicated check stores environment ids, so a locally minted id
@@ -301,10 +374,39 @@ mod tests {
             name: "production".to_string(),
             description: String::new(),
             owner: None,
+            is_global: false,
             created_at: 1,
             updated_at: 2,
         });
         assert_eq!(record.id, "env-prod");
         assert_eq!(record.name, "production");
+        assert!(!record.is_global);
+    }
+
+    #[test]
+    fn the_global_flag_crosses_with_the_row() {
+        let record = environment_record(SyntheticsEnvironmentPayload {
+            id: "global_org1".to_string(),
+            org_id: "org1".to_string(),
+            name: "global".to_string(),
+            description: String::new(),
+            owner: None,
+            is_global: true,
+            created_at: 1,
+            updated_at: 2,
+        });
+        assert!(record.is_global);
+        assert_eq!(record.id, "global_org1");
+    }
+
+    #[tokio::test]
+    async fn a_variable_without_an_environment_lands_in_the_global_one() {
+        let payload = SyntheticsVariablePayload {
+            env: None,
+            kind: "plain".to_string(),
+            ..variable("")
+        };
+        let record = variable_record("org1", payload).await.unwrap();
+        assert_eq!(record.env, "global_org1");
     }
 }

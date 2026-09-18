@@ -52,7 +52,7 @@ const VARIABLE_CACHE_TTL: Duration = Duration::from_secs(15);
 pub struct SyntheticsVariableRecord {
     pub id: String,
     pub org_id: String,
-    pub env: Option<String>,
+    pub env: String,
     pub name: String,
     pub value: String,
     pub kind: String,
@@ -241,7 +241,7 @@ pub async fn set_env<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
     id: &str,
-    env: Option<&str>,
+    env: &str,
     updated_at: i64,
 ) -> Result<bool, errors::Error> {
     let Some(model) = Entity::find()
@@ -253,7 +253,7 @@ pub async fn set_env<C: ConnectionTrait>(
         return Ok(false);
     };
     let mut am: ActiveModel = model.into();
-    am.env = Set(env.map(str::to_string));
+    am.env = Set(env.to_string());
     am.updated_at = Set(updated_at);
     match Entity::update(am).exec(conn).await {
         Ok(_) => {
@@ -363,7 +363,7 @@ mod tests {
         SyntheticsVariableRecord {
             id: "id1".into(),
             org_id: "acme".into(),
-            env: Some("env1".into()),
+            env: "env1".into(),
             name: "TOKEN".into(),
             value: value.into(),
             kind: kind.into(),

@@ -25,6 +25,8 @@ pub struct Model {
     pub name: String,
     pub description: String,
     pub owner: Option<String>,
+    /// The org's reserved `global` environment; at most one row per org.
+    pub is_global: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }

@@ -39,6 +39,7 @@ const env = (id: string, name: string, description = "") => ({
   id,
   name,
   description,
+  is_global: false,
   created_at: 0,
   updated_at: 0,
   checks_count: 0,
@@ -68,6 +69,18 @@ describe("CheckEnvironments", () => {
   afterEach(() => {
     wrapper?.unmount();
     vi.clearAllMocks();
+  });
+
+  it("does not offer the global environment, which already applies to every run", async () => {
+    listEnvironmentsMock.mockResolvedValueOnce({
+      data: [{ ...env("g", "global"), is_global: true }, env("e1", "staging")],
+    } as never);
+    wrapper = mountCard(checkWith([]));
+    await flushPromises();
+
+    expect(wrapper.find(sel("-row-global")).exists()).toBe(false);
+    expect(wrapper.find(sel("-row-staging")).exists()).toBe(true);
+    expect(wrapper.find(sel("-locked-row")).exists()).toBe(false);
   });
 
   it("renders one checkbox per environment with its description", async () => {

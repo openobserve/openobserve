@@ -15,14 +15,6 @@
 
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 
-/**
- * The rail's value for the unscoped tier.
- *
- * Not an environment name: an environment may not begin with `_`, precisely
- * because names become OpenFGA object ids, so this can never collide with one.
- */
-export const GLOBAL_SCOPE = "_global";
-
 /** The cross-tier relation of one name, for notes and delete dialogs. */
 export type CrossTierShadow =
   { kind: "overrides-global" } | { kind: "overridden-in"; envs: string[] } | null;
@@ -42,18 +34,40 @@ export function crossTierShadow(
     return globals.some((g) => g.name === name) ? { kind: "overrides-global" } : null;
   }
   const envs = environments
-    .filter((env) => (env.variables ?? []).some((v) => v.name === name))
+    .filter((env) => !env.is_global && (env.variables ?? []).some((v) => v.name === name))
     .map((env) => env.name);
   return envs.length ? { kind: "overridden-in", envs } : null;
 }
 
 /** What the right-hand pane renders for the selected scope. */
 export interface ScopeView {
-  /** The environment, or null when Global is selected. */
+  /** The selected environment; the global one (null until loaded) when Global is selected. */
   environment: SyntheticsEnvironment | null;
   variables: SyntheticsVariable[];
-  /** Global has no entity behind it, so it has no Edit, Duplicate or Delete. */
+  /** Global variables live at `/synthetics/variables`, not under the environment's path. */
   isGlobal: boolean;
+}
+
+/** The org's reserved global environment, or null before the list has loaded. */
+export function globalEnvironment(
+  environments: SyntheticsEnvironment[],
+): SyntheticsEnvironment | null {
+  return environments.find((env) => env.is_global) ?? null;
+}
+
+/** Every environment but global: the tier whose rows override it. */
+export function namedEnvironments(environments: SyntheticsEnvironment[]): SyntheticsEnvironment[] {
+  return environments.filter((env) => !env.is_global);
+}
+
+/** Global pinned first, the rest in the server's order. */
+export function railOrder(environments: SyntheticsEnvironment[]): SyntheticsEnvironment[] {
+  return [...environments].sort((a, b) => Number(b.is_global) - Number(a.is_global));
+}
+
+/** The server refuses to delete global for everyone, so the rail offers no delete. */
+export function canDeleteEnvironment(environment: SyntheticsEnvironment): boolean {
+  return !environment.is_global;
 }
 
 /**
@@ -69,13 +83,11 @@ export function resolveScope(
   environments: SyntheticsEnvironment[],
   globals: SyntheticsVariable[],
 ): ScopeView {
-  if (selected !== GLOBAL_SCOPE) {
-    const environment = environments.find((e) => e.name === selected);
-    if (environment) {
-      return { environment, variables: environment.variables, isGlobal: false };
-    }
+  const environment = environments.find((e) => e.name === selected && !e.is_global);
+  if (environment) {
+    return { environment, variables: environment.variables, isGlobal: false };
   }
-  return { environment: null, variables: globals, isGlobal: true };
+  return { environment: globalEnvironment(environments), variables: globals, isGlobal: true };
 }
 
 /**

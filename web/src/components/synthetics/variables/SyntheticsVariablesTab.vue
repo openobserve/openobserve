@@ -23,13 +23,14 @@ production - the most frequent movement here - costs no network call.
   <div class="flex min-h-0 flex-1 overflow-hidden">
     <div class="w-rail shrink-0 overflow-y-auto">
       <SyntheticsScopeRail
-        v-model="selectedScope"
+        :model-value="scope.environment?.name ?? ''"
         :environments="environments"
         :global-count="globals.length"
         @new-environment="openCreateEnvironment"
         @edit="openEditEnvironment"
         @duplicate="openDuplicateEnvironment"
         @delete="removeEnvironment"
+        @update:model-value="selectedScope = $event"
       />
     </div>
 
@@ -40,7 +41,7 @@ production - the most frequent movement here - costs no network call.
           :variables="scope.variables"
           :loading="loading"
           :environment="scope.isGlobal ? null : (scope.environment?.name ?? null)"
-          :environments="environments"
+          :environments="overridingEnvironments"
           :globals="globals"
           :scope-label="scopeLabel"
           :scope-summary="scopeSummary"
@@ -76,7 +77,7 @@ import SyntheticsScopeRail from "./SyntheticsScopeRail.vue";
 import SyntheticsVariablesList from "./SyntheticsVariablesList.vue";
 import SyntheticsEnvironmentForm from "./SyntheticsEnvironmentForm.vue";
 import SyntheticsDuplicateEnvironmentDialog from "./SyntheticsDuplicateEnvironmentDialog.vue";
-import { GLOBAL_SCOPE, resolveScope } from "./scope";
+import { namedEnvironments, resolveScope } from "./scope";
 import { environmentDeleteBlock } from "./usage";
 
 const { t } = useI18nTyped();
@@ -88,7 +89,8 @@ const globals = ref<SyntheticsVariable[]>([]);
 const loading = ref(false);
 // Held by NAME, not object: a refetch replaces every row, and an object-held
 // reference would keep rendering the pre-refresh variable list.
-const selectedScope = ref<string>(GLOBAL_SCOPE);
+// Empty until the user picks one, which resolves to the global environment.
+const selectedScope = ref<string>("");
 const environmentDrawer = ref({
   show: false,
   isEdit: false,
@@ -101,9 +103,9 @@ const duplicateSource = ref<SyntheticsEnvironment | null>(null);
 const listRef = ref<InstanceType<typeof SyntheticsVariablesList> | null>(null);
 
 const scope = computed(() => resolveScope(selectedScope.value, environments.value, globals.value));
+const overridingEnvironments = computed(() => namedEnvironments(environments.value));
 
-// Global has no record behind it, so the line that explains the tier stands in
-// for the usage count an environment carries.
+// The line that explains the tier stands in for the check count other environments show.
 const scopeLabel = computed(() =>
   scope.value.isGlobal ? t("synthetics.variables.global") : (scope.value.environment?.name ?? ""),
 );
@@ -175,7 +177,7 @@ async function removeEnvironment(environment: SyntheticsEnvironment) {
     // force is set once the user has seen the variables going with it.
     await syntheticsService.deleteEnvironment(org, environment.name, count > 0);
     // Only the selection needs moving, and only when it was the one deleted.
-    if (selectedScope.value === environment.name) selectedScope.value = GLOBAL_SCOPE;
+    if (selectedScope.value === environment.name) selectedScope.value = "";
     await refresh();
     toast({ variant: "success", message: t("synthetics.environments.deleted") });
   } catch (error: any) {

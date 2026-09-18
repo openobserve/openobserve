@@ -769,6 +769,8 @@ export interface SyntheticsEnvironment {
   name: string;
   description: string;
   owner?: string;
+  /** The org's reserved `global` environment, whose variables apply everywhere. */
+  is_global: boolean;
   created_at: number;
   updated_at: number;
   /** Checks pinned to this environment. Not derivable from this response. */

@@ -567,6 +567,7 @@ describe("CheckVariablesPanel", () => {
         id: `env-${name}`,
         name,
         description: "",
+        is_global: false,
         checks_count: 0,
         created_at: 0,
         updated_at: 0,

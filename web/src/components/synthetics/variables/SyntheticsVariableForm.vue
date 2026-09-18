@@ -152,7 +152,7 @@ export default defineComponent({
     const replacing = ref(false);
     const kindValue = ref<"plain" | "secret">("plain");
 
-    // A secret must carry an environment, so the global tab offers no such option.
+    // Global reads are open to everyone, so the server refuses a secret there.
     const kindOptions = computed(() =>
       props.environment
         ? [

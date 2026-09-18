@@ -145,6 +145,9 @@ describe("SyntheticsVariableForm — kind is fixed at creation", () => {
   it("keeps the Kind select disabled on the global tab, where a secret cannot exist", () => {
     wrapper = mountForm({ environment: null });
 
-    expect(wrapper.findComponent(OFormSelect).props("disabled")).toBe(true);
+    const select = wrapper.findComponent(OFormSelect);
+    expect(select.props("disabled")).toBe(true);
+    const values = (select.props("options") as { value: string }[]).map((o) => o.value);
+    expect(values).toEqual(["plain"]);
   });
 });

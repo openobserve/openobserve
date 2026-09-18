@@ -40,6 +40,9 @@ pub const MAX_ENVIRONMENT_NAME_LEN: usize = 64;
 /// overwrite the check's own auth at resolve time.
 pub const RESERVED_VARIABLE_PREFIX: &str = "_AUTH_";
 
+/// Reserved case-insensitively, because the name is also its OpenFGA object id.
+pub const GLOBAL_ENVIRONMENT_NAME: &str = "global";
+
 /// Whether a value is ever readable again after it is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -135,7 +138,7 @@ pub struct ResolvedVariablesGrouped {
 /// Where a variable is being moved to, for the two promote flows.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct PromoteVariableRequest {
-    /// Destination environment name, or None for the unscoped tier.
+    /// Destination environment name, or None for the global environment.
     #[serde(default)]
     pub environment: Option<String>,
 }
@@ -169,6 +172,7 @@ pub struct SyntheticsEnvironmentView {
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
+    pub is_global: bool,
     pub created_at: i64,
     pub updated_at: i64,
     /// Checks pinned to this environment. Not derivable from this response, so
@@ -181,7 +185,7 @@ pub struct SyntheticsEnvironmentView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SharedVariableScope {
     pub name: String,
-    /// `None` is the unscoped tier, which merges into every check in the org.
+    /// `None` is the global environment, which merges into every check in the org.
     pub env: Option<String>,
 }
 
@@ -320,6 +324,11 @@ pub fn validate_environment_name(name: &str) -> Result<(), String> {
                 .to_string(),
         );
     }
+    if name.eq_ignore_ascii_case(GLOBAL_ENVIRONMENT_NAME) {
+        return Err(format!(
+            "name: '{GLOBAL_ENVIRONMENT_NAME}' is reserved for the environment every org already has"
+        ));
+    }
     if !name
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
@@ -334,7 +343,7 @@ pub fn validate_environment_name(name: &str) -> Result<(), String> {
 /// Validates a create/update body against what is already stored.
 pub fn validate_variable_request(
     req: &SyntheticsVariableRequest,
-    env: Option<&str>,
+    in_global: bool,
     has_stored_value: bool,
     stored_kind: Option<SyntheticsVariableKind>,
 ) -> Result<(), String> {
@@ -350,12 +359,11 @@ pub fn validate_variable_request(
             "kind: a variable's kind is fixed when it is created; this one is stored as {stored}"
         ));
     }
-    if req.kind.unwrap_or_default() == SyntheticsVariableKind::Secret && env.is_none() {
-        return Err(
-            "kind: a secret must belong to an environment — that is what gives it an access \
-             boundary"
-                .to_string(),
-        );
+    if req.kind.unwrap_or_default() == SyntheticsVariableKind::Secret && in_global {
+        return Err(format!(
+            "kind: a secret cannot live in the '{GLOBAL_ENVIRONMENT_NAME}' environment — anyone \
+             may read it, so put the secret in the environment that should guard it"
+        ));
     }
     if req.value.is_none() && !has_stored_value {
         return Err("value: must be set when the variable has no stored value".to_string());
@@ -386,10 +394,15 @@ pub fn validate_variable_request(
 /// Validates an environment create/update body.
 pub fn validate_environment_request(req: &SyntheticsEnvironmentRequest) -> Result<(), String> {
     validate_environment_name(req.name.trim())?;
-    if req.description.len() > 4096 {
+    validate_environment_description(&req.description)
+}
+
+/// The description rule alone, for the global environment whose reserved name fails the name rule.
+pub fn validate_environment_description(description: &str) -> Result<(), String> {
+    if description.len() > 4096 {
         return Err(format!(
             "description: too long ({} > 4096 chars)",
-            req.description.len()
+            description.len()
         ));
     }
     Ok(())
@@ -439,7 +452,7 @@ fn over_cap_counts(state: &OrgVariableState) -> HashMap<String, Vec<usize>> {
             let mut names: BTreeSet<&str> = state
                 .shared
                 .iter()
-                // As `resolve_shared_variables`: unscoped is everywhere.
+                // As `resolve_shared_variables`: the global environment is everywhere.
                 .filter(|v| match (v.env.as_deref(), env) {
                     (None, _) => true,
                     (Some(row), Some(target)) => row == target,
@@ -495,15 +508,42 @@ mod tests {
     }
 
     #[test]
-    fn a_secret_without_an_environment_is_rejected() {
+    fn the_global_name_is_reserved_in_every_casing() {
+        for name in ["global", "Global", "GLOBAL"] {
+            let err = validate_environment_name(name).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+            let req = SyntheticsEnvironmentRequest {
+                name: format!(" {name} "),
+                description: String::new(),
+            };
+            assert!(validate_environment_request(&req).is_err(), "{name}");
+        }
+        assert!(validate_environment_name("global-eu").is_ok());
+        assert!(validate_environment_name("globals").is_ok());
+    }
+
+    #[test]
+    fn a_secret_in_the_global_environment_is_rejected() {
         let req = SyntheticsVariableRequest {
             name: "TOKEN".into(),
             value: Some("s3cret".into()),
             kind: Some(SyntheticsVariableKind::Secret),
             ..Default::default()
         };
-        assert!(validate_variable_request(&req, None, false, None).is_err());
-        assert!(validate_variable_request(&req, Some("env-id"), false, None).is_ok());
+        let err = validate_variable_request(&req, true, false, None).unwrap_err();
+        assert!(err.contains("global"), "{err}");
+        assert!(validate_variable_request(&req, false, false, None).is_ok());
+        let plain = SyntheticsVariableRequest {
+            kind: Some(SyntheticsVariableKind::Plain),
+            ..req
+        };
+        assert!(validate_variable_request(&plain, true, false, None).is_ok());
+    }
+
+    #[test]
+    fn the_description_rule_stands_alone_for_the_global_environment() {
+        assert!(validate_environment_description("shared defaults").is_ok());
+        assert!(validate_environment_description(&"x".repeat(4097)).is_err());
     }
 
     #[test]
@@ -515,8 +555,8 @@ mod tests {
             ..Default::default()
         };
         let stored = Some(SyntheticsVariableKind::Secret);
-        assert!(validate_variable_request(&req, Some("env-id"), true, stored).is_ok());
-        assert!(validate_variable_request(&req, Some("env-id"), false, stored).is_err());
+        assert!(validate_variable_request(&req, false, true, stored).is_ok());
+        assert!(validate_variable_request(&req, false, false, stored).is_err());
     }
 
     fn footprint(name: &str, own: &[&str], envs: &[&str]) -> CheckVariableFootprint {
@@ -835,13 +875,9 @@ mod tests {
             kind: Some(SyntheticsVariableKind::Plain),
             ..Default::default()
         };
-        let err = validate_variable_request(
-            &req,
-            Some("env-id"),
-            true,
-            Some(SyntheticsVariableKind::Secret),
-        )
-        .expect_err("demoting a secret must be rejected");
+        let err =
+            validate_variable_request(&req, false, true, Some(SyntheticsVariableKind::Secret))
+                .expect_err("demoting a secret must be rejected");
         assert!(err.starts_with("kind:"), "{err}");
     }
 
@@ -856,13 +892,8 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            validate_variable_request(
-                &req,
-                Some("env-id"),
-                true,
-                Some(SyntheticsVariableKind::Secret)
-            )
-            .is_ok()
+            validate_variable_request(&req, false, true, Some(SyntheticsVariableKind::Secret))
+                .is_ok()
         );
     }
 
@@ -876,7 +907,7 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            validate_variable_request(&req, None, true, Some(SyntheticsVariableKind::Plain))
+            validate_variable_request(&req, true, true, Some(SyntheticsVariableKind::Plain))
                 .is_ok()
         );
     }
@@ -892,13 +923,8 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            validate_variable_request(
-                &req,
-                Some("env-id"),
-                true,
-                Some(SyntheticsVariableKind::Plain)
-            )
-            .is_err()
+            validate_variable_request(&req, false, true, Some(SyntheticsVariableKind::Plain))
+                .is_err()
         );
     }
 
@@ -911,18 +937,13 @@ mod tests {
             ..Default::default()
         };
         assert!(
-            validate_variable_request(
-                &req,
-                Some("env-id"),
-                true,
-                Some(SyntheticsVariableKind::Secret)
-            )
-            .is_ok()
+            validate_variable_request(&req, false, true, Some(SyntheticsVariableKind::Secret))
+                .is_ok()
         );
     }
 
     /// No stored kind means there is nothing to change, so the only rule that applies is the
-    /// one that ties a secret to an environment.
+    /// one that keeps a secret out of the global environment.
     #[test]
     fn a_create_may_pick_either_kind() {
         for kind in [
@@ -935,7 +956,7 @@ mod tests {
                 kind: Some(kind),
                 ..Default::default()
             };
-            assert!(validate_variable_request(&req, Some("env-id"), false, None).is_ok());
+            assert!(validate_variable_request(&req, false, false, None).is_ok());
         }
     }
 

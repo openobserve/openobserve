@@ -33,11 +33,12 @@ use config::meta::{
         SyntheticVariable, for_each_string_at_path, take_strings_at_path,
     },
     synthetics_variables::{
-        CheckVariableFootprint, OrgVariableState, ResolvedVariableView, ResolvedVariablesGrouped,
-        SharedVariableScope, SplitTarget, SyntheticsEnvironmentRequest, SyntheticsEnvironmentView,
-        SyntheticsVariableKind, SyntheticsVariableRequest, SyntheticsVariableView,
-        normalize_variable_name, placeholder_names, validate_environment_request,
-        validate_variable_request, variable_cap_error,
+        CheckVariableFootprint, GLOBAL_ENVIRONMENT_NAME, OrgVariableState, ResolvedVariableView,
+        ResolvedVariablesGrouped, SharedVariableScope, SplitTarget, SyntheticsEnvironmentRequest,
+        SyntheticsEnvironmentView, SyntheticsVariableKind, SyntheticsVariableRequest,
+        SyntheticsVariableView, normalize_variable_name, placeholder_names,
+        validate_environment_description, validate_environment_request, validate_variable_request,
+        variable_cap_error,
     },
 };
 // Re-exported so handlers can name what `get_environment` returns without

@@ -14,11 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Shared variables and environments.
-//!
-//! Route middleware authorizes each of these from the path — `/variables` against
-//! the module umbrella, `/environments/{env}/...` against that environment — so
-//! the only permission work left here is filtering a list and resolving the
-//! environment named in the URL.
 
 use axum::{
     Json,
@@ -207,13 +202,15 @@ pub async fn list_synthetics_environments(
         };
         environments
             .into_iter()
+            // Global reads are open (design §7), as `GET /variables` is.
             .filter(|env| {
-                is_ofga_object_visible(
-                    &org_id,
-                    ENVIRONMENT_RESOURCE,
-                    &env.name,
-                    permitted.as_deref(),
-                )
+                env.is_global
+                    || is_ofga_object_visible(
+                        &org_id,
+                        ENVIRONMENT_RESOURCE,
+                        &env.name,
+                        permitted.as_deref(),
+                    )
             })
             .collect::<Vec<_>>()
     };
@@ -475,10 +472,6 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
     .into_response()
 }
 
-// ── Scope moves (design §9.6) ──────────────────────────────────────────────── All three only ever
-// touch plain variables: a secret already carries an environment by construction, so it can never
-// become global, and its value is write-only so there is nothing to copy between environments.
-
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/{id}/resolved-variables",
@@ -557,16 +550,17 @@ pub async fn promote_synthetic_variable(
     // a check could plant a value in an environment they cannot touch.
     let destination = match &body.environment {
         Some(env) => match resolve_environment(&org_id, env).await {
-            Ok(Some(record)) => Some(record),
+            Ok(Some(record)) => record,
             Ok(None) => return MetaHttpResponse::not_found("environment not found"),
             Err(response) => return response,
         },
-        None => None,
+        None => match openobserve_synthetics::service::global_environment(&org_id).await {
+            Ok(record) => record,
+            Err(e) => return variables_error("global_environment", e),
+        },
     };
     #[cfg(feature = "enterprise")]
-    if let Err(response) =
-        require_scope_write(&org_id, &user_email.user_id, destination.as_ref()).await
-    {
+    if let Err(response) = require_scope_write(&org_id, &user_email.user_id, &destination).await {
         return response;
     }
 
@@ -574,7 +568,7 @@ pub async fn promote_synthetic_variable(
         &org_id,
         &id,
         &name,
-        destination.as_ref(),
+        &destination,
         &created_by,
     )
     .await
@@ -590,7 +584,7 @@ pub async fn promote_synthetic_variable(
     context_path = "/api",
     tag = "Synthetics",
     operation_id = "PromoteEnvironmentVariableToGlobal",
-    summary = "Move an environment-scoped variable to the unscoped tier",
+    summary = "Move an environment-scoped variable into the global environment",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -611,11 +605,16 @@ pub async fn promote_environment_variable(
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    // The route authorizes the environment being LEFT; the unscoped tier is
-    // governed by the module umbrella, so entering it is checked separately.
+    // The route authorizes the environment being LEFT; entering global is a second object.
     #[cfg(feature = "enterprise")]
-    if let Err(response) = require_scope_write(&org_id, &user_email.user_id, None).await {
-        return response;
+    {
+        let global = match openobserve_synthetics::service::global_environment(&org_id).await {
+            Ok(global) => global,
+            Err(e) => return variables_error("global_environment", e),
+        };
+        if let Err(response) = require_scope_write(&org_id, &user_email.user_id, &global).await {
+            return response;
+        }
     }
 
     match openobserve_synthetics::service::promote_to_global(&org_id, &record, &id).await {
@@ -659,7 +658,7 @@ pub async fn split_synthetics_variable(
         match resolve_environment(&org_id, &target.environment).await {
             Ok(Some(record)) => {
                 if let Err(response) =
-                    require_scope_write(&org_id, &user_email.user_id, Some(&record)).await
+                    require_scope_write(&org_id, &user_email.user_id, &record).await
                 {
                     return response;
                 }
@@ -682,36 +681,32 @@ pub async fn split_synthetics_variable(
     }
 }
 
-/// Write permission on the scope a variable is moving into.
+/// Write permission on the environment a variable is moving into, `global` included.
 #[cfg(feature = "enterprise")]
 async fn require_scope_write(
     org_id: &str,
     user_id: &str,
-    destination: Option<&SyntheticsEnvironmentRecord>,
+    destination: &SyntheticsEnvironmentRecord,
 ) -> Result<(), Response> {
-    let (object, resource, use_self_parent) = match destination {
-        Some(env) => (env.name.clone(), ENVIRONMENT_RESOURCE, true),
-        None => (org_id.to_string(), "synthetics_module", true),
-    };
     if openobserve_core::auth::check_permissions(
-        &object,
+        &destination.name,
         org_id,
         user_id,
-        resource,
+        ENVIRONMENT_RESOURCE,
         "PUT",
         None,
-        destination.is_none(),
         false,
-        use_self_parent,
+        false,
+        true,
     )
     .await
     {
         return Ok(());
     }
-    Err(MetaHttpResponse::forbidden(match destination {
-        Some(env) => format!("Forbidden: no write access to environment '{}'", env.name),
-        None => "Forbidden: no write access to global variables".to_string(),
-    }))
+    Err(MetaHttpResponse::forbidden(format!(
+        "Forbidden: no write access to environment '{}'",
+        destination.name
+    )))
 }
 
 #[utoipa::path(
@@ -836,15 +831,13 @@ pub async fn duplicate_synthetics_environment(
     #[cfg(not(feature = "enterprise"))]
     let created_by = String::new();
 
-    // The route authorizes the environment being READ. Creating one is the
-    // module's call, so it is checked here — otherwise write on a single
-    // environment would be enough to mint new ones.
+    // The route authorizes the SOURCE; creating the copy needs what `POST /environments` needs.
     #[cfg(feature = "enterprise")]
     if !openobserve_core::auth::check_permissions(
         &org_id,
         &org_id,
         &user_email.user_id,
-        "synthetics_module",
+        ENVIRONMENT_RESOURCE,
         "POST",
         None,
         true,

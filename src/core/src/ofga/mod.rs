@@ -71,7 +71,7 @@ struct PendingMigrations {
     annotation_queues_datasets: bool,
     llm_workbench: bool,
     workflow_folders: bool,
-    synthetics_umbrella: bool,
+    synthetic_environments: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -511,11 +511,8 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.workflow_folders {
         keys.push("workflow_folder");
     }
-    // The two new types only. `synthetic_folder` gains a parent in the model,
-    // but its parent tuples are injected at check time rather than persisted,
-    // so there is nothing to backfill and no existing tuple to rewrite.
-    if pending.synthetics_umbrella {
-        keys.extend(["synthetics_module", "synthetic_environment"]);
+    if pending.synthetic_environments {
+        keys.push("synthetic_environment");
     }
     keys
 }
@@ -654,12 +651,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
         log::info!("[OFGA:Local] workflow folders permissions migration needed");
         pending.workflow_folders = true;
     }
-    // 0.0.48 because on-call took 0.0.46 and workflow folders took 0.0.47.
-    // Gating on either would skip every install that already upgraded through
-    // them, leaving the umbrella and environment types with no ownership tuple.
+    // 0.0.48: 0.0.47 (workflow folders) is the last version enterprise main shipped.
     if existing_model_version < v0_0_48 {
-        log::info!("[OFGA:Local] synthetics umbrella permissions migration needed");
-        pending.synthetics_umbrella = true;
+        log::info!("[OFGA:Local] synthetic environments permissions migration needed");
+        pending.synthetic_environments = true;
     }
 
     pending

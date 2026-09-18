@@ -23,6 +23,7 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import syntheticsService from "@/services/synthetics";
 import { MAX_CHECK_ENVIRONMENTS } from "@/constants/synthetics";
+import { namedEnvironments } from "@/components/synthetics/variables/scope";
 
 const props = defineProps<{ check: BrowserCheck }>();
 const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
@@ -30,16 +31,18 @@ const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
 const { t } = useI18nTyped();
 const store = useStore();
 
-const environments = ref<SyntheticsEnvironment[]>([]);
+const allEnvironments = ref<SyntheticsEnvironment[]>([]);
+// Global already applies to every run, so pinning a check to it selects nothing.
+const environments = computed(() => namedEnvironments(allEnvironments.value));
 const loaded = ref(false);
 
 async function fetchEnvironments() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const res = await syntheticsService.listEnvironments(org);
-    environments.value = res.data ?? [];
+    allEnvironments.value = res.data ?? [];
   } catch {
-    environments.value = [];
+    allEnvironments.value = [];
   }
   loaded.value = true;
 }
@@ -55,7 +58,7 @@ const atCap = computed(() => selected.value.length >= MAX_CHECK_ENVIRONMENTS);
  * them on save either way; the lock just makes the truth visible.
  */
 const lockedIds = computed(() =>
-  selected.value.filter((id) => !environments.value.some((env) => env.id === id)),
+  selected.value.filter((id) => !allEnvironments.value.some((env) => env.id === id)),
 );
 
 function toggle(id: string) {

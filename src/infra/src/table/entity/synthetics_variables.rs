@@ -21,8 +21,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     pub org_id: String,
-    /// `synthetics_environments.id`, or None for "every environment".
-    pub env: Option<String>,
+    /// `synthetics_environments.id`; the global environment's id means "every environment".
+    pub env: String,
     /// Stored upper-cased, so `{{base_url}}` and `{{BASE_URL}}` bind the same row.
     pub name: String,
     /// `AESenc:<base64>` under the org DEK, exactly as check secrets are stored.
