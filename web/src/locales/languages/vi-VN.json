@@ -4484,6 +4484,8 @@
       "payloadTitle": "Payload sự kiện",
       "payloadIndex": "Trường {field} chọn stream. Các sự kiện không có nó sẽ đi vào stream {stream}.",
       "payloadTime": "Trường {field} là epoch giây, và giá trị thập phân cũng được chấp nhận. Khi nó bị thiếu hoặc không dương, thời gian nhận sẽ được dùng.",
+      "windowTitle": "Dấu thời gian ngoài cửa sổ thu nhận sẽ bị loại bỏ",
+      "windowBody": "Các sự kiện cũ hơn {past} (mặc định 5 giờ) hoặc xa hơn {future} (mặc định 24 giờ) sẽ bị loại bỏ, và yêu cầu vẫn trả về mã 0 vì ứng dụng khách Splunk không thử lại khi gặp lỗi. Do đó, một dấu thời gian cố định hoặc đã cũ trông giống như một lần gửi thành công nhưng không lưu gì cả.",
       "payloadMetadata": "Các trường {fields} được lưu dưới dạng cột trên sự kiện.",
       "healthTitle": "Kiểm tra tình trạng",
       "healthBody": "Yêu cầu GET không cần xác thực và trả về {response}.",

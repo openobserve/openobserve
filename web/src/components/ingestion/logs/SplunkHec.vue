@@ -76,6 +76,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="body" as="p">
         {{ t("ingestion.splunkHec.payloadTime", { field: raw("time") }) }}
       </OText>
+      <OBanner variant="warning" icon="schedule" data-test="ingestion-logs-splunkhec-window-note">
+        <div class="flex flex-col gap-1">
+          <OText variant="body-strong">{{ t("ingestion.splunkHec.windowTitle") }}</OText>
+          <OText variant="meta" as="p" class="leading-snug">
+            {{
+              t("ingestion.splunkHec.windowBody", {
+                past: raw("ZO_INGEST_ALLOWED_UPTO"),
+                future: raw("ZO_INGEST_ALLOWED_IN_FUTURE"),
+              })
+            }}
+          </OText>
+        </div>
+      </OBanner>
       <OText variant="body" as="p">
         {{
           t("ingestion.splunkHec.payloadMetadata", {
@@ -169,14 +182,16 @@ export default defineComponent({
     // Built here because the template compiler reads a literal `<token>` in an interpolation as markup.
     const authHeader = raw("Authorization: Splunk " + "<token>");
 
+    // No literal `time`: a hardcoded epoch ages past ZO_INGEST_ALLOWED_UPTO and is
+    // then discarded, which the collector still answers with code 0.
     const curlContent = `curl -k ${endpointUrl} \\
   -H "Authorization: Splunk [SPLUNK_HEC_TOKEN]" \\
-  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default","time":1789060000}'`;
+  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default"}'`;
 
     const payloadContent = `{
   "event": { "level": "info", "log": "test message for openobserve" },
   "index": "application",
-  "time": 1789060000.123,
+  "time": 1758184800.123,
   "host": "web-01",
   "source": "/var/log/app.log",
   "sourcetype": "app:json"

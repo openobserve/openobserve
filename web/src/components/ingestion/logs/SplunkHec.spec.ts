@@ -121,15 +121,20 @@ describe("SplunkHec", () => {
       const parsed = JSON.parse(payload);
       expect(parsed).toHaveProperty("event");
       expect(parsed).toHaveProperty("index");
-      expect(parsed).toHaveProperty("time");
+      // A literal epoch ages past ZO_INGEST_ALLOWED_UPTO and is then discarded
+      // behind a code 0, so the copyable example must let the receipt time stand.
+      expect(parsed).not.toHaveProperty("time");
     });
 
     it("should document the full event envelope, including the metadata fields", () => {
       wrapper = createWrapper();
       const parsed = JSON.parse(wrapper.vm.payloadContent);
       expect(parsed.index).toBe("application");
-      // Fractional epoch SECONDS, which is what the collector reads.
-      expect(parsed.time).toBe(1789060000.123);
+      // Fractional epoch SECONDS, which is what the collector reads. Asserted as
+      // a range: a literal pins a date that silently ages out of the window.
+      expect(parsed.time).toBeGreaterThan(1_000_000_000);
+      expect(parsed.time).toBeLessThan(10_000_000_000);
+      expect(parsed.time % 1).not.toBe(0);
       expect(parsed.host).toBeDefined();
       expect(parsed.source).toBeDefined();
       expect(parsed.sourcetype).toBeDefined();
@@ -165,9 +170,16 @@ describe("SplunkHec", () => {
   });
 
   describe("Operational guidance", () => {
-    it("should warn about Edge Processor and TLS", () => {
+    it("should warn about the ingestion window, Edge Processor and TLS", () => {
       wrapper = createWrapper();
-      expect(wrapper.findAll(".o-banner-mock")).toHaveLength(2);
+      expect(wrapper.findAll(".o-banner-mock")).toHaveLength(3);
+      for (const test of [
+        "ingestion-logs-splunkhec-window-note",
+        "ingestion-logs-splunkhec-edge-processor-note",
+        "ingestion-logs-splunkhec-tls-note",
+      ]) {
+        expect(wrapper.find(`[data-test="${test}"]`).exists()).toBe(true);
+      }
     });
 
     it("should mark the key sections for tests", () => {

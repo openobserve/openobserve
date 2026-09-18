@@ -4484,6 +4484,8 @@
       "payloadTitle": "Payload dell'evento",
       "payloadIndex": "Il campo {field} seleziona lo stream. Gli eventi senza di esso vanno nello stream {stream}.",
       "payloadTime": "Il campo {field} è in secondi epoch e accetta un valore frazionario. Quando manca o non è positivo, viene usato l'orario di ricezione.",
+      "windowTitle": "I timestamp fuori dalla finestra di ingestione vengono scartati",
+      "windowBody": "Gli eventi più vecchi di {past} (5 ore per impostazione predefinita) o più avanti di {future} (24 ore per impostazione predefinita) vengono scartati e la richiesta risponde comunque con codice 0, perché un client Splunk non ritenta dopo un errore. Un timestamp fisso o obsoleto sembra quindi un invio riuscito che non memorizza nulla.",
       "payloadMetadata": "I campi {fields} vengono memorizzati come colonne sull'evento.",
       "healthTitle": "Controllo di integrità",
       "healthBody": "Una richiesta GET non richiede autenticazione e risponde {response}.",

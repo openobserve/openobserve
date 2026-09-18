@@ -700,7 +700,7 @@ pub async fn ingest(
             .inc();
     }
 
-    warn_if_wholly_discarded(org_id, endpoint, &response_body);
+    warn_and_count_discards(org_id, endpoint, &response_body);
 
     // A write failure used to be visible only in the metric label while the
     // caller still saw 200. Signalled on `write_failed` and NOT on `code`, which
@@ -759,20 +759,44 @@ fn is_wholly_discarded(status: &RecordStatus) -> bool {
     status.failed > 0 && status.successful == 0
 }
 
-/// The 200 stays (non-2xx reads as retryable), so this warn is the only loud total-loss signal.
-fn warn_if_wholly_discarded(org_id: &str, endpoint: &str, status: &StreamStatus) {
-    if !is_wholly_discarded(&status.status) {
+/// Warn and count the records a success status hides.
+///
+/// A partial drop is warned too: a mixed batch keeps `successful > 0` forever, so
+/// a source with skewed timestamps loses records indefinitely with nothing said.
+fn warn_and_count_discards(org_id: &str, endpoint: &str, status: &StreamStatus) {
+    if status.status.policy_dropped > 0 {
+        metrics::INGEST_RECORDS_DROPPED
+            .with_label_values(&[
+                org_id,
+                StreamType::Logs.as_str(),
+                &status.name,
+                "ingestion_window",
+            ])
+            .inc_by(status.status.policy_dropped as u64);
+    }
+    if status.status.failed == 0 {
         return;
     }
     if !discard_warn_permitted(&format!("{org_id}/{}", status.name), Instant::now()) {
         return;
     }
-    log::warn!(
-        "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
-        status.name,
-        status.status.failed,
-        status.status.error
-    );
+    if is_wholly_discarded(&status.status) {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded all {} record(s), none stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.error
+        );
+    } else {
+        log::warn!(
+            "[INGEST] {endpoint} {org_id}/{}: discarded {} of {} record(s), {} stored: {}",
+            status.name,
+            status.status.failed,
+            status.status.failed + status.status.successful,
+            status.status.successful,
+            status.status.error
+        );
+    }
 }
 
 /// At most one warn per stream per interval; a poisoned lock silences rather than panics.
@@ -1335,6 +1359,25 @@ mod tests {
             policy_dropped: 0,
             error: String::new(),
         }));
+    }
+
+    #[test]
+    fn a_partial_drop_is_warned_even_though_the_batch_stored_records() {
+        // A mixed batch never satisfies `is_wholly_discarded`, so a source with
+        // skewed timestamps would otherwise lose records with nothing logged.
+        let partial = RecordStatus {
+            successful: 9,
+            failed: 1,
+            policy_dropped: 1,
+            error: "too old".to_string(),
+        };
+        assert!(!is_wholly_discarded(&partial));
+
+        let mut status = StreamStatus::new("s");
+        status.status = partial;
+        // Warns on `failed`, which the wholly-discarded gate alone would skip.
+        assert!(status.status.failed > 0);
+        warn_and_count_discards("org_partial", "/test", &status);
     }
 
     /// The interval throttles per stream, so one bad client cannot drown the log.

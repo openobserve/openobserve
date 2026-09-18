@@ -4484,6 +4484,8 @@
       "payloadTitle": "Carga útil del evento",
       "payloadIndex": "El campo {field} selecciona el stream. Los eventos que no lo incluyen van al stream {stream}.",
       "payloadTime": "El campo {field} está en segundos epoch y se acepta un valor fraccionario. Cuando falta o no es positivo, se usa la hora de recepción.",
+      "windowTitle": "Las marcas de tiempo fuera de la ventana de ingesta se descartan",
+      "windowBody": "Los eventos anteriores a {past} (5 horas de forma predeterminada) o posteriores a {future} (24 horas de forma predeterminada) se descartan, y la solicitud sigue respondiendo con el código 0 porque un cliente de Splunk no reintenta tras un error. Por eso, una marca de tiempo fija o desactualizada parece un envío correcto que no almacena nada.",
       "payloadMetadata": "Los campos {fields} se almacenan como columnas en el evento.",
       "healthTitle": "Comprobación de estado",
       "healthBody": "Una solicitud GET no requiere autenticación y responde {response}.",
