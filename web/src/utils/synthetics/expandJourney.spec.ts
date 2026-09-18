@@ -20,6 +20,7 @@ import {
   composedStepName,
   expandJourney,
   loadChildren,
+  opensStartingUrl,
   translateStepId,
   undefinedPlaceholders,
   type ChildJourney,
@@ -202,5 +203,43 @@ describe("undefinedPlaceholders", () => {
       steps: [{ id: "c1", action: "assert", name: "Landed", value: "{{TOKEN}}" }],
     };
     expect(undefinedPlaceholders(child, [])).toEqual([]);
+  });
+});
+
+// The skip rule reads the FIRST EXECUTED step — the expanded list's head, as the probe does.
+describe("opensStartingUrl", () => {
+  const children = new Map([["login-test", login]]);
+  const clickFirst: ChildJourney = {
+    id: "click-test",
+    name: "Consent",
+    steps: [click("k1", "accept cookies"), click("k2", "close")],
+  };
+
+  it("opens the Starting URL when the first Step is not a navigate", () => {
+    expect(opensStartingUrl([click("s1", "Sign in"), nav("s2")], children)).toBe(true);
+  });
+
+  it("does not open it when the first Step navigates", () => {
+    expect(opensStartingUrl([nav("s1"), click("s2", "Sign in")], children)).toBe(false);
+  });
+
+  it("reads through a leading Subtest whose child starts with a navigate", () => {
+    expect(opensStartingUrl([subtest("s1", "login-test"), click("s2", "Logs")], children)).toBe(
+      false,
+    );
+  });
+
+  it("opens it for a leading Subtest whose child starts with a click", () => {
+    expect(
+      opensStartingUrl(
+        [subtest("s1", "click-test"), nav("s2")],
+        new Map([["click-test", clickFirst]]),
+      ),
+    ).toBe(true);
+  });
+
+  // An unresolved child cannot claim the navigate, so the run still opens the Starting URL.
+  it("opens it for a leading Subtest whose child is not in the cache", () => {
+    expect(opensStartingUrl([subtest("s1", "missing-test"), nav("s2")], new Map())).toBe(true);
   });
 });

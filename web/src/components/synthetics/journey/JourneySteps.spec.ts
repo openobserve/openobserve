@@ -294,10 +294,12 @@ describe("JourneySteps", () => {
       wrapper = mountLocked(false);
       await flushPromises();
 
-      // record-before stays disabled on the FIRST row by its own guardrail, so the
-      // second row is the one that proves the lock is not what disabled them.
       const rows = wrapper.findAll('[data-test="synthetics-journey-step-insert-btn"]');
       expect(rows[0].attributes("disabled")).toBeUndefined();
+      const recordBefore = wrapper.findAll(
+        '[data-test="synthetics-journey-step-record-before-btn"]',
+      );
+      expect(recordBefore[0].attributes("disabled")).toBeUndefined();
     });
   });
 
@@ -308,7 +310,6 @@ describe("JourneySteps", () => {
   // knows nothing about the prefix, and those steps cannot be filed at the anchor.
 
   describe("canRecordFrom", () => {
-    /** The second row — the first carries its own disable, so it proves nothing here. */
     function secondRowRecordBefore(w: VueWrapper) {
       return w.findAll('[data-test="synthetics-journey-step-record-before-btn"]')[1];
     }
@@ -344,6 +345,15 @@ describe("JourneySteps", () => {
       await flushPromises();
 
       expect(secondRowRecordBefore(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    // The Starting URL is what comes before row 1, so there is somewhere to record into.
+    it("should offer record-before on row 1, since the Starting URL opens the run", async () => {
+      wrapper = mountWithCapability(true);
+      await flushPromises();
+
+      const first = wrapper.findAll('[data-test="synthetics-journey-step-record-before-btn"]')[0];
+      expect(first.attributes("disabled")).toBeUndefined();
     });
 
     /** The tooltip bodies on screen. Read as props: the bubble only renders once open. */
@@ -785,7 +795,6 @@ describe("JourneySteps", () => {
       });
       await flushPromises();
 
-      // Row 1 has no "before", so the second control belongs to step-2.
       const target = recordBeforeTarget(wrapper, 1);
 
       target.dispatchEvent(new MouseEvent("mouseenter"));
@@ -809,11 +818,8 @@ describe("JourneySteps", () => {
     });
 
     it("previews nothing where the control cannot be used", async () => {
-      // A preview of an action you cannot take is worse than no preview. The
-      // first row has no "before"; a locked table and an extension too old to
-      // restore both disable the control everywhere.
+      // A preview of an action you cannot take is worse than no preview.
       const cases: Array<[Record<string, unknown>, number]> = [
-        [{ data: makeSteps(3), mode: "editor" }, 0],
         [{ data: makeSteps(3), mode: "editor", locked: true }, 1],
         [{ data: makeSteps(3), mode: "editor", canRecordFrom: false }, 1],
       ];
@@ -1166,6 +1172,295 @@ describe("JourneySteps", () => {
         false,
       );
       expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(true);
+    });
+  });
+  // ── Start row (row 0): the Starting URL, which is not a Step ──────────
+  describe("start row", () => {
+    const START_URL = "https://app.test/{{path}}";
+
+    /** The editor's start row: a navigate-shaped row whose `value` IS the Starting URL. */
+    const editorStartRow = () => ({ id: "_start", action: "navigate", value: START_URL });
+
+    /** A results-mode start row, shaped like the StepRow RunDetail builds. */
+    const resultsStartRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 0,
+      stepId: "_start",
+      action: "navigate",
+      name: "Open https://app.test/",
+      detail: "",
+      duration: 420,
+      offsetMs: 0,
+      status: "pass",
+      icon: "language",
+      statusIcon: "check-circle",
+      durStr: "420ms",
+      durColor: "",
+      error: null,
+      screenshotKey: null,
+      ...overrides,
+    });
+
+    const resultsRow = (id: number) => ({
+      id,
+      stepId: `s${id}`,
+      action: "click",
+      name: `Step ${id}`,
+      detail: "",
+      duration: 100,
+      offsetMs: 420,
+      status: "pass",
+      icon: "ads-click",
+      statusIcon: "check-circle",
+      durStr: "100ms",
+      durColor: "",
+      error: null,
+      screenshotKey: null,
+    });
+
+    function startRow(w: VueWrapper) {
+      return w.find('[data-test="synthetics-journey-start-row"]');
+    }
+
+    /** Data rows only: the drag handle's data-test shares the `o2-table-row-` prefix. */
+    function dataRows(w: VueWrapper) {
+      return w
+        .findAll("[data-test]")
+        .filter((el) => /^o2-table-row-\d+$/.test(el.attributes("data-test")!));
+    }
+
+    /** The start row, asserted present first so a missing row fails on that fact. */
+    function requireStartRow(w: VueWrapper) {
+      const row = startRow(w);
+      expect(row.exists(), "no start row rendered").toBe(true);
+      return row;
+    }
+
+    /** Whether `a` comes before `b` in document order. */
+    function precedes(a: Element, b: Element): boolean {
+      return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+    }
+
+    it("renders nothing extra when no start row is given", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor" },
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(startRow(wrapper).exists()).toBe(false);
+      expect(dataRows(wrapper)).toHaveLength(2);
+    });
+
+    it("renders the editor start row above Step 1 without renumbering the Steps", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists()).toBe(true);
+      const step1 = wrapper.find('[data-test="o2-table-row-0"]');
+      expect(precedes(row0.element, step1.element)).toBe(true);
+      // Row 0 is not a data row, so it neither shifts nor renumbers the Steps.
+      expect(dataRows(wrapper)).toHaveLength(2);
+      expect(step1.text()).toContain("1");
+      // The C1 copy: the row says what happens, the field says where.
+      expect(row0.text()).toContain("Opens");
+    });
+
+    it("shows the Starting URL in an editable field on the editor start row", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const input = requireStartRow(wrapper).find<HTMLInputElement>("input");
+      expect(input.exists()).toBe(true);
+      expect(input.element.value).toBe(START_URL);
+    });
+
+    // One value, two views: an edit here is an edit of the check's Starting URL.
+    it("emits update:start-url when the start row's URL is edited", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      await requireStartRow(wrapper).find("input").setValue("https://app.test/login");
+
+      const emitted = wrapper.emitted("update:start-url");
+      expect(emitted).toBeTruthy();
+      expect(emitted![emitted!.length - 1]).toEqual(["https://app.test/login"]);
+    });
+
+    it("follows the Starting URL when the prop changes", async () => {
+      wrapper = mount(JourneySteps, {
+        props: { data: makeSteps(2), mode: "editor", startRow: editorStartRow() } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      await wrapper.setProps({
+        startRow: { id: "_start", action: "navigate", value: "https://other.test/" },
+      } as any);
+
+      expect(requireStartRow(wrapper).find<HTMLInputElement>("input").element.value).toBe(
+        "https://other.test/",
+      );
+    });
+
+    it("gives the editor start row no name, no action picker and no locator", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          startRow: editorStartRow(),
+          detailKey: "selector",
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const row0 = requireStartRow(wrapper);
+      // Exactly one control: the URL. A name field or a locator field would be a second.
+      expect(row0.findAll("input, select, textarea")).toHaveLength(1);
+      // The action label badge every Step carries is absent — the row is not an action.
+      expect(row0.findAllComponents(OBadgeStub)).toHaveLength(0);
+      expect(row0.text()).not.toContain(enUS.synthetics.journey.actionLabels.navigate);
+    });
+
+    it("cannot be moved, selected, deleted or recorded before", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          startRow: editorStartRow(),
+          enableReorder: true,
+          selectionEnabled: true,
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      // The Steps still have their handles and checkboxes — the row 0 rule is not a global one.
+      expect(wrapper.findAll('[data-test="o2-table-row-drag-handle"]').length).toBeGreaterThan(0);
+      expect(wrapper.findAll('[data-test="o2-table-select-cell"]').length).toBeGreaterThan(0);
+
+      const row0 = requireStartRow(wrapper);
+      for (const dt of [
+        "o2-table-row-drag-handle",
+        "o2-table-select-cell",
+        "o2-table-expand-cell",
+        "synthetics-journey-step-record-before-btn",
+        "synthetics-journey-step-delete-btn",
+        "synthetics-journey-step-record-before-btn-menu",
+        "synthetics-journey-step-delete-btn-menu",
+      ]) {
+        expect(row0.find(`[data-test="${dt}"]`).exists(), `${dt} rendered on row 0`).toBe(false);
+      }
+    });
+
+    it("emits no row-click or selection for the start row", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          startRow: editorStartRow(),
+          selectionEnabled: true,
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      await requireStartRow(wrapper).trigger("click");
+
+      expect(wrapper.emitted("row-click")).toBeFalsy();
+      expect(wrapper.emitted("update:selected-ids")).toBeFalsy();
+      expect(wrapper.emitted("update:expanded-ids")).toBeFalsy();
+    });
+
+    // Against the REAL OTable spine: a result keyed `_start` lands on row 0 and nowhere else.
+    it("maps getRowStatusColor onto the start row", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: [resultsRow(1), resultsRow(2)],
+          mode: "results",
+          startRow: resultsStartRow({ status: "fail" }),
+          getRowStatusColor: (row: any) =>
+            row.stepId === "_start" ? "var(--color-status-error-text)" : undefined,
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const row0 = requireStartRow(wrapper);
+      expect(row0.attributes("data-status-color")).toBe("var(--color-status-error-text)");
+      // The hook answered only for row 0, so no Step row carries OTable's status spine.
+      expect(wrapper.findAll('[data-status-bar="true"]')).toHaveLength(0);
+    });
+
+    it("renders the results start row above Step 1 with its label and timing and no number", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: [resultsRow(1), resultsRow(2)],
+          mode: "results",
+          startRow: resultsStartRow(),
+          totalDurationMs: 620,
+          dotStateFn: (row: any) => (row.status === "fail" ? "fail" : "pass"),
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists()).toBe(true);
+      expect(precedes(row0.element, wrapper.find('[data-test="o2-table-row-0"]').element)).toBe(
+        true,
+      );
+      expect(row0.text()).toContain("Open https://app.test/");
+      expect(row0.text()).toContain("420ms");
+      // No step number: row 0's text starts with the label, the Steps keep 1 and 2.
+      expect(row0.text()).not.toMatch(/^\s*\d/);
+      expect(wrapper.find('[data-test="o2-table-row-0"]').text()).toContain("1");
+      expect(wrapper.find('[data-test="o2-table-row-1"]').text()).toContain("2");
+      expect(dataRows(wrapper)).toHaveLength(2);
+    });
+
+    it("renders the screenshot slot for the results start row", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: [resultsRow(1)],
+          mode: "results",
+          startRow: resultsStartRow({ screenshotKey: "shots/_start.png" }),
+        } as any,
+        global: { stubs: STUBS },
+        slots: {
+          "screenshot-thumb": `<template #screenshot-thumb="{ row }"><img :data-shot="row.screenshotKey" /></template>`,
+        },
+      });
+      await flushPromises();
+
+      expect(requireStartRow(wrapper).find('[data-shot="shots/_start.png"]').exists()).toBe(true);
+    });
+
+    // A child runs inside the parent's page, so an expanded reference row has no row 0.
+    it("never renders a start row in preview mode", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "preview",
+          numberPrefix: "2",
+          startRow: editorStartRow(),
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      expect(startRow(wrapper).exists()).toBe(false);
+      expect(wrapper.find('[data-test="synthetics-journey-preview-step-2.1"]').exists()).toBe(true);
     });
   });
 });

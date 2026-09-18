@@ -380,4 +380,88 @@ describe("ExecutionDetailDrawer", () => {
       expect(wrapper.text()).toContain("Error");
     });
   });
+  // `startLoad` is a sibling of `steps`, so the step cards keep their numbers and totals.
+  describe("start load (row 0)", () => {
+    const startLoad = (overrides: Partial<StepResult & { url: string }> = {}) => ({
+      stepId: "_start",
+      status: "ok" as const,
+      durationMs: 420,
+      error: "",
+      screenshotKey: null,
+      url: "https://app.test/",
+      ...overrides,
+    });
+
+    function startRow(w: VueWrapper) {
+      return w.find('[data-test="synthetics-execution-detail-start-row"]');
+    }
+
+    it("should render the start load above Step 1 with its label and duration", () => {
+      wrapper = mountDrawer({ execution: makeExecution({ startLoad: startLoad() } as any) });
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists(), "no start row rendered").toBe(true);
+      expect(row0.text()).toContain("Open https://app.test/");
+      expect(row0.text()).toContain("420 ms");
+      // Above, not among: the first numbered card follows it.
+      const firstStep = wrapper.findAll("span").find((el) => el.text() === "1")!;
+      expect(firstStep).toBeTruthy();
+      expect(
+        !!(
+          row0.element.compareDocumentPosition(firstStep.element) & Node.DOCUMENT_POSITION_FOLLOWING
+        ),
+      ).toBe(true);
+    });
+
+    it("should not number the start load or count it in the Step total", () => {
+      wrapper = mountDrawer({
+        execution: makeExecution({
+          startLoad: startLoad(),
+          steps: [
+            makeStepResult({
+              stepId: "step-1",
+              status: "ok",
+              durationMs: 300,
+              screenshotKey: "k1",
+            }),
+            makeStepResult({ stepId: "step-2", status: "ok", durationMs: 800 }),
+          ],
+        } as any),
+      });
+
+      expect(startRow(wrapper).exists(), "no start row rendered").toBe(true);
+      expect(startRow(wrapper).text()).not.toMatch(/(^|\s)0(\s|$)/);
+      const numbers = wrapper.findAll("span").filter((el) => /^\d+$/.test(el.text()));
+      expect(numbers.map((el) => el.text())).toEqual(["1", "2"]);
+      expect(wrapper.find("img").attributes("alt")).toContain("Step 1 of 2");
+    });
+
+    it("should show the start load's error and screenshot", () => {
+      wrapper = mountDrawer({
+        execution: makeExecution({
+          status: "failed",
+          startLoad: startLoad({
+            status: "fail",
+            error: "net::ERR_NAME_NOT_RESOLVED",
+            screenshotKey: "shots/_start.png",
+          }),
+        } as any),
+      });
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists(), "no start row rendered").toBe(true);
+      expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+      expect(row0.find("img").attributes("src")).toBe(
+        "https://artifacts.example.com/shots/_start.png",
+      );
+    });
+
+    it("should render an execution with no start load exactly as before", () => {
+      wrapper = mountDrawer({ execution: makeExecution({ startLoad: null } as any) });
+
+      expect(startRow(wrapper).exists()).toBe(false);
+      expect(wrapper.text()).toContain("Go to page");
+      expect(wrapper.text()).toContain("Click button");
+    });
+  });
 });

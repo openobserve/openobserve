@@ -31,6 +31,7 @@ const OInputStub = {
     "required",
     "type",
     "rows",
+    "helpText",
   ],
   emits: ["update:modelValue", "keydown", "blur", "focus"],
   template: `
@@ -44,6 +45,7 @@ const OInputStub = {
         @blur="$emit('blur', $event)"
       />
       <span v-if="error" class="o-input-error">{{ errorMessage }}</span>
+      <span v-else-if="helpText" class="o-input-help">{{ helpText }}</span>
     </div>
   `,
 };
@@ -109,6 +111,7 @@ function mountCheckDetails(
     validationErrors: Record<string, string>;
     targetLabel: string;
     targetPlaceholder: string;
+    targetHint: string;
   }> = {},
 ) {
   return mount(CheckDetails, {
@@ -442,6 +445,26 @@ describe("CheckDetails", () => {
 
       const nameWrapper = wrapper.find('[data-test="synthetics-check-details-name-input"]');
       expect(nameWrapper.find(".o-input-error").exists()).toBe(false);
+    });
+  });
+
+  // The host decides whether the run opens the Starting URL; this field only says so.
+  describe("Starting URL hint", () => {
+    const HINT = "Not opened — the first Step navigates.";
+
+    it("should show the hint under the URL input when the host passes one", () => {
+      wrapper = mountCheckDetails({ targetHint: HINT });
+
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
+      expect(urlWrapper.find(".o-input-help").exists()).toBe(true);
+      expect(urlWrapper.find(".o-input-help").text()).toBe(HINT);
+    });
+
+    it("should show no hint when the host passes none", () => {
+      wrapper = mountCheckDetails();
+
+      const urlWrapper = wrapper.find('[data-test="synthetics-check-details-url-input"]');
+      expect(urlWrapper.find(".o-input-help").exists()).toBe(false);
     });
   });
 
