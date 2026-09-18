@@ -104,19 +104,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
-          <OButton
-            v-if="config.isEnterprise == 'true' && arePanelsLoading"
-            v-show="store.state.printMode !== true"
-            variant="outline-destructive"
-            size="icon-toolbar"
-            @click="cancelQuery"
-            data-test="dashboard-cancel-btn"
-            icon-left="cancel"
-          >
-            <OTooltip :content="t('panel.cancel')" />
-          </OButton>
-          <OButtonGroup v-else v-show="store.state.printMode !== true">
+          <OButtonGroup v-show="store.state.printMode !== true">
             <OButton
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              variant="outline-destructive"
+              size="icon-toolbar"
+              @click="cancelQuery"
+              data-test="dashboard-cancel-btn"
+              icon-left="cancel"
+            >
+              <OTooltip :content="t('panel.cancel')" />
+            </OButton>
+            <OButton
+              v-else
               :variant="isVariablesChanged ? 'warning' : 'outline'"
               size="icon-toolbar"
               @click="refreshData()"
@@ -137,7 +137,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <ODropdown align="end" side="bottom">
               <template #trigger>
                 <OButton
-                  :variant="isVariablesChanged ? 'warning' : 'outline'"
+                  :variant="refreshOptionsVariant"
                   size="icon-toolbar"
                   class="w-5"
                   :disabled="arePanelsLoading"
@@ -1266,6 +1266,11 @@ export default defineComponent({
       });
     };
 
+    const refreshOptionsVariant = computed(() => {
+      if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
+      return isVariablesChanged.value ? "warning" : "outline";
+    });
+
     const refreshData = async (withoutCache = false) => {
       if (!arePanelsLoading.value) {
         // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
@@ -1845,6 +1850,7 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      refreshOptionsVariant,
       isVariablesChanged,
       refreshedVariablesDataUpdated,
       onDeletePanel,
