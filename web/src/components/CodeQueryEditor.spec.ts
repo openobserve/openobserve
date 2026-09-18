@@ -100,7 +100,7 @@ vi.mock("monaco-editor/esm/vs/editor/editor.api", () => ({
     registerHoverProvider: vi.fn(() => ({ dispose: vi.fn() })),
   },
   KeyMod: { CtrlCmd: 1 },
-  KeyCode: { Enter: 13 },
+  KeyCode: { Enter: 13, KeyK: 41 },
 }));
 
 // Mock dynamic imports
@@ -633,6 +633,38 @@ describe("CodeQueryEditor", () => {
         stopPropagation: vi.fn(),
       });
       expect(wrapper.emitted("run-query")).toBeFalsy();
+    });
+
+    // Monaco treats Ctrl/Cmd+K as a chord prefix, so the command palette relies on this forward.
+    it("should re-dispatch CtrlCmd+K on window instead of letting Monaco start a chord", async () => {
+      await mountAndSetup();
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      const seen: KeyboardEvent[] = [];
+      const listener = (e: Event) => seen.push(e as KeyboardEvent);
+      window.addEventListener("keydown", listener);
+      const preventDefault = vi.fn();
+      handler({
+        keyCode: 41,
+        ctrlKey: false,
+        metaKey: true,
+        shiftKey: false,
+        altKey: false,
+        preventDefault,
+        stopPropagation: vi.fn(),
+      });
+      handler({
+        keyCode: 41,
+        ctrlKey: true,
+        metaKey: false,
+        shiftKey: true,
+        altKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+      window.removeEventListener("keydown", listener);
+      expect(preventDefault).toHaveBeenCalled();
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toMatchObject({ key: "k", metaKey: true, ctrlKey: false });
     });
   });
 

@@ -84,14 +84,14 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import { useI18nTyped } from "@/types/i18n";
-import { ref } from "vue";
+import { ref, type PropType } from "vue";
 import PrettyStackTrace from "./PrettyStackTrace.vue";
 
 const { t } = useI18nTyped();
 
 defineProps({
   error_stack: {
-    type: Array,
+    type: Array as PropType<string[]>,
     required: true,
   },
   error: {

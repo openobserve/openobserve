@@ -8,9 +8,19 @@ import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export type DialogSize = "xs" | "sm" | "md" | "lg" | "xl" | "full";
 
+/** Vertical anchor: centered in the viewport, or pinned near the top (command palettes). */
+export type DialogPosition = "center" | "top";
+
 export interface DialogProps {
   /** Controlled open state — use with v-model:open */
   open?: boolean;
+
+  /**
+   * Vertical placement. `top` pins the panel near the top edge so its height can
+   * change with its content without the panel jumping.
+   * @default "center"
+   */
+  position?: DialogPosition;
 
   /**
    * Prevents the dialog from closing when the user clicks the overlay

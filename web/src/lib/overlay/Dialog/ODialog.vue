@@ -55,6 +55,7 @@ const contentZIndex = computed(() => 6000 + dialogDepth * 1000);
 const props = withDefaults(defineProps<DialogProps>(), {
   persistent: false,
   size: "md",
+  position: "center",
   showClose: true,
   width: undefined,
   maxHeight: undefined,
@@ -201,6 +202,13 @@ const sizeClasses = computed(() => {
 });
 
 const isFullSize = computed(() => props.size === "full");
+
+// `translate` (not transform) so the entrance animation, which drives `transform`, composes.
+const positionClasses = computed(() =>
+  props.position === "top"
+    ? "fixed top-12 left-1/2 [translate:-50%_0]"
+    : "fixed top-1/2 left-1/2 [translate:-50%_-50%]",
+);
 
 // Inline style for explicit width/maxHeight override
 const contentStyle = computed(() => {
@@ -386,7 +394,7 @@ watch(internalOpen, (open) => {
           // `transform`-based -translate utilities) so the zoom animation —
           // which drives `transform` — composes cleanly and the panel scales
           // from true center instead of sliding diagonally.
-          'fixed top-1/2 left-1/2 [translate:-50%_-50%]',
+          positionClasses,
           // Layout — flex-col so header/footer stick and only body scrolls
           'flex flex-col overflow-hidden',
           // Size

@@ -14993,7 +14993,8 @@
       "oncallAck": "Acknowledge",
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
-      "oncallResolve": "Resolve"
+      "oncallResolve": "Resolve",
+      "commandPalette": "Open the command palette (search & jump)"
     }
   },
   "components": {
@@ -19077,5 +19078,55 @@
     "scopeClaimServiceHere": "{service} pages this team in {scope} only. Elsewhere it falls to whoever owns the scope around it.",
     "scopeNothingDiscovered": "Nothing has been discovered yet, so there is no estate to pick from. Use Advanced to write the rule by field, or send some telemetry first.",
     "scopeAdvancedHint": "Match on any field and value, including ones the levels above do not cover."
+  },
+  "palette": {
+    "title": "Command palette",
+    "placeholder": "Search pages, dashboards, alerts, streams and more…",
+    "placeholderScoped": "Search within {scope}…",
+    "placeholderScopedMore": "Search within {scope} and {n} more…",
+    "trigger": "Search or jump to…",
+    "menuEntry": "Search & jump to…",
+    "askAi": "Ask O2 Assistant about \"{q}\"",
+    "clearScopes": "Clear",
+    "scopes": {
+      "actions": "Commands",
+      "pages": "Pages",
+      "dashboard": "Dashboards",
+      "alert": "Alerts",
+      "stream": "Streams",
+      "savedView": "Saved views",
+      "function": "Functions",
+      "pipeline": "Pipelines",
+      "user": "Users",
+      "synthetic": "Synthetics"
+    },
+    "switchOrg": "Switch to {name}",
+    "streamTypes": {
+      "logs": "Logs stream",
+      "metrics": "Metrics stream",
+      "traces": "Traces stream"
+    },
+    "groups": {
+      "recent": "Recent",
+      "actions": "Commands",
+      "pages": "Pages"
+    },
+    "actions": {
+      "newDashboard": "New dashboard",
+      "darkMode": "Switch to dark mode",
+      "lightMode": "Switch to light mode",
+      "slack": "Community Slack"
+    },
+    "hint": {
+      "navigate": "navigate",
+      "open": "open",
+      "newTab": "open in new tab",
+      "showScopes": "filter by type",
+      "hideScopes": "hide filters"
+    },
+    "noResults": "No matches for \"{q}\"",
+    "state": {
+      "paused": "paused"
+    }
   }
 }
