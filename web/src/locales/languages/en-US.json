@@ -18232,7 +18232,7 @@
     "policySaved": "Policy saved",
     "verdictTitle": "AI SRE verdict",
     "verdictFollowUpNote": "A verdict that arrived after the page went out was sent as a follow-up — the original page is never edited.",
-    "l0Hint": "Agent actions between incident trigger and alert notification, by severity.",
+    "l0Hint": "Agent actions between a page firing and its notification, by severity.",
     "l0BySeveritySection": "By severity",
     "l0P1Lead": "Alert immediately.",
     "l0P1Desc": "AI analysis runs in parallel — critical pages are never delayed.",
