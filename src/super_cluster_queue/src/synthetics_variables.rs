@@ -42,7 +42,7 @@ use o2_enterprise::enterprise::super_cluster::queue::{
     Message, MessageType, SyntheticsEnvironmentPayload, SyntheticsVariablePayload,
     SyntheticsVariablesMessage, SyntheticsVariablesOp,
 };
-use sea_orm::TransactionTrait;
+use sea_orm::{ConnectionTrait, TransactionTrait};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
@@ -99,27 +99,35 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
                     SyntheticsVariablesOp::VariableDelete(id) => Write::Delete(id),
                 });
             }
-            let txn = conn.begin().await?;
-            for write in &writes {
-                match write {
-                    Write::Environment(record) => {
-                        synthetics_environments::apply_upsert(&txn, record).await?
-                    }
-                    Write::Variable(record) => {
-                        synthetics_variables::apply_upsert(&txn, record).await?
-                    }
-                    Write::Delete(id) => {
-                        synthetics_variables::delete_row(&txn, &org_id, id).await?;
-                    }
-                }
-            }
-            txn.commit().await?;
+            apply_ops(conn, &org_id, &writes).await?;
         }
     }
 
     // This region's own nodes still hold the pre-apply set in their 15-second
     // cache. The event is intra-cluster, so it cannot loop back out.
     synthetics_variables::invalidate_and_publish(&org_id).await;
+    Ok(())
+}
+
+/// Applies a batch in one transaction, so half a split can never land.
+async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    writes: &[Write],
+) -> Result<()> {
+    let txn = conn.begin().await?;
+    for write in writes {
+        match write {
+            Write::Environment(record) => {
+                synthetics_environments::apply_upsert(&txn, record).await?
+            }
+            Write::Variable(record) => synthetics_variables::apply_upsert(&txn, record).await?,
+            Write::Delete(id) => {
+                synthetics_variables::delete_row(&txn, org_id, id).await?;
+            }
+        }
+    }
+    txn.commit().await?;
     Ok(())
 }
 
@@ -238,6 +246,49 @@ mod tests {
         };
         assert!(record.value.starts_with("AESenc:"), "{}", record.value);
         assert_ne!(record.value, "hunter2");
+    }
+
+    /// A split writes several rows at once, and a region holding half of one
+    /// resolves a set no region ever had.
+    #[tokio::test]
+    async fn a_batch_that_fails_halfway_leaves_nothing_behind() {
+        use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
+
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(backend.build(
+            &schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+        ))
+        .await
+        .unwrap();
+        // The same uniqueness the migration creates, which is what the second
+        // write in the batch below collides with.
+        db.execute_unprepared(
+            "CREATE UNIQUE INDEX u ON synthetics_variables (org_id, (COALESCE(env,'')), name)",
+        )
+        .await
+        .unwrap();
+
+        let mut first = variable_record("org1", variable("")).await.unwrap();
+        first.id = "var-1".to_string();
+        let mut collides = first.clone();
+        collides.id = "var-2".to_string();
+
+        let err = apply_ops(
+            &db,
+            "org1",
+            &[Write::Variable(first), Write::Variable(collides)],
+        )
+        .await
+        .expect_err("the second write collides on the unique index");
+        assert!(!err.to_string().is_empty());
+
+        let left = infra::table::entity::synthetics_variables::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(left.is_empty(), "the first write must have rolled back");
     }
 
     #[test]
