@@ -1700,6 +1700,9 @@ fn build_expr(
             } else {
                 cond.value.to_string()
             };
+            // Double up embedded single quotes so a value like "it's" can't
+            // terminate the SQL string literal early.
+            let val = val.replace('\'', "''");
             match cond.operator {
                 Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
                 Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
@@ -1936,6 +1939,29 @@ mod tests {
 
         // Should produce: ("level" = 'error' OR "status" = 'critical')
         assert_eq!(sql, "(\"level\" = 'error' OR \"status\" = 'critical')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_escapes_apostrophe() {
+        let schema = Schema::new(vec![Field::new("k8s_cluster", DataType::Utf8, false)]);
+
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "k8s_cluster".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("it's production".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // A bare apostrophe must be doubled, not passed through raw, or the
+        // generated SQL string literal terminates early and fails to parse.
+        assert_eq!(sql, "(\"k8s_cluster\" = 'it''s production')");
     }
 
     #[tokio::test]
