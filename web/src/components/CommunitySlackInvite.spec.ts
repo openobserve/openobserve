@@ -367,13 +367,13 @@ describe("CommunitySlackInvite", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("marks the invite resolved in localStorage — the day-2 decline is final", async () => {
+    it("does NOT mark the invite resolved — Maybe later can show again later", async () => {
       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
 
       await laterBtn.trigger("click");
 
       const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
-      expect(record.status).toBe("resolved");
+      expect(record.status).toBe("pending_day2");
     });
 
     it("does NOT call window.open when Maybe later is clicked", async () => {
@@ -410,14 +410,14 @@ describe("CommunitySlackInvite", () => {
       expect(openSpy).not.toHaveBeenCalled();
     });
 
-    it("dismisses when ODialog emits update:open=false, marking the invite resolved", async () => {
+    it("dismisses when ODialog emits update:open=false, without resolving the invite", async () => {
       const dialogStub = wrapper.findComponent(ODialogStub);
 
       await dialogStub.vm.$emit("update:open", false);
 
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
       const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
-      expect(record.status).toBe("resolved");
+      expect(record.status).toBe("pending_day2");
     });
 
     it("does NOT dismiss when ODialog emits update:open=true", async () => {
