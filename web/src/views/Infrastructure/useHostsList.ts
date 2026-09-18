@@ -92,7 +92,7 @@ function readMemory(
 ): MemoryReading {
   const usedBytes = usage?.get("used") ?? null;
   const usedRatio = utilization?.get("used");
-  if (usedRatio != null) {
+  if (utilization != null && usedRatio != null) {
     // Six redundant MemTotal estimates from separate scrapes; the median rejects a skewed one.
     const totals: number[] = [];
     for (const state of HOSTS_MEMORY_STATES) {
