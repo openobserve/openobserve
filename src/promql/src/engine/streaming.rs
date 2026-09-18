@@ -933,7 +933,8 @@ mod tests {
         );
     }
 
-    /// With a 10 s lookback over 20 s samples the steps hit the lower bound, miss, then the upper.
+    /// With a 10 s lookback over 20 s samples the steps hit the open lower bound, miss, then the
+    /// upper.
     #[tokio::test]
     async fn test_instant_selector_window_bounds_match_generic() {
         let (start, step, lookback) = (BASE + 70 * SECOND, 45 * SECOND, Some(10 * SECOND));
@@ -952,8 +953,8 @@ mod tests {
         assert_eq!(series.len(), 1);
         assert_eq!(
             series[0].1,
-            vec![(BASE + 70 * SECOND, 9.0), (BASE + 160 * SECOND, 24.0)],
-            "the sample at 60 s is on the lower bound of [60 s, 70 s], 115 s sees none, 160 s is its own"
+            vec![(BASE + 160 * SECOND, 24.0)],
+            "the sample at 60 s is excluded by the open lower bound of (60 s, 70 s], 115 s sees none, 160 s is its own"
         );
     }
 

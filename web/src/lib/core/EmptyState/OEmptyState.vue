@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : 'flex items-stretch justify-center max-lg:flex-wrap lg:flex-nowrap',
+            : 'flex flex-wrap items-stretch justify-center',
           sizeClass.actions,
         ]"
       >
