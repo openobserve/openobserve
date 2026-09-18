@@ -936,6 +936,7 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
 import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -2030,10 +2031,11 @@ export default defineComponent({
         if (props.spanListProp.length > 0) {
           const firstSpan = props.spanListProp[0];
           const serviceNames = extractServiceNames(props.spanListProp);
+          const traceWindow = spanWindowUs(props.spanListProp);
           (searchObj.data.traceDetails.selectedTrace as any) = {
             trace_id: props.traceIdProp || firstSpan.trace_id,
-            trace_start_time: Math.min(...props.spanListProp.map((s) => s.start_time / 1000)),
-            trace_end_time: Math.max(...props.spanListProp.map((s) => s.end_time / 1000)),
+            trace_start_time: traceWindow?.start ?? 0,
+            trace_end_time: traceWindow?.end ?? 0,
             service_name: serviceNames,
             services: {},
           };
@@ -2220,8 +2222,8 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
         const traceSpans = traceRes.data.hits;
+        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
         const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
         const rumSpans = formatRumEventsAsSpans(
           tracedResources,
@@ -2249,10 +2251,11 @@ export default defineComponent({
     };
 
     const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      const traceWindow = spanWindowUs(spans);
       searchObj.data.traceDetails.selectedTrace = {
         trace_id: traceId,
-        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
-        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        trace_start_time: traceWindow?.start ?? 0,
+        trace_end_time: traceWindow?.end ?? 0,
         service_name: extractServiceNames(spans),
         services: {},
       };
