@@ -29,35 +29,33 @@ pub(crate) fn scalar(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
         }
     };
 
-    // One element is the scalar asked for; any other count is NaN. Counted per evaluation
-    // timestamp rather than over the matrix as a whole, because across a range query a series
-    // can report at some steps and not others.
-    let value_at = |timestamp: i64| {
-        let mut present = matrix.iter().filter_map(|series| {
-            series
-                .samples
-                .iter()
-                .find(|sample| sample.timestamp == timestamp)
-                .map(|sample| sample.value)
-        });
-        match (present.next(), present.next()) {
-            (Some(only), None) => only,
-            _ => f64::NAN,
+    let timestamps = eval_ctx.timestamps();
+    let mut counts = vec![0u32; timestamps.len()];
+    let mut values = vec![f64::NAN; timestamps.len()];
+    for sample in matrix.iter().flat_map(|series| &series.samples) {
+        if let Ok(step) = timestamps.binary_search(&sample.timestamp) {
+            counts[step] += 1;
+            values[step] = sample.value;
         }
-    };
+    }
+    // a series can report at some steps and not others, so the element count belongs to a step
+    for (value, count) in values.iter_mut().zip(counts) {
+        if count != 1 {
+            *value = f64::NAN;
+        }
+    }
 
-    // A Float is what makes this a scalar downstream: exec reports it as one, and the binary
-    // operators fold a scalar operand the same way.
+    // exec and the binary operators only treat a Float as a scalar
     if eval_ctx.is_instant() {
-        return Ok(Value::Float(value_at(eval_ctx.start)));
+        return Ok(Value::Float(values[0]));
     }
 
     Ok(Value::Matrix(vec![RangeValue {
         labels: Labels::default(),
-        samples: eval_ctx
-            .timestamps()
+        samples: timestamps
             .into_iter()
-            .map(|timestamp| Sample::new(timestamp, value_at(timestamp)))
+            .zip(values)
+            .map(|(timestamp, value)| Sample::new(timestamp, value))
             .collect(),
         exemplars: None,
         time_window: None,
