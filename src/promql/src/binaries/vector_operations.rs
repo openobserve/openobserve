@@ -49,6 +49,28 @@ pub async fn vector_scalar_bin_op(
     right: f64,
     swapped_lhs_rhs: bool,
 ) -> Result<Value> {
+    vector_scalar_op(expr, left, swapped_lhs_rhs, |_| Some(right))
+}
+
+/// Implement the operation between a matrix and a scalar that holds one value per step.
+pub fn vector_step_scalar_bin_op(
+    expr: &BinaryExpr,
+    left: Vec<RangeValue>,
+    right: &[Sample],
+    swapped_lhs_rhs: bool,
+) -> Result<Value> {
+    let right: HashMap<i64, f64> = right.iter().map(|s| (s.timestamp, s.value)).collect();
+    vector_scalar_op(expr, left, swapped_lhs_rhs, |timestamp| {
+        right.get(&timestamp).copied()
+    })
+}
+
+fn vector_scalar_op(
+    expr: &BinaryExpr,
+    left: Vec<RangeValue>,
+    swapped_lhs_rhs: bool,
+    scalar_at: impl Fn(i64) -> Option<f64> + Sync,
+) -> Result<Value> {
     let is_comparison_operator = expr.op.is_comparison_operator();
     let return_bool = expr.return_bool();
     let output: Vec<RangeValue> = left
@@ -57,7 +79,8 @@ pub async fn vector_scalar_bin_op(
             let new_samples: Vec<Sample> = range
                 .samples
                 .into_iter()
-                .flat_map(|sample| {
+                .filter_map(|sample| {
+                    let right = scalar_at(sample.timestamp)?;
                     let (lhs, rhs) = if swapped_lhs_rhs {
                         (right, sample.value)
                     } else {
