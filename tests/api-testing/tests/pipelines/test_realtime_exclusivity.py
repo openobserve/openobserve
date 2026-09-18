@@ -8,18 +8,20 @@ source stream already exists" (src/core/src/pipeline/mod.rs).
 Verified against a local debug build before these assertions were written:
 status 400 and that exact message.
 
-The `source` object MUST carry `org_id`. The guard compares the incoming source
-against `list_streams_with_pipeline`, whose entries are fully qualified, so a
-payload omitting `org_id` compares unequal and slips past the check — see
-`test_source_without_org_id_documents_the_bypass` at the end, which records that
-gap rather than asserting the desired behaviour.
+A `source` omitting `org_id` used to slip past the guard: the incoming stream
+compared unequal to the fully-qualified entries from `list_streams_with_pipeline`,
+so the check never fired and the pipeline was stored unqualified. `save_pipeline`
+and `update_pipeline` now default an empty source org to the pipeline's own org
+(`default_source_org`), which the last test covers.
+
+Worth keeping green: with two realtime pipelines on one stream, both fire per
+record. Measured on a pre-fix build, 5 ingested records produced `successful: 10`
+and 2 rows per marker downstream — silent duplication at 2x ingest cost.
 """
 
 import logging
 import os
 import time
-
-import pytest
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -136,21 +138,10 @@ class TestRealtimePipelineExclusivity:
             _delete_by_name(session, base_url, name_a)
             _delete_by_name(session, base_url, name_b)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="#6443 org_id bypass: with org_id omitted from source, the incoming stream "
-               "compares unequal to the fully-qualified entries in list_streams_with_pipeline, "
-               "so the exclusivity check is skipped. XPASSes once that gap is closed.",
-    )
     def test_source_without_org_id_rejects_the_second_pipeline(
         self, create_session, base_url, random_string
     ):
-        """Asserts the DESIRED behaviour (400) for the org_id bypass, marked xfail.
-
-        Written this way round so the suite never goes red at the moment the gap is
-        fixed: it XFAILs while the bypass is open and XPASSes once the comparison is
-        made org-agnostic or org_id becomes required on the source. Drop the marker then.
-        """
+        """A source omitting org_id must not slip past the exclusivity check."""
         session = create_session
         suffix = random_string(6).lower()
         stream = f"pytest_6443_noorg_{suffix}"
