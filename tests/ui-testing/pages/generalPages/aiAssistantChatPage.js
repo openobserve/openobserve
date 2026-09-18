@@ -1,8 +1,9 @@
 // aiAssistantChatPage.js - Page Object for the AI Assistant Chat feature
-// Covers the enterprise-gated entry points (header toggle + Home "AI" tab)
-// that open the O2AIChat shell. On an OSS build both are absent: the gate
-// reads config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled, and
-// the backend reports ai_enabled: false in OSS (enterprise_value!(false, ...)).
+// Covers the gated entry points (header toggle + Home "AI" tab) that open the
+// O2AIChat shell. The header toggle gate reads config.isEnterprise == 'true'
+// && ai_enabled (Header.vue:227); the Home tab gate reads isEnterpriseOrCloud
+// && ai_enabled (HomeView.vue:186,192). On an OSS build both are absent: the
+// backend reports ai_enabled: false in OSS (enterprise_value!(false, ...)).
 //
 // Strict selector policy: data-test only, no text matching.
 import { expect } from '@playwright/test';
@@ -30,6 +31,11 @@ export class AiAssistantChatPage {
     const orgId = org || process.env['ORGNAME'] || 'default';
     const baseUrl = (process.env['INGESTION_URL'] || process.env['ZO_BASE_URL']).replace(/\/+$/, '');
     const response = await this.page.request.get(`${baseUrl}/api/${orgId}/config`);
+    if (!response.ok()) {
+      throw new Error(
+        `Failed to fetch AI chat gate config (/api/${orgId}/config): HTTP ${response.status()}`,
+      );
+    }
     const body = await response.json();
     return { buildType: body.build_type, aiEnabled: body.ai_enabled === true };
   }

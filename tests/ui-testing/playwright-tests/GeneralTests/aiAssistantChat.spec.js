@@ -1,21 +1,26 @@
 /**
  * AI Assistant Chat — Enterprise Gating
  *
- * The AI Assistant (O2AIChat) is reached through two entry points that are both
- * enterprise-gated: the header toggle (Header.vue, data-test="menu-link-ai-item")
- * and the Home "AI Assistant" tab (HomeView.vue, data-test="home-tab-ai"). The
- * gate reads config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled,
- * and the backend reports ai_enabled: false in OSS (enterprise_value!(false,
- * o2cfg.ai.enabled) in src/api/management/src/request/status/mod.rs:469) — so on
- * an OSS build neither entry point ever renders.
+ * The AI Assistant (O2AIChat) is reached through two entry points: the header
+ * toggle (Header.vue, data-test="menu-link-ai-item", gated on config.isEnterprise
+ * == 'true') and the Home "AI Assistant" tab (HomeView.vue, data-test="home-tab-ai",
+ * gated on isEnterpriseOrCloud, i.e. isEnterprise || isCloud). Both also require
+ * store.state.zoConfig.ai_enabled, and the backend reports ai_enabled: false in OSS
+ * (enterprise_value!(false, o2cfg.ai.enabled) in
+ * src/api/management/src/request/status/mod.rs:469) — so on an OSS build neither
+ * entry point ever renders.
  *
- * Exactly one of the two tests runs per environment: the active build + AI gate
- * are detected from the live /api/{org}/config response (build_type + ai_enabled)
- * — the exact values the gate itself reads (see AiAssistantChatPage). The OSS
- * test asserts the entry points are absent; the enterprise test asserts they are
- * present. The deeper functional flows (send message / stream, feedback, chat
- * history) are enterprise-gated AND depend on chat input/send controls that have
- * no stable data-test yet, so they are out of scope for this OSS run.
+ * Exactly one of the two tests runs per environment (OSS vs enterprise): the
+ * active build + AI gate are detected from the live /api/{org}/config response
+ * (build_type + ai_enabled). build_type is a proxy for the frontend
+ * isEnterprise/isCloud flags ("cloud" | "enterprise" | "opensource",
+ * status/mod.rs:403); cloud builds are not asserted here because the two entry
+ * points diverge on cloud (header toggle is enterprise-only, the Home tab is
+ * enterprise-or-cloud). The OSS test asserts the entry points are absent; the
+ * enterprise test asserts they are present. The deeper functional flows (send
+ * message / stream, feedback, chat history) are enterprise-gated AND depend on
+ * chat input/send controls that have no stable data-test yet, so they are out of
+ * scope for this OSS run.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
