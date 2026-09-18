@@ -1,7 +1,7 @@
 //logs visualise page object
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 import { expect } from "@playwright/test";
-import DashboardTimeRefresh from "./dashboard-refresh.js";
+import DateTimeHelper from "./dashboard-time.js";
 
 // Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
 const quietPeriodProbeMs = 3000;
@@ -749,10 +749,12 @@ export default class LogsVisualise {
   }
 
   // Open query inspector from a panel dropdown
-  // metaData gating the Query Inspector item populates only on a non-empty query, so the panel has to come back with rows. It can come back empty two ways: the rows are not searchable yet (WAL lag under CI load), which a refresh clears, or the dashboard's own 15m default window no longer covers the fixture - ingestion is deduped per worker, so by a late test it can be older than that - which only a wider range clears.
+  // metaData gating the Query Inspector item populates only on a non-empty query, so the panel has to come back with rows. The dashboard opens on its own 15m default whatever range the test used in logs, and the fixture is ingested once per worker, so by a late test it can sit outside that window - the panel is then empty however often it is refreshed. Widen the window first, unconditionally, so every run takes the same path instead of a recovery branch only CI ever exercises; the refreshes that follow cover rows that are not searchable yet (WAL lag under load).
   async waitForPanelToLoadData({ refreshAttempts = 3, attemptTimeout = 10000 } = {}) {
     const noData = this.page.locator('[data-test="no-data"]');
     const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+
+    await new DateTimeHelper(this.page).setRelativeTimeRange("6-h");
 
     // A refresh unmounts the empty-state overlay for as long as its query runs, so "absent
     // right now" is not "the panel came back with rows" - it has to stay absent.
@@ -779,11 +781,8 @@ export default class LogsVisualise {
       if (await hasData(attemptTimeout)) return;
     }
 
-    await new DashboardTimeRefresh(this.page).setRelative("6", "h");
-    if (await hasData(attemptTimeout * 2)) return;
-
     throw new Error(
-      "Dashboard panel still reports no data after refreshing and widening the range to 6h"
+      "Dashboard panel still reports no data over a 6h window after refreshing"
     );
   }
 
