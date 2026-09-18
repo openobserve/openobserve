@@ -89,8 +89,8 @@ test.describe("Dashboard Print Layout testcases", () => {
       await pm.dashboardPrint.expectPrintPageStyleRemoved();
       await pm.dashboardPrint.expectPrintChromeCleared();
 
-      const gridHeight = await pm.dashboardPrint.getGridStackInlineHeight();
-      expect(gridHeight).toBe("");
+      const overrideCount = await pm.dashboardPrint.getPanelTopOverrideCount();
+      expect(overrideCount).toBe(0);
 
       testLogger.info("Print layout cleared on exit");
     }
