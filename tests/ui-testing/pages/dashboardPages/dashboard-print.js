@@ -88,7 +88,9 @@ export default class DashboardPrintPage {
       .toBe(true);
   }
 
-  // Print layout fully cleared: style removed, wrapper class gone, grid height reset.
+  // Print layout cleared = px top overrides restored to calc(). GridStack
+  // re-initializes on exit and re-sets a natural (non-empty) inline height, so
+  // the print override is measured via panel tops, not an empty grid height.
   async waitForPrintModeCleared(timeout = 30000) {
     await expect
       .poll(
@@ -98,9 +100,10 @@ export default class DashboardPrintPage {
             const containerCount = document.querySelectorAll(
               ".print-mode-container"
             ).length;
-            const grid = document.querySelector(".grid-stack");
-            const height = grid ? (grid.style.height || "").trim() : "";
-            return !style && containerCount === 0 && height === "";
+            const overrideCount = Array.from(
+              document.querySelectorAll(".grid-stack-item")
+            ).filter((el) => /px$/.test((el.style.top || "").trim())).length;
+            return !style && containerCount === 0 && overrideCount === 0;
           }),
         { timeout, intervals: [500, 1000, 2000] }
       )
