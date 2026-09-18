@@ -1,0 +1,32 @@
+[
+  {
+    "title": "should enter print mode via the toolbar button and render the print layout",
+    "action": "new",
+    "verifies": "toggling the print button renders the print layout (URL print=true, print chrome, @page style, grid height set, panels force-mounted)"
+  },
+  {
+    "title": "should exit print mode and clear the print layout",
+    "action": "new",
+    "verifies": "toggling print off removes the @page style, restores the action chrome, and clears the injected grid height"
+  },
+  {
+    "title": "should enter print mode via the ?print=true URL and persist across reload",
+    "action": "new",
+    "verifies": "loading the dashboard with ?print=true re-enters print mode on mount and keeps it after a reload"
+  },
+  {
+    "title": "should render a single-table-panel dashboard full-width in print mode",
+    "action": "new",
+    "verifies": "a dashboard with exactly one table panel swaps the grid for a full-width table in print mode"
+  },
+  {
+    "title": "should show the print-capture readiness flag once panels finish loading",
+    "action": "new",
+    "verifies": "the hidden capture-readiness span appears once all panels and variables finish loading"
+  },
+  {
+    "title": "should inject no print page style for an empty dashboard in print mode",
+    "action": "new",
+    "verifies": "an empty dashboard in print mode injects no @page style, renders the empty state, and hides the add-panel CTA"
+  }
+]
