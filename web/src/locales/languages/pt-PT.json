@@ -2116,7 +2116,6 @@
     "userName": "Nome de usuário",
     "searchRole": "Função de pesquisa",
     "searchGroup": "Grupo de pesquisa",
-    "object": "Objeto",
     "serviceAccounts": "Contas de serviço",
     "ingestionTokens": "Tokens de ingestão",
     "syntheticsTokens": "Tokens de Synthetics",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "Excluída {count} função. Falha ao excluir {unsuccessful}. | Excluídas {count} funções. Falha ao excluir {unsuccessful}.",
       "bulkDeleteFailed": "Falha ao excluir {count} função(ões)",
       "bulkDeleteRolesError": "Erro ao excluir funções"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Nenhuma Permissão Selecionada",
-      "loadingResources": "Carregando Recursos...",
-      "showing": "Mostrando",
-      "top50": "Top 50",
-      "resourcesSearchHint": "recursos (Pesquise para obter um recurso específico)",
-      "noResourcesPresent": "Nenhum Recurso Presente",
-      "objectResource": "Recurso",
-      "objectType": "Tipo"
     },
     "addUser": {
       "passwordChanged": "Senha Alterada",

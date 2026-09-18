@@ -81,6 +81,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 1,
       },
       {
@@ -107,6 +108,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 4,
       },
       {
@@ -124,6 +126,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 6,
       },
       {
@@ -141,6 +144,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: false,
         top_level: true,
         visible: true,
+        parent: "",
         order: 8,
       },
       {
@@ -149,6 +153,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: false,
         top_level: true,
         visible: true,
+        parent: "",
         order: 9,
       },
       {
@@ -157,6 +162,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: false,
         top_level: true,
         visible: true,
+        parent: "",
         order: 10,
       },
       {
@@ -165,6 +171,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 11,
       },
       {
@@ -173,6 +180,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 12,
       },
       {
@@ -181,6 +189,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 13,
       },
       {
@@ -189,6 +198,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 14,
       },
       {
@@ -197,6 +207,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 15,
       },
       {
@@ -205,6 +216,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: true,
         top_level: true,
         visible: true,
+        parent: "",
         order: 16,
       },
       {
@@ -213,6 +225,7 @@ vi.mock("@/services/iam", () => ({
         has_entities: false,
         top_level: true,
         visible: true,
+        parent: "",
         order: 17,
       },
     ],
@@ -333,16 +346,10 @@ async function mountEditRole(customStubs = {}) {
             <button class="tab-serviceAccounts" @click="$emit('update:active-tab','serviceAccounts')">Service Accounts</button>
           </div>`,
         },
-        PermissionsTable: {
-          props: [
-            "rows",
-            "customFilteredPermissions",
-            "filter",
-            "visibleResourceCount",
-            "selectedPermissionsHash",
-          ],
-          emits: ["updated:permission", "expand:row"],
-          template: `<div data-test="permissions-table-stub"></div>`,
+        ModuleRail: {
+          props: ["modules", "modelValue"],
+          emits: ["update:modelValue"],
+          template: `<div data-test="module-rail-stub"></div>`,
         },
         GroupUsers: { template: '<div data-test="group-users-stub"></div>' },
         GroupServiceAccounts: { template: '<div data-test="group-service-accounts-stub"></div>' },
@@ -414,27 +421,6 @@ describe("EditRole - tabs behavior", () => {
   });
 });
 
-// 3. Permissions UI toggling
-describe("EditRole - permissions UI", () => {
-  it("updateTableData triggers visibility update and count", async () => {
-    const wrapper = await mountEditRole();
-    // seed a minimal permissions tree
-    wrapper.vm.permissionsState.permissions = [
-      {
-        name: "stream",
-        resourceName: "stream",
-        type: "Type",
-        entities: [],
-        permission: { AllowAll: { value: false } },
-        show: true,
-      },
-    ];
-    await wrapper.vm.updateTableData("all");
-    await flushPromises();
-    expect(typeof wrapper.vm.countOfVisibleResources).toBe("number");
-  });
-});
-
 // 4. Permission mapping helpers
 describe("EditRole - permission mappings", () => {
   it("getPermissionHash formats correctly for default entity", async () => {
@@ -468,30 +454,6 @@ describe("EditRole - permission mappings", () => {
     const resource = { entities: [{ name: "app", permission: { AllowGet: { value: false } } }] };
     wrapper.vm.updateEntityPermission(resource, "logs", "app", "AllowGet");
     expect(resource.entities[0].permission.AllowGet.value).toBe(true);
-  });
-});
-
-// 5. Filtering and visibility helpers
-describe("EditRole - filtering & visibility", () => {
-  it("filterResources finds rows by display_name", async () => {
-    const wrapper = await mountEditRole();
-    const rows = [
-      { display_name: "Streams", entities: [] },
-      { display_name: "Dashboards", entities: [{ display_name: "Default" }] },
-    ];
-    const res = wrapper.vm.filterResources(rows, "streams");
-    expect(res.length).toBeGreaterThan(0);
-  });
-
-  it("countVisibleResources counts nested visible rows", async () => {
-    const wrapper = await mountEditRole();
-    // Nested entities are only counted when the parent has expand: true
-    const permissions = [
-      { show: true, expand: true, entities: [{ show: true, entities: [] }] },
-      { show: false, entities: [] },
-    ];
-    const count = wrapper.vm.countVisibleResources(permissions);
-    expect(count).toBe(2);
   });
 });
 
@@ -703,15 +665,6 @@ describe("EditRole - data fetch pipeline", () => {
     expect(wrapper.vm.permissionsState.resources.length).toBeGreaterThan(0);
     expect(wrapper.vm.roleUsers.length).toBeGreaterThan(0);
   });
-
-  it("onResourceChange updates visibility and count", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.permissionsState.permissions = [
-      { show: false, permission: { AllowAll: { value: true } }, entities: [] },
-    ];
-    await wrapper.vm.onResourceChange();
-    expect(typeof wrapper.vm.countOfVisibleResources).toBe("number");
-  });
 });
 
 // 9. JSON sync flows
@@ -772,50 +725,9 @@ describe("EditRole - micro validations", () => {
     expect(wrapper.vm.activeTab).toBeTruthy();
   });
 
-  it("countVisibleResources sets reactive countOfVisibleResources", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.countVisibleResources([{ show: true, entities: [] }]);
-    expect(wrapper.vm.countOfVisibleResources).toBe(1);
-  });
-
   it("getOrgId returns store selected org identifier", async () => {
     const wrapper = await mountEditRole();
     expect(wrapper.vm.getOrgId()).toBe(store.state.selectedOrganization.identifier);
-  });
-
-  it("updatePermissionVisibility expands heavy resources children list", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.heavyResourceEntities = { logs: [{ show: true }, { show: false }] };
-    const permissions = [{ name: "logs", entities: [], permission: { AllowAll: { value: true } } }];
-    wrapper.vm.updatePermissionVisibility(permissions);
-    expect(Array.isArray(permissions[0].entities)).toBe(true);
-  });
-
-  // The type node's own AllowList grant used to forceShow every sibling, so Selected listed all ~80 streams.
-  it("under the Selected filter a granted TYPE node keeps its ungranted children hidden", async () => {
-    const wrapper = await mountEditRole();
-    const granted = {
-      name: "k8s_node_cpu",
-      show: false,
-      permission: { AllowGet: { value: true } },
-    };
-    const ungranted = { name: "mysql_up", show: false, permission: { AllowGet: { value: false } } };
-    wrapper.vm.heavyResourceEntities = { metrics: [granted, ungranted] };
-    wrapper.vm.filter.permissions = "selected";
-    const permissions = [
-      {
-        name: "metrics",
-        resourceName: "metrics",
-        type: "Type",
-        // expandPermission seeds the visible slice, so the real node is never empty here.
-        entities: [granted, ungranted],
-        permission: { AllowList: { value: true } },
-      },
-    ];
-    wrapper.vm.updatePermissionVisibility(permissions);
-    expect(permissions[0].show).toBe(true);
-    expect(granted.show).toBe(true);
-    expect(ungranted.show).toBe(false);
   });
 
   it("getResourceByName finds nested resource", async () => {
@@ -951,16 +863,6 @@ describe("EditRole - modifyResourcePermissions new resource types", () => {
     expect(r.permission.AllowDelete.show).toBe(true);
     expect(r.permission.AllowPost.show).toBe(true);
     expect(r.permission.AllowPut.show).toBe(true);
-  });
-});
-
-// Default permissions filter for a brand-new (empty) role
-describe("EditRole - empty role default filter", () => {
-  it('defaults the permissions filter to "all" when the role has no permissions', async () => {
-    // getAllRolePermissions is mocked to return [] (empty role).
-    const wrapper = await mountEditRole();
-    expect(wrapper.vm.selectedPermissionsHash.size).toBe(0);
-    expect(wrapper.vm.filter.permissions).toBe("all");
   });
 });
 
@@ -1146,11 +1048,6 @@ describe("EditRole - dbm viewer preset", () => {
       "metrics:mysql_threads",
       "metrics:postgresql_backends",
     ]);
-  });
-
-  it("sets the permissions filter to 'selected' so the seeded rows are easy to review", async () => {
-    const wrapper = await mountWithDbmPreset();
-    expect(wrapper.vm.filter.permissions).toBe("selected");
   });
 
   it("writes the seeded permissions into the save payload", async () => {
@@ -1372,33 +1269,6 @@ describe("EditRole - kubernetes viewer preset", () => {
     expect(metricsNode.expand).toBe(true);
   });
 
-  it("switches the filter to Selected so the seeded rows are not buried", async () => {
-    const wrapper = await mountWithK8sPreset();
-    expect(wrapper.vm.filter.permissions).toBe("selected");
-  });
-
-  // The granted metrics type node forces its children to show, so every stream it covers is listed.
-  it("leaves the seeded stream rows visible in the table", async () => {
-    const wrapper = await mountWithK8sPreset();
-    await wrapper.vm.updateTableData();
-    await flushPromises();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    const streamResource = wrapper.vm.getResourceByName(
-      wrapper.vm.permissionsState.permissions,
-      "stream",
-    );
-    expect(streamResource.show).toBe(true);
-    const metricsNode = streamResource.entities.find((e) => e.name === "metrics");
-    expect(metricsNode.show).toBe(true);
-    const visible = metricsNode.entities.map((e) => e.name);
-    expect(visible).toContain("k8s_pod_cpu");
-    expect(visible).toContain("k8s_node_memory");
-    expect(streamResource.entities.filter((e) => e.name !== "metrics").every((e) => !e.show)).toBe(
-      true,
-    );
-  });
-
   it("writes the seeded permissions into the save payload", async () => {
     const { updateRole } = await import("@/services/iam");
     const wrapper = await mountWithK8sPreset();
@@ -1484,5 +1354,688 @@ describe("EditRole - kubernetes viewer preset", () => {
     await flushPromises();
 
     expect(Object.keys(wrapper.vm.addedPermissions).length).toBe(0);
+  });
+});
+
+// Characterization suite: pins observed grant behaviour, so a failure means the refactor changed it; never edit to make it pass.
+describe("EditRole - grant hash encoding [characterization]", () => {
+  it("encodes a type level grant with the _all_<org> entity", async () => {
+    const wrapper = await mountEditRole();
+    expect(wrapper.vm.getPermissionHash("stream", "AllowAll")).toBe("stream:_all_default:AllowAll");
+  });
+
+  it("encodes a per entity grant as resource:entity:action", async () => {
+    const wrapper = await mountEditRole();
+    expect(wrapper.vm.getPermissionHash("logs", "AllowGet", "app")).toBe("logs:app:AllowGet");
+  });
+
+  it("passes a folder scoped entity id through untouched", async () => {
+    const wrapper = await mountEditRole();
+    expect(wrapper.vm.getPermissionHash("dashboard", "AllowGet", "folder1/dash1")).toBe(
+      "dashboard:folder1/dash1:AllowGet",
+    );
+  });
+});
+
+describe("EditRole - toggle state machine [characterization]", () => {
+  const NEW_GRANT = "logs:app:AllowGet";
+  const SAVED_GRANT = "logs:sys:AllowGet";
+
+  const withSavedGrant = (vm, hash) => {
+    vm.permissionsHash = new Set([hash]);
+    vm.selectedPermissionsHash = new Set([hash]);
+  };
+
+  it("stages a brand new grant as added and selects it", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings(NEW_GRANT);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([NEW_GRANT]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+    expect(wrapper.vm.selectedPermissionsHash.has(NEW_GRANT)).toBe(true);
+  });
+
+  it("clears the staging when a brand new grant is toggled twice", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings(NEW_GRANT);
+    wrapper.vm.updatePermissionMappings(NEW_GRANT);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+    expect(wrapper.vm.selectedPermissionsHash.has(NEW_GRANT)).toBe(false);
+  });
+
+  it("stages a saved grant as removed when it is unticked", async () => {
+    const wrapper = await mountEditRole();
+    withSavedGrant(wrapper.vm, SAVED_GRANT);
+    wrapper.vm.updatePermissionMappings(SAVED_GRANT);
+
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([SAVED_GRANT]);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
+    expect(wrapper.vm.selectedPermissionsHash.has(SAVED_GRANT)).toBe(false);
+  });
+
+  it("clears the staging when a saved grant is unticked and ticked again", async () => {
+    const wrapper = await mountEditRole();
+    withSavedGrant(wrapper.vm, SAVED_GRANT);
+    wrapper.vm.updatePermissionMappings(SAVED_GRANT);
+    wrapper.vm.updatePermissionMappings(SAVED_GRANT);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+    expect(wrapper.vm.selectedPermissionsHash.has(SAVED_GRANT)).toBe(true);
+  });
+
+  it("stages several grants independently", async () => {
+    const wrapper = await mountEditRole();
+    withSavedGrant(wrapper.vm, SAVED_GRANT);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowPut");
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    wrapper.vm.updatePermissionMappings(SAVED_GRANT);
+
+    expect(Object.keys(wrapper.vm.addedPermissions).sort()).toEqual([
+      "logs:app:AllowPut",
+      "metrics:cpu:AllowGet",
+    ]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([SAVED_GRANT]);
+  });
+
+  // The store's core invariant: selected is always saved plus added minus removed.
+  it("keeps selected equal to saved plus added minus removed", async () => {
+    const wrapper = await mountEditRole();
+    const vm = wrapper.vm;
+    vm.permissionsHash = new Set(["logs:sys:AllowGet", "logs:sys:AllowPut"]);
+    vm.selectedPermissionsHash = new Set(["logs:sys:AllowGet", "logs:sys:AllowPut"]);
+
+    ["logs:app:AllowGet", "logs:sys:AllowGet", "metrics:cpu:AllowGet", "logs:app:AllowGet"].forEach(
+      (hash) => vm.updatePermissionMappings(hash),
+    );
+
+    const expected = new Set(vm.permissionsHash);
+    Object.keys(vm.addedPermissions).forEach((hash) => expected.add(hash));
+    Object.keys(vm.removedPermissions).forEach((hash) => expected.delete(hash));
+
+    expect(Array.from(vm.selectedPermissionsHash).sort()).toEqual(Array.from(expected).sort());
+  });
+});
+
+describe("EditRole - save payload [characterization]", () => {
+  it("does not call updateRole when nothing changed", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    mockToast.mockClear();
+
+    await wrapper.vm.saveRole();
+
+    expect(vi.mocked(updateRole)).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
+  });
+
+  it("sends only the added grants when nothing was removed", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const payload = vi.mocked(updateRole).mock.calls[0][0].payload;
+    expect(payload.add).toEqual([{ object: "logs:app", permission: "AllowGet" }]);
+    expect(payload.remove).toEqual([]);
+  });
+
+  it("sends an add list and a remove list in one payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.permissionsHash = new Set(["logs:sys:AllowGet"]);
+    wrapper.vm.selectedPermissionsHash = new Set(["logs:sys:AllowGet"]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowPut");
+    wrapper.vm.updatePermissionMappings("logs:sys:AllowGet");
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload).toEqual({
+      add: [{ object: "logs:app", permission: "AllowPut" }],
+      remove: [{ object: "logs:sys", permission: "AllowGet" }],
+      add_users: [],
+      remove_users: [],
+    });
+  });
+
+  it("targets the edited role and the current organization", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    const call = vi.mocked(updateRole).mock.calls[0][0];
+    expect(call.role_id).toBe(wrapper.vm.editingRole);
+    expect(call.org_identifier).toBe(store.state.selectedOrganization.identifier);
+  });
+});
+
+describe("EditRole - baseline after save [characterization]", () => {
+  const stageAddAndRemove = (vm) => {
+    vm.permissionsHash = new Set(["logs:sys:AllowGet"]);
+    vm.selectedPermissionsHash = new Set(["logs:sys:AllowGet"]);
+    vm.updatePermissionMappings("logs:app:AllowPut");
+    vm.updatePermissionMappings("logs:sys:AllowGet");
+  };
+
+  it("clears the staged changes once the save resolves", async () => {
+    const wrapper = await mountEditRole();
+    stageAddAndRemove(wrapper.vm);
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+  });
+
+  it("promotes the saved set to the new baseline", async () => {
+    const wrapper = await mountEditRole();
+    stageAddAndRemove(wrapper.vm);
+
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    expect(Array.from(wrapper.vm.permissionsHash)).toEqual(["logs:app:AllowPut"]);
+    expect(Array.from(wrapper.vm.selectedPermissionsHash)).toEqual(["logs:app:AllowPut"]);
+  });
+
+  it("treats an immediate second save as a no change save", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    stageAddAndRemove(wrapper.vm);
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    vi.mocked(updateRole).mockClear();
+    mockToast.mockClear();
+    await wrapper.vm.saveRole();
+
+    expect(vi.mocked(updateRole)).not.toHaveBeenCalled();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "info" }));
+  });
+});
+
+describe("EditRole - JSON view parity [characterization]", () => {
+  it("stages the same grants as ticking the rows would", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.permissionsJsonValue = JSON.stringify([
+      { object: "logs:app", permission: "AllowGet" },
+      { object: "metrics:cpu", permission: "AllowList" },
+    ]);
+
+    await wrapper.vm.updateJsonInTable();
+
+    expect(Array.from(wrapper.vm.selectedPermissionsHash).sort()).toEqual([
+      "logs:app:AllowGet",
+      "metrics:cpu:AllowList",
+    ]);
+  });
+
+  it("sends the grants entered as JSON in the save payload", async () => {
+    const { updateRole } = await import("@/services/iam");
+    const wrapper = await mountEditRole();
+    vi.mocked(updateRole).mockClear();
+    wrapper.vm.permissionsJsonValue = JSON.stringify([
+      { object: "logs:app", permission: "AllowGet" },
+    ]);
+
+    await wrapper.vm.updateJsonInTable();
+    await wrapper.vm.saveRole();
+    await flushPromises();
+
+    expect(vi.mocked(updateRole).mock.calls[0][0].payload.add).toEqual([
+      { object: "logs:app", permission: "AllowGet" },
+    ]);
+  });
+});
+
+describe("EditRole - module navigation", () => {
+  // Opens Streams, then drills into one stream type, the way a user reaches individual streams.
+  const openStreamType = async (wrapper, type) => {
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const typeNode = wrapper.vm.activeModuleView.entities.find((row) => row.name === type);
+    await wrapper.vm.openFolderRow(typeNode);
+    await flushPromises();
+    return typeNode;
+  };
+
+  it("lists streams as one rail module", async () => {
+    const wrapper = await mountEditRole();
+    const keys = wrapper.vm.railModules.map((module) => module.key);
+
+    expect(keys).toContain("stream");
+    expect(keys).not.toContain("logs");
+    expect(keys).not.toContain("metrics");
+  });
+
+  it("opens on the summary, with no module selected", async () => {
+    const wrapper = await mountEditRole();
+
+    expect(wrapper.vm.activeModule).toBe("");
+    expect(wrapper.vm.activeModuleView).toBeNull();
+  });
+
+  it("opens streams with every stream on top and the stream types as rows", async () => {
+    const wrapper = await mountEditRole();
+
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+
+    expect(wrapper.vm.activeModuleView.scopes.map((scope) => scope.key)).toEqual(["stream"]);
+    expect(wrapper.vm.activeModuleView.entities.map((row) => row.name).sort()).toEqual([
+      "index",
+      "logs",
+      "metrics",
+      "traces",
+    ]);
+  });
+
+  it("lets every stream lock the stream type rows beneath it", async () => {
+    const wrapper = await mountEditRole();
+
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+
+    expect(wrapper.vm.activeModuleView.scopes[0].covers.sort()).toEqual([
+      "index",
+      "logs",
+      "metrics",
+      "traces",
+    ]);
+  });
+
+  it("drills into a stream type with every stream hidden but still in effect", async () => {
+    const wrapper = await mountEditRole();
+
+    await openStreamType(wrapper, "metrics");
+
+    const scopes = wrapper.vm.activeModuleView.scopes;
+    expect(wrapper.vm.activeModuleView.trail).toHaveLength(2);
+    expect(scopes.map((scope) => scope.key)).toEqual(["stream", "metrics"]);
+    expect(scopes.map((scope) => !!scope.hidden)).toEqual([true, false]);
+  });
+
+  it("explains a lock that comes from every stream on the stream type row", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings("stream:_all_default:AllowGet");
+
+    await openStreamType(wrapper, "metrics");
+
+    const ownScope = wrapper.vm.activeModuleView.scopes.find((scope) => scope.key === "metrics");
+    expect(String(ownScope.hint)).toContain("Every Stream");
+  });
+
+  it("lists every stream of the type, not a truncated slice", async () => {
+    const wrapper = await mountEditRole();
+
+    await openStreamType(wrapper, "metrics");
+
+    expect(wrapper.vm.activeModuleView.entities.map((row) => row.name)).toEqual([
+      "cpu",
+      "mem",
+      "postgresql_backends",
+      "mysql_threads",
+    ]);
+  });
+
+  it("stages a grant made in the pane through the same state machine as before", async () => {
+    const wrapper = await mountEditRole();
+    await openStreamType(wrapper, "metrics");
+
+    const cpu = wrapper.vm.activeModuleView.entities.find((row) => row.name === "cpu");
+    wrapper.vm.handlePermissionBatchChange([{ row: cpu, permission: "AllowGet", newValue: true }]);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual(["metrics:cpu:AllowGet"]);
+  });
+
+  it("stages a stream type grant as that type's _all_ object", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    wrapper.vm.handlePermissionBatchChange([
+      { row: metrics, permission: "AllowGet", newValue: true },
+    ]);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual(["metrics:_all_default:AllowGet"]);
+  });
+
+  it("stages every stream as the stream _all_ object", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+
+    const everyStream = wrapper.vm.activeModuleView.scopes[0];
+    wrapper.vm.handlePermissionBatchChange([
+      { row: everyStream.node, permission: "AllowGet", newValue: true },
+    ]);
+
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual(["stream:_all_default:AllowGet"]);
+  });
+
+  it("returns to the stream types from the first crumb", async () => {
+    const wrapper = await mountEditRole();
+    await openStreamType(wrapper, "metrics");
+
+    wrapper.vm.navigateTrail(0);
+
+    expect(wrapper.vm.activeModuleView.trail).toHaveLength(1);
+  });
+});
+
+describe("EditRole - pane reads the grant store", () => {
+  const openMetrics = async (wrapper) => {
+    wrapper.vm.activeModule = "stream";
+    await flushPromises();
+    const metrics = wrapper.vm.activeModuleView.entities.find((row) => row.name === "metrics");
+    await wrapper.vm.openFolderRow(metrics);
+    await flushPromises();
+    return wrapper.vm.activeModuleView.entities.find((row) => row.name === "cpu");
+  };
+
+  // The summary can remove a grant without touching row objects, so the pane must follow the store.
+  it("reflects a grant removed outside the pane", async () => {
+    const wrapper = await mountEditRole();
+    const cpu = await openMetrics(wrapper);
+    wrapper.vm.handlePermissionBatchChange([{ row: cpu, permission: "AllowGet", newValue: true }]);
+
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+
+    expect(wrapper.vm.isGranted(cpu, "AllowGet")).toBe(false);
+  });
+
+  it("writes and reads the same key for a row", async () => {
+    const wrapper = await mountEditRole();
+    const cpu = await openMetrics(wrapper);
+
+    wrapper.vm.handlePermissionChange(cpu, "AllowGet");
+
+    expect(wrapper.vm.permissionHashFor(cpu, "AllowGet")).toBe("metrics:cpu:AllowGet");
+    expect(wrapper.vm.isGranted(cpu, "AllowGet")).toBe(true);
+  });
+});
+
+describe("EditRole - summary", () => {
+  const withSaved = (vm, keys) => {
+    vm.permissionsHash = new Set(keys);
+    vm.selectedPermissionsHash = new Set(keys);
+  };
+  const moduleKeys = (vm) => vm.summaryModules.map((module) => module.moduleKey).sort();
+
+  // Stream types are children of `stream`, so their grants land on the one Streams card.
+  it("shows one card per module the role holds", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["metrics:cpu:AllowGet", "logs:app:AllowGet", "dfolder:f1:AllowGet"]);
+
+    expect(moduleKeys(wrapper.vm)).toEqual(["dfolder", "stream"]);
+  });
+
+  it("routes a dashboard grant to its folder module", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["dashboard:f1/d1:AllowGet"]);
+
+    expect(moduleKeys(wrapper.vm)).toEqual(["dfolder"]);
+  });
+
+  it("describes a type level grant in words, not the raw _all_ id", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, [`stream:_all_${wrapper.vm.getOrgId()}:AllowAll`]);
+
+    const [stream] = wrapper.vm.summaryModules;
+
+    expect(String(stream.description)).not.toContain("_all_");
+    expect(stream.description).toBe(i18n.global.t("iam.editRole.summaryReachEveryStream"));
+  });
+
+  it("lists each held action once, in column order", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["metrics:cpu:AllowGet", "metrics:cpu:AllowList", "logs:app:AllowGet"]);
+
+    const [stream] = wrapper.vm.summaryModules;
+
+    expect(stream.actions.map((action) => action.action)).toEqual(["AllowList", "AllowGet"]);
+  });
+
+  it("drops a module whose only grant is staged for removal", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["logs:app:AllowGet"]);
+
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    expect(wrapper.vm.summaryModules).toEqual([]);
+  });
+});
+
+describe("EditRole - pending changes", () => {
+  const withSaved = (vm, keys) => {
+    vm.permissionsHash = new Set(keys);
+    vm.selectedPermissionsHash = new Set(keys);
+  };
+
+  it("lists a staged addition and a staged removal with the keys to undo them", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["logs:app:AllowGet"]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+
+    const byState = Object.fromEntries(
+      wrapper.vm.pendingChanges.map((change) => [change.state, change.keys]),
+    );
+
+    expect(byState).toEqual({
+      removed: ["logs:app:AllowGet"],
+      added: ["metrics:cpu:AllowGet"],
+    });
+  });
+
+  // The drawer's Undo sends a change's keys back through the same toggle, so it must net to the saved state.
+  it("returns to the saved state when a change's keys are undone", async () => {
+    const wrapper = await mountEditRole();
+    withSaved(wrapper.vm, ["logs:app:AllowGet"]);
+    wrapper.vm.updatePermissionMappings("logs:app:AllowGet");
+
+    wrapper.vm.pendingChanges[0].keys.forEach(wrapper.vm.updatePermissionMappings);
+
+    expect(wrapper.vm.pendingChanges).toEqual([]);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+  });
+
+  it("closes the review drawer once the last change is undone", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    wrapper.vm.unsavedDrawerOpen = true;
+    await flushPromises();
+
+    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
+    await flushPromises();
+
+    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
+  });
+});
+
+describe("EditRole - folder drill-in", () => {
+  it("opens a folder showing only this folder, with the folder type scope hidden", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+    const folder = wrapper.vm.activeModuleView.entities[0];
+
+    await wrapper.vm.openFolderRow(folder);
+    await flushPromises();
+
+    const scopes = wrapper.vm.activeModuleView.scopes;
+    expect(wrapper.vm.activeModuleView.trail).toHaveLength(2);
+    expect(scopes.map((scope) => scope.resource)).toEqual(["dfolder", "dfolder"]);
+    expect(scopes.map((scope) => !!scope.hidden)).toEqual([true, false]);
+  });
+
+  // model.fga resolves every action on a dashboard as `<ACTION> from parent`, so folder grants reach its dashboards.
+  it("lets the folder and the folder type scope lock the dashboards inside", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+
+    await wrapper.vm.openFolderRow(wrapper.vm.activeModuleView.entities[0]);
+    await flushPromises();
+
+    const [typeScope, thisFolder] = wrapper.vm.activeModuleView.scopes;
+    expect(thisFolder.covers).toEqual(["dashboard"]);
+    expect(typeScope.covers).toEqual(["dfolder", "dashboard"]);
+  });
+
+  it("names the hidden folder type scope when it locks this folder", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.updatePermissionMappings("dfolder:_all_default:AllowGet");
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+
+    await wrapper.vm.openFolderRow(wrapper.vm.activeModuleView.entities[0]);
+    await flushPromises();
+
+    const thisFolder = wrapper.vm.activeModuleView.scopes.at(-1);
+    expect(String(thisFolder.hint)).toContain("Dash Folders");
+  });
+
+  it("keeps the plain folder hint when nothing above grants", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+
+    await wrapper.vm.openFolderRow(wrapper.vm.activeModuleView.entities[0]);
+    await flushPromises();
+
+    expect(String(wrapper.vm.activeModuleView.scopes.at(-1).hint)).toBe(
+      "Grants on the folder itself",
+    );
+  });
+
+  it("returns to the folder list from the first crumb", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+    await wrapper.vm.openFolderRow(wrapper.vm.activeModuleView.entities[0]);
+
+    wrapper.vm.navigateTrail(0);
+
+    expect(wrapper.vm.activeModuleView.trail).toHaveLength(1);
+  });
+
+  it("leaves the folder when another module is chosen", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.activeModule = "dfolder";
+    await flushPromises();
+    await wrapper.vm.openFolderRow(wrapper.vm.activeModuleView.entities[0]);
+
+    wrapper.vm.activeModule = "metrics";
+    await flushPromises();
+
+    expect(wrapper.vm.openFolder).toBeNull();
+  });
+});
+
+describe("EditRole - header row", () => {
+  it("puts the permission count and view switch in the summary header, once", async () => {
+    const wrapper = await mountEditRole();
+
+    const counts = wrapper.findAll('[data-test="edit-role-permissions-count"]');
+    expect(counts).toHaveLength(1);
+    expect(
+      wrapper
+        .find('[data-test="edit-role-summary"]')
+        .find('[data-test="edit-role-permissions-count"]')
+        .exists(),
+    ).toBe(true);
+  });
+
+  it("keeps the view switch reachable in the JSON view, which has no pane header", async () => {
+    const wrapper = await mountEditRole();
+
+    wrapper.vm.permissionsUiType = "json";
+    await flushPromises();
+
+    expect(wrapper.find('[data-test="edit-role-summary"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="edit-role-permissions-ui-type-toggle"]')).toHaveLength(1);
+  });
+});
+
+describe("EditRole - org module", () => {
+  const withOrgResource = (vm) => {
+    vm.permissionsState.resources = [
+      ...vm.permissionsState.resources,
+      { key: "org", display_name: "Organizations", has_entities: true, order: 999 },
+    ];
+  };
+
+  // The backend does not reject org grants from other orgs, so the rail is the only gate.
+  it("hides the organizations module outside the meta org", async () => {
+    const metaOrg = store.state.zoConfig.meta_org;
+    store.state.zoConfig.meta_org = "_meta";
+    try {
+      const wrapper = await mountEditRole();
+      withOrgResource(wrapper.vm);
+
+      expect(wrapper.vm.railModules.map((module) => module.key)).not.toContain("org");
+    } finally {
+      store.state.zoConfig.meta_org = metaOrg;
+    }
+  });
+
+  it("offers the organizations module inside the meta org", async () => {
+    const wrapper = await mountEditRole();
+    withOrgResource(wrapper.vm);
+
+    expect(wrapper.vm.railModules.map((module) => module.key)).toContain("org");
+  });
+});
+
+describe("EditRole - presets after undo", () => {
+  // Undo only clears the grant store, so a preset must judge "already granted" from the store, not row flags.
+  it("seeds the read-only preset again after every change is undone", async () => {
+    const wrapper = await mountEditRole();
+    await wrapper.vm.applyPreset("readonly");
+    const seeded = Object.keys(wrapper.vm.addedPermissions);
+    expect(seeded.length).toBeGreaterThan(0);
+
+    wrapper.vm.pendingChanges
+      .flatMap((change) => change.keys)
+      .forEach(wrapper.vm.updatePermissionMappings);
+    expect(Object.keys(wrapper.vm.addedPermissions)).toEqual([]);
+
+    await wrapper.vm.applyPreset("readonly");
+    expect(Object.keys(wrapper.vm.addedPermissions).sort()).toEqual([...seeded].sort());
+  });
+});
+
+describe("EditRole - overlapping entity loads", () => {
+  // The loaders push into the list, so two overlapping opens must share one request.
+  it("lists a resource's entities once when it is opened twice at the same time", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getResourceByName(
+      wrapper.vm.permissionsState.permissions,
+      "provider",
+    );
+    onlineEvalsService.providers.list.mockClear();
+
+    await Promise.all([
+      wrapper.vm.getResourceEntities(resource),
+      wrapper.vm.getResourceEntities(resource),
+    ]);
+
+    expect(onlineEvalsService.providers.list).toHaveBeenCalledTimes(1);
+    expect(resource.entities).toHaveLength(1);
   });
 });

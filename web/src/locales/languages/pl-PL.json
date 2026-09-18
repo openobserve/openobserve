@@ -2116,7 +2116,6 @@
     "userName": "Nazwa użytkownika",
     "searchRole": "Szukaj roli",
     "searchGroup": "Szukaj grupy użytkowników",
-    "object": "Obiekt",
     "serviceAccounts": "Konta serwisowe",
     "ingestionTokens": "Tokeny wprowadzania",
     "syntheticsTokens": "Tokeny syntetyczne",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "Usunięto {count} rolę. Nie udało się usunąć {unsuccessful}. | Usunięto {count} role. Nie udało się usunąć {unsuccessful}.",
       "bulkDeleteFailed": "Nie udało się usunąć {count} rol(i)",
       "bulkDeleteRolesError": "Błąd podczas usuwania ról"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Nie wybrano uprawnień",
-      "loadingResources": "Ładowanie zasobów...",
-      "showing": "Pokazuje",
-      "top50": "Top 50",
-      "resourcesSearchHint": "zasobów (Szukaj, aby uzyskać konkretny zasób)",
-      "noResourcesPresent": "Brak zasobów",
-      "objectResource": "Zasób",
-      "objectType": "Typ"
     },
     "addUser": {
       "passwordChanged": "Hasło zmienione",

@@ -2116,7 +2116,6 @@
     "userName": "Имя пользователя",
     "searchRole": "Поиск роли",
     "searchGroup": "Поиск группы пользователей",
-    "object": "Объект",
     "serviceAccounts": "Сервисные учетные записи",
     "ingestionTokens": "Токены загрузки",
     "syntheticsTokens": "Синтетические токены",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "Удалена {count} роль. Не удалось удалить {unsuccessful}. | Удалено {count} ролей. Не удалось удалить {unsuccessful}.",
       "bulkDeleteFailed": "Не удалось удалить {count} рол(ей)",
       "bulkDeleteRolesError": "Ошибка при удалении ролей"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Разрешения не выбраны",
-      "loadingResources": "Загрузка ресурсов...",
-      "showing": "Показано",
-      "top50": "Топ 50",
-      "resourcesSearchHint": "ресурсов (найдите для получения конкретного ресурса)",
-      "noResourcesPresent": "Ресурсы отсутствуют",
-      "objectResource": "Ресурс",
-      "objectType": "Тип"
     },
     "addUser": {
       "passwordChanged": "Пароль изменён",

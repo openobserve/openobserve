@@ -2116,7 +2116,6 @@
     "userName": "使用者名稱",
     "searchRole": "搜尋角色",
     "searchGroup": "搜尋使用者群組",
-    "object": "物件",
     "serviceAccounts": "服務帳戶",
     "ingestionTokens": "擷取權杖",
     "syntheticsTokens": "合成監控權杖",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "已刪除 {count} 個角色。無法刪除 {unsuccessful}。 | 已刪除 {count} 個角色。無法刪除 {unsuccessful}。",
       "bulkDeleteFailed": "無法刪除 {count} 個角色",
       "bulkDeleteRolesError": "刪除角色時發生錯誤"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "未選取權限",
-      "loadingResources": "正在載入資源…",
-      "showing": "顯示",
-      "top50": "前 50 個",
-      "resourcesSearchHint": "資源（搜尋以取得特定資源）",
-      "noResourcesPresent": "無資源",
-      "objectResource": "資源",
-      "objectType": "類型"
     },
     "addUser": {
       "passwordChanged": "密碼已變更",

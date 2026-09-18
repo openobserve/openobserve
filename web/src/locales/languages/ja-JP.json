@@ -2116,7 +2116,6 @@
     "userName": "ユーザー名",
     "searchRole": "ロールを検索",
     "searchGroup": "グループを検索",
-    "object": "オブジェクト",
     "serviceAccounts": "サービスアカウント",
     "ingestionTokens": "インジェストトークン",
     "syntheticsTokens": "Syntheticsトークン",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "{count} ロールを削除しました。{unsuccessful} の削除に失敗しました。 | {count} ロールを削除しました。{unsuccessful} の削除に失敗しました。",
       "bulkDeleteFailed": "{count}個のロールの削除に失敗しました。",
       "bulkDeleteRolesError": "ロールの削除中にエラーが発生しました。"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "権限が選択されていません",
-      "loadingResources": "リソースを読み込み中...",
-      "showing": "表示中",
-      "top50": "上位50件",
-      "resourcesSearchHint": "リソース（特定のリソースを検索）",
-      "noResourcesPresent": "リソースがありません",
-      "objectResource": "リソース",
-      "objectType": "タイプ"
     },
     "addUser": {
       "passwordChanged": "パスワード変更完了",

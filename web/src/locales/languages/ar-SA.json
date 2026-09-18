@@ -2116,7 +2116,6 @@
     "userName": "اسم المستخدم",
     "searchRole": "البحث عن دور",
     "searchGroup": "البحث عن مجموعة مستخدمين",
-    "object": "الكائن",
     "serviceAccounts": "حسابات الخدمة",
     "ingestionTokens": "رموز الاستهلاك",
     "syntheticsTokens": "رموز الاصطناع",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "تم حذف {count} الدور. فشل في حذف {unsuccessful}. | حذف {count} الأدوار. فشل في حذف {unsuccessful}.",
       "bulkDeleteFailed": "فشل في حذف {count} الدور | فشل في حذف {count} الأدوار",
       "bulkDeleteRolesError": "خطأ أثناء حذف الأدوار"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "لم يتم اختيار أي صلاحيات",
-      "loadingResources": "تحميل الموارد...",
-      "showing": "العرض",
-      "top50": "أفضل 50",
-      "resourcesSearchHint": "الموارد (ابحث للحصول على مورد محدد)",
-      "noResourcesPresent": "لا توجد موارد متاحة",
-      "objectResource": "المصدر",
-      "objectType": "النوع"
     },
     "addUser": {
       "passwordChanged": "تم تغيير كلمة المرور",

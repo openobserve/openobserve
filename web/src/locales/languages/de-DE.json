@@ -2116,7 +2116,6 @@
     "userName": "Nutzername",
     "searchRole": "Rolle suchen",
     "searchGroup": "Gruppe suchen",
-    "object": "Objekt",
     "serviceAccounts": "Dienstkonten",
     "ingestionTokens": "Tokens für die Aufnahme",
     "syntheticsTokens": "Synthetics-Tokens",
@@ -2300,16 +2299,6 @@
       "bulkDeletePartial": "Gelöscht: {count} Rolle. Fehler beim Löschen von {unsuccessful}. | Gelöscht: {count} Rollen. Fehler beim Löschen von {unsuccessful}.",
       "bulkDeleteFailed": "Fehler beim Löschen von {count} Rolle(n)",
       "bulkDeleteRolesError": "Fehler beim Löschen von Rollen"
-    },
-    "permissionsTable": {
-      "noPermissionsSelected": "Keine Berechtigungen ausgewählt",
-      "loadingResources": "Ressourcen werden geladen...",
-      "showing": "Angezeigt",
-      "top50": "Top 50",
-      "resourcesSearchHint": "Ressourcen (Suche, um eine bestimmte Ressource zu finden)",
-      "noResourcesPresent": "Keine Ressourcen vorhanden",
-      "objectResource": "Ressource",
-      "objectType": "Typ"
     },
     "addUser": {
       "passwordChanged": "Passwort geändert",

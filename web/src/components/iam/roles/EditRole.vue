@@ -58,158 +58,126 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-show="activeTab === 'permissions'"
         data-test="edit-role-permissions-section"
-        class="bg-card-glass-bg flex h-full flex-col"
+        class="bg-card-glass-bg flex h-full min-h-0"
       >
-        <div class="bg-surface-base flex flex-shrink-0 items-center justify-between">
+        <ModuleRail
+          v-show="permissionsUiType === 'table'"
+          v-model="activeModule"
+          :modules="railModules"
+        />
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
-            v-show="permissionsUiType === 'table'"
-            data-test="edit-role-permissions-filters"
-            class="sticky top-0 z-2 flex items-start justify-start gap-3 px-3 py-2"
+            v-if="permissionsUiType === 'json'"
+            class="bg-surface-base flex flex-shrink-0 items-center justify-end px-3 pt-3 pb-2"
           >
-            <div data-test="edit-role-permissions-show-toggle" class="flex items-center">
-              <span data-test="edit-role-permissions-show-text" style="font-size: var(--text-sm)">
-                {{ t("iam.editRole.show") }}
-              </span>
-              <OToggleGroup
-                class="ms-1"
-                :model-value="filter.permissions"
-                @update:model-value="(v) => updateTableData(v as string)"
-              >
-                <OToggleGroupItem
-                  v-for="visual in permissionDisplayOptions"
-                  :key="visual.value"
-                  :value="visual.value"
-                  size="sm"
-                  :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                >
-                  {{ visual.label }}
-                </OToggleGroupItem>
-              </OToggleGroup>
-            </div>
-            <div data-test="edit-role-permissions-search-input">
-              <OInput
-                v-model="filter.value"
-                :debounce="500"
-                class="no-border o2-search-input h-9 w-50"
-                :placeholder="t('iam.editRole.searchPermissions')"
-                @update:model-value="onResourceChange"
-              >
-                <template #icon-left>
-                  <OIcon name="search" size="sm" />
-                </template>
-              </OInput>
-            </div>
-            <div data-test="edit-role-permissions-resource-select-input">
-              <OSelect
-                v-model="filter.resource"
-                :options="resourceOptions"
-                :placeholder="t('iam.editRole.selectResource')"
-                clearable
-                searchable
-                style="width: 12.5rem"
-                @update:model-value="onResourceChange"
-              />
-            </div>
-          </div>
-          <div></div>
-          <div class="flex items-center gap-2">
-            <span data-test="edit-role-permissions-count" class="text-sm font-bold">
-              {{
-                t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
-              }}
-            </span>
-            <OToggleGroup
-              data-test="edit-role-permissions-ui-type-toggle"
-              class="my-1 me-3"
+            <PermissionsViewSwitch
+              :count="selectedPermissionsHash.size"
               :model-value="permissionsUiType"
-              @update:model-value="(v) => updatePermissionsUi(v as string)"
-            >
-              <OToggleGroupItem
-                v-for="visual in permissionUiOptions"
-                :key="visual.value"
-                :value="visual.value"
-                size="sm"
-                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-              >
-                {{ visual.label }}
-              </OToggleGroupItem>
-            </OToggleGroup>
-          </div>
-        </div>
-
-        <div
-          data-test="edit-role-permissions-table-section"
-          class="rounded-default min-h-0 flex-1 overflow-y-auto"
-        >
-          <div v-show="permissionsUiType === 'table'">
-            <PermissionsTable
-              ref="permissionTableRef"
-              :rows="permissionsState.permissions"
-              :customFilteredPermissions="filteredPermissions"
-              :filter="filter"
-              :visibleResourceCount="countOfVisibleResources"
-              :selected-permissions-hash="selectedPermissionsHash"
-              :loading="isFetchingInitialRoles"
-              @updated:permission="handlePermissionChange"
-              @updated:permission-batch="handlePermissionBatchChange"
-              @expand:row="expandPermission"
-              @update:filter="onClearFilter"
+              @update:model-value="updatePermissionsUi"
             />
           </div>
-          <div v-show="permissionsUiType === 'json'">
-            <div class="flex items-center justify-between">
-              <div class="mb-3 font-bold">
-                {{
-                  t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
-                }}
-              </div>
-              <div
-                class="flex cursor-pointer items-center"
-                :title="t('menu.help')"
-                @click="toggleHelpSection"
-              >
-                <OIcon name="help" size="sm" />
-                <span class="ms-1"> {{ t("iam.editRole.help") }} </span>
-              </div>
-            </div>
-            <div class="flex flex-nowrap">
-              <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
-                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
-                <QueryEditor
-                  data-test="logs-vrl-function-editor"
-                  editor-id="add-function-editor"
-                  class="mt-2"
-                  language="json"
-                  ref="permissionJsonEditorRef"
-                  v-model:query="permissionsJsonValue"
-                  style="height: calc(100vh - var(--navbar-height) - 295px)"
+
+          <div
+            data-test="edit-role-permissions-table-section"
+            class="rounded-default min-h-0 flex-1 overflow-y-auto"
+          >
+            <ModulePane
+              v-if="permissionsUiType === 'table' && activeModuleView"
+              class="h-full"
+              :trail="activeModuleView.trail"
+              :scopes="activeModuleView.scopes"
+              :entities="activeModuleView.entities"
+              :loading="moduleLoading || isFetchingInitialRoles"
+              :is-granted="isGranted"
+              :is-pending-removal="isPendingRemoval"
+              :icon="activeRailModule?.icon"
+              :added="activeRailModule?.added"
+              :removed="activeRailModule?.removed"
+              @change="(change) => handlePermissionBatchChange([change])"
+              @open="openFolderRow"
+              @navigate="navigateTrail"
+            >
+              <template #actions>
+                <PermissionsViewSwitch
+                  :count="selectedPermissionsHash.size"
+                  :model-value="permissionsUiType"
+                  @update:model-value="updatePermissionsUi"
                 />
-                <!-- eslint-enable local/no-hardcoded-px -->
-              </div>
-              <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
-                <div class="flex items-center justify-between px-2">
-                  <div style="font-size: var(--text-base)">
-                    {{ t("iam.editRole.quickReference") }}
-                  </div>
-                  <OIcon
-                    class="cursor-pointer"
-                    name="close"
-                    size="xs"
-                    :title="t('common.close')"
-                    @click="toggleHelpSection"
-                  />
+              </template>
+            </ModulePane>
+            <RoleSummary
+              v-else-if="permissionsUiType === 'table'"
+              class="h-full"
+              :modules="summaryModules"
+              :loading="isFetchingInitialRoles"
+              @open="(moduleKey) => (activeModule = moduleKey)"
+              @preset="applyPreset"
+            >
+              <template #actions>
+                <PermissionsViewSwitch
+                  :count="selectedPermissionsHash.size"
+                  :model-value="permissionsUiType"
+                  @update:model-value="updatePermissionsUi"
+                />
+              </template>
+            </RoleSummary>
+            <div v-show="permissionsUiType === 'json'">
+              <div class="flex items-center justify-between">
+                <div class="mb-3 font-bold">
+                  {{
+                    t("iam.editRole.permissionCountSingular", {
+                      count: selectedPermissionsHash.size,
+                    })
+                  }}
                 </div>
-                <OSeparator class="mt-2 mb-4" />
-                <div class="mt-2 px-2">
-                  <div>
-                    {{ t("iam.editRole.jsonConfigHelp") }}
+                <div
+                  class="flex cursor-pointer items-center"
+                  :title="t('menu.help')"
+                  @click="toggleHelpSection"
+                >
+                  <OIcon name="help" size="sm" />
+                  <span class="ms-1"> {{ t("iam.editRole.help") }} </span>
+                </div>
+              </div>
+              <div class="flex flex-nowrap">
+                <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                  <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+                  <QueryEditor
+                    data-test="logs-vrl-function-editor"
+                    editor-id="add-function-editor"
+                    class="mt-2"
+                    language="json"
+                    ref="permissionJsonEditorRef"
+                    v-model:query="permissionsJsonValue"
+                    style="height: calc(100vh - var(--navbar-height) - 295px)"
+                  />
+                  <!-- eslint-enable local/no-hardcoded-px -->
+                </div>
+                <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
+                  <div class="flex items-center justify-between px-2">
+                    <div style="font-size: var(--text-base)">
+                      {{ t("iam.editRole.quickReference") }}
+                    </div>
+                    <OIcon
+                      class="cursor-pointer"
+                      name="close"
+                      size="xs"
+                      :title="t('common.close')"
+                      @click="toggleHelpSection"
+                    />
                   </div>
-                  <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
-                  <div>
-                    <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
-                    {{ t("iam.editRole.specificInstanceOr") }}
-                    <span class="font-bold">{{ raw("organizationID") }}</span>
-                    {{ t("iam.editRole.forAllInstances") }}
+                  <OSeparator class="mt-2 mb-4" />
+                  <div class="mt-2 px-2">
+                    <div>
+                      {{ t("iam.editRole.jsonConfigHelp") }}
+                    </div>
+                    <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
+                    <div>
+                      <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
+                      {{ t("iam.editRole.specificInstanceOr") }}
+                      <span class="font-bold">{{ raw("organizationID") }}</span>
+                      {{ t("iam.editRole.forAllInstances") }}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -220,8 +188,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div class="z-2 mt-2.5 flex w-full flex-shrink-0 justify-end">
       <div
-        class="bg-card-glass-bg border-border-default flex w-full justify-end gap-2 border-t px-3 py-2"
+        class="bg-card-glass-bg border-border-default flex w-full items-center justify-end gap-2 border-t px-3 py-2"
       >
+        <!-- Sits beside Save because that is where the eye goes before committing. -->
+        <OButton
+          v-if="pendingChanges.length"
+          variant="outline"
+          size="sm-action"
+          data-test="edit-role-review-changes-btn"
+          @click="unsavedDrawerOpen = true"
+        >
+          {{ t("iam.editRole.reviewChanges") }}
+          <OBadge
+            variant="warning-soft"
+            size="sm"
+            class="ms-1.5"
+            data-test="edit-role-unsaved-count"
+          >
+            {{ raw(String(pendingChanges.length)) }}
+          </OBadge>
+        </OButton>
         <OButton
           data-test="edit-role-cancel-btn"
           variant="outline"
@@ -241,6 +227,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
   </OPageLayout>
+  <UnsavedChangesDrawer
+    v-model:open="unsavedDrawerOpen"
+    :changes="pendingChanges"
+    @undo="(keys) => keys.forEach(updatePermissionMappings)"
+  />
   <ConfirmDialog
     :title="t('iam.editRole.leaveConfirm.title')"
     :message="t('iam.editRole.leaveConfirm.message')"
@@ -251,19 +242,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { cloneDeep } from "lodash-es";
-import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, watch, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
-import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
-import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
+import useRoleGrants, { buildGrantKey, splitGrantKey } from "@/composables/iam/useRoleGrants";
+import ModuleRail, { type RailModule } from "@/components/iam/roles/ModuleRail.vue";
+import ModulePane, { type ScopeRow } from "@/components/iam/roles/ModulePane.vue";
+import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.vue";
+import UnsavedChangesDrawer, {
+  type PendingChange,
+} from "@/components/iam/roles/UnsavedChangesDrawer.vue";
+import RoleSummary, {
+  type SummaryAction,
+  type SummaryModule,
+} from "@/components/iam/roles/RoleSummary.vue";
+import {
+  buildRoleModules,
+  GROUP_LABEL_KEYS,
+  STREAM_PARENT_KEY,
+} from "@/components/iam/roles/roleModules";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -319,8 +321,6 @@ onBeforeMount(() => {
   getRoleDetails();
 });
 
-const permissionTableRef: any = ref(null);
-
 const { t } = useI18nTyped();
 
 const { permissionsState } = usePermissions();
@@ -344,21 +344,21 @@ const editingRole = ref("");
 
 const permissions: Ref<Permission[]> = ref([]);
 
-const permissionsHash = ref(new Set()); // Saved permissions of role
+const grants = useRoleGrants();
 
-const selectedPermissionsHash = ref(new Set()); // Saved + new added permission hash
+// These aliases are the state surface the specs reach through `wrapper.vm`, so the names stay.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const permissionsHash = grants.saved; // Saved permissions of role
 
-const addedPermissions: any = ref({});
+const selectedPermissionsHash = grants.current; // Saved + new added permission hash
+
+const addedPermissions = grants.added;
 
 const resourceMapper: Ref<{ [key: string]: Resource }> = ref({});
 
-const removedPermissions: any = ref({});
-
-const countOfVisibleResources = ref(0);
+const removedPermissions = grants.removed;
 
 const isFetchingInitialRoles = ref(false);
-
-const filteredPermissions: Ref<{ [key: string]: Entity[] }> = ref({});
 
 const heavyResourceEntities: Ref<{ [key: string]: Entity[] }> = ref({});
 const permissionsJsonValue = ref("");
@@ -445,42 +445,395 @@ const tabs = computed(() => {
   return baseTabs;
 });
 
-const permissionDisplayOptions = [
-  {
-    label: t("iam.editRole.all"),
-    value: "all",
-    icon: "format-list-bulleted",
-  },
-  {
-    label: t("iam.editRole.selected"),
-    value: "selected",
-    icon: "check-box",
-  },
-];
+// "" is the summary: the landing pane that lists what the role grants.
+const activeModule = ref("");
 
-const permissionUiOptions = [
-  {
-    label: t("iam.editRole.table"),
-    value: "table",
-    icon: "table-chart",
-  },
-  {
-    label: t("iam.editRole.json"),
-    value: "json",
-    icon: "data-object",
-  },
-];
+// The module or folder whose entities are in flight, so a slower one cannot clear the newer spinner.
+const loadingFor = ref("");
 
-const filter = ref({
-  resource: "",
-  value: "",
-  permissions: "selected",
-  method: filterResources,
+const unsavedDrawerOpen = ref(false);
+
+// The folder opened inside a folder module, or null at the module's top level.
+const openFolder = ref<any>(null);
+
+const moduleLoading = computed(
+  () => loadingFor.value === activeModule.value || loadingFor.value === openFolder.value?.name,
+);
+
+// Mirrors setPermission's guard: `org` is grantable from the meta org only.
+const grantableResources = computed(() =>
+  permissionsState.resources.filter(
+    (resource: any) =>
+      resource.key !== "org" ||
+      store.state.selectedOrganization.identifier === store.state.zoConfig.meta_org,
+  ),
+);
+
+const roleModules = computed(() => buildRoleModules(grantableResources.value));
+
+const resourceLabel = (key: string) =>
+  permissionsState.resources.find((resource: any) => resource.key === key)?.display_name ?? key;
+
+const moduleLabel = (key: string) => raw(resourceLabel(key));
+
+const railModules = computed<RailModule[]>(() =>
+  roleModules.value.map((module) => {
+    const totals = module.countedKeys.reduce(
+      (sum, key) => {
+        const stat = grants.statFor(key);
+        return {
+          granted: sum.granted + stat.granted,
+          added: sum.added + stat.added,
+          removed: sum.removed + stat.removed,
+        };
+      },
+      { granted: 0, added: 0, removed: 0 },
+    );
+    return {
+      key: module.key,
+      label: moduleLabel(module.key),
+      icon: module.icon,
+      groupId: module.group,
+      groupLabel: t(GROUP_LABEL_KEYS[module.group]),
+      ...totals,
+    };
+  }),
+);
+
+const ACTION_ORDER = ["AllowAll", "AllowList", "AllowGet", "AllowPost", "AllowPut", "AllowDelete"];
+
+const ACTION_LABEL_KEYS = {
+  AllowAll: "iam.all",
+  AllowList: "iam.list",
+  AllowGet: "iam.get",
+  AllowPost: "iam.create",
+  AllowPut: "iam.update",
+  AllowDelete: "iam.delete",
+} as const;
+
+const activeRailModule = computed(() =>
+  railModules.value.find((module) => module.key === activeModule.value),
+);
+
+const moduleOf = (moduleKey: string) =>
+  roleModules.value.find((candidate) => candidate.key === moduleKey);
+
+const isGranted = (node: any, action: string) =>
+  selectedPermissionsHash.value.has(permissionHashFor(node, action));
+
+const isPendingRemoval = (node: any, action: string) =>
+  !!grants.removed.value[permissionHashFor(node, action)];
+
+const typeScope = (resourceKey: string, node: any): ScopeRow => ({
+  key: resourceKey,
+  node,
+  resource: resourceKey,
+  covers: [resourceKey],
+  label: t("iam.editRole.scopeAllOf", { module: node?.display_name ?? resourceLabel(resourceKey) }),
+  hint: t("iam.editRole.scopeIncludesFuture"),
 });
 
-const filteredResources: Ref<any[]> = ref([]);
+const everyStreamScope = (covers: string[]): ScopeRow => ({
+  key: STREAM_PARENT_KEY,
+  node: resourceMapper.value[STREAM_PARENT_KEY],
+  resource: STREAM_PARENT_KEY,
+  covers,
+  label: t("iam.editRole.scopeEveryStream"),
+  hint: t("iam.editRole.scopeEveryStreamHint"),
+});
 
-const resourceOptions: Ref<any[]> = ref([]);
+// Stream types are type rows under the `stream` node, so they are the rows the Streams module lists.
+const streamTypeKeys = () =>
+  (resourceMapper.value[STREAM_PARENT_KEY]?.entities ?? []).map((entity: any) => entity.name);
+
+const moduleScopes = (moduleKey: string): ScopeRow[] => {
+  const node = resourceMapper.value[moduleKey];
+  if (!node) return [];
+  return moduleKey === STREAM_PARENT_KEY
+    ? [everyStreamScope(streamTypeKeys())]
+    : [typeScope(moduleKey, node)];
+};
+
+// A parent scope is edited on its own screen, so a drilled level hides it but still names it as the source of any lock.
+const underHiddenParent = (parent: ScopeRow, parentModule: string, own: ScopeRow): ScopeRow[] => {
+  const grantsAnything = ACTION_ORDER.some(
+    (action) => parent.node && isGranted(parent.node, action),
+  );
+  return [
+    { ...parent, hidden: true },
+    grantsAnything
+      ? {
+          ...own,
+          hint: t("iam.editRole.scopeCoveredByParent", {
+            scope: parent.label,
+            module: moduleLabel(parentModule),
+          }),
+        }
+      : own,
+  ];
+};
+
+// model.fga defines each action on a folder item as `... or <ACTION> from parent`, so a folder grant reaches its items.
+const folderScopes = (moduleKey: string, folder: any): ScopeRow[] => {
+  const [moduleScope] = moduleScopes(moduleKey);
+  const items = folder.childName ? [folder.childName] : [];
+  const thisFolder: ScopeRow = {
+    key: `folder-${folder.name}`,
+    node: folder,
+    resource: moduleKey,
+    covers: items,
+    label: t("iam.editRole.scopeThisFolder"),
+    hint: t("iam.editRole.scopeThisFolderHint"),
+  };
+  // The type level grant reaches every folder, and through each folder its items.
+  return moduleScope
+    ? underHiddenParent(
+        { ...moduleScope, covers: [...moduleScope.covers, ...items] },
+        moduleKey,
+        thisFolder,
+      )
+    : [thisFolder];
+};
+
+// A stream type is an `_all_` scope in its own right, so everything beneath it inherits both rows.
+const streamTypeScopes = (typeNode: any): ScopeRow[] =>
+  underHiddenParent(
+    everyStreamScope([typeNode.name]),
+    STREAM_PARENT_KEY,
+    typeScope(typeNode.name, typeNode),
+  );
+
+const activeModuleView = computed(() => {
+  const module = moduleOf(activeModule.value);
+  if (!module) return null;
+
+  const title = moduleLabel(module.key);
+
+  // An org-wide resource has no items, so its only row is its own grant.
+  if (!module.hasEntities) {
+    return {
+      trail: [title],
+      scopes: [] as ScopeRow[],
+      entities: [resourceMapper.value[module.key]].filter(Boolean),
+    };
+  }
+
+  const child = openFolder.value;
+  if (child && module.key === STREAM_PARENT_KEY) {
+    return {
+      trail: [title, raw(child.display_name ?? child.name)],
+      scopes: streamTypeScopes(child),
+      entities: heavyResourceEntities.value[child.name] ?? [],
+    };
+  }
+
+  if (child) {
+    return {
+      trail: [title, raw(child.display_name ?? child.name)],
+      scopes: folderScopes(module.key, child),
+      entities: child.entities ?? [],
+    };
+  }
+
+  return {
+    trail: [title],
+    scopes: moduleScopes(module.key),
+    entities: resourceMapper.value[module.key]?.entities ?? [],
+  };
+});
+
+const openModule = async (moduleKey: string) => {
+  openFolder.value = null;
+  const module = moduleOf(moduleKey);
+  if (!module || !module.hasEntities) return;
+
+  loadingFor.value = moduleKey;
+  try {
+    await getResourceEntities(resourceMapper.value[module.key]);
+  } finally {
+    // Only the newest open clears the flag, or a slower module would hide the one on screen.
+    if (loadingFor.value === moduleKey) loadingFor.value = "";
+  }
+};
+
+watch(activeModule, openModule);
+
+const openFolderRow = async (child: any) => {
+  openFolder.value = child;
+  // A stream type keeps its full list in heavyResourceEntities; its own `entities` is filter-shaped.
+  if (activeModule.value === STREAM_PARENT_KEY && heavyResourceEntities.value[child.name]) return;
+
+  loadingFor.value = child.name;
+  try {
+    await getResourceEntities(child);
+  } finally {
+    if (loadingFor.value === child.name) loadingFor.value = "";
+  }
+};
+
+const navigateTrail = (index: number) => {
+  if (index === 0) openFolder.value = null;
+};
+
+const resourceParent = (resource: string) =>
+  permissionsState.resources.find((candidate: any) => candidate.key === resource)?.parent;
+
+// Names come from entities the role load already fetched; an unloaded id shows as itself.
+const entityLabel = (resource: string, entity: string) => {
+  if (entity === `_all_${getOrgId()}`) {
+    return resource === STREAM_PARENT_KEY
+      ? t("iam.editRole.scopeEveryStream")
+      : t("iam.editRole.scopeAllOf", { module: resourceLabel(resource) });
+  }
+
+  const parent = resourceParent(resource);
+  const pools = [
+    heavyResourceEntities.value[resource],
+    resourceMapper.value[resource]?.entities,
+    ...(parent ? (resourceMapper.value[parent]?.entities ?? []) : []).map(
+      (folder: any) => folder.entities,
+    ),
+  ];
+  for (const pool of pools) {
+    const match = pool?.find((candidate: any) => candidate.name === entity);
+    if (match) return raw(match.display_name ?? entity);
+  }
+  return raw(entity);
+};
+
+type GrantState = "saved" | "added" | "removed";
+
+// resource -> entity -> grants, including staged removals so they stay reviewable until saved.
+const grantsByResource = computed(() => {
+  const byResource = new Map<string, Map<string, { action: string; state: GrantState }[]>>();
+  const record = (key: string, state: GrantState) => {
+    const { resource, entity, permission } = splitGrantKey(key);
+    const byEntity = byResource.get(resource) ?? new Map();
+    byEntity.set(entity, [...(byEntity.get(entity) ?? []), { action: permission, state }]);
+    byResource.set(resource, byEntity);
+  };
+  selectedPermissionsHash.value.forEach((key: string) =>
+    record(key, addedPermissions.value[key] ? "added" : "saved"),
+  );
+  Object.keys(removedPermissions.value).forEach((key) => record(key, "removed"));
+  return byResource;
+});
+
+const isWideEntity = (entity: string) => entity === `_all_${getOrgId()}`;
+
+const summaryActions = (actions: Iterable<string>): SummaryAction[] =>
+  [...new Set(actions)]
+    .sort((a, b) => ACTION_ORDER.indexOf(a) - ACTION_ORDER.indexOf(b))
+    .map((action) => ({
+      action,
+      label: t(ACTION_LABEL_KEYS[action as keyof typeof ACTION_LABEL_KEYS] ?? "iam.all"),
+    }));
+
+// Only a loaded list has a known size, so coverage reads "N of M" when it can and "N" otherwise.
+const knownTotal = (resource: string): number | undefined =>
+  heavyResourceEntities.value[resource]?.length ??
+  (resourceMapper.value[resource]?.entities?.length || undefined);
+
+const heldGrants = (resource: string) =>
+  [...(grantsByResource.value.get(resource)?.entries() ?? [])]
+    .map(
+      ([entity, grants]) => [entity, grants.filter((grant) => grant.state !== "removed")] as const,
+    )
+    .filter(([, grants]) => grants.length);
+
+const actionsOf = (held: ReturnType<typeof heldGrants>) =>
+  summaryActions(held.flatMap(([, grants]) => grants.map((grant) => grant.action)));
+
+// "N of M" when the list is loaded, a plain count otherwise.
+const specificReach = (resource: string, count: number) => {
+  const total = knownTotal(resource);
+  return total
+    ? t("iam.editRole.summaryReachSome", {
+        count: count.toLocaleString(),
+        total: total.toLocaleString(),
+      })
+    : t("iam.editRole.summaryGrantCount", { count }, count);
+};
+
+const moduleDescription = (moduleKey: string, countedKeys: string[]): I18nText => {
+  const rootWide = heldGrants(moduleKey).some(([entity]) => isWideEntity(entity));
+  if (rootWide) {
+    return moduleKey === STREAM_PARENT_KEY
+      ? t("iam.editRole.summaryReachEveryStream")
+      : t("iam.editRole.summaryReachAllOf", { module: resourceLabel(moduleKey) });
+  }
+
+  const granted = countedKeys
+    .map((key) => ({ key, held: heldGrants(key) }))
+    .filter(({ held }) => held.length);
+  if (granted.length !== 1) {
+    return raw(granted.map(({ key }) => resourceLabel(key)).join(", "));
+  }
+
+  const [{ key, held }] = granted;
+  const specific = held.filter(([entity]) => !isWideEntity(entity));
+  return t("iam.editRole.summaryReachOne", {
+    label: resourceLabel(key),
+    reach: specific.length
+      ? specificReach(key, specific.length)
+      : t("iam.editRole.summaryReachAll"),
+  });
+};
+
+const summaryModules = computed<SummaryModule[]>(() => {
+  const heldResources = new Set(
+    [...grantsByResource.value.keys()].filter((resource) => heldGrants(resource).length),
+  );
+
+  return roleModules.value
+    .filter((module) => module.countedKeys.some((key) => heldResources.has(key)))
+    .map((module) => {
+      const rail = railModules.value.find((candidate) => candidate.key === module.key);
+      return {
+        moduleKey: module.key,
+        label: rail?.label ?? moduleLabel(module.key),
+        icon: module.icon,
+        group: module.group,
+        granted: rail?.granted ?? 0,
+        description: moduleDescription(module.key, module.countedKeys),
+        actions: actionsOf(module.countedKeys.flatMap((key) => heldGrants(key))),
+      };
+    });
+});
+
+const pendingChanges = computed<PendingChange[]>(() => {
+  const changes: PendingChange[] = [];
+  grantsByResource.value.forEach((byEntity, resource) => {
+    byEntity.forEach((grants, entity) => {
+      (["added", "removed"] as const).forEach((state) => {
+        const ofState = grants.filter((grant) => grant.state === state);
+        if (!ofState.length) return;
+        changes.push({
+          id: `${resource}-${entity}-${state}`,
+          state,
+          label: entityLabel(resource, entity),
+          moduleLabel: raw(resourceLabel(resource)),
+          actions: summaryActions(ofState.map((grant) => grant.action)),
+          keys: ofState.map((grant) => buildGrantKey(resource, grant.action, entity)),
+        });
+      });
+    });
+  });
+  return changes;
+});
+// Nothing left to review once the last change is undone, so the drawer gets out of the way.
+watch(
+  () => pendingChanges.value.length,
+  (count) => {
+    if (!count) unsavedDrawerOpen.value = false;
+  },
+);
+
+const applyPreset = async (presetId: string) => {
+  if (presetId === "readonly") seedReadonlyPreset();
+  else if (presetId === "dbm") await seedDbmViewerPreset();
+  else if (presetId === "k8s") await seedK8sViewerPreset();
+};
 
 const updateActiveTab = (tab: string) => {
   if (!tab) return;
@@ -498,31 +851,13 @@ const getRoleDetails = () => {
 
       setDefaultPermissions();
 
-      filteredResources.value = permissionsState.resources
-        // A nested type is reached by expanding its parent, not as a row of its
-        // own, so offering it here selects something the table never renders.
-        .filter((r) => !r.parent)
-        .map((r) => {
-          return {
-            label: r.display_name,
-            value: r.key,
-          };
-        });
-
-      resourceOptions.value = cloneDeep(filteredResources.value);
-
       await getResourcePermissions();
       await getUsers();
       savePermissionHash();
       await updateRolePermissions(permissions.value);
       isFetchingInitialRoles.value = false;
 
-      // A brand-new role has no saved permissions, so the default "Selected"
-      // filter renders an empty matrix that looks broken. Default to "All" so
-      // the user sees the full permission grid to start checking boxes.
       if (selectedPermissionsHash.value.size === 0) {
-        filter.value.permissions = "all";
-
         // A preset only stages PENDING "added" permissions, so the user can still tweak them before saving.
         const preset = router.currentRoute.value.query.preset;
         if (preset === "readonly") {
@@ -533,8 +868,6 @@ const getRoleDetails = () => {
           await seedK8sViewerPreset();
         }
       }
-
-      updateTableData();
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
@@ -750,14 +1083,12 @@ const getOrgId = () => {
 };
 
 const savePermissionHash = () => {
-  permissions.value.forEach((permission: Permission) => {
-    const { resource, entity } = decodePermission(permission.object);
-
-    // Creating permissions hash to check if permission is selected at the time of save as we need to send only added and removed permissions
-    const permissionHash = `${resource}:${entity}:${permission.permission}`;
-    permissionsHash.value.add(permissionHash);
-    selectedPermissionsHash.value.add(permissionHash);
-  });
+  grants.seedSaved(
+    permissions.value.map((permission: Permission) => {
+      const { resource, entity } = decodePermission(permission.object);
+      return buildGrantKey(resource, permission.permission, entity);
+    }),
+  );
 };
 
 const updateRolePermissions = async (permissions: Permission[]) => {
@@ -968,9 +1299,8 @@ const seedReadonlyPreset = () => {
   permissionsState.permissions.forEach((resource: Resource) => {
     readonlyPerms.forEach((perm) => {
       const permDetail = resource.permission?.[perm as "AllowList"];
-      // Only seed permissions the resource actually exposes and that are not
-      // already selected.
-      if (!permDetail || !permDetail.show || permDetail.value) return;
+      // Held grants are the source of truth: `value` survives an undo and would make the preset a no-op.
+      if (!permDetail || !permDetail.show || grants.has(permissionHashFor(resource, perm))) return;
       permDetail.value = true;
       handlePermissionChange(resource, perm);
     });
@@ -981,7 +1311,7 @@ const collectVisibleReadGrants = (row: Entity, perms: readonly (keyof Entity["pe
   perms
     .filter((perm) => {
       const permDetail = row.permission?.[perm];
-      return !!permDetail && permDetail.show && !permDetail.value;
+      return !!permDetail && permDetail.show && !grants.has(permissionHashFor(row, perm as string));
     })
     .map((perm) => ({ row, permission: perm as string, newValue: true }));
 
@@ -1009,7 +1339,7 @@ const seedDbmViewerPreset = async () => {
     if (metricsEntity) {
       if (!metricsEntity.expand) await expandPermission(metricsEntity);
 
-      // `metrics.entities` only ever holds the visible slice, so seeding off it would silently miss streams.
+      // `metrics.entities` only holds rows visible under the current filter, so seeding off it would silently miss streams.
       const rows = heavyResourceEntities.value["metrics"] ?? [];
       const curated = new Set(DBM_VIEWER_STREAMS);
       const matchedRows = rows.filter((row: Entity) => curated.has(row.name));
@@ -1029,9 +1359,6 @@ const seedDbmViewerPreset = async () => {
 
   if (changes.length) {
     handlePermissionBatchChange(changes);
-    // Unlike readonly (which seeds every resource), only a handful of the org's
-    // streams are seeded here — "all" would bury them in a 50-row truncated grid.
-    filter.value.permissions = "selected";
   }
 
   reportDbmViewerSeeding(matched, DBM_VIEWER_STREAMS.length);
@@ -1060,7 +1387,7 @@ const seedK8sViewerPreset = async () => {
 
   if (!metricsEntity.expand) await expandPermission(metricsEntity);
 
-  // `metrics.entities` only ever holds the visible slice, so seeding off it would silently miss streams.
+  // `metrics.entities` only holds rows visible under the current filter, so seeding off it would silently miss streams.
   const rows = heavyResourceEntities.value["metrics"] ?? [];
   const curated = new Set(K8S_VIEWER_STREAMS);
   const matched = rows.filter((row: Entity) => curated.has(row.name));
@@ -1075,8 +1402,6 @@ const seedK8sViewerPreset = async () => {
 
   if (changes.length) {
     handlePermissionBatchChange(changes);
-    // Unlike readonly (which seeds every resource), only a handful of the org's streams are seeded here — "all" would bury them in a 50-row truncated grid.
-    filter.value.permissions = "selected";
   }
 
   reportK8sViewerSeeding(matched.length, K8S_VIEWER_STREAMS.length);
@@ -1090,7 +1415,8 @@ const reportK8sViewerSeeding = (matched: number, total: number) => {
   );
 };
 
-const handlePermissionChange = (row: any, permission: string) => {
+// The pane reads with the same key the toggle writes, so the two can never disagree.
+const permissionHashFor = (row: any, permission: string) => {
   let entity = "";
   let resourceName = row.resourceName;
 
@@ -1105,10 +1431,11 @@ const handlePermissionChange = (row: any, permission: string) => {
     entity = "_all_" + store.state.selectedOrganization.identifier;
   }
 
-  const permissionHash = `${resourceName}:${entity}:${permission}`;
+  return `${resourceName}:${entity}:${permission}`;
+};
 
-  // Add permission to addedPermissions if not present
-  updatePermissionMappings(permissionHash);
+const handlePermissionChange = (row: any, permission: string) => {
+  updatePermissionMappings(permissionHashFor(row, permission));
 };
 
 const handlePermissionBatchChange = (
@@ -1120,66 +1447,7 @@ const handlePermissionBatchChange = (
   });
 };
 
-const updatePermissionMappings = (permissionHash: string) => {
-  const permissionSplit = permissionHash.split(":");
-  const object = permissionSplit[0] + ":" + permissionSplit[1];
-  const permission = permissionSplit[2];
-
-  if (!addedPermissions.value[permissionHash] && !permissionsHash.value.has(permissionHash)) {
-    selectedPermissionsHash.value.add(permissionHash);
-    addedPermissions.value[permissionHash] = {
-      object,
-      permission: permission,
-    };
-    return;
-  }
-
-  // Remove permission from removedPermissions if present
-  if (
-    removedPermissions.value[permissionHash] &&
-    permissionsHash.value.has(permissionHash) &&
-    !selectedPermissionsHash.value.has(permissionHash)
-  ) {
-    delete removedPermissions.value[permissionHash];
-    selectedPermissionsHash.value.add(permissionHash);
-    return;
-  }
-
-  // Remove permission from removedPermissions if present
-  if (removedPermissions.value[permissionHash]) {
-    delete removedPermissions.value[permissionHash];
-    return;
-  }
-
-  // Remove permission from addedPermissions if present
-  if (permissionsHash.value.has(permissionHash)) {
-    selectedPermissionsHash.value.delete(permissionHash);
-    removedPermissions.value[permissionHash] = {
-      object,
-      permission: permission,
-    };
-
-    return;
-  }
-
-  // Remove permission from addedPermissions if present
-  if (addedPermissions.value[permissionHash]) {
-    selectedPermissionsHash.value.delete(permissionHash);
-    delete addedPermissions.value[permissionHash];
-    return;
-  }
-};
-
-const updateTableData = async (value: string = filter.value.permissions) => {
-  filter.value.permissions = value;
-
-  await nextTick();
-
-  setTimeout(() => {
-    updatePermissionVisibility(permissionsState.permissions);
-    countVisibleResources(permissionsState.permissions);
-  }, 0);
-};
+const updatePermissionMappings = (permissionHash: string) => grants.toggle(permissionHash);
 
 const updatePermissionsUi = async (value: string) => {
   permissionsUiType.value = value;
@@ -1336,198 +1604,6 @@ const updateJsonInTable = () => {
   });
 };
 
-const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
-  let count = 0;
-
-  permissions.forEach((permission: Entity | Resource) => {
-    if (permission.show) {
-      count += 1;
-    }
-
-    // Recursively count in nested entities only when the parent row is expanded
-    if (permission.entities?.length && permission.expand) {
-      count += countVisibleResources(permission.entities);
-    }
-  });
-
-  countOfVisibleResources.value = count;
-  return count;
-};
-
-const updatePermissionVisibility = (
-  permissions: (Resource | Entity)[],
-  forceShow: boolean = false,
-  level: number = 0,
-  relations: string[] = [],
-): void => {
-  permissions.forEach((permission: Entity | Resource) => {
-    // Check if any permission value is true
-
-    const parentRelations = [...relations];
-
-    if (permission.type === "Type") parentRelations.push(permission.resourceName);
-
-    const showResource = Object.values(permission.permission).some(
-      (permDetail) => permDetail.value,
-    );
-
-    let isResourceFiltered = true;
-
-    if (filter.value.resource) isResourceFiltered = parentRelations.includes(filter.value.resource);
-
-    if (filter.value.value) {
-      isResourceFiltered =
-        isResourceFiltered &&
-        (permission.display_name || permission.name)
-          .toLowerCase()
-          .includes(filter.value.value.toLowerCase());
-    }
-
-    permission.show =
-      filter.value.permissions === "all" ? isResourceFiltered : showResource && isResourceFiltered;
-
-    // The type node's own AllowList would otherwise re-show every ungranted stream under "selected".
-    if (forceShow && filter.value.permissions === "all") permission.show = true;
-
-    // Recursively update the show property for entities
-    if (!permission.entities?.length) return;
-
-    if (
-      permission.name === "logs" ||
-      permission.name === "metrics" ||
-      permission.name === "traces" ||
-      permission.name === "index"
-    ) {
-      updatePermissionVisibility(
-        heavyResourceEntities.value[permission.name] || [],
-        permission.show,
-        level + 1,
-        parentRelations,
-      );
-    } else {
-      if (permission.entities?.length)
-        updatePermissionVisibility(
-          permission.entities || [],
-          permission.show,
-          level + 1,
-          parentRelations,
-        );
-    }
-
-    let filteredEntities: Entity[] = [];
-
-    if (
-      permission.name === "logs" ||
-      permission.name === "metrics" ||
-      permission.name === "traces" ||
-      permission.name === "index"
-    ) {
-      filteredEntities =
-        heavyResourceEntities.value[permission.name]?.filter((entity: any) => entity.show) || [];
-    } else {
-      filteredEntities = permission.entities?.filter((entity) => entity.show) || [];
-    }
-
-    // Update the permission object to add `show` property
-
-    // If we need to show child by default show parent
-
-    if (filteredEntities?.length) {
-      permission.show = true;
-    }
-
-    if (
-      permission.show &&
-      (permission.name === "logs" ||
-        permission.name === "metrics" ||
-        permission.name === "traces" ||
-        permission.name === "index")
-    ) {
-      permission.entities =
-        filter.value.permissions === "all"
-          ? [...filteredEntities.slice(0, 50)]
-          : [...filteredEntities];
-    }
-
-    filteredEntities.length = 0;
-  });
-};
-
-// const updateFilteredPermissions = (
-//   permissions: (Resource | Entity)[]
-// ): void => {
-//   permissions.forEach((permission: Entity | Resource) => {
-//     // Check if any permission value is true
-//     const showResource = Object.values(permission.permission).some(
-//       (permDetail) => permDetail.value
-//     );
-
-//     // Recursively update the show property for entities
-//     if (permission.entities?.length) {
-//       updatePermissionVisibility(permission.entities);
-//     }
-
-//     const filteredEntities = permission.entities?.filter(
-//       (entity) => entity.show
-//     );
-
-//     // Update the permission object to add `show` property
-
-//     let isResourceFiltered = true;
-//     if (filter.value.resource)
-//       isResourceFiltered = filter.value.resource === permission.resourceName;
-
-//     if (filter.value.value) {
-//       isResourceFiltered =
-//         isResourceFiltered &&
-//         (permission.display_name || permission.name)
-//           .toLowerCase()
-//           .includes(filter.value.value.toLowerCase());
-//     }
-
-//     // If we need to show child by default show parent
-//     if (filteredEntities) {
-//       permission.entities = [...filteredEntities];
-//     } else {
-//       permission.show =
-//         filter.value.permissions === "all"
-//           ? isResourceFiltered
-//           : showResource && isResourceFiltered;
-//     }
-//   });
-// };
-
-const onResourceChange = async () => {
-  updatePermissionVisibility(permissionsState.permissions);
-  countVisibleResources(permissionsState.permissions);
-};
-
-const onClearFilter = () => {
-  filter.value.value = "";
-  filter.value.resource = "";
-  onResourceChange();
-};
-
-function filterResources(rows: any, terms: any) {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    let isAdded = false;
-    if (rows[i]["display_name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-      isAdded = true;
-      continue;
-    }
-    for (var j = 0; j < rows[i].entities.length; j++) {
-      if (!isAdded && rows[i].entities[j]["display_name"].toLowerCase().includes(terms)) {
-        filtered.push(rows[i]);
-        break;
-      }
-    }
-  }
-  return filtered;
-}
-
 const expandPermission = async (resource: any) => {
   const expand = !resource.expand;
 
@@ -1552,6 +1628,8 @@ const getPermissionHash = (resourceName: string, permission: string, entity?: st
  * @param resource
  * @param typeOf - Type to assign the new entities that we get from the server
  */
+const entityLoads = new Map<string, Promise<unknown>>();
+
 const getResourceEntities = (resource: Resource | Entity) => {
   if (!resource) return Promise.resolve(true);
 
@@ -1598,7 +1676,11 @@ const getResourceEntities = (resource: Resource | Entity) => {
     logs_cache: getLogsCacheStreams,
   };
 
-  return new Promise((resolve, reject) => {
+  // The loaders push, so two overlapping opens of one resource would list every row twice.
+  const pending = entityLoads.get(resource.name);
+  if (pending) return pending;
+
+  const load = new Promise((resolve, reject) => {
     (async () => {
       try {
         if (!resource.entities?.length) {
@@ -1614,9 +1696,6 @@ const getResourceEntities = (resource: Resource | Entity) => {
           } finally {
             resource.is_loading = false;
           }
-
-          // unncecessaryly we are updating the all resource entities, fix to update the current resource
-          updatePermissionVisibility(permissionsState.permissions);
         }
 
         resolve(true);
@@ -1625,6 +1704,9 @@ const getResourceEntities = (resource: Resource | Entity) => {
       }
     })();
   });
+
+  entityLoads.set(resource.name, load);
+  return load.finally(() => entityLoads.delete(resource.name));
 };
 
 const getEnrichmentTables = async () => {
@@ -2230,7 +2312,7 @@ const updateEntityEntities = (
     entity.name === "index"
   ) {
     heavyResourceEntities.value[entity.name] = [...entities];
-    if (entity.entities) entity.entities.push(...entities.slice(0, 50));
+    if (entity.entities) entity.entities.push(...entities);
   } else {
     if (entity.entities) entity.entities.push(...entities);
   }
@@ -2436,8 +2518,7 @@ const saveRole = () => {
   // Users and service accounts are both sent as users; merge the two staging
   // sets (dedup via Set) for the request payload.
   const payload = {
-    add: Object.values(addedPermissions.value),
-    remove: Object.values(removedPermissions.value),
+    ...grants.payload(),
     add_users: Array.from(
       new Set([...addedUsers.value, ...addedServiceAccounts.value]),
     ) as string[],
@@ -2475,23 +2556,7 @@ const saveRole = () => {
 
       // Resetting permissions state on save
 
-      Object.keys(removedPermissions.value).forEach((permission) => {
-        if (permissionsHash.value.has(permission)) permissionsHash.value.delete(permission);
-
-        if (selectedPermissionsHash.value.has(permission))
-          selectedPermissionsHash.value.delete(permission);
-      });
-
-      permissionsHash.value = new Set([
-        ...Array.from(permissionsHash.value),
-        ...Array.from(selectedPermissionsHash.value),
-      ]);
-
-      selectedPermissionsHash.value = cloneDeep(permissionsHash.value);
-
-      addedPermissions.value = {};
-
-      removedPermissions.value = {};
+      grants.commit();
 
       roleUsers.value = roleUsers.value.filter(
         (user) => !removedUsers.value.has(user) && !removedServiceAccounts.value.has(user),
