@@ -17876,6 +17876,7 @@
     "target_rotation_all": "{rotation} 的所有人",
     "target_rotation_deleted": "此團隊已不再擁有的輪值",
     "target_rotation_legacy": "目前值班的人",
+    "target_unrecognized": "此畫面無法辨識的目標",
     "ladderPoolEveryone": "{rotation} 的所有人",
     "target_user": "特定人員",
     "target_whole_team": "整個團隊",

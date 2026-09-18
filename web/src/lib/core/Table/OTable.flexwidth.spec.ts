@@ -168,4 +168,37 @@ describe("OTable flex column width", () => {
     expect(st.frozen).toBe(false);
     expect(st.allowHorizontalScroll).toBe(true);
   });
+
+  // Regression: a non-resizable table whose fixed columns alone overflow gave its
+  // autoWidth column 0px on a laptop (Alert History hid every alert name).
+  it("non-resizable: floors the table width so an autoWidth column keeps its size", async () => {
+    const wrapper = mount(OTable, {
+      props: {
+        data,
+        columns: [
+          { id: "name", header: "Name", accessorKey: "name", size: 200, meta: { autoWidth: true } },
+          { id: "type", header: "Type", accessorKey: "type", size: 700 },
+          { id: "actions", header: "Actions", isAction: true, size: 80 },
+        ],
+        defaultColumns: false,
+        tableId: "autowidth-floor",
+      } as any,
+    });
+    await flushPromises();
+    const st: any = (wrapper.vm.$ as any).setupState;
+    const minWidth = () =>
+      (wrapper.find('[data-test="o2-table"]').attributes("style") || "").match(
+        /min-width:\s*(\d+)px/,
+      )?.[1];
+
+    st.containerWidth = 1200;
+    await flushPromises();
+    expect(st.allowHorizontalScroll).toBe(false);
+    expect(minWidth()).toBeUndefined();
+
+    st.containerWidth = 600;
+    await flushPromises();
+    expect(st.allowHorizontalScroll).toBe(true);
+    expect(Number(minWidth())).toBeGreaterThanOrEqual(980);
+  });
 });

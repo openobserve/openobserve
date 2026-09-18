@@ -120,7 +120,7 @@ const resolvedRowClass = computed(() => {
 });
 
 // < md columns scroll within the table rather than being crushed down to the name column.
-const { isMobile: isMobileViewport, lgUp } = useBreakpoint();
+const { isMobile: isMobileViewport } = useBreakpoint();
 const horizontalScrollOn = computed(() => !!props.horizontalScroll || isMobileViewport.value);
 
 const showColumnToggle = computed(
@@ -902,9 +902,8 @@ const allowHorizontalScroll = computed(() => {
     // (table-fixed otherwise grows past 100% and the overflow is clipped).
     return fillMinSum() > containerWidth.value + 1;
   }
-  // < lg past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
-  if (!lgUp.value) return fillMinSum() > containerWidth.value + 1;
-  return false;
+  // Past the columns' min widths the table grows anyway, clipping trailing columns out of reach.
+  return fillMinSum() > containerWidth.value + 1;
 });
 
 const SPACER_ID = "__spacer__";
@@ -1081,10 +1080,20 @@ const computedTableWidth = computed<string | undefined>(() => {
 });
 
 // < md the column sizes' sum is the table's floor, so the container scrolls instead of crushing them.
-const mobileMinTableWidth = computed<string | undefined>(() => {
-  if (!isMobileViewport.value || props.horizontalScroll || props.defaultColumns) return undefined;
-  const sum = table.getVisibleLeafColumns().reduce((a, c) => a + c.getSize(), 0);
-  return sum > 0 ? `${sum}px` : undefined;
+const minTableWidth = computed<string | undefined>(() => {
+  if (props.horizontalScroll || props.defaultColumns) return undefined;
+  const cols = table.getVisibleLeafColumns();
+  if (isMobileViewport.value) {
+    const sum = cols.reduce((a, c) => a + c.getSize(), 0);
+    return sum > 0 ? `${sum}px` : undefined;
+  }
+  if (useComputedWidth.value || containerWidth.value <= 0) return undefined;
+  if (fillMinSum() <= containerWidth.value + 1) return undefined;
+  // table-fixed hands a filler column 0px once the fixed columns alone overflow.
+  const fillers = cols
+    .filter((c) => (c.columnDef.meta as any)?.flex || (c.columnDef.meta as any)?.autoWidth)
+    .reduce((a, c) => a + c.getSize(), 0);
+  return `${nonFlexFixedSum() + fillers}px`;
 });
 
 // Virtual measureElement callback — wraps the virtualizer's measure.
@@ -1385,7 +1394,7 @@ defineExpose({
             ...measuredColumnSizeVars,
             ...dynamicSizeVars,
             ...(computedTableWidth ? { width: computedTableWidth } : {}),
-            ...(mobileMinTableWidth ? { minWidth: mobileMinTableWidth } : {}),
+            ...(minTableWidth ? { minWidth: minTableWidth } : {}),
             '--table-row-height':
               props.rowHeight != null
                 ? `${props.rowHeight}px`

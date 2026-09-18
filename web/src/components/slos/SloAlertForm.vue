@@ -113,6 +113,8 @@ import OInput from "@/lib/forms/Input/OInput.vue";
 import AlertDestinationsField from "@/components/alerts/AlertDestinationsField.vue";
 import SloAlertCondition from "@/components/slos/SloAlertCondition.vue";
 import alertsService from "@/services/alerts";
+import { saveAlertMutation } from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
 import destinationService from "@/services/alert_destination";
 import type { Slo } from "@/ts/interfaces/slo";
 import { buildSloAlertPayload, deriveSloAlertName } from "@/utils/alerts/sloAlertPayload";
@@ -236,6 +238,8 @@ const conditionFieldErrors = computed(() => ({
   long: fieldError("condition.long_window_secs"),
   short: fieldError("condition.short_window_secs"),
 }));
+// An SLO alert is an ordinary alert row; the mutation declares the scope it drops.
+const saveAlert = useMutation(() => saveAlertMutation(org.value, () => !!props.alertId));
 
 const submit = async () => {
   attemptedSubmit.value = true;
@@ -252,11 +256,7 @@ const submit = async () => {
   saving.value = true;
   try {
     const body = buildSloAlertPayload(form, { slo: props.slo, existing: existing.value });
-    if (props.alertId) {
-      await alertsService.update_by_alert_id(org.value, body);
-    } else {
-      await alertsService.create_by_alert_id(org.value, body);
-    }
+    await saveAlert.mutateAsync({ payload: body });
     emit("saved");
   } catch (e: any) {
     toast({

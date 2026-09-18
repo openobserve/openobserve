@@ -416,27 +416,19 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option1.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
-    // Register listener before tab switch so the Tab2 variable load API call is captured
-    const tab2VarLoadPromise = page.waitForResponse(
-      response => response.url().includes('/values') && response.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
-
     // Switch to Tab2
     await scopedVars.getTabLocator("Tab2").click();
     // Wait for tab content to load
     await scopedVars.waitForTabContentLoaded();
 
-    // Wait for variable to appear on the dashboard after tab switch
-    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     // Wait for inner dropdown to be fully initialized
     await scopedVars.getVariableDropdown(variableName).waitFor({ state: "visible", timeout: 10000 });
-    // Wait for the variable values API to complete so Tab2 shows its loaded value
-    await tab2VarLoadPromise;
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
-    // Get initial value on Tab2 (should be default, not changed by Tab1)
-    const tab2Selector = scopedVars.getVariableSelectorLocator(variableName);
+    // Get initial value on Tab2 (should be default, not changed by Tab1). Any
+    // '/values' response satisfies a raw waitForResponse - including the one
+    // Tab1's selection triggers - so gate on this variable's own load finishing
+    // instead, or the baseline captures the mid-load placeholder.
+    const tab2Selector = await scopedVars.waitForVariableValueSettled(variableName);
     const tab2Value = await tab2Selector.innerText();
 
     // Go back to Tab1 and change value
@@ -457,27 +449,16 @@ test.describe("Dashboard Variables - Tab Level", { tag: ['@dashboards', '@dashbo
     await option2.click();
     await safeWaitForHidden(page, `[data-test="variable-selector-${variableName}-inner-popover"]`, { timeout: 3000 });
 
-    // Register listener before tab switch to catch any Tab2 variable reload triggered by Tab1 change
-    const tab2VarReloadPromise = page.waitForResponse(
-      response => response.url().includes('/values') && response.status() === 200,
-      { timeout: 10000 }
-    ).catch(() => null);
-
     // Switch to Tab2 and verify value hasn't changed
     await scopedVars.getTabLocator("Tab2").click();
     // Wait for tab content to load
     await scopedVars.waitForTabContentLoaded();
 
-    // Wait for variable to appear on the dashboard after tab switch
-    await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
     // Wait for inner dropdown to be fully initialized
     await scopedVars.getVariableDropdown(variableName).waitFor({ state: "visible", timeout: 10000 });
-    // Wait for any variable API call to settle before reading the value
-    await tab2VarReloadPromise;
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Verify value hasn't changed
-    const tab2SelectorAfter = scopedVars.getVariableSelectorLocator(variableName);
+    const tab2SelectorAfter = await scopedVars.waitForVariableValueSettled(variableName);
     const tab2ValueAfter = await tab2SelectorAfter.innerText();
     expect(tab2ValueAfter).toContain(tab2Value);
 

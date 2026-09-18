@@ -17881,6 +17881,7 @@
     "target_rotation_all": "{rotation} の全員",
     "target_rotation_deleted": "このチームには存在しないローテーション",
     "target_rotation_legacy": "オンコール中の担当者",
+    "target_unrecognized": "この画面では認識されないターゲットです",
     "ladderPoolEveryone": "{rotation} の全員",
     "target_user": "特定の担当者",
     "target_whole_team": "チーム全員",

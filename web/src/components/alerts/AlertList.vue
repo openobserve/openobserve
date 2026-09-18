@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template #toolbar>
                 <!-- A container, not a viewport breakpoint: the folder rail squeezes this toolbar at any width. -->
                 <div
-                  class="flex w-full items-center gap-2 max-lg:@container/alert-toolbar max-lg:min-w-0 max-lg:flex-1 max-lg:flex-wrap max-lg:gap-y-1.5 max-md:contents"
+                  class="@container/alert-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
                 >
                   <OToggleGroup
                     mobile-dropdown
@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :title="lgUp ? undefined : tab.label"
                       :data-test="`alert-list-tab-${tab.value}`"
                     >
-                      <span class="@max-[34rem]/alert-toolbar:hidden">{{ tab.label }}</span>
+                      <span class="@max-[42rem]/alert-toolbar:hidden">{{ tab.label }}</span>
                     </OToggleGroupItem>
                   </OToggleGroup>
                   <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="alert-list-search-scope-current"
                             :title="t('alerts.searchThisFolderTooltip')"
-                            ><span class="max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
                               t("alerts.searchThisFolder")
                             }}</span></OToggleGroupItem
                           >
@@ -205,7 +205,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="alert-list-search-across-folders-toggle"
                             :title="t('alerts.searchAllFoldersTooltip')"
-                            ><span class="max-md:hidden">{{
+                            ><span class="max-md:hidden @max-[34rem]/alert-toolbar:hidden">{{
                               t("alerts.searchAllFolders")
                             }}</span></OToggleGroupItem
                           >
@@ -216,20 +216,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #toolbar-trailing>
-                <OButton
+                <ORefreshButton
+                  layout="inline"
                   variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="loading"
+                  :last-run-at="lastUpdatedAt"
+                  :loading="fetching"
+                  shortcut-id="alertsRefresh"
                   data-test="alert-list-refresh-btn"
                   @click="refreshAlerts"
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="t('alerts.reloadAlertsTooltip')"
-                    shortcut-id="alertsRefresh"
-                  />
-                </OButton>
+                />
               </template>
 
               <template #cell-name="{ row }">
@@ -814,7 +809,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:list="refreshList"
         @cancel:hideform="hideForm"
         @refresh:destinations="refreshDestination"
-        @refresh:templates="getTemplates"
+        @refresh:templates="refreshTemplates"
       />
     </template>
     <template v-else>
@@ -926,6 +921,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { alertDetailQuery } from "@/services/alerts.queries";
+import { alertsListQuery } from "@/services/alerts.queries";
+import { alertKeys } from "@/services/alerts.querykeys";
+import { anomalyKeys } from "@/services/anomaly_detection.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  cloneAnomalyAlertMutation,
+  retrainAnomalyMutation,
+  toggleAlertStateMutation,
+  toggleAnomalyAlertStateMutation,
+} from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import {
   defineComponent,
   ref,
@@ -937,6 +946,7 @@ import {
   onMounted,
   computed,
   reactive,
+  nextTick,
 } from "vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import type { Ref } from "vue";
@@ -958,8 +968,7 @@ import {
   sloIdOf,
 } from "@/utils/alerts/sloAlertRouting";
 import sloService from "@/services/slos";
-import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import segment from "@/services/segment_analytics";
@@ -975,7 +984,6 @@ import FolderList from "../common/sidebar/FolderList.vue";
 
 import MoveAcrossFolders from "../common/sidebar/MoveAcrossFolders.vue";
 import { invalidateDependencyGraphCache } from "@/composables/alerts/useDependencyGraph";
-import { nextTick } from "vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
@@ -983,6 +991,7 @@ import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -1007,6 +1016,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { COL } from "@/lib/core/Table/OTable.types";
+
 // import alertList from "./alerts";
 
 export default defineComponent({
@@ -1025,6 +1035,7 @@ export default defineComponent({
     OTooltip,
     SelectFolderDropDown,
     OButton,
+    ORefreshButton,
     OIcon,
     ODialog,
     ODropdown,
@@ -1107,6 +1118,10 @@ export default defineComponent({
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
     const loading = ref(true);
+    // A request in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     const oTableRef: any = ref(null);
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
@@ -1775,6 +1790,19 @@ export default defineComponent({
     // ---------------------------------------------------------------------------
     // Normalizes an anomaly-detection item returned by the merged alerts list API
     // (alert_type === "anomaly_detection") into the standard alert row shape.
+    // A row's uuid keys `alertStateLoadingMap` and the enable/disable match, so
+    // it has to survive a re-paint of the same list — a fresh getUUID() per map
+    // would hand the same alert a new identity on every revalidation.
+    const rowUuids = new Map<string, string>();
+    const stableUuid = (identity: string) => {
+      let uuid = rowUuids.get(identity);
+      if (!uuid) {
+        uuid = getUUID();
+        rowUuids.set(identity, uuid);
+      }
+      return uuid;
+    };
+
     const normalizeAnomalyToAlertRow = (anomaly: any, _num?: number): any => ({
       alert_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
       anomaly_id: anomaly.alert_id || anomaly.anomaly_id || anomaly.id,
@@ -1791,7 +1819,7 @@ export default defineComponent({
       filters: anomaly.filters || [],
       histogram_interval: anomaly.histogram_interval || "",
       description: anomaly.description || "",
-      uuid: getUUID(),
+      uuid: stableUuid(anomaly.alert_id || anomaly.anomaly_id || anomaly.id || anomaly.name),
       owner: anomaly.owner || "",
       period: anomaly.trigger_condition?.period ?? "",
       frequency: anomaly.trigger_condition?.frequency ?? "",
@@ -1848,20 +1876,10 @@ export default defineComponent({
 
     // ---------------------------------------------------------------------------
 
+    // The folder is part of the query key, so a revisit inside the tier's
+    // staleTime resolves from cache with no request and no special loading path.
     const getAlertsByFolderId = async (store: any, folderId: any) => {
-      //this is the condition where we are fetching the alerts from the server
-      // assigning it to the allAlertsListByFolderId in the store
-      if (!store.state.organizationData.allAlertsListByFolderId[folderId]) {
-        await getAlertsFn(store, folderId);
-      } else {
-        //this is the condition where we are assigning the alerts to the filteredResults so whenever
-        // we are not fetching the alerts again, we are just assigning the alerts to the filteredResults
-        allAlerts.value = store.state.organizationData.allAlertsListByFolderId[folderId];
-        // Data is served synchronously from cache — clear the loading flag
-        // (it starts true to avoid the empty-state flash) so the table renders
-        // the cached rows instead of staying stuck on the skeleton.
-        loading.value = false;
-      }
+      await getAlertsFn(store, folderId);
     };
     const getAlertsFn = async (
       store: any,
@@ -1869,6 +1887,7 @@ export default defineComponent({
       query = "",
       refreshResults = true,
       alertType = "",
+      force = false,
     ) => {
       //why refreshResults flag is used
       // this is the only used for one edge case when we move alerts from one folder to another folder
@@ -1890,35 +1909,21 @@ export default defineComponent({
         //here we reset the filteredResults before fetching the filtered alerts
         filteredResults.value = [];
       }
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
-        timeout: 0,
-      });
       if (query) {
         folderId = "";
       }
-      loading.value = true;
-      forbidden.value = false;
-      try {
-        const res = await alertsService.listByFolderId(
-          1,
-          1000,
-          "name",
-          false,
-          "",
-          store?.state?.selectedOrganization?.identifier,
-          folderId,
-          query,
-          alertType,
-        );
+
+      // Painting the same rows twice is safe: uuids are stable per alert, and
+      // the route-driven dialogs below run once, on the fresh result. Returns
+      // false when the folder changed mid-flight and the render was skipped.
+      const renderAlerts = (rows: any[]): boolean => {
         var counter = 1;
         let localAllAlerts = [];
         //this is the alerts that we use to store
-        localAllAlerts = res.data.list.map((alert: any) => {
+        localAllAlerts = rows.map((alert: any) => {
           return {
             ...alert,
-            uuid: getUUID(),
+            uuid: stableUuid(alert.alert_id || alert.name),
           };
         });
 
@@ -2059,8 +2064,7 @@ export default defineComponent({
         //if it is not equal then we are returning  and if is not search across folders then we are returning as well as in previous step we are anyways storing in the store for future use
         //this will prevent the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         if (folderId != activeFolderId.value && !query) {
-          dismiss();
-          return;
+          return false;
         }
         //here we are actually assigning the localAllAlerts to the allAlerts to avoid the side effects of allAlerts are overriding the actual alerts if users are rapidly moving from one folder to another folder
         allAlerts.value = localAllAlerts;
@@ -2080,25 +2084,53 @@ export default defineComponent({
         //here we are filtering the alerts by the activeTab
         //why we are passing the refreshResults flag as false because we dont need to show the alerts in the table
         filterAlertsByTab(refreshResults);
-        if (router.currentRoute.value.query.action == "import") {
-          showImportAlertDialog.value = true;
-        }
-        if (router.currentRoute.value.query.action == "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-        if (router.currentRoute.value.query.action == "update") {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          const alert = await getAlertById(alertId);
+        return true;
+      };
 
-          // Same diversion as the edit button. This path is reached by a hard
-          // reload, a bookmark or the back button, so guarding only the button
-          // would leave the generic editor reachable for an SLO alert.
-          if (!(await divertSloAlert(alert))) {
-            showAddUpdateFn({
-              row: alert,
-            });
-          }
+      const org = store?.state?.selectedOrganization?.identifier;
+
+      // Stale-while-revalidate: the rows already on screen stay put while the
+      // folder revalidates, so only a cold cache spins and toasts.
+      // renderAlerts reports whether it rendered — the folder can change
+      // mid-flight — so the paint is driven here rather than through `apply`.
+      // Painted even on a manual refresh: the rows stay while the request runs.
+      const cachedRows = queryClient.getQueryData<any[]>(
+        alertKeys.list(org, folderId, query, alertType),
+      );
+      const painted = cachedRows ? renderAlerts(cachedRows) : false;
+      const opts = alertsListQuery(org, folderId, query, alertType);
+      const pending = force
+        ? queryClient
+            .invalidateQueries({
+              queryKey: opts.queryKey,
+              exact: true,
+              refetchType: "none",
+            })
+            .then(() => queryClient.fetchQuery(opts))
+        : queryClient.fetchQuery(opts);
+
+      loading.value = !painted;
+      fetching.value = true;
+      forbidden.value = false;
+      const dismiss = painted
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingAlerts"),
+            timeout: 0,
+          });
+
+      try {
+        if (!renderAlerts(await pending)) {
+          dismiss();
+          return;
         }
+        // The cache records the fetch time; fetchQuery does not hand it back, so read it here.
+        lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
+        // `?action=…` deep links are handled by the immediate watcher on
+        // `query.action` below. Handling them here too re-opened a blank form
+        // after every save: the post-save refresh reads the route before
+        // hideForm's cleanup push lands, so it still sees the stale `action`.
         dismiss();
       } catch (error: any) {
         console.error(error);
@@ -2113,6 +2145,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        fetching.value = false;
       }
     };
     /** Send an SLO alert to its SLO page instead of the generic editor.
@@ -2157,12 +2190,14 @@ export default defineComponent({
         timeout: 0,
       });
       try {
-        const res = await alertsService.get_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          id,
+        // Cached for the editor-open path only. The read-modify-write in
+        // WorkflowLinkAlertsDialog deliberately still goes straight to the
+        // service — a stale alert there would overwrite someone else's edit.
+        const data = await queryClient.fetchQuery(
+          alertDetailQuery(store.state.selectedOrganization.identifier, id),
         );
         dismiss();
-        return res.data;
+        return data;
       } catch (error) {
         dismiss();
         throw error;
@@ -2215,11 +2250,17 @@ export default defineComponent({
 
     const refreshAlerts = async () => {
       if (searchAcrossFolders.value && searchQuery.value) {
-        await getAlertsFn(store, activeFolderId.value, searchQuery.value);
+        await getAlertsFn(store, activeFolderId.value, searchQuery.value, true, "", true);
       } else {
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
       }
       filterAlertsByTab();
+      // Re-apply the in-folder search too. Without it a refresh handed back the
+      // whole folder while the search box still showed the term — the same
+      // shape every other reload path here already guards against.
+      if (filterQuery.value) {
+        filterAlertsByQuery(filterQuery.value);
+      }
     };
 
     onMounted(async () => {
@@ -2342,52 +2383,61 @@ export default defineComponent({
         console.error("Navigation failed:", error);
       }
     };
+    // The one handler for `?action=…` deep links (hard reload, bookmark, Back).
+    // Named so tests can drive it without racing the router.
+    const handleActionQuery = async (action: unknown) => {
+      if (!action) {
+        showAddAlertDialog.value = false;
+        showImportAlertDialog.value = false;
+        return;
+      }
+
+      // Handle update action
+      if (action === "update" && router.currentRoute.value.query.alert_id) {
+        const alertId = router.currentRoute.value.query.alert_id as string;
+        try {
+          const alert = await getAlertById(alertId);
+          if (!(await divertSloAlert(alert))) {
+            showAddUpdateFn({ row: alert });
+          }
+        } catch (error) {
+          console.error("AlertList: Failed to load alert", error);
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
+          });
+        }
+      }
+
+      // Handle add action
+      if (action === "add") {
+        showAddUpdateFn({ row: undefined });
+      }
+
+      // Handle import action
+      if (action === "import") {
+        showImportAlertDialog.value = true;
+      }
+    };
     watch(
       () => router.currentRoute.value.query.action,
-      async (action) => {
-        if (!action) {
-          showAddAlertDialog.value = false;
-          showImportAlertDialog.value = false;
-          return;
-        }
-
-        // Handle update action
-        if (action === "update" && router.currentRoute.value.query.alert_id) {
-          const alertId = router.currentRoute.value.query.alert_id as string;
-          try {
-            const alert = await getAlertById(alertId);
-            if (!(await divertSloAlert(alert))) {
-              showAddUpdateFn({ row: alert });
-            }
-          } catch (error) {
-            console.error("AlertList: Failed to load alert", error);
-            toast({
-              variant: "error",
-              message: t("toastMessages.alerts.failedToLoadAlertForEditing"),
-            });
-          }
-        }
-
-        // Handle add action
-        if (action === "add") {
-          showAddUpdateFn({ row: undefined });
-        }
-
-        // Handle import action
-        if (action === "import") {
-          showImportAlertDialog.value = true;
-        }
-      },
+      handleActionQuery,
       { immediate: true }, // Run immediately to handle direct navigation
     );
-    const getDestinations = async () => {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        })
-        .then((res) => {
-          destinations.value = res.data;
+    const getDestinations = async (force = false) => {
+      const options = destinationsQuery(store.state.selectedOrganization.identifier, "alert");
+      // A destination created in the form's new tab never expires this tab's cache, so refresh forces.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
+        .then((list: any) => {
+          destinations.value = list as any;
         })
         .catch(() =>
           toast({
@@ -2397,13 +2447,20 @@ export default defineComponent({
         );
     };
 
-    const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => {
-          templates.value = res.data;
+    const getTemplates = (force = false) => {
+      const options = templatesQuery(store.state.selectedOrganization.identifier);
+      // The mount read stays cache-first; only the form's refresh button forces a server read.
+      const ready = force
+        ? queryClient.invalidateQueries({
+            queryKey: options.queryKey,
+            exact: true,
+            refetchType: "none",
+          })
+        : Promise.resolve();
+      void ready
+        .then(() => queryClient.fetchQuery(options))
+        .then((list: any) => {
+          templates.value = list;
         })
         .catch(() =>
           toast({
@@ -2412,6 +2469,8 @@ export default defineComponent({
           }),
         );
     };
+    // The form's refresh event carries no payload, so a bare `getTemplates` handler would never see `force`.
+    const refreshTemplates = () => getTemplates(true);
     const pageSize = ref<number>(savedAlertListFilters.perPage || 20);
     const pageSizeOptions = [20, 50, 100, 250, 500];
     // Restored the same way as pageSize above, so returning from add/edit/detail lands back on the page the user was viewing instead of resetting to page 1.
@@ -2478,24 +2537,23 @@ export default defineComponent({
           timeout: 0,
         });
         try {
-          await alertsService.clone_by_id(
-            store.state.selectedOrganization.identifier,
-            toBeClonedID.value,
-            {
+          await cloneAnomalyAlert.mutateAsync({
+            alertId: toBeClonedID.value,
+            data: {
               name: toBeCloneAlertName.value,
               folder_id: (folderIdToBeCloned.value as string) || "default",
               stream_type: toBeClonestreamType.value,
               stream_name: toBeClonestreamName.value,
             },
-            folderIdToBeCloned.value,
-          );
+            folderId: folderIdToBeCloned.value,
+          });
           dismiss();
           toast({
             variant: "success",
             message: t("toastMessages.alerts.anomalyDetectionClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value);
+          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
@@ -2605,7 +2663,7 @@ export default defineComponent({
                 message: t("toastMessages.alerts.alertClonedSuccessfully"),
               });
               showForm.value = false;
-              await getAlertsFn(store, folderIdToBeCloned.value);
+              await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
               activeFolderId.value = folderIdToBeCloned.value;
             } else {
               toast({
@@ -2645,7 +2703,7 @@ export default defineComponent({
       //and we dont need to fetch the alerts again because we are already fetching the alerts in the getAlertsFn
       const resolvedFolderId = folderId || activeFolderId.value || "default";
       // Always fetch the latest alerts for the folder from backend
-      await getAlertsFn(store, resolvedFolderId);
+      await getAlertsFn(store, resolvedFolderId, "", true, "", true);
       // Re-apply active search/filter on the freshly fetched data
       if (filterQuery.value) {
         filterAlertsByQuery(filterQuery.value);
@@ -2677,6 +2735,46 @@ export default defineComponent({
         page: "Add Alert",
       });
     };
+    const alertWriteOrgId = useOrgId();
+    const toggleAlertStateWrite = useMutation(() =>
+      toggleAlertStateMutation(alertWriteOrgId.value),
+    );
+    const toggleAnomalyState = useMutation(() =>
+      toggleAnomalyAlertStateMutation(alertWriteOrgId.value),
+    );
+    const cloneAnomalyAlert = useMutation(() => cloneAnomalyAlertMutation(alertWriteOrgId.value));
+    const retrainAnomalyAlert = useMutation(() => retrainAnomalyMutation(alertWriteOrgId.value));
+
+    // Only the entries that hold alert rows: the same scope also holds templates, destinations, sources and history, which a patch would re-stamp as fresh.
+    const ALERT_ROW_KEYS = ["list", "search", "dependencies"];
+    const alertRowEntries = (org: string) => ({
+      queryKey: alertKeys.all(org),
+      predicate: (q: any) => ALERT_ROW_KEYS.includes(q.queryKey[3]),
+    });
+    // Table rows are mapped copies, so a local field flip must also reach the cached raw rows every folder revisit re-renders from.
+    const patchCachedAlert = (alertId: any, patch: Record<string, any>) => {
+      if (!alertId) return;
+      const id = String(alertId);
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        let hit = false;
+        const next = cached.map((r: any) => {
+          if (String(r?.alert_id ?? r?.anomaly_id ?? r?.id) !== id) return r;
+          hit = true;
+          return { ...r, ...patch };
+        });
+        // `undefined` leaves an entry without this alert untouched instead of re-stamping it as fresh.
+        return hit ? next : undefined;
+      });
+      // The editor reads the detail entry cache-first and a row patch cannot reach it; invalidated rather than removed so an in-flight editor read is not cancelled.
+      void queryClient.invalidateQueries({
+        queryKey: alertKeys.detail(org, id),
+        exact: true,
+        refetchType: "none",
+      });
+    };
+
     // A delete is one row leaving a list the server has already confirmed. Splice
     // it out — of the rows, the filtered view, the selection AND the per-folder
     // cache a folder revisit is served from — instead of refetching every alert in
@@ -2687,6 +2785,10 @@ export default defineComponent({
       if (!gone.size) return;
 
       const keep = (row: any) => !gone.has(String(row?.alert_id));
+      // Read before the splice below removes the rows this has to inspect.
+      const droppedAnomaly = allAlerts.value.some(
+        (row: any) => !keep(row) && row?.type === "anomaly",
+      );
       allAlerts.value = allAlerts.value.filter(keep);
       filteredResults.value = filteredResults.value.filter(keep);
       // Anything that failed to delete stays selected, so a bulk retry is one click.
@@ -2706,6 +2808,23 @@ export default defineComponent({
         );
         store.dispatch("setAllAlertsListByFolderId", pruned);
       }
+
+      // The store copy above is not the only cache the list is served from: the
+      // per-folder query entries are what a revisit inside staleTime reads, so
+      // splice the rows out of every one of them too, and drop each deleted
+      // alert's detail entry outright.
+      const org = store.state.selectedOrganization.identifier;
+      queryClient.setQueriesData(alertRowEntries(org), (cached: any) => {
+        if (!Array.isArray(cached)) return undefined;
+        const next = cached.filter(keep);
+        return next.length === cached.length ? undefined : next;
+      });
+      gone.forEach((id: string) =>
+        queryClient.removeQueries({ queryKey: alertKeys.detail(org, id), exact: true }),
+      );
+
+      // The deletes that call this are direct service calls, so the anomaly scope has no mutation to drop it from.
+      if (droppedAnomaly) queryClient.invalidateQueries({ queryKey: anomalyKeys.all(org) });
 
       // The alert is gone from every destination and template that referenced it.
       invalidateDependencyGraphCache();
@@ -2814,24 +2933,30 @@ export default defineComponent({
     const toggleAlertState = (row: any) => {
       alertStateLoadingMap.value[row.uuid] = true;
 
-      alertsService
-        .toggle_state_by_alert_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-          !row?.enabled,
-          activeFolderId.value,
-        )
+      // Two mutations, not one conditional invalidation: an anomaly row is also a config Overview renders.
+      const toggle = row.type === "anomaly" ? toggleAnomalyState : toggleAlertStateWrite;
+
+      toggle
+        .mutateAsync({
+          alertId: row.alert_id,
+          enabled: !row?.enabled,
+          folderId: activeFolderId.value,
+        })
         .then((res: any) => {
           const isEnabled = res.data.enabled;
           filteredResults.value.forEach((alert: any) => {
             alert.uuid === row.uuid ? (alert.enabled = isEnabled) : null;
           });
+          patchCachedAlert(row.alert_id, { enabled: isEnabled });
           toast({
             variant: "success",
             message: isEnabled
               ? t("toastMessages.alerts.alertResumedSuccessfully")
               : t("toastMessages.alerts.alertPausedSuccessfully"),
           });
+        })
+        .catch(() => {
+          /* the mutation handler already toasts the failure; this only keeps the rejection handled */
         })
         .finally(() => {
           alertStateLoadingMap.value[row.uuid] = false;
@@ -2850,7 +2975,7 @@ export default defineComponent({
     };
 
     const refreshDestination = async () => {
-      await getDestinations();
+      await getDestinations(true);
     };
 
     const importAlert = () => {
@@ -2952,7 +3077,7 @@ export default defineComponent({
           message: t("alerts.alertTriggeredSuccess"),
         });
         if (row.type === "anomaly") {
-          await getAlertsFn(store, activeFolderId.value);
+          await getAlertsFn(store, activeFolderId.value, "", true, "", true);
         }
       } catch (error: any) {
         toast({
@@ -2964,11 +3089,10 @@ export default defineComponent({
 
     const retrainAnomaly = async (row: any) => {
       try {
-        await alertsService.retrain_by_id(
-          store.state.selectedOrganization.identifier,
-          row.alert_id,
-        );
+        await retrainAnomalyAlert.mutateAsync(row.alert_id);
         row.status = "training";
+        // Patched, not invalidated: refetching the whole folder for one cell would take the scroll with it.
+        patchCachedAlert(row.alert_id, { status: "training" });
         toast({
           variant: "success",
           message: t("toastMessages.alerts.retrainingTriggered"),
@@ -3088,15 +3212,17 @@ export default defineComponent({
 
     // A delete inside the dependency popover — reload the current folder's alerts
     // so the table drops the removed row.
-    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value);
+    // Forced: a cached reload would paint the deleted alert straight back.
+    const onDependencyDeleted = () => getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
     const updateAcrossFolders = async (activeFolderId: any, selectedFolderId: any) => {
       //here we are fetching the alerts of the selected folder first and then fetching the alerts of the active folder
+      // A post-write reload, so both folders force past staleTime.
       if (selectedFolderId === activeFolderId) {
-        await getAlertsFn(store, activeFolderId);
+        await getAlertsFn(store, activeFolderId, "", true, "", true);
       } else {
-        await getAlertsFn(store, selectedFolderId, "", false);
-        await getAlertsFn(store, activeFolderId);
+        await getAlertsFn(store, selectedFolderId, "", false, "", true);
+        await getAlertsFn(store, activeFolderId, "", true, "", true);
       }
       showMoveAlertDialog.value = false;
       selectedAlertToMove.value = [];
@@ -3266,7 +3392,7 @@ export default defineComponent({
 
     //this function is used to refresh the imported alerts
     const refreshImportedAlerts = async (store: any, folderId: any) => {
-      await getAlertsFn(store, folderId);
+      await getAlertsFn(store, folderId, "", true, "", true);
     };
     const updateFolderIdToBeCloned = (folderId: any) => {
       folderIdToBeCloned.value = folderId.value;
@@ -3371,7 +3497,7 @@ export default defineComponent({
           });
         }
         // Refresh alerts
-        await getAlertsFn(store, activeFolderId.value);
+        await getAlertsFn(store, activeFolderId.value, "", true, "", true);
 
         if (filterQuery.value) {
           filterAlertsByQuery(filterQuery.value);
@@ -3481,7 +3607,9 @@ export default defineComponent({
           );
         } else {
           selectedAlerts.value = [];
-          await getAlertsFn(store, activeFolderId.value);
+          // Forced: the point of this branch is to hear it from the server, and an
+          // unforced read inside staleTime answers from cache without asking.
+          await getAlertsFn(store, activeFolderId.value, "", true, "", true);
           if (filterQuery.value) filterAlertsByQuery(filterQuery.value);
         }
       } catch (error: any) {
@@ -3589,6 +3717,7 @@ export default defineComponent({
       addAlert,
       isUpdated,
       showAddUpdateFn,
+      handleActionQuery,
       showDeleteDialogFn,
       duplicateAlert,
       showAddAlertDialog,
@@ -3608,6 +3737,8 @@ export default defineComponent({
       streams,
       isFetchingStreams,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       isSubmitting,
       filterQuery,
@@ -3629,6 +3760,7 @@ export default defineComponent({
       goToAlertInsights,
       goToAlertHistory,
       getTemplates,
+      refreshTemplates,
       exportAlert,
       showExportDialog,
       alertsToExport,

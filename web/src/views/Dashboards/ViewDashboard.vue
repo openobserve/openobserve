@@ -387,6 +387,8 @@ import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import useBreakpoint from "@/composables/useBreakpoint";
+import { queryClient } from "@/composables/query/queryClient";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -677,9 +679,8 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      if (!store.state.organizationData.folders.length) {
-        await getFoldersList(store);
-      }
+      // Caught: a folder-list failure must not abort the panel setup below.
+      await getFoldersList(store).catch(() => null);
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
@@ -1279,6 +1280,17 @@ export default defineComponent({
 
         // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
         shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
+
+        // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+        if (dashboardId.value) {
+          void queryClient.invalidateQueries({
+            queryKey: annotationKeys.dashboard(
+              store.state.selectedOrganization.identifier,
+              String(dashboardId.value),
+            ),
+            refetchType: "none",
+          });
+        }
 
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();

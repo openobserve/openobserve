@@ -33,9 +33,12 @@ vi.mock("@/composables/fieldValueStore", () => ({
 }));
 
 // Defaults to an empty list so no test is perturbed by leftover state.
-vi.mock("@/services/query_functions", () => ({
-  default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
-}));
+vi.mock("@/services/query_functions", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn().mockResolvedValue({ data: { list: [] } }) },
+  });
+});
 
 import queryFunctions from "@/services/query_functions";
 import useSqlSuggestions from "./useSuggestions";
