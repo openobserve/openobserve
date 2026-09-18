@@ -708,8 +708,7 @@ function openInLogs() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <!-- ── LIST MODE: results + per-row INSIGHTS affordance ── -->
-    <template v-if="!detailOpen">
+    <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
       <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
       <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
         <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
@@ -822,10 +821,10 @@ function openInLogs() {
           </div>
         </template>
       </OTable>
-    </template>
+    </div>
 
     <!-- ── DETAIL MODE: pushed in place of the list (single surface, no stacked drawer) ── -->
-    <template v-else>
+    <template v-if="detailOpen">
       <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
         <!-- Push-nav header: back to results · event position · copy link -->
         <div
