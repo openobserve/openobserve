@@ -76,6 +76,21 @@ export class AlertManagement {
         await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
     }
 
+    /**
+     * The dialog's Save button.
+     *
+     * Not named `cloneSubmitButton`: that is a locator key, and
+     * _exposeLocators() copies every key onto the page object, replacing any
+     * method of the same name.
+     */
+    cloneSaveButton() {
+        return this.page.locator(this.locators.cloneSubmitButton);
+    }
+
+    async fillCloneName(name) {
+        await this.page.locator(this.locators.cloneAlertNameField).fill(name);
+    }
+
     async submitCloneDialog() {
         await this.page.locator(this.locators.cloneSubmitButton).click();
     }

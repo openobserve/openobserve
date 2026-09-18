@@ -829,6 +829,14 @@ export class AlertsPage {
         return this.management.openCloneDialog(alertName);
     }
 
+    cloneSaveButton() {
+        return this.management.cloneSaveButton();
+    }
+
+    async fillCloneName(name) {
+        return this.management.fillCloneName(name);
+    }
+
     async submitCloneDialog() {
         return this.management.submitCloneDialog();
     }

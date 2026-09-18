@@ -909,7 +909,8 @@ def test_clone_of_a_simple_alert_keeps_the_source_enabled_state(
 @pytest.mark.skip(
     reason="Backend gap: POST /alerts with alert_type=composite and name='' returns 200 "
     "and stores an unnamed alert, while the same empty name on a simple alert is "
-    "rejected 400 'Alert name is required'. clone inherits it (name='' clones to '')."
+    "rejected 400 'Alert name is required'. clone inherits it (name='' clones to ''). "
+    "The clone dialog now blocks it in the UI (#14627); this is the API half."
 )
 def test_composite_rejects_a_blank_name_like_a_simple_alert_does(
     client: OpenObserveClient, composite_prereqs: dict[str, Any]

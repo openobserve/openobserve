@@ -18,10 +18,14 @@ const PageManager = require('../../../pages/page-manager.js');
 const testLogger = require('../../utils/test-logger.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const {
-  STREAM, SINK, uniq, simpleAlert,
+  STREAM, uniq, simpleAlert,
   createAlert, listAlerts, findAlertId, findAlertIdInFolder, getAlert,
   deleteAlertInFolder, deleteAlertFolder, seedAlertFixtures, createAlertFolder,
 } = require('../../utils/alerts-api-helpers.js');
+
+// Ingested by global setup on every run, so it exists on any server the suite
+// is pointed at — unlike the alert fixtures' own notification sink.
+const RETARGET_STREAM = 'e2e_automate';
 
 test.describe('Clone Alert dialog testcases', {
   tag: ['@alerts', '@alerts-clone'],
@@ -118,14 +122,17 @@ test.describe('Clone Alert dialog testcases', {
     const newName = uniq('auto_alert_clone_stream_copy');
     // Choosing a different stream is the whole point of the stream selects the
     // composite branch hides: the copy must follow the dialog, not the source.
-    await pm.alertsPage.cloneAlert(source.name, 'logs', SINK, { newName });
+    // RETARGET_STREAM, not the notification sink: the sink only exists once
+    // some other spec has fired an alert into it, which makes the stream this
+    // test picks depend on run order.
+    await pm.alertsPage.cloneAlert(source.name, 'logs', RETARGET_STREAM, { newName });
 
     const newId = await findAlertId(page, newName);
     expect(newId, 'the retargeted copy must exist').toBeTruthy();
     created.push({ id: newId, folderId: 'default' });
 
     const clone = await getAlert(page, newId);
-    expect(clone.stream_name).toBe(SINK);
+    expect(clone.stream_name).toBe(RETARGET_STREAM);
     expect(clone.query_condition, 'retargeting must not rewrite the condition').toEqual(
       (await getAlert(page, source.id)).query_condition,
     );
@@ -151,13 +158,20 @@ test.describe('Clone Alert dialog testcases', {
     testLogger.info('Clone routed to the chosen folder, not default');
   });
 
-  test('should demand a stream type and a stream name before cloning', {
+  test('should demand a name, a stream type and a stream name before cloning', {
     tag: ['@alert-clone-dialog', '@all', '@alerts', '@alerts-clone', '@P2'],
   }, async ({ page }) => {
     const source = await createSource(page, 'auto_alert_clone_validation');
 
     await openAlertList(page, source.name);
     await pm.alertsPage.openCloneDialog(source.name);
+
+    // The name is prefilled but erasable, and nothing below the dialog rejects
+    // a blank one, so Save has to stay out of reach until a name is typed.
+    await pm.alertsPage.fillCloneName('');
+    await expect(pm.alertsPage.cloneSaveButton()).toBeDisabled();
+    await pm.alertsPage.fillCloneName(source.name);
+    await expect(pm.alertsPage.cloneSaveButton()).toBeEnabled();
 
     // An ordinary alert has a stream, and the copy cannot inherit it silently:
     // both selects start empty and each is refused in turn.

@@ -297,7 +297,7 @@ test.describe('Clone Composite Alerts testcases', {
     testLogger.info('Cloning a composite extended the child delete guard to the copy');
   });
 
-  test.fixme('should refuse a blank clone name', {
+  test('should refuse a blank clone name', {
     tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
   }, async ({ page }) => {
     const childA = await createChild(page, uniq('composite_clone_child_a'));
@@ -308,18 +308,24 @@ test.describe('Clone Composite Alerts testcases', {
     await pm.compositeAlertsPage.clickCloneButton(source.name);
     await pm.compositeAlertsPage.expectCloneDialogVisible();
 
-    // Neither side validates the name: the dialog's OInput carries no required
-    // rule and the composite create path has no server-side check either, so
-    // this saves an unnamed composite — a row that cannot be searched, toggled
-    // or deleted by name. The same empty name on a plain alert is rejected
-    // 400 "Alert name is required".
+    // Nothing below the dialog validates the name — the composite create path
+    // accepts "" where a plain alert is rejected 400 — so an empty name has to
+    // be refused here or it stores a row that cannot be searched, toggled or
+    // deleted by name. Whitespace is not a name either.
     await pm.compositeAlertsPage.fillCloneName('');
-    await pm.compositeAlertsPage.submitClone();
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeDisabled();
+    await pm.compositeAlertsPage.fillCloneName('   ');
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeDisabled();
 
-    await pm.compositeAlertsPage.expectCloneDialogVisible();
+    await pm.compositeAlertsPage.fillCloneName(`${source.name} - Copy`);
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeEnabled();
+
+    await pm.compositeAlertsPage.cancelClone();
+    await pm.compositeAlertsPage.expectCloneDialogHidden();
     expect(
-      (await listAlerts(page)).filter((row) => !row.name),
-      'a blank name must not create an alert',
+      (await listAlerts(page)).filter((row) => !row.name || !row.name.trim()),
+      'no unnamed alert may exist in the folder',
     ).toHaveLength(0);
+    testLogger.info('Blank clone name kept Save disabled and created nothing');
   });
 });
