@@ -4484,6 +4484,8 @@
       "payloadTitle": "事件承載內容",
       "payloadIndex": "{field} 欄位會選取串流。沒有此欄位的事件會進入 {stream} 串流。",
       "payloadTime": "{field} 欄位是 epoch 秒數，且接受小數值。當該欄位缺少或不是正數時，會使用接收時間。",
+      "windowTitle": "超出擷取視窗的時間戳記將被捨棄",
+      "windowBody": "早於 {past}（預設 5 小時）或晚於 {future}（預設 24 小時）的事件將被捨棄，而要求仍會回應 代碼 0，因為 Splunk 用戶端不會重試錯誤。因此，硬式編碼或過期的時間戳記看起來像是傳送成功，實際卻沒有儲存任何資料。",
       "payloadMetadata": "{fields} 欄位會儲存為事件上的資料行。",
       "healthTitle": "健康檢查",
       "healthBody": "GET 請求不需要驗證，並會回應 {response}。",
