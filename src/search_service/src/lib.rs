@@ -167,6 +167,7 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
+    request.bypass_index_optimizer = in_req.query.bypass_index_optimizer;
     let meta = Sql::new_from_req(&request, &query).await?;
 
     #[cfg(feature = "enterprise")]

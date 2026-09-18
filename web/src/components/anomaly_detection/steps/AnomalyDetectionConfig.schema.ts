@@ -90,14 +90,78 @@ export const hasTimestampAliasInSql = (sql: string, timestampColumn: string): bo
   return new RegExp(`\\bAS\\s+["'\`]?${escaped}["'\`]?\\s*(?:,|\\s|$)`, "i").test(sql);
 };
 
+export type AnomalyIntervalUnit = "s" | "m" | "h" | "d";
+
+const INTERVAL_UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+
+/** Seconds for one interval value + unit pair; null when either part is not a positive s/m/h/d interval. */
+export const anomalyIntervalSeconds = (value: number, unit: string): number | null => {
+  const mult = INTERVAL_UNIT_SECONDS[unit];
+  if (!mult || !Number.isFinite(value) || value <= 0) return null;
+  return value * mult;
+};
+
+/** One governing interval as stored on the server: the raw wire value plus the form state it seeded. */
+export interface AnomalyStoredInterval {
+  raw: string | number | null;
+  value: number;
+  unit: string;
+  parsed: boolean;
+}
+
+/** The stored governing triple, captured once from the edit-fetch response (D4). */
+export interface AnomalyStoredIntervals {
+  histogram: AnomalyStoredInterval;
+  schedule: AnomalyStoredInterval;
+  window: AnomalyStoredInterval;
+}
+
+/** A window narrower than one schedule gap plus one bucket deterministically skips buckets (spec §4.3). */
+export const lookBackWindowFloorSeconds = (
+  scheduleValue: number,
+  scheduleUnit: string,
+  histogramValue: number,
+  histogramUnit: string,
+): number | null => {
+  const schedule = anomalyIntervalSeconds(scheduleValue, scheduleUnit);
+  const histogram = anomalyIntervalSeconds(histogramValue, histogramUnit);
+  if (schedule === null || histogram === null) return null;
+  return schedule + histogram;
+};
+
+/** Compact human form for a seconds count, e.g. 3900 → "1h 5m". */
+export const formatAnomalySeconds = (secs: number): string => {
+  const units: Array<[number, AnomalyIntervalUnit]> = [
+    [86400, "d"],
+    [3600, "h"],
+    [60, "m"],
+    [1, "s"],
+  ];
+  const parts: string[] = [];
+  let rest = Math.max(0, Math.floor(secs));
+  for (const [size, label] of units) {
+    const n = Math.floor(rest / size);
+    if (n > 0) {
+      parts.push(`${n}${label}`);
+      rest -= n * size;
+    }
+  }
+  return parts.length ? parts.join(" ") : "0s";
+};
+
+const sameInterval = (stored: AnomalyStoredInterval, value: unknown, unit: unknown): boolean =>
+  Number(value) === stored.value && unit === stored.unit;
+
 /**
  * Schema factory — takes a getter for the org's timestamp column
  * (store.state.zoConfig.timestamp_column) so the alias rule stays live without
- * the schema file importing the store.
+ * the schema file importing the store, and one for the stored governing triple
+ * so legacy rows are grandfathered by value, not by touched-flags (spec §4.5).
  */
 export const createAnomalyDetectionConfigSchema = (
   t: Translator,
   getTimestampColumn: () => string = () => "_timestamp",
+  getStoredIntervals: () => AnomalyStoredIntervals | null = () => null,
 ) =>
   makeAnomalyDetectionConfigBase(t).superRefine((value, ctx) => {
     if (value.query_mode === "custom_sql") {
@@ -154,7 +218,69 @@ export const createAnomalyDetectionConfigSchema = (
         message: t("alerts.anomaly.budgetRange"),
       });
     }
+
+    const stored = getStoredIntervals();
+    const histogramUntouched =
+      stored !== null &&
+      sameInterval(stored.histogram, value.histogram_interval_value, value.histogram_interval_unit);
+    const scheduleUntouched =
+      stored !== null &&
+      sameInterval(stored.schedule, value.schedule_interval_value, value.schedule_interval_unit);
+    const windowUntouched =
+      stored !== null &&
+      sameInterval(stored.window, value.detection_window_value, value.detection_window_unit);
+    // D4 grandfathering: an untouched stored triple round-trips verbatim, so the floor judges only edits.
+    const grandfathered =
+      stored !== null && histogramUntouched && scheduleUntouched && windowUntouched;
+    // D9 tolerance: an unparsable stored value the user has not replaced yields no floor computation.
+    const scheduleReliable = stored === null || stored.schedule.parsed || !scheduleUntouched;
+    const histogramReliable = stored === null || stored.histogram.parsed || !histogramUntouched;
+    if (!grandfathered && scheduleReliable && histogramReliable) {
+      const floor = lookBackWindowFloorSeconds(
+        value.schedule_interval_value,
+        value.schedule_interval_unit,
+        value.histogram_interval_value,
+        value.histogram_interval_unit,
+      );
+      const windowSecs = anomalyIntervalSeconds(
+        value.detection_window_value,
+        value.detection_window_unit,
+      );
+      if (floor !== null && windowSecs !== null && windowSecs < floor) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["detection_window_value"],
+          message: t("alerts.anomaly.lookBackWindowFloor", { min: formatAnomalySeconds(floor) }),
+        });
+      }
+    }
   });
+
+/** Badge copy keys for a config's `notice_class` (§4.8); the class is the ONLY key — never error-string prefixes. */
+export const anomalyNoticeBadgeKeys = (
+  noticeClass: unknown,
+): { labelKey: string; tooltipKeys: string[] } | null => {
+  switch (noticeClass) {
+    case "window_floor":
+      return {
+        labelKey: "alerts.anomaly.noticeWindowFloor",
+        tooltipKeys: ["alerts.anomaly.noticeWindowFloorTooltip"],
+      };
+    case "window_skip":
+      // One class carries two server message constants (§4.8) — the tooltip names both causes.
+      return {
+        labelKey: "alerts.anomaly.noticeWindowSkip",
+        tooltipKeys: ["alerts.anomaly.noticeSkipScored", "alerts.anomaly.noticeSkipAbsence"],
+      };
+    case "hybrid_fallback":
+      return {
+        labelKey: "alerts.anomaly.noticeHybridFallback",
+        tooltipKeys: ["alerts.anomaly.noticeHybridFallbackTooltip"],
+      };
+    default:
+      return null;
+  }
+};
 
 /** The stored per-day budget, or null; absent/invalid = percentile mode — the only wire contract assumed. */
 export const anomalyBudgetPerDay = (cfg: Record<string, any> | null | undefined): number | null => {
@@ -198,7 +324,8 @@ export const anomalyDetectionConfigDefaults = (
   histogram_interval_unit: cfg?.histogram_interval_unit ?? "m",
   schedule_interval_value: cfg?.schedule_interval_value ?? 1,
   schedule_interval_unit: cfg?.schedule_interval_unit ?? "h",
-  detection_window_value: cfg?.detection_window_value ?? 1,
+  // 3h is the smallest round window meeting §4.3's recommendation (2×(1h+5m) + the absence allowance).
+  detection_window_value: cfg?.detection_window_value ?? 3,
   detection_window_unit: cfg?.detection_window_unit ?? "h",
   training_window_days: cfg?.training_window_days ?? 14,
   retrain_interval_days: cfg?.retrain_interval_days ?? 7,
