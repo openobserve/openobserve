@@ -1,0 +1,9 @@
+[
+  { "title": "should toggle print mode via the button and restore chrome on exit", "action": "new", "verifies": "print button toggles print mode: header chrome hides, #o2-print-page injects, URL print param syncs, and everything restores on exit" },
+  { "title": "should render a single table panel full-width with the grid bypassed", "action": "new", "verifies": "a single table panel renders via the full-height branch (grid bypassed) in print mode and reverts on exit" },
+  { "title": "should hydrate print mode from a print=true deep link", "action": "new", "verifies": "visiting the dashboard with print=true mounts it already in print mode with chrome hidden" },
+  { "title": "should inject @page size and reposition straddling panels in multi-panel grid", "action": "new", "verifies": "preparePrintLayout injects an @page size rule, sets grid height, and overrides panel tops; clearPrintLayout restores them on exit" },
+  { "title": "should apply print-media CSS overrides only under @media print", "action": "new", "verifies": "the @media print overflow override is active under print media and inert under screen media" },
+  { "title": "should hide chrome but skip @page injection for an empty dashboard", "action": "new", "verifies": "an empty dashboard hides chrome in print mode but does not inject the @page rule" },
+  { "title": "should not accumulate #o2-print-page across rapid toggles", "action": "new", "verifies": "repeated enter/exit cycles leave no duplicate #o2-print-page elements and a clean final state" }
+]

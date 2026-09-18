@@ -1,0 +1,25 @@
+{
+  "feature_slug": "dashboard-print-layout",
+  "feature_title": "Dashboard Print Layout",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-print.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-print.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/views/Dashboards/RenderDashboardCharts.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed file is web/src/views/Dashboards/RenderDashboardCharts.vue, which lives under the open-source web/src tree. No enterprise-owned paths (enterprise/, o2_enterprise/, src/enterprise/) appear, and there are no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipping: the diff is a real UI code change (not docs/CI/test-data-only), there is no tests-added label or skip request in feature_hint.txt/trigger_comment.txt (both empty), and no explicit opt-out was passed. The change is user-facing, so it proceeds to E2E.",
+    "e2e": "E2E is warranted: the change adds print-mode layout logic (preparePrintLayout/clearPrintLayout, beforeprint/afterprint listeners, print CSS) to dashboard chart rendering. This is a user-exercisable flow — entering print mode and printing/exporting a dashboard should reflow panels without breaking the grid — so it needs Playwright coverage.",
+    "area": "Area is Dashboards: the entire change is in web/src/views/Dashboards/RenderDashboardCharts.vue, and sibling specs live under tests/ui-testing/playwright-tests/Dashboards/ (dashboard.spec.js, dashboard2.spec.js, etc.).",
+    "group": "Dashboards-Core is the closest matrix shard: it already runs dashboard.spec.js / dashboard2.spec.js / dashboardtype.spec.js and covers the core dashboard rendering/grid behavior that print mode modifies. Dashboards-Charts is chart-viz specific and Dashboards-Settings is settings specific, neither of which fits this rendering change.",
+    "existing_tests": "No E2E specs in the diff. The patch modifies only web/src/views/Dashboards/RenderDashboardCharts.vue (application code), and no files under tests/ui-testing/playwright-tests/ are changed, so there is no pre-existing Playwright coverage to enhance."
+  }
+}

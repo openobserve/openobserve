@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-print.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-share-link.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-folder.spec.js",
+    "tests/ui-testing/playwright-tests/Dashboards/dashboard-chartJson.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_target": ".github/workflows/playwright.yml -> testfolder \"Dashboards-Core\" -> run_files",
+  "rationale": "No existing spec covers dashboard print mode/print layout. A grep across tests/ui-testing for print-mode|print-btn|printMode|o2-print-page|print=true|dashboard-print returned zero hits. The closest specs (dashboard-share-link, dashboard-folder) cover share/export and folder management, not the print reflow. Print layout is a distinct feature area within Dashboards, so a dedicated spec is warranted. The spec must be registered in the Dashboards-Core run_files list in .github/workflows/playwright.yml."
+}
