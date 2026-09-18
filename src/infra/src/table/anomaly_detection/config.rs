@@ -242,6 +242,13 @@ pub async fn delete<C: ConnectionTrait>(conn: &C, org_id: &str, anomaly_id: &str
 /// Overwrites every non-PK field of `active` with the values from `src`.
 /// `created_at` is intentionally excluded — it must never be overwritten.
 fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Model) {
+    // D10 (§4.2): read before the interval below is overwritten with the peer's value.
+    let cursor = guarded_cursor(
+        stored_field(&active.last_processed_timestamp).flatten(),
+        stored_field(&active.histogram_interval),
+        src.last_processed_timestamp,
+        &src.histogram_interval,
+    );
     active.org_id = Set(src.org_id);
     active.stream_name = Set(src.stream_name);
     active.stream_type = Set(src.stream_type);
@@ -264,7 +271,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.training_started_at = Set(src.training_started_at);
     active.training_completed_at = Set(src.training_completed_at);
     active.last_error = Set(src.last_error);
-    active.last_processed_timestamp = Set(src.last_processed_timestamp);
+    active.last_processed_timestamp = Set(cursor);
     active.current_model_version = Set(src.current_model_version);
     active.rcf_num_trees = Set(src.rcf_num_trees);
     active.rcf_tree_size = Set(src.rcf_tree_size);
@@ -283,6 +290,34 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     // destinations, so a peer's fire time must not suppress a local alert.
     // last_recovery_notified_at is NOT patched, for the same reason one step later: a peer's
     // pending mark would recover an alert this region's destinations never received.
+}
+
+/// D10: a replicated apply never rewinds the cursor; only an interval edit's reset (§4.2) may.
+fn guarded_cursor(
+    stored_cursor: Option<i64>,
+    stored_interval: Option<String>,
+    incoming_cursor: Option<i64>,
+    incoming_interval: &str,
+) -> Option<i64> {
+    if stored_interval.is_some_and(|stored| stored != incoming_interval) {
+        return incoming_cursor;
+    }
+    match (stored_cursor, incoming_cursor) {
+        (Some(stored), Some(incoming)) => Some(stored.max(incoming)),
+        (Some(stored), None) => Some(stored),
+        (None, incoming) => incoming,
+    }
+}
+
+/// The value the apply would overwrite; `NotSet` means no fetched row backs the field.
+fn stored_field<V>(value: &sea_orm::ActiveValue<V>) -> Option<V>
+where
+    V: Clone + Into<sea_orm::Value>,
+{
+    match value {
+        sea_orm::ActiveValue::Set(v) | sea_orm::ActiveValue::Unchanged(v) => Some(v.clone()),
+        sea_orm::ActiveValue::NotSet => None,
+    }
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
@@ -623,6 +658,7 @@ mod tests {
             ("training_started_at", Scope::Replicated),
             ("training_completed_at", Scope::Replicated),
             ("last_error", Scope::Replicated),
+            // D10: forward-only unless the interval changed; this fixture changes it.
             ("last_processed_timestamp", Scope::Replicated),
             ("current_model_version", Scope::Replicated),
             ("rcf_num_trees", Scope::Replicated),
@@ -889,6 +925,64 @@ mod tests {
         patch_all_fields(&mut active, peer);
 
         assert_eq!(active.retries.unwrap(), 0);
+    }
+
+    /// N17, the two-writer race: a peer that judged less recently must not rewind judgment.
+    #[test]
+    fn a_replicated_apply_with_an_older_cursor_does_not_rewind() {
+        let mut local = make_model("anom-1", "org");
+        local.last_processed_timestamp = Some(2_000);
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.last_processed_timestamp = Some(1_000);
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.last_processed_timestamp.unwrap(), Some(2_000));
+    }
+
+    /// The forward direction still replicates: a peer that judged further advances us.
+    #[test]
+    fn a_replicated_apply_with_a_newer_cursor_advances() {
+        let mut local = make_model("anom-1", "org");
+        local.last_processed_timestamp = Some(2_000);
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.last_processed_timestamp = Some(3_000);
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.last_processed_timestamp.unwrap(), Some(3_000));
+    }
+
+    /// A null peer cursor on an unchanged grid is a rewind, not the designed reset.
+    #[test]
+    fn a_null_peer_cursor_on_the_same_grid_keeps_judgment() {
+        let mut local = make_model("anom-1", "org");
+        local.last_processed_timestamp = Some(2_000);
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.last_processed_timestamp = None;
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.last_processed_timestamp.unwrap(), Some(2_000));
+    }
+
+    /// N17, the designed exception: an interval edit redefined the grid, so its reset lands.
+    #[test]
+    fn an_interval_edit_reset_rides_the_replicated_apply() {
+        let mut local = make_model("anom-1", "org");
+        local.last_processed_timestamp = Some(2_000);
+        let mut active = local.into_active_model();
+
+        let mut peer = make_model("anom-1", "org");
+        peer.histogram_interval = "5m".to_string();
+        peer.last_processed_timestamp = None;
+        patch_all_fields(&mut active, peer);
+
+        assert_eq!(active.last_processed_timestamp.unwrap(), None);
+        assert_eq!(active.histogram_interval.unwrap(), "5m");
     }
 
     /// `put()` inserts unknown rows, so a fresh region starts its own backoff from zero.

@@ -33,6 +33,8 @@ pub struct Request {
     pub use_cache: bool,
     pub overwrite_cache: bool,
     pub histogram_interval: i64,
+    // anomaly queries bin via date_bin; the tantivy fast path bins on the epoch grid
+    pub bypass_index_optimizer: bool,
 }
 
 impl Default for Request {
@@ -52,6 +54,7 @@ impl Default for Request {
             use_cache: default_use_cache(),
             overwrite_cache: false,
             histogram_interval: 0,
+            bypass_index_optimizer: false,
         }
     }
 }
@@ -84,6 +87,7 @@ impl Request {
             use_cache: default_use_cache(),
             overwrite_cache,
             histogram_interval,
+            bypass_index_optimizer: false,
         }
     }
 
@@ -122,6 +126,7 @@ impl From<FlightSearchRequest> for Request {
             use_cache: req.search_info.use_cache,
             overwrite_cache: req.search_info.clear_cache,
             histogram_interval: req.search_info.histogram_interval,
+            bypass_index_optimizer: req.index_info.bypass_index_optimizer,
         }
     }
 }
@@ -191,7 +196,10 @@ mod tests {
                 histogram_interval: 60,
                 ..Default::default()
             },
-            index_info: IndexInfo::default(),
+            index_info: IndexInfo {
+                bypass_index_optimizer: true,
+                ..Default::default()
+            },
             super_cluster_info: SuperClusterInfo {
                 user_id: Some("alice".to_string()),
                 work_group: Some("wg1".to_string()),
@@ -217,6 +225,18 @@ mod tests {
         assert_eq!(req.local_mode, Some(true));
         assert!(!req.streaming_output);
         assert!(req.streaming_id.is_none());
+        assert!(req.bypass_index_optimizer);
+    }
+
+    #[test]
+    fn test_bypass_index_optimizer_survives_proto_roundtrip_into_request() {
+        let original = make_flight_request();
+        let proto: cluster_rpc::FlightSearchRequest = original.into();
+        let recovered = FlightSearchRequest::from(proto);
+        assert!(recovered.index_info.bypass_index_optimizer);
+        let req = Request::from(recovered);
+        assert!(req.bypass_index_optimizer);
+        assert!(!Request::default().bypass_index_optimizer);
     }
 
     #[test]
