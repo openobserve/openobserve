@@ -135,7 +135,9 @@ describe("SplunkHec", () => {
       const nowSeconds = Date.now() / 1000;
       expect(parsed.time).toBeGreaterThan(nowSeconds - 60);
       expect(parsed.time).toBeLessThanOrEqual(nowSeconds + 60);
-      expect(parsed.time % 1).not.toBe(0);
+      // Millisecond precision, asserted on the rendered text: `time % 1` is 0 for
+      // the one run in a thousand where Date.now() lands on a whole second.
+      expect(wrapper.vm.payloadContent).toMatch(/"time": \d+\.\d{3},/);
       expect(parsed.host).toBeDefined();
       expect(parsed.source).toBeDefined();
       expect(parsed.sourcetype).toBeDefined();
