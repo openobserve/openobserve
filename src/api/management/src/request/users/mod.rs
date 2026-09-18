@@ -250,9 +250,9 @@ fn validate_org_id(org_id: &str) -> Option<&'static str> {
     operation_id = "UserSave",
     summary = "Create new user",
     description = "Creates a new user account within the organization with specified role and authentication credentials. \
-                   The password must be at least 8 characters long and the email address must be valid. Users are \
-                   automatically assigned to the organization with the specified role and can begin accessing resources \
-                   immediately upon creation.",
+                   The password must be at least 15 characters long by default or comply to the defined password policy \
+                   and the email address must be valid. Users are automatically assigned to the organization with the \
+                   specified role and can begin accessing resources immediately upon creation.",
     security(
         ("Authorization"= [])
     ),
@@ -325,10 +325,10 @@ pub async fn save(
     summary = "Update user account",
     description = "Updates user account information including role assignments, password changes, or other profile details. \
                    Users can modify their own account settings, while administrators have broader permissions to update \
-                   any user account. Password changes require the new password to be at least 8 characters long for \
-                   security compliance. Setting remove_lockout releases an active failed-login lockout and resets the \
-                   counters; it answers to the same gate as an administrative password reset, so Root or Admin on the \
-                   organization, and never the locked-out user themselves.",
+                   any user account. Password changes require the new password to be at least 15 characters long by default \
+                   or comply to the defined password policy for security compliance. Setting remove_lockout releases an \
+                   active failed-login lockout and resets the counters; it answers to the same gate as an administrative \
+                   password reset, so Root or Admin on the organization, and never the locked-out user themselves.",
     security(
         ("Authorization"= [])
     ),
