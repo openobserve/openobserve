@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :last-run-at="lastFetched ? lastFetched.getTime() : null"
           :loading="isLoading"
           :disabled="isLoading"
-          @click="loadAll"
+          @click="() => loadAll(true)"
         />
         <DateTime
           ref="dateTimeRef"
@@ -46,13 +46,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-5"
       data-test="overview-incidents-section"
     >
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeIncidents") }}
           <OTag type="countChip" value="warning">{{ incidentsTotal }}</OTag>
           <span
             v-if="incidentsTotal > incidents.length"
-            class="text-text-secondary ml-2 align-middle text-xs font-normal"
+            class="text-text-secondary ms-2 align-middle text-xs font-normal"
             >{{ t("overview.showingOf", { shown: incidents.length, total: incidentsTotal }) }}</span
           >
         </div>
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="inc in incidents"
           :key="inc.id"
-          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-b-[0.0625em] border-l-[0.1875em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
+          class="group bg-surface-base hover:bg-table-row-hover-bg border-b-border-default flex items-center gap-3 border-s-[0.1875em] border-b-[0.0625em] px-3.5 py-2.5 transition-[background] duration-150 last:border-b-0"
           :class="incidentRowClass(inc.severity)"
         >
           <span class="flex shrink-0 items-center" :class="incidentIconClass(inc.severity)">
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >{{ inc.alert_count }} {{ t("overview.alertsSuffix") }}</span
             >
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToIncident(inc)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -127,13 +127,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="mb-5"
       data-test="overview-services-section"
     >
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.services") }}
           <OTag type="countChip" value="warning">{{ services.length }}</OTag>
           <span
             v-if="servicePanelVisible && selectedService"
-            class="text-text-secondary ml-1 text-xs font-normal"
+            class="text-text-secondary ms-1 text-xs font-normal"
           >
             {{ t("overview.viewingLabel") }}
             <strong class="text-text-body font-semibold">{{
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="relative">
         <!-- Left fade + floating scroll control (only present when scrollable) -->
         <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pr-8 transition-opacity duration-200"
+          class="from-surface-base pointer-events-none absolute inset-y-0 left-0 z-10 flex items-center bg-linear-to-r to-transparent pe-8 transition-opacity duration-200"
           :class="svcScrollCanLeft ? 'opacity-100' : 'opacity-0'"
         >
           <button
@@ -195,7 +195,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="svc.label ?? svc.id"
                 >{{ svc.label }}</span
               >
-              <span class="ml-1 inline-flex shrink-0 items-center">
+              <span class="ms-1 inline-flex shrink-0 items-center">
                 <OButton
                   variant="ghost-muted"
                   size="icon"
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Right fade + floating scroll control (only present when scrollable) -->
         <div
-          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent pl-8 transition-opacity duration-200"
+          class="from-surface-base pointer-events-none absolute inset-y-0 right-0 z-10 flex items-center justify-end bg-linear-to-l to-transparent ps-8 transition-opacity duration-200"
           :class="svcScrollCanRight ? 'opacity-100' : 'opacity-0'"
         >
           <button
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ACTIVE ANOMALIES -->
     <section v-if="anomalies.length > 0" class="mb-5" data-test="overview-anomalies-section">
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.activeAnomalies") }}
           <OTag type="countChip" value="warning">{{ anomalies.length }}</OTag>
@@ -337,7 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span class="text-text-secondary text-xs font-normal">{{ item.description }}</span>
             </div>
           </div>
-          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible">
+          <span class="invisible shrink-0 whitespace-nowrap group-hover:visible max-md:visible">
             <OButton variant="ghost-primary" size="sm" @click="goToAlert(item)">
               {{ t("overview.investigate") }}
             </OButton>
@@ -349,7 +349,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- RECENT EVENTS (alert firing feed) -->
     <section v-if="recentEvents.length > 0" class="mb-5" data-test="overview-recent-events-section">
-      <div class="mb-2 flex items-center justify-between pl-1">
+      <div class="mb-2 flex items-center justify-between ps-1">
         <div class="text-text-heading text-sm font-medium tracking-[0.01em]">
           {{ t("overview.recentEvents") }}
           <OTag type="countChip" value="warning">{{ recentEvents.length }}</OTag>
@@ -406,7 +406,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showAlertsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-alerts-card"
           @click="goToAlertList"
         >
@@ -433,7 +433,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showLogsCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-logs-card"
           @click="goToLogs"
         >
@@ -460,7 +460,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           v-if="showTracesCard"
           type="button"
-          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 pr-3.5 pl-3 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
+          class="group rounded-default border-border-default bg-surface-base hover:border-accent hover:bg-tabs-hover-bg focus-visible:ring-accent/40 relative flex min-h-16 max-w-72 min-w-0 flex-1 basis-56 cursor-pointer items-center gap-3 border py-2.5 ps-3 pe-3.5 text-left transition-[color,background-color,border-color,box-shadow] duration-150 outline-none hover:shadow-md focus-visible:ring-2"
           data-test="overview-empty-traces-card"
           @click="goToTraces"
         >
@@ -498,23 +498,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { alertHistoryQuery } from "@/services/alerts.queries";
+import { incidentsQuery } from "@/services/incidents.queries";
+import { serviceTopologyQuery } from "@/services/service_graph.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { anomalyConfigsQuery } from "@/services/anomaly_detection.queries";
+import { anomalyHistoryQuery } from "@/services/anomaly_detection.queries";
 import { ref, reactive, computed, defineAsyncComponent, onMounted, watch, nextTick } from "vue";
 
-// Module-level cache for anomaly history — survives re-renders, cleared on org change
-const ANOMALY_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-const _anomalyCache = new Map<
-  string,
-  { ts: number; startTime: number; endTime: number; data: any[] }
->();
 import { raw, useI18nTyped } from "@/types/i18n";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import { isFiringOutcome, isErrorOutcome } from "@/utils/alerts/runOutcome";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import alertsService from "@/services/alerts";
 import anomalyService from "@/services/anomaly_detection";
-import incidentsService from "@/services/incidents";
-import serviceGraphService from "@/services/service_graph";
 import config from "@/aws-exports";
 import DateTime from "@/components/DateTime.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -525,6 +522,9 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import ServiceGraphNodeSidePanel from "@/plugins/traces/ServiceGraphNodeSidePanel.vue";
+import { overviewRange } from "@/services/service_graph";
+import { sqlEquals } from "@/utils/query/sqlFilterBuilder";
+
 const AlertHistoryDrawer = defineAsyncComponent(
   () => import("@/components/alerts/AlertHistoryDrawer.vue"),
 );
@@ -685,52 +685,53 @@ const servicePanelVisible = ref(false);
 // ── Data loading ─────────────────────────────────────────────────────────────
 const orgId = computed(() => store.state.selectedOrganization?.identifier);
 
-const loadAll = async () => {
+// `force` comes from the Refresh button. A mount or a tab switch reads the
+// cache instead, which is what stops every tab switch re-requesting.
+const loadAll = async (force = false) => {
   if (!orgId.value) return;
   isLoading.value = true;
   await Promise.allSettled([
-    runSection("recentEvents", loadHistoryAndSplit),
-    runSection("anomalies", loadAnomalies),
-    runSection("incidents", loadIncidents),
-    runSection("services", loadServiceGraph),
+    runSection("recentEvents", () => loadHistoryAndSplit(force)),
+    runSection("anomalies", () => loadAnomalies(force)),
+    runSection("incidents", () => loadIncidents(force)),
+    runSection("services", () => loadServiceGraph(force)),
   ]);
   isLoading.value = false;
   lastFetched.value = new Date();
 };
 
 // Dedicated anomaly loader — uses anomaly_detection service for reliable results
-const loadAnomalies = async () => {
+const loadAnomalies = async (force = false) => {
   try {
     const org = orgId.value;
     const { startTime, endTime } = timeRange.value;
-    const cacheKey = org;
-    const cached = _anomalyCache.get(cacheKey);
 
     let rawHits: Array<{ cfg: any; hits: any[] }>;
 
-    if (
-      cached &&
-      Date.now() - cached.ts < ANOMALY_CACHE_TTL_MS &&
-      cached.startTime === startTime &&
-      cached.endTime === endTime
-    ) {
-      // Serve from cache — no network calls
-      anomalies.value = cached.data;
-      return;
-    }
+    // `force` bypasses staleTime; the options object is the same either way.
+    const read = <T,>(options: any): Promise<T> => {
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient.fetchQuery(options);
+    };
+    const readConfigs = (org: string) => read<any[]>(anomalyConfigsQuery(org));
+    const readHistory = (org: string, limit: number) => read<any>(anomalyHistoryQuery(org, limit));
 
     // Fire list first; only fetch history if configs exist
     try {
-      const listRes = await anomalyService.list(org);
-      const configs: any[] = listRes.data ?? [];
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
-        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
         return;
       }
       const configById = new Map(configs.map((c: any) => [c.id ?? c.anomaly_id, c]));
-      const bulkRes = await anomalyService.getAllHistory(org, 20);
-      const bulkConfigs: any[] = bulkRes.data?.configs ?? [];
+      const bulkRes = await readHistory(org, 20);
+      const bulkConfigs: any[] = bulkRes?.configs ?? [];
       // Merge bulk history hits with config metadata
       rawHits = bulkConfigs.map((entry: any) => ({
         cfg: configById.get(entry.cfg?.id) ?? entry.cfg,
@@ -738,11 +739,9 @@ const loadAnomalies = async () => {
       }));
     } catch {
       // Bulk endpoint not available — fall back to per-config requests
-      const listRes = await anomalyService.list(org);
-      const configs: any[] = listRes.data ?? [];
+      const configs: any[] = await readConfigs(org);
       if (!configs.length) {
         anomalies.value = [];
-        _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: [] });
         return;
       }
       const limitPerConfig = Math.min(20, Math.ceil(500 / configs.length));
@@ -795,7 +794,6 @@ const loadAnomalies = async () => {
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 3);
 
-    _anomalyCache.set(cacheKey, { ts: Date.now(), startTime, endTime, data: result });
     anomalies.value = result;
   } catch {
     anomalies.value = [];
@@ -803,17 +801,28 @@ const loadAnomalies = async () => {
 };
 
 // Alert trigger history feeds recentEvents only
-const loadHistoryAndSplit = async () => {
+const loadHistoryAndSplit = async (force = false) => {
   try {
-    const res = await alertsService.getHistory(orgId.value, {
-      start_time: timeRange.value.startTime.toString(),
-      end_time: timeRange.value.endTime.toString(),
+    // Quantised range: the raw timestamps move on every mount, so a key built
+    // from them could never hit — which is why switching tabs re-requested this.
+    const q = overviewRange(timeRange.value.startTime, timeRange.value.endTime);
+    const historyOptions = alertHistoryQuery(orgId.value, {
+      start_time: q.start,
+      end_time: q.end,
       from: 0,
       size: 500,
       sort_by: "timestamp",
       sort_order: "desc",
     });
-    const hits: any[] = res.data?.hits ?? [];
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: historyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(historyOptions);
+    const hits: any[] = res?.hits ?? [];
 
     // Recent events: firing shown per-occurrence; failed deduped by alert_name with count.
     // This previously filtered on the literal strings ["firing", "error"], neither
@@ -866,29 +875,45 @@ const loadHistoryAndSplit = async () => {
   }
 };
 
-const loadIncidents = async () => {
+const loadIncidents = async (force = false) => {
   if (!isIncidentsEnabled.value) return;
   try {
-    const res = await incidentsService.list(orgId.value, "open", 4, 0);
-    incidents.value = res.data?.incidents ?? [];
-    incidentsTotal.value = res.data?.total ?? incidents.value.length;
+    const incidentOptions = incidentsQuery(orgId.value, "open", 4, 0);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: incidentOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(incidentOptions);
+    incidents.value = res?.incidents ?? [];
+    incidentsTotal.value = res?.total ?? incidents.value.length;
   } catch {
     incidents.value = [];
     incidentsTotal.value = 0;
   }
 };
 
-const loadServiceGraph = async () => {
+const loadServiceGraph = async (force = false) => {
   if (!isEnterpriseOrCloud.value) return;
   try {
     graphStream.value = "all";
 
-    const res = await serviceGraphService.getCurrentTopology(orgId.value, {
+    const topologyOptions = serviceTopologyQuery(orgId.value, {
       startTime: timeRange.value.startTime,
       endTime: timeRange.value.endTime,
     });
-    const nodes: any[] = res.data?.nodes ?? [];
-    const edges: any[] = res.data?.edges ?? [];
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: topologyOptions.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res: any = await queryClient.fetchQuery(topologyOptions);
+    const nodes: any[] = res?.nodes ?? [];
+    const edges: any[] = res?.edges ?? [];
     graphData.value = { nodes, edges };
 
     // Build per-node latency flag from incoming edges that have a baseline
@@ -979,17 +1004,17 @@ const shortDimKey = (key: string): string =>
 
 const severityRowClass = (severity: string) =>
   severity === "critical"
-    ? "border-l-[0.1875em] border-l-error-600"
-    : "border-l-[0.1875em] border-l-warning-600";
+    ? "border-s-[0.1875em] border-s-error-600"
+    : "border-s-[0.1875em] border-s-warning-600";
 
 const severityIconClass = (severity: string) =>
   severity === "critical" ? "text-error-600" : "text-warning-600";
 
 const incidentRowClass = (severity: string) => {
   const s = (severity ?? "").toLowerCase();
-  if (s === "p1") return "border-l-error-600";
-  if (s === "p2") return "border-l-warning-600";
-  return "border-l-status-info-text";
+  if (s === "p1") return "border-s-error-600";
+  if (s === "p2") return "border-s-warning-600";
+  return "border-s-status-info-text";
 };
 
 const incidentIconClass = (severity: string) => {
@@ -1000,9 +1025,9 @@ const incidentIconClass = (severity: string) => {
 };
 
 const serviceCardClass = (svc: any) => {
-  if (svc.errorFlag && svc.error_rate >= 5) return "border-l-[0.1875em] border-l-error-600";
-  if (svc.errorFlag || svc.latencyFlag) return "border-l-[0.1875em] border-l-warning-600";
-  return "border-l-[0.1875em] border-l-status-positive";
+  if (svc.errorFlag && svc.error_rate >= 5) return "border-s-[0.1875em] border-s-error-600";
+  if (svc.errorFlag || svc.latencyFlag) return "border-s-[0.1875em] border-s-warning-600";
+  return "border-s-[0.1875em] border-s-status-positive";
 };
 
 // ── Navigation ───────────────────────────────────────────────────────────────
@@ -1016,7 +1041,7 @@ const goToService = (svc: any, e?: MouseEvent) => {
   // Fired from the per-card info-icon button — stop it bubbling to the card
   // click (which opens the latency/info side panel).
   e?.stopPropagation();
-  let filter = `service_name = '${svc.label ?? svc.id}'`;
+  let filter = sqlEquals("service_name", svc.label ?? svc.id);
   if (svc.errorFlag) filter += ` AND span_status = 'ERROR'`;
 
   const query: Record<string, string> = {
@@ -1108,7 +1133,7 @@ watch(
   () => store.state.selectedOrganization?.identifier,
   (val, old) => {
     if (val && val !== old) {
-      _anomalyCache.delete(old ?? "");
+      // The org-switch purge in MainLayout drops the previous org's entries.
       loadAll();
     }
   },

@@ -1,22 +1,6 @@
 // Copyright 2026 OpenObserve Inc.
 //
-// Validation schema for ScoreConfigDialog.vue (online-evals score-config drawer).
-// Client-side validation: (1) name — required + a create-only lowercase-slug
-// pattern; (2) min/max — each must be a non-empty number, but ONLY when the data
-// type is numeric (the inputs are hidden and the values are dropped from the
-// payload for categorical/boolean, so a blank must not block Save there — the
-// check is gated on dataType in superRefine). There is NO min<max ordering rule
-// and NO "≥1 category" rule.
-//
-// The component owns <OForm>: it creates the form with `useOForm` and reads it
-// reactively through `form.useStore` (single source of truth, no mirror ref, no
-// `v-model`). That read view (`formValues`) drives the `dataType`/
-// `healthyDirection`/`categories` `v-if` branches. The real text/number inputs
-// (name/description/min/max/healthy values) are plain form-owned `name=` fields.
-// The bespoke choice grids (dataType radio-cards, healthy-threshold
-// radios/checkboxes — several embed inline number inputs, so they have no OForm*
-// representation) plus the categories tag-entry write directly into the form via
-// `form.setFieldValue` from each control's own `@change`/`@click` handler.
+// min/max are validated only for numeric configs; categorical/boolean hide and drop them, so no "≥1 category" rule.
 
 import { z } from "zod";
 import type { ScoreDataType } from "@/services/online-evals.service";
@@ -75,23 +59,36 @@ export const makeScoreConfigSchema = (
       // Save behind an invisible field (clear min on numeric → switch to
       // categorical → Save silently no-ops). Gate the check on dataType.
       if (val.dataType !== "numeric") return;
-      if (isBlankNumber(val.min)) {
+      const minIsBlank = isBlankNumber(val.min);
+      const maxIsBlank = isBlankNumber(val.max);
+      if (minIsBlank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["min"],
           message: t("onlineEvals.scoreConfig.validation.minRequired"),
         });
       }
-      if (isBlankNumber(val.max)) {
+      if (maxIsBlank) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["max"],
           message: t("onlineEvals.scoreConfig.validation.maxRequired"),
         });
       }
+      // min >= max corrupts every normalization dividing by (max - min); checked only once both parse.
+      if (
+        !isBlankNumber(val.min) &&
+        !isBlankNumber(val.max) &&
+        Number(val.min) >= Number(val.max)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["max"],
+          message: t("onlineEvals.scoreConfig.validation.maxNotGreaterThanMin"),
+        });
+      }
     });
-// Intentionally NO numeric `min < max` ordering rule and NO categorical
-// "≥1 category" rule — both min≥max ranges and empty categorical are allowed.
+// Intentionally NO categorical "≥1 category" rule — empty categorical is allowed.
 
 export type ScoreConfigForm = z.infer<ReturnType<typeof makeScoreConfigSchema>>;
 

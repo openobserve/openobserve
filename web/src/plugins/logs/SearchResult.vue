@@ -21,36 +21,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full max-h-full w-full flex-col overflow-hidden" ref="searchListContainer">
       <!-- Section header: static at top -->
       <div
-        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b"
+        class="border-card-glass-border bg-card-glass-bg flex h-9 shrink-0 items-center border-b max-md:h-auto max-md:min-h-9 max-md:flex-wrap max-md:gap-y-1 max-md:py-0.5"
       >
         <!-- Field panel toggle — same style as add-panel config sidebar -->
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="ml-1.5 shrink-0"
+          class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
-          @click="toggleFieldList"
+          @click="isMobile ? $emit('open-mobile-fields') : toggleFieldList()"
         >
           <OIcon
             :name="
-              searchObj.meta.showFields
-                ? 'keyboard-double-arrow-left'
-                : 'keyboard-double-arrow-right'
+              isMobile
+                ? 'menu'
+                : searchObj.meta.showFields
+                  ? 'keyboard-double-arrow-left'
+                  : 'keyboard-double-arrow-right'
             "
             size="sm"
           />
           <OTooltip
             :content="
-              searchObj.meta.showFields
-                ? t('logs.searchResult.collapseFields')
-                : t('logs.searchResult.openFields')
+              isMobile
+                ? t('search.showFields')
+                : searchObj.meta.showFields
+                  ? t('logs.searchResult.collapseFields')
+                  : t('logs.searchResult.openFields')
             "
             side="bottom"
             shortcut-id="logsToggleSidebar"
           />
         </OButton>
         <div
-          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 pl-2 text-left"
+          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 ps-2 text-left"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -60,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left max-md:min-w-32"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -73,13 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-records-chip">{{
                 recordsChips.records
               }}</OTag>
-              <OTag type="logsResultChip" value="info" data-test="logs-result-time-chip">{{
-                recordsChips.time
-              }}</OTag>
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-time-chip"
+                >{{ recordsChips.time }}</OTag
+              >
               <OTag
                 v-if="recordsChips.scan"
                 type="logsResultChip"
                 value="warn"
+                class="max-md:hidden"
                 data-test="logs-result-scan-chip"
                 >{{ recordsChips.scan }}</OTag
               >
@@ -99,7 +108,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTag type="logsResultChip" value="neutral" data-test="logs-result-patterns-chip"
                 >{{ patternChips.patterns }} {{ t("logs.searchResult.patterns") }}</OTag
               >
-              <OTag type="logsResultChip" value="info" data-test="logs-result-pattern-time-chip"
+              <OTag
+                type="logsResultChip"
+                value="info"
+                class="max-md:hidden"
+                data-test="logs-result-pattern-time-chip"
                 >{{ patternChips.time }} {{ t("logs.searchResult.msUnit") }}</OTag
               >
             </template>
@@ -121,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pr-2">
+        <div class="flex flex-none items-center justify-end gap-1 pe-2 max-md:ms-auto">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -265,6 +278,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
 
+      <!-- Outside scrollContainerRef so the results progress bar can't scroll away. -->
+      <div class="relative">
+        <LoadingProgress
+          data-test="logs-results-progress"
+          :loading="searchObj.loading"
+          :loadingProgressPercentage="searchObj.loadingProgressPercentage || 0"
+        />
+      </div>
+
       <!-- Combined scroll: histogram + logs/patterns scroll together vertically.
         The histogram is pinned along the X axis only (see histogramPinStyle), so
         scrolling the wide results table sideways can't drag the chart with it. -->
@@ -323,7 +345,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot border-card-glass-border border-b border-l">
+              <div class="histogram-skeleton__plot border-card-glass-border border-s border-b">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"
@@ -489,7 +511,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :columns="getColumns || []"
                   :data="searchObj.data.queryResults?.hits || []"
                   :wrap="searchObj.meta.toggleSourceWrap"
-                  :loading="searchObj.loading"
+                  :loading="isResultsSkeleton"
+                  :streaming="isResultsStreaming"
                   :row-key="logsRowKey"
                   :row-height="20"
                   virtual-scroll
@@ -524,6 +547,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @row-click="openLogDetailsByRow"
                   @update:expandedIds="onExpandedLogIdsChange"
                 >
+                  <!-- Empty slot opts out of OTable's default banner, which would shift the grid on every partition. -->
+                  <template #loading-banner />
+
                   <!-- FTS-highlighted cell content; falls back to the plain value. -->
                   <template
                     v-for="col in getColumns || []"
@@ -540,26 +566,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Per-cell hover actions: AI button on the timestamp cell; copy /
                  add-search-term on closable field cells. -->
-                  <template #cell-hover-actions="{ row, column, active }">
+                  <template #cell-hover-actions="{ row, column, value, active }">
                     <O2AIContextAddBtn
                       v-if="active && !contextMenuOpen && column.id === logsTimestampCol"
-                      class="size-6!"
-                      :imageHeight="'14'"
-                      :imageWidth="'14'"
                       data-test="logs-search-result-ai-btn"
                       @send-to-ai-chat="sendToAiChat(JSON.stringify(row), true)"
                     />
                     <CellActions
-                      v-else-if="
-                        active &&
-                        !contextMenuOpen &&
-                        column.meta?.closable &&
-                        row[column.id] != null
-                      "
+                      v-else-if="active && !contextMenuOpen && showLogCellActions(column, row)"
                       :column="column"
                       :row="row"
+                      :value="value"
                       :selected-stream-fields="searchObj.data.stream.selectedStreamFields"
                       :hide-search-term-actions="false"
+                      :hide-ai="column.id === 'source'"
                       @copy="copyLogToClipboard"
                       @add-search-term="addSearchTerm"
                       @send-to-ai-chat="sendToAiChat"
@@ -868,6 +888,7 @@ import CellActions from "@/plugins/logs/data-table/CellActions.vue";
 import O2AIContextAddBtn from "@/components/common/O2AIContextAddBtn.vue";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
 import { extractStatusFromLog } from "@/utils/logs/statusParser";
+import useBreakpoint from "@/composables/useBreakpoint";
 import {
   buildPatternVolumeContext,
   fetchWindowTotal,
@@ -925,6 +946,7 @@ export default defineComponent({
     "sendToAiChat",
     "run-query",
     "jump-to-stream-data",
+    "open-mobile-fields",
   ],
   props: {
     expandedLogs: {
@@ -1132,6 +1154,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { isDark } = useTheme();
+    const { isMobile } = useBreakpoint();
     const searchListContainer = ref<HTMLElement | null>(null);
 
     // Responsive: observe the outer container (reacts to splitter + window resize)
@@ -1181,7 +1204,7 @@ export default defineComponent({
       if (!parts) return null;
 
       return {
-        records: t("search.recordsChip", {
+        records: t(isMobile.value ? "search.recordsChipShort" : "search.recordsChip", {
           start: parts.start,
           end: parts.end,
           total: parts.total,
@@ -1967,6 +1990,11 @@ export default defineComponent({
       return ((searchObj.data?.resultGrid?.columns as any[]) ?? []).filter((col: any) => !!col.id);
     });
 
+    const hasResultRows = computed(() => (searchObj.data.queryResults?.hits?.length ?? 0) > 0);
+    // First paint has nothing to show, so the skeleton is right; once rows exist we switch to `streaming` so partial results stay on screen.
+    const isResultsSkeleton = computed(() => searchObj.loading && !hasResultRows.value);
+    const isResultsStreaming = computed(() => searchObj.loading && hasResultRows.value);
+
     const getPartitionPaginations = computed(() => {
       return searchObj.data.queryResults?.partitionDetail?.paginations || [];
     });
@@ -2090,6 +2118,10 @@ export default defineComponent({
     watch(
       () => patternsState.value.loading,
       (loading, wasLoading) => {
+        // The patterns list shares its scroller with the rest of the view, so a re-run must land on row 1 rather than inherit the previous offset
+        if (loading && !wasLoading) {
+          scrollTableToTop(0);
+        }
         if (wasLoading && !loading) {
           searchObj.meta.lastRunAt = Date.now();
         }
@@ -2185,6 +2217,10 @@ export default defineComponent({
     const isFunctionErrorOpen = ref(false);
 
     const logsTimestampCol = computed(() => store.state.zoConfig.timestamp_column || "_timestamp");
+
+    // `source` (whole-row JSON) is not closable but still gets copy; AI stays on the timestamp cell.
+    const showLogCellActions = (column: any, row: any) =>
+      column.meta?.closable ? row[column.id] != null : column.id === "source";
 
     // ── Right-click cell actions ──────────────────────────────────────────────
     // The cell the user last right-clicked, held as plain values (not the
@@ -2282,6 +2318,7 @@ export default defineComponent({
       );
     };
     // `immediate` so a mount with results already present still highlights them.
+    // `clearCache: true` is load-bearing: updateGridColumns() reassigns the columns on every streaming chunk, and this is the only path that drops the previous partition's highlighted HTML for a reused row index.
     watch(
       () => getColumns.value,
       () => reprocessLogsHighlight(true),
@@ -2345,6 +2382,7 @@ export default defineComponent({
     return {
       raw,
       isDark,
+      isMobile,
       t,
       store,
       config,
@@ -2363,6 +2401,7 @@ export default defineComponent({
       addSearchTerm,
       removeSearchTerm,
       logsTimestampCol,
+      showLogCellActions,
       logsCellHtml,
       logsRowIndex,
       logsRowKey,
@@ -2414,6 +2453,9 @@ export default defineComponent({
       getTableWidth,
       scrollTableToTop,
       getColumns,
+      hasResultRows,
+      isResultsSkeleton,
+      isResultsStreaming,
       reorderSelectedFields,
       getPaginations,
       refreshPagination,
@@ -2673,21 +2715,24 @@ export default defineComponent({
   backdrop-filter: blur(0.625rem);
   margin-top: 0;
   overflow: visible;
+}
 
-  :deep(.o-pagination__btn) {
-    padding: 0.125rem 0.25rem !important;
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    min-width: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    border-radius: 0.25rem !important;
-    line-height: 1rem !important;
+/* keep(deep-nesting): without lang="scss", Vue's scoped compiler doesn't flatten a
+   nested :deep() with its parent selector, so it silently never matches — keep these
+   top-level instead of nested inside .paginator-section/.select-pagination. */
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
 
-    svg {
-      width: 1rem !important;
-      height: 1rem !important;
-    }
-  }
+.paginator-section :deep(.o-pagination__btn) svg {
+  width: 1rem !important;
+  height: 1rem !important;
 }
 
 .select-pagination {
@@ -2695,13 +2740,13 @@ export default defineComponent({
   width: 4rem !important;
   height: 1.5rem !important;
   margin-top: 0;
+}
 
-  :deep(button) {
-    height: 1.5rem !important;
-    min-height: 1.5rem !important;
-    font-size: var(--text-xs) !important;
-    padding-inline: 0.5rem !important;
-  }
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
 }
 /* keep(keyframes): the histogram skeleton's shimmer @keyframes and the
    animation: that references it must stay in the same scoped block so Vue

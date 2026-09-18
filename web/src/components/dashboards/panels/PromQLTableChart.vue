@@ -27,6 +27,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-filtering="enableFiltering"
         @row-click="$emit('row-click', $event)"
       >
+        <!-- kube-state omits the metric family entirely when nothing is in that
+             state, so an empty triage table means nothing is wrong rather than
+             nothing was collected. -->
+        <template v-if="panelConfig.curated_empty_means_healthy" #empty>
+          <!-- Hand-rolled to match PanelContainer's tile: OEmptyState pins its title to text-text-heading and has no success tone. -->
+          <div
+            class="text-status-success-text absolute inset-0 flex items-center justify-center gap-1 text-sm"
+            data-test="no-data-all-clear"
+          >
+            <OIcon name="check" size="sm" />
+            <span>{{ t("infra.curated.tileAllClear") }}</span>
+          </div>
+        </template>
+
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">

@@ -18,7 +18,7 @@ limitations under the License. -->
     <div
       v-if="result && result.success"
       data-test="test-result-success"
-      class="rounded-default border-status-positive flex gap-3 border-l-3 border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
+      class="rounded-default border-status-positive flex gap-3 border-s-3 border-solid bg-[rgba(76,175,80,0.08)] px-4 py-3 dark:bg-[rgba(76,175,80,0.12)]"
     >
       <div class="text-status-positive shrink-0 pt-0.5">
         <OIcon name="check-circle" size="md" />
@@ -59,7 +59,7 @@ limitations under the License. -->
     <div
       v-else-if="result && !result.success"
       data-test="test-result-failure"
-      class="rounded-default border-status-negative flex gap-3 border-l-3 border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
+      class="rounded-default border-status-negative flex gap-3 border-s-3 border-solid bg-[rgba(244,67,54,0.08)] px-4 py-3 dark:bg-[rgba(244,67,54,0.12)]"
     >
       <div class="text-status-negative shrink-0 pt-0.5">
         <OIcon name="error" size="md" />
@@ -104,7 +104,7 @@ limitations under the License. -->
         >
           <template #trigger>
             <div class="text-text-secondary text-2xs flex items-center">
-              <OIcon name="info" size="xs" class="mr-1" />
+              <OIcon name="info" size="xs" class="me-1" />
               <span class="text-xs">{{ t("alerts.viewDetails") }}</span>
             </div>
           </template>
@@ -160,7 +160,7 @@ limitations under the License. -->
     <div
       v-else-if="isLoading"
       data-test="test-result-loading"
-      class="rounded-default border-theme-accent flex gap-3 border-l-3 border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
+      class="rounded-default border-theme-accent flex gap-3 border-s-3 border-solid bg-[rgba(33,150,243,0.08)] px-4 py-3 dark:bg-[rgba(33,150,243,0.12)]"
     >
       <div class="text-theme-accent shrink-0 pt-0.5">
         <OSpinner size="xs" />

@@ -37,7 +37,10 @@ use tonic::{
 };
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::{
-    EnvFilter, Registry, filter::LevelFilter as TracingLevelFilter, fmt::Layer, prelude::*,
+    EnvFilter, Registry,
+    filter::{FilterExt, LevelFilter as TracingLevelFilter},
+    fmt::Layer,
+    prelude::*,
 };
 
 /// Setup the tracing related components
@@ -565,13 +568,20 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
         tracing_subscriber::fmt::layer().with_ansi(false).boxed()
     };
 
+    // search inspector needs info-level spans/events: RUST_LOG must not gate the OTel layer
+    let otel_filter = if cfg.common.search_inspector_enabled {
+        FilterExt::boxed(EnvFilter::new(&cfg.log.level).or(TracingLevelFilter::INFO))
+    } else {
+        FilterExt::boxed(EnvFilter::new(&cfg.log.level))
+    };
+
     global::set_tracer_provider(tracer.clone());
     Registry::default()
-        .with(tracing_subscriber::EnvFilter::new(&cfg.log.level))
-        .with(layer)
-        .with(OpenTelemetryLayer::new(
-            tracer.tracer("tracing-otel-subscriber"),
-        ))
+        .with(layer.with_filter(EnvFilter::new(&cfg.log.level)))
+        .with(
+            OpenTelemetryLayer::new(tracer.tracer("tracing-otel-subscriber"))
+                .with_filter(otel_filter),
+        )
         .init();
 
     // Return the tracer provider

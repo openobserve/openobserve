@@ -4,10 +4,22 @@
     "actual_folder": "RegressionSet/Logs",
     "browser": "chrome",
     "run_files": [
+      "logs-bugs.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Regression-Core",
+    "actual_folder": "RegressionSet/Logs",
+    "browser": "chrome",
+    "run_files": [
       "logs-regression.spec.js",
-      "logs-bugs.spec.js",
       "logs-9754.spec.js",
-      "logs-9044-7354.spec.js"
+      "logs-9044-7354.spec.js",
+      "logs-multistream-matchall-pagination.spec.js",
+      "logs-14303-streaming-render.spec.js",
+      "logs-multistream-share-url.spec.js",
+      "logs-histogram-severity.spec.js"
     ],
     "disabled": []
   },
@@ -18,7 +30,11 @@
     "run_files": [
       "alerts-regression.spec.js",
       "alerts-stream-switching.spec.js",
-      "alerts-bugs.spec.js"
+      "alerts-bugs.spec.js",
+      "alerts-14306-composite-clone.spec.js",
+      "alerts-14308-composite-trigger-timestamps.spec.js",
+      "alerts-measure-column-default.spec.js",
+      "alerts-from-dashboard-panel.spec.js"
     ],
     "disabled": []
   },
@@ -46,7 +62,10 @@
     "browser": "chrome",
     "run_files": [
       "enrichment-regression.spec.js",
-      "pipeline-regression.spec.js"
+      "pipeline-regression.spec.js",
+      "enrichment-lifecycle.spec.js",
+      "pipeline-preview-bounds.spec.js",
+      "pipeline-export.spec.js"
     ],
     "disabled": []
   },
@@ -56,7 +75,10 @@
     "browser": "chrome",
     "run_files": [
       "traces-regression.spec.js",
-      "traces-bugs.spec.js"
+      "traces-bugs.spec.js",
+      "traces-filter-reset.spec.js",
+      "traces-share-url.spec.js",
+      "traces-span-kind-badges.spec.js"
     ],
     "disabled": []
   },
@@ -65,7 +87,8 @@
     "actual_folder": "RegressionSet/Metrics",
     "browser": "chrome",
     "run_files": [
-      "metrics-regression.spec.js"
+      "metrics-regression.spec.js",
+      "metrics-14238-stale-nodata.spec.js"
     ],
     "disabled": []
   },
@@ -93,7 +116,29 @@
     "actual_folder": "RegressionSet/Reports",
     "browser": "chrome",
     "run_files": [
-      "reports-regression-bugs.spec.js"
+      "reports-regression-bugs.spec.js",
+      "reports-list-refresh.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Logs-Regression-Results",
+    "actual_folder": "RegressionSet/Logs",
+    "browser": "chrome",
+    "run_files": [
+      "logs-search-around-size.spec.js",
+      "logs-v040-limit-and-stream-list.spec.js",
+      "logs-vrl-column-cell-actions.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "Pipelines-Regression-Forms",
+    "actual_folder": "RegressionSet/Pipelines",
+    "browser": "chrome",
+    "run_files": [
+      "function-delete-confirm.spec.js",
+      "pipeline-query-filter-removal.spec.js"
     ],
     "disabled": []
   }

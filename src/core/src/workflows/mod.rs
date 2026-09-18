@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use config::meta::{
+    folder::DEFAULT_FOLDER,
     pipeline::components::NodeData,
     self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
 };
@@ -35,7 +36,7 @@ use usage_reporting::publish_triggers_usage;
 
 use crate::{
     common::{meta::authz::Authz, utils::get_nats_lock},
-    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult},
+    pipeline::batch_execution::{ExecutablePipeline, WorkflowResult, WorkflowRunOptions},
 };
 
 pub mod runtime;
@@ -59,6 +60,13 @@ pub struct WorkflowTrigger {
     pub metadata: HashMap<String, Value>,
     pub run_id: String,
     pub origin_cluster: String,
+}
+
+/// The two run flags travel together; separate bool params would push `test_workflow` past
+/// the argument limit and read as positional noise at the call site.
+pub struct TestWorkflowOptions {
+    pub is_draft: bool,
+    pub suppress_destinations: bool,
 }
 
 enum WorkflowExecutionStatus {
@@ -252,7 +260,23 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
     ))
 }
 
+// Re-serializing Unsupported rewrites a newer build's node data, so every save path must bounce it.
+fn reject_unsupported_nodes(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    match workflow
+        .nodes
+        .iter()
+        .find(|n| matches!(n.data, NodeData::Unsupported))
+    {
+        Some(node) => Err(anyhow::anyhow!(
+            "node {} has an unsupported node type: this version of OpenObserve does not recognize it",
+            node.id
+        )),
+        None => Ok(()),
+    }
+}
+
 async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(workflow)?;
     for node in &workflow.nodes {
         if !node.position.is_valid() {
             return Err(anyhow::anyhow!("node {} position is not valid", node.id));
@@ -312,17 +336,66 @@ async fn validate_workflow(workflow: &Workflow, is_draft: bool) -> Result<(), an
     Ok(())
 }
 
-pub async fn save_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Saves a workflow into `folder_slug`, defaulting to the org's default folder.
+///
+/// The folder slug is resolved to a primary key here, so callers pass the
+/// user-facing id straight from the request.
+pub async fn save_workflow(
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    let slug = normalize_folder_slug(folder_slug);
+    workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
+
     db::workflows::save_workflow_record(workflow.clone()).await?;
-    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    set_ownership(
+        &workflow.org_id,
+        "workflows",
+        Authz {
+            obj_id: workflow.id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     Ok(())
 }
 
-pub async fn save_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+/// `resolve_folder_pk` treats a blank slug as the default folder, so the
+/// ownership tuple must normalize identically or the two name different folders.
+/// Public so the handlers authorize the same slug they end up writing to.
+pub fn normalize_folder_slug(folder_slug: Option<&str>) -> &str {
+    folder_slug
+        .map(db::workflows::normalize_folder_slug)
+        .unwrap_or(DEFAULT_FOLDER)
+}
+
+/// Saves a draft into `folder_slug`, defaulting to the org's default folder.
+///
+/// A draft is folder-scoped like a published workflow: a folderless draft was
+/// appended to every folder's listing, and the folder it is drafted in is the one
+/// it publishes into.
+pub async fn save_draft(
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(&workflow)?;
+    let slug = normalize_folder_slug(folder_slug);
+    workflow.folder_id = db::workflows::resolve_folder_pk(&workflow.org_id, slug).await?;
+
     db::workflows::save_draft_record(workflow.clone()).await?;
-    set_ownership(&workflow.org_id, "workflows", Authz::new(&workflow.id)).await;
+    set_ownership(
+        &workflow.org_id,
+        "workflows",
+        Authz {
+            obj_id: workflow.id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
@@ -335,18 +408,70 @@ pub async fn update_workflow(workflow: Workflow) -> Result<(), anyhow::Error> {
 }
 
 pub async fn update_draft(workflow: Workflow) -> Result<(), anyhow::Error> {
+    reject_unsupported_nodes(&workflow)?;
     db::workflows::update_draft_record(workflow.clone()).await?;
     db::workflows::notify_draft_upsert(&workflow).await?;
     Ok(())
 }
 
-pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+/// Publishes a draft as a workflow in `folder_slug`, defaulting to the folder the
+/// draft already sits in.
+pub async fn promote_draft(
+    org_id: &str,
+    mut workflow: Workflow,
+    folder_slug: Option<&str>,
+) -> Result<(), anyhow::Error> {
     validate_workflow(&workflow, false).await?;
+    // Resolved before the destination overwrites it: a promote into a different
+    // folder has to drop the source folder's tuple, and `remove_ownership` only
+    // matches when it names the OLD parent.
+    let src_slug = draft_folder_slug(&workflow).await;
+    let slug = folder_slug
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .or(src_slug.as_deref())
+        .unwrap_or(DEFAULT_FOLDER);
+    workflow.folder_id = db::workflows::resolve_folder_pk(org_id, slug).await?;
+
     let id = workflow.id.clone();
     db::workflows::promote_draft(org_id, workflow.clone()).await?;
+    if let Some(src) = src_slug.as_deref().filter(|src| *src != slug) {
+        remove_ownership(
+            org_id,
+            "workflows",
+            Authz {
+                obj_id: id.clone(),
+                parent_type: "workflow_folder".to_string(),
+                parent: src.to_string(),
+            },
+        )
+        .await;
+    }
+    set_ownership(
+        org_id,
+        "workflows",
+        Authz {
+            obj_id: id.clone(),
+            parent_type: "workflow_folder".to_string(),
+            parent: slug.to_string(),
+        },
+    )
+    .await;
     db::workflows::notify_workflow_upsert(&workflow).await?;
     db::workflows::notify_draft_delete(&id).await?;
     Ok(())
+}
+
+/// The draft's folder as a URL slug. `None` for a draft written before drafts had
+/// folders, whose `folder_id` is still blank.
+async fn draft_folder_slug(draft: &Workflow) -> Option<String> {
+    if draft.folder_id.is_empty() {
+        return None;
+    }
+    infra::table::folders::get_name_by_pk(&draft.folder_id)
+        .await
+        .ok()
+        .flatten()
 }
 
 pub async fn enable_disable_workflow(
@@ -364,11 +489,15 @@ pub async fn enable_disable_workflow(
     Ok(())
 }
 
+/// `folder_slug` of `None` lists across every folder in the org rather than
+/// falling back to the default one.
 pub async fn list_workflows(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    folder_slug: Option<&str>,
+    search_substring: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = workflows::list_by_org(org_id)
+    let ret = db::workflows::list_workflows(org_id, folder_slug, search_substring)
         .await?
         .into_iter()
         .filter(|pipeline| is_permitted(&pipeline.id, org_id, permitted.as_ref()))
@@ -376,11 +505,88 @@ pub async fn list_workflows(
     Ok(ret)
 }
 
+/// Moves workflows into another folder, re-pointing their authorization parent.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    // The row stores the folder's primary key but tuples name folders by slug,
+    // so resolve the source slug before the move overwrites it.
+    let folder_pks = infra::table::workflows::folder_pks_by_ids(org_id, workflow_ids).await?;
+
+    // Without this the update simply matches no rows and the caller is told the
+    // move succeeded.
+    let found: HashSet<&str> = folder_pks.iter().map(|(id, _)| id.as_str()).collect();
+    let missing: Vec<&str> = workflow_ids
+        .iter()
+        .map(String::as_str)
+        .filter(|id| !found.contains(id))
+        .collect();
+    if !missing.is_empty() {
+        return Err(anyhow::anyhow!(
+            "workflows not found: {}",
+            missing.join(", ")
+        ));
+    }
+
+    let mut slugs: HashMap<&str, Option<String>> = HashMap::new();
+    for (_, pk) in &folder_pks {
+        if !slugs.contains_key(pk.as_str()) {
+            let slug = infra::table::folders::get_name_by_pk(pk)
+                .await
+                .ok()
+                .flatten();
+            slugs.insert(pk.as_str(), slug);
+        }
+    }
+    let previous: Vec<(String, Option<String>)> = folder_pks
+        .iter()
+        .map(|(id, pk)| (id.clone(), slugs.get(pk.as_str()).cloned().flatten()))
+        .collect();
+
+    db::workflows::move_workflows(org_id, workflow_ids, dst_folder_slug).await?;
+
+    // Ownership follows the row. Removing the tuple requires naming the OLD
+    // parent: without it the stale parent survives and the source folder's
+    // grants keep reaching a workflow that has left it. Ordered per workflow,
+    // concurrent across them.
+    futures::future::join_all(previous.into_iter().map(|(id, src_slug)| async move {
+        if let Some(src) = src_slug {
+            remove_ownership(
+                org_id,
+                "workflows",
+                Authz {
+                    obj_id: id.clone(),
+                    parent_type: "workflow_folder".to_string(),
+                    parent: src,
+                },
+            )
+            .await;
+        }
+        set_ownership(
+            org_id,
+            "workflows",
+            Authz {
+                obj_id: id,
+                parent_type: "workflow_folder".to_string(),
+                parent: dst_folder_slug.to_string(),
+            },
+        )
+        .await;
+    }))
+    .await;
+    Ok(())
+}
+
+/// `folder_slug` of `None` lists across every folder in the org rather than
+/// falling back to the default one.
 pub async fn list_drafts(
     org_id: &str,
     permitted: Option<Vec<String>>,
+    folder_slug: Option<&str>,
 ) -> Result<Vec<Workflow>, anyhow::Error> {
-    let ret = workflows::list_drafts_by_org(org_id)
+    let ret = db::workflows::list_drafts(org_id, folder_slug)
         .await?
         .into_iter()
         .filter(|draft| is_permitted(&draft.id, org_id, permitted.as_ref()))
@@ -408,8 +614,10 @@ pub async fn get_workflow_associations(
 fn is_permitted(workflow_id: &str, org_id: &str, permitted: Option<&Vec<String>>) -> bool {
     match permitted {
         Some(permitted) => {
-            permitted.contains(&format!("workflow:{}", workflow_id))
-                || permitted.contains(&format!("workflow:_all_{org_id}"))
+            // `_all_` is the sentinel list_objects returns for viewer/editor/admin
+            // instead of enumerating, not a stored grant.
+            permitted.contains(&format!("workflows:{}", workflow_id))
+                || permitted.contains(&format!("workflows:_all_{org_id}"))
         }
         None => true,
     }
@@ -434,19 +642,207 @@ pub async fn delete_draft(org_id: &str, id: &str) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn run_outcome_for(error: Option<&str>) -> RunOutcome {
+    if error.is_some() {
+        RunOutcome::Error
+    } else {
+        RunOutcome::Succeeded
+    }
+}
+
+/// process_workflow returns Ok with a populated `errors` map when individual nodes fail,
+/// so a run that errored on every node is only visible through that map.
+fn run_error_from_result(res: &Result<WorkflowResult, anyhow::Error>) -> Option<String> {
+    match res {
+        Err(e) => Some(e.to_string()),
+        Ok(result) if !result.errors.is_empty() => {
+            let mut node_ids: Vec<&str> = result.errors.keys().map(String::as_str).collect();
+            node_ids.sort_unstable();
+            Some(format!("errors in nodes: {}", node_ids.join(", ")))
+        }
+        Ok(_) => None,
+    }
+}
+
+/// Records a synchronously-executed run in the history stream. Test and retry
+/// runs never enter the trigger queue, so nothing else would publish them.
+fn record_workflow_run(
+    org_id: &str,
+    workflow_id: &str,
+    trigger_type: WorkflowTriggerType,
+    source_id: &str,
+    run_id: &str,
+    start_time: i64,
+    error: Option<String>,
+) {
+    let end_time = chrono::Utc::now().timestamp_micros();
+    let status = run_outcome_for(error.as_deref());
+    publish_triggers_usage(TriggerData {
+        _timestamp: start_time,
+        org: org_id.to_string(),
+        module: TriggerDataType::Workflow,
+        key: workflow_history_key(workflow_id, trigger_type, source_id, run_id),
+        is_realtime: false,
+        is_silenced: false,
+        status,
+        start_time,
+        end_time,
+        error,
+        source_node: Some(config::cluster::LOCAL_NODE.name.clone()),
+        evaluation_took_in_secs: Some((end_time - start_time) as f64 / 1_000_000.0),
+        ..Default::default()
+    });
+}
+
+/// Folds a finished run into the row we persist: node errors plus the per-node input/output
+/// maps. A clean run yields an empty `data` and a fully populated map, which is what makes a
+/// successful run inspectable after the fact.
+fn run_errors_from_parts(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+    node_errors: &HashMap<String, config::meta::self_reporting::error::NodeErrors>,
+    input_map: HashMap<String, Vec<Value>>,
+    output_map: HashMap<String, Vec<Value>>,
+) -> WorkflowRunErrors {
+    let mut errored_input_map = HashMap::new();
+    let mut workflow_errors = Vec::new();
+
+    for (node_id, errors) in node_errors {
+        let mut inputs = Vec::with_capacity(errors.error_count as usize);
+        let mut err_list = Vec::with_capacity(errors.error_count as usize);
+
+        for (e, val) in &errors.errors {
+            let mut e = e.clone();
+            // stored in db, so cap the string length here and the count below
+            e.truncate(100);
+            err_list.push(e);
+            if let Some(mut v) = val.clone() {
+                // a vrl fn over a result array errors with the whole array; store the
+                // individual entries instead so a retry can replay them
+                if let Some(arr) = v.as_array_mut() {
+                    for v in arr.drain(0..) {
+                        inputs.push(v);
+                    }
+                } else {
+                    inputs.push(v);
+                }
+            }
+        }
+        // errors without inputs must still reach the user, so the error list and the
+        // input map are populated independently
+        if !err_list.is_empty() {
+            err_list.truncate(50);
+            workflow_errors.push(WorkflowError {
+                node_id: node_id.clone(),
+                error: err_list,
+            });
+        }
+        if !inputs.is_empty() {
+            errored_input_map.insert(node_id.clone(), inputs);
+        }
+    }
+
+    let ip_map = InputMap {
+        error_node_map: errored_input_map,
+        input_map,
+        output_map,
+    };
+
+    // the run errors row doubles as the execution-history map: same structure, so a
+    // true error v/s a clean run is distinguished by `data` being empty or not
+    WorkflowRunErrors {
+        org_id: org_id.to_string(),
+        cluster: config::get_cluster_name(),
+        id: 0, // will be set directly in db
+        workflow_id: workflow_id.to_string(),
+        run_id: run_id.to_string(),
+        ran_at: chrono::Utc::now().timestamp_micros(),
+        data: workflow_errors,
+        input_data: Some(serde_json::to_string(&ip_map).unwrap_or_default()),
+    }
+}
+
+/// The workflow has already run, so a failure to store its history is logged, not returned.
+async fn persist_run_errors(
+    org_id: &str,
+    workflow_id: &str,
+    run_id: &str,
+    errors: WorkflowRunErrors,
+) {
+    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
+        log::error!(
+            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{workflow_id} in db : {e}"
+        );
+    }
+}
+
+// A body-supplied id keys history only once proven to name a workflow or draft in this org.
+async fn verified_history_id<'a>(org_id: &str, claimed_id: &'a str) -> Option<&'a str> {
+    if claimed_id.is_empty() {
+        return None;
+    }
+    let known = matches!(get_workflow_by_id(org_id, claimed_id).await, Ok(Some(_)))
+        || matches!(get_draft_by_id(org_id, claimed_id).await, Ok(Some(_)));
+    history_id_if_known(claimed_id, known)
+}
+
+fn history_id_if_known(claimed_id: &str, known_in_org: bool) -> Option<&str> {
+    (known_in_org && !claimed_id.is_empty()).then_some(claimed_id)
+}
+
+/// `workflow_id` is the sender-claimed saved id; history is recorded only when it verifies.
 pub async fn test_workflow(
     org_id: &str,
+    workflow_id: &str,
     workflow: Workflow,
     inputs: Vec<serde_json::Value>,
     from_node: Option<String>,
-    is_draft: bool,
+    options: TestWorkflowOptions,
+    user_id: &str,
 ) -> Result<WorkflowResult, anyhow::Error> {
+    let TestWorkflowOptions {
+        is_draft,
+        suppress_destinations,
+    } = options;
     validate_workflow(&workflow, is_draft).await?;
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
+    let run_id = config::ider::uuid();
+    let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable
-        .process_workflow(org_id, inputs, from_node)
-        .await?;
-    Ok(res)
+        .process_workflow(
+            org_id,
+            inputs,
+            from_node,
+            WorkflowRunOptions {
+                suppress_destinations,
+            },
+        )
+        .await;
+    if let Some(history_id) = verified_history_id(org_id, workflow_id).await {
+        record_workflow_run(
+            org_id,
+            history_id,
+            WorkflowTriggerType::Test,
+            user_id,
+            &run_id,
+            start_time,
+            run_error_from_result(&res),
+        );
+        // per-node data must persist too or re-opening the run shows nodes as never having run
+        if let Ok(result) = &res {
+            let errors = run_errors_from_parts(
+                org_id,
+                history_id,
+                &run_id,
+                &result.errors,
+                result.inputs.clone(),
+                result.outputs.clone(),
+            );
+            persist_run_errors(org_id, history_id, &run_id, errors).await;
+        }
+    }
+    res
 }
 
 pub async fn trigger_workflow(
@@ -472,8 +868,8 @@ pub async fn trigger_workflow(
     if let Err(e) = send_workflow_trigger(
         &trace_id,
         org_id,
-        "Webhook".to_string(),
-        WorkflowTriggerType::Webhook,
+        user_id.to_string(),
+        WorkflowTriggerType::Manual,
         id,
         metadata,
         &inputs,
@@ -499,7 +895,7 @@ async fn execute_workflow(
 ) -> Result<WorkflowExecutionStatus, anyhow::Error> {
     let workflow = get_workflow_by_id(org_id, id)
         .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("workflow with given id not found"))?;
 
     if !workflow.enabled {
         return Ok(WorkflowExecutionStatus::Success);
@@ -507,81 +903,20 @@ async fn execute_workflow(
 
     let executable = ExecutablePipeline::new_from_workflow(&workflow).await?;
 
-    let now = chrono::Utc::now().timestamp_micros();
-    let res = executable.process_workflow(org_id, inputs, None).await?;
+    let res = executable
+        .process_workflow(org_id, inputs, None, Default::default())
+        .await?;
 
-    let mut errored_input_map = HashMap::new();
-    let mut workflow_errors = Vec::new();
-
-    for (node_id, errors) in res.errors {
-        let mut inputs = Vec::with_capacity(errors.error_count as usize);
-        let mut err_list = Vec::with_capacity(errors.error_count as usize);
-
-        for (mut e, val) in errors.errors {
-            // because we are storing the errors in db, we don't want to have
-            // a long string * a lot of errors
-            // so we truncate the length here, and then limit the count below
-            e.truncate(100);
-            err_list.push(e);
-            if let Some(mut v) = val {
-                // top level value should always be a single json value,
-                // except when the erroring node was a vrl fn over a result array
-                // in that case we actually want to store the individual entries
-                // instead of the whole array, so we can replay it correctly
-                if let Some(arr) = v.as_array_mut() {
-                    for v in arr.drain(0..) {
-                        inputs.push(v);
-                    }
-                } else {
-                    inputs.push(v);
-                }
-            }
-        }
-        // it is possible that we have errors, but no corresponding inputs
-        // we should always show the errors to user, so we store it in db
-        // but only create entry in input map if inputs are present
-        if !err_list.is_empty() {
-            err_list.truncate(50);
-            workflow_errors.push(WorkflowError {
-                node_id: node_id.clone(),
-                error: err_list,
-            });
-        }
-        if !inputs.is_empty() {
-            errored_input_map.insert(node_id, inputs);
-        }
-    }
-
-    let ip_map = InputMap {
-        error_node_map: errored_input_map,
-        input_map: res.inputs,
-        output_map: res.outputs,
-    };
-
+    let WorkflowResult {
+        errors: node_errors,
+        inputs: input_map,
+        outputs: output_map,
+        ..
+    } = res;
+    let errors = run_errors_from_parts(org_id, id, run_id, &node_errors, input_map, output_map);
     // if this is not empty, then some node errored
-    let errored = !workflow_errors.is_empty();
-
-    // we hijack the workflow run errors to store both the error as well as execution history map
-    // as both have essentially the same structure and no point in duplicating tables and adding
-    // migration true error v/s just run can be distinguished by workflow_errors is empty or
-    // not.
-    let errors = WorkflowRunErrors {
-        org_id: org_id.to_string(),
-        cluster: config::get_cluster_name(),
-        id: 0, // will be set directly in db
-        workflow_id: id.to_string(),
-        run_id: run_id.to_string(),
-        ran_at: now,
-        data: workflow_errors,
-        input_data: Some(serde_json::to_string(&ip_map).unwrap()),
-    };
-    // workflow has already run, so not much point in returning error because
-    // we couldn't save the errors to db, log and ignore
-    if let Err(e) = db::workflows::save_workflow_errors(errors).await {
-        log::error!(
-            "[Workflows] : error saving workflow run errors for run id {run_id} for workflow {org_id}/{id} in db : {e}"
-        );
-    }
+    let errored = !errors.data.is_empty();
+    persist_run_errors(org_id, id, run_id, errors).await;
 
     if errored {
         Ok(WorkflowExecutionStatus::Errored)
@@ -607,7 +942,7 @@ pub async fn retry_run(
 ) -> Result<WorkflowResult, anyhow::Error> {
     let workflow = workflows::get_by_org_wid(org_id, wid)
         .await?
-        .ok_or(anyhow::anyhow!("workflow with given id not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("workflow with given id not found"))?;
 
     let mut start_id = None;
     for node in &workflow.nodes {
@@ -657,14 +992,28 @@ pub async fn retry_run(
 
     let node_id = from_node.as_ref().unwrap_or(&start_id);
 
-    let inputs = ip_map.input_map.remove(node_id).ok_or(anyhow::anyhow!(
-        "node id {node_id} does not have any associated input data in the stored inputs"
-    ))?;
+    let inputs = ip_map.input_map.remove(node_id).ok_or_else(|| {
+        anyhow::anyhow!(
+            "node id {node_id} does not have any associated input data in the stored inputs"
+        )
+    })?;
 
+    let start_time = chrono::Utc::now().timestamp_micros();
     let res = executable
-        .process_workflow(org_id, inputs, from_node)
-        .await?;
-    Ok(res)
+        .process_workflow(org_id, inputs, from_node, Default::default())
+        .await;
+    // the retry is its own run; the failed run's id stays as source_id for provenance
+    let retry_run_id = config::ider::uuid();
+    record_workflow_run(
+        org_id,
+        wid,
+        WorkflowTriggerType::Retry,
+        run_id,
+        &retry_run_id,
+        start_time,
+        run_error_from_result(&res),
+    );
+    res
 }
 
 pub async fn send_workflow_trigger(
@@ -712,6 +1061,17 @@ pub async fn send_workflow_trigger(
     log::info!("successfully sent workflow trigger for trace id {trace_id} run id {run_id}");
 
     Ok(())
+}
+
+/// The 4-part positional run-history key. Display, not Debug: a Debug-formatted
+/// variant would put braces and spaces into a key the history API parses.
+pub fn workflow_history_key(
+    workflow_id: &str,
+    trigger_type: WorkflowTriggerType,
+    source_id: &str,
+    run_id: &str,
+) -> String {
+    format!("{workflow_id}/{trigger_type}/{source_id}/{run_id}")
 }
 
 pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
@@ -819,9 +1179,11 @@ pub async fn handle_workflow_trigger(trigger: WorkflowTrigger) {
         org: trigger.org_id.clone(),
         module: TriggerDataType::Workflow,
         // this order matters in the workflow history api, as we parse this there
-        key: format!(
-            "{}/{:?}/{}/{}",
-            trigger.workflow_id, trigger.trigger_type, trigger.source_id, run_id
+        key: workflow_history_key(
+            &trigger.workflow_id,
+            trigger.trigger_type,
+            &trigger.source_id,
+            &run_id,
         ),
         is_realtime: false,
         is_silenced: false,
@@ -861,4 +1223,249 @@ pub async fn get_data_for_run(
 ) -> Result<Option<String>, anyhow::Error> {
     let ret = infra::table::workflows::get_run_data(org_id, workflow_id, run_id).await?;
     Ok(ret)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_key_for_a_manual_run_records_manual_and_the_firing_user() {
+        let key = workflow_history_key(
+            "wf123",
+            WorkflowTriggerType::Manual,
+            "user@example.com",
+            "run789",
+        );
+        assert_eq!(key, "wf123/Manual/user@example.com/run789");
+        assert!(
+            !key.contains("/Webhook/"),
+            "a manual run must not be recorded as a webhook"
+        );
+    }
+
+    #[test]
+    fn history_key_source_id_is_the_user_not_the_literal_trigger_name() {
+        let key = workflow_history_key(
+            "wf123",
+            WorkflowTriggerType::Manual,
+            "user@example.com",
+            "run789",
+        );
+        let source_id = key.split('/').nth(2).unwrap();
+        assert_ne!(source_id, "Webhook");
+        assert_eq!(source_id, "user@example.com");
+    }
+
+    #[test]
+    fn history_key_for_test_and_retry_runs_use_their_own_trigger_types() {
+        assert_eq!(
+            workflow_history_key("wf1", WorkflowTriggerType::Test, "u1", "r1"),
+            "wf1/Test/u1/r1"
+        );
+        assert_eq!(
+            workflow_history_key("wf1", WorkflowTriggerType::Retry, "u1", "r1"),
+            "wf1/Retry/u1/r1"
+        );
+    }
+
+    #[test]
+    fn history_key_is_positional_with_the_trigger_type_second() {
+        let key = workflow_history_key("wf1", WorkflowTriggerType::AlertFired, "src", "run");
+        let parts: Vec<_> = key.split('/').collect();
+        assert_eq!(parts[0], "wf1");
+        assert_eq!(parts[1], "AlertFired");
+        assert_eq!(parts[3], "run");
+    }
+    fn workflow_with_unsupported_node() -> Workflow {
+        Workflow {
+            id: "w1".to_string(),
+            org_id: "org1".to_string(),
+            folder_id: "folder1".to_string(),
+            name: "w".to_string(),
+            description: String::new(),
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+            created_by: String::new(),
+            nodes: vec![config::meta::pipeline::components::Node::new(
+                "u1".to_string(),
+                NodeData::Unsupported,
+                0.0,
+                0.0,
+                "default".to_string(),
+            )],
+            edges: vec![],
+        }
+    }
+
+    #[tokio::test]
+    async fn an_unsupported_node_is_rejected_before_it_can_be_saved() {
+        // re-serializing Unsupported rewrites a newer build's node, so no save path may pass it
+        let workflow = workflow_with_unsupported_node();
+        for is_draft in [false, true] {
+            let err = validate_workflow(&workflow, is_draft).await.unwrap_err();
+            assert!(err.to_string().contains("unsupported node type"), "{err}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_draft_save_rejects_an_unsupported_node_before_any_db_write() {
+        // save_draft/update_draft skip validate_workflow, so they need their own guard
+        let workflow = workflow_with_unsupported_node();
+        let err = save_draft(workflow.clone(), None).await.unwrap_err();
+        assert!(err.to_string().contains("unsupported node type"), "{err}");
+        let err = update_draft(workflow).await.unwrap_err();
+        assert!(err.to_string().contains("unsupported node type"), "{err}");
+    }
+
+    #[test]
+    fn a_sender_claimed_workflow_id_keys_history_only_when_known_in_the_org() {
+        // the id arrives in the request body, so an unverified one must never key history
+        assert_eq!(history_id_if_known("wf1", true), Some("wf1"));
+        assert_eq!(history_id_if_known("wf1", false), None);
+        assert_eq!(history_id_if_known("", true), None);
+    }
+
+    fn node_errors_with(msg: &str) -> config::meta::self_reporting::error::NodeErrors {
+        let mut ne = config::meta::self_reporting::error::NodeErrors::new(
+            "n1".to_string(),
+            "FunctionNode".to_string(),
+            None,
+        );
+        ne.errors.insert((msg.to_string(), None));
+        ne.error_count = 1;
+        ne
+    }
+
+    #[test]
+    fn a_run_whose_nodes_all_errored_is_not_recorded_as_succeeded() {
+        let mut result = WorkflowResult::default();
+        result
+            .errors
+            .insert("n1".to_string(), node_errors_with("boom"));
+
+        let error = run_error_from_result(&Ok(result));
+        assert!(
+            error.is_some(),
+            "node-level errors must surface as a run error"
+        );
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Error);
+    }
+
+    #[test]
+    fn a_failed_run_is_recorded_as_error_not_succeeded() {
+        let res: Result<WorkflowResult, anyhow::Error> = Err(anyhow::anyhow!("exploded"));
+        let error = run_error_from_result(&res);
+        assert_eq!(error.as_deref(), Some("exploded"));
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Error);
+    }
+
+    #[test]
+    fn a_clean_run_is_still_recorded_as_succeeded() {
+        let res: Result<WorkflowResult, anyhow::Error> = Ok(WorkflowResult::default());
+        let error = run_error_from_result(&res);
+        assert!(error.is_none());
+        assert_eq!(run_outcome_for(error.as_deref()), RunOutcome::Succeeded);
+    }
+
+    #[test]
+    fn a_retry_run_gets_its_own_run_id_and_keeps_the_original_as_source() {
+        let original_run_id = "original-run-1";
+        let retry_run_id = config::ider::uuid();
+        assert_ne!(
+            retry_run_id, original_run_id,
+            "a retry must not reuse the failed run's id as its own run_id"
+        );
+
+        let key = workflow_history_key(
+            "wf1",
+            WorkflowTriggerType::Retry,
+            original_run_id,
+            &retry_run_id,
+        );
+        let parts: Vec<_> = key.split('/').collect();
+        assert_eq!(parts[2], original_run_id, "source_id keeps the provenance");
+        assert_ne!(parts[3], parts[2], "run_id must be a fresh id");
+    }
+
+    #[test]
+    fn a_test_run_is_recorded_under_the_real_workflow_id() {
+        // the history API queries `key LIKE '{workflow_id}/%'`, so a synthetic
+        // `test-<uuid>` id in slot 0 would make every Test row unreadable
+        let key = workflow_history_key(
+            "wf-real-id",
+            WorkflowTriggerType::Test,
+            "user@example.com",
+            "run1",
+        );
+        assert!(key.starts_with("wf-real-id/"));
+        assert!(!key.starts_with("test-"));
+        assert_eq!(key.split('/').nth(2).unwrap(), "user@example.com");
+    }
+
+    #[test]
+    fn a_clean_run_still_stores_every_nodes_input_and_output() {
+        // a successful run has no node errors, so the only thing that can make its
+        // steps inspectable later is the input/output map being persisted anyway
+        let mut result = WorkflowResult::default();
+        result
+            .inputs
+            .insert("n1".to_string(), vec![serde_json::json!({"in": 1})]);
+        result
+            .outputs
+            .insert("n1".to_string(), vec![serde_json::json!({"out": 2})]);
+
+        let errors = run_errors_from_parts(
+            "org1",
+            "wf1",
+            "run1",
+            &result.errors,
+            result.inputs.clone(),
+            result.outputs.clone(),
+        );
+
+        assert!(
+            errors.data.is_empty(),
+            "a clean run must not fabricate node errors"
+        );
+        let ip_map: InputMap = serde_json::from_str(
+            errors
+                .input_data
+                .as_deref()
+                .expect("input_data must be stored"),
+        )
+        .expect("stored input_data must be a valid InputMap");
+        assert_eq!(
+            ip_map.input_map.get("n1").map(Vec::len),
+            Some(1),
+            "every node's input must be stored so the run can be inspected later"
+        );
+        assert_eq!(
+            ip_map.output_map.get("n1").map(Vec::len),
+            Some(1),
+            "every node's output must be stored so the run can be inspected later"
+        );
+    }
+
+    #[test]
+    fn an_errored_node_still_records_its_error_and_replay_input() {
+        let mut result = WorkflowResult::default();
+        result
+            .errors
+            .insert("n1".to_string(), node_errors_with("boom"));
+
+        let errors = run_errors_from_parts(
+            "org1",
+            "wf1",
+            "run1",
+            &result.errors,
+            result.inputs.clone(),
+            result.outputs.clone(),
+        );
+
+        assert_eq!(errors.data.len(), 1, "the node error must be persisted");
+        assert_eq!(errors.data[0].node_id, "n1");
+        assert_eq!(errors.data[0].error, vec!["boom".to_string()]);
+    }
 }

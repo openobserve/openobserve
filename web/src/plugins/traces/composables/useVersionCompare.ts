@@ -93,10 +93,12 @@ function windowsEqual(x: CompareWindows | null, y: CompareWindows | null): boole
 export function useVersionCompare() {
   const store = useStore();
   const { t } = useI18nTyped();
-  const { fetchQueryDataWithHttpStream } = useHttpStreaming();
+  const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
 
   const armA = useLLMInsights();
   const armB = useLLMInsights();
+
+  let rawSampleTraceIds: string[] = [];
 
   const a = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
   const b = ref<GenAiAgentListItem | null>(null) as Ref<GenAiAgentListItem | null>;
@@ -132,6 +134,10 @@ export function useVersionCompare() {
     return (sql: string, startMicros: number, endMicros: number) =>
       new Promise((resolve, reject) => {
         const traceId = generateTraceContext().traceId;
+        rawSampleTraceIds.push(traceId);
+        const untrack = () => {
+          rawSampleTraceIds = rawSampleTraceIds.filter((id) => id !== traceId);
+        };
         const useBase64 = store.state.zoConfig?.sql_base64_enabled;
         const hits: any[] = [];
         fetchQueryDataWithHttpStream(
@@ -166,9 +172,13 @@ export function useVersionCompare() {
                 response?.error ||
                 response?.error_detail ||
                 t("traces.failedToFetchRawSample");
+              untrack();
               reject(new Error(message));
             },
-            complete: () => resolve(hits),
+            complete: () => {
+              untrack();
+              resolve(hits);
+            },
             reset: () => {},
           },
         );
@@ -343,10 +353,24 @@ export function useVersionCompare() {
     sampledNote.value = t("aiObservability.versionCompare.sampledNote", { cap: SAMPLE_CAP });
   }
 
+  // Both arms plus any in-flight raw-sample fetch outlive the component otherwise; the consumer must call this on unmount.
+  function cancel() {
+    rawSampleTraceIds.forEach((traceId) =>
+      cancelStreamQueryBasedOnRequestId({
+        trace_id: traceId,
+        org_id: store.state.selectedOrganization?.identifier,
+      }),
+    );
+    rawSampleTraceIds = [];
+    armA.cancelAll();
+    armB.cancelAll();
+  }
+
   return {
     setPair,
     align,
     run,
+    cancel,
     kpiA: armA.kpi,
     kpiB: armB.kpi,
     // Sparklines from each arm's own useLLMInsights instance — additive

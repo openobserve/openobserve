@@ -150,6 +150,8 @@ export const BADGE_GROUPS = {
     shape: "pill",
     values: {
       active: { variant: "success-soft", labelKey: "components.badge.alertStatus.active" },
+      // Every anomaly config starts here and stays until its first model trains.
+      waiting: { variant: "default-soft", labelKey: "components.badge.alertStatus.waiting" },
       ready: { variant: "success-soft", labelKey: "components.badge.alertStatus.ready" },
       running: { variant: "blue-soft", labelKey: "components.badge.alertStatus.running" },
       training: { variant: "warning-soft", labelKey: "components.badge.alertStatus.training" },
@@ -179,6 +181,41 @@ export const BADGE_GROUPS = {
       p3: { variant: "amber-soft", label: raw("P3") },
       p4: { variant: "blue-soft", label: raw("P4") },
       p5: { variant: "default-soft", label: raw("P5") },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // On-call RESPONSE state — where a page is in its life, not how bad it is.
+  //
+  // Distinct from `alertState`: an alert can be firing while its page is
+  // acknowledged. Triaged is the agent having looked without taking the ball,
+  // so it stays warm rather than reading as owned.
+  oncallResponseState: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      triggered: { variant: "error-soft", labelKey: "oncall.state_triggered" },
+      triaged: { variant: "amber-soft", labelKey: "oncall.state_triaged" },
+      acknowledged: { variant: "blue-soft", labelKey: "oncall.state_acknowledged" },
+      resolved: { variant: "success-soft", labelKey: "oncall.state_resolved" },
+    },
+    fallback: { variant: "default-soft" },
+  },
+
+  // Whether a team would reach anybody if something broke right now.
+  //
+  // Rostered and reachable are two different questions, and a team can pass the
+  // first while failing the second — somebody is on the rota, and no transport
+  // exists to wake them. A green `Covered` beside "no page can be delivered to
+  // anyone" told the reader the team was fine, so the third value exists to say
+  // which half is true.
+  oncallCoverage: {
+    mode: "dot",
+    shape: "pill",
+    values: {
+      covered: { variant: "success-soft", labelKey: "oncall.coverage_covered" },
+      gap: { variant: "warning-soft", labelKey: "oncall.coverage_gap" },
+      unreachable: { variant: "error-soft", labelKey: "oncall.coverage_unreachable" },
     },
     fallback: { variant: "default-soft" },
   },

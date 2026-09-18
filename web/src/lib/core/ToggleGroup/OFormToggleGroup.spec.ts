@@ -82,4 +82,44 @@ describe("OFormToggleGroup", () => {
     await flushPromises();
     expect(wrapper.text()).toContain("Must be cron");
   });
+
+  // The #error slot lets a consumer re-home the message — needed when two
+  // OForm* wrappers share one field name and only one should print it.
+  describe("#error slot", () => {
+    const cronSchema = z.object({
+      freq: z.string().refine((v) => v === "cron", "Must be cron"),
+    });
+
+    function mountWithErrorSlot(errorSlot: string) {
+      return mount(OForm, {
+        props: { defaultValues: { freq: "once" }, schema: cronSchema },
+        slots: {
+          default: `<OFormToggleGroup name="freq" data-test="freq-toggle">
+            ${errorSlot}
+            ${ITEMS}
+          </OFormToggleGroup>`,
+        },
+        global: { components: { OFormToggleGroup, OToggleGroupItem } },
+      });
+    }
+
+    it("suppresses the built-in message when an empty #error slot is supplied", async () => {
+      wrapper = mountWithErrorSlot("<template #error />");
+      await (wrapper.vm as any).form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.text()).not.toContain("Must be cron");
+    });
+
+    it("renders consumer content given in the #error slot", async () => {
+      wrapper = mountWithErrorSlot(
+        `<template #error><span data-test="own-error">owned</span></template>`,
+      );
+      await (wrapper.vm as any).form.handleSubmit();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="own-error"]').exists()).toBe(true);
+      expect(wrapper.text()).not.toContain("Must be cron");
+    });
+  });
 });

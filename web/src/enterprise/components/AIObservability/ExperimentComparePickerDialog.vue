@@ -52,6 +52,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   experimentCompareDefaults,
   makeExperimentCompareSchema,
@@ -107,7 +109,7 @@ watch(
     form.reset(experimentCompareDefaults());
     loading.value = true;
     try {
-      peers.value = await llmExperimentsService.list(props.orgId);
+      peers.value = await queryClient.fetchQuery(experimentsListQuery(props.orgId));
     } catch (error: any) {
       peers.value = [];
       toast({

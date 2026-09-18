@@ -28,7 +28,7 @@ use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
+    CompactMergeOutput, FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
@@ -49,10 +49,13 @@ pub enum MergeMode {
     TraceTimeIndex,
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
-    /// Metrics index stream, hour still open: the ingester and the incremental
-    /// compactor merges write one `hash-sorted-v1-*` file
-    /// ordered by `(__hash__, _timestamp)`.
+    /// Metrics index stream, ingester mover: one `hash-sorted-v1-*` file ordered by
+    /// `(__hash__, _timestamp)`.
     MetricsHashSorted,
+    /// Metrics index stream, hour still open: the compactor merges the pending ingester files
+    /// into size-split `hash-merged-v1-*` files in the same order, without `.midx`; the
+    /// hour-end merge takes them once more.
+    MetricsHashMerged,
     /// Metrics index stream, closed hour: the whole hour merges into
     /// size-split `indexed-v1-*` files in the same order.
     MetricsIndexed,
@@ -87,7 +90,7 @@ impl MergeMode {
             return if finalize {
                 Self::MetricsIndexed
             } else {
-                Self::MetricsHashSorted
+                Self::MetricsHashMerged
             };
         }
         Self::for_stream(stream_type, stream_name)
@@ -109,11 +112,6 @@ impl MergeMode {
         }
     }
 
-    /// True for the indexed metrics hour-end merge.
-    pub fn is_metrics_indexed(&self) -> bool {
-        matches!(self, Self::MetricsIndexed)
-    }
-
     /// True when the whole hour must be merged as one batch — every file of
     /// the hour, including ones already above the size target, and regardless
     /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
@@ -121,7 +119,7 @@ impl MergeMode {
         match self {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(_) => true,
-            Self::MetricsIndexed => true,
+            Self::MetricsIndexed | Self::MetricsHashMerged => true,
             _ => false,
         }
     }
@@ -129,15 +127,23 @@ impl MergeMode {
     /// Row order the merge writes.
     pub fn output_sort_order(&self) -> FileSortOrder {
         match self {
-            Self::MetricsHashSorted | Self::MetricsIndexed => FileSortOrder::HashTimestampAsc,
+            Self::MetricsHashSorted | Self::MetricsHashMerged | Self::MetricsIndexed => {
+                FileSortOrder::HashTimestampAsc
+            }
             _ => FileSortOrder::TimestampDesc,
         }
+    }
+
+    /// The open-hour round over a metrics-index stream's pending ingester files.
+    pub fn merges_open_hour_pending(&self) -> bool {
+        matches!(self, Self::MetricsHashMerged)
     }
 
     /// Metrics-specific layout of the file(s) the merge writes.
     pub fn metrics_file_layout(&self) -> Option<MetricsFileLayout> {
         match self {
             Self::MetricsHashSorted => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsHashMerged => Some(MetricsFileLayout::HashMerged),
             Self::MetricsIndexed => Some(MetricsFileLayout::Indexed),
             _ => None,
         }
@@ -152,10 +158,10 @@ impl MergeMode {
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
         let hash_ordered = files
             .iter()
-            .filter(|f| MetricsFileLayout::of(&f.key).is_some())
+            .filter(|f| MetricsFileLayout::is_hash_ordered(&f.key))
             .count();
         match self {
-            Self::MetricsHashSorted | Self::MetricsIndexed => {
+            Self::MetricsHashSorted | Self::MetricsHashMerged | Self::MetricsIndexed => {
                 if hash_ordered == files.len() {
                     FileSortOrder::HashTimestampAsc
                 } else {
@@ -191,7 +197,7 @@ impl MergeMode {
             Self::Downsampling(rule) => {
                 super::downsampling::generate_downsampling_sql(schema, rule)
             }
-            Self::MetricsHashSorted | Self::MetricsIndexed => format!(
+            Self::MetricsHashSorted | Self::MetricsHashMerged | Self::MetricsIndexed => format!(
                 "SELECT * FROM tbl ORDER BY {}",
                 FileSortOrder::HashTimestampAsc
                     .order_by_clause()
@@ -210,6 +216,7 @@ impl fmt::Display for MergeMode {
             #[cfg(feature = "enterprise")]
             Self::Downsampling(rule) => write!(f, "downsampling(step={}s)", rule.step),
             Self::MetricsHashSorted => write!(f, "metrics_hash_sorted"),
+            Self::MetricsHashMerged => write!(f, "metrics_hash_merged"),
             Self::MetricsIndexed => write!(f, "metrics_indexed"),
         }
     }
@@ -222,6 +229,8 @@ pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
+    /// Where a single merged file is built.
+    pub sink: CompactMergeOutput,
 }
 
 impl MergeOutput {
@@ -234,14 +243,17 @@ impl MergeOutput {
                 .common
                 .feature_ingester_none_compression
                 .then_some("none"),
+            sink: CompactMergeOutput::Memory,
         }
     }
 
     /// Compactor: the configured format for the stream.
     pub fn for_compactor(stream_type: StreamType) -> Self {
+        let cfg = get_config();
         Self {
-            file_format: output_file_format(stream_type, false, get_config().common.file_format),
+            file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
+            sink: cfg.compact.merge_output,
         }
     }
 }

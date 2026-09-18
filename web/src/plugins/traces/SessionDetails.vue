@@ -42,14 +42,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @click="copySessionId"
           />
         </span>
+        <span
+          v-if="detail?.userId"
+          class="rounded-default border-border-default bg-surface-base text-text-body inline-flex min-w-0 items-center gap-1.5 border px-2 py-1"
+          data-test="session-detail-user-id"
+        >
+          <OIcon name="person" size="xs" class="text-text-secondary flex-shrink-0" />
+          <span class="max-w-64 truncate text-sm">{{ detail.userId }}</span>
+        </span>
       </template>
 
       <template #actions>
+        <TraceAnnotateMenu
+          v-if="canAnnotate"
+          ref-type="session"
+          :ref-id="sessionId"
+          :ref-trace-start-time="sessionEvaluationRange.startTime"
+          :source-stream="streamName"
+          compact
+          data-test="session-detail-annotate-btn"
+        />
         <OButton
           v-if="canManualEvaluate"
-          variant="primary"
+          variant="outline"
           size="sm"
-          icon-left="play-circle"
           data-test="session-detail-evaluate-btn"
           @click="manualEvaluationOpen = true"
         >
@@ -239,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="info"
                       size="xs"
-                      class="text-text-muted ml-[0.15rem] cursor-default"
+                      class="text-text-muted ms-[0.15rem] cursor-default"
                     />
                     <OTooltip max-width="17.5rem">
                       <template #content>
@@ -619,7 +635,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <div class="flex-1"></div>
                             <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                              <OIcon name="open-in-new" size="xs" class="mr-1" />
+                              <OIcon name="open-in-new" size="xs" class="me-1" />
                               {{ t("traces.sessionDetail.openInTraceExplorer") }}
                             </OButton>
                           </div>
@@ -894,6 +910,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts" setup>
 import { ref, reactive, onMounted, nextTick, computed, defineAsyncComponent } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import useSmartBack from "@/composables/useSmartBack";
 import { useStore } from "vuex";
 import { copyToClipboard } from "@/utils/clipboard";
 import { formatDate } from "@/utils/date";
@@ -927,6 +944,9 @@ import { renderMarkdown } from "./markdown";
 
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
+);
+const TraceAnnotateMenu = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
 );
 
 const { t } = useI18nTyped();
@@ -995,6 +1015,21 @@ const canManualEvaluate = computed(() => {
   );
 });
 const manualEvaluationOpen = ref(false);
+
+// Same enterprise gate as manual evaluation minus the online-eval flag —
+// queuing a session for human review does not require the eval engine.
+const canAnnotate = computed(() => {
+  const range = sessionEvaluationRange.value;
+  return (
+    hasLlmSessionData.value &&
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+    Boolean(orgIdentifier.value) &&
+    Boolean(streamName.value) &&
+    Boolean(sessionId.value) &&
+    Number.isFinite(range.startTime) &&
+    range.startTime > 0
+  );
+});
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.
@@ -1600,27 +1635,32 @@ async function load() {
   }
 }
 
-function goBack() {
-  // When opened from the AI/LLM Sessions page, return there (stays in the AI
-  // menu) instead of dropping into the Traces sessions tab.
+// Real history back, when there is one, instead of a hand-built push: the
+// list's own URL (filters, page, stream/agent mode) round-trips exactly as
+// the user left it, whichever of the several pages that open a session
+// (AI Sessions, Discovery, Queue Workbench) it actually was. The fallback
+// below only fires with no history to pop (direct link / reload), so it only
+// needs to be a SANE landing spot, not an exact one.
+const { goBack } = useSmartBack(() => {
+  // When opened from the AI/LLM Sessions page, return there (stays in
+  // the AI menu) instead of dropping into the Traces sessions tab.
   if (route.name === "aiSessionDetails") {
-    router.push({
+    return {
       name: "aiSessions",
       query: {
         org_identifier: store.state.selectedOrganization?.identifier,
       },
-    });
-    return;
+    };
   }
-  router.push({
+  return {
     name: "traces",
     query: {
       tab: "sessions",
       stream: streamName.value,
       org_identifier: store.state.selectedOrganization?.identifier,
     },
-  });
-}
+  };
+});
 
 function copySessionId() {
   if (!detail.value) return;

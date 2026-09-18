@@ -100,6 +100,8 @@ pub struct DispatchPlan {
     pub items: Vec<DispatchItem>,
     /// Groups `delivery_decision` suppressed (silence / warning policy).
     pub suppressed: usize,
+    /// Groups in pending state
+    pub pending: usize,
     /// Qualifying groups dropped by the MN-8 knob — reported so the caller
     /// can log them; silent truncation is not acceptable here either.
     pub dropped_by_knob: Vec<String>,
@@ -140,6 +142,7 @@ pub fn plan_dispatch(
 ) -> DispatchPlan {
     let mut items = Vec::new();
     let mut suppressed = 0usize;
+    let mut pending = 0;
     let mut dropped_by_knob = Vec::new();
     let mut inconsistent = Vec::new();
 
@@ -185,13 +188,23 @@ pub fn plan_dispatch(
             continue;
         };
 
-        let decision = delivery_decision(
-            level,
-            state.last_notified_level,
-            state.silenced_until,
-            now,
-            tc.notify_on_warning,
-        );
+        // the states here are the recent/updated states, so we need to check the last outcome
+        // and decide based on that
+        let decision = if state
+            .last_outcome
+            .as_ref()
+            .is_some_and(|last| matches!(last, RunOutcome::Pending))
+        {
+            DeliveryDecision::SuppressedByPending
+        } else {
+            delivery_decision(
+                level,
+                state.last_notified_level,
+                state.silenced_until,
+                now,
+                tc.notify_on_warning,
+            )
+        };
         match decision {
             DeliveryDecision::Deliver | DeliveryDecision::DeliverEscalation => {
                 // The knob counts QUALIFYING sends, so a silenced group never
@@ -213,6 +226,7 @@ pub fn plan_dispatch(
             DeliveryDecision::SuppressedBySilence | DeliveryDecision::SuppressedByWarningPolicy => {
                 suppressed += 1
             }
+            DeliveryDecision::SuppressedByPending => pending += 1,
             DeliveryDecision::NotFiring => {}
         }
     }
@@ -220,6 +234,7 @@ pub fn plan_dispatch(
     DispatchPlan {
         items,
         suppressed,
+        pending,
         dropped_by_knob,
         inconsistent,
     }

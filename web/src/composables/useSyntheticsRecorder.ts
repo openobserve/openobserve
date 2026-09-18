@@ -15,7 +15,7 @@
 
 import { reactive, ref } from "vue";
 import type { TranslateFn } from "@/types/i18n";
-import { mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { mapWireSteps, substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import type {
   BrowserStep,
   RecorderCommand,
@@ -31,7 +31,6 @@ import type {
   StructuredError,
   WireStep,
 } from "@/types/synthetics";
-import { substituteVariables } from "@/utils/synthetics/mapRecordedStep";
 import { classifyRestoreFailure } from "@/utils/synthetics/replayFailure";
 import { DEFAULT_TEST_ID_ATTR, MIN_EXTENSION_VERSION } from "@/constants/synthetics";
 
@@ -172,8 +171,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
   /** Callback invoked when content script announces itself (toolbar icon injection). */
   let onAutoDetected: (() => void) | null = null;
 
-  // Global message listener — processes all bridge messages from the content script.
-  window.addEventListener("message", (event: MessageEvent) => {
+  function handleWindowMessage(event: MessageEvent) {
     if (event.source !== window) return;
 
     // Content script announces itself when injected on demand (toolbar icon
@@ -219,7 +217,10 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
 
     // Streaming data push (synthetics-recorder type) → data handler
     bridgeDataHandler?.(msg);
-  });
+  }
+
+  // Global message listener — processes all bridge messages from the content script.
+  window.addEventListener("message", handleWindowMessage);
 
   /**
    * One-shot command via postMessage. Resolves `null` when the extension is
@@ -816,6 +817,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
 
   /** Release the port; call from the host component's onUnmounted. */
   function cleanup() {
+    window.removeEventListener("message", handleWindowMessage);
     bridgeDisconnect();
   }
 

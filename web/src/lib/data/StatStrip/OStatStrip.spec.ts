@@ -45,4 +45,81 @@ describe("OStatStrip", () => {
     expect(basisOf(false)).toContain("grow");
     expect(basisOf(true)).toContain("grow");
   });
+
+  // ── which tile reads as active ────────────────────────────────────────────
+  describe("selection", () => {
+    const selectedKeys = (props: Record<string, unknown>) =>
+      mount(OStatStrip, {
+        props: { items, selectable: true, ...props },
+        global: {
+          stubs: {
+            OStatCard: {
+              props: ["selected", "dataTest"],
+              template: '<div :data-test="dataTest" :data-selected="String(selected)" />',
+            },
+          },
+        },
+      }).findAll("[data-selected='true']").length;
+
+    const selectedTile = (props: Record<string, unknown>) => {
+      const wrapper = mount(OStatStrip, {
+        props: { items, selectable: true, ...props },
+        global: {
+          stubs: {
+            OStatCard: {
+              props: ["selected"],
+              template: '<div data-card :data-selected="String(selected)" />',
+            },
+          },
+        },
+      });
+      return wrapper
+        .findAll("[data-card]")
+        .findIndex((card) => card.attributes("data-selected") === "true");
+    };
+
+    it("marks the selected tile", () => {
+      expect(selectedTile({ selectedKey: "b" })).toBe(1);
+    });
+
+    it("falls back to the default tile when nothing is filtered", () => {
+      // Otherwise the strip shows NO tile active while the grid behind it is
+      // showing everything — a state the control cannot express.
+      expect(selectedTile({ selectedKey: null, defaultKey: "a" })).toBe(0);
+    });
+
+    it("falls back when the filter names no tile of its own", () => {
+      // Several callers spell "no filter" as the string "all" rather than null.
+      expect(selectedTile({ selectedKey: "all", defaultKey: "a" })).toBe(0);
+    });
+
+    it("lights exactly one tile, never two", () => {
+      expect(selectedKeys({ selectedKey: "b", defaultKey: "a" })).toBe(1);
+      expect(selectedKeys({ selectedKey: null, defaultKey: "a" })).toBe(1);
+    });
+
+    it("leaves every tile unlit when there is no default to fall back to", () => {
+      expect(selectedKeys({ selectedKey: null })).toBe(0);
+    });
+
+    it("announces which tile is pressed, not just a border colour", () => {
+      // The only cue today is `border-accent`, so the filter state does not
+      // exist for anyone using a screen reader.
+      const wrapper = mount(OStatStrip, {
+        props: { items, selectable: true, selectedKey: "b", defaultKey: "a" },
+      });
+      const pressed = wrapper.findAll("button").map((b) => b.attributes("aria-pressed"));
+      expect(pressed).toEqual(["false", "true"]);
+    });
+
+    it("leaves a static strip's tiles unpressable, not merely unpressed", () => {
+      const wrapper = mount(OStatStrip, { props: { items } });
+      expect(wrapper.findAll("button")).toHaveLength(0);
+      expect(wrapper.find("[aria-pressed]").exists()).toBe(false);
+    });
+
+    it("stays inert when the strip is not selectable", () => {
+      expect(selectedKeys({ selectable: false, selectedKey: "b", defaultKey: "a" })).toBe(0);
+    });
+  });
 });

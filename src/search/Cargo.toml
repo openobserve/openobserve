@@ -50,6 +50,7 @@ rand.workspace = true
 rayon.workspace = true
 regex.workspace = true
 regex-syntax.workspace = true
+schema.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlparser.workspace = true

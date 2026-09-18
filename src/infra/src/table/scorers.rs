@@ -14,8 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    Schema, Set,
+    ColumnTrait, Condition, ConnectionTrait, EntityTrait, Order, PaginatorTrait, QueryFilter,
+    QueryOrder, Schema, Set,
 };
 use serde::{Deserialize, Serialize};
 
@@ -178,6 +178,31 @@ pub async fn get_by_entity_id_and_version(
         .map(Scorer::from);
 
     Ok(record)
+}
+
+pub async fn get_by_entity_ids_and_versions(
+    org_id: &str,
+    identities: &[(String, i32)],
+) -> Result<Vec<Scorer>, errors::Error> {
+    if identities.is_empty() {
+        return Ok(Vec::new());
+    }
+    let identities = identities
+        .iter()
+        .fold(Condition::any(), |condition, (entity_id, version)| {
+            condition.add(
+                Condition::all()
+                    .add(Column::EntityId.eq(entity_id.clone()))
+                    .add(Column::Version.eq(*version)),
+            )
+        });
+    Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .filter(identities)
+        .all(get_orm_client_ro().await)
+        .await
+        .map(|records| records.into_iter().map(Scorer::from).collect())
+        .map_err(Into::into)
 }
 
 pub async fn get_by_active_name(org_id: &str, name: &str) -> Result<Option<Scorer>, errors::Error> {

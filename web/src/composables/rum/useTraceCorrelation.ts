@@ -19,6 +19,7 @@ import { useStore } from "vuex";
 import searchService from "@/services/search";
 import useStreams from "@/composables/useStreams";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import { normalizeTraceId, rumFieldEqualsAnySql, traceIdLookupVariants } from "@/utils/rum/fields";
 
 export interface TraceCorrelationData {
@@ -49,7 +50,7 @@ export default function useTraceCorrelation(
 ) {
   const store = useStore();
   const { getStream } = useStreams(t);
-  const { resolveTracesStream } = useCorrelatedTracesStream(t);
+  const { resolveTraceLocation, cancel: cancelTracesStream } = useCorrelatedTracesStream(t);
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
@@ -139,18 +140,18 @@ export default function useTraceCorrelation(
       let backendSpans: any[] = [];
       let hasTrace = false;
 
-      const tracesStream = await resolveTracesStream(
-        canonicalTraceId,
-        range.startTime,
-        range.endTime,
-      );
+      const location = await resolveTraceLocation(canonicalTraceId, range.startTime, range.endTime);
+      const tracesStream = location.stream;
+      // Spans can start before the RUM event and outlive it, so query the
+      // trace's own range where the index knew it.
+      const traceWindow = traceQueryWindow(location.range, range.startTime, range.endTime);
 
       try {
         const traceQuery = {
           query: {
             sql: `select * from "${tracesStream}" where trace_id = '${canonicalTraceId}' order by start_time`,
-            start_time: range.startTime,
-            end_time: range.endTime,
+            start_time: traceWindow.startTime,
+            end_time: traceWindow.endTime,
             from: 0,
             size: 100,
           },
@@ -228,5 +229,6 @@ export default function useTraceCorrelation(
     performanceData,
     fetchCorrelation,
     reset,
+    cancelTracesStream,
   };
 }

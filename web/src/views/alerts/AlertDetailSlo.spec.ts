@@ -98,6 +98,17 @@ const plainAlert = () => ({
   query_condition: { type: "sql", sql: "select 1" },
 });
 
+// What GET /alerts/{id} answers for an anomaly: the handler falls back to the
+// anomaly-detection config and tags it so the caller can discriminate.
+const anomalyAlert = () => ({
+  id: "alert-1",
+  name: "k8s-logs-volume",
+  alert_type: "anomaly_detection",
+  stream_name: "k8s_logs",
+  stream_type: "logs",
+  query_condition: null,
+});
+
 /** Declares `sloName` explicitly: an auto-stub would swallow a missing prop. */
 const ConfigSummaryStub = {
   name: "AlertConfigSummary",
@@ -135,6 +146,13 @@ async function mountView(alert: any) {
 
 const openConfigTab = async (w: VueWrapper) => {
   (w.vm as any).activeTab = "configuration";
+  await flushPromises();
+};
+
+/** An anomaly config opens on its charts tab, so a history assertion has to
+ *  switch to History first — everywhere else that is already the default. */
+const openHistoryTab = async (w: VueWrapper) => {
+  (w.vm as any).activeTab = "history";
   await flushPromises();
 };
 
@@ -293,6 +311,36 @@ describe("AlertDetail — SLO alerts", () => {
       );
     });
 
+    // The anomaly form takes its prefill from the `anomaly_id` route param, so
+    // the generic editor opens blank on an anomaly — no stream, no schedule.
+    it("diverts an anomaly alert to the anomaly editor, which can prefill it", async () => {
+      wrapper = await mountView(anomalyAlert());
+      await clickEdit(wrapper);
+
+      expect(errorToasts()).toEqual([]);
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "editAnomalyDetection",
+          params: expect.objectContaining({ anomaly_id: "alert-1" }),
+        }),
+      );
+    });
+
+    it("carries the folder through to the anomaly editor", async () => {
+      wrapper = await mountView(anomalyAlert());
+      await clickEdit(wrapper);
+
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            org_identifier: store.state.selectedOrganization.identifier,
+            folder: "default",
+          }),
+        }),
+      );
+    });
+
     // `slo_condition` present but carrying no `slo_id` is the same failure as a
     // NULL condition — the route would be `/slos/undefined`.
     it("treats a blank slo_id as unplaceable too", async () => {
@@ -322,5 +370,62 @@ describe("AlertDetail — SLO alerts", () => {
     const subtitle = wrapper.findComponent({ name: "OPageLayout" }).props("subtitle") as string;
     expect(subtitle).toContain("default");
     expect(subtitle).toContain("host");
+  });
+});
+
+/** The same problem as the SLO family: the GET falls back to the anomaly
+ *  CONFIG row, so the chart has nothing to plot and the history tab asked for
+ *  an alert id that does not exist as an alert. */
+describe("AlertDetail — anomaly detection configs", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => wrapper?.unmount());
+
+  // With no query_condition the chart can only render its "unavailable" frame.
+  it("hides the evaluation chart, which has no query to plot", async () => {
+    wrapper = await mountView(anomalyAlert());
+    expect(wrapper.findComponent({ name: "AlertGroupChart" }).exists()).toBe(false);
+  });
+
+  it("hands the config to the summary so the Configuration tab has something to show", async () => {
+    wrapper = await mountView(anomalyAlert());
+    await openConfigTab(wrapper);
+
+    expect(wrapper.findComponent(ConfigSummaryStub).props("alert")).toMatchObject({
+      alert_type: "anomaly_detection",
+      stream_name: "k8s_logs",
+    });
+  });
+
+  it("reads history as an anomaly, which is the only parameter the endpoint accepts for one", async () => {
+    wrapper = await mountView(anomalyAlert());
+    await openHistoryTab(wrapper);
+
+    expect(wrapper.findComponent({ name: "AlertEvaluationHistory" }).props("isAnomaly")).toBe(true);
+  });
+
+  it("still reads an ordinary alert's history as an alert", async () => {
+    wrapper = await mountView(plainAlert());
+
+    expect(wrapper.findComponent({ name: "AlertEvaluationHistory" }).props("isAnomaly")).toBe(
+      false,
+    );
+  });
+
+  // Anomaly configs never write a transitions row.
+  it("does not offer the level-changes view, which cannot have rows", async () => {
+    wrapper = await mountView(anomalyAlert());
+    await openHistoryTab(wrapper);
+
+    expect(wrapper.find('[data-test="alerts-alertdetail-history-view"]').exists()).toBe(false);
+    expect(alertsService.list_group_transitions).not.toHaveBeenCalled();
+  });
+
+  it("keeps the level-changes view for an ordinary alert", async () => {
+    wrapper = await mountView(plainAlert());
+
+    expect(wrapper.find('[data-test="alerts-alertdetail-history-view"]').exists()).toBe(true);
+    expect(alertsService.list_group_transitions).toHaveBeenCalled();
   });
 });

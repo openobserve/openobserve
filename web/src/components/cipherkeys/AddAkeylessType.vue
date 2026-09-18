@@ -75,7 +75,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="authType != ''"
     >
-      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
+      <legend class="text-text-heading ms-2 px-1 px-2 py-0 text-xs">
         {{ getAuthenticationTypeLabel(authType) }}
         {{ t("cipherKey.configuration") }}
       </legend>
@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="rounded-default relative w-full border border-[lightgray] p-3"
       v-if="secretType != ''"
     >
-      <legend class="text-text-heading ml-2 px-1 px-2 py-0 text-xs">
+      <legend class="text-text-heading ms-2 px-1 px-2 py-0 text-xs">
         {{ getSecretOptionLabel(secretType) }}
         {{ t("cipherKey.configuration") }}
       </legend>

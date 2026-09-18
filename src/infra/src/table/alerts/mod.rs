@@ -212,6 +212,10 @@ impl TryFrom<alerts::Model> for MetaAlert {
             .tags
             .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
             .unwrap_or_default();
+        alert.oncall_team = value.oncall_team;
+        alert.runbook_url = value.runbook_url;
+
+        alert.pending_period_sec = value.pending_period_sec;
 
         Ok(alert)
     }
@@ -969,6 +973,7 @@ fn update_mutable_fields(
     let align_time = alert.trigger_condition.align_time;
     let updated_at: i64 = chrono::Utc::now().timestamp_micros();
     let workflows = serde_json::to_value(alert.workflows)?;
+    let pending_periond_sec = alert.pending_period_sec;
 
     // Handle deduplication configuration
     // Note: time_window_minutes is stored in a separate column, not in the JSON config
@@ -1008,6 +1013,8 @@ fn update_mutable_fields(
     alert_am.query_promql_multi_alert = Set(promql_multi_alert.then_some(true));
     alert_am.query_slo_condition = Set(query_slo_condition);
     alert_am.slo_id = Set(slo_id);
+    alert_am.oncall_team = Set(alert.oncall_team.clone());
+    alert_am.runbook_url = Set(alert.runbook_url.clone());
     alert_am.query_vrl_function = Set(query_vrl_function);
     alert_am.query_search_event_type = Set(query_search_event_type);
     alert_am.query_multi_time_range = Set(query_multi_time_range);
@@ -1038,6 +1045,7 @@ fn update_mutable_fields(
     alert_am.dedup_config = Set(dedup_config);
     alert_am.creates_incident = Set(alert.creates_incident);
     alert_am.workflows = Set(workflows);
+    alert_am.pending_period_sec = Set(pending_periond_sec);
     Ok(())
 }
 
@@ -1100,6 +1108,8 @@ pub(super) mod tests {
             priority: None,
             tags: None,
             slo_id: None,
+            oncall_team: None,
+            runbook_url: None,
             query_slo_condition: None,
             trigger_frequency_type: 1, // Seconds
             trigger_frequency_seconds: 300,
@@ -1116,6 +1126,7 @@ pub(super) mod tests {
             dedup_config: None,
             creates_incident: false,
             workflows: serde_json::json!(["abc123"]),
+            pending_period_sec: 0,
         }
     }
 

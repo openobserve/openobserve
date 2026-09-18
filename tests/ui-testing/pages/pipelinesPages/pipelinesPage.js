@@ -280,7 +280,7 @@ export class PipelinesPage {
         this.addConditionDeleteBtn = page.locator('[data-test="add-condition-drawer"] [data-test="o-drawer-neutral-btn"]');
         this.scheduledAlertTabs = page.locator('[data-test="scheduled-alert-tabs"]');
         this.nestedGroups = page.locator('.el-border');
-        this.operatorLabels = page.locator('span.tw\\:lowercase');
+        this.operatorLabels = page.locator('[data-test="alert-conditions-operator-label"]');
         this.firstConditionLabel = page.locator('[data-test="add-condition-section"]').getByText('if', { exact: true }).first();
         this.noteContainer = page.locator('[data-test="add-condition-note-container"]');
         this.noteHeading = page.locator('[data-test="add-condition-note-heading"]');
@@ -360,7 +360,11 @@ export class PipelinesPage {
 
     // Methods from original PipelinesPage
     async gotoPipelinesPage() {
-        await openNavFlyoutChild(this.page, 'pipeline');
+        // The flyout child is a hover-reveal that can self-close mid-click, so retry the reveal+click until the pipeline route actually loads.
+        await expect(async () => {
+            await openNavFlyoutChild(this.page, 'pipeline');
+            await this.page.waitForURL(/pipeline/, { timeout: 5000 });
+        }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
     }
 
     async pipelinesPageDefaultOrg() {
@@ -1621,6 +1625,30 @@ export class PipelinesPage {
         await this.page.waitForTimeout(300);
     }
 
+    async fillUnaryCondition(columnName, operator, index = 0) {
+        // Select the column (mirror fillCondition's column step) then the unary
+        // operator. Unary operators (is_null / is_not_null / is_empty /
+        // is_not_empty) render no value input, so never fill a value here.
+        const triggers = this.columnSelectTrigger;
+        const wrappers = this.columnSelect;
+        const trigCount = await triggers.count();
+        if (trigCount > 0) {
+            await triggers.nth(index).click();
+        } else {
+            await wrappers.nth(index).click();
+        }
+        await this.columnSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const searchCount = await this.columnSelectSearch.count();
+        if (searchCount > 0) {
+            await this.columnSelectSearch.first().fill(columnName);
+        }
+        await this.columnOptionByName(columnName).waitFor({ state: 'visible', timeout: 10000 });
+        await this.columnOptionByName(columnName).click();
+        await this.page.waitForTimeout(300);
+
+        await this.selectOperatorFromMenu(operator);
+    }
+
     async addNewCondition() {
         await this.addConditionButton.first().click();
         await this.page.waitForTimeout(500);
@@ -1915,6 +1943,44 @@ export class PipelinesPage {
         // The old `[role="alert"]` locator now matches Monaco's hidden a11y alert
         // (`class="monaco-alert" data-aria-hidden="true"`), so assert the real error.
         await this.conditionRequiredToast.first().waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    async verifyNoConditionError() {
+        // A successful save surfaces no inline schema error. Used to prove a
+        // unary condition (value-exempt) saved without the "fill all fields" error.
+        await expect(this.conditionRequiredToast).toHaveCount(0);
+    }
+
+    async verifyValueInputCount(expectedCount) {
+        // Count value inputs (v-if-removed for unary operators, present for binary).
+        await expect(this.valueInput).toHaveCount(expectedCount);
+    }
+
+    async verifyOperatorSelected(operator, index = 0) {
+        // The operator OFormSelect renders in reka-Select mode (non-listbox), so
+        // its trigger carries no `data-test-selected-value`; it shows the selected
+        // label as text. Unary operators map wire value -> display label.
+        const labelByOperator = {
+            is_null: 'Is Null',
+            is_not_null: 'Is Not Null',
+            is_empty: 'Is Empty',
+            is_not_empty: 'Is Not Empty',
+        };
+        const expectedLabel = labelByOperator[operator] ?? operator;
+        await expect(this.operatorSelectTrigger.nth(index)).toContainText(expectedLabel);
+    }
+
+    async verifyUnaryOperatorsOffered() {
+        // Open the operator menu and assert each unary option is offered by its
+        // snake_case `data-test-value` (the OSelect option value, not the label).
+        await this.operatorSelectTrigger.first().waitFor({ state: 'visible', timeout: 15000 });
+        await this.operatorSelectTrigger.first().click();
+        for (const operator of ["is_null", "is_not_null", "is_empty", "is_not_empty"]) {
+            const option = this.page.locator(
+                `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+            ).first();
+            await expect(option).toBeVisible();
+        }
     }
 
     async fillPartialCondition(columnName) {
@@ -2952,6 +3018,35 @@ export class PipelinesPage {
     }
 
     /**
+     * Expand a field in the Associate Query sidebar and tick its first value.
+     * @param {string} fieldName
+     * @returns {Promise<string>} the value that was ticked
+     */
+    async addQueryFieldValueFilter(fieldName) {
+        const expandBtn = this.page.locator(`[data-test="log-search-expand-${fieldName}-field-btn"]`);
+        await expandBtn.waitFor({ state: 'visible', timeout: 30000 });
+        await expandBtn.click();
+
+        const firstValue = this.page
+            .locator(`[data-test^="logs-search-subfield-add-${fieldName}-"]`)
+            .first();
+        // Field values arrive from their own request after the panel opens.
+        await firstValue.waitFor({ state: 'visible', timeout: 30000 });
+        const dataTest = await firstValue.getAttribute('data-test');
+        await firstValue.locator('button[role="checkbox"], input[type="checkbox"]').first().click();
+        await this.page.waitForTimeout(1000);
+        return (dataTest ?? '').replace(`logs-search-subfield-add-${fieldName}-`, '');
+    }
+
+    /** Untick every selected value for the open field, which removes its query condition. */
+    async clearQueryFieldValueFilter() {
+        const clearBtn = this.page.locator('[data-test="field-values-panel-clear-selection-btn"]');
+        await clearBtn.waitFor({ state: 'visible', timeout: 15000 });
+        await clearBtn.click();
+        await this.page.waitForTimeout(1000);
+    }
+
+    /**
      * Wait for watcher to process stream change
      * Deterministic wait that checks for query state to stabilize
      * Replaces: await page.waitForTimeout(2000) after stream change
@@ -3234,6 +3329,52 @@ export class PipelinesPage {
      * @param {string} pipelineName - Pipeline name
      * @returns {import('@playwright/test').Locator} Pipeline row locator
      */
+    // ---- row View preview (#12647) and bulk export (#7030) ------------
+    // The preview bubble is OTooltip's own content node, not a pipeline-owned
+    // element, so it is matched by the library's data-test rather than by a
+    // loose class pattern.
+    getPipelineViewButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-view-pipeline"]`);
+    }
+    getPipelinePreviewTooltip() {
+        return this.page.locator('[data-test="o-tooltip-content"]').first();
+    }
+    getPipelineEditButton(pipelineName) {
+        return this.page.locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`);
+    }
+    getBulkExportButton() {
+        return this.page.locator('[data-test="pipeline-list-export-pipelines-btn"]');
+    }
+    getSelectAllRowsCheckbox() {
+        return this.page.locator('[data-test="o2-table-select-all"]');
+    }
+
+    /** Hover the row's View action and return the preview bubble's box. */
+    async hoverViewAndGetPreviewBox(pipelineName) {
+        const btn = this.getPipelineViewButton(pipelineName);
+        await expect(btn, 'Row View action must be present').toBeVisible({ timeout: 20000 });
+        await btn.hover();
+        const tooltip = this.getPipelinePreviewTooltip();
+        await expect(tooltip, 'Hovering View must open the graph preview').toBeVisible({ timeout: 10000 });
+        return await tooltip.boundingBox();
+    }
+
+    async expectPipelineInList(pipelineName) {
+        await expect(this.getPipelineEditButton(pipelineName),
+            `Pipeline ${pipelineName} must be in the filtered list`).toBeVisible({ timeout: 20000 });
+    }
+
+    async expectBulkExportHidden() {
+        await expect(this.getBulkExportButton(),
+            'Bulk export must stay hidden while nothing is selected').toBeHidden();
+    }
+
+    async selectAllRowsAndExpectBulkExport() {
+        await this.getSelectAllRowsCheckbox().click();
+        await expect(this.getBulkExportButton(),
+            'Selecting pipelines must reveal a bulk export action').toBeVisible({ timeout: 10000 });
+    }
+
     getPipelineRowByName(pipelineName) {
         return this.page
             .locator(`[data-test="pipeline-list-${pipelineName}-update-pipeline"]`)

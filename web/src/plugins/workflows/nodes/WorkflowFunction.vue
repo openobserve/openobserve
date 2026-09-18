@@ -87,7 +87,8 @@ import {
   currentTriggerKind,
   setNodeIncomplete,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import { triggerDef } from "@/plugins/workflows/triggers";
+import { buildTestDisplaySample } from "@/plugins/workflows/testSample";
+import { buildIncidentDisplaySample } from "@/plugins/workflows/incidentSample";
 
 const { t } = useI18nTyped();
 const savedData: any = workflowObj.currentSelectedNodeData?.data || {};
@@ -105,8 +106,15 @@ const JS_DEFAULT_CODE = `// \`row\` is the trigger event: { meta: {...}, data: [
 // Seed the inline function editor's "Events" panel with the CURRENT trigger's
 // sample (alert vs incident), so the author sees the real payload shape. No
 // trigger (it was deleted) -> no sample.
+//
+// The DISPLAY sample (the single event `row` is bound to), wrapped in a one-element
+// array: `row` is one event, so showing the wire batch is what makes authors write
+// `row[0]`. The array wrapper is load-bearing — the picker's `sampleEvents` is typed
+// Array and a non-array silently falls back to a generic log sample.
 const kind = currentTriggerKind();
-const sampleEvents = kind ? triggerDef(kind).buildSample() : [];
+const displaySample = (k: string): unknown =>
+  k === "incident_event" ? buildIncidentDisplaySample() : buildTestDisplaySample();
+const sampleEvents = kind ? [displaySample(kind)] : [];
 
 // Inline "Create New Function" widens the drawer + hides its footer (the
 // AddFunction toolbar owns save/cancel).

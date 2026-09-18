@@ -102,6 +102,17 @@ pub struct ListAlertsResponseBodyItem {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<u8>, example = 3)]
     pub priority: Option<u8>,
+    /// The on-call team this alert names, when it names one.
+    ///
+    /// Routing's highest-precedence tier, and the only tier a list row can
+    /// report: every other one resolves from the identity dimensions of the row
+    /// that fires, which an alert definition does not carry. Absent means
+    /// "resolved at fire time", not "pages nobody".
+    ///
+    /// The list has always had a column for this and never had the field, so
+    /// every alert read as unbound — including ones deliberately pinned.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oncall_team: Option<String>,
     /// Normalized selection tags (PT-6). Omitted when empty.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
@@ -144,6 +155,11 @@ pub struct ListAlertsResponseBodyItem {
     /// Count of parent composites currently readable to the caller.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub referenced_by_composite_count: Option<usize>,
+    /// Composite rows only: the trigger expression with child IDs resolved to names.
+    // Omitted when any child is unreadable by the caller, rather than leaking a
+    // name or a KSUID through the summary.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expression_summary: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -466,6 +482,10 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             level: None,
             level_since: None,
             priority: alert.priority.map(|p| p.to_i32() as u8),
+            // Blank is the same as unset here: the field is validated at save,
+            // so an empty string is a value nothing wrote deliberately, and
+            // sending it would render an empty team chip.
+            oncall_team: alert.oncall_team.filter(|t| !t.trim().is_empty()),
             tags: alert.tags,
             destinations: alert.destinations,
             template: alert.template,
@@ -477,6 +497,7 @@ impl TryFrom<(meta_folders::Folder, meta_alerts::Alert, Option<Trigger>)>
             groups_firing_is_lower_bound: None,
             child_count: None,
             referenced_by_composite_count: None,
+            expression_summary: None,
         })
     }
 }
@@ -520,6 +541,13 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         ..Default::default()
     });
 
+    // Never inferred: an errored run and an empty one leave the config identical.
+    let last_outcome = v
+        .get("last_outcome")
+        .and_then(|o| o.as_str())
+        .map(String::from);
+    let last_outcome_at = v.get("last_outcome_at").and_then(|t| t.as_i64());
+
     let folder_name = v
         .get("folder_name")
         .and_then(|n| n.as_str())
@@ -546,11 +574,12 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         is_real_time: false,
         last_trained_at: v.get("training_completed_at").and_then(|t| t.as_i64()),
         status,
-        // Anomaly configs do not flow through the alert scheduler's state
-        // write path; leave run state unset rather than implying "never fired".
-        last_outcome: None,
-        last_outcome_at: None,
+        // No `alert_states` row exists, so `enrich_with_run_state` cannot fill these.
+        last_outcome,
+        last_outcome_at,
+        // How long the outcome has HELD is not recorded anywhere.
         last_outcome_since: None,
+        // The detector reports a count, never a warning/critical classification.
         level: None,
         level_since: None,
         last_error: v
@@ -566,6 +595,14 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
             .and_then(|p| p.as_u64())
             .and_then(|p| u8::try_from(p).ok())
             .filter(|p| (1..=5).contains(p)),
+        // Read the same way as the alert path, so an anomaly config pinned to
+        // a team reads as pinned in the same column rather than falling to
+        // "resolved at fire time" purely because it took the other branch.
+        oncall_team: v
+            .get("oncall_team")
+            .and_then(|t| t.as_str())
+            .filter(|t| !t.trim().is_empty())
+            .map(String::from),
         tags: v
             .get("tags")
             .and_then(|t| serde_json::from_value::<Vec<String>>(t.clone()).ok())
@@ -580,6 +617,7 @@ pub fn anomaly_config_to_list_item(v: &serde_json::Value) -> Option<ListAlertsRe
         groups_firing_is_lower_bound: None,
         child_count: None,
         referenced_by_composite_count: None,
+        expression_summary: None,
     })
 }
 
@@ -659,6 +697,7 @@ mod tests {
             level: None,
             level_since: None,
             priority: None,
+            oncall_team: None,
             tags: vec![],
             destinations: vec![],
             template: None,
@@ -668,6 +707,7 @@ mod tests {
             groups_firing_is_lower_bound: None,
             child_count: None,
             referenced_by_composite_count: None,
+            expression_summary: None,
         };
         let json = serde_json::to_value(&item).unwrap();
         let obj = json.as_object().unwrap();
@@ -686,6 +726,10 @@ mod tests {
         assert!(!obj.contains_key("groups_firing"));
         assert!(!obj.contains_key("groups_observed_is_lower_bound"));
         assert!(!obj.contains_key("groups_firing_is_lower_bound"));
+        // Absent means "resolved at fire time", which the list renders as its
+        // own label. A `null` would be a third state the column has no words
+        // for.
+        assert!(!obj.contains_key("oncall_team"));
     }
 
     #[test]
@@ -806,6 +850,61 @@ mod tests {
         let item = ListAlertsResponseBodyItem::try_from((folder, alert, None)).unwrap();
         assert_eq!(item.alert_type, "realtime");
         assert!(item.is_real_time);
+    }
+
+    /// The defect this field was added for. The list column reads the alert's
+    /// bound team, and the field was never on the item — so a deliberately
+    /// pinned alert was indistinguishable from an unbound one.
+    #[test]
+    fn test_a_bound_alert_reports_the_team_it_names() {
+        let mut alert = meta_alerts::Alert::default();
+        alert.id = Some(svix_ksuid::Ksuid::new(None, None));
+        alert.oncall_team = Some("team_payments".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), alert, None))
+                .unwrap();
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_payments"));
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(
+            json.get("oncall_team").and_then(|t| t.as_str()),
+            Some("team_payments")
+        );
+    }
+
+    /// Unbound is the absence of the field, not an empty string — the column
+    /// renders "resolved at fire time" from absence, and a blank value would
+    /// draw an empty team chip instead.
+    #[test]
+    fn test_an_unbound_alert_omits_the_field_entirely() {
+        let mut blank = meta_alerts::Alert::default();
+        blank.id = Some(svix_ksuid::Ksuid::new(None, None));
+        blank.oncall_team = Some("   ".to_string());
+
+        let item =
+            ListAlertsResponseBodyItem::try_from((meta_folders::Folder::default(), blank, None))
+                .unwrap();
+
+        assert!(item.oncall_team.is_none(), "whitespace is not a team");
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("oncall_team"));
+    }
+
+    /// An anomaly config takes the other construction path. It carried the same
+    /// column and would otherwise have kept the bug after the alert path lost it.
+    #[test]
+    fn test_an_anomaly_config_reports_its_team_too() {
+        let id = valid_ksuid_str();
+        let v = serde_json::json!({
+            "anomaly_id": id,
+            "name": "x",
+            "oncall_team": "team_search",
+        });
+
+        let item = anomaly_config_to_list_item(&v).expect("should parse");
+
+        assert_eq!(item.oncall_team.as_deref(), Some("team_search"));
     }
 
     #[test]
@@ -967,5 +1066,76 @@ mod anomaly_priority_tag_tests {
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("priority"));
         assert!(!obj.contains_key("tags"));
+    }
+
+    /// `enrich_with_run_state` cannot reach an anomaly, so the scheduler records
+    /// the outcome on the trigger and `list_configs` merges it in.
+    #[test]
+    fn test_last_outcome_is_read_from_the_recorded_trigger_value() {
+        for outcome in ["firing", "normal", "error", "skipped"] {
+            let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+                "last_outcome": outcome,
+                "last_outcome_at": 1_700,
+            })))
+            .unwrap();
+            assert_eq!(item.last_outcome.as_deref(), Some(outcome));
+            // Never presented as live state — always qualified by when it ran.
+            assert_eq!(item.last_outcome_at, Some(1_700));
+        }
+    }
+
+    /// Why the outcome is recorded, not inferred: any derivation from the config
+    /// row reports a permanently broken detector as healthy.
+    #[test]
+    fn test_an_errored_run_is_not_reported_as_normal() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            "enabled": true,
+            "last_outcome": "error",
+            "last_outcome_at": 2_000,
+            // Identical to a clean run: nothing here distinguishes the two.
+            "last_detection_run": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome.as_deref(), Some("error"));
+    }
+
+    /// Nothing recorded yet — never run, or last run predates the upgrade.
+    #[test]
+    fn test_last_outcome_is_unset_when_nothing_was_recorded() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "is_trained": true,
+            // Present and zero: `push` binds start_time as a literal 0, so a
+            // freshly created trigger reports a run that never happened.
+            "last_detection_run": 0,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome, None);
+        assert_eq!(item.last_outcome_at, None);
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("last_outcome"));
+    }
+
+    /// Echoing `last_outcome_at` would claim the outcome changed on every run.
+    #[test]
+    fn test_last_outcome_since_is_not_faked_from_the_run_timestamp() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "normal",
+            "last_outcome_at": 2_000,
+        })))
+        .unwrap();
+        assert_eq!(item.last_outcome_since, None);
+    }
+
+    /// The detector reports a count, never a warning/critical classification.
+    #[test]
+    fn test_anomaly_configs_have_no_level() {
+        let item = anomaly_config_to_list_item(&cfg(serde_json::json!({
+            "last_outcome": "firing",
+            "last_outcome_at": 2_500,
+        })))
+        .unwrap();
+        assert_eq!(item.level, None);
+        assert_eq!(item.level_since, None);
     }
 }

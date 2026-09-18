@@ -189,3 +189,10 @@ export const buildIncidentSample = (eventType: string = DEFAULT_INCIDENT_EVENT):
   const meta = { ...commonMeta(def.type, def.status, def.severity), ...def.extras };
   return [{ meta, data: [] }];
 };
+
+// The DISPLAY payload: the single event `row` is bound to. `data` is dropped —
+// incidents always pass `&[]` on the wire, so showing it only invites `row.data[0]`.
+export const buildIncidentDisplaySample = (eventType: string = DEFAULT_INCIDENT_EVENT): unknown => {
+  const [{ meta }] = buildIncidentSample(eventType) as [{ meta: Record<string, unknown> }];
+  return { meta };
+};

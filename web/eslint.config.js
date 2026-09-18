@@ -266,6 +266,60 @@ const noHardcodedPx = {
   },
 };
 
+// Directional spacing and borders must follow the document's inline direction.
+const PHYSICAL_DIRECTION_UTILITY =
+  /(?<![A-Za-z0-9_-])(?:-?(?:ml|mr|pl|pr)-(?:\d+(?:\.\d+)?(?:\/\d+)?|auto|px|full|page-edge|sm|md|\[[^\]\r\n]+\])?!?|border-[lr](?:-(?:\[[^\]\r\n]+\]|[a-z0-9][A-Za-z0-9_./%!-]*))?!?)(?![A-Za-z0-9_-])/g;
+const noPhysicalDirectionUtilities = {
+  rules: {
+    "no-physical-direction-utilities": {
+      meta: {
+        type: "problem",
+        docs: { description: "Use logical Tailwind direction utilities" },
+      },
+      create(context) {
+        const sourceCode = context.sourceCode ?? context.getSourceCode();
+        const reported = new Set();
+        const replacementFor = (utility) =>
+          utility
+            .replace(/^(-?)ml-/, "$1ms-")
+            .replace(/^(-?)mr-/, "$1me-")
+            .replace(/^(-?)pl-/, "$1ps-")
+            .replace(/^(-?)pr-/, "$1pe-")
+            .replace(/^border-l/, "border-s")
+            .replace(/^border-r/, "border-e");
+        const scanNode = (node) => {
+          const [start, end] = node.range;
+          const chunk = sourceCode.getText().slice(start, end);
+          let match;
+          PHYSICAL_DIRECTION_UTILITY.lastIndex = 0;
+          while ((match = PHYSICAL_DIRECTION_UTILITY.exec(chunk))) {
+            const at = start + match.index;
+            if (reported.has(at)) continue;
+            reported.add(at);
+            context.report({
+              loc: {
+                start: sourceCode.getLocFromIndex(at),
+                end: sourceCode.getLocFromIndex(at + match[0].length),
+              },
+              message: `Physical direction utility "${match[0]}" is not RTL-safe. Use "${replacementFor(match[0])}".`,
+            });
+          }
+        };
+        const scriptVisitor = { Literal: scanNode, TemplateElement: scanNode };
+        const services = sourceCode.parserServices ?? context.parserServices;
+
+        if (services?.defineTemplateBodyVisitor) {
+          return services.defineTemplateBodyVisitor(
+            { VLiteral: scanNode, Literal: scanNode, TemplateElement: scanNode },
+            scriptVisitor,
+          );
+        }
+        return scriptVisitor;
+      },
+    },
+  },
+};
+
 // ── no-hardcoded-color ─────────────────────────────────────────────────────
 // Colour is a design token: a component reaches it through a --color-* utility class,
 // never as a literal, or it cannot follow the theme. <style> blocks are gated by
@@ -281,8 +335,8 @@ const noHardcodedPx = {
 const COLOR_LITERAL =
   /(?<![\w#&])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![0-9a-fA-F])|\b(?:rgba?|hsla?|oklch|oklab|lab|lch)\s*\(/gi;
 
-// Pre-existing violations, measured when this rule was introduced: 261 colour literals
-// (202 hex, 59 functional) in the <script> blocks of these 52 .vue files. Every entry is a file that hardcodes
+// Pre-existing violations, measured when this rule was introduced: 260 colour literals
+// (201 hex, 59 functional) in the <script> blocks of these 51 .vue files. Every entry is a file that hardcodes
 // colour today and is PENDING MIGRATION to design tokens — it is a debt record, NOT a
 // sanctioned home. The list must only ever SHRINK: deleting a line when a file is
 // migrated is the only edit ever made to it. New entries are NOT accepted — a new colour
@@ -296,7 +350,6 @@ const COLOR_ALLOWLIST = [
   "web/src/components/alerts/IncidentDetailDrawer.vue",
   "web/src/components/alerts/IncidentServiceGraph.vue",
   "web/src/components/alerts/PreviewAlert.vue",
-  "web/src/components/anomaly_detection/steps/AnomalyDetectionConfig.vue",
   "web/src/components/dashboards/ColorSwatchPicker.vue",
   "web/src/components/dashboards/DashboardLogDrawer.vue",
   "web/src/components/dashboards/PanelSchemaRenderer.vue",
@@ -672,6 +725,7 @@ export default [
         rules: {
           ...noLegacyO2Tokens.rules,
           ...noHardcodedPx.rules,
+          ...noPhysicalDirectionUtilities.rules,
           ...noHardcodedColor.rules,
         },
       },
@@ -688,6 +742,7 @@ export default [
     rules: {
       "local/no-legacy-o2-tokens": ["error"],
       "local/no-hardcoded-px": ["error"],
+      "local/no-physical-direction-utilities": ["error"],
       "local/no-hardcoded-color": ["error"],
 
       // A missing key is invisible at build time — vue-i18n renders the raw key to

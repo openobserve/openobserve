@@ -93,7 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-if="expandedSections[item.id] && item.children.length > 0"
                 :data-test="`toc-level2-container-${item.id}`"
-                class="mt-1 ml-4 space-y-1"
+                class="ms-4 mt-1 space-y-1"
               >
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
@@ -142,7 +142,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div
                       v-if="expandedSections[child.id] && child.children.length > 0"
                       :data-test="`toc-level3-container-${child.id}`"
-                      class="mt-1 ml-4 space-y-1"
+                      class="ms-4 mt-1 space-y-1"
                     >
                       <div
                         v-for="grandchild in child.children"

@@ -169,19 +169,11 @@ pub async fn process_association_changes(
 
     let mgr = get_pattern_manager().await?;
 
-    for item in &update.add {
+    // An unknown id is caller input, so it must not surface as a server error.
+    for item in update.add.iter().chain(&update.remove) {
         if !mgr.check_pattern_exists(&item.pattern_id) {
-            return Err(errors::Error::Message(format!(
-                "pattern with id {} not found",
-                item.pattern_id
-            )));
-        }
-    }
-    for item in &update.remove {
-        if !mgr.check_pattern_exists(&item.pattern_id) {
-            return Err(errors::Error::Message(format!(
-                "pattern with id {} not found",
-                item.pattern_id
+            return Err(errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams(
+                format!("pattern with id {} not found", item.pattern_id),
             )));
         }
     }

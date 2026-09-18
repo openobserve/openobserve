@@ -126,20 +126,43 @@ export interface ExperimentApplicability {
   scorerApplicability: ExperimentScorerApplicability[];
 }
 
+export type ExperimentExecutionStatus =
+  "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export type ExperimentStatus =
+  ExperimentExecutionStatus | "scoring" | "execution_failed" | "scoring_failed";
+
 export interface LlmExperiment extends ExperimentCreatePayload {
   id: string;
   orgId: string;
   /** Resolved server-side from the pinned dataset; null when it was deleted. */
   datasetName: string | null;
   scorers: PinnedExperimentScorer[];
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
-  statusReason: string | null;
+  /** Consolidated execution + scoring lifecycle when summary data is available. */
+  status: ExperimentStatus;
+  /** Stored execution lifecycle used by execution-only actions such as cancel/retry. */
+  executionStatus: ExperimentExecutionStatus;
+  executionStatusReason: string | null;
   deadlineAt: number;
   completedAt: number | null;
   lifecycleVersion: number;
   retryCount: number;
+  /** At most one Experiment per Dataset carries this. */
+  isBaseline: boolean;
   createdBy: string;
   createdAt: number;
+  /**
+   * Present only when fetched with `includeSummary` (list) or via `get()`
+   * (always summarized). Lets the browse table read cost/progress/scores
+   * straight off the row instead of a per-experiment detail fetch.
+   */
+  scoringStatus?: string | null;
+  executionProgress?: ExperimentProgress | null;
+  scoringProgress?: ExperimentProgress | null;
+  taskOutcomes?: ExperimentTaskOutcomes | null;
+  scoreOutcomes?: ExperimentScoreOutcomes | null;
+  scoreSummaries?: ExperimentScoreSummary[];
+  aggregateSummary?: ExperimentAggregateSummary | null;
 }
 
 export interface ExperimentDetail {
@@ -153,7 +176,7 @@ export interface ExperimentExecution {
   itemLogicalId: string;
   rowId: string;
   trialIndex: number;
-  status: "pending" | "ok" | "error" | "skipped";
+  status: "queued" | "pending" | "ok" | "error" | "skipped";
   skipReason?: "no_reference" | "no_trace" | null;
   output: unknown | null;
   errorMessage: string | null;
@@ -183,6 +206,41 @@ export interface ExperimentRowDetail {
   scoreSummaries: ExperimentScoreSummary[];
 }
 
+export type ExperimentResultRowSort = "dataset" | "dispersion_desc";
+
+export interface ExperimentResultRow {
+  rowIndex: number;
+  rowId: string;
+  logicalId: string;
+  input: unknown;
+  expectedOutput: unknown | null;
+  trialCount: number;
+  status: ExperimentSlotStatus;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
+  output: unknown | null;
+  scoreSummaries: ExperimentScoreSummary[];
+  p50LatencyMs: number | null;
+  dispersion: ExperimentRowDispersion | null;
+}
+
+export interface ExperimentResultRowPage {
+  rows: ExperimentResultRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalRows: number;
+    hasMore: boolean;
+  };
+}
+
+export interface ExperimentResultRowPageOptions {
+  page?: number;
+  pageSize?: number;
+  sort?: ExperimentResultRowSort;
+  highDispersionOnly?: boolean;
+}
+
 export interface ExperimentRowDispersion {
   rowId: string;
   logicalId: string;
@@ -204,6 +262,8 @@ export interface ExperimentResults {
   pagination?: ExperimentResultPagination;
   taskProgress?: ExperimentProgress;
   scoringProgress?: ExperimentProgress;
+  taskOutcomes?: ExperimentTaskOutcomes;
+  scoreOutcomes?: ExperimentScoreOutcomes;
   skipSummary?: ExperimentSkipSummary;
   scoreSummaries?: ExperimentScoreSummary[];
   aggregateSummary?: ExperimentAggregateSummary;
@@ -218,8 +278,13 @@ export interface ExperimentResultScore {
   score: Record<string, unknown> | null;
 }
 
+export type ExperimentSlotStatus =
+  "pending" | "running" | "scoring" | "completed" | "skipped" | "task_failed" | "score_failed";
+
 export interface ExperimentResultSlot extends ExperimentSlot {
-  taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
+  /** Single lifecycle rollup of task and score evidence — the list-surface field. */
+  status: ExperimentSlotStatus;
+  taskStatus: "pending" | "queued" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
 }
@@ -234,15 +299,37 @@ export interface ExperimentResultPagination {
 export interface ExperimentAggregateSummary {
   p50LatencyMs: number | null;
   totalCost: number;
+  taskCost?: number | null;
+  scoringCost?: number | null;
+  costIncomplete?: boolean;
   incomplete: boolean;
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
+  errorTaskSlots: number;
 }
 
 export interface ExperimentProgress {
   completed: number;
   total: number;
   skipped: number;
+}
+
+export interface ExperimentTaskOutcomes {
+  total: number;
+  succeeded: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+}
+
+export interface ExperimentScoreOutcomes {
+  completed: number;
+  total: number;
+  scored: number;
+  failed: number;
+  pending: number;
+  skipped: number;
+  unscored: number;
 }
 
 export interface ExperimentSkipSummary {
@@ -284,6 +371,7 @@ export type ExperimentComparisonAssignment =
 export type ExperimentComparisonScoreDataType = "numeric" | "categorical" | "boolean";
 
 export interface ExperimentComparisonDimension {
+  id: string;
   name: string;
   kind: "score" | "cost" | "latency";
   /** Score value type; null for the cost and latency dimensions. */
@@ -296,8 +384,10 @@ export interface ExperimentComparisonDimension {
   delta: number | null;
   /** Change in the better direction; positive always means improved. */
   orientedDelta: number | null;
-  /** Whether the dimension declares a comparison policy and can vote. */
+  /** Whether the dimension is selected and can vote on the outcome. */
   gating: boolean;
+  /** Whether the dimension has a comparison policy and can be selected. */
+  canAffectOutcome: boolean;
   /** Whether orientedDelta is a fraction of the configured range, not raw units. */
   normalized: boolean;
   baselineSampleCount: number;
@@ -333,6 +423,7 @@ export interface ExperimentComparison {
   candidateId: string;
   datasetId: string;
   threshold: number;
+  outcomeDimensions: string[];
   assignmentRule: string;
   counts: {
     baselineRows: number;
@@ -355,8 +446,38 @@ export interface ExperimentResultQuery {
   resultPageSize?: number;
 }
 
-const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const TASK_RESULT_STATUSES = [
+  "pending",
+  "queued",
+  "in_progress",
+  "ok",
+  "skipped",
+  "error",
+] as const;
 const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
+const SLOT_STATUSES = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
+
+// Mirrors the server rollup so a response predating the field still gets one.
+function deriveSlotStatus(
+  taskStatus: ExperimentResultSlot["taskStatus"],
+  scores: ExperimentResultScore[],
+): ExperimentSlotStatus {
+  if (taskStatus === "pending" || taskStatus === "queued") return "pending";
+  if (taskStatus === "in_progress") return "running";
+  if (taskStatus === "error") return "task_failed";
+  if (taskStatus === "skipped") return "skipped";
+  if (scores.some((s) => s.status === "pending" || s.status === "in_progress")) return "scoring";
+  if (scores.some((s) => s.status === "error")) return "score_failed";
+  return "completed";
+}
 
 function normalizeTaskResultStatus(input: unknown): ExperimentResultSlot["taskStatus"] {
   return TASK_RESULT_STATUSES.includes(input as (typeof TASK_RESULT_STATUSES)[number])
@@ -445,6 +566,12 @@ function normalizePreview(input: any): ExperimentPreview {
 }
 
 function normalizeExperiment(input: any): LlmExperiment {
+  const executionStatus = value<ExperimentExecutionStatus>(
+    input,
+    "executionStatus",
+    "execution_status",
+    input.status,
+  );
   return {
     id: input.id,
     orgId: value(input, "orgId", "org_id", ""),
@@ -462,36 +589,140 @@ function normalizeExperiment(input: any): LlmExperiment {
     trialCount: Number(value(input, "trialCount", "trial_count", 0)),
     metadata: input.metadata ?? null,
     idempotencyKey: value(input, "idempotencyKey", "idempotency_key", null),
-    status: input.status,
-    statusReason: value(input, "statusReason", "status_reason", null),
+    // Summary responses expose the full execution + scoring lifecycle as
+    // `status`. Mutation responses do not carry a summary, so fall back to the
+    // stored execution status there.
+    status: value<ExperimentStatus>(input, "status", "status", executionStatus),
+    executionStatus,
+    executionStatusReason: value(
+      input,
+      "executionStatusReason",
+      "execution_status_reason",
+      value(input, "statusReason", "status_reason", null),
+    ),
     deadlineAt: Number(value(input, "deadlineAt", "deadline_at", 0)),
-    completedAt: value(input, "completedAt", "completed_at", null),
+    completedAt: value(
+      input,
+      "executionCompletedAt",
+      "execution_completed_at",
+      value(input, "completedAt", "completed_at", null),
+    ),
     lifecycleVersion: Number(value(input, "lifecycleVersion", "lifecycle_version", 0)),
     retryCount: Number(value(input, "retryCount", "retry_count", 0)),
+    isBaseline: value<boolean>(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    scoringStatus: value(input, "scoringStatus", "scoring_status", undefined),
+    executionProgress: hasSummaryField(input, "executionProgress", "execution_progress")
+      ? normalizeProgress(value<any>(input, "executionProgress", "execution_progress", {}))
+      : undefined,
+    scoringProgress: hasSummaryField(input, "scoringProgress", "scoring_progress")
+      ? normalizeProgress(value<any>(input, "scoringProgress", "scoring_progress", {}))
+      : undefined,
+    taskOutcomes: hasSummaryField(input, "taskOutcomes", "task_outcomes")
+      ? normalizeTaskOutcomes(value<any>(input, "taskOutcomes", "task_outcomes", {}))
+      : undefined,
+    scoreOutcomes: hasSummaryField(input, "scoreOutcomes", "score_outcomes")
+      ? normalizeScoreOutcomes(value<any>(input, "scoreOutcomes", "score_outcomes", {}))
+      : undefined,
+    scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
+      ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
+      : undefined,
+    aggregateSummary: hasSummaryField(input, "aggregateSummary", "aggregate_summary")
+      ? normalizeAggregateSummary(value<any>(input, "aggregateSummary", "aggregate_summary", {}))
+      : undefined,
   };
+}
+
+function hasSummaryField(input: any, camel: string, snake: string): boolean {
+  return input?.[camel] !== undefined || input?.[snake] !== undefined;
 }
 
 function numberOrNull(input: unknown): number | null {
   return input === null || input === undefined || input === "" ? null : Number(input);
 }
 
-function normalizeResults(input: any): ExperimentResults {
-  const taskProgress = value<any>(input, "taskProgress", "task_progress", {});
-  const scoringProgress = value<any>(input, "scoringProgress", "scoring_progress", {});
+function normalizeTaskOutcomes(input: any): ExperimentTaskOutcomes {
+  return {
+    total: Number(input?.total ?? 0),
+    succeeded: Number(input?.succeeded ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+  };
+}
+
+function normalizeScoreOutcomes(input: any): ExperimentScoreOutcomes {
+  return {
+    completed: Number(input?.completed ?? 0),
+    total: Number(input?.total ?? 0),
+    scored: Number(input?.scored ?? 0),
+    failed: Number(input?.failed ?? 0),
+    pending: Number(input?.pending ?? 0),
+    skipped: Number(input?.skipped ?? 0),
+    unscored: Number(input?.unscored ?? 0),
+  };
+}
+
+function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSummary {
+  return {
+    p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
+    totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
+    taskCost: numberOrNull(value(aggregateSummary, "taskCost", "task_cost", null)),
+    scoringCost: numberOrNull(value(aggregateSummary, "scoringCost", "scoring_cost", null)),
+    costIncomplete: Boolean(value(aggregateSummary, "costIncomplete", "cost_incomplete", false)),
+    incomplete: Boolean(aggregateSummary?.incomplete ?? false),
+    incompleteTaskSlots: Number(
+      value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
+    ),
+    incompleteScoreDimensions: Number(
+      value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
+    ),
+    errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
+  };
+}
+
+// The server moved these four fields out of the results object and onto the
+// (now always-summarized) experiment, so `experimentSummary` — when passed —
+// takes priority; `input` stays as a fallback for a response predating the move.
+function normalizeResults(input: any, experimentSummary: any = {}): ExperimentResults {
+  const taskProgress = value<any>(
+    experimentSummary,
+    "executionProgress",
+    "execution_progress",
+    value<any>(input, "taskProgress", "task_progress", {}),
+  );
+  const scoringProgress = value<any>(
+    experimentSummary,
+    "scoringProgress",
+    "scoring_progress",
+    value<any>(input, "scoringProgress", "scoring_progress", {}),
+  );
+  const taskOutcomes = value<any>(
+    experimentSummary,
+    "taskOutcomes",
+    "task_outcomes",
+    value<any>(input, "taskOutcomes", "task_outcomes", undefined),
+  );
+  const scoreOutcomes = value<any>(
+    experimentSummary,
+    "scoreOutcomes",
+    "score_outcomes",
+    value<any>(input, "scoreOutcomes", "score_outcomes", undefined),
+  );
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   const pagination = value<any>(input, "pagination", "pagination", {});
-  const aggregateSummary = value<any>(input, "aggregateSummary", "aggregate_summary", {});
+  const aggregateSummary = value<any>(
+    experimentSummary,
+    "aggregateSummary",
+    "aggregate_summary",
+    value<any>(input, "aggregateSummary", "aggregate_summary", {}),
+  );
   const dispersionSummary = value<any>(input, "dispersionSummary", "dispersion_summary", {});
   return {
-    rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map((row) => ({
-      rowId: String(value(row, "rowId", "row_id", "")),
-      logicalId: String(value(row, "logicalId", "logical_id", "")),
-      maxNormalized: numberOrNull(value(row, "maxNormalized", "max_normalized", null)),
-      high: Boolean(row?.high),
-      outlierTrialIndex: numberOrNull(value(row, "outlierTrialIndex", "outlier_trial_index", null)),
-    })),
+    rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map(
+      normalizeRowDispersion,
+    ),
     dispersionSummary: {
       highDispersionRowCount: Number(
         value(dispersionSummary, "highDispersionRowCount", "high_dispersion_row_count", 0),
@@ -509,6 +740,8 @@ function normalizeResults(input: any): ExperimentResults {
     },
     taskProgress: normalizeProgress(taskProgress),
     scoringProgress: normalizeProgress(scoringProgress),
+    taskOutcomes: taskOutcomes === undefined ? undefined : normalizeTaskOutcomes(taskOutcomes),
+    scoreOutcomes: scoreOutcomes === undefined ? undefined : normalizeScoreOutcomes(scoreOutcomes),
     skipSummary: {
       fullySkippedSlots: Number(value(skipSummary, "fullySkippedSlots", "fully_skipped_slots", 0)),
       partiallySkippedSlots: Number(
@@ -520,20 +753,13 @@ function normalizeResults(input: any): ExperimentResults {
       ),
       noTraceDimensions: Number(value(skipSummary, "noTraceDimensions", "no_trace_dimensions", 0)),
     },
-    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
-      normalizeScoreSummary,
-    ),
-    aggregateSummary: {
-      p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
-      totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
-      incomplete: Boolean(aggregateSummary.incomplete ?? false),
-      incompleteTaskSlots: Number(
-        value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
-      ),
-      incompleteScoreDimensions: Number(
-        value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
-      ),
-    },
+    scoreSummaries: value<any[]>(
+      experimentSummary,
+      "scoreSummaries",
+      "score_summaries",
+      value<any[]>(input, "scoreSummaries", "score_summaries", []),
+    ).map(normalizeScoreSummary),
+    aggregateSummary: normalizeAggregateSummary(aggregateSummary),
   };
 }
 
@@ -558,20 +784,26 @@ function normalizeExecution(record: any): ExperimentExecution {
 }
 
 function normalizeResultSlot(slot: any): ExperimentResultSlot {
+  const taskStatus = normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending"));
+  const scores: ExperimentResultScore[] = (slot.scores ?? []).map((score: any) => ({
+    scorerId: value(score, "scorerId", "scorer_id", ""),
+    scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
+    status: normalizeScoreResultStatus(score.status ?? "pending"),
+    score: score.score ?? null,
+  }));
+  const status = SLOT_STATUSES.includes(slot.status)
+    ? (slot.status as ExperimentSlotStatus)
+    : deriveSlotStatus(taskStatus, scores);
   return {
     rowId: value(slot, "rowId", "row_id", ""),
     logicalId: value(slot, "logicalId", "logical_id", ""),
     trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
     input: slot.input,
     expectedOutput: value(slot, "expectedOutput", "expected_output", null),
-    taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
+    status,
+    taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
-    scores: (slot.scores ?? []).map((score: any) => ({
-      scorerId: value(score, "scorerId", "scorer_id", ""),
-      scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
-      status: normalizeScoreResultStatus(score.status ?? "pending"),
-      score: score.score ?? null,
-    })),
+    scores,
   };
 }
 
@@ -592,6 +824,49 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
     noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
     skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     value: summary.value ?? null,
+  };
+}
+
+function normalizeRowDispersion(row: any): ExperimentRowDispersion {
+  return {
+    rowId: String(value(row, "rowId", "row_id", "")),
+    logicalId: String(value(row, "logicalId", "logical_id", "")),
+    maxNormalized: numberOrNull(value(row, "maxNormalized", "max_normalized", null)),
+    high: Boolean(row?.high),
+    outlierTrialIndex: numberOrNull(value(row, "outlierTrialIndex", "outlier_trial_index", null)),
+  };
+}
+
+export function normalizeExperimentResultRowPage(input: any): ExperimentResultRowPage {
+  const pagination = input?.pagination ?? {};
+  return {
+    rows: (input?.rows ?? []).map((row: any) => ({
+      rowIndex: Number(value(row, "rowIndex", "row_index", 0)),
+      rowId: String(value(row, "rowId", "row_id", "")),
+      logicalId: String(value(row, "logicalId", "logical_id", "")),
+      input: row?.input,
+      expectedOutput: value(row, "expectedOutput", "expected_output", null),
+      trialCount: Number(value(row, "trialCount", "trial_count", 0)),
+      status: row?.status as ExperimentSlotStatus,
+      taskOutcomes: hasSummaryField(row, "taskOutcomes", "task_outcomes")
+        ? normalizeTaskOutcomes(value<any>(row, "taskOutcomes", "task_outcomes", {}))
+        : undefined,
+      scoreOutcomes: hasSummaryField(row, "scoreOutcomes", "score_outcomes")
+        ? normalizeScoreOutcomes(value<any>(row, "scoreOutcomes", "score_outcomes", {}))
+        : undefined,
+      output: row?.output ?? null,
+      scoreSummaries: value<any[]>(row, "scoreSummaries", "score_summaries", []).map(
+        normalizeScoreSummary,
+      ),
+      p50LatencyMs: numberOrNull(value(row, "p50LatencyMs", "p50_latency_ms", null)),
+      dispersion: row?.dispersion ? normalizeRowDispersion(row.dispersion) : null,
+    })),
+    pagination: {
+      page: Number(pagination.page ?? 1),
+      pageSize: Number(value(pagination, "pageSize", "page_size", 50)),
+      totalRows: Number(value(pagination, "totalRows", "total_rows", 0)),
+      hasMore: Boolean(value(pagination, "hasMore", "has_more", false)),
+    },
   };
 }
 
@@ -631,6 +906,12 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     null,
   );
   return {
+    // The backend computes a stable per-dimension `id` (score dimensions:
+    // `score:<encoded identity>`; cost/latency: fixed literals) and that is
+    // the exact value the `outcomeDimensions` filter expects back — sending
+    // `name` instead is rejected server-side. Falling back to `name` only
+    // covers a backend that omits `id`; it isn't the primary source.
+    id: String(input?.id || input?.name || ""),
     name: String(input?.name ?? ""),
     kind: input?.kind,
     dataType: value(input, "dataType", "data_type", null),
@@ -642,6 +923,9 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     delta: value(input, "delta", "delta", null),
     orientedDelta: value(input, "orientedDelta", "oriented_delta", null),
     gating: Boolean(value(input, "gating", "gating", false)),
+    canAffectOutcome: Boolean(
+      value(input, "canAffectOutcome", "can_affect_outcome", input?.gating ?? false),
+    ),
     normalized: Boolean(value(input, "normalized", "normalized", false)),
     baselineSampleCount: Number(value(input, "baselineSampleCount", "baseline_sample_count", 0)),
     candidateSampleCount: Number(value(input, "candidateSampleCount", "candidate_sample_count", 0)),
@@ -661,6 +945,7 @@ export function normalizeExperimentComparison(input: any): ExperimentComparison 
     candidateId: value(input, "candidateId", "candidate_id", ""),
     datasetId: value(input, "datasetId", "dataset_id", ""),
     threshold: Number(input?.threshold ?? 0),
+    outcomeDimensions: value(input, "outcomeDimensions", "outcome_dimensions", []),
     assignmentRule: value(input, "assignmentRule", "assignment_rule", ""),
     counts: {
       baselineRows: Number(value(counts, "baselineRows", "baseline_rows", 0)),
@@ -703,8 +988,22 @@ function normalizeProgress(input: any): ExperimentProgress {
 }
 
 const llmExperimentsService = {
-  async list(orgId: string): Promise<LlmExperiment[]> {
-    const response = await http().get(base(orgId));
+  /**
+   * `includeSummary` folds each row's status/progress/scores/cost into the
+   * same call — the alternative is a detail fetch per experiment, which is
+   * an N+1 fan-out for a page that just needs a few summary numbers per row.
+   */
+  async list(
+    orgId: string,
+    options: { includeSummary?: boolean; datasetId?: string } = {},
+  ): Promise<LlmExperiment[]> {
+    const params = {
+      ...(options.includeSummary ? { includeSummary: true } : {}),
+      ...(options.datasetId ? { datasetId: options.datasetId } : {}),
+    };
+    const response = await http().get(base(orgId), {
+      params: Object.keys(params).length ? params : undefined,
+    });
     const rows = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     return rows.map(normalizeExperiment);
   },
@@ -749,7 +1048,7 @@ const llmExperimentsService = {
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),
-      results: normalizeResults(response.data?.results),
+      results: normalizeResults(response.data?.results, response.data?.experiment),
     };
   },
 
@@ -761,9 +1060,17 @@ const llmExperimentsService = {
     // a client-side default silently overrides it (a 0 here makes every
     // movement a regression).
     threshold?: number,
+    outcomeDimensions?: string[],
   ): Promise<ExperimentComparison> {
     const response = await http().get(`${base(orgId)}/compare`, {
-      params: { baselineId, candidateId, ...(threshold === undefined ? {} : { threshold }) },
+      params: {
+        baselineId,
+        candidateId,
+        ...(outcomeDimensions === undefined
+          ? {}
+          : { outcomeDimensions: outcomeDimensions.join(",") }),
+        ...(threshold === undefined ? {} : { threshold }),
+      },
     });
     return normalizeExperimentComparison(response.data);
   },
@@ -778,6 +1085,17 @@ const llmExperimentsService = {
       `${base(orgId)}/${experimentId}/rows/${encodeURIComponent(rowId)}`,
     );
     return normalizeExperimentRowDetail(response.data);
+  },
+
+  async listRows(
+    orgId: string,
+    experimentId: string,
+    options: ExperimentResultRowPageOptions = {},
+  ): Promise<ExperimentResultRowPage> {
+    const response = await http().get(`${base(orgId)}/${experimentId}/rows`, {
+      params: options,
+    });
+    return normalizeExperimentResultRowPage(response.data);
   },
 
   async retry(orgId: string, experimentId: string): Promise<LlmExperiment> {
@@ -805,6 +1123,23 @@ const llmExperimentsService = {
     overrides: ExperimentClonePayload = {},
   ): Promise<LlmExperiment> {
     const response = await http().post(`${base(orgId)}/${experimentId}/clone`, overrides);
+    return normalizeExperiment(response.data);
+  },
+
+  /** Makes this Experiment the Baseline for its Dataset (at most one at a time). */
+  async setBaseline(
+    orgId: string,
+    experimentId: string,
+  ): Promise<{ experiment: LlmExperiment; previousBaselineId: string | null }> {
+    const response = await http().put(`${base(orgId)}/${experimentId}/baseline`);
+    return {
+      experiment: normalizeExperiment(response.data?.experiment),
+      previousBaselineId: value(response.data, "previousBaselineId", "previous_baseline_id", null),
+    };
+  },
+
+  async clearBaseline(orgId: string, experimentId: string): Promise<LlmExperiment> {
+    const response = await http().delete(`${base(orgId)}/${experimentId}/baseline`);
     return normalizeExperiment(response.data);
   },
 };

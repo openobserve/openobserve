@@ -13,7 +13,7 @@
 // card disappear with nothing but `SyntaxError: 2` in the console.
 //
 // This ran against en-US only, which left the far likelier source uncovered: the
-// other 14 locales are machine-translated, and a translator that localises a
+// other locales are machine-translated, and a translator that localises a
 // placeholder NAME produces exactly the same crash in exactly the same way.
 //
 //   en-US  "Are you sure you want to delete {identifier}?"

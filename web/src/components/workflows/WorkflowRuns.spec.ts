@@ -19,47 +19,61 @@
 // inspect separate (Edit Workflow -> editor route; back -> list). The canvas /
 // panel / result drawer are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
-const { mockRouter, mockToast, mockHydrate, mockLoadRun, mockReset, workflowObj, listWorkflows } =
-  vi.hoisted(() => {
-    const workflowObj: any = {
-      readOnly: false,
-      currentSelectedWorkflow: { id: "", name: "", nodes: [], edges: [] },
-      testRun: { resultDrawer: { show: false, nodeId: "" }, result: null },
-      // The NDV now renders inside this view, so the template reads dialog.show.
-      dialog: { show: false, name: "", expand: false },
-    };
-    return {
-      mockRouter: {
-        push: vi.fn(),
-        replace: vi.fn(),
-        currentRoute: { value: { query: {} as Record<string, any> } },
-      },
-      mockToast: vi.fn(),
-      mockHydrate: vi.fn(),
-      mockLoadRun: vi.fn().mockResolvedValue({ ok: true }),
-      mockReset: vi.fn(),
-      workflowObj,
-      listWorkflows: vi.fn().mockResolvedValue({ data: [] }),
-    };
-  });
+const {
+  mockRouter,
+  mockToast,
+  mockHydrate,
+  mockLoadRun,
+  mockRetry,
+  mockReset,
+  workflowObj,
+  listWorkflows,
+} = vi.hoisted(() => {
+  const workflowObj: any = {
+    readOnly: false,
+    currentSelectedWorkflow: { id: "", name: "", nodes: [], edges: [] },
+    testRun: { resultDrawer: { show: false, nodeId: "" }, result: null },
+    // The NDV now renders inside this view, so the template reads dialog.show.
+    dialog: { show: false, name: "", expand: false },
+  };
+  return {
+    mockRouter: {
+      push: vi.fn(),
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} as Record<string, any> } },
+    },
+    mockToast: vi.fn(),
+    mockHydrate: vi.fn(),
+    mockLoadRun: vi.fn().mockResolvedValue({ ok: true }),
+    mockRetry: vi.fn().mockResolvedValue({ ok: true }),
+    mockReset: vi.fn(),
+    workflowObj,
+    listWorkflows: vi.fn().mockResolvedValue({ data: [] }),
+  };
+});
 
 vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
-vi.mock("@/services/workflows", () => ({
-  default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listWorkflows: (...a: any[]) => listWorkflows(...a) },
+  });
+});
 vi.mock("@/plugins/workflows/useWorkflowCanvas", () => ({
   default: () => ({ resetWorkflowData: mockReset }),
   workflowObj,
   hydrateWorkflow: (...a: any[]) => mockHydrate(...a),
   loadWorkflowRun: (...a: any[]) => mockLoadRun(...a),
+  retryWorkflowRun: (...a: any[]) => mockRetry(...a),
+  isRetryableRun: (run: any) =>
+    !!run && !!run.error && run.event_type !== "Test" && run.event_type !== "Retry",
 }));
 
-import { describe, it, expect, beforeEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -125,6 +139,21 @@ describe("WorkflowRuns", () => {
       nodes: [],
       edges: [],
     };
+  });
+
+  // The panel is a fixed 27.5rem of a master-detail page, so with no collapse control
+  // the canvas can never be seen whole.
+  it("collapses the runs panel so the canvas can be seen in full", async () => {
+    const wrapper = await mountRuns();
+    const toggle = wrapper.find('[data-test="workflow-runs-panel-collapse"]');
+    expect(toggle.exists()).toBe(true);
+    expect(wrapper.find('[data-test="workflow-runs-panel"]').exists()).toBe(true);
+
+    await toggle.trigger("click");
+    expect(wrapper.find('[data-test="workflow-runs-panel"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="workflow-runs-panel-collapse"]').trigger("click");
+    expect(wrapper.find('[data-test="workflow-runs-panel"]').exists()).toBe(true);
   });
 
   it("locks the canvas read-only for its lifetime and restores on unmount", async () => {
@@ -203,7 +232,7 @@ describe("WorkflowRuns", () => {
     await wrapper.find('[data-test="workflow-runs-edit"]').trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -233,7 +262,13 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default", run_id: "run-5" },
+      query: {
+        id: "wf-1",
+        name: "my flow",
+        org_identifier: "default",
+        run_id: "run-5",
+        folder: "default",
+      },
     });
   });
 
@@ -248,7 +283,7 @@ describe("WorkflowRuns", () => {
 
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflowEditor",
-      query: { id: "wf-1", name: "my flow", org_identifier: "default" },
+      query: { id: "wf-1", name: "my flow", org_identifier: "default", folder: "default" },
     });
   });
 
@@ -273,7 +308,67 @@ describe("WorkflowRuns", () => {
     await wrapper.find(".back-btn").trigger("click");
     expect(mockRouter.push).toHaveBeenCalledWith({
       name: "workflows",
-      query: { org_identifier: "default" },
+      query: { org_identifier: "default", folder: "default" },
     });
+  });
+});
+
+// ── Retry the loaded run ─────────────────────────────────────────────────────
+// The Runs view already has the failed run open and inspected node-by-node, so
+// "re-run this" belongs in the header next to Debug In Editor. It appears only
+// when the loaded run is one the backend can actually replay.
+describe("WorkflowRuns — retry the loaded run", () => {
+  const RETRY = '[data-test="workflow-runs-retry"]';
+
+  const loadRun = async (run: any) => {
+    workflowObj.runsHistory = { list: [run], fetchedAt: 0, params: {}, loading: false };
+    const wrapper = await mountRuns({ id: "wf-1", run_id: run.run_id });
+    await flushPromises();
+    return wrapper;
+  };
+
+  beforeEach(() => {
+    mockRetry.mockClear();
+    mockRetry.mockResolvedValue({ ok: true });
+    mockToast.mockClear();
+  });
+
+  it("offers retry for a loaded failed run from a real trigger", async () => {
+    const w = await loadRun({ run_id: "r-1", error: "boom", event_type: "AlertFired" });
+    expect(w.find(RETRY).exists()).toBe(true);
+  });
+
+  it("does NOT offer retry for a loaded TEST run", async () => {
+    const w = await loadRun({ run_id: "r-1", error: "boom", event_type: "Test" });
+    expect(w.find(RETRY).exists()).toBe(false);
+  });
+
+  it("does NOT offer retry for a loaded RETRY run", async () => {
+    const w = await loadRun({ run_id: "r-1", error: "boom", event_type: "Retry" });
+    expect(w.find(RETRY).exists()).toBe(false);
+  });
+
+  it("does NOT offer retry when no run is loaded", async () => {
+    workflowObj.runsHistory = { list: [], fetchedAt: 0, params: {}, loading: false };
+    const w = await mountRuns({ id: "wf-1" });
+    expect(w.find(RETRY).exists()).toBe(false);
+  });
+
+  it("retries the loaded run and reports it started", async () => {
+    const w = await loadRun({ run_id: "r-1", error: "boom", event_type: "AlertFired" });
+    await w.find(RETRY).trigger("click");
+    await flushPromises();
+    expect(mockRetry).toHaveBeenCalledWith(
+      expect.objectContaining({ workflowId: "wf-1", runId: "r-1" }),
+    );
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+  });
+
+  it("surfaces a refusal from the backend", async () => {
+    mockRetry.mockResolvedValue({ ok: false, error: "Errored run info not found" });
+    const w = await loadRun({ run_id: "r-1", error: "boom", event_type: "AlertFired" });
+    await w.find(RETRY).trigger("click");
+    await flushPromises();
+    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
   });
 });

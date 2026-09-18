@@ -130,6 +130,36 @@ describe("anomaly_detection service", () => {
 
       expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/v2/${org_identifier}/alerts`, data);
     });
+
+    // The folder must travel as ?folder=: it is what the permission gate
+    // authorizes, and a body-only copy lands the config in the default folder.
+    it("should send the folder as a query param when one is given", async () => {
+      const org_identifier = "org123";
+      const data = { name: "cpu-anomaly" };
+
+      mockHttpInstance.post.mockResolvedValue({ data: { id: "id" } });
+
+      await anomaly_detection.create(org_identifier, data, "payments");
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `/api/v2/${org_identifier}/alerts?folder=payments`,
+        data,
+      );
+    });
+
+    it("should encode folder names that need escaping", async () => {
+      const org_identifier = "org123";
+      const data = { name: "cpu-anomaly" };
+
+      mockHttpInstance.post.mockResolvedValue({ data: { id: "id" } });
+
+      await anomaly_detection.create(org_identifier, data, "my folder&x");
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        `/api/v2/${org_identifier}/alerts?folder=my%20folder%26x`,
+        data,
+      );
+    });
   });
 
   describe("update", () => {

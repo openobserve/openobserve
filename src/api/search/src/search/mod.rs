@@ -145,7 +145,7 @@ pub mod utils;
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many you get. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
             "category": "search",
             "pinned": true
         }))
@@ -532,7 +532,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode only took/hits/total/from/size/columns/scan_size/function_error are returned; rows are never capped, so `size` is what controls how many records you get around the key.", "category": "search"}))
     )
 )]
 pub async fn around_v1(
@@ -849,7 +849,7 @@ pub async fn build_search_request_per_field(
 
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
     let fields = req
         .fields
         .iter()
@@ -950,6 +950,8 @@ pub async fn build_search_request_per_field(
     };
 
     let size = req.query.size;
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
+    let keyword = keyword.replace('\'', "''");
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1048,9 +1050,10 @@ async fn values_inner(
         query_sql = sql;
     }
 
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
     let keyword = match query.get("keyword") {
         None => "".to_string(),
-        Some(v) => v.trim().to_string(),
+        Some(v) => v.trim().replace('\'', "''"),
     };
     let no_count = match query.get("no_count") {
         None => false,
@@ -1161,7 +1164,7 @@ async fn values_inner(
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
 
     let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {

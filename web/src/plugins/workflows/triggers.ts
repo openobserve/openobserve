@@ -28,7 +28,8 @@
 //   2. Give it a `buildSample()` (inline, or a builder like testSample.ts /
 //      incidentSample.ts) describing the payload it emits.
 //   3. Add its i18n strings under `workflow.triggerKind.<camelKind>` in
-//      en-US.json: { label, node, desc, intro }.
+//      en-US.json: { label, node, desc, intro, tab }. `tab` is the short list
+//      tab label; without it the tab falls back to the full `label`.
 // Nothing else needs touching — no picker/title/label/mapping edits.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -44,8 +45,10 @@ import { INCIDENT_PAYLOAD_FIELDS } from "./incidentFields";
 // than one (e.g. an incident's lifecycle event_types), the trigger drawer shows
 // a dropdown so the user can preview each variant's exact payload.
 export interface TriggerSampleVariant {
-  /** Stable key + the value shown in the dropdown (e.g. the event_type). */
+  /** Stable key + the underlying event_type value (used for `event_type == "..."`). */
   key: string;
+  /** i18n key for the human-readable dropdown label; falls back to `key` when absent. */
+  labelKey?: I18nKey;
   /** This variant's sample payload. */
   build: () => unknown[];
 }
@@ -60,6 +63,9 @@ export interface WorkflowTriggerDef {
   icon: IconName;
   /** i18n key — picker label + the list's Trigger column. */
   labelKey: I18nKey;
+  /** i18n key — short form for the list's type tabs ("Alerts", not "Alert Fired").
+   *  Falls back to `labelKey` when a trigger does not define one. */
+  tabLabelKey?: I18nKey;
   /** i18n key — canvas card + config-drawer title (e.g. "Alert Trigger"). */
   nodeTitleKey: I18nKey;
   /** i18n key — picker sub-label. */
@@ -107,6 +113,25 @@ export interface WorkflowTriggerDef {
   linksAlerts?: boolean;
 }
 
+// Human-readable dropdown labels per incident event_type; the raw type stays the
+// stored value (and is still visible in the payload preview) for filter authoring.
+const INCIDENT_EVENT_TYPE_LABEL_KEYS: Record<string, I18nKey> = {
+  created: "workflow.node.incidentEventType.created",
+  alert: "workflow.node.incidentEventType.alert",
+  severity_upgrade: "workflow.node.incidentEventType.severity_upgrade",
+  severity_override: "workflow.node.incidentEventType.severity_override",
+  acknowledged: "workflow.node.incidentEventType.acknowledged",
+  resolved: "workflow.node.incidentEventType.resolved",
+  reopened: "workflow.node.incidentEventType.reopened",
+  dimension_upgraded: "workflow.node.incidentEventType.dimension_upgraded",
+  title_changed: "workflow.node.incidentEventType.title_changed",
+  assignment_changed: "workflow.node.incidentEventType.assignment_changed",
+  comment: "workflow.node.incidentEventType.comment",
+  ai_analysis_begin: "workflow.node.incidentEventType.ai_analysis_begin",
+  ai_analysis_complete: "workflow.node.incidentEventType.ai_analysis_complete",
+  ai_analysis_failed: "workflow.node.incidentEventType.ai_analysis_failed",
+};
+
 export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
   {
     kind: "alert_fired",
@@ -114,6 +139,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     enabled: true,
     icon: "notifications-active",
     labelKey: "workflow.triggerKind.alertFired.label",
+    tabLabelKey: "workflow.triggerKind.alertFired.tab",
     nodeTitleKey: "workflow.triggerKind.alertFired.node",
     descKey: "workflow.triggerKind.alertFired.desc",
     introKey: "workflow.triggerKind.alertFired.intro",
@@ -128,6 +154,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     enabled: true,
     icon: "warning",
     labelKey: "workflow.triggerKind.incidentEvent.label",
+    tabLabelKey: "workflow.triggerKind.incidentEvent.tab",
     nodeTitleKey: "workflow.triggerKind.incidentEvent.node",
     descKey: "workflow.triggerKind.incidentEvent.desc",
     introKey: "workflow.triggerKind.incidentEvent.intro",
@@ -136,6 +163,7 @@ export const WORKFLOW_TRIGGERS: WorkflowTriggerDef[] = [
     // event_type, so it doubles as a reference for `event_type == "..."` filters.
     sampleVariants: INCIDENT_EVENT_TYPES.map((type) => ({
       key: type,
+      labelKey: INCIDENT_EVENT_TYPE_LABEL_KEYS[type],
       build: () => buildIncidentSample(type),
     })),
     sampleVariantLabelKey: "workflow.node.incidentEventTypeLabel",

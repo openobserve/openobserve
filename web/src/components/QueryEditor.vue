@@ -13,7 +13,7 @@
       :data-test="`${dataTestPrefix}-ai-input-bar`"
       :class="[
         'border-b-card-glass-border bg-gradient-ai-faint z-10 flex h-9 shrink-0 items-center gap-2 border-b px-2',
-        props.hasExpandButton && 'pr-10',
+        props.hasExpandButton && 'pe-10',
       ]"
     >
       <!-- Show streaming status with spinner + stop button -->
@@ -109,12 +109,7 @@
 
       <!-- Floating AI Icon (top-right corner of editor) - hidden when AI bar is open -->
       <OButton
-        v-if="
-          config.isEnterprise == 'true' &&
-          store.state.zoConfig.ai_enabled &&
-          !hideNlToggle &&
-          !isAIMode
-        "
+        v-if="aiFeatureEnabled && !hideNlToggle && !isAIMode"
         :data-test="`${dataTestPrefix}-ai-toggle-btn`"
         variant="ghost"
         size="icon-toolbar"
@@ -270,6 +265,11 @@ const nlpIcon = computed(() => {
 // Computed: AI input field class based on theme
 const aiInputFieldClass = computed(() => "h-7! flex-1 my-px");
 
+// AI features require an enterprise build with ai_enabled; OSS/AI-off must never surface the AI bar.
+const aiFeatureEnabled = computed(
+  () => config.isEnterprise == "true" && store.state.zoConfig.ai_enabled,
+);
+
 // Computed: Is in AI mode?
 // When externally controlled (nlpMode prop passed), only show AI bar when nlpMode is explicitly ON.
 // The parent decides when the AI bar appears (e.g., after generation success).
@@ -279,8 +279,8 @@ const isAIMode = computed(() => {
     // External control: only nlpMode matters for showing the AI bar
     return nlpMode.value;
   }
-  // Internal control: nlpMode OR auto-detected NL
-  return nlpMode.value || isNaturalLanguageDetected.value;
+  // Internal control: explicit toggle, or auto-detected NL only where AI is available
+  return nlpMode.value || (aiFeatureEnabled.value && isNaturalLanguageDetected.value);
 });
 
 // Computed: Root container style - sets overall height

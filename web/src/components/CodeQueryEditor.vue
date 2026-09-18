@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative flex h-full w-full flex-col" v-bind="$attrs">
+  <div class="relative flex h-full w-full flex-col" dir="ltr" v-bind="$attrs">
     <div
       data-test="query-editor"
       class="logs-query-editor bg-card-glass-bg min-h-0 flex-1"
@@ -74,6 +74,8 @@ const loadMonaco = async () => {
     // X depends on UNKNOWN service" errors that silently degrade intellisense.
     monaco = await import("monaco-editor/esm/vs/editor/editor.api");
     await import("monaco-editor/esm/vs/editor/editor.all.js");
+    // Monaco caches glyph widths once; a webfont swapping in later leaves carets drawn at stale offsets.
+    document.fonts?.addEventListener?.("loadingdone", () => monaco?.editor?.remeasureFonts?.());
   }
   return monaco;
 };
@@ -462,6 +464,9 @@ export default defineComponent({
       // One provider set per language, shared by every editor of that language.
       registerLanguageProviders(props.language);
 
+      // Faces load lazily on first use, so without this the first measurement can hit the fallback font.
+      await document.fonts?.load?.(`1rem ${getFontMono()}`).catch(() => {});
+
       let editorElement = document.getElementById(props.editorId);
       let retryCount = 0;
       const maxRetries = 5;
@@ -596,15 +601,17 @@ export default defineComponent({
         emit("run-query");
       };
 
-      editorObj.createContextKey("ctrlenter", true);
-      editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
+      // Handled here rather than via addCommand: monaco's addCommand discards the
+      // disposable it gets back, so its CommandsRegistry entry outlives the editor.
+      editorObj.onKeyDown((e: any) => {
+        if (e.keyCode === monaco.KeyCode.Enter && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          e.stopPropagation();
+          runQuery();
+        }
+      });
       editorObj.onDidFocusEditorWidget(() => {
         emit("focus");
-
-        // added hack to handle case where ctrl+enter / cmd+enter stops working after
-        // user click on the result row and open sidebase or opensidebar from schedule search
-        // This is because the editor loses focus and the context key "ctrlenter" is not active anymore, so we need to re-add the command on focus
-        editorObj.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runQuery, "ctrlenter");
       });
 
       editorObj.onDidBlurEditorWidget(() => {

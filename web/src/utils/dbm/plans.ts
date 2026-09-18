@@ -538,7 +538,7 @@ export function planEmptyReason(res: QueryPlansResponse): "captureOff" | "noPlan
 /**
  * The left-padding utility for a plan node at `depth`.
  *
- * A Tailwind step (rem-based) rather than an arbitrary value: `pl-[24px]` is
+ * A Tailwind step (rem-based) rather than an arbitrary value: `ps-[24px]` is
  * banned by the house rule and would not scale with the text it indents.
  *
  * Capped because real captured plans reach 19 levels — uncapped, the deepest
@@ -548,5 +548,5 @@ export function planEmptyReason(res: QueryPlansResponse): "captureOff" | "noPlan
 export function planIndentClass(depth: number): string {
   const MAX_INDENT_STEPS = 10;
   const step = Math.min(Math.max(depth, 0), MAX_INDENT_STEPS);
-  return `pl-${step * 2}`;
+  return `ps-${step * 2}`;
 }

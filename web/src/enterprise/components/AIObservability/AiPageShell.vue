@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Last-refreshed indicator (staleness dot + relative time), left of the
            picker — the labeled Refresh button carries no timestamp of its own. -->
       <AiLastRefreshed
-        class="mr-1"
+        class="me-1"
         :last-run-at="lastRunAt"
         :loading="isLoading"
         :data-test="`${dataTest}-last-refreshed`"

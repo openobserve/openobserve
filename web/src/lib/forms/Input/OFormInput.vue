@@ -28,6 +28,7 @@ if (import.meta.env.DEV && !form) {
         :label-position="props.labelPosition"
         :placeholder="props.placeholder"
         :type="props.type"
+        :model-modifiers="props.modelModifiers"
         :disabled="props.disabled"
         :readonly="props.readonly"
         :required="props.required"

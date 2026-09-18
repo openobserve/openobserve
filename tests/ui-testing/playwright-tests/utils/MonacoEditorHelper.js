@@ -52,6 +52,8 @@ class MonacoEditorHelper {
      */
     async focus(container) {
         const inputArea = this.getInputArea(container);
+        // The textarea lags the container when the editor is revealed via v-if; wait for it to attach so a one-shot count() can't miss it and skip focusing (→ typed text lands nowhere).
+        await inputArea.waitFor({ state: 'attached', timeout: 10000 }).catch(() => {});
         if (await inputArea.count() > 0) {
             await inputArea.focus();
         } else {
@@ -66,7 +68,10 @@ class MonacoEditorHelper {
      */
     async clear(container) {
         await this.focus(container);
-        await this.page.keyboard.press('Control+a');
+        // ControlOrMeta, not Control: on macOS Control+a is "move to line start",
+        // so a plain Control+a leaves the editor untouched and the next type()
+        // appends to the existing query instead of replacing it.
+        await this.page.keyboard.press('ControlOrMeta+a');
         await this.page.keyboard.press('Backspace');
     }
 

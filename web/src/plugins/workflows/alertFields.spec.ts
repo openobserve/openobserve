@@ -111,8 +111,8 @@ describe("alertFields", () => {
   });
 
   describe("ALERT_PAYLOAD_FIELDS", () => {
-    it("exposes the 13 flattened columns a Condition can branch on", () => {
-      expect(ALERT_PAYLOAD_FIELDS).toHaveLength(13);
+    it("exposes the 11 flattened columns a Condition can branch on", () => {
+      expect(ALERT_PAYLOAD_FIELDS).toHaveLength(11);
     });
 
     it("lists exactly the expected column values", () => {
@@ -128,14 +128,14 @@ describe("alertFields", () => {
         "meta_org_id",
         "meta_alert_start_time",
         "meta_alert_end_time",
-        "meta_alert_trigger_time",
-        "meta_alert_url",
       ]);
     });
 
-    it("uses the column name as its own label (label === value)", () => {
+    // The label is the dotted path the payload actually carries; the value is the
+    // flattened column the backend evaluates against. They intentionally differ.
+    it("labels each column with its dotted meta path (value stays the flattened form)", () => {
       ALERT_PAYLOAD_FIELDS.forEach((f) => {
-        expect(f.label).toBe(f.value);
+        expect(f.label).toBe(f.value.replace(/^meta_/, "meta."));
       });
     });
 
@@ -165,10 +165,12 @@ describe("alertFields", () => {
       });
     });
 
-    it("carries two runtime-only columns beyond the trigger meta schema", () => {
+    // Offering a column the backend never emits makes a condition that can never
+    // match, with no error — so the two lists must agree exactly.
+    it("offers no column the trigger meta schema does not emit", () => {
       const fromSchema = new Set(TRIGGER_META_VARS.map((v) => v.ref.replace(/^meta\./, "meta_")));
       const extra = ALERT_PAYLOAD_FIELDS.map((f) => f.value).filter((v) => !fromSchema.has(v));
-      expect(extra.sort()).toEqual(["meta_alert_trigger_time", "meta_alert_url"]);
+      expect(extra).toEqual([]);
     });
 
     it("shapes each option as { label, value, type } for the FilterGroup suggestions", () => {

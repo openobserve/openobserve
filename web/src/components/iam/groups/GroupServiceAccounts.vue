@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="iam-service-accounts-selection-filters"
       class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2"
     >
-      <div data-test="iam-service-accounts-selection-show-toggle" class="mr-3">
+      <div data-test="iam-service-accounts-selection-show-toggle" class="me-3">
         <div class="flex items-center">
           <span
             data-test="iam-service-accounts-selection-show-text"
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ t("iam.groupServiceAccounts.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-service-accounts-selection-search-input" class="mr-3">
+      <div data-test="iam-service-accounts-selection-search-input" class="me-3">
         <OSearchInput
           data-test="service-accounts-list-search-input"
           v-model="userSearchKey"
@@ -102,9 +102,8 @@ import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
-import { watch } from "vue";
+import { watch, ref, onBeforeMount } from "vue";
 import type { Ref } from "vue";
-import { ref, onBeforeMount } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";

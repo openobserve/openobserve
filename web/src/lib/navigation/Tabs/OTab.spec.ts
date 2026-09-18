@@ -238,7 +238,7 @@ describe("OTab", () => {
       expect(grip.classes()).toContain("opacity-0");
       expect(grip.classes()).toContain("group-hover/otab:opacity-50");
       // The gutter is padding on the tab, not flow width from the grip.
-      expect(wrapper.find('[role="tab"]').classes()).toContain("pl-3");
+      expect(wrapper.find('[role="tab"]').classes()).toContain("ps-3");
       expect(grip.classes()).toContain("absolute");
     });
 

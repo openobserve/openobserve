@@ -4,6 +4,21 @@ import { ref } from "vue";
 
 const organizationDataLocal: any = ref({});
 
+// Keyed by storage key, so ~107 useLocalStorage() call sites share one listener
+// instead of each leaking its own for the lifetime of the page.
+const storageReaders = new Map<string, () => void>();
+
+let storageListenerAttached = false;
+
+const attachStorageListener = () => {
+  if (storageListenerAttached) return;
+  storageListenerAttached = true;
+  window.addEventListener("storage", (event: StorageEvent) => {
+    if (event.key == null) return;
+    storageReaders.get(event.key)?.();
+  });
+};
+
 const useLocalStorage = (
   key: string,
   defaultValue: unknown,
@@ -22,9 +37,9 @@ const useLocalStorage = (
 
     read();
 
-    window.addEventListener("load", () => {
-      window.addEventListener("storage", read);
-    });
+    // Most recent ref per key wins, which is what keeps the map bounded.
+    storageReaders.set(key, read);
+    attachStorageListener();
 
     const write = () => {
       const val: unknown = isJSONValue ? JSON.stringify(defaultValue) : defaultValue;

@@ -136,7 +136,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
           panelSchema.type != 'table' &&
-          !loading
+          !loading &&
+          !panelSchema.config?.curated_no_data_eligible
         "
         size="inline"
         icon="bar-chart"
@@ -197,7 +198,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
           >
-            <OIcon size="xs" class="mr-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
+            <OIcon size="xs" class="me-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
             <span class="select-none">{{ drilldown.name }}</span>
           </div>
         </template>
@@ -216,6 +217,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardId="dashboardId"
         :annotation="annotationToAddEdit"
         @close="closeAddAnnotation"
+        @saved="reloadAnnotations"
         :panelsList="panelsList"
       />
       <!-- Alert Context Menu -->
@@ -694,6 +696,7 @@ export default defineComponent({
       searchRequestTraceIds,
       loadingProgressPercentage,
       isPartialData,
+      reloadAnnotations,
     } = usePanelDataLoader(
       panelSchema,
       selectedTimeObj,
@@ -1820,6 +1823,7 @@ export default defineComponent({
       validatePanelData,
       isAddAnnotationDialogVisible,
       closeAddAnnotation,
+      reloadAnnotations,
       isAddAnnotationMode,
       toggleAddAnnotationMode,
       annotationToAddEdit,

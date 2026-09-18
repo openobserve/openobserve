@@ -171,7 +171,7 @@ describe("DestinationPreview", () => {
       wrapper
         .find('[data-test="slack-preview"]')
         .classes()
-        .some((className) => className.startsWith("border-l")),
+        .some((className) => className.startsWith("border-s")),
     ).toBe(false);
   });
 

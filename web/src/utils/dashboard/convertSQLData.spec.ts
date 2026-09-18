@@ -10843,4 +10843,91 @@ describe("convertSQLData", () => {
       expect(result.options.grid.bottom).toBeGreaterThan(0);
     });
   });
+  // A conditional overlay series (`CASE WHEN ... THEN value END`) is NULL on
+  // every healthy bucket. Filtering rows on ALL y keys being non-null deleted
+  // those rows outright, taking the base series' value and the x category with
+  // them — the anomaly detection charts lost their whole baseline.
+  describe("sparse y column does not delete the row", () => {
+    const sparsePanel = () => ({
+      queries: [
+        {
+          fields: {
+            x: [{ alias: "zo_sql_key" }],
+            y: [{ alias: "zo_sql_num" }, { alias: "anomaly_value" }],
+            z: [],
+            breakdown: [],
+          },
+        },
+      ],
+      config: { top_results: 10, top_results_others: false, connect_nulls: false },
+      type: "line",
+    });
+
+    // Ten buckets, three of them flagged; the overlay column is null on the rest.
+    const rows = [
+      { zo_sql_key: "16:25", zo_sql_num: 1900, anomaly_value: null },
+      { zo_sql_key: "16:30", zo_sql_num: 2000, anomaly_value: null },
+      { zo_sql_key: "16:35", zo_sql_num: 2050, anomaly_value: null },
+      { zo_sql_key: "16:40", zo_sql_num: 2140, anomaly_value: null },
+      { zo_sql_key: "16:45", zo_sql_num: 3000, anomaly_value: 3000 },
+      { zo_sql_key: "16:50", zo_sql_num: 3000, anomaly_value: 3000 },
+      { zo_sql_key: "16:55", zo_sql_num: 2100, anomaly_value: null },
+      { zo_sql_key: "17:00", zo_sql_num: 2980, anomaly_value: 2980 },
+      { zo_sql_key: "17:05", zo_sql_num: 2000, anomaly_value: null },
+      { zo_sql_key: "17:10", zo_sql_num: 1950, anomaly_value: null },
+    ];
+
+    const render = async (panel: any, data: any[]) =>
+      await convertSQLData(
+        panel,
+        [data],
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockResultMetaData,
+        mockMetadata,
+        mockChartPanelStyle,
+        mockAnnotations,
+      );
+
+    it("keeps every bucket on the x axis", async () => {
+      const result = await render(sparsePanel(), rows);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+    });
+
+    it("keeps the dense series complete", async () => {
+      const result = await render(sparsePanel(), rows);
+      const base = result.options.series.find((s: any) => s.data.includes(1900));
+      expect(base.data).toEqual([1900, 2000, 2050, 2140, 3000, 3000, 2100, 2980, 2000, 1950]);
+    });
+
+    // The gap is what breaks the overlay line at a bucket that is NOT flagged.
+    it("holds the sparse series null where it has no value", async () => {
+      const result = await render(sparsePanel(), rows);
+      const overlay = result.options.series.find((s: any) => !s.data.includes(1900));
+      expect(overlay.data).toHaveLength(10);
+      expect(overlay.data[6]).toBeNull();
+      expect(overlay.data[4]).toBe(3000);
+    });
+
+    // Unchanged behaviour: a row carrying no y value at all is still dropped.
+    it("still drops a row where every y column is null", async () => {
+      const withEmptyRow = [
+        ...rows.slice(0, 2),
+        { zo_sql_key: "16:33", zo_sql_num: null, anomaly_value: null },
+        ...rows.slice(2),
+      ];
+      const result = await render(sparsePanel(), withEmptyRow);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+      expect(result.options.xAxis[0].data).not.toContain("16:33");
+    });
+
+    // A single-y panel takes the same path; `some` and `every` agree there.
+    it("leaves a single-y panel unchanged", async () => {
+      const panel = sparsePanel();
+      panel.queries[0].fields.y = [{ alias: "zo_sql_num" }];
+      const result = await render(panel, rows);
+      expect(result.options.xAxis[0].data).toHaveLength(10);
+    });
+  });
 });

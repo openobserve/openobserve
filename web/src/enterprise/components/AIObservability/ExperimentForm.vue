@@ -46,7 +46,7 @@
             data-test="ai-experiment-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.identitySection") }}
               </span>
@@ -133,7 +133,7 @@
             data-test="ai-experiment-form-task-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.form.tabTask") }}
               </span>
@@ -205,7 +205,9 @@
                     <span class="bg-status-info-text h-2 w-2 shrink-0 rounded-full" />
                     <span class="text-text-secondary">
                       {{ t("aiObservability.experiments.form.providerEndpointLabel") }}
-                      <span class="font-mono">{{ providerEndpoint(selectedProvider) }}</span>
+                      <span class="font-mono">{{
+                        resolvedEndpointOf(selectedProvider) || "—"
+                      }}</span>
                     </span>
                     <span class="text-text-secondary">{{ separator }}</span>
                     <span class="text-text-secondary">
@@ -357,7 +359,7 @@
             data-test="ai-experiment-form-scorers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.experiments.scorers") }}
               </span>
@@ -481,7 +483,14 @@ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
+import { type RemoteTask } from "@/services/remote-tasks.service";
+import { remoteTasksListQuery } from "@/services/llm-experiments.queries";
+import {
+  cloneExperimentMutation,
+  createExperimentMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
 import llmExperimentsService, {
   type ExperimentCreatePayload,
   type ExperimentPreview,
@@ -491,8 +500,8 @@ import onlineEvalsService, { type Provider, type Scorer } from "@/services/onlin
 import {
   defaultModelOf,
   entityId,
+  resolvedEndpointOf,
   scorerTypeOf,
-  valueOf,
 } from "@/enterprise/components/onlineEvals/utils/evalEntity";
 import {
   createPreviewRequestGate,
@@ -623,7 +632,7 @@ async function loadRemoteTasks() {
   if (!orgId.value) return;
   loadingRemoteTasks.value = true;
   try {
-    remoteTasks.value = await remoteTasksService.list(orgId.value);
+    remoteTasks.value = await queryClient.fetchQuery(remoteTasksListQuery(orgId.value));
   } catch {
     remoteTasks.value = [];
   } finally {
@@ -713,14 +722,6 @@ function goBack() {
 const separator = raw("·");
 const dash = raw("—");
 
-function providerEndpoint(provider: Provider) {
-  if (provider.endpoint) return provider.endpoint;
-  const type = String(valueOf(provider, "providerType", "provider_type") || "").toLowerCase();
-  if (type === "openai") return "api.openai.com";
-  if (type === "anthropic") return "api.anthropic.com";
-  return "—";
-}
-
 // A provider added in another tab should be reachable without reloading.
 async function refreshProviders() {
   if (!orgId.value) return;
@@ -792,14 +793,18 @@ function buildPayload(values: ExperimentForm): ExperimentCreatePayload {
   };
 }
 
+// Create and clone both add a row the browser this navigates to would otherwise miss.
+const createExperimentWrite = useMutation(() => createExperimentMutation(orgId.value));
+const cloneExperimentWrite = useMutation(() => cloneExperimentMutation(orgId.value));
+
 async function submitClone(payload: ExperimentCreatePayload): Promise<string> {
   // datasetId and datasetVersion are deliberately absent: an omitted field keeps
   // what the source pinned, which is the only pin a comparison stays valid over.
   const { datasetId: _datasetId, datasetVersion: _datasetVersion, ...overrides } = payload;
   return (
-    await llmExperimentsService.clone(orgId.value, cloneOfId.value, {
-      ...overrides,
-      idempotencyKey: overrides.idempotencyKey ?? undefined,
+    await cloneExperimentWrite.mutateAsync({
+      experimentId: cloneOfId.value,
+      overrides: { ...overrides, idempotencyKey: overrides.idempotencyKey ?? undefined },
     })
   ).id;
 }
@@ -812,7 +817,7 @@ async function onSubmit(values: ExperimentForm) {
     const body = preview.value ? withPreviewScorers(payload, preview.value) : payload;
     const createdId = cloning.value
       ? await submitClone(body)
-      : (await llmExperimentsService.create(orgId.value, body)).experiment.id;
+      : (await createExperimentWrite.mutateAsync(body)).experiment.id;
     idempotencyKey.value = nextIdempotencyKey();
     allowLeave = true;
     toast({

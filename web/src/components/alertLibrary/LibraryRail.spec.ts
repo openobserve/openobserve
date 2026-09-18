@@ -206,10 +206,17 @@ describe("LibraryRail", () => {
     ).toBeDefined();
   });
 
-  it("carries no install-status facet — the rail navigates, the strip filters", () => {
+  it("carries no availability facet — the rail navigates, the strip filters", () => {
+    // Needles read from the catalogue, not typed as literals: a copy change
+    // would otherwise leave this passing while testing nothing.
+    const ready = i18n.global.t("alert_library.statReady");
+    const needsData = i18n.global.t("alert_library.statNeedsData");
+    expect(ready).not.toContain("alert_library.");
+    expect(needsData).not.toContain("alert_library.");
+
     const text = mountRail().text();
-    expect(text).not.toContain("Ready to install");
-    expect(text).not.toContain("Installed");
+    expect(text).not.toContain(ready);
+    expect(text).not.toContain(needsData);
   });
 
   it("never hides a row you have ticked, whatever you type", () => {

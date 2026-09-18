@@ -14,18 +14,24 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Service mocks must be hoisted
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
   const actual = (await importOriginal()) as any;
@@ -338,7 +344,20 @@ describe("PipelinesDestinationList", () => {
   // ── editor toggle ──────────────────────────────────────────────────────────
 
   describe("editor toggle", () => {
-    it.skip("toggleDestinationEditor toggles showDestinationEditor", async () => {
+    // Registers the route (normally added by useManagementRoutes at app setup, not run in this isolated mount) so router.push updates currentRoute for real instead of throwing "No match for".
+    beforeEach(() => {
+      router.addRoute({
+        name: "pipelineDestinations",
+        path: "/test-pipeline-destinations",
+        component: { template: "<div />" },
+      });
+    });
+
+    afterEach(() => {
+      router.removeRoute("pipelineDestinations");
+    });
+
+    it("toggleDestinationEditor toggles showDestinationEditor", async () => {
       wrapper = mountComponent();
       await flushPromises();
 
@@ -349,7 +368,7 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).showDestinationEditor).toBe(false);
     });
 
-    it.skip("editDestination(null) sets showDestinationEditor to true", async () => {
+    it("editDestination(null) sets showDestinationEditor to true", async () => {
       wrapper = mountComponent();
       await flushPromises();
       (wrapper.vm as any).editDestination(null);
@@ -357,7 +376,7 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).showDestinationEditor).toBe(true);
     });
 
-    it.skip("editDestination with existing dest stores editingDestination", async () => {
+    it("editDestination with existing dest stores editingDestination", async () => {
       wrapper = mountComponent();
       await flushPromises();
       const dest = (wrapper.vm as any).destinations[0];
@@ -366,13 +385,34 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).editingDestination).toEqual(dest);
     });
 
-    it.skip("clones destination so original is not mutated", async () => {
+    it("clones destination so original is not mutated", async () => {
       wrapper = mountComponent();
       await flushPromises();
       const original = { name: "orig", url: "http://x.com" };
       (wrapper.vm as any).editDestination(original);
       (wrapper.vm as any).editingDestination.name = "mutated";
       expect(original.name).toBe("orig");
+    });
+
+    it("a stale getDestinations() resolving after Add must not close the editor (regression)", async () => {
+      // Defers destinationService.list() so editDestination(null) (the Add click) can run while onBeforeMount's call is still in flight, then resolves it to reproduce the late-API-response race.
+      let resolveList!: (v: any) => void;
+      (destinationService.list as any).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveList = resolve;
+        }),
+      );
+
+      wrapper = mountComponent();
+      (wrapper.vm as any).editDestination(null);
+      await flushPromises();
+      expect(router.currentRoute.value.query.action).toBe("add");
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+
+      resolveList({ data: [] });
+      await flushPromises();
+
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
     });
 
     it("shows PipelineDestinationEditor when showDestinationEditor is true", async () => {
@@ -528,9 +568,40 @@ describe("PipelinesDestinationList", () => {
       (destinationService.list as any).mockResolvedValue({
         data: [makeDestination(1), makeDestination(2)],
       });
-      await (wrapper.vm as any).getDestinations();
+      // The mount already warmed the cache, so the new mock is only reached by
+      // a forced reload — the same thing the refresh button does.
+      await (wrapper.vm as any).getDestinations(true);
       await flushPromises();
       expect((wrapper.vm as any).destinations).toHaveLength(2);
+    });
+  });
+
+  // ── editor lifecycle ───────────────────────────────────────────────────────
+
+  describe("after saving from the editor", () => {
+    it("leaves the editor closed and re-reads the list from the server", async () => {
+      // The page's own route is registered lazily in the app; the component pushes to it by name.
+      if (!(router as any).hasRoute("pipelineDestinations")) {
+        (router as any).addRoute({
+          name: "pipelineDestinations",
+          path: "/settings/pipeline_destinations",
+          component: { template: "<div />" },
+        });
+      }
+      // The editor is reached with `?action=add`, which `updateRoute()` reopens from.
+      (router as any).currentRoute.value.query = { action: "add" };
+      wrapper = mountComponent();
+      await flushPromises();
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+
+      (destinationService.list as any).mockClear();
+      await (wrapper.vm as any).handleDestinationCreated("destination-new");
+      await flushPromises();
+
+      // A warm list reads the route synchronously, so the query must be gone first.
+      expect((wrapper.vm as any).showDestinationEditor).toBe(false);
+      // Forced: creating a destination does not expire the cached scope.
+      expect(destinationService.list).toHaveBeenCalled();
     });
   });
 });

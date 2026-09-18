@@ -9,12 +9,15 @@ import { createRouter, createWebHistory } from "vue-router";
 import config from "@/aws-exports";
 
 // Mock dependencies
-vi.mock("@/services/jstransform", () => ({
-  default: {
-    create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
-    update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
-  },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(() => Promise.resolve({ data: { message: "Function created successfully" } })),
+      update: vi.fn(() => Promise.resolve({ data: { message: "Function updated successfully" } })),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -697,6 +700,46 @@ describe("AddFunction.vue Branch Coverage", () => {
 
     it("renders with no forced language at all (unchanged behaviour)", () => {
       expect(placeholder(mountAddFunction()).exists()).toBe(true);
+    });
+  });
+
+  // getCode() is the workflow disk-save's source of truth. formData.function only
+  // catches up 500ms (editor debounce) after the last keystroke, so reading it at
+  // click time silently saved the stale seed instead of the typed code.
+  describe("getCode reads the LIVE editor buffer", () => {
+    const EditorStub = {
+      name: "UnifiedQueryEditor",
+      template: "<div class='uqe-stub' />",
+      setup(_props: any, { expose }: any) {
+        // Trailing whitespace: the debounced path always trimmed, so getCode must too.
+        expose({ getValue: () => "  row.meta.enriched = true;\n\n" });
+      },
+    };
+
+    it("🔑 returns the buffer even before the debounced update:query lands", async () => {
+      const wrapper = mount(AddFunction, {
+        props: { ...defaultProps, forcedLanguage: "javascript", defaultCode: "// seed\n" },
+        global: {
+          plugins: [mockI18n, mockRouter],
+          provide: { store: mockStore },
+          stubs: { ...stubs, UnifiedQueryEditor: EditorStub },
+        },
+      });
+      await flushPromises();
+      expect((wrapper.vm.$ as any).exposed.getCode()).toBe("row.meta.enriched = true;");
+    });
+
+    it("falls back to formData while the editor has not mounted", async () => {
+      const wrapper = mount(AddFunction, {
+        props: { ...defaultProps, forcedLanguage: "javascript", defaultCode: "// seed\n" },
+        global: {
+          plugins: [mockI18n, mockRouter],
+          provide: { store: mockStore },
+          stubs: { ...stubs, UnifiedQueryEditor: true },
+        },
+      });
+      await flushPromises();
+      expect((wrapper.vm.$ as any).exposed.getCode()).toBe("// seed");
     });
   });
 });

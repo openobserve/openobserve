@@ -40,7 +40,7 @@
         class="text-status-error-text max-h-50 overflow-y-auto p-3"
       >
         <div class="mb-2 font-bold">{{ t("dashboard.dashboardJsonEditor.pleaseFixIssues") }}</div>
-        <ul class="ml-3">
+        <ul class="ms-3">
           <li v-for="(error, index) in validationErrors" :key="index">
             {{ error }}
           </li>
@@ -51,10 +51,9 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, watch, computed } from "vue";
+import { defineComponent, ref, onMounted, watch, computed, defineAsyncComponent } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { defineAsyncComponent } from "vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import { validateDashboardJson } from "@/utils/dashboard/panelValidation";

@@ -30,7 +30,7 @@
   reach the payload as one.
 -->
 <template>
-  <div :data-test="dataTest">
+  <div :data-test="dataTest" :data-error="errorMessage ? 'true' : undefined">
     <label class="text-text-secondary mb-1 block text-xs">
       {{ label }}<span v-if="required" class="text-text-body"> *</span>
     </label>
@@ -53,7 +53,9 @@
          that grey. -->
     <div
       class="rounded-default border-input-border bg-input-bg h-[2.125rem] overflow-hidden border [&_.monaco-editor]:bg-transparent [&_.monaco-editor_.margin]:bg-transparent [&_.monaco-editor-background]:bg-transparent"
-      :class="focused ? 'border-input-border-focus' : ''"
+      :class="[
+        errorMessage ? 'border-input-border-error' : focused ? 'border-input-border-focus' : '',
+      ]"
     >
       <!-- Keyed by language: monaco reads `language` ONCE, when it is created —
            it registers the grammar and the completion providers there and
@@ -76,7 +78,15 @@
         @blur="focused = false"
       />
     </div>
-    <p v-if="hint" class="text-text-secondary mt-1 text-xs">{{ hint }}</p>
+    <p
+      v-if="errorMessage"
+      class="text-input-error-text mt-1 text-xs"
+      role="alert"
+      :data-test="dataTest ? `${dataTest}-error` : undefined"
+    >
+      {{ errorMessage }}
+    </p>
+    <p v-else-if="hint" class="text-text-secondary mt-1 text-xs">{{ hint }}</p>
   </div>
 </template>
 
@@ -104,6 +114,9 @@ const props = withDefaults(
     suggestions?: unknown[] | null;
     /** Field-value lookup, awaited by the completion provider. */
     fieldValueResolver?: ((field: string) => Promise<string[]>) | null;
+    /** Validation message. Present means invalid: the border turns and the
+     *  message replaces the hint, matching how OInput reports an error. */
+    errorMessage?: string | null;
     dataTest?: string;
   }>(),
   {
@@ -112,6 +125,7 @@ const props = withDefaults(
     keywords: () => [],
     suggestions: null,
     fieldValueResolver: null,
+    errorMessage: null,
   },
 );
 

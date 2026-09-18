@@ -841,6 +841,15 @@ pub(crate) fn has_reserved_dbm_key(rec: &Map<String, Value>) -> bool {
         .any(|k| k.starts_with(RESERVED_DBM_PREFIX) || k == O2_EVENT_NAME)
 }
 
+/// Whether a record carrying `key` could be touched by `canonicalize_dbm_record` at all.
+pub(crate) fn may_canonicalize_key(key: &str) -> bool {
+    key.starts_with("o2_")
+        || matches!(
+            key,
+            "postgresql_calls" | "postgresql_state" | "postgresql_query_id"
+        )
+}
+
 // ─── Read-path pruning: the `o2_dbm_kind` secondary index ────────────────────
 //
 // Every DBM read over the server-vantage stream is `WHERE _timestamp BETWEEN …
@@ -974,12 +983,14 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// seeding list cannot drift from the detection lists. A fifth engine added
 /// there is seeded automatically rather than silently de-optimizing the page.
 ///
-/// The union collapses to FIVE fields, because the two marker arrays are
-/// deliberately different shapes:
+/// The union collapses to SEVEN fields — the scope columns, then the marker
+/// columns of the two deliberately different-shaped arrays:
 ///
 /// | Field | Justified by |
 /// |---|---|
 /// | `o2_dbm_kind` | the canonical operand of every DBM read |
+/// | `o2_dbm_engine` | scope predicate: every Metrics-tab panel and every engine-scoped service read emits `o2_dbm_engine = '<engine>'` |
+/// | `o2_dbm_instance` | scope predicate: the instance filter of the Metrics/Activity pages — measured 2.1 GB scanned to return 83 rows without it |
 /// | `o2_pg_event` | `DEADLOCK_MARKERS` — Postgres deadlocks (filelog) |
 /// | `o2_my_event` | `DEADLOCK_MARKERS` — MySQL deadlocks (filelog) |
 /// | `o2_maria_event` | `DEADLOCK_MARKERS` — MariaDB deadlocks (filelog) |
@@ -991,9 +1002,17 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// four columns. `o2_recipe` is shared between the two arrays and must appear
 /// once, which is why this dedupes rather than concatenating.
 ///
+/// The scope columns are plain AND-equality operands, not OR members, so they
+/// prune independently: `is_expr_valid_for_index` recurses `And` per branch and
+/// keeps whichever operands are indexed. Their selectivity caveat is the same
+/// as the kind column's — on a single-engine, single-instance deployment each
+/// value covers most rows and the 35% skip-threshold guard stands the index
+/// down per file; the win is on fleets, where one instance is a sliver of the
+/// stream.
+///
 /// Every extra indexed column costs tantivy work at parquet-write time and
 /// bytes in the index file, so the set is kept closed: an addition here needs a
-/// real OR operand in a real read query behind it.
+/// real predicate in a real read query behind it.
 ///
 /// # Seeding a column the stream does not have is SAFE
 ///
@@ -1017,8 +1036,10 @@ pub const SERVER_STREAM_INDEX_FIELD: &str = O2_DBM_KIND;
 /// `o2_maria_event` entry that indexes nothing, costs nothing, and becomes
 /// live the day that recipe first ships.
 pub fn server_stream_index_fields() -> Vec<&'static str> {
-    let mut fields = Vec::with_capacity(1 + DEADLOCK_MARKERS.len() + BLOCKING_MARKERS.len());
+    let mut fields = Vec::with_capacity(3 + DEADLOCK_MARKERS.len() + BLOCKING_MARKERS.len());
     fields.push(SERVER_STREAM_INDEX_FIELD);
+    fields.push(O2_DBM_ENGINE);
+    fields.push(O2_DBM_INSTANCE);
     for (col, _) in DEADLOCK_MARKERS.iter().chain(BLOCKING_MARKERS.iter()) {
         if !fields.contains(col) {
             fields.push(col);
@@ -1133,10 +1154,12 @@ pub fn needs_kind_index_field(settings: &mut config::meta::stream::StreamSetting
 /// Cheap by construction: it stops at the first hit, and on the overwhelmingly
 /// common case (a stream carrying no DBM data at all) it is one `get` per
 /// record over a map the ingest loop has already built.
-pub fn batch_has_dbm_records(records: &[(i64, Map<String, Value>)]) -> bool {
+pub fn batch_has_dbm_records<'a>(
+    records: impl IntoIterator<Item = &'a Map<String, Value>>,
+) -> bool {
     records
-        .iter()
-        .any(|(_, rec)| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
+        .into_iter()
+        .any(|rec| rec.get(O2_DBM_KIND).and_then(Value::as_str).is_some())
 }
 
 /// Seed [`server_stream_index_fields`] as secondary indexes on a stream that is
@@ -1212,6 +1235,11 @@ pub fn apply_to_record(local_val: &mut Map<String, Value>) {
     if !config::get_config().db_monitoring.enabled {
         return;
     }
+    canonicalize_dbm_record(local_val);
+}
+
+/// `apply_to_record` without the config read, for callers that already hold the DBM flag.
+pub(crate) fn canonicalize_dbm_record(local_val: &mut Map<String, Value>) {
     // The strip is gated on a fast pre-scan: this function runs on EVERY log
     // record every customer ships, and essentially all of them carry no
     // reserved key at all — for those, one O(record keys) scan replaces 83

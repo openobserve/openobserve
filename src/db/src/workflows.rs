@@ -18,6 +18,7 @@ use std::{
     sync::{Arc, LazyLock},
 };
 
+use config::meta::folder::{DEFAULT_FOLDER, FolderType};
 use infra::{
     coordinator::get_coordinator,
     db::Event,
@@ -58,6 +59,12 @@ pub enum WorkflowTriggerType {
     AlertFired,
     IncidentEvent,
     Webhook,
+    Manual,
+    Test,
+    Retry,
+    // A trigger type written by a newer node. Decoding to a real variant instead would
+    // relabel it as that trigger, and run history is searched across regions.
+    Unknown,
 }
 
 impl From<&str> for WorkflowTriggerType {
@@ -66,7 +73,10 @@ impl From<&str> for WorkflowTriggerType {
             "AlertFired" => Self::AlertFired,
             "IncidentEvent" => Self::IncidentEvent,
             "Webhook" => Self::Webhook,
-            _ => Self::AlertFired,
+            "Manual" => Self::Manual,
+            "Test" => Self::Test,
+            "Retry" => Self::Retry,
+            _ => Self::Unknown,
         }
     }
 }
@@ -77,6 +87,10 @@ impl std::fmt::Display for WorkflowTriggerType {
             Self::AlertFired => write!(f, "AlertFired"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
             Self::Webhook => write!(f, "Webhook"),
+            Self::Manual => write!(f, "Manual"),
+            Self::Test => write!(f, "Test"),
+            Self::Retry => write!(f, "Retry"),
+            Self::Unknown => write!(f, "Unknown"),
         }
     }
 }
@@ -106,6 +120,92 @@ pub async fn get_workflow(
             .insert(workflow_id.to_string(), workflow.clone());
     }
     Ok(workflow)
+}
+
+/// Canonical form of a user-facing folder slug.
+///
+/// Trimmed, because the trimmed and padded spellings have to name the same
+/// folder: the lookup is by exact name, so returning the untrimmed slug here
+/// sends " default " to the database and reports the org's default folder as
+/// missing. An empty or absent slug means the default folder, which is what
+/// every pre-folders client sends.
+pub fn normalize_folder_slug(folder_slug: &str) -> &str {
+    let slug = folder_slug.trim();
+    if slug.is_empty() {
+        DEFAULT_FOLDER
+    } else {
+        slug
+    }
+}
+
+/// Translates a user-facing folder slug into the folder primary key stored on
+/// `workflows.folder_id`, creating the org's default folder on first use.
+pub async fn resolve_folder_pk(org_id: &str, folder_slug: &str) -> Result<String, anyhow::Error> {
+    let slug = normalize_folder_slug(folder_slug);
+
+    if slug == DEFAULT_FOLDER {
+        crate::folders::ensure_default_folder(org_id, FolderType::Workflows)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    }
+
+    infra::table::folders::get_pk_by_name(org_id, slug, FolderType::Workflows)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("folder not found: {slug}"))
+}
+
+/// Lists an org's workflows in one folder, or across the org when `folder_slug`
+/// is `None`, optionally restricted to rows matching `search_substring`.
+pub async fn list_workflows(
+    org_id: &str,
+    folder_slug: Option<&str>,
+    search_substring: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_by_org_folder(org_id, Some(&pk), search_substring).await
+        }
+        None => infra::table::workflows::list_by_org_folder(org_id, None, search_substring).await,
+    }
+}
+
+/// Moves workflows into another folder. `dst_folder_slug` is the user-facing id.
+pub async fn move_workflows(
+    org_id: &str,
+    workflow_ids: &[String],
+    dst_folder_slug: &str,
+) -> Result<(), anyhow::Error> {
+    // Normalized once so the existence check and the pk lookup cannot disagree.
+    let dst_slug = normalize_folder_slug(dst_folder_slug);
+    if !infra::table::folders::exists(org_id, dst_slug, FolderType::Workflows).await? {
+        return Err(anyhow::anyhow!("destination folder not found"));
+    }
+    let pk = resolve_folder_pk(org_id, dst_slug).await?;
+    infra::table::workflows::move_to_folder(org_id, workflow_ids, &pk).await?;
+
+    // The cache keys on workflow id and now holds a stale folder, so drop the
+    // moved entries rather than trying to patch them.
+    let mut cache = CACHE.write().await;
+    for id in workflow_ids {
+        cache.remove(id);
+    }
+    Ok(())
+}
+
+/// Lists an org's drafts in one folder, or across the org when `folder_slug` is
+/// `None`.
+pub async fn list_drafts(
+    org_id: &str,
+    folder_slug: Option<&str>,
+) -> Result<Vec<Workflow>, anyhow::Error> {
+    match folder_slug {
+        Some(slug) => {
+            let pk = resolve_folder_pk(org_id, slug).await?;
+            infra::table::workflows::list_drafts_by_org(org_id, Some(&pk)).await
+        }
+        None => infra::table::workflows::list_drafts_by_org(org_id, None).await,
+    }
 }
 
 pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
@@ -463,6 +563,115 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 CACHE.write().await.remove(id);
             }
             Event::Empty => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_padded_slug_names_the_same_folder_as_the_trimmed_one() {
+        // The lookup is by exact name, so an untrimmed slug reports a folder that exists as
+        // missing.
+        assert_eq!(normalize_folder_slug(" default "), DEFAULT_FOLDER);
+        assert_eq!(normalize_folder_slug("  incidents  "), "incidents");
+        assert_eq!(normalize_folder_slug("incidents"), "incidents");
+    }
+
+    #[test]
+    fn a_blank_slug_means_the_default_folder() {
+        for blank in ["", "   ", "\t\n"] {
+            assert_eq!(normalize_folder_slug(blank), DEFAULT_FOLDER);
+        }
+    }
+
+    #[test]
+    fn unknown_trigger_type_does_not_decode_to_a_real_one() {
+        // A type a NEWER node wrote. Decoding it to a real variant would relabel the run
+        // as that trigger, and run history is searched across regions.
+        assert_eq!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(WorkflowTriggerType::from(""), WorkflowTriggerType::Unknown);
+        assert_ne!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
+    fn known_trigger_types_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_test_and_retry_are_distinct_trigger_types() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            assert_ne!(ty, WorkflowTriggerType::Unknown);
+            assert_ne!(ty, WorkflowTriggerType::Webhook);
+        }
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Test);
+        assert_ne!(WorkflowTriggerType::Test, WorkflowTriggerType::Retry);
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Retry);
+    }
+
+    #[test]
+    fn manual_test_and_retry_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_encodes_as_manual_not_webhook() {
+        assert_eq!(WorkflowTriggerType::Manual.to_string(), "Manual");
+        assert_eq!(WorkflowTriggerType::Test.to_string(), "Test");
+        assert_eq!(WorkflowTriggerType::Retry.to_string(), "Retry");
+    }
+
+    #[test]
+    fn every_trigger_type_is_fieldless_so_display_stays_positional() {
+        // A fielded variant would Display braces/slashes into the 4-part history key.
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+            WorkflowTriggerType::Unknown,
+        ] {
+            let encoded = ty.to_string();
+            // The key separator is `/`; a fielded variant would Debug-format braces and
+            // spaces into it. Underscores or hyphens would be harmless, so don't forbid them.
+            assert!(
+                !encoded.contains('/') && !encoded.contains(' ') && !encoded.contains('{'),
+                "trigger type {encoded} would corrupt the positional history key"
+            );
+            assert!(!encoded.is_empty());
         }
     }
 }

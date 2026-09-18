@@ -37,23 +37,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   is missed now that the card states its condition in words.
 
   The chip is warning-toned, not error-toned: an alert with no data yet is not
-  broken. It can still be read, previewed and installed, and it starts working
+  broken. It can still be read, previewed and added, and it starts working
   when the stream arrives — which is what the tooltip says.
 -->
 <template>
+  <!-- Not a button any more: a control nested in role="button" is invalid for keyboard and AT. -->
   <article
-    class="rounded-default border-border-default bg-surface-base hover:border-border-strong focus-visible:ring-accent/40 flex h-full cursor-pointer flex-col gap-2 border p-3 outline-none focus-visible:ring-2"
-    role="button"
-    tabindex="0"
-    :aria-label="t('alert_library.openDetails', { title: entry.title })"
+    class="rounded-default bg-surface-base flex h-full cursor-pointer flex-col gap-2 border p-3"
+    :class="
+      selected
+        ? 'border-accent ring-accent/40 ring-2'
+        : 'border-border-default hover:border-border-strong'
+    "
     :data-test="`alert-library-card-${entry.id}`"
+    :data-selected="selected ? 'true' : 'false'"
     @click="emit('open')"
-    @keydown.enter.prevent="emit('open')"
-    @keydown.space.prevent="emit('open')"
   >
     <div class="flex items-start gap-2">
-      <h3 class="text-text-heading min-w-0 flex-1 text-sm leading-snug font-medium">
-        {{ entry.title }}
+      <OCheckbox
+        size="sm"
+        :model-value="selected"
+        :aria-label="t('alert_library.selectAlert', { title: entry.title })"
+        class="mt-0.5 shrink-0"
+        :data-test="`alert-library-select-${entry.id}`"
+        @update:model-value="emit('update:selected', $event === true)"
+      />
+      <h3 class="min-w-0 flex-1 text-sm leading-snug font-medium">
+        <button
+          type="button"
+          class="text-text-heading focus-visible:ring-accent/40 rounded-default cursor-pointer text-left outline-none focus-visible:ring-2"
+          :data-test="`alert-library-card-title-${entry.id}`"
+          @click.stop="emit('open')"
+        >
+          {{ entry.title }}
+        </button>
       </h3>
       <OTag
         type="severity"
@@ -125,6 +142,7 @@ import { computed } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { AlertLibraryEntry } from "@/types/alertLibrary";
 import { useI18nTyped } from "@/types/i18n";
 
@@ -134,9 +152,14 @@ const props = defineProps<{
   entry: AlertLibraryEntry;
   /** Whether every stream this alert queries exists in the org. */
   ready: boolean;
+  /** Selection lives in the gallery; the card only renders and reports it. */
+  selected?: boolean;
 }>();
 
-const emit = defineEmits<{ (e: "open"): void }>();
+const emit = defineEmits<{
+  (e: "open"): void;
+  (e: "update:selected", value: boolean): void;
+}>();
 
 const { t } = useI18nTyped();
 

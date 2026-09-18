@@ -9353,57 +9353,6 @@
     },
     {
       "type": "library",
-      "name": "vue-drag-resize",
-      "version": "1.5.4",
-      "bom-ref": "zinc-observe-web@0.1.0|vue-drag-resize@1.5.4",
-      "author": "Kirill Murashov",
-      "description": "Vue Component for resize and drag elements",
-      "licenses": [
-        {
-          "license": {
-            "id": "MIT",
-            "acknowledgement": "declared"
-          }
-        }
-      ],
-      "purl": "pkg:npm/vue-drag-resize@1.5.4",
-      "externalReferences": [
-        {
-          "url": "git+https://github.com/kirillmurashov/vue-drag-resize.git",
-          "type": "vcs",
-          "comment": "as detected from PackageJson property \"repository.url\""
-        },
-        {
-          "url": "https://github.com/kirillmurashov/vue-drag-resize.git",
-          "type": "website",
-          "comment": "as detected from PackageJson property \"homepage\""
-        },
-        {
-          "url": "https://github.com/kirillmurashov/vue-drag-resize/issues",
-          "type": "issue-tracker",
-          "comment": "as detected from PackageJson property \"bugs.url\""
-        },
-        {
-          "url": "https://registry.npmjs.org/vue-drag-resize/-/vue-drag-resize-1.5.4.tgz",
-          "type": "distribution",
-          "hashes": [
-            {
-              "alg": "SHA-512",
-              "content": "491dd4ee7e9301910180fef3c3b6d1f668ed0256018ea2286964c33f3e475cdfe76213b1292037d5a0fba7bd5f9aad63b72b7dade0270b1eb6bda94d2fd64072"
-            }
-          ],
-          "comment": "as detected from npm-ls property \"resolved\" and property \"integrity\""
-        }
-      ],
-      "properties": [
-        {
-          "name": "cdx:npm:package:path",
-          "value": "node_modules/vue-drag-resize"
-        }
-      ]
-    },
-    {
-      "type": "library",
       "name": "vue-draggable-next",
       "version": "2.3.0",
       "bom-ref": "zinc-observe-web@0.1.0|vue-draggable-next@2.3.0",
@@ -71276,7 +71225,6 @@
         "zinc-observe-web@0.1.0|vite@7.3.2",
         "zinc-observe-web@0.1.0|vitest-canvas-mock@1.1.3",
         "zinc-observe-web@0.1.0|vitest@4.0.16",
-        "zinc-observe-web@0.1.0|vue-drag-resize@1.5.4",
         "zinc-observe-web@0.1.0|vue-draggable-next@2.3.0",
         "zinc-observe-web@0.1.0|vue-i18n@11.2.8",
         "zinc-observe-web@0.1.0|vue-router@4.6.4",
@@ -72515,9 +72463,6 @@
     },
     {
       "ref": "zinc-observe-web@0.1.0|vitest@4.0.16|picomatch@4.0.4"
-    },
-    {
-      "ref": "zinc-observe-web@0.1.0|vue-drag-resize@1.5.4"
     },
     {
       "ref": "zinc-observe-web@0.1.0|vue-draggable-next@2.3.0",

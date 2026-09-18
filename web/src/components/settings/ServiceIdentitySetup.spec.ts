@@ -94,6 +94,7 @@ const inlineOverrides = {
       foundInLogs: "Found in Logs",
       foundInTraces: "Found in Traces",
       foundInMetrics: "Found in Metrics",
+      foundInProfiles: "Found in Profiles",
       autoSuggestedBanner: "Auto suggested",
       identityConfigSaved: "Configuration saved",
       identityConfigSaveFailed: "Failed to save configuration",

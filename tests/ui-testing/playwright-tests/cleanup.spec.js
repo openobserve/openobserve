@@ -41,7 +41,8 @@ test.describe("Pre-Test Cleanup", () => {
         'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
         /^destination\d{1,3}$/,    // destination4, destination44, destination444, etc.
         'wf_auto_dest_',           // Workflows v1 test destinations
-        'wf_auto_'                 // Workflows v1 generic test destinations
+        'wf_auto_',                // Workflows v1 generic test destinations
+        'pw_lib_dest_'             // alert-library.spec.js (Alert Library e2e destinations)
       ],
       // Template prefixes to clean up
       [
@@ -65,7 +66,8 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
-        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
+        'test_fv_alerts_tmpl_',    // alerts-form-validation.spec.js (templates created by the test cases)
+        'pw_lib_tmpl_'             // alert-library.spec.js (Alert Library e2e templates)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ', 'wf_auto_']
@@ -80,6 +82,11 @@ test.describe("Pre-Test Cleanup", () => {
     const activeOrg = getOrgIdentifier();
     await pm.apiCleanup.cleanupFunctionsInOrg(activeOrg, [/^wf_auto_fn_/, /^wf_auto_/]);
     await pm.apiCleanup.cleanupStreams([/^wf_auto_stream_/, /^wf_auto_sink_/], ['default']);
+
+    // metrics-14238-stale-nodata.spec.js seeds one METRICS stream per run, named with a
+    // timestamp so parallel runs cannot collide — which also means nothing ever reuses
+    // them. Harmless on CI's throwaway server, but they pile up on a shared dev env.
+    await pm.apiCleanup.cleanupStreams([/^e2e_14238_/], [], { streamType: 'metrics' });
 
     // Clean up all reports owned by automation user
     await pm.apiCleanup.cleanupReports();
@@ -128,6 +135,8 @@ test.describe("Pre-Test Cleanup", () => {
       ],
       // Pipeline name patterns to match
       [
+        /^e2e-12647-/,                 // pipeline-preview-bounds.spec.js (#12647)
+        /^e2e7030/,                    // pipeline-export.spec.js (#7030)
         /^validation-precedence-\d+$/,
         /^validation-multiple-or-\d+$/,
         /^validation-nested-or-\d+$/,
@@ -162,6 +171,7 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up functions matching test patterns
     // Patterns from sanity/pipeline tests (default org only)
     const sanityFunctionPatterns = [
+      /^e2e_2812_/,                  // function-delete-confirm.spec.js (#2812)
       /^Pipeline\d{1,3}$/,           // Pipeline1, Pipeline12, Pipeline123
       /^first\d{1,3}$/,              // first0, first1, first99
       /^second\d{1,3}$/,             // second0, second1, second99
@@ -217,6 +227,8 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up file-based enrichment tables matching test patterns
     // These are tables uploaded via file and tracked in /api/{org}/streams?type=enrichment_tables
     await pm.apiCleanup.cleanupFileEnrichmentTables([
+      /^e2e_2937_/,                                                                          // enrichment-lifecycle.spec.js (#2937)
+      /^e2e_2067_/,                                                                          // enrichment-lifecycle.spec.js (#2067)
       /^protocols_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,       // protocols_<uuid>_csv (VRL test)
       /^enrichment_info_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/, // enrichment_info_<uuid>_csv (upload test)
       /^append_[a-f0-9]{8}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{4}_[a-f0-9]{12}_csv$/,          // append_<uuid>_csv (append test)
@@ -282,6 +294,12 @@ test.describe("Pre-Test Cleanup", () => {
     // Clean up streams matching test patterns
     await pm.apiCleanup.cleanupStreams(
       [
+        /^e2e_sev_str_/,               // logs-histogram-severity.spec.js (#11353)
+        /^e2e_sev_num_/,               // logs-histogram-severity.spec.js (#11441)
+        /^e2e_ms7332_/,                // logs-multistream-share-url.spec.js (#7332)
+        /^e2e_12647_dest_/,            // pipeline-preview-bounds.spec.js (#12647) destination stream
+        /^e2e7030[a-z0-9]+-(alpha|beta)_dest$/, // pipeline-export.spec.js (#7030) destination streams
+        /^e2e_10602_/,                 // logs-v040-limit-and-stream-list.spec.js (#10602)
         /^sanitylogstream_/,           // sanitylogstream_61hj, etc.
         /^test\d+$/,                   // test1, test2, test3, etc.
         /^stress_test/,                // stress_test*, stress_test_<runId>_w0, stress_test1, etc.
@@ -333,7 +351,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^backfill_source_\d+$/,                       // Backfill source streams (backfill_source_<number>)
         /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
-        /^e2e_time_test_\d+$/                       // e2e_time_test_<timestamp>
+        /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
+        /^pw_lib_(ready|absent)_/                   // alert-library.spec.js (Alert Library e2e readiness streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']
@@ -345,6 +364,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
+        /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }

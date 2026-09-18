@@ -126,6 +126,15 @@ const TOKENS_FIELD = `gen_ai_usage_total_tokens`;
 const MODEL_FIELD = `gen_ai_response_model`;
 const OBSERVATION_TYPE_FIELD = `gen_ai_operation_name`;
 
+// Scope for every panel that groups by model. `baseFilter` alone admits ALL
+// gen_ai spans — including `execute_tool` children and evaluator spans, which
+// legitimately carry no model (the OTEL gen_ai conventions only put a model on
+// generation/embedding operations). Bucketing those under a synthetic
+// "unknown" model made them dominate the per-model panels: an agent emits one
+// generation span per turn but a tool span per tool call, so "unknown" read as
+// ~9x the real model and its token bar was always a flat zero.
+const modelScopedFilter = `${baseFilter} AND ${MODEL_FIELD} IS NOT NULL`;
+
 export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
   {
     id: "cost-trend",
@@ -143,8 +152,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
           ${MODEL_FIELD} as model,
           COALESCE(SUM(${COST_FIELD}), 0) as cost
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND ${MODEL_FIELD} IS NOT NULL
+        WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
@@ -167,8 +175,7 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
           ${MODEL_FIELD} as model,
           COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
-        WHERE ${baseFilter}
-          AND ${MODEL_FIELD} IS NOT NULL
+        WHERE ${modelScopedFilter}
         GROUP BY ts, ${MODEL_FIELD}
         ORDER BY ts
       `,
@@ -213,14 +220,14 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
       // render as grouped bars per model (see `series`).
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           approx_percentile_cont(duration, 0.5)  / 1000.0 as p50_ms,
           approx_percentile_cont(duration, 0.9)  / 1000.0 as p90_ms,
           approx_percentile_cont(duration, 0.95) / 1000.0 as p95_ms,
           approx_percentile_cont(duration, 0.99) / 1000.0 as p99_ms
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY p95_ms DESC
       `,
       seriesField: "model",
@@ -293,11 +300,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           COUNT(*) as count
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY count DESC
       `,
       seriesField: "model",
@@ -315,11 +322,11 @@ export const LLM_INSIGHTS_PANELS: LLMPanelDef[] = [
     query: {
       sql: `
         SELECT
-          COALESCE(${MODEL_FIELD}, 'unknown') as model,
+          ${MODEL_FIELD} as model,
           COALESCE(SUM(${TOKENS_FIELD}), 0) as tokens
         FROM {{stream}}
-        WHERE ${baseFilter}
-        GROUP BY COALESCE(${MODEL_FIELD}, 'unknown')
+        WHERE ${modelScopedFilter}
+        GROUP BY ${MODEL_FIELD}
         ORDER BY tokens DESC
       `,
       seriesField: "model",

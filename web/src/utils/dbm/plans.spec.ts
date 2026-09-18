@@ -550,11 +550,11 @@ describe("planIndentClass", () => {
   });
 
   it("emits a rem-based Tailwind step, never a px arbitrary value", () => {
-    // House rule: px is banned in class arbitrary values. A `pl-[24px]` here
+    // House rule: px is banned in class arbitrary values. A `ps-[24px]` here
     // would fail the CI lint and scale wrongly against text.
     for (let depth = 0; depth < 25; depth += 1) {
       expect(planIndentClass(depth)).not.toMatch(/px/);
-      expect(planIndentClass(depth)).toMatch(/^pl-\d+(\.\d+)?$/);
+      expect(planIndentClass(depth)).toMatch(/^ps-\d+(\.\d+)?$/);
     }
   });
 

@@ -178,7 +178,7 @@ function refreshPage() {
           <p class="text-text-secondary m-0 mb-2 text-sm font-semibold tracking-wide capitalize">
             {{ t("synthetics.createBrowserTest.setupIncognitoCalloutTitle") }}
           </p>
-          <ol class="text-text-secondary m-0 flex list-decimal flex-col gap-1 pl-4 text-sm">
+          <ol class="text-text-secondary m-0 flex list-decimal flex-col gap-1 ps-4 text-sm">
             <i18n-t
               keypath="synthetics.createBrowserTest.setupIncognitoCalloutStep1"
               tag="li"

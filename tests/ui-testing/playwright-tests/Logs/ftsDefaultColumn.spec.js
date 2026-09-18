@@ -20,7 +20,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const { ingestTestData, waitForStreamData } = require('../utils/data-ingestion.js');
+const { ingestTestData, waitForStreamData, waitForStreamListed } = require('../utils/data-ingestion.js');
 const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 const TC008_SECOND_STREAM = 'e2e_automate_fts2_tc008';
@@ -38,6 +38,9 @@ test.describe("FTS Default Column Selection testcases", () => {
       await ingestTestData(page, TC008_SECOND_STREAM);
       expect(await waitForStreamData(page, TC008_SECOND_STREAM, 1, 30000),
         `stream ${TC008_SECOND_STREAM} never became queryable within 30s of ingestion`).toBe(true);
+      // Queryable is not the same as LISTED: the stream popover is built from /streams, which enumerates a new stream later than _search can query it.
+      expect(await waitForStreamListed(page, TC008_SECOND_STREAM, 'logs'),
+        `stream ${TC008_SECOND_STREAM} never appeared in the streams list after ingestion`).toBe(true);
     } finally {
       await context.close();
     }
@@ -59,6 +62,10 @@ test.describe("FTS Default Column Selection testcases", () => {
     // leaving the results table empty and timing out waitForSearchResults.
     await waitForStreamData(page, "e2e_automate", 1, 30000);
 
+    // Re-checked in THIS session rather than only the beforeAll context, because the streams list is cached per session and must be confirmed before the goto below, which is where the page caches the list the popover filters.
+    expect(await waitForStreamListed(page, TC008_SECOND_STREAM, 'logs'),
+      `stream ${TC008_SECOND_STREAM} is not listed for this session — the stream popover cannot offer it`).toBe(true);
+
     // Navigate to logs page and select stream
     await page.goto(
       `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
@@ -76,15 +83,17 @@ test.describe("FTS Default Column Selection testcases", () => {
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
       await pm.logsPage.clickSearchBarRefreshButton();
+      // The results body can render before the FTS default column resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
         .waitForSearchResults(20000)
+        .then(() => pm.logsPage.resolveFtsDefaultField(15000))
         .then(() => true)
         .catch(() => false);
       if (!resultsReady) {
         testLogger.info(`Search results not ready (attempt ${attempt}/3), retrying refresh...`);
       }
     }
-    expect(resultsReady, 'Search results did not render after retries').toBe(true);
+    expect(resultsReady, 'Search results / FTS default did not render after retries').toBe(true);
 
     testLogger.info('FTS default column test setup completed');
   });
@@ -332,15 +341,17 @@ test.describe("FTS Default Column Selection testcases", () => {
     let resultsReady = false;
     for (let attempt = 1; attempt <= 3 && !resultsReady; attempt++) {
       await pm.logsPage.clickSearchBarRefreshButton();
+      // The results body can render before the FTS default column re-resolves, so gate on the FTS header too.
       resultsReady = await pm.logsPage
         .waitForSearchResults(20000)
+        .then(() => pm.logsPage.resolveFtsDefaultField(15000))
         .then(() => true)
         .catch(() => false);
       if (!resultsReady) {
         testLogger.info(`TC-FTS-008 search results not ready (attempt ${attempt}/3), retrying refresh...`);
       }
     }
-    expect(resultsReady, 'Search results did not render on second stream').toBe(true);
+    expect(resultsReady, 'Search results / FTS default did not render on second stream').toBe(true);
 
     // Assert that the FTS default column re-resolved on the new stream.
     const secondFtsField = await pm.logsPage.resolveFtsDefaultField(15000);

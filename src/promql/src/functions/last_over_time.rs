@@ -15,22 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
-pub(crate) fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, LastOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct LastOverTimeFunc;
-
-impl LastOverTimeFunc {
-    pub fn new() -> Self {
-        LastOverTimeFunc {}
-    }
-}
 
 impl RangeFunc for LastOverTimeFunc {
     fn name(&self) -> &'static str {
@@ -38,15 +27,12 @@ impl RangeFunc for LastOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        if samples.is_empty() {
-            return None;
-        }
         // NOTE: Comment taken from prometheus golang source.
         // The last_over_time function acts like offset; thus, it
         // should keep the metric name.  For all the other range
         // vector functions, the only change needed is to drop the
         // metric name in the output.
-        Some(samples.last().unwrap().value)
+        samples.last().map(|sample| sample.value)
     }
 }
 
@@ -54,9 +40,14 @@ impl RangeFunc for LastOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, LastOverTimeFunc, eval_ctx)
+    }
 
     // Test helper
     fn last_over_time_test_helper(data: Value) -> Result<Value> {
@@ -78,7 +69,7 @@ mod tests {
 
     #[test]
     fn test_last_over_time_exec_empty_samples_returns_none() {
-        let func = LastOverTimeFunc::new();
+        let func = LastOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

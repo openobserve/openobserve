@@ -35,8 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Standalone (routed) header: shared OPageHeader -->
         <OPageHeader
           v-if="mode === 'standalone'"
-          :title="traceTree[0]?.operationName || t('traces.loadingTrace')"
-          title-data-test="trace-details-operation-name"
+          title-overflow="visible"
           :back="
             showBackButton
               ? {
@@ -47,11 +46,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           class=""
         >
+          <!-- Operation names run long (SQL, URLs); the default header title never shrinks, so it never ellipsises. -->
+          <template #title>
+            <span
+              data-test="trace-details-operation-name"
+              class="block truncate"
+              :title="traceTree[0]?.operationName"
+            >
+              {{ traceTree[0]?.operationName || t("traces.loadingTrace") }}
+            </span>
+          </template>
+
           <template #subtitle>
             <div class="text-2xs text-text-secondary flex items-center space-x-2 whitespace-nowrap">
               <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
               <div class="bg-text-label h-4 w-px py-0" />
-              <span class="mr-1">
+              <span class="me-1">
                 {{ t("traces.traceId") }}:
                 <span
                   data-test="trace-details-trace-id"
@@ -75,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Session ID (LLM traces) -->
               <template v-if="sessionId">
                 <div class="bg-text-label h-4 w-px py-0" />
-                <span class="mr-1">
+                <span class="me-1">
                   {{ t("traces.traceDetails.sessionId") }}:
                   <span
                     data-test="trace-details-session-id"
@@ -98,7 +108,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
               <!-- Span Count Badge -->
               <span class="inline-flex">
-                <OTag type="logsResultChip" value="neutral" data-test="trace-details-spans-count">
+                <!-- sm + py-1! keeps both count chips at 1.1875rem: anything over the header's fixed 1.25rem subtitle band grows into the title's descenders. -->
+                <OTag
+                  type="logsResultChip"
+                  value="neutral"
+                  size="sm"
+                  data-test="trace-details-spans-count"
+                  class="py-1!"
+                >
                   <span data-test="span-count-text">
                     {{ formatLargeNumber(effectiveSpanList.length) }}
                     {{ t("traces.spansLabel") }}
@@ -114,7 +131,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OTag
                   type="logsResultChip"
                   value="error"
+                  size="sm"
                   data-test="trace-details-error-spans-count"
+                  class="py-1!"
                 >
                   <span
                     >{{ formatLargeNumber(errorSpansCount) }} {{ t("traces.errorsLabel") }}</span
@@ -201,7 +220,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Embedded (logs) header -->
         <header
           v-else
-          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 pl-1"
+          class="bg-surface-base flex! h-auto items-center justify-between py-0.5 ps-1"
         >
           <div class="flex w-fit! items-center space-x-4">
             <!-- Back button -->
@@ -210,7 +229,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-back-btn"
               variant="ghost-muted"
               size="icon-xs"
-              class="mr-1.5"
+              class="me-1.5"
               @click="handleBackOrClose"
             >
               <OIcon name="arrow-back" size="sm" />
@@ -238,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span>{{ formatTimestamp(traceStartTime, store.state.timezone) }}</span>
                 <div class="bg-text-label h-4 w-px py-0" />
-                <span class="mr-1">
+                <span class="me-1">
                   {{ t("traces.traceId") }}:
                   <span
                     v-if="mode === 'embedded'"
@@ -272,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <!-- Session ID (LLM traces) -->
                 <template v-if="sessionId">
                   <div class="bg-text-label h-4 w-px py-0" />
-                  <span class="mr-1">
+                  <span class="me-1">
                     {{ t("traces.traceDetails.sessionId") }}:
                     <span
                       data-test="trace-details-session-id"
@@ -319,7 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="bg-text-label h-4 w-px py-0" />
 
               <!-- Error Count Badge -->
-              <span class="mr-[0.85rem] inline-flex">
+              <span class="me-[0.85rem] inline-flex">
                 <OTag
                   type="logsResultChip"
                   value="error"
@@ -341,7 +360,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-apply-filters-btn-right"
               variant="outline"
               size="xs"
-              class="mr-2.5"
+              class="me-2.5"
               @click="openFilterPopover"
             >
               <template #icon-left><OIcon name="filter-alt" size="xs" /></template>
@@ -367,7 +386,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-share-link-btn"
               :url="traceDetailsShareURL"
               variant="outline"
-              buttonClass="mr-1!"
+              buttonClass="me-1!"
               size="icon-xs"
             />
 
@@ -377,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-close-btn"
               variant="ghost"
               size="icon-xs"
-              class="mr-1!"
+              class="me-1!"
               @click="handleBackOrClose"
             >
               <OIcon name="close" size="sm" />
@@ -392,7 +411,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="border-border-default bg-card-glass-bg! flex items-center justify-between border-b bg-white py-0"
         >
           <div
-            class="trace-details-view-tabs ml-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
+            class="trace-details-view-tabs ms-[0.325rem] flex items-center space-x-4 py-[0.325rem]"
           >
             <!--
               Tabs are data-driven from `traceTabs` so they can be dragged to
@@ -421,11 +440,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
           </div>
 
-          <div class="flex items-center gap-2 space-x-2 pr-[0.325rem]">
+          <div class="flex items-center gap-2 space-x-2 pe-[0.325rem]">
             <!-- Unified Search Input Group -->
             <div
               v-if="activeTab !== 'flame-graph' && activeTab !== 'map' && activeTab !== 'thread'"
-              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent mr-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
+              class="unified-search-group rounded-default dark:bg-surface-base dark:hover:border-theme-accent dark:focus-within:border-theme-accent me-1! flex w-fit items-stretch gap-1 transition-colors duration-200"
             >
               <div class="log-stream-search-input">
                 <OSearchInput
@@ -452,7 +471,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-text-secondary mx-0.5">/</span>
                   <span class="text-text-secondary">{{ searchResults }}</span>
                 </div>
-                <div class="ml-1 flex h-full items-center">
+                <div class="ms-1 flex h-full items-center">
                   <OButton
                     data-test="trace-details-search-prev-btn"
                     :disabled="!searchResults || currentIndex === 0"
@@ -491,7 +510,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :title="selectedStreamsString"
                 class="w-44!"
               />
-              <span class="traces-view-logs-btn pl-1">
+              <span class="traces-view-logs-btn ps-1">
                 <!-- Single button with wrapper for tooltip functionality -->
                 <span class="inline-block" tabindex="0">
                   <OButton
@@ -522,7 +541,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
-              class="ml-1"
+              class="ms-1"
               @click="redirectToSessionReplay"
             >
               <template #icon-left>
@@ -608,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l-solid border-l-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-l transition-all duration-300"
+                class="border-s-solid border-s-card-glass-border min-h-0 shrink-0 overflow-x-hidden overflow-y-auto border-s transition-all duration-300"
                 :class="isTimelineExpanded ? '' : 'full'"
                 :style="{
                   width: `calc(100% - ${leftWidth}px)`,
@@ -755,7 +774,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div
                 v-if="isSidebarOpen && (selectedSpanId || showTraceDetails)"
-                class="border-l-solid border-l-card-glass-border h-full overflow-hidden border-l"
+                class="border-s-solid border-s-card-glass-border h-full overflow-hidden border-s"
                 style="width: 40%; min-width: 18.75rem"
               >
                 <TraceDetailsSidebar
@@ -899,12 +918,17 @@ import { useStore } from "vuex";
 import useTheme from "@/composables/useTheme";
 import { createTracesContextProvider } from "@/composables/contextProviders/tracesContextProvider";
 import { contextRegistry } from "@/composables/contextProviders";
-import { formatTimeWithSuffix, getImageURL } from "@/utils/zincutils";
+import {
+  formatTimeWithSuffix,
+  getImageURL,
+  b64EncodeUnicode,
+  formatLargeNumber,
+} from "@/utils/zincutils";
 import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveSessionId } from "./traceDetails.utils";
+import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
@@ -917,16 +941,18 @@ import {
   type TreeNode as EngineTreeNode,
 } from "@/utils/traces/treeVisualizationEngine";
 import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import { spanWindowUs } from "@/utils/rum/traceWindow";
 import useResizer from "@/composables/useResizer";
+import useSmartBack from "@/composables/useSmartBack";
 import { copyToClipboard } from "@/utils/clipboard";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
 import useRumSpanBuilder from "@/composables/rum/useRumSpanBuilder";
-import { b64EncodeUnicode, formatLargeNumber } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
 import searchService from "@/services/search";
 import config from "@/aws-exports";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import useNotifications from "@/composables/useNotifications";
 import { parseUsageDetails, parseCostDetails, hasTracePreview, isLLMTrace } from "@/utils/llmUtils";
 import { formatTimestamp, useTraceProcessing } from "@/composables/traces/useTraceProcessing";
@@ -1471,10 +1497,10 @@ export default defineComponent({
         };
       }
       // Standalone mode - get from URL
-      return {
-        from: Number(router.currentRoute.value.query.from),
-        to: Number(router.currentRoute.value.query.to),
-      };
+      return resolveUrlTimeRange(
+        router.currentRoute.value.query.from,
+        router.currentRoute.value.query.to,
+      );
     });
 
     const effectiveOrgIdentifier = computed(() => {
@@ -2009,10 +2035,11 @@ export default defineComponent({
         if (props.spanListProp.length > 0) {
           const firstSpan = props.spanListProp[0];
           const serviceNames = extractServiceNames(props.spanListProp);
+          const traceWindow = spanWindowUs(props.spanListProp);
           (searchObj.data.traceDetails.selectedTrace as any) = {
             trace_id: props.traceIdProp || firstSpan.trace_id,
-            trace_start_time: Math.min(...props.spanListProp.map((s) => s.start_time / 1000)),
-            trace_end_time: Math.max(...props.spanListProp.map((s) => s.end_time / 1000)),
+            trace_start_time: traceWindow?.start ?? 0,
+            trace_end_time: traceWindow?.end ?? 0,
             service_name: serviceNames,
             services: {},
           };
@@ -2199,8 +2226,8 @@ export default defineComponent({
         if (effectiveStart !== data.from || effectiveEnd !== data.to) {
           updateUrlQueryParams({ from: effectiveStart, to: effectiveEnd });
         }
-        const rumData = await fetchRumEventsForTrace(data.trace_id, effectiveStart, effectiveEnd);
         const traceSpans = traceRes.data.hits;
+        const rumData = await fetchRumEventsForTrace(data.trace_id, traceSpans);
         const { tracedResources, viewEvents, actionEvents, allViewEvents } = rumData;
         const rumSpans = formatRumEventsAsSpans(
           tracedResources,
@@ -2228,10 +2255,11 @@ export default defineComponent({
     };
 
     const updateSelectedTrace = (traceId: string, spans: any[]) => {
+      const traceWindow = spanWindowUs(spans);
       searchObj.data.traceDetails.selectedTrace = {
         trace_id: traceId,
-        trace_start_time: Math.floor(Math.min(...spans.map((span) => span.start_time)) / 1000),
-        trace_end_time: Math.ceil(Math.max(...spans.map((span) => span.end_time)) / 1000),
+        trace_start_time: traceWindow?.start ?? 0,
+        trace_end_time: traceWindow?.end ?? 0,
         service_name: extractServiceNames(spans),
         services: {},
       };
@@ -2754,7 +2782,7 @@ export default defineComponent({
       const refresh = 0;
 
       const query = b64EncodeUnicode(
-        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${spanList.value[0]["trace_id"]}'`,
+        `${quoteSqlIdentifierIfNeeded(String(store.state.organizationData?.organizationSettings?.trace_id_field_name))}='${escapeSingleQuotes(String(spanList.value[0]["trace_id"]))}'`,
       );
 
       router.push({
@@ -2937,10 +2965,13 @@ export default defineComponent({
       window.open(route.href, "_blank");
     };
 
-    const routeToTracesList = () => {
-      // Only navigate if in standalone mode
-      if (props.mode !== "standalone") return;
-
+    // Real browser back when there's history to pop — this trace can be
+    // reached from many AI Observability pages (Sessions, Discovery, Queue
+    // Workbench, Experiments, Eval Jobs, LLM Insights) as well as the plain
+    // Traces search, and router.back() returns to whichever one it actually
+    // was, filters and all. The hand-built push below only fires as a
+    // fallback (direct link / reload, no history to pop).
+    const { goBack: backToTracesList } = useSmartBack(() => {
       const query = cloneDeep(router.currentRoute.value.query);
       delete query.trace_id;
 
@@ -2951,12 +2982,13 @@ export default defineComponent({
         query.to = searchObj.data.datetime.endTime.toString();
       }
 
-      router.push({
-        name: "traces",
-        query: {
-          ...query,
-        },
-      });
+      return { name: "traces", query: { ...query } };
+    });
+
+    const routeToTracesList = () => {
+      // Only navigate if in standalone mode
+      if (props.mode !== "standalone") return;
+      backToTracesList();
     };
 
     const openTraceLink = async () => {

@@ -51,7 +51,7 @@ fn create_cli_app() -> Command {
                 .about("reset openobserve data")
                 .arg(arg!("component", 'c', "component", "reset data of the component: root, user, alert, dashboard, function, stream-stats, file-list-jobs, index-updated-at", true))
                 .arg(arg!("time", 't', "time", "timestamp in microseconds, used by file-list-jobs (default: 0) and index-updated-at (default: stream min data date)"))
-                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by file-list-jobs and index-updated-at (default: all streams)")),
+                .arg(arg!("stream", 's', "stream", "stream key org/stream_type/stream_name, used by stream-stats, file-list-jobs and index-updated-at (default: all streams)")),
             Command::new("import")
                 .about("import openobserve data").args(dataArgs()),
             Command::new("export")
@@ -281,16 +281,20 @@ pub async fn cli() -> Result<bool, anyhow::Error> {
                     db::functions::reset().await?;
                 }
                 "stream-stats" => {
-                    // reset stream stats update offset
-                    db::compact::stats::set_offset(0, None).await?;
-                    // reset stream stats table data
-                    infra_file_list::reset_stream_stats().await?;
-                    // load stream list
-                    db::schema::cache().await?;
-                    // update stats from file list
-                    compaction::stats::update_stats_from_file_list()
-                        .await
-                        .expect("file list remote calculate stats failed");
+                    if let Some(stream) = command.get_one::<String>("stream") {
+                        super::stream::reset_stream_stats(stream).await?;
+                    } else {
+                        // reset stream stats update offset
+                        db::compact::stats::set_offset(0, None).await?;
+                        // reset stream stats table data
+                        infra_file_list::reset_stream_stats().await?;
+                        // load stream list
+                        db::schema::cache().await?;
+                        // update stats from file list
+                        compaction::stats::update_stats_from_file_list()
+                            .await
+                            .expect("file list remote calculate stats failed");
+                    }
                 }
                 "file-list-jobs" => {
                     let time = command

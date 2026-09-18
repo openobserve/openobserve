@@ -13,6 +13,8 @@ export interface PayloadFormData {
   name: string;
   description: I18nText;
   is_real_time: boolean | string;
+  /** Minutes on the form; getAlertPayload converts to seconds on the wire. */
+  pending_period_sec: number | string;
   trigger_condition: {
     threshold: number | string;
     operator: string;
@@ -56,6 +58,8 @@ export interface PayloadFormData {
   /** Feature 2: integer storage id 1..5, or null/undefined when unset. */
   priority?: number | string | null;
   tags?: string[];
+  /** On-call team this alert pages, overriding ownership discovery. */
+  oncall_team?: string | null;
   uuid?: string;
   updatedAt?: string;
   createdAt?: string;
@@ -160,6 +164,14 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   payload.trigger_condition.frequency = parseInt(formData.trigger_condition.frequency as any);
 
   payload.trigger_condition.silence = parseInt(formData.trigger_condition.silence as any);
+
+  // Minutes on the form, seconds on the wire. Forced to 0 for realtime even
+  // though the field is unreachable in that template — same belt-and-suspenders
+  // as the warning_threshold strip below, in case a stale value survives a
+  // realtime<->scheduled toggle without a full remount.
+  payload.pending_period_sec = payload.is_real_time
+    ? 0
+    : Math.round((parseInt(formData.pending_period_sec as any, 10) || 0) * 60);
 
   payload.description = raw(formData.description.trim());
 
@@ -311,6 +323,11 @@ export const getAlertPayload = (formData: PayloadFormData, context: PayloadConte
   // the field when empty so an untagged alert adds no key.
   if (!Array.isArray(payload.tags) || payload.tags.length === 0) {
     delete (payload as any).tags;
+  }
+  // Unset means "work the team out from the identity dimensions", which the
+  // backend expresses as an absent key rather than an empty string.
+  if (typeof payload.oncall_team !== "string" || payload.oncall_team.trim() === "") {
+    delete (payload as any).oncall_team;
   }
 
   if (formData.query_condition.vrl_function) {

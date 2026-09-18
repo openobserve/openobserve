@@ -21,6 +21,7 @@ import { copyToClipboard } from "@/utils/clipboard";
 import type { TranslateFn } from "@/types/i18n";
 import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
 import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { escapeSingleQuotes } from "@/utils/queryUtils";
 import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
@@ -344,11 +345,14 @@ const useTraces = () => {
     const traceIdField = getTraceIdField();
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
+    const spanId = escapeSingleQuotes(String(span.spanId || span.span_id));
+    const escapedTraceId = escapeSingleQuotes(String(traceId));
+
     let query: string = isSpan
-      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${span.spanId || span.span_id}' ${
-          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'` : ""
+      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${spanId}' ${
+          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${escapedTraceId}'` : ""
         }`
-      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'`;
+      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${escapedTraceId}'`;
 
     if (query) query = b64EncodeStandard(query) as string;
 

@@ -31,6 +31,12 @@ import { cloneDeep, debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import {
+  saveAnomalyConfigMutation,
+  triggerAnomalyTrainingMutation,
+} from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import segment from "@/services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -100,6 +106,7 @@ import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import { anomalyBudgetPerDay } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -156,6 +163,11 @@ export const defaultAlertValue: any = () => {
       frequency_type: "minutes",
       timezone: "UTC",
     },
+    // Minutes while the form is open — the CANONICAL stored value (mirrors
+    // trigger_condition.frequency); `_ui.pendingPeriod` is the DISPLAY value,
+    // which may be in hours. getAlertPayload converts to seconds on save.
+    // 0 = fire immediately.
+    pending_period_sec: 0,
     destinations: [],
     // Enterprise-only: workflows linked to this alert (run when it fires).
     workflows: [],
@@ -177,6 +189,9 @@ export const defaultAlertValue: any = () => {
     // serialize unchanged.
     priority: null,
     tags: [],
+    // Empty means "route from the identity dimensions"; the payload layer
+    // drops the key so alerts that never set a team serialize unchanged.
+    oncall_team: "",
   };
 };
 
@@ -198,7 +213,9 @@ export const defaultAnomalyConfig = () => ({
   detection_window_unit: "h" as "m" | "h",
   training_window_days: 14,
   retrain_interval_days: 7,
-  threshold: 100,
+  threshold: 97,
+  // Set only when the backend stored a budget; undefined/null = percentile mode.
+  alert_budget_per_day: undefined as number | undefined,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -286,12 +303,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
   };
 
+  /** Split the alert's STORED pending period (always MINUTES, mirroring
+   *  `frequencyDisplay`) into the display unit + the number the user actually
+   *  sees. AlertSettings.vue derives its own initial unit the same way — see
+   *  its `initialPendingPeriodMode`, kept in sync by rule, not shared code
+   *  (matching how `frequencyMode` and this helper stay independent). */
+  const pendingPeriodDisplay = (obj: any): { mode: "minutes" | "hours"; value: number } => {
+    const mins = Number(obj?.pending_period_sec ?? 0);
+    const isHours = mins >= 60 && mins % 60 === 0;
+    return {
+      mode: isHours ? "hours" : "minutes",
+      value: isHours ? mins / 60 : mins,
+    };
+  };
+
   const buildDefaultForm = (): any => {
     const base = defaultAlertValue();
     return {
       ...base,
       logGroupBy: [] as string[],
-      _ui: { checkEvery: frequencyDisplay(base).checkEvery },
+      _ui: {
+        checkEvery: frequencyDisplay(base).checkEvery,
+        pendingPeriod: pendingPeriodDisplay(base).value,
+      },
       _meta: defaultAddAlertMeta({
         frequencyMode: frequencyDisplay(base).mode,
         minAutoRefreshInterval: minAutoRefreshInterval(),
@@ -312,7 +346,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return {
       ...obj,
       logGroupBy: groupBy,
-      _ui: obj?._ui ?? { checkEvery: freq.checkEvery },
+      _ui: obj?._ui ?? {
+        checkEvery: freq.checkEvery,
+        pendingPeriod: pendingPeriodDisplay(obj).value,
+      },
       _meta:
         obj?._meta ??
         defaultAddAlertMeta({
@@ -392,6 +429,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyRetraining = ref(false);
   const anomalySaving = ref(false);
 
+  const anomalyOrgId = useOrgId();
+  const saveAnomalyConfig = useMutation(() =>
+    saveAnomalyConfigMutation(
+      anomalyOrgId.value,
+      () => router.currentRoute.value.params.anomaly_id as string | undefined,
+    ),
+  );
+  const triggerAnomalyTraining = useMutation(() =>
+    triggerAnomalyTrainingMutation(anomalyOrgId.value),
+  );
+
   const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
@@ -416,10 +464,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!anomalyId) return;
     anomalyRetraining.value = true;
     try {
-      await anomalyDetectionService.triggerTraining(
-        store.state.selectedOrganization.identifier,
-        anomalyId,
-      );
+      await triggerAnomalyTraining.mutateAsync(anomalyId);
       toast({
         variant: "success",
         message: t("alerts.messages.trainingTriggered"),
@@ -1047,6 +1092,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         trigger_condition: {
           silence: Number(source.trigger_condition?.silence ?? 0),
         },
+        // Stored and evaluated for composite alerts server-side (see
+        // handle_composite_alert_trigger). Note the detail GET response
+        // doesn't return it yet on edit — see the fallback comment on the
+        // edit-prefill conversion above.
+        pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
         workflows: source.workflows ?? [],
@@ -1856,6 +1906,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     try {
+      const budgetPerDay = anomalyBudgetPerDay(c);
       const payload: any = {
         alert_type: "anomaly_detection",
         name: c.name,
@@ -1888,25 +1939,25 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_window_seconds: anomalyDetectionWindowSeconds.value,
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          threshold: c.threshold,
+          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+          ...(budgetPerDay !== null
+            ? { alert_budget_per_day: budgetPerDay }
+            : { threshold: c.threshold }),
           alert_enabled: c.alert_enabled,
         },
       };
 
       const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
-      if (routeAnomalyId) {
-        await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
-        toast({
-          variant: "success",
-          message: t("alerts.messages.anomalyConfigUpdated"),
-        });
-      } else {
-        await anomalyDetectionService.create(orgId, payload);
-        toast({
-          variant: "success",
-          message: t("alerts.anomalyCreated"),
-        });
-      }
+      await saveAnomalyConfig.mutateAsync({
+        payload,
+        folderId: (activeFolderId.value as string) || "default",
+      });
+      toast({
+        variant: "success",
+        message: routeAnomalyId
+          ? t("alerts.messages.anomalyConfigUpdated")
+          : t("alerts.anomalyCreated"),
+      });
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
@@ -2039,6 +2090,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   let callAlert: Promise<{ data: any }>;
 
+  // Advisories that ride along with a 200 — an alert that can only ever page
+  // the catch-all team, or one whose groups span teams. Shown beside the
+  // success toast and never in place of it: the save did happen, and an
+  // operator who meant it is entitled to keep it.
+  const showSaveWarnings = (res: { data?: { warnings?: string[] } }) => {
+    for (const message of res?.data?.warnings ?? []) {
+      toast({ variant: "warning", message: raw(message), timeout: 10000 });
+    }
+  };
+
   // Post-schema scheduled/realtime save. Runs ONLY after the composed schema
   // passes (via handleSubmit); preserves the imperative gates + the payload
   // assembly byte-for-byte (Rule ④ payload parity). The payload is built from
@@ -2170,7 +2231,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2179,6 +2240,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertUpdated"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();
@@ -2207,7 +2269,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2216,6 +2278,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertSaved"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();
@@ -2294,6 +2357,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // BE stores seconds; the form field displays minutes (mirrors the
+      // frequency field's display unit). Falls back to 0 for any alert type
+      // where the field is absent from the GET response (older cached
+      // response shape, etc.) rather than showing NaN.
+      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
       if (data.query_condition?.promql_condition) {
@@ -2628,6 +2696,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               },
             });
           }
+          if ((newVal as any).pendingPeriodFieldRef) {
+            focusManager.registerField("pending_period", {
+              ref: (newVal as any).pendingPeriodFieldRef,
+              onBeforeFocus: () => {
+                if (isAnomalyMode.value) {
+                  activeTab.value = "anomaly-alerting";
+                } else {
+                  activeTab.value = "condition";
+                }
+              },
+            });
+          }
         });
       }
     },
@@ -2796,7 +2876,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
-          filters: data.filters ?? [],
+          filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,
           schedule_interval_value: sched.value,

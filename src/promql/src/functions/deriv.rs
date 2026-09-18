@@ -15,23 +15,12 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::{common::linear_regression, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#deriv
-pub(crate) fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, DerivFunc::new(), eval_ctx)
-}
-
 pub struct DerivFunc;
-
-impl DerivFunc {
-    pub fn new() -> Self {
-        DerivFunc {}
-    }
-}
 
 impl RangeFunc for DerivFunc {
     fn name(&self) -> &'static str {
@@ -43,11 +32,7 @@ impl RangeFunc for DerivFunc {
             return None;
         }
         // https://github.com/prometheus/prometheus/issues/2674
-        let value = linear_regression(samples, samples[0].timestamp / 1000);
-        match value {
-            Some((slope, _)) => Some(slope),
-            _ => None,
-        }
+        linear_regression(samples, samples[0].timestamp / 1000).map(|(slope, _)| slope)
     }
 }
 
@@ -55,9 +40,14 @@ impl RangeFunc for DerivFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn deriv(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, DerivFunc, eval_ctx)
+    }
     // Test helper
     fn deriv_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
@@ -78,7 +68,7 @@ mod tests {
 
     #[test]
     fn test_deriv_exec_fewer_than_two_samples_returns_none() {
-        let func = DerivFunc::new();
+        let func = DerivFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
         let one = vec![Sample::new(1000, 5.0)];
         assert!(func.exec(&one, 0, &Duration::ZERO).is_none());

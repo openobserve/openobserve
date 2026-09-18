@@ -112,7 +112,7 @@
             >
               <span class="text-status-success-text text-lg font-bold">{{ thresholdSign }}</span>
               <span class="text-text-body font-mono text-sm font-bold">{{ healthyLabel }}</span>
-              <span class="text-2xs text-text-secondary ml-auto">{{
+              <span class="text-2xs text-text-secondary ms-auto">{{
                 t("onlineEvals.scoreConfig.detail.thresholdHint")
               }}</span>
             </div>

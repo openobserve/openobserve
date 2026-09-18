@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="bg-section-header-bg hover:bg-surface-subtle-hover flex cursor-pointer items-center gap-2 overflow-hidden px-2 py-2"
         @click="onDropDownClick"
       >
-        <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="mr-1" />
+        <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="me-1" />
         <span class="text-status-error-text text-sm font-semibold">
           {{ t("dashboard.dashboardErrors.errorsCount", { count: props.errors.errors.length }) }}
         </span>

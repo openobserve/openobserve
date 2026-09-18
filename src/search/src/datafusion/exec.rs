@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -51,7 +51,7 @@ use datafusion::{
 #[cfg(feature = "enterprise")]
 use o2_enterprise::enterprise::search::WorkGroup;
 use vortex::{VortexSessionDefault, io::session::RuntimeSessionExt, session::VortexSession};
-use vortex_datafusion::VortexFormat;
+use vortex_datafusion::{VortexFormat, VortexTableOptions};
 
 use super::{
     peak_memory_pool::PeakMemoryPool, planner::extension_planner::OpenobserveQueryPlanner,
@@ -83,12 +83,16 @@ fn create_session_config(
     let mut config = SessionConfig::from_env()?
         .with_batch_size(get_batch_size())
         .with_target_partitions(target_partitions)
+        .with_collect_statistics(true)
         .with_information_schema(true);
 
     config
         .options_mut()
         .execution
         .listing_table_ignore_subdirectory = false;
+
+    // DF55 migrated aggregate streams regress grouped-agg perf; revisit on the next DF bump.
+    config.options_mut().execution.enable_migration_aggregate = false;
 
     config.options_mut().sql_parser.dialect = Dialect::PostgreSQL;
 
@@ -100,13 +104,19 @@ fn create_session_config(
         };
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
-    // sorted inputs: let DataFusion chain non-overlapping files into ordered
-    // partitions instead of adding a global sort
+    // any declared order: chain non-overlapping files into ordered partitions instead of sorting
     if sort_order.is_sorted() {
         config
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
+    }
+    // hash-sorted only: timestamp-ordered sessions still want the round-robin exchange
+    if sort_order == FileSortOrder::HashTimestampAsc {
+        config
+            .options_mut()
+            .optimizer
+            .enable_round_robin_repartition = false;
     }
 
     // When set to true, skips verifying that the schema produced by planning the input of
@@ -293,7 +303,7 @@ impl<'a> DataFusionContextBuilder<'a> {
         for rule in self.physical_optimizer_rules {
             builder = builder.with_physical_optimizer_rule(rule);
         }
-        if cfg.search.feature_join_match_one_enabled {
+        if cfg.search.feature_join_match_one_enabled || cfg.search.feature_shared_cte_enabled {
             builder = builder.with_query_planner(Arc::new(OpenobserveQueryPlanner::new()));
         }
         Ok(SessionContext::new_with_state(builder.build()))
@@ -509,22 +519,41 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
+/// Registers the metrics files; an all-hash-sorted set also registers the
+/// `HASH_SORTED_TABLE_SUFFIX` table with its order declared.
 pub async fn register_metrics_table(
     session: &SearchSession,
     schema: Arc<Schema>,
     table_name: &str,
     files: Vec<FileKey>,
+    sort_order: FileSortOrder,
 ) -> Result<SessionContext> {
     let schema = metrics_query_schema(schema);
     let ctx = DataFusionContextBuilder::new()
         .trace_id(&session.id)
         .work_group(session.work_group.clone())
         .stream_type(StreamType::Metrics)
+        .sort_order(sort_order)
         .build(session.target_partitions)
         .await?;
 
+    let file_stat_cache = ctx.runtime_env().cache_manager.get_file_statistic_cache();
+    // a separate table: declaring the order on the main table would change its file grouping
+    if sort_order.is_sorted() {
+        let tables = TableBuilder::new()
+            .sort_order(sort_order)
+            .file_stat_cache(file_stat_cache.clone())
+            .build(session.clone(), files.clone(), schema.clone())
+            .await?;
+        let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
+        ctx.register_table(
+            format!("{table_name}{HASH_SORTED_TABLE_SUFFIX}"),
+            union_table,
+        )?;
+    }
+
     let tables = TableBuilder::new()
-        .file_stat_cache(ctx.runtime_env().cache_manager.get_file_statistic_cache())
+        .file_stat_cache(file_stat_cache)
         .build(session.clone(), files, schema.clone())
         .await?;
     let union_table = Arc::new(NewUnionTable::new(schema, tables));
@@ -568,7 +597,7 @@ fn metrics_query_schema_with_utf8_view(
 /// Create a datafusion table from a list of files and a schema
 pub struct TableBuilder {
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     index_condition: Option<IndexCondition>,
     fst_fields: Vec<String>,
     timestamp_filter: Option<(i64, i64)>,
@@ -598,10 +627,7 @@ impl TableBuilder {
         self
     }
 
-    pub fn file_stat_cache(
-        mut self,
-        file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
-    ) -> Self {
+    pub fn file_stat_cache(mut self, file_stat_cache: Option<Arc<FileStatisticsCache>>) -> Self {
         self.file_stat_cache = file_stat_cache;
         self
     }
@@ -708,13 +734,18 @@ impl TableBuilder {
             FileFormat::Parquet => Arc::new(ParquetFormat::default()),
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
-                Arc::new(VortexFormat::new(vortex_session))
+                if self.sort_order.is_sorted() {
+                    // the shards already parallelize; per-file spawned read-ahead only buys memory
+                    let mut options = VortexTableOptions::default();
+                    options.scan_concurrency = Some(1);
+                    Arc::new(VortexFormat::new_with_options(vortex_session, options))
+                } else {
+                    Arc::new(VortexFormat::new(vortex_session))
+                }
             }
         };
 
-        let mut listing_options = ListingOptions::new(file_format)
-            .with_target_partitions(target_partitions)
-            .with_collect_stat(true);
+        let mut listing_options = ListingOptions::new(file_format);
 
         if self.sort_order.is_sorted() {
             // specify sort columns for parquet file
@@ -775,6 +806,7 @@ impl TableBuilder {
             self.index_condition.clone(),
             self.fst_fields.clone(),
             self.timestamp_filter,
+            target_partitions,
         )?;
         if self.file_stat_cache.is_some() {
             table = table.with_cache(self.file_stat_cache.clone());
@@ -892,10 +924,14 @@ mod tests {
                 .cpu_num
                 .max(get_config().limit.datafusion_min_partition_num)
         );
-        assert_eq!(config.options().execution.batch_size, get_batch_size());
+        assert_eq!(
+            config.options().execution.batch_size.get(),
+            get_batch_size()
+        );
         assert_eq!(config.options().sql_parser.dialect, Dialect::PostgreSQL);
         assert!(!config.options().execution.listing_table_ignore_subdirectory);
         assert!(config.information_schema());
+        assert!(!config.options().execution.enable_migration_aggregate);
         assert_eq!(
             config.options().execution.parquet.pushdown_filters,
             get_config().search.feature_pushdown_filter_enabled
@@ -1481,7 +1517,9 @@ mod tests {
                 row_group_size: None,
             }];
 
-            let result = register_metrics_table(&session, schema, "test_table", files).await;
+            let result =
+                register_metrics_table(&session, schema, "test_table", files, FileSortOrder::None)
+                    .await;
 
             // Should create context successfully
             assert!(result.is_ok());

@@ -16,13 +16,19 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
-    <div class="flex items-center justify-between p-3">
-      <div class="mr-3 flex items-center text-xl tracking-[0.005em]">
-        <span data-test="dashboard-viewpanel-title">
+    <div class="flex items-center justify-between p-3 max-md:flex-wrap max-md:gap-y-2">
+      <div
+        class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:flex-1 max-md:basis-full"
+      >
+        <span
+          class="truncate"
+          :title="isMobile ? dashboardPanelData.data.title : undefined"
+          data-test="dashboard-viewpanel-title"
+        >
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
@@ -101,7 +107,7 @@
               />
               <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="mr-2 flex shrink-0 items-center justify-end"
+                  class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->
@@ -175,9 +181,15 @@ import {
   onUnmounted,
   onMounted,
   onBeforeMount,
+  onActivated,
+  inject,
+  provide,
+  computed,
+  defineAsyncComponent,
 } from "vue";
 
 import { useI18nTyped } from "@/types/i18n";
+import useBreakpoint from "@/composables/useBreakpoint";
 import { getDashboard, getPanel, checkIfVariablesAreLoaded } from "../../../utils/commons";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
@@ -188,10 +200,8 @@ import VariablesValueSelector from "../../../components/dashboards/VariablesValu
 import PanelSchemaRenderer from "../../../components/dashboards/PanelSchemaRenderer.vue";
 // import _ from "lodash-es";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
-import { onActivated } from "vue";
 import { parseDuration } from "@/utils/date";
 import HistogramIntervalDropDown from "@/components/dashboards/addPanel/HistogramIntervalDropDown.vue";
-import { inject, provide, computed } from "vue";
 import { replaceHistogramInterval } from "@/utils/dashboard/histogramIntervalReplacer";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import config from "@/aws-exports";
@@ -199,7 +209,6 @@ import { isEqual } from "lodash-es";
 import { processQueryMetadataErrors } from "@/utils/zincutils";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
-import { defineAsyncComponent } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -258,6 +267,7 @@ export default defineComponent({
     const showLegendsDialog = ref(false);
     const panelSchemaRendererRef: any = ref(null);
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const store = useStore();
 
@@ -789,6 +799,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       t,
       setTimeForVariables,
       dateTimeForVariables,

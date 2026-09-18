@@ -139,7 +139,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching
                the other AI pages' AiPageShell header. -->
           <AiLastRefreshed
-            class="mr-1"
+            class="me-1 max-lg:hidden"
             :last-run-at="qualityLastRunAt"
             :loading="qualityRefreshing"
             data-test="quality-last-refreshed"
@@ -148,6 +148,7 @@ the Free Software Foundation, either version 3 of the License, or
             ref="qualityDatePickerRef"
             v-model="qualitySelectedDate"
             :auto-apply-dashboard="true"
+            class="max-lg:[&_.date-time-label]:hidden"
             data-test="quality-time-range-picker"
           />
           <OButton
@@ -197,12 +198,16 @@ the Free Software Foundation, either version 3 of the License, or
             :score-configs="scoreConfigs"
             :configs-loading="isLoading"
             @update:agent-key="onQualityAgentChange"
-            @ready="reloadQuality"
+            @ready="reloadQuality()"
+            @reload-configs="reloadLists()"
           />
           <ScoreConfigList
             v-else-if="activeTab === 'scoreConfigs'"
+            :forbidden="scoreConfigsForbidden"
             :rows="filteredRows as ScoreConfig[]"
             :all-score-configs="scoreConfigs"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :scorers="scorers"
             :search="filterQuery"
             :loading="isLoading"
@@ -215,12 +220,15 @@ the Free Software Foundation, either version 3 of the License, or
             @import-custom="goToImportScoreConfig"
             @export="exportScoreConfigRow"
             @export-bulk="exportScoreConfigBulk"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
           <ScorerList
             v-else-if="activeTab === 'scorers'"
+            :forbidden="scorersForbidden"
             :rows="filteredRows as Scorer[]"
             :all-scorers="scorers"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :jobs="jobs"
             :score-configs="scoreConfigs"
             :providers="providers"
@@ -236,14 +244,17 @@ the Free Software Foundation, either version 3 of the License, or
             @export="exportScorerRow"
             @export-bulk="exportScorerBulk"
             @add-provider="goToAddProvider"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
           <EvalJobList
             v-else-if="activeTab === 'jobs'"
+            :forbidden="jobsForbidden"
             :rows="filteredRows as EvalJob[]"
             :search="filterQuery"
             :loading="isLoading"
             :action-loading="jobsBulkDeleting"
+            :last-run-at="listsLastRunAt"
+            :refreshing="listsRefreshing"
             :pending-status-id="pendingJobStatusId"
             @update:search="filterQuery = $event"
             @create="openCreateDialog"
@@ -253,7 +264,7 @@ the Free Software Foundation, either version 3 of the License, or
             @pause="(row: EvalJob) => pauseJob(row)"
             @delete="(row: EvalJob) => deleteRow(row)"
             @delete-bulk="(ids: string[]) => deleteJobsBulk(ids)"
-            @refresh="loadAll(orgId)"
+            @refresh="reloadLists()"
           />
         </div>
       </section>
@@ -367,12 +378,17 @@ the Free Software Foundation, either version 3 of the License, or
 </template>
 
 <script setup lang="ts">
+import {
+  setJobActiveMutation,
+  deleteEvalEntityMutation,
+} from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { computed, nextTick, onBeforeMount, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import onlineEvalsService, {
+import {
   type EvalJob,
   type ScoreConfig,
   type Scorer,
@@ -420,7 +436,9 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import type { DateWindow } from "./onlineEvals/composables/useQualityData";
 import { useAiDateRange, resolveAiDateWindow } from "@/enterprise/composables/useAiDateRange";
-import genAiAgentMappingService from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { onlineEvalKeys } from "@/services/online-evals.service.querykeys";
 import { downloadFile } from "@/utils/dom";
 import type { I18nKey } from "@/types/i18n";
 import {
@@ -503,10 +521,38 @@ const {
   scoreConfigVersions,
   providers,
   isLoading,
+  jobsForbidden,
+  scorersForbidden,
+  scoreConfigsForbidden,
   loadAll,
   loadProviders,
   ensureScoreConfigVersions,
 } = useOnlineEvalsData();
+
+// The three list tabs load together, so one stamp serves all of them. Read back
+// from the cache, not `Date.now()`: a cached read leaves the rows as old as the
+// fetch that filled them, and the oldest list is what the rows on screen are.
+const listsLastRunAt = ref<number | null>(null);
+// Separate from `isLoading`, which only rises on a cold read: without it the
+// refresh button never spins on a warm reload and a second click fires again.
+const listsRefreshing = ref(false);
+const reloadLists = async (force = true) => {
+  listsRefreshing.value = true;
+  try {
+    await loadAll(orgId.value, force);
+  } finally {
+    listsRefreshing.value = false;
+  }
+  const org = orgId.value;
+  const times = [
+    onlineEvalKeys.scoreConfigs(org),
+    onlineEvalKeys.scorers(org),
+    onlineEvalKeys.jobs(org),
+  ]
+    .map((key) => queryClient.getQueryState(key)?.dataUpdatedAt)
+    .filter((at): at is number => !!at);
+  listsLastRunAt.value = times.length ? Math.min(...times) : Date.now();
+};
 
 const isRefreshingProviders = ref(false);
 
@@ -636,7 +682,7 @@ const qualityDatePickerRef = ref<{
   getConsumableDateTime: () => { startTime: number; endTime: number };
 } | null>(null);
 const qualityPageRef = ref<{
-  refreshAll: () => Promise<void>;
+  refreshAll: (reloadConfigs?: boolean) => Promise<void>;
   isAnyLoading: boolean;
 } | null>(null);
 
@@ -661,12 +707,21 @@ const selectedQualityAgent = computed<AgentFilterSelection | null>(() => {
 // start of a reload instead of looking idle until the data queries kick in.
 const qualityAgentsLoading = ref(false);
 
-async function loadQualityAgents() {
+async function loadQualityAgents(force = false) {
   const { startUs, endUs } = qualityDateWindow.value;
   if (!orgId.value || !startUs || !endUs) return;
   qualityAgentsLoading.value = true;
   try {
-    const response = await genAiAgentMappingService.listAgents(orgId.value, startUs, endUs);
+    const options = genAiAgentsQuery(orgId.value, startUs, endUs);
+    // Agents appear as they emit spans and no write expires the list, so a user refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const response = await queryClient.fetchQuery(options);
     qualityAgents.value = response.agents;
     if (
       qualityAgentKey.value !== ALL_AGENTS_VALUE &&
@@ -706,7 +761,7 @@ function syncQualityDateWindow() {
 // unchanged) and is handled separately by onQualityAgentChange below.
 const qualityReloading = ref(false);
 
-async function reloadQuality() {
+async function reloadQuality(userRefresh = false) {
   qualityReloading.value = true;
   try {
     // On the @ready trigger this runs from QualityPage's onMounted; wait a
@@ -714,8 +769,8 @@ async function reloadQuality() {
     // call into it.
     await nextTick();
     syncQualityDateWindow();
-    await loadQualityAgents();
-    await qualityPageRef.value?.refreshAll?.();
+    await loadQualityAgents(userRefresh);
+    await qualityPageRef.value?.refreshAll?.(userRefresh);
   } finally {
     qualityReloading.value = false;
   }
@@ -724,7 +779,7 @@ async function reloadQuality() {
 // Trigger 2 — Refresh button. Re-anchors relative ranges ("Past 15 minutes")
 // to "now" via the shared reload path.
 function onQualityRefresh() {
-  void reloadQuality();
+  void reloadQuality(true);
 }
 
 // Trigger 3 — date-time change. DateTimePickerDashboard's inner DateTime emits
@@ -822,7 +877,8 @@ watch(
 );
 
 onBeforeMount(async () => {
-  await loadAll(orgId.value);
+  // Mount reads the cache; only the refresh button and post-write reloads force.
+  await reloadLists(false);
   syncFromRoute();
 });
 
@@ -911,16 +967,19 @@ function crossNavigateToJob(row: EvalJob) {
   router.push({ name: route.name as string, query }).catch(() => {});
 }
 
+const setJobActive = useMutation(() => setJobActiveMutation(orgId.value));
+const deleteEvalEntity = useMutation(() => deleteEvalEntityMutation(orgId.value));
+
 async function activateJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.activate(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: true });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.activated"),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.activateError"));
   } finally {
@@ -932,12 +991,12 @@ async function pauseJob(row: EvalJob) {
   if (pendingJobStatusId.value !== null) return;
   pendingJobStatusId.value = row.id;
   try {
-    await onlineEvalsService.jobs.pause(orgId.value, row.id);
+    await setJobActive.mutateAsync({ id: row.id, active: false });
     toast({
       variant: "success",
       message: t("onlineEvals.actions.paused"),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.actions.pauseError"));
   } finally {
@@ -966,7 +1025,7 @@ async function handleSaved() {
   dialog.value = { open: false, mode: "create", row: null };
   scorerTypeDialog.value = false;
   clearRouteAction();
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function goToImportScoreConfig() {
@@ -979,7 +1038,7 @@ function closeImport() {
 
 async function handleImportSaved() {
   importingEntity.value = null;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function openScoreConfigLibrary() {
@@ -998,7 +1057,7 @@ async function triggerScoreConfigLibraryImport() {
 
 async function handleScoreConfigLibraryImported() {
   showScoreConfigLibrary.value = false;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function exportScoreConfigRow(row: ScoreConfig) {
@@ -1040,7 +1099,7 @@ async function triggerScorerLibraryImport() {
 
 async function handleScorerLibraryImported() {
   showScorerLibrary.value = false;
-  await loadAll(orgId.value);
+  await reloadLists();
 }
 
 function exportScorerRow(row: Scorer) {
@@ -1204,17 +1263,19 @@ async function performDelete() {
   if (!row || !tab) return;
   const singular = t(`onlineEvals.singular.${tab}`);
   try {
-    if (tab === "scoreConfigs")
-      await onlineEvalsService.scoreConfigs.delete(orgId.value, entityId(row as ScoreConfig));
-    else if (tab === "scorers")
-      await onlineEvalsService.scorers.delete(orgId.value, entityId(row as Scorer));
-    else if (tab === "jobs") await onlineEvalsService.jobs.delete(orgId.value, (row as EvalJob).id);
+    const id =
+      tab === "scoreConfigs"
+        ? entityId(row as ScoreConfig)
+        : tab === "scorers"
+          ? entityId(row as Scorer)
+          : (row as EvalJob).id;
+    await deleteEvalEntity.mutateAsync({ tab, id });
 
     toast({
       variant: "success",
       message: t("onlineEvals.deleted", { label: singular }),
     });
-    await loadAll(orgId.value);
+    await reloadLists();
   } catch (err: any) {
     showError(err, t("onlineEvals.deleteError", { label: singular.toLowerCase() }));
   } finally {
@@ -1231,7 +1292,7 @@ async function performBulkJobsDelete() {
   jobsBulkDeleting.value = true;
   try {
     const results = await Promise.allSettled(
-      ids.map((id) => onlineEvalsService.jobs.delete(orgId.value, id)),
+      ids.map((id) => deleteEvalEntity.mutateAsync({ tab: "jobs", id })),
     );
     const failed = results.filter((r) => r.status === "rejected").length;
     if (failed > 0) {
@@ -1247,7 +1308,7 @@ async function performBulkJobsDelete() {
         message: t("onlineEvals.job.deletedBulk", { count: ids.length }),
       });
     }
-    await loadAll(orgId.value);
+    await reloadLists();
   } finally {
     pendingBulkDeleteIds.value = [];
     pendingDeleteTab.value = null;

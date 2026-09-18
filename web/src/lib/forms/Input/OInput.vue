@@ -224,6 +224,13 @@ watch(
   },
 );
 
+/** Focus the underlying input/textarea programmatically. */
+function focus() {
+  inputRef.value?.focus();
+}
+
+defineExpose({ focus });
+
 // ── Styles ─────────────────────────────────────────────────────────────────
 // Height applied to the wrapper (so border is included in the box, matching
 // OSelect); the inner input fills it via h-full. 34px control height per the
@@ -365,6 +372,9 @@ const wrapperClasses = computed(() => [
         :aria-required="required || undefined"
         :autofocus="autofocus"
         :maxlength="maxlength"
+        :min="min"
+        :max="max"
+        :step="step"
         :autocomplete="autocomplete"
         :tabindex="inputTabindex"
         :aria-invalid="hasError || undefined"

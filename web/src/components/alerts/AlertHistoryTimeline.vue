@@ -39,6 +39,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ errorCount }} {{ errorLabel }}</span
           >
         </span>
+        <span v-if="pendingCount > 0" class="text-2xs flex items-center gap-1">
+          <span class="rounded-default bg-badge-blue-solid-bg inline-block h-2 w-2" />
+          <span class="text-badge-blue-soft-text font-medium"
+            >{{ pendingCount }} {{ t("alerts.historyTimeline.pending") }}</span
+          >
+        </span>
         <span v-if="skippedCount > 0" class="text-2xs text-text-muted flex items-center gap-1">
           <span class="rounded-default bg-border-default inline-block h-2 w-2" />
           {{ skippedCount }} {{ t("alerts.historyTimeline.skipped") }}
@@ -148,6 +154,7 @@ import {
   isErrorOutcome,
   isFiringOutcome,
   isOkOutcome,
+  isPendingOutcome,
   outcomeLabel,
 } from "@/utils/alerts/runOutcome";
 
@@ -187,6 +194,12 @@ function isError(s: string) {
   return isErrorOutcome(s);
 }
 
+/** Condition matched but hasn't held for the pending period yet — not a
+ *  confirmed firing, not healthy. */
+function isPending(s: string) {
+  return isPendingOutcome(s);
+}
+
 function normalizeStatus(s: string): string {
   return outcomeLabel(
     s,
@@ -195,6 +208,7 @@ function normalizeStatus(s: string): string {
     errorLabel.value,
     t("alerts.historyTimeline.skipped"),
     t("alerts.historyTimeline.unknown"),
+    t("alerts.historyTimeline.pending"),
   );
 }
 
@@ -204,6 +218,10 @@ function blockColor(status: string): string {
   // An errored evaluation is not a firing, but it must not read as "no data"
   // either — give it its own tone rather than the neutral border colour.
   if (isError(status)) return "var(--color-badge-warning-solid-bg)";
+  // Pending is neither a confirmed firing nor healthy — its own tone (the
+  // same blue the alertState badge uses for "pending" elsewhere) keeps it
+  // from reading as either red firing or grey skipped/unknown.
+  if (isPending(status)) return "var(--color-badge-blue-solid-bg)";
   return "var(--color-border-default)";
 }
 
@@ -219,10 +237,13 @@ const okCount = computed(() => props.history.filter((r) => isOk(r.status)).lengt
 // alert did not trigger) nor healthy — previously they fell into the catch-all
 // bucket and were mislabelled "Skipped".
 const errorCount = computed(() => props.history.filter((r) => isError(r.status)).length);
+// Pending is its own count, not folded into "skipped" — see isPending above.
+const pendingCount = computed(() => props.history.filter((r) => isPending(r.status)).length);
 const skippedCount = computed(
   () =>
-    props.history.filter((r) => !isFiring(r.status) && !isOk(r.status) && !isError(r.status))
-      .length,
+    props.history.filter(
+      (r) => !isFiring(r.status) && !isOk(r.status) && !isError(r.status) && !isPending(r.status),
+    ).length,
 );
 
 // ── Flapping detection ───────────────────────────────────────────────────────
@@ -341,7 +362,9 @@ const segments = computed<Segment[]>(() => {
         ? "firing"
         : bucket.some((r) => isOk(r.status))
           ? "ok"
-          : "skipped";
+          : bucket.some((r) => isPending(r.status))
+            ? "pending"
+            : "skipped";
       return { status, timestamp: bucket[0].timestamp, flapping: bucketFlapping };
     });
   }

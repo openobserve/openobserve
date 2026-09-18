@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              localStorage keys), so the two surfaces don't share a type. Same
              control shape as the Traces SearchBar toolbar for consistency. -->
         <template #trailing>
-          <div class="ml-auto flex shrink-0 items-center gap-2">
+          <div class="ms-auto flex shrink-0 items-center gap-2">
             <OToggleGroup
               :model-value="vizType"
               type="single"
@@ -178,9 +178,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getConsumableRelativeTime } from "@/utils/date";
-import genAiAgentMappingService, {
-  type GenAiAgentListItem,
-} from "@/services/gen-ai-agent-mapping.service";
+import type { GenAiAgentListItem } from "@/services/gen-ai-agent-mapping.service";
+import { genAiAgentsQuery } from "@/services/gen-ai-agent-mapping.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { agentOptionKey } from "@/plugins/traces/llmAgentFilter";
 import AiScopeBar from "@/enterprise/components/AIObservability/AiScopeBar.vue";
 import { useAiDateController } from "@/enterprise/composables/useAiDateController";
@@ -360,7 +360,7 @@ async function loadAgents() {
   try {
     const org = store.state.selectedOrganization.identifier;
     const { startTime, endTime } = effectiveWindow();
-    const res = await genAiAgentMappingService.listAgents(org, startTime, endTime);
+    const res = await queryClient.fetchQuery(genAiAgentsQuery(org, startTime, endTime));
     agents.value = res.agents ?? [];
     // Reconcile the selection against the fresh list. Reloading (e.g. after a
     // time-range change) can return a different or empty set, which would

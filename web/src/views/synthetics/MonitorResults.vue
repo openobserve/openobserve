@@ -93,6 +93,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :retries="retries"
         @edit="editMonitor"
         @open-run="openRunDetail"
+        @open-run-error="openRunError"
         @refresh="refresh"
         @jump-to-window="onJumpToWindow"
       />
@@ -117,7 +118,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variant="drawerRunStatus.variant"
         size="sm"
         :icon="drawerRunStatus.icon"
-        class="ml-3"
+        class="ms-3"
       >
         {{ drawerRunStatus.label }}
       </OBadge>
@@ -142,6 +143,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :override-run-id="selectedRunId"
       :override-execution-id="selectedExecutionId"
       :override-monitor-type="resolvedCheckType"
+      :override-error="drawerErrorRecord"
       @update-status="onRunStatusUpdate"
     />
   </ODrawer>
@@ -235,6 +237,16 @@ const isRefreshing = ref(false);
 const drawerOpen = ref(false);
 const selectedRunId = ref("");
 const selectedExecutionId = ref("");
+// Set for a run that never produced an execution record (quota skip, reaper
+// row): it has no ids to fetch, so RunDetail renders the error from this.
+const drawerErrorRecord = ref<{
+  errorSource: string;
+  message: string;
+  timestamp: number;
+  location: string;
+  browser: string;
+  device: string;
+} | null>(null);
 const drawerRunStatus = ref<{
   variant: BadgeVariant;
   icon: string;
@@ -260,6 +272,7 @@ function onDrawerClose(open: boolean) {
     drawerRunStatus.value = null;
     drawerUrl.value = "";
     drawerTimestamp.value = "";
+    drawerErrorRecord.value = null;
     // Clear drawer query params
     const next = { ...route.query };
     delete next.run;
@@ -398,6 +411,7 @@ function triggerRun() {
 
 function openRunDetail(runId: string, executionId: string) {
   if (!runId || !executionId) return;
+  drawerErrorRecord.value = null;
   selectedRunId.value = runId;
   selectedExecutionId.value = executionId;
   drawerRunStatus.value = null;
@@ -410,19 +424,33 @@ function openRunDetail(runId: string, executionId: string) {
     .catch(() => {});
 }
 
+/** Open the drawer for a run that never executed (quota skip / reaper row):
+ *  no ids to fetch, so RunDetail renders the error straight from the row. */
+function openRunError(info: {
+  errorSource: string;
+  message: string;
+  timestamp: number;
+  location: string;
+  browser: string;
+  device: string;
+}) {
+  selectedRunId.value = "";
+  selectedExecutionId.value = "";
+  drawerRunStatus.value = null;
+  drawerErrorRecord.value = info;
+  drawerOpen.value = true;
+}
+
 onMounted(() => {
   // Always default to last 15 minutes; respect explicit URL params
   if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
   writeToUrl();
-  // On a deep link / refresh the folder list is not in the store yet, so the
-  // header subtitle would fall back to the raw folder ID. Cheap and cached.
-  if (!store.state.organizationData?.foldersByType?.synthetics?.length) {
-    getFoldersListByType(store, "synthetics").catch((err) =>
-      console.error("[synthetics] failed to load folders", err),
-    );
-  }
+  // Without the folder list the header subtitle falls back to the raw folder ID.
+  getFoldersListByType(store, "synthetics").catch((err) =>
+    console.error("[synthetics] failed to load folders", err),
+  );
   fetchCheck();
   // Auto-open drawer if query params present
   const runQ = route.query.run;

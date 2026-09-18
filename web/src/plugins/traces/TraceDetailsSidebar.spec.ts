@@ -644,6 +644,73 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  // OTel GenAI semconv v5 (issue #14127): gen_ai_system_instructions is a
+  // Part[] array. This must recognise the same part types as the Preview
+  // message renderer (LLMContentRenderer.vue) and the Thread tab
+  // (threadView.utils.ts), not just `type: "text"`.
+  describe("System instructions parsing (parsedSystemInstructions)", () => {
+    it("renders a reasoning part, not just text parts", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "reasoning", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("still renders a plain text part (regression check)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("joins multiple parts with a newline", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Be concise." },
+            { type: "text", content: "Never make up facts." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Be concise.\nNever make up facts.");
+    });
+
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "thinking", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("returns null when there are no system instructions", () => {
+      const w = mountSidebar({
+        span: { ...mockSpan, gen_ai_system_instructions: undefined },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe(null);
+    });
+  });
+
   describe("Service information in Attributes tab", () => {
     it("should display service information", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');
@@ -2076,6 +2143,53 @@ describe("TraceDetailsSidebar", async () => {
       // This test verifies the selector is present in the component's
       // <style> blocks via the ?raw source import.
       expect(componentSource).toMatch(/\.vjs-tree/);
+    });
+  });
+
+  describe("Scores block — enterprise/cloud only (scoring itself is not an OSS feature)", () => {
+    const mockScoredLLMSpan = {
+      ...mockSpan,
+      span_id: "score-span-1",
+      gen_ai_operation_name: "chat",
+      gen_ai_response_model: "gpt-4",
+      llm_input: '{"messages": [{"role": "user", "content": "Hi"}]}',
+      llm_output: '{"choices": [{"message": {"content": "Hello!"}}]}',
+    };
+
+    const originalIsEnterprise = config.isEnterprise;
+    const originalIsCloud = config.isCloud;
+
+    afterEach(() => {
+      config.isEnterprise = originalIsEnterprise;
+      config.isCloud = originalIsCloud;
+    });
+
+    function hasScoresLabel(w: ReturnType<typeof mountSidebar>): boolean {
+      return w.findAll("span").some((el) => el.text() === "Scores");
+    }
+
+    it("shows the Scores label for an LLM span on an enterprise build", () => {
+      config.isEnterprise = "true";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
+    });
+
+    it("hides the Scores block entirely on a true OSS build — _llm_scores can never be written to there", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "false";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(false);
+      w.unmount();
+    });
+
+    it("still shows on a cloud build even with isEnterprise false — cloud registers the same enterprise backend", () => {
+      config.isEnterprise = "false";
+      config.isCloud = "true";
+      const w = mountSidebar({ span: mockScoredLLMSpan });
+      expect(hasScoresLabel(w)).toBe(true);
+      w.unmount();
     });
   });
 });

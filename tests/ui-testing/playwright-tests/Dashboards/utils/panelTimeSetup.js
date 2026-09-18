@@ -7,6 +7,33 @@ import { expect } from "playwright/test";
 import testLogger from '../../utils/test-logger.js';
 import { waitForDashboardPage, deleteDashboard } from './dashCreation.js';
 
+// A dashboard dialog (settings/variables) still tearing down swallows the add-panel
+// click silently, so retry until the AddPanel form actually mounts.
+async function openAddPanel(page) {
+  const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
+  const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
+  const panelNameField = page.locator('[data-test="dashboard-panel-name"]');
+
+  await Promise.race([
+    addPanelBtn.waitFor({ state: "visible", timeout: 15000 }),
+    noPanelBtn.waitFor({ state: "visible", timeout: 15000 })
+  ]);
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const targetBtn = (await addPanelBtn.isVisible().catch(() => false)) ? addPanelBtn : noPanelBtn;
+    await targetBtn.click().catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+
+    try {
+      await panelNameField.waitFor({ state: "visible", timeout: 10000 });
+      return;
+    } catch (error) {
+      if (attempt === 3) throw error;
+      testLogger.warn('Add Panel did not open, retrying click', { attempt });
+    }
+  }
+}
+
 /**
  * Start creating a panel (opens add panel form, fills basic fields) WITHOUT saving.
  * Use this when you need to perform actions in Add Panel mode before saving.
@@ -40,15 +67,7 @@ export async function startPanelCreation(page, pm, config) {
     timeout: 10000
   });
 
-  // Click add panel
-  await page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]').click();
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-  // Wait for AddPanel view to load
-  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
-    state: "visible",
-    timeout: 10000
-  });
+  await openAddPanel(page);
 
   // Set panel name — inline-edited title (OFormInlineEdit): click the trigger to
   // open the editor, then fill the revealed input.
@@ -149,29 +168,7 @@ export async function addPanelWithPanelTime(page, pm, config) {
 
   testLogger.info('Adding panel with panel time', { panelName, panelTimeEnabled, panelTimeRange });
 
-  // Click add panel button - handle both cases (no panels vs existing panels)
-  const noPanelBtn = page.locator('[data-test="dashboard-if-no-panel-add-panel-btn"]');
-  const addPanelBtn = page.locator('[data-test="dashboard-panel-add"]');
-
-  // Wait for one of the two buttons to become visible (dashboard may still be loading after save)
-  await Promise.race([
-    addPanelBtn.waitFor({ state: "visible", timeout: 15000 }),
-    noPanelBtn.waitFor({ state: "visible", timeout: 15000 })
-  ]);
-
-  // Now check which one is actually visible and click it
-  if (await addPanelBtn.isVisible().catch(() => false)) {
-    await addPanelBtn.click();
-  } else {
-    await noPanelBtn.click();
-  }
-  await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-
-  // Wait for AddPanel view to load
-  await page.locator('[data-test="dashboard-panel-name"]').waitFor({
-    state: "visible",
-    timeout: 10000
-  });
+  await openAddPanel(page);
 
   // Set panel name — inline-edited title (OFormInlineEdit): click the trigger to
   // open the editor, then fill the revealed input.

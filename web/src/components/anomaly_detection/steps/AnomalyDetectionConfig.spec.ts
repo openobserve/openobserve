@@ -14,16 +14,14 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Spec for AnomalyDetectionConfig (the "Detection Config" step of the anomaly
-// wizard). Two layers:
-//   1. SURVIVING BEHAVIOR — the buildPreviewSql / loadPreview logic that the
-//      migration kept unchanged (kept verbatim from the pre-rewrite spec).
-//   2. OFORM BEHAVIOR — the real <OForm> the migration introduced: per-mode
-//      required validation, the two §4-restored rules (training_window_days ≥1,
-//      detection_function required — each only where its control renders),
-//      z.coerce.number typing + write-back egress, the custom_sql bare-Monaco
-//      bridge with submission-gated errors (R3), the filters[] field-array
-//      keying (rendered-inputs delete test), and the exposed validate() surface
-//      the parent (useAlertForm) still calls to gate Next/Save.
+// wizard) —
+// the real <OForm> the migration introduced: per-mode required validation, the
+// two §4-restored rules (training_window_days ≥1, detection_function required —
+// each only where its control renders), z.coerce.number typing + write-back
+// egress, the custom_sql bare-Monaco bridge with submission-gated errors (R3),
+// the filters[] field-array keying (rendered-inputs delete test), and the
+// exposed validate() surface the parent (useAlertForm) still calls to gate
+// Next/Save. The data-preview chart lives in AnomalyDataPreview.spec.ts.
 //
 // The step OWNS its <OForm> (Rule ③ useOForm owner) and returns `form` from
 // setup(), so the TanStack form is reachable as `(wrapper.vm as any).form`.
@@ -40,11 +38,14 @@ import { firstFieldError } from "@/lib/forms/Form/fieldError";
 import streamService from "@/services/stream";
 
 // vi.mock must be hoisted — declared before component import
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: vi.fn().mockResolvedValue({ data: { schema: [] } }),
+    },
+  });
+});
 
 // The stored-value lookup the field-value resolver ends at. Stubbed so the
 // resolver tests can assert the composite key it was asked for without an
@@ -55,10 +56,6 @@ const { getFieldValuesForSuggestion } = vi.hoisted(() => ({
 }));
 vi.mock("@/composables/fieldValueStore", () => ({ getFieldValuesForSuggestion }));
 
-vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
-  default: { template: '<div data-test="panel-schema-renderer" />' },
-}));
-
 vi.mock("@/components/QueryEditor.vue", () => ({
   default: {
     template: '<div data-test="query-editor" />',
@@ -67,6 +64,8 @@ vi.mock("@/components/QueryEditor.vue", () => ({
 }));
 
 import AnomalyDetectionConfig from "./AnomalyDetectionConfig.vue";
+import { anomalyDetectionConfigDefaults } from "./AnomalyDetectionConfig.schema";
+import { defaultAnomalyConfig } from "@/composables/useAlertForm";
 
 // ---------------------------------------------------------------------------
 // Mount factory — keeps stubs and global plugins in one place
@@ -86,7 +85,6 @@ function buildConfig(configOverrides: Record<string, unknown> = {}) {
     detection_window_unit: "m",
     training_window_days: 7,
     threshold: 97,
-    threshold_min: 0,
     ...configOverrides,
   };
 }
@@ -95,7 +93,6 @@ const mountOptions = {
   global: {
     plugins: [store, i18n],
     stubs: {
-      PanelSchemaRenderer: true,
       QueryEditor: true,
     },
   },
@@ -133,14 +130,29 @@ const renderedFilterFields = (w: VueWrapper): unknown[] =>
     .filter((c: any) => /^filters\[\d+\]\.field$/.test(c.props("name") || ""))
     .map((c: any) => c.findComponent(OSelect).props("modelValue"));
 
-// ---------------------------------------------------------------------------
-// Helper: call loadPreview() and return the normalised SQL string
-// ---------------------------------------------------------------------------
-async function getSqlFromPreview(wrapper: VueWrapper): Promise<string> {
-  (wrapper.vm as any).loadPreview();
-  await flushPromises();
-  return (wrapper.vm as any).previewPanelSchema?.queries?.[0]?.query ?? "";
-}
+// The sensitivity tiers, in render order (decreasing percentile).
+const SENSITIVITY_TIERS = [99, 97, 95];
+
+// data-state of each tier button. A missing button reads as undefined so a
+// "no tier is active" assertion cannot pass just because nothing rendered.
+const tierStates = (w: VueWrapper): Array<string | undefined> =>
+  SENSITIVITY_TIERS.map((value) => {
+    const button = w.find(`[data-test="anomaly-sensitivity-tier-${value}"]`);
+    return button.exists() ? button.attributes("data-state") : undefined;
+  });
+
+// The exact-percentile <input> (data-test lands on the OInput wrapper div).
+const percentileInput = (w: VueWrapper) =>
+  w.find('[data-test="anomaly-sensitivity-percentile"] input');
+
+// The one copy string the tests pin: it is the only anchor proving the range
+// message is the translated one rather than zod's raw English default.
+const RANGE_MESSAGE = "Enter a whole number between 50 and 99";
+
+const sensitivityHintText = (w: VueWrapper): string | undefined => {
+  const hint = w.find('[data-test="anomaly-sensitivity-hint"]');
+  return hint.exists() ? hint.text() : undefined;
+};
 
 // A valid custom SQL query (aliases time_bucket, NOT the timestamp column).
 const VALID_CUSTOM_SQL =
@@ -156,355 +168,6 @@ describe("AnomalyDetectionConfig", () => {
   });
 
   // =========================================================================
-  describe("filters mode — detection function", () => {
-    it("should use count(*) AS value when detection_function is count", async () => {
-      wrapper = mountConfig({ detection_function: "count" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use count(*) AS value when detection_function is not set", async () => {
-      wrapper = mountConfig({ detection_function: "" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("count(*) AS value");
-    });
-
-    it("should use avg(response_time) AS value when detection_function is avg", async () => {
-      wrapper = mountConfig({
-        detection_function: "avg",
-        detection_function_field: "response_time",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("avg(response_time) AS value");
-    });
-
-    it("should use sum(bytes) AS value when detection_function is sum", async () => {
-      wrapper = mountConfig({
-        detection_function: "sum",
-        detection_function_field: "bytes",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("sum(bytes) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.95) AS value when detection_function is p95", async () => {
-      wrapper = mountConfig({
-        detection_function: "p95",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.95) AS value");
-    });
-
-    it("should use approx_percentile_cont(latency, 0.99) AS value when detection_function is p99", async () => {
-      wrapper = mountConfig({
-        detection_function: "p99",
-        detection_function_field: "latency",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("approx_percentile_cont(latency, 0.99) AS value");
-    });
-
-    it("should include the stream name in FROM clause", async () => {
-      wrapper = mountConfig({ stream_name: "my_stream" });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain('FROM "my_stream"');
-    });
-
-    it("should include GROUP BY and ORDER BY time_bucket", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("GROUP BY time_bucket");
-      expect(sql).toContain("ORDER BY time_bucket");
-    });
-
-    it("should produce a full default count query with no filters", async () => {
-      wrapper = mountConfig();
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"my_stream\" GROUP BY time_bucket ORDER BY time_bucket",
-      );
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — histogram interval", () => {
-    it("should embed 15m interval when histogram_interval_value is 15 and unit is m", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 15,
-        histogram_interval_unit: "m",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '15m')");
-    });
-
-    it("should embed 1h interval when histogram_interval_value is 1 and unit is h", async () => {
-      wrapper = mountConfig({
-        histogram_interval_value: 1,
-        histogram_interval_unit: "h",
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("histogram(_timestamp, '1h')");
-    });
-
-    it("should leave previewPanelSchema null when stream_name is empty", async () => {
-      wrapper = mountConfig({ stream_name: "" });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
-  // =========================================================================
-  describe("filters mode — WHERE clause from filters", () => {
-    it("should not include WHERE clause when filters array is empty", async () => {
-      wrapper = mountConfig({ filters: [] });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).not.toContain("WHERE");
-    });
-
-    it("should include WHERE status = '200' for a single equality filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "=", value: "200" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-    });
-
-    it("should chain additional filters with AND for multiple filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-    });
-
-    it("should include field IS NULL for an Is Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NULL");
-    });
-
-    it("should include field IS NOT NULL for an Is Not Null filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "error_msg", operator: "Is Not Null", value: "" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE error_msg IS NOT NULL");
-    });
-
-    it("should include field IN (values) for an IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "IN", value: "200,404,500" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status IN (200,404,500)");
-    });
-
-    it("should include field NOT IN (values) for a NOT IN filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "status", operator: "NOT IN", value: "500,503" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status NOT IN (500,503)");
-    });
-
-    it("should use str_match for a Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Contains", value: "error" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'error')");
-    });
-
-    it("should use str_match for a str_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "str_match", value: "timeout" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match(message, 'timeout')");
-    });
-
-    it("should use str_match_ignore_case for a str_match_ignore_case filter", async () => {
-      wrapper = mountConfig({
-        filters: [
-          {
-            field: "message",
-            operator: "str_match_ignore_case",
-            value: "ERROR",
-          },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE str_match_ignore_case(message, 'ERROR')");
-    });
-
-    it("should use re_match for a re_match filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "level", operator: "re_match", value: "^(error|warn)$" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE re_match(level, '^(error|warn)$')");
-    });
-
-    it("should use match_all for a match_all filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "match_all", value: "critical" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE match_all('critical')");
-    });
-
-    it("should use LIKE pattern for a Starts With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Starts With", value: "/api" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '/api%'");
-    });
-
-    it("should use LIKE pattern for an Ends With filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "path", operator: "Ends With", value: ".json" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE path LIKE '%.json'");
-    });
-
-    it("should use NOT LIKE pattern for a Not Contains filter", async () => {
-      wrapper = mountConfig({
-        filters: [{ field: "message", operator: "Not Contains", value: "debug" }],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE message NOT LIKE '%debug%'");
-    });
-
-    it("should skip a filter whose field is empty", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The empty-field filter must not produce a stray fragment
-      expect(sql).not.toContain("= '200'");
-      // The valid filter must still appear
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should skip a filter whose value is empty and operator needs a value", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "" },
-          { field: "env", operator: "=", value: "prod" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      // The valueless filter (= '') should be skipped
-      expect(sql).not.toContain("status =");
-      expect(sql).toContain("WHERE env = 'prod'");
-    });
-
-    it("should produce a complete WHERE clause with three filters", async () => {
-      wrapper = mountConfig({
-        filters: [
-          { field: "status", operator: "=", value: "200" },
-          { field: "env", operator: "=", value: "prod" },
-          { field: "region", operator: "=", value: "us-east" },
-        ],
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toContain("WHERE status = '200'");
-      expect(sql).toContain("AND env = 'prod'");
-      expect(sql).toContain("AND region = 'us-east'");
-    });
-  });
-
-  // =========================================================================
-  describe("custom_sql mode — query passed through as-is (normalized)", () => {
-    it("should use custom SQL directly when query_mode is custom_sql", async () => {
-      const customSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: customSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(customSql);
-    });
-
-    it("should pass through a JOIN query unchanged after normalization", async () => {
-      const rawSql =
-        'SELECT histogram(_timestamp, \'5m\') AS time_bucket, count(*) AS value FROM "events" e JOIN "users" u ON e.user_id = u.id GROUP BY time_bucket ORDER BY time_bucket';
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a subquery unchanged after normalization", async () => {
-      const rawSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM (SELECT * FROM \"raw_events\" WHERE env = 'prod') sub GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "raw_events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should pass through a CTE query unchanged after normalization", async () => {
-      const rawSql =
-        "WITH filtered AS (SELECT * FROM \"events\" WHERE level = 'error') SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM filtered GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: rawSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(rawSql);
-    });
-
-    it("should collapse multiline SQL to a single line", async () => {
-      const multilineSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket,\n       count(*) AS value\nFROM \"events\"\nGROUP BY time_bucket\nORDER BY time_bucket";
-      const expectedSql =
-        "SELECT histogram(_timestamp, '5m') AS time_bucket, count(*) AS value FROM \"events\" GROUP BY time_bucket ORDER BY time_bucket";
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "events",
-        custom_sql: multilineSql,
-      });
-      const sql = await getSqlFromPreview(wrapper);
-      expect(sql).toBe(expectedSql);
-    });
-
-    it("should leave previewPanelSchema null when custom_sql is empty and stream_name is empty", async () => {
-      // stream_name must also be empty — the immediate watcher seeds custom_sql
-      // from buildDefaultSql() when stream_name is set and custom_sql is blank.
-      wrapper = mountConfig({
-        query_mode: "custom_sql",
-        stream_name: "",
-        custom_sql: "",
-      });
-      (wrapper.vm as any).loadPreview();
-      await flushPromises();
-      expect((wrapper.vm as any).previewPanelSchema).toBeNull();
-    });
-  });
-
   // =========================================================================
   // OForm behavior — the real <OForm> the migration introduced
   // =========================================================================
@@ -800,18 +463,23 @@ describe("AnomalyDetectionConfig", () => {
       expect(typeof config.histogram_interval_value).toBe("number");
     });
 
-    it("threshold range max/min are written back to threshold / threshold_min", async () => {
-      const { wrapper: w, config } = mountReturning();
-      wrapper = w;
+    // The threshold_min absence is asserted against a config built by
+    // defaultAnomalyConfig() — the object the real app hands this step. A local
+    // fixture that never had the key could not prove the write-back stopped
+    // adding it.
+    it("threshold is written back as a number", async () => {
+      const config = defaultAnomalyConfig();
+      wrapper = mount(AnomalyDetectionConfig, { ...mountOptions, props: { config } });
       await flushPromises();
       const form = getForm(wrapper);
 
-      form.setFieldValue("threshold_range", { min: 10, max: 80 });
+      form.setFieldValue("threshold", 95);
       await flushPromises();
       await nextTick();
 
-      expect(config.threshold).toBe(80);
-      expect(config.threshold_min).toBe(10);
+      expect(config.threshold).toBe(95);
+      expect(typeof config.threshold).toBe("number");
+      expect("threshold_min" in config).toBe(false);
     });
 
     it("query_mode is mirrored to props.config (egress, not into-form mirror)", async () => {
@@ -825,6 +493,506 @@ describe("AnomalyDetectionConfig", () => {
       await nextTick();
 
       expect(config.query_mode).toBe("custom_sql");
+    });
+  });
+
+  // =========================================================================
+  // Sensitivity — ONE form field (`threshold`, always a number) behind two
+  // controls: the three-tier toggle group and the exact percentile input.
+  // Picking a tier sets the number; typing a number re-highlights the matching
+  // tier, or none. The derived hint line states what the setting costs in
+  // flagged buckets, and the single error message is rendered by the step (both
+  // wrappers suppress their own).
+  //
+  // The sliding pill is NOT asserted here: jsdom lays nothing out, so
+  // OToggleGroup's measure() always bails on offsetParent === null and
+  // indicatorVisible is false from mount forever. data-state on the buttons is
+  // the assertable selection state; the indicator case lives in
+  // OToggleGroup.spec.ts, which has the geometry harness for it.
+  // =========================================================================
+  describe("sensitivity — tier toggle + exact percentile on one field", () => {
+    it("clicking a tier sets threshold and writes it back to props.config", async () => {
+      const { wrapper: w, config } = mountReturning();
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-95"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+
+      expect(form.state.values.threshold).toBe(95);
+      expect(config.threshold).toBe(95);
+    });
+
+    it("a seeded tier value renders that tier active", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+    });
+
+    it("a seeded non-tier value renders no tier active and shows the exact percentile", async () => {
+      wrapper = mountConfig({ threshold: 88 });
+      await flushPromises();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
+      expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe("88");
+      expect(sensitivityHintText(wrapper)).toContain("88%");
+    });
+
+    it("typing a tier value lights that tier up", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+
+      await percentileInput(wrapper).setValue("95");
+      await flushPromises();
+      await nextTick();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "on"]);
+    });
+
+    it("moving to a non-tier value after picking a tier leaves no tier active", async () => {
+      wrapper = mountConfig({ threshold: 97 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').trigger("click");
+      await flushPromises();
+      await nextTick();
+      expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
+
+      form.setFieldValue("threshold", 88);
+      await flushPromises();
+      await nextTick();
+
+      expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
+    });
+
+    it("the percentile input emits a number, not a string", async () => {
+      wrapper = mountConfig({ threshold: 97 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await percentileInput(wrapper).setValue("95");
+      await flushPromises();
+      await nextTick();
+
+      expect(form.state.values.threshold).toBe(95);
+      expect(typeof form.state.values.threshold).toBe("number");
+    });
+
+    it("hint names the training-score percentile and promises no alert rate", async () => {
+      // The percentile indexes training scores, so any "about N per day" arithmetic is measured fiction.
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("97%");
+      expect(hint).toContain("training");
+      for (const promise of ["per day", "per week", "about", "3%", "resolution"]) {
+        expect(hint).not.toContain(promise);
+      }
+    });
+
+    it("hint no longer varies with the detection resolution", async () => {
+      // The per-day arithmetic read the resolution; the honest hint has no
+      // rate to derive from it.
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      const before = sensitivityHintText(wrapper);
+      expect(before).toBeDefined();
+
+      getForm(wrapper).setFieldValue("histogram_interval_value", 60);
+      await flushPromises();
+      await nextTick();
+      expect(sensitivityHintText(wrapper)).toBe(before);
+    });
+
+    it("hint is suppressed while the percentile is out of range", async () => {
+      wrapper = mountConfig({ threshold: 97 });
+      await flushPromises();
+      // Sanity first: without it, "absent" would also be satisfied by the whole
+      // row failing to render.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      for (const bad of ["", 40, 99.5]) {
+        getForm(wrapper).setFieldValue("threshold", bad);
+        await flushPromises();
+        await nextTick();
+        expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+      }
+    });
+
+    // toModelNumber passes "" through unchanged, so the parent's config briefly
+    // holds a non-number. Submit must stay blocked for as long as it does.
+    it("blocks submit while the percentile is cleared", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await percentileInput(wrapper).setValue("");
+      await flushPromises();
+      await nextTick();
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+    });
+
+    it("a percentile below the accepted range blocks submit with exactly one message", async () => {
+      wrapper = mountConfig({ threshold: 40 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+      // Two OForm* wrappers on one field, but only the step's own message renders.
+      // Counting the step's own node cannot detect a duplicate — OFormInput's
+      // built-in message has a different data-test and OFormToggleGroup's has
+      // none — so count occurrences of the message TEXT.
+      const occurrences = wrapper.text().split(RANGE_MESSAGE).length - 1;
+      expect(occurrences).toBe(1);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-error"]').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-error"]').attributes("role")).toBe(
+        "alert",
+      );
+      await expect((wrapper.vm as any).validate()).resolves.toBe(false);
+    });
+
+    it("a non-integer percentile is rejected with the translated message", async () => {
+      // A bare .int() would emit zod's untranslated "expected int, received
+      // number" here; the spinner and paste both produce decimals.
+      wrapper = mountConfig({ threshold: 95.5 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await flushPromises();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+    });
+
+    it("a percentile above 99 blocks submit (99 is the real server ceiling)", async () => {
+      wrapper = mountConfig({ threshold: 100 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "threshold")).toBe(RANGE_MESSAGE);
+    });
+
+    it("hint is suppressed for a percentile outside the accepted range", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      getForm(wrapper).setFieldValue("threshold", 40);
+      await flushPromises();
+      await nextTick();
+
+      // An invalid percentile gets the error message, not a hint quoting a
+      // "60% anomaly rate" as though it were a real setting.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+    });
+
+    it("tier labels re-resolve when the locale changes", async () => {
+      wrapper = mountConfig({ threshold: 99 });
+      await flushPromises();
+      const before = wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text();
+
+      const previous = i18n.global.locale.value;
+      try {
+        i18n.global.locale.value = "de-DE";
+        await nextTick();
+        // A module-level const array would still read the English label captured
+        // at import time; a computed over t() re-resolves.
+        expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(
+          i18n.global.t("alerts.anomaly.sensitivityConservative"),
+        );
+      } finally {
+        i18n.global.locale.value = previous;
+        await nextTick();
+      }
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(before);
+    });
+
+    it("hint is suppressed for a fractional percentile", async () => {
+      wrapper = mountConfig({
+        threshold: 97,
+        histogram_interval_value: 5,
+        histogram_interval_unit: "m",
+      });
+      await flushPromises();
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(true);
+
+      // 100 - 97.3 is 2.700000000000003 in binary floating point; a fractional
+      // percentile is as invalid as an out-of-range one, so it gets the error.
+      getForm(wrapper).setFieldValue("threshold", 97.3);
+      await flushPromises();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
+    });
+
+    it("the schema default threshold is 97 when the config carries none", () => {
+      expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
+    });
+  });
+
+  describe("sensitivity — percentile row alignment", () => {
+    it("keeps the toggle bar and the percentile box on one centred row", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // A stacked label here would push the whole row below the Sensitivity heading.
+      // Walk up from the input to the row that also holds the tier toggle: that
+      // shared ancestor is the one whose cross-axis alignment sets the row's top.
+      let row: HTMLElement | null = wrapper.find('[data-test="anomaly-sensitivity-percentile"]')
+        .element as HTMLElement;
+      while (row && !row.querySelector('[data-test="anomaly-sensitivity-tier"]')) {
+        row = row.parentElement;
+      }
+      expect(row).not.toBeNull();
+      expect(row?.className).toContain("items-center");
+      expect(row?.className).not.toContain("items-end");
+    });
+
+    it("keeps the percentile label out of the narrow numeric column", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The label renders as a sibling span, never inside OInput's own field column.
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"] label').exists()).toBe(
+        false,
+      );
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile-info"]').exists()).toBe(true);
+    });
+  });
+
+  // Wire contract: `alert_budget_per_day` absent/invalid = percentile mode; while set, `threshold` is API-derived and must never render or be written.
+  describe("sensitivity — budget mode", () => {
+    it("a config with no budget renders the percentile controls only", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-budget-count"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-budget-tiers"]').exists()).toBe(false);
+    });
+
+    it("a stored budget replaces the percentile control with the budget control", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-budget-count"] input').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-percentile"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').exists()).toBe(false);
+      expect(
+        (wrapper.find('[data-test="anomaly-budget-count"] input').element as HTMLInputElement)
+          .value,
+      ).toBe("2");
+    });
+
+    it("a sub-daily budget is surfaced as alerts per week", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 1 / 7 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+    });
+
+    it("the budget tiers map to 1/week, 1/day and 4/day", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await wrapper.find('[data-test="anomaly-budget-tier-1_week"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(1);
+      expect(form.state.values.budget_period).toBe("week");
+
+      await wrapper.find('[data-test="anomaly-budget-tier-4_day"]').trigger("click");
+      await flushPromises();
+      expect(form.state.values.budget_count).toBe(4);
+      expect(form.state.values.budget_period).toBe("day");
+    });
+
+    it("writes the budget back as a per-day number and never touches threshold", async () => {
+      const { wrapper: w, config } = mountReturning({
+        alert_budget_per_day: 2,
+        threshold: 96.4,
+      });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 3);
+      form.setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(config.alert_budget_per_day).toBeCloseTo(3 / 7, 10);
+      // Controller-derived display value — the UI must not write it back.
+      expect(config.threshold).toBe(96.4);
+    });
+
+    it("an invalid count blocks submit and does not clobber the stored budget", async () => {
+      const { wrapper: w, config } = mountReturning({ alert_budget_per_day: 2 });
+      wrapper = w;
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      form.setFieldValue("budget_count", 0);
+      await flushPromises();
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(false);
+      expect(fieldError(wrapper, "budget_count")).toBe("Enter a number greater than 0");
+      // Writing undefined here would silently flip the config to percentile mode.
+      expect(config.alert_budget_per_day).toBe(2);
+    });
+
+    it("a fractional controller-written percentile does not block a budget-mode submit", async () => {
+      // In budget mode `threshold` carries the controller's derived display
+      // percentile, which may be fractional; the percentile-mode integer rule
+      // must not judge it.
+      wrapper = mountConfig({ alert_budget_per_day: 1, threshold: 96.4 });
+      await flushPromises();
+      const form = getForm(wrapper);
+
+      await form.handleSubmit();
+      await nextTick();
+
+      expect(form.state.isValid).toBe(true);
+    });
+
+    it("budget-mode hint states the ceiling, never a ranking or a promise of importance", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+
+      const hint = sensitivityHintText(wrapper);
+      expect(hint).toBeDefined();
+      expect(hint).toContain("2");
+      expect(hint).toContain("per day");
+      for (const claim of ["most important", "most unusual", "highest", "top", "rank"]) {
+        expect(hint!.toLowerCase()).not.toContain(claim);
+      }
+    });
+
+    it("switching the period to week switches the hint", async () => {
+      wrapper = mountConfig({ alert_budget_per_day: 2 });
+      await flushPromises();
+      getForm(wrapper).setFieldValue("budget_period", "week");
+      await flushPromises();
+      await nextTick();
+
+      expect(sensitivityHintText(wrapper)).toContain("per week");
+    });
+  });
+
+  // =========================================================================
+  // The dual-handle slider and its mark lines are GONE, not merely bypassed.
+  // Without these an additive implementation that leaves the old control in
+  // place would pass every test above.
+  // =========================================================================
+  describe("sensitivity — the removed slider and the relocated chart", () => {
+    it("no longer declares a threshold_range form field or renders the slider", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(getForm(wrapper).state.values).not.toHaveProperty("threshold_range");
+      expect(wrapper.find('[data-test="anomaly-threshold-range"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-threshold-range-label"]').exists()).toBe(false);
+    });
+
+    // The chart moved to AnomalyDataPreview in the right-hand Preview card; this
+    // step now shows the generated SQL in its place.
+    it("shows the SQL preview row and no data-preview chart", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="anomaly-data-preview-load-btn"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="anomaly-data-preview-empty"]').exists()).toBe(false);
+    });
+
+    // In custom_sql mode the user's own editor is on this form already, so a
+    // read-only copy of the same query below it is noise.
+    it("hides the SQL preview row in custom_sql mode", async () => {
+      wrapper = mountConfig({ query_mode: "custom_sql", custom_sql: VALID_CUSTOM_SQL });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').exists()).toBe(false);
+    });
+
+    it("renders the previewSql prop the parent passes down", async () => {
+      const sql = 'SELECT 1 AS value FROM "my_stream"';
+      wrapper = mount(AnomalyDetectionConfig, {
+        ...mountOptions,
+        props: { config: buildConfig(), previewSql: sql },
+      });
+      await flushPromises();
+
+      expect(wrapper.find('[data-test="anomaly-sql-preview"]').attributes("query")).toBe(sql);
+    });
+
+    it("labels the preview row and drops the score-range framing", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      expect(wrapper.text()).toContain("SQL Preview");
+      expect(wrapper.text()).not.toContain("Anomaly Score Range");
+    });
+
+    it("gives the tier group an accessible name", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // The row's "Sensitivity" text is a plain div bound to neither control,
+      // so aria-label is the group's only accessible name.
+      const group = wrapper.find('[data-test="anomaly-sensitivity-tier"]');
+      expect(group.exists()).toBe(true);
+      expect(group.attributes("aria-label")).toBe("Sensitivity");
+    });
+
+    it("exposes no mark-line or series-max machinery", async () => {
+      wrapper = mountConfig();
+      await flushPromises();
+
+      // Only symbols actually exposed today are asserted — `updateMarkLines` was
+      // never in the setup() return, so asserting it would pass either way.
+      expect((wrapper.vm as any).onSeriesDataUpdate).toBeUndefined();
+      expect((wrapper.vm as any).previewHasData).toBeUndefined();
     });
   });
 

@@ -342,13 +342,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OCardSection role="body">
                 <div class="mb-2 flex items-center">
-                  <OIcon name="info" size="md" class="mr-2" />
+                  <OIcon name="info" size="md" class="me-2" />
                   <div class="text-sm font-medium">
                     {{ connectionNotes.title }}
                   </div>
                 </div>
                 <div class="text-sm">
-                  <ol class="mb-0 pl-3 leading-[1.8]">
+                  <ol class="mb-0 ps-3 leading-[1.8]">
                     <li
                       v-for="(stepText, index) in connectionNotes.steps"
                       :key="index"
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="rounded-default text-compact bg-surface-base mt-2 p-2"
                   >
                     <strong>{{ t("alert_destinations.exampleLabel") }}</strong>
-                    <code class="text-text-link ml-1 bg-transparent p-0 font-mono">{{
+                    <code class="text-text-link ms-1 bg-transparent p-0 font-mono">{{
                       connectionNotes.example
                     }}</code>
                   </div>
@@ -430,12 +430,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
+import { saveDestinationMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
 import { ref, computed, watch } from "vue";
 import OCard from "@/lib/core/Card/OCard.vue";
 import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import destinationService from "@/services/alert_destination";
-import { useStore } from "vuex";
 import type { DestinationData, Headers } from "@/ts/interfaces";
 import { isValidResourceName, getImageURL, getUUID } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -461,13 +462,17 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits(["created", "updated", "cancel"]);
-const store = useStore();
 const { t } = useI18nTyped();
 
 // Co-located Zod schema (factory keeps the required message i18n-driven).
 const destinationSchema = makeDestinationSchema(t);
 
 const isEditMode = computed(() => !!props.destination);
+
+const orgIdForWrites = useOrgId();
+const saveDestinationWrite = useMutation(() =>
+  saveDestinationMutation(orgIdForWrites.value, () => isEditMode.value),
+);
 
 const apiMethods = [
   { label: raw("GET"), value: "get" },
@@ -1152,13 +1157,8 @@ const createDestination = (value?: DestinationForm) => {
   // (its isSubmitting drives the Save button spinner).
   if (isEditMode.value) {
     // Update existing destination
-    return destinationService
-      .update({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
         dismiss();
         emit("updated", name);
@@ -1175,13 +1175,8 @@ const createDestination = (value?: DestinationForm) => {
       });
   } else {
     // Create new destination
-    return destinationService
-      .create({
-        org_identifier: store.state.selectedOrganization.identifier,
-        destination_name: name,
-        data: payload,
-        module: "pipeline",
-      })
+    return saveDestinationWrite
+      .mutateAsync({ destination_name: name, data: payload, module: "pipeline" })
       .then(() => {
         dismiss();
         emit("created", name);

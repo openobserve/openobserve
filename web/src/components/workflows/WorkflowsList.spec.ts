@@ -17,30 +17,46 @@
 // (pause/resume, edit, delete), the history drawer and the child-route escape
 // hatch. Heavy children (OTable, drawers, the graph preview) are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
-const { mockRouter, mockToast, mockHydrate } = vi.hoisted(() => ({
+const { mockRouter, mockRoute, mockToast, mockHydrate, mockGetFolders } = vi.hoisted(() => ({
   mockRouter: {
     push: vi.fn(),
     currentRoute: { value: { name: "workflows", query: {} } },
   },
+  mockRoute: { query: {} as Record<string, any> },
   mockToast: vi.fn(),
   mockHydrate: vi.fn(),
+  // Awaited before the first fetch, so it has to settle or no rows ever load.
+  mockGetFolders: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("vue-router", () => ({ useRouter: () => mockRouter }));
+vi.mock("vue-router", () => ({
+  useRouter: () => mockRouter,
+  // The list scopes itself to ?folder=; without the export it throws in setup.
+  useRoute: () => mockRoute,
+}));
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: (...a: any[]) => mockToast(...a),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: vi.fn(),
-    deleteWorkflow: vi.fn(),
-    enableWorkflow: vi.fn(),
-  },
+// Partial: the rest of commons is pulled in by other modules in this tree.
+vi.mock("@/utils/commons", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
+  getFoldersListByType: (...a: any[]) => mockGetFolders(...a),
 }));
+
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: vi.fn(),
+      deleteWorkflow: vi.fn(),
+      enableWorkflow: vi.fn(),
+    },
+  });
+});
 
 // Re-export the real trigger registry so triggerLabel() resolves kinds to labels
 // (the list mocks the canvas composable, but the registry is pure data).
@@ -60,7 +76,6 @@ vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   },
 }));
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -91,6 +106,10 @@ const OTableStub = {
       <template v-for="row in data" :key="row.id">
         <slot name="cell-name" :row="row" />
         <slot name="cell-trigger" :row="row" />
+        <!-- Only in cross-folder mode, same as the real column set. -->
+        <span v-if="columns.some(c => c.id === 'folder_name')" data-test="folder-cell">
+          <slot name="cell-folder_name" :row="row" />
+        </span>
         <slot name="cell-actions" :row="row" />
       </template>
       <slot name="bottom" />
@@ -109,6 +128,13 @@ const OButtonStub = {
 const globalStubs = {
   OTable: OTableStub,
   OButton: OButtonStub,
+  // The real one ticks its "1m ago" label on an interval, which never lets vi.runAllTimers() finish.
+  ORefreshButton: {
+    name: "ORefreshButton",
+    props: ["layout", "variant", "lastRunAt", "loading"],
+    emits: ["click"],
+    template: '<button class="o-refresh" v-bind="$attrs" @click="$emit(\'click\', $event)" />',
+  },
   OInput: {
     name: "OInput",
     inheritAttrs: false,
@@ -117,7 +143,7 @@ const globalStubs = {
     template:
       '<span class="o-input-wrap"><slot name="icon-left" />' +
       '<input class="o-input" v-bind="$attrs" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />' +
-      "</span>",
+      '<slot name="icon-right" /></span>',
   },
   OTag: {
     name: "OTag",
@@ -152,14 +178,36 @@ const globalStubs = {
     emits: ["update:ok", "update:cancel", "update:modelValue"],
     template: '<div data-test="confirm-dialog-stub" :data-open="String(modelValue)" />',
   },
-  PageLayout: {
-    name: "PageLayout",
-    template: '<div class="page-layout"><slot name="header" /><slot /></div>',
+  OPageLayout: {
+    name: "OPageLayout",
+    props: ["title", "subtitle", "icon", "bleed"],
+    template:
+      '<div class="page-layout"><slot name="title" /><slot name="sidebar" />' +
+      '<slot name="actions" /><slot /></div>',
   },
-  OPageHeader: {
-    name: "OPageHeader",
-    props: ["title", "subtitle", "icon"],
-    template: '<div class="app-page-header"><slot name="title" /><slot name="actions" /></div>',
+  BetaBadge: { name: "BetaBadge", template: '<span class="beta-badge" />' },
+  FolderList: {
+    name: "FolderList",
+    props: ["type"],
+    emits: ["update:activeFolderId"],
+    template: '<div data-test="folder-list-stub" :data-type="type" />',
+  },
+  MoveAcrossFolders: {
+    name: "MoveAcrossFolders",
+    props: ["modelValue", "type", "workflowIds"],
+    emits: ["update:modelValue", "updated"],
+    template: '<div data-test="move-dialog-stub" :data-open="String(modelValue)" />',
+  },
+  OToggleGroup: {
+    name: "OToggleGroup",
+    props: ["modelValue", "type", "mobileDropdown"],
+    emits: ["update:model-value"],
+    template: '<div class="o-toggle-group" v-bind="$attrs"><slot /></div>',
+  },
+  OToggleGroupItem: {
+    name: "OToggleGroupItem",
+    props: ["value", "size", "iconLeft", "title"],
+    template: '<button class="o-toggle-group-item" v-bind="$attrs"><slot /></button>',
   },
   // Renders the child-route slot with a fake editor component so the
   // `<component :is="Component" @saved="getWorkflows" />` binding is exercised.
@@ -201,12 +249,18 @@ const mountList = () =>
 const table = (w: any) => w.findComponent(OTableStub);
 const rows = (w: any) => table(w).props("data") as any[];
 
+// The tabs group and the this/all-folders scope group are both OToggleGroups;
+// only the scope one is `type="single"`.
+const scopeGroup = (w: any) =>
+  w.findAllComponents({ name: "OToggleGroup" }).find((g: any) => g.props("type") === "single");
+
 describe("WorkflowsList", () => {
   let wrapper: any = null;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
+    mockRoute.query = {};
     listWorkflows.mockResolvedValue({
       data: [makeWorkflow(1), makeWorkflow(2, { enabled: false })],
     });
@@ -222,11 +276,57 @@ describe("WorkflowsList", () => {
   // ── loading + row mapping ──────────────────────────────────────────────────
 
   describe("data loading", () => {
-    it("fetches the workflows for the selected org on mount", async () => {
+    it("fetches the workflows for the selected org and folder on mount", async () => {
       wrapper = mountList();
       await flushPromises();
-      expect(listWorkflows).toHaveBeenCalledWith("default");
+      // org, folder from ?folder= (default), not cross-folder, so no search term.
+      expect(listWorkflows).toHaveBeenCalledWith("default", "default");
       expect(rows(wrapper)).toHaveLength(2);
+    });
+
+    it("serves a revisit from the cache without a request or a skeleton", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+
+      wrapper = mountList();
+      await nextTick();
+      expect(table(wrapper).props("loading")).toBe(false);
+      expect(rows(wrapper)).toHaveLength(2);
+      await flushPromises();
+      expect(listWorkflows).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps each folder's list, so going back to one costs no request", async () => {
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+      mockRoute.query = { folder: "team-b" };
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      expect(listWorkflows.mock.calls.map((c: any[]) => c[1])).toEqual(["team-a", "team-b"]);
+    });
+
+    it("keeps the rows on screen while a write reloads the same list", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      let resolveReload: (v: any) => void = () => {};
+      listWorkflows.mockReturnValueOnce(new Promise((r) => (resolveReload = r)));
+
+      await wrapper.find('[data-test="workflow-list-refresh"]').trigger("click");
+      await flushPromises();
+      expect(table(wrapper).props("loading")).toBe(false);
+      expect(rows(wrapper)).toHaveLength(2);
+
+      resolveReload({ data: [makeWorkflow(1)] });
+      await flushPromises();
+      expect(rows(wrapper)).toHaveLength(1);
     });
 
     it("renders the list page shell", async () => {
@@ -280,6 +380,24 @@ describe("WorkflowsList", () => {
       wrapper = mountList();
       await flushPromises();
       expect(rows(wrapper)[0].trigger).toBe("—");
+    });
+
+    // Sorting the rendered string orders "9:54 AM" after "1:19 PM" — the Updated
+    // column is the one users click most, so it has to sort chronologically.
+    it("sorts Updated by the raw timestamp, not the formatted string", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      const col = table(wrapper)
+        .props("columns")
+        .find((c: any) => c.id === "updated_at");
+      expect(col.accessorKey).toBe("updated_at");
+
+      const morning = new Date("2026-09-01T09:54:00Z").getTime() * 1000;
+      const afternoon = new Date("2026-09-01T13:19:00Z").getTime() * 1000;
+      const sorted = [{ updated_at: afternoon }, { updated_at: morning }].sort(
+        (a: any, b: any) => a[col.accessorKey] - b[col.accessorKey],
+      );
+      expect(sorted[0].updated_at).toBe(morning);
     });
 
     it("formats a microsecond updated_at timestamp", async () => {
@@ -359,6 +477,94 @@ describe("WorkflowsList", () => {
 
   // ── search ─────────────────────────────────────────────────────────────────
 
+  // ── folders ────────────────────────────────────────────────────────────────
+
+  describe("folders", () => {
+    const search = (w: any) => w.find('[data-test="workflow-list-search-input"]');
+
+    it("scopes the fetch to the folder named in the URL", async () => {
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      expect(listWorkflows).toHaveBeenCalledWith("default", "team-a");
+    });
+
+    it("stays in the current folder while the search box is empty", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      listWorkflows.mockClear();
+
+      scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+      await flushPromises();
+      // Cross-folder is a search mode: an empty box must not pull the whole org.
+      expect(listWorkflows).not.toHaveBeenCalledWith("default", undefined, true, expect.anything());
+      expect(rows(wrapper)).toHaveLength(2);
+    });
+
+    it("hands the term to the backend once a cross-folder search is typed", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+        listWorkflows.mockClear();
+
+        await search(wrapper).setValue("  workflow-2  ");
+        vi.runAllTimers();
+        await flushPromises();
+        expect(listWorkflows).toHaveBeenCalledWith("default", undefined, true, "workflow-2");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("leaves cross-folder rows to the backend instead of filtering again", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+
+        await search(wrapper).setValue("workflow-2");
+        vi.runAllTimers();
+        await flushPromises();
+        // Both fixtures survive: the client must not re-apply the term locally.
+        expect(rows(wrapper)).toHaveLength(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    // Drafts are folder-scoped too: a folderless draft used to be appended to
+    // every folder's listing, so its folder is named here like any other row's.
+    it("names the folder on published rows and on drafts", async () => {
+      vi.useFakeTimers();
+      try {
+        listWorkflows.mockResolvedValue({
+          data: [
+            makeWorkflow(1, { folder_name: "Team A" }),
+            makeWorkflow(2, { is_draft: true, folder_name: "Team B" }),
+          ],
+        });
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await search(wrapper).setValue("workflow");
+        vi.runAllTimers();
+        await flushPromises();
+
+        const cells = wrapper.findAll('[data-test="folder-cell"]');
+        expect(cells).toHaveLength(2);
+        expect(cells[0].text()).toBe("Team A");
+        expect(cells[1].text()).toBe("Team B");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe("search", () => {
     const search = (w: any) => w.find('[data-test="workflow-list-search-input"]');
 
@@ -427,6 +633,26 @@ describe("WorkflowsList", () => {
       expect(rows(wrapper)).toHaveLength(2);
     });
 
+    it("resets the folder scope when the empty state clears the filters", async () => {
+      vi.useFakeTimers();
+      try {
+        // Empty, so the empty state (which owns the clear-filters action) renders.
+        listWorkflows.mockResolvedValue({ data: [] });
+        wrapper = mountList();
+        await flushPromises();
+        scopeGroup(wrapper).vm.$emit("update:model-value", "all");
+        await flushPromises();
+        expect(scopeGroup(wrapper).props("modelValue")).toBe("all");
+
+        wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "clear-filters");
+        await nextTick();
+        // Left on "all" the toggle stays lit while the list is back to one folder.
+        expect(scopeGroup(wrapper).props("modelValue")).toBe("this");
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("opens the create editor from the empty state's primary action", async () => {
       listWorkflows.mockResolvedValue({ data: [] });
       wrapper = mountList();
@@ -435,7 +661,7 @@ describe("WorkflowsList", () => {
       wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action", "create");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -459,7 +685,7 @@ describe("WorkflowsList", () => {
       await wrapper.find('[data-test="workflow-list-add-btn"]').trigger("click");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createWorkflow",
-        query: { org_identifier: "default" },
+        query: { org_identifier: "default", folder: "default" },
       });
     });
 
@@ -472,7 +698,12 @@ describe("WorkflowsList", () => {
       expect(mockHydrate.mock.calls[0][0].id).toBe("wf-1");
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "workflowEditor",
-        query: { id: "wf-1", name: "workflow-1", org_identifier: "default" },
+        query: {
+          id: "wf-1",
+          name: "workflow-1",
+          org_identifier: "default",
+          folder: "default",
+        },
       });
     });
 
@@ -787,6 +1018,7 @@ describe("WorkflowsList", () => {
           id: "wf-1",
           name: "workflow-1",
           org_identifier: "default",
+          folder: "default",
         },
       });
     });
@@ -813,6 +1045,101 @@ describe("WorkflowsList", () => {
       const previews = wrapper.findAllComponents({ name: "WorkflowView" });
       expect(previews).toHaveLength(2);
       expect(previews[0].props("workflow").id).toBe("wf-1");
+    });
+  });
+
+  // ── page restoration across route navigation (OTable pagination-reset fix) ─
+
+  describe("page restoration across route navigation", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("defaults currentPage to 1", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      expect(wrapper.vm.currentPage).toBe(1);
+    });
+
+    it("onPageChange updates currentPage", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.vm.onPageChange(4);
+      expect(wrapper.vm.currentPage).toBe(4);
+    });
+
+    it("restorePageIndex reasserts the page via a macrotask (setTimeout(0))", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      vi.useFakeTimers();
+      wrapper.vm.currentPage = 3;
+      const setPageIndex = vi.fn();
+      // OTable is shallow-stubbed in this suite; plant the piece of its exposed surface the fix depends on directly onto the template ref.
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+
+      wrapper.vm.restorePageIndex();
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("reasserts the persisted page once the initial fetch resolves on mount", async () => {
+      let resolveFetch: (v: any) => void = () => {};
+      listWorkflows.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      vi.useFakeTimers();
+
+      wrapper = mountList();
+      wrapper.vm.currentPage = 3;
+
+      resolveFetch({ data: [makeWorkflow(1)] });
+      await flushPromises();
+
+      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake — restorePageIndex() reads oTableRef.value lazily when its timer fires, so this still lands in time.
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
+    });
+
+    it("reasserts the restored page when a save lands while OTable has remounted mid-fetch", async () => {
+      let resolveFetch: (v: any) => void = () => {};
+      mockRouter.currentRoute.value = { name: "workflowEditor", query: {} } as any;
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.vm.currentPage = 3;
+      vi.useFakeTimers();
+
+      listWorkflows.mockReturnValue(
+        new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      // "saved" starts the re-fetch while still on the editor route (OTable isn't mounted yet).
+      wrapper.findComponent({ name: "FakeEditor" }).vm.$emit("saved");
+      // goBack() lands the route on "workflows" — remounting OTable — before the fetch resolves.
+      mockRouter.currentRoute.value = { name: "workflows", query: {} } as any;
+      await nextTick();
+
+      resolveFetch({ data: [makeWorkflow(1)] });
+      await flushPromises();
+
+      // Only now, once the fetched data has re-rendered OTable and re-bound the ref, plant the fake.
+      const setPageIndex = vi.fn();
+      wrapper.vm.oTableRef = { table: { setPageIndex } };
+      expect(setPageIndex).not.toHaveBeenCalled();
+
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
+      expect(setPageIndex).toHaveBeenCalledWith(2);
     });
   });
 });

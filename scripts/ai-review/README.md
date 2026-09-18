@@ -6,6 +6,12 @@ Automated PR review that posts a single consolidated comment on every pull reque
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
 
+The posted comment never names the model or provider behind the review — the heading carries no
+model label, the comment marker is provider-neutral, and `redactProviderIdentity` in
+`run-review.mjs` strips the provider/model ids out of anything on its way to the PR (a model
+naming itself, or an upstream error echoing the slug). Naming the model in this repo and in the
+Actions logs is fine; naming it in the comment is not.
+
 ## How it works (one paragraph)
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /
@@ -107,3 +113,19 @@ or `break glass`.
 - The App installation's granted permissions bound the token; keep the install at the minimum
   above so a mis-scoped install can't hand the reviewer a write-capable credential.
 - OSS (`openobserve`) and ENT (`o2-enterprise`) run identical engine files — keep them in sync.
+
+## Trace content and GenAI attributes
+
+The review exports model instructions, input, and output to the configured OpenObserve trace
+stream. These values can contain repository source and PR context, so access to that stream must
+be restricted accordingly.
+
+Model spans use the OpenTelemetry GenAI content attributes:
+
+- `gen_ai.system_instructions`
+- `gen_ai.input.messages`
+- `gen_ai.output.messages`
+
+Token counts, cost, model, response ID, and finish reasons come from the Opencode assistant
+response. Do not put content-length metadata below `gen_ai.prompt.*`: OpenObserve recognizes that
+prefix as legacy TraceLoop prompt content and would tokenize the metadata instead of the prompt.

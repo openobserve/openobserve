@@ -30,9 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       class="create-report-page flex min-h-0 w-full flex-1 flex-col"
     >
       <div class="bg-card-glass-bg flex min-h-0 flex-1 overflow-auto">
-        <div ref="addAlertFormRef" class="my-3 px-4" style="width: 64rem">
+        <!-- The [style*=width] variant caps the fields' inline widths: max-width beats an inline width. -->
+        <div
+          ref="addAlertFormRef"
+          class="my-3 w-256 px-4 max-md:max-w-full max-md:[&_[style*=width]]:max-w-full"
+        >
           <OForm :id="formId" :form="form" class="create-report-form">
-            <div class="flex items-start gap-4 px-2 pt-3">
+            <div class="flex items-start gap-4 px-2 pt-3 max-md:flex-wrap">
               <div data-test="add-report-name-input" class="o2-input">
                 <OFormInput
                   data-test="add-report-name-input"
@@ -81,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 :label="t('reports.cachedReport')"
               />
-              <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+              <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                 <OTooltip side="right" align="center">
                   <template #content>{{ t("reports.cachedReportHint") }}</template>
                 </OTooltip>
@@ -107,10 +111,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- items-start (not items-center): keeps all selects
                          top-aligned when a validation error appears under one and
                          grows its cell taller. -->
-                    <div class="flex items-start justify-start">
+                    <div class="flex items-start justify-start max-md:flex-col max-md:gap-2">
                       <div
                         data-test="add-report-folder-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -121,12 +125,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingFolders"
                           @update:model-value="(v: any) => onFolderSelection(v, index)"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                       <div
                         data-test="add-report-dashboard-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -137,12 +142,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
                           @update:model-value="(v: any) => onDashboardSelection(v, index)"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                       <div
                         data-test="add-report-tab-select"
-                        class="o2-input pt-0"
+                        class="o2-input pt-0 max-md:w-full!"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -152,7 +158,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           :label="t('reports.dashboardTab')"
                           required
                           :loading="isFetchingDashboard || isFetchingFolders"
-                          style="min-width: 15.625rem !important; width: 100% !important"
+                          class="min-w-62.5! max-md:min-w-0!"
+                          style="width: 100% !important"
                         />
                       </div>
                     </div>
@@ -181,7 +188,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       >
                         {{ t("reports.reportFormat") }}
                       </div>
-                      <div class="flex gap-3">
+                      <div class="flex gap-3 max-md:flex-col">
                         <!-- Report Type -->
                         <div class="o2-input col-auto" data-test="add-report-type-select">
                           <OFormSelect
@@ -250,7 +257,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             :name="showCustomDimensions ? 'expand-less' : 'expand-more'"
                             size="sm"
-                            class="mr-1"
+                            class="me-1"
                           />
                           <span class="text-text-secondary font-bold">{{
                             t("reports.customDimensions")
@@ -348,12 +355,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-3 flex items-start justify-start">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 20rem"
                       >
                         <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
-                          <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
                             <OTooltip side="right" align="center">
                               <template #content>
                                 <span style="font-size: var(--text-sm); white-space: pre-line">
@@ -398,7 +405,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OFormToggleGroup>
-                      <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                      <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                         <OTooltip side="right" align="center">
                           <template #content
                             >{{ t("reports.scheduleNowHint") }}<br />
@@ -414,7 +421,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 10rem"
                       >
                         <OFormInput
@@ -451,7 +458,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="selectedTimeTab === 'scheduleLater'"
                       class="mt-3 flex items-start justify-start"
                     >
-                      <div data-test="add-report-schedule-start-date-input" class="o2-input mr-2">
+                      <div data-test="add-report-schedule-start-date-input" class="o2-input me-2">
                         <OFormDate
                           name="date"
                           :label="t('reports.startDate')"
@@ -459,7 +466,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="add-report-schedule-start-date-field"
                         />
                       </div>
-                      <div data-test="add-report-schedule-start-time-input" class="o2-input mr-2">
+                      <div data-test="add-report-schedule-start-time-input" class="o2-input me-2">
                         <OFormTime
                           name="time"
                           :label="t('common.startTime')"
@@ -563,7 +570,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                    <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                       <OTooltip max-width="20rem">
                         <template #content>{{ t("reports.imagePreviewHint") }}</template>
                       </OTooltip>
@@ -593,7 +600,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-report-cancel-btn"
         variant="outline"
         size="sm-action"
-        class="mr-2"
+        class="me-2"
         :disabled="isSaving"
         @click="openCancelDialog"
       >
@@ -631,6 +638,10 @@ import dashboardService from "@/services/dashboards";
 import type { Ref } from "vue";
 import { DateTime as _DateTime } from "luxon";
 import reports from "@/services/reports";
+import { saveReportMutation } from "@/services/reports.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
+
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -1179,6 +1190,9 @@ const getDashboaordFolders = () => {
   });
 };
 
+const reportOrgId = useOrgId();
+const reportSave = useMutation(() => saveReportMutation(reportOrgId.value));
+
 // @submit handler — OForm calls this only once the whole schema passes (incl. the
 // conditional superRefine rules), so the schema (not a manual validate) gates the
 // save. `value` is the validated, form-owned payload (name/title/frequency/
@@ -1293,17 +1307,13 @@ const saveReport = async (value: CreateReportForm) => {
   const reportId = routeQuery?.report_id as string | undefined;
   const folderId = selectedReportFolderId.value || "default";
 
-  let savePromise: Promise<any>;
-  if (isEditingReport.value && reportId) {
-    // v2 update by ID
-    savePromise = reports.updateReportById(org, reportId, reportPayload);
-  } else if (isEditingReport.value) {
-    // legacy v1 update by name
-    savePromise = reports.updateReport(org, reportPayload);
-  } else {
-    // v2 create with folder
-    savePromise = reports.createReportV2(org, reportPayload, folderId);
-  }
+  // Which of the three shapes runs is this form's decision; the scope it drops is not.
+  const savePromise: Promise<any> = reportSave.mutateAsync({
+    payload: reportPayload,
+    reportId,
+    folderId,
+    isEdit: isEditingReport.value,
+  });
 
   const dismiss = toast({
     variant: "loading",
@@ -1317,7 +1327,7 @@ const saveReport = async (value: CreateReportForm) => {
   });
 
   return savePromise
-    .then(() => {
+    .then(async () => {
       // Invalidate the folder cache so ReportList fetches fresh data on mount
       const fId = selectedReportFolderId.value || "default";
       const updated = {

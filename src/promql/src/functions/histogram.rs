@@ -88,9 +88,13 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
         // can then consume them directly for every timestamp.
         bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
         // Get the labels (without bucket label) from the first series
-        let mut base_labels = bucket_series[0].1.labels.clone();
-        base_labels
-            .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
+        let base_labels = bucket_series[0]
+            .1
+            .labels
+            .iter()
+            .filter(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL)
+            .cloned()
+            .collect();
 
         let mut samples = Vec::with_capacity(timestamps.len());
         let mut cursors = vec![0usize; bucket_series.len()];
@@ -198,30 +202,17 @@ fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
 /// `coalesce_buckets` merges buckets with the same upper bound.
 /// The input buckets must be sorted.
 fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
-    let mut st = None;
-    let mut buckets = buckets
-        .into_iter()
-        .filter_map(|b| match st.as_mut() {
-            None => {
-                st = Some(b);
-                None
-            }
-            Some(last) => {
-                if b.upper_bound == last.upper_bound {
-                    st = Some(Bucket::new(last.upper_bound, last.count + b.count));
-                    None
-                } else {
-                    let nb = last.clone();
-                    *last = b;
-                    Some(nb)
-                }
-            }
-        })
-        .collect::<Vec<_>>();
-    if let Some(last) = st {
-        buckets.push(last);
+    let mut merged: Vec<Bucket> = Vec::new();
+    for bucket in buckets {
+        if let Some(last) = merged.last_mut()
+            && bucket.upper_bound == last.upper_bound
+        {
+            last.count += bucket.count;
+        } else {
+            merged.push(bucket);
+        }
     }
-    buckets
+    merged
 }
 
 // For the rationale behind this function, see
@@ -279,6 +270,26 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1.0), (2, 1.0), (3, 1.0)],
         );
+    }
+
+    #[test]
+    fn test_coalesce_buckets_preserves_float_edges() {
+        let buckets = coalesce_buckets(vec![
+            Bucket::new(-0.0, 1.0),
+            Bucket::new(0.0, 2.0),
+            Bucket::new(f64::INFINITY, f64::INFINITY),
+            Bucket::new(f64::INFINITY, f64::NEG_INFINITY),
+            Bucket::new(f64::NAN, 4.0),
+            Bucket::new(f64::NAN, 5.0),
+        ]);
+        assert_eq!(buckets.len(), 4);
+        assert_eq!(buckets[0].upper_bound.to_bits(), (-0.0_f64).to_bits());
+        assert_eq!(buckets[0].count, 3.0);
+        assert!(buckets[1].count.is_nan());
+        assert!(buckets[2].upper_bound.is_nan());
+        assert!(buckets[3].upper_bound.is_nan());
+        assert_eq!(buckets[2].count, 4.0);
+        assert_eq!(buckets[3].count, 5.0);
     }
 
     #[test]

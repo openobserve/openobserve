@@ -7,6 +7,9 @@ import sankeyData from "../../../../test-data/sankey_data.json";
 const testLogger = require('../../utils/test-logger.js');
 const { getAuthHeaders, getOrgIdentifier, refreshCloudConfig } = require('../../utils/cloud-auth.js');
 
+// Streams this worker process has already loaded the fixture into.
+const ingestedStreams = new Set();
+
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
   // Remove UTF characters using regular expression
@@ -27,6 +30,14 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     throw new Error("Required environment variables are not set");
   }
 
+  // Every beforeEach re-posts this fixture, but the rows are identical and the org is
+  // shared, so repeats add nothing observable while costing ~90 s of each test's
+  // 180 s budget on cloud — enough on its own to time out the longer specs.
+  const ingestKey = `${getOrgIdentifier()}:${streamName}`;
+  if (ingestedStreams.has(ingestKey)) {
+    return { skipped: true };
+  }
+
   // Resolve headers/org per attempt so a refreshed passcode is picked up on retry.
   const post = () =>
     fetch(
@@ -44,7 +55,18 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
     let fetchResponse;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      fetchResponse = await post();
+      try {
+        fetchResponse = await post();
+      } catch (networkError) {
+        // A connect timeout / socket reset rejects before any status exists, so the
+        // status-based retries below never see it and beforeEach dies on a blip.
+        if (attempt === MAX_ATTEMPTS) throw networkError;
+        testLogger.warn(
+          `Ingestion request failed (${networkError.message}) — retrying (attempt ${attempt}/${MAX_ATTEMPTS})`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        continue;
+      }
 
       // The per-org cloud passcode can be rotated mid-session (another shard, or expiry).
       // The 401 leaves no data ingested and surfaces far away as "No dropdown options
@@ -76,9 +98,10 @@ export const ingestion = async (page, streamName = "e2e_automate") => {
       );
     }
 
+    ingestedStreams.add(ingestKey);
     return await fetchResponse.json();
   } catch (error) {
-    testLogger.error("Ingestion failed", { error });
+    testLogger.error("Ingestion failed", { error: error.message, cause: String(error.cause ?? '') });
     throw error;
   }
 };

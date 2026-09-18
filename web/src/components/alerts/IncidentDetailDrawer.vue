@@ -57,6 +57,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </span>
 
+          <span
+            v-if="incidentDetails.acknowledged_by"
+            class="inline-flex cursor-default items-center gap-1"
+          >
+            <span class="text-text-secondary text-xs">{{
+              t("alerts.incidents.acknowledgedBy")
+            }}</span>
+            <OUserCell :value="incidentDetails.acknowledged_by" />
+          </span>
+
           <span class="inline-flex cursor-default">
             <OTag type="severity" :value="incidentDetails.severity" />
             <OTooltip
@@ -94,8 +104,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             variant="outline"
             size="sm"
             :loading="updating"
+            :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
             @click="acknowledgeIncident"
-            ><OIcon name="visibility" size="sm" />{{ t("alerts.incidents.acknowledge")
+            ><OIcon name="check-circle" size="sm" aria-hidden="true" />{{
+              t("alerts.incidents.acknowledge")
             }}<OTooltip :delay="500" :content="t('alerts.incidents.markAsAcknowledgedTooltip')"
           /></OButton>
           <OButton
@@ -574,6 +586,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- PART 2: Sidebar Content (33.33% width) - 3 sections -->
                   <div class="flex h-full w-1/3 flex-col gap-2">
+                    <!-- Who this incident woke. Absent entirely when it paged
+                         nobody, which is also the OSS and on-call-disabled
+                         case, so no feature flag is needed. -->
+                    <div
+                      v-if="oncallResponse"
+                      class="border-card-glass-border rounded-default bg-card-glass-bg flex min-h-0 shrink flex-col overflow-hidden border"
+                      data-test="incident-oncall-panel"
+                    >
+                      <div class="px-4 pt-2 pb-1">
+                        <div class="text-text-heading text-sm font-semibold">
+                          {{ t("alerts.incidents.onCall") }}
+                        </div>
+                      </div>
+                      <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-4 pb-3">
+                        <!-- Which team is carrying this, at what priority. The
+                             panel used to answer neither, so an incident named
+                             no owner while the record behind it did. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallTeam") }}
+                          </span>
+                          <span class="text-text-body truncate text-xs">
+                            {{ raw(oncallTeamName) }}
+                            <OTooltip side="bottom" :content="raw(oncallTeamName)" />
+                          </span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallPriority") }}
+                          </span>
+                          <OTag type="alertPriority" :value="oncallPriority" size="sm" />
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallState") }}
+                          </span>
+                          <OTag
+                            type="oncallResponseState"
+                            :value="oncallResponse.state"
+                            size="sm"
+                          />
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallOpened") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.opened_at" unit="us" />
+                        </div>
+                        <!-- Who answered, and when. An unanswered page is the
+                             fact worth a colour: it is still climbing. -->
+                        <div class="flex items-center justify-between gap-2">
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAckedBy") }}
+                          </span>
+                          <OUserCell
+                            v-if="oncallResponse.acked_by"
+                            :value="oncallResponse.acked_by"
+                          />
+                          <span v-else class="text-status-warning-text text-xs">
+                            {{ t("alerts.incidents.onCallUnanswered") }}
+                          </span>
+                        </div>
+                        <!-- A snoozed page looks identical to a quiet one, and
+                             it is the reading that gets an incident forgotten. -->
+                        <div
+                          v-if="oncallResponse.snoozed_until"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-snoozed"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallSnoozedUntil") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.snoozed_until" unit="us" />
+                        </div>
+                        <div
+                          v-if="oncallResponse.closed_at"
+                          class="flex items-center justify-between gap-2"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallResolved") }}
+                          </span>
+                          <OTimeCell :value="oncallResponse.closed_at" unit="us" />
+                        </div>
+                        <!-- The ladder ran a second time because the record
+                             changed hands. Without it the timeline reads as one
+                             very long escalation. -->
+                        <div
+                          v-if="(oncallResponse.ladder_run ?? 1) > 1"
+                          class="flex items-center justify-between gap-2"
+                          data-test="incident-oncall-ladder-run"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallLadderRun") }}
+                          </span>
+                          <span class="text-text-body text-xs">
+                            {{ raw(String(oncallResponse.ladder_run)) }}
+                          </span>
+                        </div>
+
+                        <!-- Impacted teams are paged alongside the owner to
+                             contain the blast radius. Listing only the first
+                             record hid every one of them. -->
+                        <div
+                          v-if="oncallLiaisons.length"
+                          class="border-border-default flex flex-col gap-1 border-t pt-2"
+                          data-test="incident-oncall-liaisons"
+                        >
+                          <span class="text-text-secondary text-xs">
+                            {{ t("alerts.incidents.onCallAlsoPaged") }}
+                          </span>
+                          <span
+                            v-for="liaison in oncallLiaisons"
+                            :key="liaison.id"
+                            class="flex items-center justify-between gap-2"
+                          >
+                            <span class="text-text-body truncate text-xs">
+                              {{ raw(oncallTeamNameFor(liaison.team_id)) }}
+                            </span>
+                            <OTag type="oncallResponseState" :value="liaison.state" size="sm" />
+                          </span>
+                        </div>
+
+                        <router-link
+                          class="text-accent text-xs"
+                          :to="{
+                            name: 'onCallResponseDetail',
+                            params: { responseId: oncallResponse.id },
+                            query: { org_identifier: store.state.selectedOrganization.identifier },
+                          }"
+                          data-test="incident-oncall-link"
+                        >
+                          {{ t("alerts.incidents.openPage") }}
+                        </router-link>
+                      </div>
+                    </div>
+
                     <!-- 2.2A: Manage Panel (40% of available height after gaps) -->
                     <div
                       class="border-card-glass-border rounded-default bg-card-glass-bg flex h-[calc(35%-0.4rem)] flex-col overflow-hidden border"
@@ -818,7 +966,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- Alert Triggers Tab Content -->
               <div v-if="activeTab === 'alertTriggers'" class="flex flex-1 overflow-hidden">
                 <!-- Left Section: Alert Triggers Table -->
-                <div class="flex flex-1 flex-col overflow-hidden pt-4 pr-2">
+                <div class="flex flex-1 flex-col overflow-hidden pe-2 pt-4">
                   <div
                     :class="[
                       'border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border',
@@ -1102,7 +1250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1186,7 +1334,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1287,7 +1435,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     size="md"
                     @click="refreshCorrelation"
                     class="mt-3"
-                    ><OIcon name="refresh" size="sm" class="mr-1" />{{ t("common.retry") }}</OButton
+                    ><OIcon name="refresh" size="sm" class="me-1" />{{ t("common.retry") }}</OButton
                   >
                 </div>
 
@@ -1338,7 +1486,7 @@ import {
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { formatToReadable } from "@/utils/date";
 import incidentsService, {
   Incident,
@@ -1347,7 +1495,13 @@ import incidentsService, {
   IncidentCorrelatedStreams,
   ArchivedRcaReport,
 } from "@/services/incidents";
-import streamService from "@/services/stream";
+import oncallService from "@/services/oncall";
+import type { OnCallResponse } from "@/ts/interfaces/oncall";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { updateIncidentMutation, updateIncidentStatusMutation } from "@/services/incidents.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import serviceStreamsApi, {
   buildChipDimensionsFromFilters,
   type CorrelationResponse,
@@ -1368,6 +1522,8 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -1392,6 +1548,8 @@ export default defineComponent({
     OButton,
     OSpinner,
     OTooltip,
+    OTimeCell,
+    OUserCell,
     OIcon,
     OTag,
     OInlineEdit,
@@ -1401,7 +1559,14 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
+    const route = useRoute();
     const { confirm } = useConfirmDialog();
+
+    const incidentOrgId = useOrgId();
+    const updateIncidentStatus = useMutation(() =>
+      updateIncidentStatusMutation(incidentOrgId.value),
+    );
+    const updateIncident = useMutation(() => updateIncidentMutation(incidentOrgId.value));
 
     // Copy to clipboard state
     const copiedField = ref<string | null>(null);
@@ -1427,7 +1592,68 @@ export default defineComponent({
     const incidentDetails = ref<(IncidentWithAlerts & { correlation_reason?: string }) | null>(
       null,
     );
+    // The on-call record this incident paged, if any. Null in OSS, when
+    // on-call is off, and when nothing was routed — all of which mean the
+    // panel simply does not render.
+    const oncallResponse = ref<OnCallResponse | null>(null);
+    /// Every record this incident opened. The owner's is the headline; an
+    /// impacted team gets its own record and used to be dropped on the floor
+    /// by taking `[0]` and discarding the rest.
+    const oncallResponses = ref<OnCallResponse[]>([]);
+    const oncallTeamNames = ref<Record<string, string>>({});
     const triggers = ref<IncidentAlert[]>([]);
+
+    /// Newest firing wins: an incident can page more than once, and the panel
+    /// answers "who has it now". A failure leaves the panel hidden rather than
+    /// claiming nobody was paged.
+    async function loadOnCallResponse(org: string, incidentId: string) {
+      try {
+        const res = await oncallService.listResponsesForIncident({
+          org_identifier: org,
+          incident_id: incidentId,
+        });
+        const records = res.data ?? [];
+        oncallResponses.value = records;
+        // The owner fixes the thing; a liaison contains the blast radius. The
+        // owner's record is the one the panel is about.
+        oncallResponse.value =
+          records.find((record) => record.responder_role !== "impacted") ?? records[0] ?? null;
+        await loadOnCallTeamNames(org, records);
+      } catch {
+        oncallResponse.value = null;
+        oncallResponses.value = [];
+      }
+    }
+
+    /// A team id is a ksuid, and printing one asks the reader to look it up
+    /// somewhere else. One list call resolves every record's team at once.
+    async function loadOnCallTeamNames(org: string, records: OnCallResponse[]) {
+      if (!records.some((record) => record.team_id)) return;
+      try {
+        const res = await oncallService.listTeams({ org_identifier: org });
+        oncallTeamNames.value = Object.fromEntries(
+          (res.data ?? []).map((team) => [team.id, team.name]),
+        );
+      } catch {
+        // The ids still render; a failed lookup must not blank the panel.
+        oncallTeamNames.value = {};
+      }
+    }
+
+    const oncallTeamNameFor = (teamId: string) => oncallTeamNames.value[teamId] ?? teamId;
+
+    const oncallTeamName = computed(() =>
+      oncallResponse.value ? oncallTeamNameFor(oncallResponse.value.team_id) : "",
+    );
+
+    /// `OTag` keys its palette on the lowercase name, and the wire sends 1–5.
+    const oncallPriority = computed(() =>
+      oncallResponse.value ? `p${oncallResponse.value.priority}` : "",
+    );
+
+    const oncallLiaisons = computed(() =>
+      oncallResponses.value.filter((record) => record.id !== oncallResponse.value?.id),
+    );
     const alerts = ref<any[]>([]);
 
     // Title editing
@@ -1906,7 +2132,7 @@ export default defineComponent({
           !correlationData.value?.traceStreams?.length
         ) {
           // No correlation data found - try building fallback correlation
-          await buildFallbackCorrelation(org, incidentDetails.value);
+          await buildFallbackCorrelation(org, incidentDetails.value, force);
         }
       } catch (error: any) {
         console.error("Failed to load correlated streams:", error);
@@ -1918,7 +2144,7 @@ export default defineComponent({
     };
 
     // Build fallback correlation using first alert's stream schema
-    const buildFallbackCorrelation = async (org: string, incident: Incident) => {
+    const buildFallbackCorrelation = async (org: string, incident: Incident, force = false) => {
       try {
         const groupValues: Record<string, string> = incident.group_values ?? {};
         // Get first alert to determine source stream
@@ -1933,8 +2159,16 @@ export default defineComponent({
         const streamName = firstAlert.stream_name || "default";
 
         // Step 1: Get stream schema (like logs page does)
-        const schemaResponse = await streamService.schema(org, streamName, streamType);
-        const schema = schemaResponse.data;
+        const schemaOptions = streamSchemaQuery(org, streamName, streamType);
+        // Retry is the user asking again, so a field added since the last read must show up.
+        if (force) {
+          await queryClient.invalidateQueries({
+            queryKey: schemaOptions.queryKey,
+            exact: true,
+            refetchType: "none",
+          });
+        }
+        const schema = await queryClient.fetchQuery(schemaOptions);
 
         // Step 2: Extract schema fields (like logs page does)
         // CRITICAL FIX: Use uds_schema (user-defined schema) if available!
@@ -2026,6 +2260,7 @@ export default defineComponent({
               logs: streamType === "logs" ? [streamInfo] : [],
               metrics: streamType === "metrics" ? [streamInfo] : [],
               traces: streamType === "traces" ? [streamInfo] : [],
+              profiles: [],
             },
             // Extra marker consumed downstream; not part of CorrelationResponse.
             correlation_method: "frontend-fallback",
@@ -2038,9 +2273,8 @@ export default defineComponent({
     };
 
     // Refresh correlation data
-    const refreshCorrelation = () => {
-      fetchCorrelatedStreams(true);
-    };
+    // Returns the promise so callers (and specs) can await the refresh.
+    const refreshCorrelation = () => fetchCorrelatedStreams(true);
 
     // Lazy load correlation when user clicks telemetry tab for the first time
     watch(activeTab, (newTab) => {
@@ -2326,6 +2560,7 @@ export default defineComponent({
         const response = await incidentsService.get(org, incidentId);
 
         incidentDetails.value = response.data;
+        void loadOnCallResponse(org, incidentId);
         triggers.value = response.data.triggers || [];
         // Composites have no `alerts` row, so the live-definition resolver
         // returns them under `composite_alerts`; merge so the name-based
@@ -2433,10 +2668,11 @@ export default defineComponent({
       contextRegistry.setActive("");
       contextRegistry.unregister("incidents");
 
-      // Navigate back to incident list
+      // Navigate back to incident list, carrying over this route's own query (e.g. page) instead of dropping it.
       router.push({
         name: "incidentList",
         query: {
+          ...route.query,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
@@ -2471,14 +2707,14 @@ export default defineComponent({
       if (!incidentDetails.value) return;
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
+        incidentDetails.value.acknowledged_by = response.data.acknowledged_by;
+        incidentDetails.value.acknowledged_at = response.data.acknowledged_at;
         incidentDetails.value.updated_at = response.data.updated_at || Date.now() * 1000;
         editableStatus.value = response.data.status;
         toast({
@@ -2509,7 +2745,18 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = () => updateStatus("acknowledged");
+    const acknowledgeIncident = async () => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
+      // The caller's promise must cover the update, not just the confirm dialog.
+      return updateStatus("acknowledged");
+    };
     const resolveIncident = () => updateStatus("resolved");
     const reopenIncident = () => updateStatus("open");
 
@@ -2533,9 +2780,9 @@ export default defineComponent({
       }
 
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateIncident(org, incidentDetails.value.id, {
-          title: nextTitle,
+        const response = await updateIncident.mutateAsync({
+          id: incidentDetails.value.id,
+          updates: { title: nextTitle },
         });
 
         // Update local state with the actual title from the API response
@@ -2665,12 +2912,10 @@ export default defineComponent({
 
       updating.value = true;
       try {
-        const org = store.state.selectedOrganization.identifier;
-        const response = await incidentsService.updateStatus(
-          org,
-          incidentDetails.value.id,
-          newStatus,
-        );
+        const response = await updateIncidentStatus.mutateAsync({
+          id: incidentDetails.value.id,
+          status: newStatus,
+        });
 
         // Update local state with the actual status from the API response
         incidentDetails.value.status = response.data.status;
@@ -2718,8 +2963,9 @@ export default defineComponent({
       try {
         const org = store.state.selectedOrganization.identifier;
         const incidentId = incidentDetails.value.id;
-        const response = await incidentsService.updateIncident(org, incidentId, {
-          severity: newSeverity,
+        const response = await updateIncident.mutateAsync({
+          id: incidentId,
+          updates: { severity: newSeverity },
         });
 
         const data = response.data;
@@ -3062,8 +3308,8 @@ export default defineComponent({
             const classes = [
               "rca-h1 font-bold text-lg text-center mb-4 pb-2 border-b-2",
               // TODO: Discuss with team - h2 section separators with background and left border
-              // Remove 'rca-section-bg px-4 py-3 rounded-default border-l-4' if not approved
-              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-l-4",
+              // Remove 'rca-section-bg px-4 py-3 rounded-default border-s-4' if not approved
+              "rca-h2 font-bold text-lg mt-5 mb-3 rca-section-bg px-4 py-3 rounded-default border-s-4",
               "rca-h3 font-semibold text-base mt-4 mb-2",
               "rca-h4 font-semibold text-sm mt-3 mb-2",
             ];
@@ -3079,8 +3325,8 @@ export default defineComponent({
             const body = token.items.map((item: any) => this.listitem(item)).join("");
             const tag = token.ordered ? "ol" : "ul";
             const classes = token.ordered
-              ? "rca-ol pl-5 my-3 space-y-1.5 list-decimal"
-              : "rca-ul pl-5 my-3 space-y-1.5 list-disc";
+              ? "rca-ol ps-5 my-3 space-y-1.5 list-decimal"
+              : "rca-ul ps-5 my-3 space-y-1.5 list-disc";
             return `<${tag} class="${classes}">${body}</${tag}>`;
           },
           listitem(item: any) {
@@ -3113,7 +3359,7 @@ export default defineComponent({
           },
           blockquote({ tokens }: any) {
             const text = this.parser.parse(tokens);
-            return `<blockquote class="rca-blockquote border-l-4 pl-4 py-2 my-3 italic">${text}</blockquote>`;
+            return `<blockquote class="rca-blockquote border-s-4 ps-4 py-2 my-3 italic">${text}</blockquote>`;
           },
           paragraph({ tokens }: any) {
             const text = this.parser.parseInline(tokens);
@@ -3333,6 +3579,11 @@ export default defineComponent({
       loading,
       updating,
       incidentDetails,
+      oncallResponse,
+      oncallLiaisons,
+      oncallTeamName,
+      oncallTeamNameFor,
+      oncallPriority,
       triggers,
       alerts,
       selectedAlertIndex,

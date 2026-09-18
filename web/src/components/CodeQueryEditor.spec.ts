@@ -41,6 +41,7 @@ const mockEditorObj = {
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   dispose: vi.fn(),
@@ -583,10 +584,10 @@ describe("CodeQueryEditor", () => {
         },
         global: { plugins: [store] },
       });
-      // Wait until the async setupEditor completes and addCommand is recorded
+      // Wait until the async setupEditor completes and the key handler is bound
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );
@@ -598,28 +599,40 @@ describe("CodeQueryEditor", () => {
       shortcutWrapper = null;
     });
 
-    it("should call addCommand with CtrlCmd+Enter keybinding", async () => {
+    // The shortcut is bound via onKeyDown rather than addCommand: monaco's
+    // addCommand discards the disposable it gets back, so its CommandsRegistry
+    // entry outlives the editor and retains this component.
+    it("should bind the shortcut through onKeyDown, not addCommand", async () => {
       await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      // KeyMod.CtrlCmd | KeyCode.Enter = 1 | 13 (bitwise OR of the mock values)
-      expect(firstCall[0]).toBe(1 | 13);
+      expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
+      expect(mockEditorObj.addCommand).not.toHaveBeenCalled();
     });
 
-    it("should emit run-query when CtrlCmd+Enter handler is invoked", async () => {
+    it("should emit run-query when CtrlCmd+Enter is pressed", async () => {
       const wrapper = await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const handler = mockEditorObj.addCommand.mock.calls[0][1];
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
       expect(typeof handler).toBe("function");
-      handler();
+      handler({
+        keyCode: 13,
+        ctrlKey: true,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
       expect(wrapper.emitted("run-query")).toBeTruthy();
     });
 
-    it("should register addCommand with ctrlenter context", async () => {
-      await mountAndSetup();
-      expect(mockEditorObj.addCommand).toHaveBeenCalled();
-      const firstCall = mockEditorObj.addCommand.mock.calls[0];
-      expect(firstCall[2]).toBe("ctrlenter");
+    it("should ignore Enter without a modifier", async () => {
+      const wrapper = await mountAndSetup();
+      const handler = mockEditorObj.onKeyDown.mock.calls[0][0];
+      handler({
+        keyCode: 13,
+        ctrlKey: false,
+        metaKey: false,
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+      });
+      expect(wrapper.emitted("run-query")).toBeFalsy();
     });
   });
 
@@ -644,7 +657,7 @@ describe("CodeQueryEditor", () => {
 
       await vi.waitFor(
         () => {
-          expect(mockEditorObj.addCommand).toHaveBeenCalled();
+          expect(mockEditorObj.onKeyDown).toHaveBeenCalled();
         },
         { timeout: 10000 },
       );

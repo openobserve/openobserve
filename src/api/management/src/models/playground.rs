@@ -59,12 +59,26 @@ impl From<Snapshot> for PlaygroundSnapshotResponseBody {
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PlaygroundToolCallBody {
+    pub id: String,
+    pub name: String,
+    pub arguments: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PlaygroundMessageBody {
     pub role: String,
     /// Structured content is accepted and passed through, so multimodal and
     /// tool-result messages survive.
     #[serde(default)]
     pub content: Option<Value>,
+    #[serde(default)]
+    pub reasoning_content: Option<String>,
+    #[serde(default)]
+    pub tool_call_id: Option<String>,
+    #[serde(default)]
+    pub tool_calls: Vec<PlaygroundToolCallBody>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]

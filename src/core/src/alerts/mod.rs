@@ -221,6 +221,7 @@ impl QueryConditionExt for QueryCondition {
                     search_type: Some(SearchEventType::Alerts),
                     regions: vec![],
                     clusters: vec![],
+                    search_event_context,
                 };
                 // check super cluster
                 #[cfg(not(feature = "enterprise"))]
@@ -1062,16 +1063,17 @@ impl ConditionExt for Condition {
         if self.column.is_empty() {
             return true;
         }
+        let resolved = resolve_column(row, &self.column);
         match self.operator {
-            Operator::IsNull => return row.get(&self.column).is_none_or(Value::is_null),
-            Operator::IsNotNull => return row.get(&self.column).is_some_and(|v| !v.is_null()),
-            Operator::IsEmpty => return row.get(&self.column).is_none_or(is_empty_value),
+            Operator::IsNull => return resolved.is_none_or(Value::is_null),
+            Operator::IsNotNull => return resolved.is_some_and(|v| !v.is_null()),
+            Operator::IsEmpty => return resolved.is_none_or(is_empty_value),
             Operator::IsNotEmpty => {
-                return row.get(&self.column).is_some_and(|v| !is_empty_value(v));
+                return resolved.is_some_and(|v| !is_empty_value(v));
             }
             _ => {}
         }
-        let val = match row.get(&self.column) {
+        let val = match resolved {
             Some(val) => val,
             None => {
                 return false;
@@ -1314,6 +1316,41 @@ fn is_empty_value(v: &Value) -> bool {
     v.is_null() || matches!(v, Value::String(s) if s.is_empty())
 }
 
+/// Walks `segments` into `map`, trying every split point because `_` is both the
+/// flattening separator and a legal character inside a key (`meta_alert_count`).
+fn descend_segments<'a>(map: &'a Map<String, Value>, segments: &[&str]) -> Option<&'a Value> {
+    for take in (1..=segments.len()).rev() {
+        let key = segments[..take].join("_");
+        let Some(child) = map.get(&key) else {
+            continue;
+        };
+        let rest = &segments[take..];
+        if rest.is_empty() {
+            return Some(child);
+        }
+        if let Some(child_map) = child.as_object()
+            && let Some(found) = descend_segments(child_map, rest)
+        {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// Resolves a condition column against a record that may be flattened (`meta_alert_count`,
+/// the ingest shape and what the workflow field picker submits) or nested (`meta.alert_count`,
+/// the shape a workflow now preserves), so both keep matching the same saved condition.
+fn resolve_column<'a>(row: &'a Map<String, Value>, column: &str) -> Option<&'a Value> {
+    if let Some(val) = row.get(column) {
+        return Some(val);
+    }
+    let segments: Vec<&str> = column.split(['.', '_']).filter(|s| !s.is_empty()).collect();
+    if segments.len() < 2 {
+        return None;
+    }
+    descend_segments(row, &segments)
+}
+
 /// Evaluates a single condition against a record
 async fn evaluate_condition(
     row: &Map<String, Value>,
@@ -1329,14 +1366,15 @@ async fn evaluate_condition(
     if column.is_empty() {
         return true;
     }
+    let resolved = resolve_column(row, column);
     match operator {
-        Operator::IsNull => return row.get(column).is_none_or(Value::is_null),
-        Operator::IsNotNull => return row.get(column).is_some_and(|v| !v.is_null()),
-        Operator::IsEmpty => return row.get(column).is_none_or(is_empty_value),
-        Operator::IsNotEmpty => return row.get(column).is_some_and(|v| !is_empty_value(v)),
+        Operator::IsNull => return resolved.is_none_or(Value::is_null),
+        Operator::IsNotNull => return resolved.is_some_and(|v| !v.is_null()),
+        Operator::IsEmpty => return resolved.is_none_or(is_empty_value),
+        Operator::IsNotEmpty => return resolved.is_some_and(|v| !is_empty_value(v)),
         _ => {}
     }
-    let val: &Value = match row.get(column) {
+    let val: &Value = match resolved {
         Some(val) => val,
         None => {
             return false;
@@ -1662,6 +1700,9 @@ fn build_expr(
             } else {
                 cond.value.to_string()
             };
+            // Double up embedded single quotes so a value like "it's" can't
+            // terminate the SQL string literal early.
+            let val = val.replace('\'', "''");
             match cond.operator {
                 Operator::EqualTo => format!("\"{field_alias}\" = '{val}'"),
                 Operator::NotEqualTo => format!("\"{field_alias}\" != '{val}'"),
@@ -1898,6 +1939,29 @@ mod tests {
 
         // Should produce: ("level" = 'error' OR "status" = 'critical')
         assert_eq!(sql, "(\"level\" = 'error' OR \"status\" = 'critical')");
+    }
+
+    #[tokio::test]
+    async fn test_condition_group_to_sql_escapes_apostrophe() {
+        let schema = Schema::new(vec![Field::new("k8s_cluster", DataType::Utf8, false)]);
+
+        let condition_group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "k8s_cluster".to_string(),
+                operator: Operator::EqualTo,
+                value: Value::String("it's production".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+
+        let sql = condition_group.to_sql(&schema).await.unwrap();
+
+        // A bare apostrophe must be doubled, not passed through raw, or the
+        // generated SQL string literal terminates early and fails to parse.
+        assert_eq!(sql, "(\"k8s_cluster\" = 'it''s production')");
     }
 
     #[tokio::test]
@@ -3009,6 +3073,159 @@ mod tests {
         assert_eq!(
             having_data_type(&AggFunction::Max, &DataType::Utf8),
             DataType::Utf8
+        );
+    }
+
+    // A workflow carries the alert payload UNFLATTENED, but the field picker submits the
+    // flattened key (`meta_alert_count`) as the column. Both shapes must resolve, or every
+    // condition saved before workflows stopped flattening would silently stop matching.
+    #[tokio::test]
+    async fn test_resolve_column_flat_key_against_nested_record() {
+        let row = match serde_json::json!({
+            "meta": {"alert_count": 50, "alert_name": "verify"},
+            "data": []
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta_alert_count"),
+            Some(&Value::from(50))
+        );
+        assert_eq!(
+            resolve_column(&row, "meta_alert_name"),
+            Some(&Value::from("verify"))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_column_dotted_path_against_nested_record() {
+        let row = match serde_json::json!({"meta": {"alert_count": 50}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta.alert_count"),
+            Some(&Value::from(50))
+        );
+    }
+
+    // The ingest path still hands over an already-flattened row; a literal key wins
+    // outright so nothing about pipelines changes.
+    #[tokio::test]
+    async fn test_resolve_column_prefers_literal_key() {
+        let row = match serde_json::json!({
+            "meta_alert_count": 7,
+            "meta": {"alert_count": 50}
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(
+            resolve_column(&row, "meta_alert_count"),
+            Some(&Value::from(7))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_column_missing_is_none() {
+        let row = match serde_json::json!({"meta": {"alert_count": 50}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert_eq!(resolve_column(&row, "meta_missing_field"), None);
+        assert_eq!(resolve_column(&row, "nope"), None);
+    }
+
+    // A nested record must satisfy a saved flat-key condition end to end.
+    #[tokio::test]
+    async fn test_evaluate_condition_matches_nested_record_via_flat_key() {
+        let row = match serde_json::json!({
+            "meta": {"alert_count": 50, "alert_name": "verify"},
+            "data": []
+        }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::EqualTo,
+                &Value::from(50),
+                false
+            )
+            .await
+        );
+        assert!(
+            !evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::EqualTo,
+                &Value::from(51),
+                false
+            )
+            .await
+        );
+    }
+
+    // The branch builder saves thresholds as strings ("500"), so a numeric field must
+    // still compare numerically — lexically "700" < "500" would misroute every branch.
+    #[tokio::test]
+    async fn test_evaluate_condition_numeric_field_against_string_threshold() {
+        let row = match serde_json::json!({ "meta": {"alert_count": 700} }) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::GreaterThan,
+                &Value::from("500"),
+                false
+            )
+            .await,
+            "700 > \"500\" must hold numerically"
+        );
+        assert!(
+            !evaluate_condition(
+                &row,
+                "meta_alert_count",
+                &Operator::GreaterThan,
+                &Value::from("900"),
+                false
+            )
+            .await,
+            "700 > \"900\" must be false"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_evaluate_condition_null_checks_see_nested_record() {
+        let row = match serde_json::json!({"meta": {"alert_name": "verify"}}) {
+            Value::Object(m) => m,
+            _ => unreachable!(),
+        };
+
+        assert!(
+            evaluate_condition(
+                &row,
+                "meta_alert_name",
+                &Operator::IsNotNull,
+                &Value::Null,
+                false
+            )
+            .await
+        );
+        assert!(
+            evaluate_condition(&row, "meta_absent", &Operator::IsNull, &Value::Null, false).await
         );
     }
 }

@@ -53,6 +53,7 @@ fn definition(id: &str, org: &str, name: &str) -> alert_composites::ActiveModel 
         last_edited_by: Set(None),
         updated_at: Set(None),
         evaluation_generation: Set(0),
+        pending_period_sec: Set(0),
     }
 }
 
@@ -161,6 +162,7 @@ async fn migration_creates_only_v1_tables_indexes_and_claim_epoch() {
         "last_edited_by",
         "updated_at",
         "evaluation_generation",
+        "pending_period_sec",
     ]
     .into_iter()
     .map(str::to_string)

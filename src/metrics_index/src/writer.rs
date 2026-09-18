@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, RecordBatch, UInt32Array, UInt64Array},
@@ -24,10 +24,15 @@ use arrow::{
         writer::{FileWriter as ArrowFileWriter, IpcWriteOptions},
     },
 };
-use config::meta::promql::{HASH_LABEL, is_metrics_hash_excluded_label};
+use config::meta::promql::{
+    HASH_LABEL, METRICS_HASH_EXCLUDED_LABELS, is_metrics_hash_excluded_label,
+};
 use datafusion::error::{DataFusionError, Result};
 
-use crate::layout::METRICS_INDEX_ROW_COUNT;
+use crate::layout::{
+    METRICS_INDEX_EXCLUDED_LABELS_KEY, METRICS_INDEX_PARENT_RECORDS_KEY, METRICS_INDEX_ROW_COUNT,
+    METRICS_INDEX_ROW_GROUP_SIZE_KEY, METRICS_INDEX_VERSION, METRICS_INDEX_VERSION_KEY,
+};
 
 /// Writer for an indexed metrics file's `.midx` metrics index. Every row
 /// describes one contiguous metrics series run in the data file: its row count plus the
@@ -127,12 +132,37 @@ impl MetricsIndexWriter {
         Ok(())
     }
 
-    pub fn finish(self) -> Result<Vec<u8>> {
+    /// Encode the index for a data file of `parent_records` rows and the given parquet row-group
+    /// size (`None` for Vortex).
+    pub fn finish(self, parent_records: i64, row_group_size: Option<usize>) -> Result<Vec<u8>> {
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            METRICS_INDEX_VERSION_KEY.to_string(),
+            METRICS_INDEX_VERSION.to_string(),
+        );
+        metadata.insert(
+            METRICS_INDEX_PARENT_RECORDS_KEY.to_string(),
+            parent_records.to_string(),
+        );
+        if let Some(row_group_size) = row_group_size {
+            metadata.insert(
+                METRICS_INDEX_ROW_GROUP_SIZE_KEY.to_string(),
+                row_group_size.to_string(),
+            );
+        }
+        metadata.insert(
+            METRICS_INDEX_EXCLUDED_LABELS_KEY.to_string(),
+            METRICS_HASH_EXCLUDED_LABELS.join(","),
+        );
+        let schema = Arc::new(Schema::new_with_metadata(
+            self.schema.fields().clone(),
+            metadata,
+        ));
         let batch = concat_batches(&self.schema, &self.pending_batches)?;
+        let batch = RecordBatch::try_new(Arc::clone(&schema), batch.columns().to_vec())?;
         let options =
             IpcWriteOptions::default().try_with_compression(Some(CompressionType::ZSTD))?;
-        let mut writer =
-            ArrowFileWriter::try_new_with_options(Vec::new(), batch.schema_ref(), options)?;
+        let mut writer = ArrowFileWriter::try_new_with_options(Vec::new(), &schema, options)?;
         writer.write(&batch)?;
         Ok(writer.into_inner()?)
     }
@@ -187,7 +217,16 @@ mod tests {
         writer.write(&batch1).unwrap();
         writer.write(&batch2).unwrap();
 
-        let bytes = writer.finish().unwrap();
+        let bytes = writer.finish(5, Some(4)).unwrap();
+        let metadata = FileReader::try_new(Cursor::new(bytes.clone()), None)
+            .unwrap()
+            .schema()
+            .metadata()
+            .clone();
+        assert_eq!(metadata[METRICS_INDEX_VERSION_KEY], "1");
+        assert_eq!(metadata[METRICS_INDEX_PARENT_RECORDS_KEY], "5");
+        assert_eq!(metadata[METRICS_INDEX_ROW_GROUP_SIZE_KEY], "4");
+        assert!(metadata[METRICS_INDEX_EXCLUDED_LABELS_KEY].contains("trace_id"));
         let batches = FileReader::try_new(Cursor::new(bytes), None)
             .unwrap()
             .collect::<std::result::Result<Vec<_>, _>>()

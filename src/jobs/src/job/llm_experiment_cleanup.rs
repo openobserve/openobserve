@@ -40,7 +40,7 @@ pub fn run() {
 
     spawn_pausable_job!("llm_experiment_cleanup", CLEANUP_INTERVAL_SECS, {
         let now = chrono::Utc::now().timestamp_millis();
-        match o2_enterprise::enterprise::llm_evaluations::experiment_deletion::purge_marked(now)
+        match o2_enterprise::enterprise::llm_evaluations::experiments::deletion::purge_marked(now)
             .await
         {
             Ok(0) => log::debug!("[LLM_EXPERIMENT_CLEANUP] nothing marked for cleanup"),

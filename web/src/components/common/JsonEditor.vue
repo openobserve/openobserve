@@ -21,7 +21,7 @@
         class="text-status-error-text max-h-50 shrink-0 overflow-y-auto p-3"
       >
         <div class="mb-2 font-bold">{{ t("common.pleaseFixIssues") }}</div>
-        <ul class="ml-3">
+        <ul class="ms-3">
           <li v-for="(error, index) in localValidationErrors" :key="index">
             {{ error }}
           </li>
@@ -46,7 +46,7 @@
       </div>
     </div>
     <!-- o2aichat enabled -->
-    <div v-if="store.state.isAiChatEnabled" class="ml-2 h-full w-[25vw]">
+    <div v-if="store.state.isAiChatEnabled" class="ms-2 h-full w-[25vw]">
       <O2AIChat
         class="h-full"
         :is-open="store.state.isAiChatEnabled"

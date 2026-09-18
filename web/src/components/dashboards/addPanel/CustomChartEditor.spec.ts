@@ -447,10 +447,10 @@ describe("CustomChartEditor", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
-      // Inline `padding-left: 20px; height: 100%` -> pl-5 (1.25rem) / h-full.
+      // Inline `padding-left: 20px; height: 100%` -> ps-5 (1.25rem) / h-full.
       const classes = queryEditor.classes();
 
-      expect(classes).toContain("pl-5");
+      expect(classes).toContain("ps-5");
       expect(classes).toContain("h-full");
     });
   });

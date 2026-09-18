@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, defineAsyncComponent, provide } from "vue";
+import { ref, onMounted, watch, defineAsyncComponent, provide } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
@@ -478,6 +478,19 @@ const addPanelToDashboard = () => {
 // ============================================================================
 // Watchers
 // ============================================================================
+
+// Applying a saved view while already on the build tab does not remount this
+// component, so onMounted never re-reads savedBuildConfig. Re-initialize here so
+// the applied view is reflected. initializeFromQuery consumes and nulls it, so a
+// fresh non-null value always signals a newly applied saved view.
+watch(
+  () => searchObj.meta.savedBuildConfig,
+  (config) => {
+    if (config) {
+      initializeFromQuery();
+    }
+  },
+);
 
 // NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
 // rather than a deep watcher. A deep watcher here would call router.push on every

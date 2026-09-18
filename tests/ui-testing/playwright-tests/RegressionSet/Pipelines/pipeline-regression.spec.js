@@ -449,7 +449,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   }
 
   test("Bug #11498: should disable Run Query button when no stream is selected", {
-    tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
+    tag: ['@smoke', '@P0', '@bug-11498', '@pipelineRegression']
   }, async ({ page }) => {
     testLogger.info("Testing Run Query button is disabled without stream selection");
     await setupBug11498Test(page);
@@ -476,7 +476,7 @@ test.describe("Pipeline Regression - Scheduled Pipeline Validation", { tag: ['@a
   });
 
   test("Bug #11498: should enable Run Query button after stream is selected", {
-    tag: ['@smoke', '@P0', '@bug11498', '@pipelineRegression']
+    tag: ['@smoke', '@P0', '@bug-11498', '@pipelineRegression']
   }, async ({ page }) => {
     testLogger.info("Testing Run Query button enables after stream selection");
     await setupBug11498Test(page);

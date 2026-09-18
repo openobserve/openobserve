@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
-              <OIcon name="arrow-forward" size="sm" class="ml-1" />
+              <OIcon name="arrow-forward" size="sm" class="ms-1" />
             </template>
           </OButton>
         </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
-                <OIcon name="arrow-forward" size="sm" class="ml-1" />
+                <OIcon name="arrow-forward" size="sm" class="ms-1" />
               </template>
             </OButton>
           </div>
@@ -235,11 +235,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OUserCell :value="row.inviter_id" />
             </template>
             <template #cell-actions="{ row }">
-              <div class="flex justify-end gap-2 pr-3">
+              <div class="flex justify-end gap-2 pe-3">
                 <OButton
                   variant="primary"
                   size="sm"
                   :disabled="actioningToken === row.token"
+                  class="max-md:hidden"
                   :data-test="`org-group-accept-invite-${row.inviter_org_id}`"
                   @click="acceptInvite(row.token)"
                 >
@@ -249,11 +250,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="outline"
                   size="sm"
                   :disabled="actioningToken === row.token"
+                  class="max-md:hidden"
                   :data-test="`org-group-reject-invite-${row.inviter_org_id}`"
                   @click="rejectInvite(row.token)"
                 >
                   {{ t("billing.billingGroup.reject") }}
                 </OButton>
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="org-group-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    class="md:hidden"
+                    :disabled="actioningToken === row.token"
+                    :data-test="`org-group-accept-invite-${row.inviter_org_id}-menu`"
+                    @select="acceptInvite(row.token)"
+                  >
+                    <span>{{ t("billing.billingGroup.accept") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    class="md:hidden"
+                    :disabled="actioningToken === row.token"
+                    :data-test="`org-group-reject-invite-${row.inviter_org_id}-menu`"
+                    @select="rejectInvite(row.token)"
+                  >
+                    <span>{{ t("billing.billingGroup.reject") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
           </OTable>
@@ -372,6 +402,8 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
@@ -420,6 +452,8 @@ export default defineComponent({
     OTable,
     OUserCell,
     ODrawer,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     AppTabs,
   },

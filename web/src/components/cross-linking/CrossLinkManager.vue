@@ -37,7 +37,7 @@
               :data-test="`cross-link-item-name-${idx}`"
             >
               {{ link.name }}
-              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ml-1" />
+              <OTag v-if="link._source" type="crossLinkSource" :value="link._source" class="ms-1" />
             </div>
             <!-- URL -->
             <div
@@ -61,7 +61,7 @@
             </div>
           </div>
           <!-- Actions -->
-          <div v-if="!readonly" class="ml-2 flex shrink-0 items-center gap-1">
+          <div v-if="!readonly" class="ms-2 flex shrink-0 items-center gap-1">
             <OButton
               variant="ghost"
               size="icon-sm"

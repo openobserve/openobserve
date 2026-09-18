@@ -53,7 +53,7 @@ pub async fn search(
     schema: Arc<Schema>,
     file_list: &[FileKey],
     sort_order: FileSortOrder,
-    file_stat_cache: Option<Arc<dyn FileStatisticsCache>>,
+    file_stat_cache: Option<Arc<FileStatisticsCache>>,
     mut index_condition: Option<IndexCondition>,
     mut fst_fields: Vec<String>,
     bloom_indexed_fields: Vec<String>,
@@ -185,7 +185,6 @@ pub async fn search(
                     &f.key,
                     f.meta.compressed_size,
                     f.meta.max_ts,
-                    f.meta.records,
                 )
             })
             .collect_vec(),

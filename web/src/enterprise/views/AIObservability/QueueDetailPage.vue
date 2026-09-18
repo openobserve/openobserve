@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               selectable
               :selected-key="statusFilter"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>
@@ -199,8 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
             <OButton
-              :variant="row.status === 'reviewed' ? 'outline' : 'primary'"
-              size="sm"
+              variant="outline"
+              size="sm-toolbar"
               icon-right="arrow-forward"
               :data-test="`ai-queue-detail-review-${row.id}`"
               @click.stop="startReviewing(row)"
@@ -223,6 +224,7 @@ import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
@@ -264,9 +266,14 @@ const loading = ref(false);
 const search = ref("");
 const statusFilter = ref<LlmQueueItemStatus | "all">("all");
 
+// Real browser back when there's history to pop.
+const { goBack: backToQueues } = useSmartBack(() => ({
+  name: "aiQueues",
+  query: orgQuery.value,
+}));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.queues"),
-  to: { name: "aiQueues", query: orgQuery.value },
+  onClick: backToQueues,
 }));
 
 const pendingCount = computed(() => items.value.filter((i) => i.status === "pending").length);
@@ -369,7 +376,7 @@ const columns = computed<OTableColumnDef<LlmQueueItem>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
+    header: t("aiObservability.queues.detail.columns.actions"),
     accessorKey: "actions",
     sortable: false,
     isAction: true,

@@ -9,11 +9,14 @@ import streamService from "@/services/stream";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 
 // Mock streamService
-vi.mock("@/services/stream", () => ({
-  default: {
-    fieldValues: vi.fn(),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      fieldValues: vi.fn(),
+    },
+  });
+});
 
 // Shared mocks accessible in both the vi.mock factory and test callbacks.
 // vi.hoisted ensures they exist before vi.mock factories run.
@@ -696,6 +699,28 @@ describe("FieldList.vue Comprehensive Coverage", () => {
       const reparsed = wrapper.vm as any;
 
       expect(reparsed.activeIncludeFilterValues["brand"]).toEqual(["null"]);
+    });
+  });
+
+  describe("Embedded Single Quote Escaping", () => {
+    // Regression: a value containing a literal ' must have it doubled before
+    // being wrapped in the outer quotes, otherwise the generated SQL is invalid.
+    it("escapes an embedded single quote when including a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "include")).toBe(
+        "op='notificationHandling''s'",
+      );
+    });
+
+    it("escapes an embedded single quote when excluding a value", () => {
+      wrapper = createWrapper();
+      const vm = wrapper.vm as any;
+
+      expect(vm.buildExpression("op", "notificationHandling's", "exclude")).toBe(
+        "op!='notificationHandling''s'",
+      );
     });
   });
 

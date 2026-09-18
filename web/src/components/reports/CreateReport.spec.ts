@@ -46,23 +46,29 @@ vi.mock("vue-router", async () => {
   };
 });
 
-vi.mock("@/services/reports", () => ({
-  default: {
-    getReport: vi.fn(),
-    getReportById: vi.fn(),
-    createReport: vi.fn(),
-    createReportV2: vi.fn(),
-    updateReport: vi.fn(),
-    updateReportById: vi.fn(),
-  },
-}));
+vi.mock("@/services/reports", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getReport: vi.fn(),
+      getReportById: vi.fn(),
+      createReport: vi.fn(),
+      createReportV2: vi.fn(),
+      updateReport: vi.fn(),
+      updateReportById: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/dashboards", () => ({
-  default: {
-    list_Folders: vi.fn(),
-    list: vi.fn(),
-  },
-}));
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_Folders: vi.fn(),
+      list: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),

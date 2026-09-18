@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="pricingError && !features?.length"
         class="text-status-error-text mb-2 flex items-center"
       >
-        <OIcon name="warning" size="sm" class="mr-2" />
+        <OIcon name="warning" size="sm" class="me-2" />
         <span class="text-text-body text-base leading-5.5">{{
           t("billing.pricingErrorMessage")
         }}</span>
@@ -59,9 +59,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="feature.is_parent"
             name="check-circle"
             size="md"
-            class="text-status-positive check-icon mr-2"
+            class="text-status-positive check-icon me-2"
           />
-          <div class="text-text-body text-base leading-5.5" :class="{ 'ml-6': !feature.is_parent }">
+          <div class="text-text-body text-base leading-5.5" :class="{ 'ms-6': !feature.is_parent }">
             {{ feature.name }}
           </div>
         </div>

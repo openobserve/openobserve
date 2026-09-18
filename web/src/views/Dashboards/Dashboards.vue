@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <OPageLayout
+    overflow-first
     bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
@@ -26,6 +27,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :main-panel="false"
   >
     <template #actions>
+      <!-- new dashboard button -->
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
+        {{ t(`dashboard.add`) }}
+      </OButton>
+    </template>
+
+    <template #actions-overflow>
       <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
       <OButton
@@ -94,22 +102,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </ODropdownItem>
       </ODropdown>
-      <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
-        {{ t(`dashboard.add`) }}
-      </OButton>
     </template>
 
     <!-- Folder rail + table — matches the Alerts/Reports layout. -->
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- Left: shared folder list (same component as Alerts/Reports) -->
-      <div class="w-rail h-full shrink-0">
+      <div
+        class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+      >
         <div class="h-full">
           <FolderList
             type="dashboards"
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- Right: dashboards table -->
-      <div class="h-full min-w-0 flex-1">
+      <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
         <div class="bg-card-glass-bg h-full">
           <OTable
             class="h-full w-full"
@@ -128,6 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :columns="columns"
             row-key="id"
             :loading="loading"
+            :forbidden="forbidden"
             :frame="false"
             :default-columns="false"
             show-index
@@ -136,6 +137,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :footer-title="t('dashboard.header')"
             :page-size="20"
             :page-size-options="[20, 50, 100, 250, 500]"
+            :current-page="currentPage"
+            @update:current-page="onPageChange"
             selection="multiple"
             v-model:selected-ids="selectedIds"
             :enable-column-resize="true"
@@ -146,8 +149,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar inside the table frame: scoped search (fills the bar) + refresh -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
-                <div class="min-w-0 flex-1">
+              <!-- min-w-0: otherwise the wrapper can't shrink below the search's min-content and pushes controls off-edge. -->
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
+                <div class="min-w-0 flex-1 max-md:min-w-40">
                   <OInput
                     v-model="dynamicQueryModel"
                     :placeholder="
@@ -165,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="mr-1 self-center"
+                        class="me-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -174,7 +178,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="folder-outline"
                           data-test="dashboard-search-scope-current"
                           :title="t('dashboard.searchThisFolderTitle')"
-                          >{{ t("dashboard.searchThisFolder") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchThisFolder")
+                          }}</span></OToggleGroupItem
                         >
                         <OToggleGroupItem
                           value="all"
@@ -182,7 +188,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           icon-left="search"
                           data-test="dashboard-search-across-folders-toggle"
                           :title="t('dashboard.searchAllFoldersTitle')"
-                          >{{ t("dashboard.searchAllFolders") }}</OToggleGroupItem
+                          ><span class="max-md:hidden">{{
+                            t("dashboard.searchAllFolders")
+                          }}</span></OToggleGroupItem
                         >
                       </OToggleGroup>
                     </template>
@@ -191,20 +199,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="refreshing"
+                shortcut-id="dashboardsListRefresh"
                 data-test="dashboard-list-refresh"
-                @click="getDashboards"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('dashboard.reloadDashboards')"
-                  shortcut-id="dashboardsListRefresh"
-                />
-              </OButton>
+                @click="refreshDashboards"
+              />
             </template>
             <template #cell-name="{ row, value }">
               <span class="inline-flex items-center gap-1">
@@ -279,6 +282,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.move_to_another_folder')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-move-to-another-folder"
                   @click.stop="showMoveDashboardPanel(row)"
                 />
@@ -288,6 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.duplicate')"
                   variant="ghost"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-duplicate"
                   data-row-action="duplicate"
                   @click.stop="duplicateDashboard(row.id, row.folder_id)"
@@ -298,6 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('dashboard.delete')"
                   variant="ghost-destructive"
                   size="icon-xs-sq"
+                  class="max-md:hidden"
                   data-test="dashboard-delete"
                   data-row-action="delete"
                   @click.stop="showDeleteDialogFn({ row })"
@@ -317,6 +323,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     />
                   </template>
                   <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    data-test="dashboard-move-to-another-folder-menu"
+                    @select="showMoveDashboardPanel(row)"
+                  >
+                    <span>{{ t("dashboard.move_to_another_folder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="content-copy"
+                    class="md:hidden"
+                    data-test="dashboard-duplicate-menu"
+                    @select="duplicateDashboard(row.id, row.folder_id)"
+                  >
+                    <span>{{ t("dashboard.duplicate") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="dashboard-delete-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("dashboard.delete") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
                     :icon-left="isHome(row.id) ? 'keep' : 'keep-outline'"
                     data-test="dashboard-list-set-home-btn"
                     @select="toggleHome(row)"
@@ -329,36 +360,53 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </template>
             <template #empty>
-              <OEmptyState
-                size="hero"
-                :preset="activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'"
-                :title="
-                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
-                "
-                :description="
-                  showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesMessage') : undefined
-                "
-                :hide-action="showFavoritesOnly && !filterQuery"
-                :filtered="!!filterQuery"
-                @action="
-                  (id) =>
-                    id === 'clear-filters'
-                      ? (filterQuery = '')
-                      : id === 'import'
-                        ? importDashboard()
-                        : id === 'templates'
-                          ? (showAddDashboardFromGitHub = true)
-                          : addDashboard()
-                "
-              />
+              <div class="flex w-full flex-col items-center gap-2">
+                <OEmptyState
+                  size="hero"
+                  :preset="
+                    activeFolderId !== 'default' ? 'no-dashboards-in-folder' : 'no-dashboards'
+                  "
+                  :title="
+                    showFavoritesOnly && !filterQuery ? t('dashboard.noFavoritesTitle') : undefined
+                  "
+                  :description="
+                    showFavoritesOnly && !filterQuery
+                      ? t('dashboard.noFavoritesMessage')
+                      : undefined
+                  "
+                  :hide-action="showFavoritesOnly && !filterQuery"
+                  :filtered="!!filterQuery"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? (filterQuery = '')
+                        : id === 'import'
+                          ? importDashboard()
+                          : id === 'templates'
+                            ? (showAddDashboardFromGitHub = true)
+                            : addDashboard()
+                  "
+                />
+                <!-- Gated on the URL folder — correct on FIRST render, unlike the async activeFolderId. -->
+                <TemplateSuggestionCards
+                  v-if="($route.query.folder ?? 'default') === 'default'"
+                  class="w-full max-w-3xl"
+                  :active-folder-id="
+                    showFavoritesOnly ? '__favorites__' : (activeFolderId ?? 'default')
+                  "
+                  :filter-query="filterQuery"
+                  @open-drawer="showAddDashboardFromGitHub = true"
+                  @imported="refreshDashboards"
+                />
+              </div>
             </template>
             <template #bottom>
               <div class="flex w-full items-center justify-between gap-4 py-1">
-                <div class="flex shrink-0 items-center text-xs font-normal">
+                <div class="flex shrink-0 items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body mr-1 text-sm">{{
+                  <span class="text-text-body me-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton
@@ -482,6 +530,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -501,6 +550,7 @@ import {
   onUnmounted,
   ref,
   watch,
+  toRaw,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -514,7 +564,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useRoute, useRouter } from "vue-router";
-import { toRaw } from "vue";
 import { getImageURL, verifyOrganizationStatus } from "../../utils/zincutils";
 import ConfirmDialog from "../../components/ConfirmDialog.vue";
 import {
@@ -523,10 +572,14 @@ import {
   evictDashboardsFromCache,
   getAllDashboards,
   getAllDashboardsByFolderId,
+  loadDashboardsByFolderId,
   getDashboard,
   getFoldersList,
 } from "../../utils/commons";
+import { dashboardsByFolderQuery } from "@/services/dashboards.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import TemplateSuggestionCards from "@/components/dashboards/TemplateSuggestionCards.vue";
 import FolderList from "@/components/common/sidebar/FolderList.vue";
 import useNotifications from "@/composables/useNotifications";
 import { debounce } from "lodash-es";
@@ -591,6 +644,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OIcon,
     ODropdown,
     ODropdownItem,
@@ -600,6 +654,7 @@ export default defineComponent({
     AddDashboard,
     OTooltip,
     AddDashboardFromGitHub,
+    TemplateSuggestionCards,
     OTable,
     ConfirmDialog,
     AddFolder,
@@ -641,6 +696,14 @@ export default defineComponent({
     const folderSearchQuery = ref("");
     const selectedIds = ref<string[]>([]);
     const { track } = useReo();
+
+    // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
+    const currentPage = ref(Number(route.query.page) || 1);
+    const onPageChange = (page: number) => {
+      currentPage.value = page;
+      if (String(route.query.page ?? "1") === String(page)) return;
+      router.replace({ query: { ...route.query, page: String(page) } });
+    };
 
     const { showPositiveNotification, showErrorNotification } = useNotifications();
 
@@ -747,11 +810,9 @@ export default defineComponent({
     const handleAiDashboardEvent = async (event: AiDashboardEvent) => {
       const folderId = event.folderId || activeFolderId.value;
       if (folderId) {
-        // Clear cached data so getAllDashboardsByFolderId re-fetches from API
-        store.dispatch("setAllDashboardList", {
-          ...store.state.organizationData.allDashboardList,
-          [folderId]: undefined,
-        });
+        // The AI agent just changed this folder, so refetch rather than serving
+        // the cached list.
+        await getAllDashboards(store, folderId, true);
         const response = await getAllDashboardsByFolderId(store, folderId);
         dashboardList.value = response || [];
       }
@@ -851,8 +912,12 @@ export default defineComponent({
     const selectedDashboardIds = computed(() => selectedIds.value);
 
     onMounted(async () => {
-      //get folders list
-      await getFoldersList(store);
+      // Awaited so the landing decision settles after FolderList's async init emission.
+      try {
+        await getFoldersList(store);
+      } catch {
+        // Already reported by the grouped access toast; the empty rail stands in.
+      }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
       // landing below depends on knowing whether any exist.
@@ -893,36 +958,48 @@ export default defineComponent({
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           Promise.all(
             favFolders.map((fid) => getAllDashboardsByFolderId(store, fid).catch(() => null)),
-          );
+          ).then(() => {
+            // A folder switched away from mid-flight must not stamp over the one now active.
+            if (activeFolderId.value === FAVORITES_FOLDER_ID) stampFolders(favFolders);
+          });
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
           });
           return;
         }
-        // skip the skeleton for already-cached folders so we don't flash it
-        // String() matches JS's own null→"null" key coercion (behavior-neutral).
-        loading.value =
-          !store.state.organizationData.allDashboardList[String(activeFolderId.value)];
+        // Paints whatever is already in hand, then swaps in the server's copy.
+        // Only a folder never opened this session spins.
+        forbidden.value = false;
+        const folderId = activeFolderId.value;
         try {
-          const response = await getAllDashboardsByFolderId(store, activeFolderId.value);
-
-          dashboardList.value = response || [];
+          await loadDashboardsByFolderId(store, folderId, {
+            apply: (rows) => (dashboardList.value = rows || []),
+            loading,
+          });
+          // A folder switched away from mid-flight must not stamp over the one now active.
+          if (activeFolderId.value === folderId) stampFolders([folderId ?? "default"]);
         } catch (error) {
           console.error("Error loading dashboards:", error);
-          showErrorNotification(
-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
-          );
+          forbidden.value = asCaughtError(error).response?.status === 403;
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (!forbidden.value) {
+            showErrorNotification(
+              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+            );
+          }
         } finally {
           loading.value = false;
           searchAcrossFolders.value = false;
           router.push({
             path: "/dashboards",
             query: {
+              ...route.query,
               org_identifier: store.state.selectedOrganization.identifier,
               folder: activeFolderId.value,
             },
@@ -1110,7 +1187,8 @@ export default defineComponent({
           folderId || "default",
         );
 
-        await getDashboards();
+        // Post-write reload: the duplicate will not appear from a cache hit.
+        await getDashboards(true);
 
         showPositiveNotification(t("dashboard.dashboards.duplicatedSuccessfully"));
       } catch (err) {
@@ -1136,25 +1214,61 @@ export default defineComponent({
     const dashboardList = ref<Record<string, any>[]>([]);
     // Start in the loading state so the table shows the skeleton on first
     // render instead of briefly flashing the empty state before the fetch.
+    // A refresh with rows already on screen: the button spins, the table keeps
+    // its rows instead of dropping back to a skeleton.
+    const refreshing = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    // Favorites span several folders, so the age shown is the oldest list on screen.
+    const stampFolders = (folderIds: any[]) => {
+      const org = store.state.selectedOrganization.identifier;
+      const times = folderIds
+        .map(
+          (fid) =>
+            queryClient.getQueryState(dashboardsByFolderQuery(org, fid).queryKey)?.dataUpdatedAt,
+        )
+        .filter((t): t is number => !!t);
+      lastUpdatedAt.value = times.length ? Math.min(...times) : Date.now();
+    };
     const loading = ref(true);
-    const getDashboards = async () => {
+    // Only the dashboards fetch is authoritative on access; the folder list is not.
+    const forbidden = ref(false);
+    // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        setTimeout(() => {
+          oTableRef.value?.table?.setPageIndex(currentPage.value - 1);
+        }, 0);
+      },
+      { once: true },
+    );
+    // Bound to the refresh button and post-write reloads: both must reach the
+    // server. Without `force` this read was a cache hit, so the Refresh button
+    // issued no request at all inside the tier's staleTime.
+    const refreshDashboards = () => getDashboards(true);
+
+    const getDashboards = async (force = false) => {
       const dismiss = toast({
         variant: "loading",
         message: t("dashboard.dashboards.loadingDashboards"),
         timeout: 0,
       });
-      loading.value = true;
+      // Only spin the table when there is nothing to show — a refresh with rows
+      // on screen keeps them and spins the button instead.
+      refreshing.value = true;
+      loading.value = dashboardList.value.length === 0;
       try {
         if (showFavoritesOnly.value) {
           // Refresh in the favorites view: re-read the favorites setting and
           // force-refetch each involved folder so titles/owners are current.
           const org = store.state.selectedOrganization?.identifier;
           const userId = store.state.userInfo?.email;
-          if (org && userId) await loadFavorites(org, userId);
+          if (org && userId) await loadFavorites(org, userId, force);
           const favFolders = [...new Set(favorites.value.map((f: any) => f.folderId))];
           const fetched = await Promise.all(
             favFolders.map((fid) =>
-              getAllDashboards(store, fid)
+              getAllDashboards(store, fid, true)
                 .then(() => fid)
                 .catch(() => null),
             ),
@@ -1174,11 +1288,14 @@ export default defineComponent({
             )
             .map((f: any) => f.dashboardId);
           await pruneFavorites(stale);
+          stampFolders(favFolders);
         } else {
-          const response = await getAllDashboards(store, activeFolderId.value ?? "default");
+          const folderId = activeFolderId.value ?? "default";
+          const response = await getAllDashboards(store, folderId, force);
           // folderId is always truthy here, so getAllDashboards never returns
           // undefined; `?? []` only satisfies the type (fallback unreachable).
           dashboardList.value = response ?? [];
+          stampFolders([folderId]);
         }
       } catch (err) {
         showErrorNotification(
@@ -1187,6 +1304,7 @@ export default defineComponent({
       } finally {
         dismiss();
         loading.value = false;
+        refreshing.value = false;
       }
     };
 
@@ -1300,7 +1418,8 @@ export default defineComponent({
           // of lingering until the next navigation.
           if (deletedWasHome) {
             const org = store.state.selectedOrganization?.identifier;
-            if (org) useHomeDashboard(t).load(org);
+            // Forced: a plain load would answer from the cache and keep the pin for up to staleTime.
+            if (org) useHomeDashboard(t).load(org, true);
           }
         } catch (err) {
           showErrorNotification(
@@ -1625,15 +1744,14 @@ export default defineComponent({
         await pruneFavorites(deletedIds);
 
         selectedIds.value = [];
-        // Refresh dashboards. The local getDashboards() takes no arguments; the
-        // previous (store, folderId) args were silently ignored at runtime, so
-        // dropping them is behavior-neutral.
-        await getDashboards();
+        // Post-write reload: must reach the server, or the just-pruned cache
+        // entry is simply re-read.
+        await getDashboards(true);
         // If the pinned dashboard was in the batch, re-read the (now cleared)
         // home_dashboard setting so the Home shortcut/pin updates immediately.
         if (bulkIncludedHome) {
           const org = store.state.selectedOrganization?.identifier;
-          if (org) await useHomeDashboard(t).load(org);
+          if (org) await useHomeDashboard(t).load(org, true);
         }
       } catch (error) {
         dismiss();
@@ -1675,7 +1793,7 @@ export default defineComponent({
       {
         id: "dashboardsListRefresh",
         handler: () => {
-          if (!isInputFocused()) getDashboards();
+          if (!isInputFocused()) refreshDashboards();
         },
       },
       {
@@ -1696,6 +1814,9 @@ export default defineComponent({
       dashboard,
       columns,
       loading,
+      refreshing,
+      lastUpdatedAt,
+      forbidden,
       showAddDashboardDialog,
       showAddDashboardFromGitHub,
       addDashboard,
@@ -1711,6 +1832,7 @@ export default defineComponent({
       deleteDashboard,
       duplicateDashboard,
       getDashboards,
+      refreshDashboards,
       getImageURL,
       verifyOrganizationStatus,
       activeFolderId,
@@ -1742,6 +1864,8 @@ export default defineComponent({
       filteredFolders,
       updateActiveFolderId,
       selectedIds,
+      currentPage,
+      onPageChange,
       multipleExportDashboard,
       moveMultipleDashboards,
       openBulkDeleteDialog,

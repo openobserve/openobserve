@@ -17,7 +17,7 @@
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
       <OButton
-        v-if="detail?.experiment.status === 'running'"
+        v-if="detail?.experiment.executionStatus === 'running'"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -27,10 +27,10 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="failedSlotCount > 0"
+        v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
-        :disabled="acting"
+        :disabled="acting || slotRetryActive"
         data-test="ai-experiment-detail-retry"
         @click="retryExperiment"
       >
@@ -112,7 +112,17 @@
           :key="card.key"
           :label="card.label"
           :icon="card.icon"
+          :as="isMetricCardActionable(card) ? 'button' : 'div'"
+          :type="isMetricCardActionable(card) ? 'button' : undefined"
+          :aria-pressed="isMetricCardActionable(card) ? highDispersionOnly : undefined"
+          :class="{
+            'focus-visible:ring-button-outline-hover-border cursor-pointer text-left focus-visible:ring-3':
+              isMetricCardActionable(card),
+            'ring-button-outline-hover-border ring-2':
+              isMetricCardActionable(card) && highDispersionOnly,
+          }"
           :data-test="card.dataTest"
+          @click="handleMetricCardClick(card)"
         >
           <template #value>
             <span class="text-text-secondary text-2xl leading-none font-bold">
@@ -130,10 +140,10 @@
 
       <div class="min-h-0 flex-1 overflow-hidden">
         <OTable
-          :data="visibleSlots"
+          :data="visibleRows"
           :columns="columns"
-          row-key="slotKey"
-          :loading="loading"
+          row-key="rowKey"
+          :loading="loading || rowsLoading"
           :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
@@ -150,7 +160,13 @@
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"
-                :placeholder="t('aiObservability.experiments.detail.searchPlaceholder')"
+                :placeholder="
+                  t(
+                    isMultiTrial
+                      ? 'aiObservability.experiments.detail.searchInputPlaceholder'
+                      : 'aiObservability.experiments.detail.searchPlaceholder',
+                  )
+                "
                 clearable
                 data-test="ai-experiment-detail-search"
               />
@@ -164,6 +180,19 @@
                 clearable
                 data-test="ai-experiment-detail-status-filter"
               />
+              <OButton
+                v-if="isMultiTrial"
+                class="shrink-0"
+                size="sm-toolbar"
+                variant="outline"
+                icon-left="swap-vert"
+                :active="sortByDispersion"
+                :aria-pressed="sortByDispersion"
+                data-test="ai-experiment-detail-sort-dispersion"
+                @click="toggleDispersionSort"
+              >
+                {{ t("aiObservability.experiments.detail.sortByDispersion") }}
+              </OButton>
             </div>
           </template>
 
@@ -183,9 +212,9 @@
           <template #cell-slotStatus="{ row }: { row: any }">
             <OTag
               size="sm"
-              :variant="statusVariant(row.taskStatus, 'eval').variant"
-              :label="statusVariant(row.taskStatus, 'eval').label"
-              :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+              :variant="statusVariant(row.status, 'eval').variant"
+              :label="statusVariant(row.status, 'eval').label"
+              :data-test="`ai-experiment-row-status-${row.rowKey}`"
             />
           </template>
 
@@ -199,8 +228,41 @@
             </span>
           </template>
 
+          <template #cell-trialCount="{ row }: { row: any }">
+            <span class="text-text-secondary">{{ raw(row.trialLabel) }}</span>
+          </template>
+
+          <template #cell-dispersion="{ row }: { row: any }">
+            <OTag
+              v-if="row.highDispersion"
+              size="sm"
+              variant="warning"
+              :label="
+                raw(
+                  `${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`,
+                )
+              "
+            />
+            <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
+          </template>
+
           <template #cell-latency="{ row }: { row: any }">
             <span class="text-text-secondary">{{ raw(row.latency) }}</span>
+          </template>
+
+          <!-- Only boolean scores with a configured healthy value ever set
+               row.violations[id] — everything else (numeric, categorical, or
+               a boolean with no healthy value set yet) renders exactly as
+               before: plain text, no false "everything is fine" green. -->
+          <template v-for="id in scorerIds" :key="id" #[`cell-score:${id}`]="{ row }: { row: any }">
+            <OTag
+              v-if="row.violations[id]"
+              size="sm"
+              variant="error"
+              :label="raw(row[`score:${id}`])"
+              :data-test="`ai-experiment-score-violation-${row.rowKey}-${id}`"
+            />
+            <span v-else class="text-text-secondary">{{ raw(row[`score:${id}`]) }}</span>
           </template>
 
           <template #empty>
@@ -229,15 +291,17 @@
       @navigate="loadRowDetail"
       @retry="retryRowSlot"
       @trace="openTrace"
+      @score-trace="openScoreTrace"
     />
   </OPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { gt, raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -254,9 +318,22 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
+import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
+import {
+  cancelExperimentMutation,
+  cloneExperimentMutation,
+  retryExperimentMutation,
+  retryExperimentSlotMutation,
+} from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
+  type ExperimentResultRow,
+  type ExperimentResultRowSort,
   type ExperimentResultSlot,
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
@@ -273,7 +350,7 @@ import {
   durationUnit,
   formatDuration,
 } from "@/enterprise/components/AIObservability/experimentRowContent";
-import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
+import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
 
@@ -286,28 +363,70 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
+const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
-// Meant to fetch the whole run in one request, so the search box and the status
-// filter below cover every slot. Pinned to the server's current
-// MAX_RESULT_PAGE_SIZE until that cap is lifted — while it stands, both controls
-// only see the first page of a longer run.
-const ALL_RESULTS_PAGE_SIZE = 50;
+const RESULTS_PAGE_SIZE = 100;
+const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
 const statusFilter = ref("");
+const sortByDispersion = ref(false);
+const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
+const slotRetryActive = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
+const SLOT_RETRY_POLL_INTERVAL_MS = 2_000;
+let slotRetryPollTimer: ReturnType<typeof setTimeout> | null = null;
+let slotRetryPollGeneration = 0;
 
+// Real browser back when there's history to pop — returns to the Experiments
+// list with whatever filter (e.g. a dataset) the user actually arrived
+// through, not just the bare list. The fallback only fires with no history
+// to pop (direct link / reload).
+const { goBack: backToExperiments } = useSmartBack(() => aiExperimentsRoute(orgId.value));
 const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
-  to: aiExperimentsRoute(orgId.value),
+  onClick: backToExperiments,
 }));
-const slots = computed<ExperimentResultSlot[]>(() => detail.value?.results.slots ?? []);
+const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
 /** Scorer columns come from the pinned scorers, so a run with two scorers gets
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
+
+// Session-cached per org (see `scoreConfigs.listCached`) rather than a plain
+// `list()` — this page mounts fresh every time a different experiment is
+// opened, and Score Configs change far less often than that.
+const scoreConfigs = ref<ScoreConfig[]>([]);
+async function loadScoreConfigs() {
+  if (!orgId.value) return;
+  try {
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.listCached(orgId.value);
+  } catch {
+    // Non-fatal: without configs, boolean cells just render unhighlighted —
+    // same as before this feature existed.
+    scoreConfigs.value = [];
+  }
+}
+
+/** scorerId -> the healthy boolean for its produced Score Config, when that
+ *  config is boolean-typed and has one configured. `undefined` means "don't
+ *  know" (non-boolean, no config found, or no healthy value set) — the cell
+ *  renders plain in that case rather than guessing. */
+const scorerHealthyBoolean = computed<Record<string, boolean | undefined>>(() => {
+  const map: Record<string, boolean | undefined> = {};
+  for (const summary of detail.value?.results.scoreSummaries ?? []) {
+    if (!summary.scoreConfigId) continue;
+    const config = scoreConfigs.value.find(
+      (c) => c.entityId === summary.scoreConfigId || c.id === summary.scoreConfigId,
+    );
+    if (!config) continue;
+    const healthy = healthyBooleanValue(config);
+    if (healthy !== null) map[summary.scorerId] = healthy;
+  }
+  return map;
+});
 
 /** Score summaries carry the pinned Score Config name even before the first
  *  Score exists. Completed Score records remain a compatibility fallback. */
@@ -325,31 +444,59 @@ const scorerNames = computed<Record<string, string>>(() => {
     }
   }
   for (const score of detail.value?.results.scores ?? []) record(score);
-  for (const slot of slots.value) {
-    for (const entry of slot.scores) record(entry.score as Record<string, unknown> | undefined);
-  }
   return names;
 });
 
-const slotRows = computed(() =>
-  slots.value.map((slot) => {
+const tableRows = computed(() =>
+  resultRows.value.map((row) => {
     const scores: Record<string, string> = {};
+    // Which score columns are a violated boolean policy on THIS row — set
+    // only when the config's healthy value is known and this row disagrees
+    // with it, so a normal (non-boolean, or unconfigured) score never lights
+    // up red by accident.
+    const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
-      const entry = slot.scores.find((s) => s.scorerId === id);
-      scores[`score:${id}`] = entry?.status === "success" ? experimentScoreValue(entry.score) : "—";
+      const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null, row.trialCount);
+      const healthy = scorerHealthyBoolean.value[id];
+      const aggregate = summary?.value as Record<string, unknown> | null | undefined;
+      if (healthy !== undefined && aggregate?.kind === "boolean") {
+        const trueCount = Number(aggregate.trueCount ?? aggregate.true_count ?? 0);
+        const falseCount = Number(aggregate.falseCount ?? aggregate.false_count ?? 0);
+        const unhealthyCount = healthy ? falseCount : trueCount;
+        if (unhealthyCount > 0) violations[id] = true;
+      }
     }
+    const maxDispersion = row.dispersion?.maxNormalized ?? null;
     return {
-      ...slot,
+      ...row,
       ...scores,
-      slotKey: `${slot.rowId}:${slot.trialIndex}`,
-      input: slot.input ?? "—",
-      output: slot.execution?.output ?? "—",
-      latency: durationLabel(slot.execution?.latencyMs),
+      violations,
+      rowKey: row.rowId,
+      input: row.input ?? "—",
+      output: row.output ?? "—",
+      trialLabel: gt(
+        "aiObservability.experiments.detail.trialCount",
+        { count: row.trialCount },
+        row.trialCount,
+      ),
+      latency: durationLabel(row.p50LatencyMs),
+      dispersion: maxDispersion ?? -1,
+      dispersionLabel: maxDispersion === null ? "—" : `${Math.round(maxDispersion * 100)}%`,
+      highDispersion: row.dispersion?.high ?? false,
     };
   }),
 );
 
-const STATUS_FILTERS = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const STATUS_FILTERS = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
 
 const statusOptions = computed(() =>
   STATUS_FILTERS.map((status) => ({
@@ -358,12 +505,10 @@ const statusOptions = computed(() =>
   })),
 );
 
-// Every slot is loaded, so filtering here covers the whole run rather than the
-// page in view.
-const visibleSlots = computed(() => {
+const visibleRows = computed(() => {
   const term = rowSearch.value.trim().toLowerCase();
-  return slotRows.value.filter((row) => {
-    if (statusFilter.value && row.taskStatus !== statusFilter.value) return false;
+  return tableRows.value.filter((row) => {
+    if (statusFilter.value && row.status !== statusFilter.value) return false;
     if (!term) return true;
     return `${row.input} ${row.output}`.toLowerCase().includes(term);
   });
@@ -424,6 +569,8 @@ const metricCards = computed<MetricCard[]>(() => {
   const aggregate = results.aggregateSummary;
   const task = results.taskProgress;
   const scoring = results.scoringProgress;
+  const taskOutcomes = results.taskOutcomes;
+  const scoreOutcomes = results.scoreOutcomes;
   const scoreDistribution = (results.scoreSummaries ?? []).reduce(
     (distribution, summary) => ({
       success: distribution.success + summary.sampleCount,
@@ -453,6 +600,15 @@ const metricCards = computed<MetricCard[]>(() => {
     key: "cost",
     label: t("aiObservability.experiments.detail.totalCost"),
     value: aggregate?.totalCost == null ? "—" : `$${aggregate.totalCost.toFixed(4)}`,
+    footer: t(
+      aggregate?.costIncomplete
+        ? "aiObservability.experiments.detail.partialCostBreakdown"
+        : "aiObservability.experiments.detail.costBreakdown",
+      {
+        task: formatCost(aggregate?.taskCost ?? aggregate?.totalCost),
+        scoring: formatCost(aggregate?.scoringCost),
+      },
+    ),
     icon: "payments" as IconName,
     dataTest: "ai-experiment-detail-cost",
   });
@@ -467,21 +623,27 @@ const metricCards = computed<MetricCard[]>(() => {
   if (task) {
     cards.push({
       key: "progress",
-      label: t("aiObservability.experiments.detail.progress"),
+      label: t("aiObservability.experiments.detail.tasks"),
       value: `${task.completed}/${task.total}`,
-      footer: task.skipped
-        ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
-        : undefined,
+      footer: taskOutcomes
+        ? t("aiObservability.experiments.detail.taskDistribution", taskOutcomes)
+        : task.skipped
+          ? t("aiObservability.experiments.detail.skippedCount", { count: task.skipped })
+          : undefined,
       icon: "check-circle" as IconName,
       dataTest: "ai-experiment-detail-progress",
     });
   }
-  if (scoring && (scoring.total > 0 || results.scoreSummaries?.length)) {
+  if (scoring && (scoreOutcomes?.total || scoring.total > 0 || results.scoreSummaries?.length)) {
     cards.push({
       key: "scoring",
-      label: t("aiObservability.experiments.detail.scoring"),
-      value: `${scoring.completed}/${scoring.total}`,
-      footer: t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
+      label: t("aiObservability.experiments.detail.scores"),
+      value: scoreOutcomes
+        ? `${scoreOutcomes.completed}/${scoreOutcomes.total}`
+        : `${scoring.completed}/${scoring.total}`,
+      footer: scoreOutcomes
+        ? t("aiObservability.experiments.detail.scoreOutcomeDistribution", scoreOutcomes)
+        : t("aiObservability.experiments.detail.scoringDistribution", scoreDistribution),
       icon: "fact-check" as IconName,
       dataTest: "ai-experiment-detail-scoring",
     });
@@ -489,11 +651,31 @@ const metricCards = computed<MetricCard[]>(() => {
   return cards;
 });
 
+function formatCost(cost: number | null | undefined): string {
+  return cost == null ? "—" : `$${cost.toFixed(4)}`;
+}
+
+function isMetricCardActionable(card: MetricCard) {
+  return card.key === "dispersion" && isMultiTrial.value;
+}
+
+function toggleDispersionSort() {
+  sortByDispersion.value = !sortByDispersion.value;
+}
+
+function toggleHighDispersionFilter() {
+  highDispersionOnly.value = !highDispersionOnly.value;
+}
+
+function handleMetricCardClick(card: MetricCard) {
+  if (isMetricCardActionable(card)) toggleHighDispersionFilter();
+}
+
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
     header: t("aiObservability.experiments.detail.slotStatus"),
-    accessorKey: "taskStatus",
+    accessorKey: "status",
     sortable: true,
     size: COL.status,
     meta: { align: "left" as const },
@@ -507,14 +689,27 @@ const columns = computed<OTableColumnDef[]>(() => [
     minSize: 160,
     meta: { align: "left" as const, flex: true, isName: true },
   },
-  {
-    id: "output",
-    header: t("aiObservability.experiments.detail.columns.output"),
-    accessorKey: "output",
-    sortable: false,
-    size: 320,
-    meta: { align: "left" as const },
-  },
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "trialCount",
+          header: t("aiObservability.experiments.detail.columns.trials"),
+          accessorKey: "trialCount",
+          sortable: true,
+          size: 120,
+          meta: { align: "left" as const },
+        },
+      ]
+    : [
+        {
+          id: "output",
+          header: t("aiObservability.experiments.detail.columns.output"),
+          accessorKey: "output",
+          sortable: false,
+          size: 320,
+          meta: { align: "left" as const },
+        },
+      ]),
   ...scorerIds.value.map((id) => ({
     id: `score:${id}`,
     header: raw(scorerNames.value[id] ?? id),
@@ -524,9 +719,23 @@ const columns = computed<OTableColumnDef[]>(() => [
     size: 140,
     meta: { align: "left" as const },
   })),
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "dispersion",
+          header: t("aiObservability.experiments.detail.columns.dispersion"),
+          accessorKey: "dispersion",
+          sortable: true,
+          size: 130,
+          meta: { align: "left" as const },
+        },
+      ]
+    : []),
   {
     id: "latency",
-    header: t("aiObservability.experiments.detail.columns.latency"),
+    header: isMultiTrial.value
+      ? t("aiObservability.experiments.detail.columns.p50Latency")
+      : t("aiObservability.experiments.detail.columns.latency"),
     accessorKey: "latency",
     sortable: true,
     size: 120,
@@ -534,22 +743,77 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+function resultRowOptions(page: number) {
+  const sort: ExperimentResultRowSort = sortByDispersion.value ? "dispersion_desc" : "dataset";
+  return {
+    page,
+    pageSize: RESULTS_PAGE_SIZE,
+    sort,
+    highDispersionOnly: highDispersionOnly.value,
+  };
+}
+
+async function fetchAllResultRows() {
+  const rows: ExperimentResultRow[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const next = await llmExperimentsService.listRows(
+      orgId.value,
+      experimentId.value,
+      resultRowOptions(page),
+    );
+    rows.push(...next.rows);
+    hasMore = next.pagination.hasMore;
+    page += 1;
+  }
+  return rows;
+}
+
+function showLoadError(error: any) {
+  toast({
+    variant: "error",
+    message:
+      raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
+  });
+}
+
+async function refreshRows() {
+  if (!orgId.value || !experimentId.value) return;
+  rowsLoading.value = true;
+  try {
+    resultRows.value = await fetchAllResultRows();
+  } catch (error: any) {
+    showLoadError(error);
+  } finally {
+    rowsLoading.value = false;
+  }
+}
+// `refresh` only re-reads this page; the list's run status comes from the mutations' scope drop.
+const cancelWrite = useMutation(() => cancelExperimentMutation(orgId.value));
+const retryWrite = useMutation(() => retryExperimentMutation(orgId.value));
+const retrySlotWrite = useMutation(() => retryExperimentSlotMutation(orgId.value));
+const cloneWrite = useMutation(() => cloneExperimentMutation(orgId.value));
+
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
   loading.value = true;
+  rowsLoading.value = true;
   try {
-    detail.value = await llmExperimentsService.get(orgId.value, experimentId.value, {
-      resultPage: 1,
-      resultPageSize: ALL_RESULTS_PAGE_SIZE,
-    });
+    const [nextDetail, rows] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+    ]);
+    detail.value = nextDetail;
+    resultRows.value = rows;
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message:
-        raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
-    });
+    showLoadError(error);
   } finally {
     loading.value = false;
+    rowsLoading.value = false;
   }
 }
 
@@ -587,15 +851,30 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   if (slot.taskStatus !== "error") return;
   retryingRow.value = true;
   try {
-    await llmExperimentsService.retrySlot(
-      orgId.value,
-      experimentId.value,
-      slot.rowId,
-      slot.trialIndex,
-      globalThis.crypto.randomUUID(),
-    );
-    await loadRowDetail(slot.rowId);
-    await refresh();
+    const queued = await retrySlotWrite.mutateAsync({
+      experimentId: experimentId.value,
+      rowId: slot.rowId,
+      trialIndex: slot.trialIndex,
+      idempotencyKey: globalThis.crypto.randomUUID(),
+    });
+    if (selectedRowDetail.value?.rowId === slot.rowId) {
+      selectedRowDetail.value = {
+        ...selectedRowDetail.value,
+        trials: selectedRowDetail.value.trials.map((trial) =>
+          trial.trialIndex === slot.trialIndex
+            ? {
+                ...trial,
+                status: "pending",
+                taskStatus: "queued",
+                execution: queued,
+                scores: [],
+              }
+            : trial,
+        ),
+      };
+    }
+    startSlotRetryPolling(slot.rowId);
+    slotRetryActive.value = true;
     toast({ variant: "success", message: t("aiObservability.experiments.retrySuccess") });
   } catch (error: any) {
     toast({
@@ -607,15 +886,84 @@ async function retryRowSlot(slot: ExperimentResultSlot) {
   }
 }
 
+function stopSlotRetryPolling() {
+  slotRetryPollGeneration += 1;
+  slotRetryActive.value = false;
+  if (slotRetryPollTimer !== null) {
+    globalThis.clearTimeout(slotRetryPollTimer);
+    slotRetryPollTimer = null;
+  }
+}
+
+function startSlotRetryPolling(rowId: string) {
+  stopSlotRetryPolling();
+  scheduleSlotRetryPoll(rowId, slotRetryPollGeneration);
+}
+
+function scheduleSlotRetryPoll(rowId: string, generation: number) {
+  slotRetryPollTimer = globalThis.setTimeout(() => {
+    slotRetryPollTimer = null;
+    void pollSlotRetry(rowId, generation);
+  }, SLOT_RETRY_POLL_INTERVAL_MS);
+}
+
+async function pollSlotRetry(rowId: string, generation: number) {
+  const refreshSelectedRow = selectedRowDetail.value?.rowId === rowId;
+
+  try {
+    const [nextDetail, rows, nextRowDetail] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+      refreshSelectedRow
+        ? llmExperimentsService.getRow(orgId.value, experimentId.value, rowId)
+        : Promise.resolve(null),
+    ]);
+
+    if (generation !== slotRetryPollGeneration) return;
+
+    detail.value = nextDetail;
+    resultRows.value = rows;
+    if (nextRowDetail && selectedRowDetail.value?.rowId === rowId) {
+      selectedRowDetail.value = nextRowDetail;
+    }
+  } catch {
+    // Keep polling durable queued work after a transient refresh failure.
+  }
+
+  if (generation !== slotRetryPollGeneration) return;
+
+  const rowStillPending =
+    selectedRowDetail.value?.rowId === rowId &&
+    selectedRowDetail.value.trials.some(
+      (trial) =>
+        ["queued", "pending", "in_progress"].includes(trial.taskStatus) ||
+        trial.scores.some((score) => ["pending", "in_progress"].includes(score.status)),
+    );
+  if (rowStillPending) {
+    scheduleSlotRetryPoll(rowId, generation);
+  } else {
+    slotRetryActive.value = false;
+    // The retry settled after the mutation expired the list, so a list read meanwhile still shows it running.
+    void queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+  }
+}
+
+function openScoreTrace(target: { traceId: string; timestamp: number }) {
+  openExperimentTrace(orgId.value, target, (location) => router.resolve(location), globalThis.open);
+}
+
 async function cancelExperiment() {
-  await runAction(() => llmExperimentsService.cancel(orgId.value, experimentId.value), {
+  await runAction(() => cancelWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.cancelSuccess"),
     error: t("aiObservability.experiments.cancelError"),
   });
 }
 
 async function retryExperiment() {
-  await runAction(() => llmExperimentsService.retry(orgId.value, experimentId.value), {
+  await runAction(() => retryWrite.mutateAsync(experimentId.value), {
     success: t("aiObservability.experiments.retrySuccess"),
     error: t("aiObservability.experiments.retryError"),
   });
@@ -639,7 +987,7 @@ async function cloneExperiment() {
   }
   acting.value = true;
   try {
-    const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
+    const clone = await cloneWrite.mutateAsync({ experimentId: experimentId.value });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(orgId.value, clone.id));
   } catch (error: any) {
@@ -672,4 +1020,8 @@ async function runAction(
 }
 
 watch([orgId, experimentId], refresh, { immediate: true });
+watch([sortByDispersion, highDispersionOnly], refreshRows);
+watch(orgId, loadScoreConfigs, { immediate: true });
+watch([orgId, experimentId], stopSlotRetryPolling);
+onUnmounted(stopSlotRetryPolling);
 </script>

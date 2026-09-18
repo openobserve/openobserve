@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   useDependencyGraph,
   buildFocusChain,
@@ -21,8 +21,34 @@ import {
   removeNodeFromGraph,
   depKindIcon,
   depKindColor,
+  invalidateDependencyGraphCache,
 } from "@/composables/alerts/useDependencyGraph";
 import type { DepNode } from "@/composables/alerts/useDependencyGraph";
+
+const graphInputs = vi.hoisted(() => ({
+  alerts: vi.fn(async () => ({ data: { list: [] } })),
+  destinations: vi.fn(async () => ({ data: [] })),
+  templates: vi.fn(async () => ({ data: [] })),
+}));
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { listByFolderId: (...a: any[]) => graphInputs.alerts(...a) },
+  });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...a: any[]) => graphInputs.destinations(...a) },
+  });
+});
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...a: any[]) => graphInputs.templates(...a) },
+  });
+});
 
 const { buildGraph } = useDependencyGraph();
 
@@ -311,5 +337,37 @@ describe("useDependencyGraph.removeNodeFromGraph", () => {
   it("leaves the graph alone when the node is already gone", () => {
     const before = graph();
     expect(removeNodeFromGraph(before, "alert:nope")).toBe(before);
+  });
+});
+
+describe("useDependencyGraph.loadGraph", () => {
+  const calls = () => [
+    graphInputs.alerts.mock.calls.length,
+    graphInputs.destinations.mock.calls.length,
+    graphInputs.templates.mock.calls.length,
+  ];
+
+  beforeEach(() => {
+    invalidateDependencyGraphCache();
+    Object.values(graphInputs).forEach((fn) => fn.mockClear());
+  });
+
+  it("builds each input once and serves a reopen from the shared graph", async () => {
+    const { loadGraph } = useDependencyGraph();
+    await loadGraph("org-a");
+    await loadGraph("org-a");
+
+    expect(calls()).toEqual([1, 1, 1]);
+  });
+
+  // A refresh re-reads the inputs it names; the caller's own list is already fresh.
+  it("re-reads only the named inputs on a refresh", async () => {
+    const { loadGraph } = useDependencyGraph();
+    await loadGraph("org-a");
+    invalidateDependencyGraphCache();
+
+    await loadGraph("org-a", ["alerts", "templates"]);
+
+    expect(calls()).toEqual([2, 1, 2]);
   });
 });

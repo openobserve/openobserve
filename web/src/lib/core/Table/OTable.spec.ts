@@ -986,8 +986,8 @@ describe("OTable", () => {
         },
       });
 
-      // The toolbar floats above the pointer, so it lives in <body> and exists only
-      // while a cell is hovered — never one overlay per cell.
+      // The toolbar floats clear of the hovered row, so it lives in <body> and exists
+      // only while a cell is hovered — never one overlay per cell.
       const toolbars = () =>
         document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]');
       expect(toolbars().length).toBe(0);
@@ -1047,6 +1047,99 @@ describe("OTable", () => {
       expect(document.querySelectorAll('[data-test^="o2-table-cell-hover-actions-"]').length).toBe(
         0,
       );
+    });
+
+    describe("placement", () => {
+      const realRect = Element.prototype.getBoundingClientRect;
+
+      // The td, the thead and the toolbar are the only rects the placement reads.
+      function stubRects(cellTop: number, cellBottom: number, headerBottom: number) {
+        Element.prototype.getBoundingClientRect = function () {
+          const el = this as HTMLElement;
+          if (el.tagName === "THEAD") {
+            return { top: 0, bottom: headerBottom, height: headerBottom } as DOMRect;
+          }
+          if (el.classList?.contains("o2-table-cell-hover-actions")) {
+            return { top: 0, bottom: 34, left: 0, right: 120, width: 120, height: 34 } as DOMRect;
+          }
+          if (el.tagName === "TD") {
+            return {
+              top: cellTop,
+              bottom: cellBottom,
+              left: 100,
+              right: 300,
+              width: 200,
+              height: cellBottom - cellTop,
+            } as DOMRect;
+          }
+          return { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 } as DOMRect;
+        } as any;
+      }
+
+      async function hoverCell(
+        cellTop: number,
+        cellBottom: number,
+        headerBottom: number,
+        clientX: number,
+      ) {
+        stubRects(cellTop, cellBottom, headerBottom);
+        wrapper = mount(OTable, {
+          props: { data: makeRows(3), columns: makeColumns() },
+          slots: { "cell-hover-actions": `<span class="hover-act">A</span>` },
+        });
+        await wrapper
+          .find('[data-test="o2-table-cell-id"]')
+          .trigger("mouseenter", { clientX, clientY: 999 });
+        await nextTick();
+        await nextTick();
+        await nextTick();
+        return document.querySelector('[data-test^="o2-table-cell-hover-actions-"]') as HTMLElement;
+      }
+
+      const arrowOf = (bar: HTMLElement) =>
+        bar.querySelector('[data-test^="o2-table-cell-hover-arrow-"]') as HTMLElement;
+
+      beforeEach(() => {
+        Object.defineProperty(window, "innerWidth", { value: 800, configurable: true });
+      });
+
+      afterEach(() => {
+        Element.prototype.getBoundingClientRect = realRect;
+        document.querySelectorAll(".o2-table-cell-hover-actions").forEach((n) => n.remove());
+      });
+
+      it("anchors to the row's top edge, not the pointer, and points the arrow down", async () => {
+        const bar = await hoverCell(300, 324, 40, 200);
+        // clientY was 999 — a pointer-anchored toolbar would have landed there.
+        expect(bar.style.top).toBe("300px");
+        expect(bar.style.transform).toBe("translate(-50%, -100%)");
+        expect(arrowOf(bar).className).toContain("-bottom-1");
+      });
+
+      it("flips below the row when the toolbar would cover the sticky header", async () => {
+        const bar = await hoverCell(50, 74, 40, 200);
+        expect(bar.style.top).toBe("74px");
+        expect(bar.style.transform).toBe("translate(-50%, 0)");
+        expect(arrowOf(bar).className).toContain("-top-1");
+      });
+
+      it("clamps the toolbar to the window but keeps the arrow over the pointer", async () => {
+        const bar = await hoverCell(300, 324, 40, 795);
+        // Half-width is 60, so the centre can go no further than 800 - 60.
+        expect(bar.style.left).toBe("740px");
+        // Pointer 795 sits 115px into a 120px bar; the arrow stops 10px short of the corner.
+        expect(arrowOf(bar).style.left).toBe("110px");
+      });
+
+      it("centres the arrow and clips it to the half outside the bar", async () => {
+        const bar = await hoverCell(300, 324, 40, 400);
+        expect(bar.style.left).toBe("400px");
+        // `left` is the arrow's centre (`-ms-1`); unclipped, the rotated square's
+        // upper half notches any filled control in the bar (the AI chip).
+        expect(arrowOf(bar).style.left).toBe("60px");
+        expect(arrowOf(bar).className).toContain("-ms-1");
+        expect(arrowOf(bar).className).toContain("[clip-path:polygon(0_100%");
+      });
     });
   });
 
@@ -1458,6 +1551,34 @@ describe("OTable", () => {
         },
       });
       expect(wrapper.find('[data-test="custom-loading-banner"]').exists()).toBe(true);
+    });
+
+    it("suppresses the default banner for an empty loading-banner slot but keeps the streaming bar", () => {
+      // An empty slot still counts as "provided" — consumers can opt out of the default banner entirely.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+        slots: {
+          "loading-banner": "",
+        },
+      });
+      expect(wrapper.findAll('[data-test="o2-table-loading-banner"]').length).toBe(0);
+      expect(wrapper.find('[data-test="o2-table-streaming-bar"]').exists()).toBe(true);
+    });
+
+    it("renders the default banner while streaming when no loading-banner slot is supplied", () => {
+      // Pairs with the empty-slot case: together they pin the opt-out as a contract.
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(5),
+          columns: makeColumns(),
+          streaming: true,
+        },
+      });
+      expect(wrapper.find('[data-test="o2-table-loading-banner"]').exists()).toBe(true);
     });
   });
 
@@ -2015,5 +2136,216 @@ describe("OTable", () => {
       expect(emitted).toBeTruthy();
       expect(emitted![emitted!.length - 1][0]).toEqual(newOrder);
     });
+  });
+
+  // currentPage only lands if it's present at mount alongside the real data — data arriving after mount loses the race to TanStack's own deferred autoResetPageIndex, so async callers must remount (e.g. via :key) rather than update data in place.
+  describe("controlled currentPage (client mode)", () => {
+    it("restores the given page when mounted directly with data already present", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: makeRows(20),
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+        },
+      });
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(2);
+    });
+
+    it("does NOT restore the page if data arrives after mount (documents the race)", async () => {
+      wrapper = mount(OTable, {
+        props: {
+          data: [],
+          columns: makeColumns(),
+          pagination: "client",
+          pageSize: 5,
+          currentPage: 3,
+          loading: true,
+        },
+      });
+      await wrapper.setProps({ data: makeRows(20), loading: false });
+      await nextTick();
+      await nextTick();
+      expect((wrapper.vm as any).table.getState().pagination.pageIndex).toBe(0);
+    });
+  });
+});
+
+describe("OTable row rail + row tone", () => {
+  let wrapper: VueWrapper<any>;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountWith(props: Record<string, unknown>) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(3),
+        columns: makeColumns(),
+        pagination: "none",
+        sorting: "none",
+        ...props,
+      },
+    });
+  }
+
+  // V2: the rail used to be a JS colour string injected as an inline boxShadow,
+  // which forced the call site to reach a raw var() and a ramp primitive.
+  it("paints a token-backed rail per row", async () => {
+    wrapper = mountWith({ rowRailTone: (row: TestRow) => (row.id === 1 ? "p1" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].classes().join(" ")).toContain("border-s-priority-p1");
+    expect(rows[1].classes().join(" ")).not.toContain("border-s-priority-p1");
+  });
+
+  it.each([
+    ["p3", "border-s-priority-p3"],
+    ["error", "border-s-icon-chip-error-text"],
+    ["neutral", "border-s-border-default"],
+  ])("rails tone %s with its own token", async (tone, expected) => {
+    wrapper = mountWith({ rowRailTone: () => tone });
+    await nextTick();
+    expect(wrapper.find("tbody tr").classes().join(" ")).toContain(expected);
+  });
+
+  // V12: the old muted row was `!bg-surface-panel` — an !important override onto
+  // a library row, which the next OTable row-state feature would silently lose to.
+  it("mutes a row without an !important override", async () => {
+    wrapper = mountWith({ rowTone: (row: TestRow) => (row.id === 2 ? "muted" : null) });
+    await nextTick();
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[1].classes()).toContain("bg-surface-panel");
+    expect(rows[1].classes().join(" ")).not.toContain("!bg-surface-panel");
+  });
+
+  it("keeps a caller's own rowClass alongside both", async () => {
+    wrapper = mountWith({
+      rowRailTone: () => "p2",
+      rowTone: () => "muted",
+      rowClass: (row: TestRow) => `custom-${row.id}`,
+    });
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).toContain("border-s-priority-p2");
+    expect(classes).toContain("bg-surface-panel");
+    expect(classes).toContain("custom-1");
+  });
+
+  it("adds nothing when neither prop is passed", async () => {
+    wrapper = mountWith({});
+    await nextTick();
+    const classes = wrapper.find("tbody tr").classes().join(" ");
+    expect(classes).not.toContain("border-s-");
+    expect(classes).not.toContain("bg-surface-panel");
+  });
+});
+
+describe("OTable body sections", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  function mountSectioned(props: Record<string, any> = {}) {
+    return mount(OTable, {
+      props: {
+        data: makeRows(4),
+        columns: makeColumns(),
+        rowSection: (row: TestRow) => (row.id % 2 === 0 ? "even" : "odd"),
+        sectionOrder: ["odd", "even"],
+        ...props,
+      },
+      slots: {
+        "group-header": `<template #group-header="{ sectionKey, rows }">
+          <span :data-test="'hdr-' + sectionKey">{{ sectionKey }}:{{ rows.length }}</span>
+        </template>`,
+      },
+    }) as unknown as VueWrapper;
+  }
+
+  it("renders one heading per section, in the given order", () => {
+    wrapper = mountSectioned();
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings).toEqual(["odd:2", "even:2"]);
+  });
+
+  /// Rows have to sit under their own heading, or the heading is describing
+  /// whatever happened to follow it.
+  it("gathers each section's rows contiguously", () => {
+    wrapper = mountSectioned();
+
+    // Section rows are addressable by the heading row that precedes them.
+    const rowText = wrapper.findAll("tbody tr").map((tr) => tr.text());
+    const oddAt = rowText.findIndex((t) => t.includes("odd:2"));
+    const evenAt = rowText.findIndex((t) => t.includes("even:2"));
+    expect(oddAt).toBe(0);
+    // Two data rows between the two headings.
+    expect(evenAt).toBe(3);
+  });
+
+  /// A key nobody listed renders after every key that was, so a new state stays
+  /// visible instead of disappearing because the caller forgot it.
+  it("puts an unlisted section after the listed ones", () => {
+    wrapper = mountSectioned({
+      data: [...makeRows(2), { id: 99, name: "New", email: "n@e.com", status: "Other" }],
+      rowSection: (row: TestRow) => (row.id === 99 ? "surprise" : "odd"),
+      sectionOrder: ["odd"],
+    });
+
+    const headings = wrapper.findAll("[data-test^='hdr-']").map((el) => el.text());
+    expect(headings[headings.length - 1]).toContain("surprise");
+  });
+
+  /// A heading over no rows reads as a load that failed rather than a state
+  /// nothing happens to be in.
+  it("renders no heading for a section with no rows", () => {
+    wrapper = mountSectioned({
+      data: makeRows(2).filter((r) => r.id % 2 === 1),
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.find("[data-test='hdr-even']").exists()).toBe(false);
+    expect(wrapper.find("[data-test='hdr-odd']").exists()).toBe(true);
+  });
+
+  /// Returning null drops a row from the body as well as from every heading —
+  /// otherwise it would render under whichever section happened to precede it.
+  it("drops a row no section claims", () => {
+    wrapper = mountSectioned({
+      rowSection: (row: TestRow) => (row.id === 1 ? null : "kept"),
+      sectionOrder: ["kept"],
+    });
+
+    expect(wrapper.text()).not.toContain("User 1");
+    expect(wrapper.find("[data-test='hdr-kept']").text()).toBe("kept:3");
+  });
+
+  /// Every row's section is hidden (a caller filtering to a section nothing
+  /// currently matches) — the page has data, so `data.length` alone cannot
+  /// say the table is empty. It has to fall back to what the body actually
+  /// has left, or the reader sees neither rows nor an empty state.
+  it("shows the empty state when every row's section is filtered out", () => {
+    wrapper = mountSectioned({
+      rowSection: () => null,
+      sectionOrder: ["odd", "even"],
+    });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.find('[data-test="o2-table-empty"]').exists()).toBe(true);
+  });
+
+  /// Without the prop nothing changes — the plain body is the same one every
+  /// other table in the app renders.
+  it("renders no headings when no section resolver is given", () => {
+    wrapper = mountSectioned({ rowSection: undefined });
+
+    expect(wrapper.findAll("[data-test^='hdr-']")).toHaveLength(0);
+    expect(wrapper.findAll("tbody tr")).toHaveLength(4);
   });
 });

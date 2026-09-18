@@ -159,11 +159,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <div class="flex min-h-0 flex-1">
+      <div class="flex min-h-0 flex-1 max-lg:flex-col max-lg:overflow-y-auto">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
-            'flex min-h-0 min-w-0 flex-col gap-2 py-2',
+            'flex min-h-0 min-w-0 flex-col gap-2 py-2 max-lg:flex-none',
             isCompositeMode ? 'flex-1' : 'flex-[6.5]',
           ]"
         >
@@ -172,15 +172,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
-              <span class="text-compact mr-3 font-semibold tracking-[0.01em]">{{
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>
               <!-- Alert Type -->
               <OToggleGroup
                 :model-value="formData.is_real_time"
                 :disabled="beingUpdated || anomalyEditMode"
-                class="shrink-0"
+                class="min-w-0"
+                mobile-dropdown
                 data-test="add-alert-type-tabs"
                 @update:model-value="onAlertTypeChange"
               >
@@ -198,7 +199,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </OToggleGroupItem>
               </OToggleGroup>
             </div>
-            <div v-if="!isCompositeMode" class="flex items-center gap-4 px-3 py-2">
+            <div
+              v-if="!isCompositeMode"
+              class="flex items-center gap-4 px-3 py-2 max-md:flex-wrap max-md:gap-2"
+            >
               <!-- Stream Type -->
               <div v-if="!isCompositeMode" class="flex items-center gap-1.5">
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
@@ -219,7 +223,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Stream Name -->
-              <div v-if="!isCompositeMode" class="flex min-w-0 flex-1 items-center gap-1.5">
+              <div
+                v-if="!isCompositeMode"
+                class="flex min-w-0 flex-1 items-center gap-1.5 max-md:basis-full"
+              >
                 <div class="text-text-heading text-xs font-semibold whitespace-nowrap">
                   {{ t("alerts.stream_name") }} <span class="text-text-body">*</span>
                 </div>
@@ -242,7 +249,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- TIER 3: Configuration Tabs -->
-          <div class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col">
+          <div
+            class="alert-v3-tabs bg-card-glass-bg mx-2 flex min-h-0 flex-1 flex-col max-lg:flex-none"
+          >
             <!-- Tab Headers -->
             <OToggleGroup
               :model-value="activeTab"
@@ -271,7 +280,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
 
             <!-- Tab Content -->
-            <div class="flex-1 overflow-auto">
+            <div class="flex-1 overflow-auto max-lg:flex-none max-lg:overflow-visible">
               <!-- Alert Rules Tab (Conditions + Alert Settings merged) -->
               <!-- data-tab-pane: lets focusOnFirstError find the tab owning an
                invalid field and bring it forward before focusing it. -->
@@ -407,7 +416,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
-                <AnomalyDetectionConfig ref="anomalyStep2Ref" :config="anomalyConfig" />
+                <AnomalyDetectionConfig
+                  ref="anomalyStep2Ref"
+                  :config="anomalyConfig"
+                  :preview-sql="anomalyPreviewSql"
+                />
               </div>
 
               <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
@@ -449,19 +462,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- end LEFT column wrapper -->
 
         <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
-        <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
+        <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:h-160 max-lg:flex-none max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
             <div
               class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
             >
-              <span class="text-sm font-medium">{{
-                isAnomalyMode ? t("alerts.sqlPreview") : t("alerts.preview")
-              }}</span>
+              <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
                 <div class="bg-border-default h-4 w-px" />
                 <OIcon
@@ -488,17 +499,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <!-- editor-height is QueryEditor's own API for this; a class cannot
-                   win against the inline height its rootStyle always sets. -->
-                <QueryEditor
-                  editor-id="anomaly-sql-preview"
-                  language="sql"
-                  :read-only="true"
-                  :show-auto-complete="false"
-                  :hide-nl-toggle="true"
-                  :query="anomalyPreviewSql"
-                  editor-height="100%"
-                />
+                <AnomalyDataPreview :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div
@@ -580,6 +581,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide, ref } from "vue";
+import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -597,9 +599,9 @@ import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDrop
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
+import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPreview.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -653,9 +655,9 @@ export default defineComponent({
     PreviewAlert,
     AlertSummary,
     AnomalyDetectionConfig,
+    AnomalyDataPreview,
     AnomalyAlerting,
     AnomalySummary,
-    QueryEditor,
     InlineSelectFolderDropdown,
     OButton,
     OToggleGroup,
@@ -670,6 +672,7 @@ export default defineComponent({
     CompositeAlertForm,
   },
   setup(props, { emit }) {
+    const store = useStore();
     const alertForm = useAlertForm(props, emit);
 
     // Share server SQL-validation squiggle ranges with the descendant query
@@ -852,6 +855,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };

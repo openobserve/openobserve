@@ -17,13 +17,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="iam-roles-selection-section" class="flex h-full flex-col p-0">
     <div class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2">
-      <div class="mr-3">
+      <div class="me-3">
         <div data-test="iam-roles-selection-show-toggle" class="flex items-center">
           <span data-test="iam-roles-selection-show-text" style="font-size: var(--text-sm)">
             {{ t("iam.groupRoles.show") }}
           </span>
           <OToggleGroup
-            class="ml-1"
+            class="ms-1"
             :model-value="usersDisplay"
             @update:model-value="(v) => updateUserTable(v as string)"
           >
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OToggleGroup>
         </div>
       </div>
-      <div data-test="iam-roles-selection-search-input" class="mr-3">
+      <div data-test="iam-roles-selection-search-input" class="me-3">
         <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
@@ -87,7 +87,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { watch, onBeforeMount } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { rolesQuery } from "@/services/iam.queries";
+import { watch, onBeforeMount, computed, nextTick } from "vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -100,8 +103,6 @@ import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
-import { getRoles } from "@/services/iam";
-import { useStore } from "vuex";
 import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
@@ -132,8 +133,6 @@ const props = defineProps({
 
 defineEmits(["add", "remove"]);
 
-const users = ref([]);
-
 usePermissions();
 
 const rows: Ref<any[]> = ref([]);
@@ -157,7 +156,15 @@ const usersDisplayOptions = [
 
 const hasFetchedOrgUsers = ref(false);
 
-const store = useStore();
+const orgIdForList = useOrgId();
+// Gated: the picker is lazy, so nothing is read until it is first opened.
+// After that the query is live and an invalidation of the roles scope repaints
+// it without this component asking.
+const rolesList = useQuery(() =>
+  Object.assign(rolesQuery(orgIdForList.value), {
+    enabled: hasFetchedOrgUsers.value && !!orgIdForList.value,
+  }),
+);
 
 const groupUsersMap = ref(new Set());
 
@@ -215,17 +222,21 @@ const updateUserTable = async (value: string) => {
   }
 };
 
-const getchOrgUsers = async () => {
-  // fetch group users
-  hasFetchedOrgUsers.value = true;
-  const data: any = await getRoles(store.state.selectedOrganization.identifier);
+const shapeRoles = (data: any) =>
+  cloneDeep(data).map((role: any) => ({
+    role_name: role,
+    isInGroup: groupUsersMap.value.has(role),
+  }));
 
-  users.value = cloneDeep(data.data).map((role: any) => {
-    return {
-      role_name: role,
-      isInGroup: groupUsersMap.value.has(role),
-    };
-  });
+// The picker is the query, not a copy of it.
+const users = computed<any[]>(() => shapeRoles(rolesList.data.value ?? []));
+
+const getchOrgUsers = async () => {
+  // Enabling the query is what performs the first read; `suspense()` waits for
+  // it to settle without issuing a second request.
+  hasFetchedOrgUsers.value = true;
+  await nextTick();
+  await rolesList.suspense();
   return true;
 };
 

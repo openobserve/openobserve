@@ -50,6 +50,10 @@ pub enum TriggerModule {
     SloBackfill,
     /// Boolean expression evaluated over durable child-alert rollup states.
     CompositeAlert,
+    /// On-call escalation. One job per open response record, re-armed at the
+    /// next rung's delay. Its own lane so a paging timer is never queued
+    /// behind an alert evaluation backlog.
+    OncallEscalation,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -64,6 +68,7 @@ impl std::fmt::Display for TriggerModule {
             Self::Slo => write!(f, "slo"),
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
+            Self::OncallEscalation => write!(f, "oncall_escalation"),
         }
     }
 }
@@ -115,6 +120,13 @@ pub struct ScheduledTriggerData {
     pub tolerance: i64,
     #[serde(default)]
     pub last_satisfied_at: Option<i64>,
+    /// Last run's outcome as the `RunOutcome` wire string. Written only by
+    /// anomaly detection, which has no `alert_states` rollup row to read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    /// When `last_outcome` was recorded (microseconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backfill_job: Option<BackfillJob>,
     // ── Multi-level silence (alerts_2.md §7.1) ──────────────────────────────
@@ -240,6 +252,7 @@ mod tests {
         assert_eq!(TriggerModule::Slo as i32, 6);
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
+        assert_eq!(TriggerModule::OncallEscalation as i32, 9);
     }
 
     #[test]
@@ -280,6 +293,8 @@ mod tests {
             period_end_time: Some(1000),
             tolerance: 42,
             last_satisfied_at: Some(999),
+            last_outcome: None,
+            last_outcome_at: None,
             backfill_job: None,
             delivery_silenced_until: None,
             last_notified_level: None,
@@ -345,6 +360,8 @@ mod tests {
             period_end_time: Some(1_234_567),
             tolerance: 10,
             last_satisfied_at: Some(9_999_999),
+            last_outcome: None,
+            last_outcome_at: None,
             backfill_job: None,
             delivery_silenced_until: None,
             last_notified_level: None,
@@ -540,6 +557,8 @@ mod tests {
             period_end_time: Some(500),
             tolerance: 5,
             last_satisfied_at: None,
+            last_outcome: None,
+            last_outcome_at: None,
             delivery_silenced_until: None,
             last_notified_level: None,
             notified_destinations: vec![],

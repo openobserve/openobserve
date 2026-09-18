@@ -52,9 +52,11 @@ use super::{Alert, QueryCondition, StreamType};
 /// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
-    /// Optional folder ID indicating the folder in which to create the alert.
-    /// If omitted the alert will be created in the default folder.
-    #[schema(example = "default")]
+    /// Deprecated. The destination folder is taken from the `folder` query
+    /// parameter, which is what the permission check authorizes; the default
+    /// folder is used when it is absent. A value here that disagrees with the
+    /// query parameter is rejected with 400 rather than silently ignored.
+    #[schema(deprecated, example = "default")]
     pub folder_id: Option<String>,
 
     /// Discriminates the alert type. Defaults to scheduled alert when absent.
@@ -140,8 +142,7 @@ pub struct AnomalyAlertFields {
     pub training_window_days: Option<i32>,
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
-    /// Percentile threshold (50.0–99.9). Default: 97.0
-    /// Also accepts the name `threshold` (integer, e.g. 97) for API convenience.
+    /// Percentile threshold (50.0–99.9), default 97.0; also accepts `threshold` as an integer.
     #[serde(
         default,
         alias = "threshold",
@@ -149,6 +150,9 @@ pub struct AnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Delivered-alert budget per day; mutually exclusive with `percentile`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -342,8 +346,13 @@ pub struct UpdateAnomalyAlertFields {
         deserialize_with = "config::meta::slo::lenient_f64::deserialize_opt"
     )]
     pub percentile: Option<f64>,
+    /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alert_budget_per_day: Option<f64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
+    /// Moves the config to this folder. Naming a folder you cannot write to
+    /// returns 403; omit it to leave the config where it is.
     pub folder_id: Option<String>,
     pub owner: Option<String>,
 }

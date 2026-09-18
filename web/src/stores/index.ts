@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import type { I18nText } from "@/types/i18n";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 import { createStore } from "vuex";
 import { useLocalOrganization, useLocalCurrentUser, useLocalTimezone } from "../utils/zincutils";
@@ -21,6 +22,7 @@ import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
+import { purgeAllQueries } from "@/composables/query/queryClient";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -46,13 +48,13 @@ const organizationObj = {
   rumToken: {
     rum_token: "",
   },
-  // Which traces stream contains a given (canonical 32-char) trace id, learned
-  // by probing — see useCorrelatedTracesStream. knownStreams is the org-level
-  // fact ("streams that have ever contained a correlated trace") that keeps
-  // steady-state resolution at one point lookup regardless of stream count.
+  // Which traces stream contains a given (canonical 32-char) trace id, and the
+  // range it ran in when the time index knew — see useCorrelatedTracesStream.
+  // knownStreams is the org-level fact ("streams that have ever contained a
+  // correlated trace") that keeps steady-state resolution at one point lookup.
   // Lives here so resetOrganizationData wipes it on org switch.
   correlatedTracesStreams: {
-    byTraceId: {} as Record<string, string>,
+    byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
     knownStreams: [] as string[],
   },
   quotaThresholdMsg: "",
@@ -210,13 +212,17 @@ export default createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
-    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+    setCorrelatedTracesStream(
+      state,
+      payload: { traceId: string; stream: string; range?: TraceTimeRange },
+    ) {
       const cache = state.organizationData.correlatedTracesStreams;
       // Bounded: past the cap, clear and restart. knownStreams survives, so a
       // re-resolution of any dropped id is a single point lookup — LRU would
       // be bookkeeping for ~100KB of strings.
       if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
-      cache.byTraceId[payload.traceId] = payload.stream;
+      // The range is absent whenever the answer came from the probe fallback.
+      cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
       if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     setOrgTokens(state, payload) {
@@ -274,11 +280,8 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      // Every caller commits ONE type's folders ({ alerts: [...] }), so replacing
-      // the whole map made each module's fetch wipe every other module's cached
-      // folders. Worst with a late-resolving fetch from a page the user has left:
-      // opening the alert form and going back to Dashboards landed on a folder
-      // sidebar holding nothing but Favorites.
+      // Merge, not replace: callers pass a single `{ [type]: folders }` entry,
+      // and replacing dropped every sibling type's cached list.
       state.organizationData.foldersByType = {
         ...state.organizationData.foldersByType,
         ...payload,
@@ -437,6 +440,9 @@ export default createStore({
     },
     logout(context) {
       context.commit("logout");
+      // Nothing from the previous session may survive — including anything the
+      // query layer persisted to localStorage/IndexedDB.
+      purgeAllQueries();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);

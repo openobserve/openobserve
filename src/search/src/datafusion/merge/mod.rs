@@ -59,13 +59,18 @@ pub async fn merge_parquet_files(
         run_merge_query(&sql, mode.output_sort_order(), schema, tables).await?;
 
     let files = match mode {
-        MergeMode::MetricsIndexed => {
+        MergeMode::MetricsIndexed | MergeMode::MetricsHashMerged => {
             metrics::write_files(
                 &schema,
                 bloom_filter_fields,
                 &metadata,
-                output.file_format,
-                get_config().compact.max_file_size,
+                metrics::MetricsOutput {
+                    file_format: output.file_format,
+                    max_file_size: get_config().compact.max_file_size,
+                    layout: mode
+                        .metrics_file_layout()
+                        .expect("metrics merge modes name their layout"),
+                },
                 rx,
                 read_task,
             )
@@ -175,6 +180,15 @@ async fn run_merge_query(
     Ok((schema, rx, read_task))
 }
 
+/// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).
+pub(super) fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
+    // data_tmp_dir is wiped at startup, reclaiming files a crash orphaned
+    let tmp_dir = &get_config().common.data_tmp_dir;
+    std::fs::create_dir_all(tmp_dir)?;
+    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
+}
+
 pub fn append_metadata<W: AsyncFileWriter>(
     writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,
@@ -237,6 +251,18 @@ mod tests {
         assert_eq!(
             metrics.mark_file_key("files/o/metrics/s/1.parquet"),
             "files/o/metrics/s/hash-sorted-v1-1.parquet"
+        );
+        let merged = MergedFile::MetricsHashMerged {
+            data_path: tempfile::NamedTempFile::new().unwrap().into_temp_path(),
+            meta: FileMeta::default(),
+        };
+        assert_eq!(
+            merged.file_name("1", FileFormat::Parquet),
+            "hash-merged-v1-1.parquet"
+        );
+        assert_eq!(
+            merged.mark_file_key("files/o/metrics/s/1.parquet"),
+            "files/o/metrics/s/hash-merged-v1-1.parquet"
         );
     }
 

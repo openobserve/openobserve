@@ -184,8 +184,8 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
-    /// Separate allowances from the AI pool, in a different unit. Browser and
-    /// protocol hold independent grants — a browser step costs ~52x a protocol one.
+    /// Separate allowances from the AI pool, in a different unit: browser and protocol hold
+    /// independent one-time grants.
     #[cfg(feature = "cloud")]
     pub browser_steps_used: u64,
     #[cfg(feature = "cloud")]
@@ -193,7 +193,11 @@ pub struct AllOrgListDetails {
     #[cfg(feature = "cloud")]
     pub protocol_steps_used: u64,
     #[cfg(feature = "cloud")]
+    pub status_steps_used: u64,
+    #[cfg(feature = "cloud")]
     pub protocol_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -317,7 +321,8 @@ impl TriggerStatus {
                     // is a healthy trigger; a failed delivery is not.
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
-                    | usage::RunOutcome::Succeeded => status.healthy += 1,
+                    | usage::RunOutcome::Succeeded
+                    | usage::RunOutcome::Pending => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
@@ -370,6 +375,8 @@ pub struct OrgIngestionToken {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -382,11 +389,26 @@ pub struct CreateOrgIngestionTokenRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Also mint a Splunk HEC token for this credential.
+    #[serde(default)]
+    pub splunk_token: bool,
 }
 
+/// Requested change to a Splunk HEC token.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SplunkTokenAction {
+    Generate,
+    Revoke,
+}
+
+/// At least one of the two fields must be present.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgIngestionTokenEnableRequest {
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub splunk_token: Option<SplunkTokenAction>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -828,7 +850,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -892,7 +918,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -921,7 +951,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1005,7 +1039,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1044,7 +1082,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),

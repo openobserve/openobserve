@@ -21,9 +21,21 @@ import http, { attemptTokenRefresh } from "@/services/http";
 
 export type PlaygroundMessageRole = "system" | "user" | "assistant" | "tool";
 
+export interface PlaygroundRequestToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
 export interface PlaygroundRequestMessage {
   role: PlaygroundMessageRole;
   content: string;
+  /** DeepSeek thinking mode: must be replayed verbatim when tools are present. */
+  reasoningContent?: string;
+  /** Assistant role only: calls the model issued before a tool result. */
+  toolCalls?: PlaygroundRequestToolCall[];
+  /** Tool role only: the assistant call this result answers. */
+  toolCallId?: string;
 }
 
 export interface PlaygroundRequestTool {
@@ -57,12 +69,15 @@ export interface PlaygroundRunUsage {
 }
 
 export interface PlaygroundRunToolCall {
+  id: string;
   name: string;
   arguments: string;
 }
 
 export interface PlaygroundRunResult {
   text: string;
+  /** Provider reasoning retained for a later tool-enabled turn, never rendered. */
+  reasoningContent: string | null;
   /** Non-null when the model issued a tool call. The call IS the output and the
    *  run ends there — the Playground does not execute tools. */
   toolCall: PlaygroundRunToolCall | null;
@@ -159,9 +174,30 @@ function normalizeScore(row: any): PlaygroundScoreResult {
  *  builder. Everything else — OpenAI, DeepSeek, Azure, gateways — takes the
  *  `chat/completions` shape. */
 const ANTHROPIC_KIND = "anthropic";
+/** Has JSON mode but rejects `json_schema`; the server degrades it for us. */
+const DEEPSEEK_KIND = "deepseek";
 
 function providerKind(request: PlaygroundRunRequest): string {
   return (request.providerType ?? "").trim().toLowerCase();
+}
+
+/** `native` is enforced, `approximated` is JSON mode with the schema restated in the prompt, `dropped` never leaves the client. */
+export type ResponseSchemaSupport = "native" | "approximated" | "dropped";
+
+export function responseSchemaSupport(providerType?: string): ResponseSchemaSupport {
+  switch ((providerType ?? "").trim().toLowerCase()) {
+    case ANTHROPIC_KIND:
+      return "dropped";
+    case DEEPSEEK_KIND:
+      return "approximated";
+    default:
+      return "native";
+  }
+}
+
+/** True when a provider of this kind carries no response schema at all. */
+export function providerDropsResponseSchema(providerType?: string): boolean {
+  return responseSchemaSupport(providerType) === "dropped";
 }
 
 /**
@@ -201,7 +237,8 @@ function wireTools(request: PlaygroundRunRequest): unknown[] | undefined {
  */
 function wireResponseFormat(request: PlaygroundRunRequest): unknown | undefined {
   if (!request.responseSchema) return undefined;
-  if (providerKind(request) === ANTHROPIC_KIND) return undefined;
+  // The same predicate the UI warns from, so the warning cannot outlive the drop.
+  if (providerDropsResponseSchema(request.providerType)) return undefined;
   return {
     type: "json_schema",
     json_schema: {
@@ -214,7 +251,7 @@ function wireResponseFormat(request: PlaygroundRunRequest): unknown | undefined 
 
 /** True when a response schema was asked for but this provider cannot carry it. */
 export function dropsResponseSchema(request: PlaygroundRunRequest): boolean {
-  return Boolean(request.responseSchema) && providerKind(request) === ANTHROPIC_KIND;
+  return Boolean(request.responseSchema) && providerDropsResponseSchema(request.providerType);
 }
 
 /**
@@ -231,6 +268,11 @@ function wireBody(request: PlaygroundRunRequest): Record<string, unknown> {
     messages: request.messages.map((message) => ({
       role: message.role,
       content: message.content,
+      ...(message.reasoningContent !== undefined
+        ? { reasoningContent: message.reasoningContent }
+        : {}),
+      ...(message.toolCalls?.length ? { toolCalls: message.toolCalls } : {}),
+      ...(message.toolCallId ? { toolCallId: message.toolCallId } : {}),
     })),
     params: {
       temperature: request.params.temperature ?? 0,
@@ -295,6 +337,7 @@ async function runLive(
   let buffer = "";
   let text = "";
   let toolCall: PlaygroundRunToolCall | null = null;
+  let reasoningContent: string | null = null;
   let usage: PlaygroundRunUsage | null = null;
 
   // Drains until the reader reports done.
@@ -324,6 +367,7 @@ async function runLive(
           // The model may emit several; the cell shows one, so the first wins.
           if (!toolCall) {
             toolCall = {
+              id: String(data.id ?? ""),
               name: String(data.name ?? ""),
               arguments: String(data.arguments ?? ""),
             };
@@ -331,6 +375,8 @@ async function runLive(
           break;
         case "done":
           usage = normalizeUsage(data);
+          reasoningContent =
+            typeof data.reasoningContent === "string" ? data.reasoningContent : null;
           break;
         case "error":
           // Once the stream is open the server has no status code left, so an
@@ -345,7 +391,7 @@ async function runLive(
     }
   }
 
-  return { text, toolCall, usage: usage ?? emptyUsage() };
+  return { text, reasoningContent, toolCall, usage: usage ?? emptyUsage() };
 }
 
 /** The server's error message, falling back to the bare status. */

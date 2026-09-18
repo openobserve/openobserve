@@ -21,7 +21,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use strum::Display;
 use utoipa::ToSchema;
 
-use crate::{meta::search::SearchEventType, stats::MemorySize};
+use crate::{
+    meta::search::{SearchEventContext, SearchEventType},
+    stats::MemorySize,
+};
 
 /// Custom deserializer that accepts either a comma-separated string or a string array
 fn deserialize_string_or_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
@@ -76,6 +79,8 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Suffix of the extra table that declares the `(__hash__, _timestamp)` file order.
+pub const HASH_SORTED_TABLE_SUFFIX: &str = "__hash_sorted";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///
@@ -87,6 +92,9 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     VALUE_LABEL,
     HASH_LABEL,
     EXEMPLARS_LABEL,
+    // OTLP per-point metadata, not dimensions: a restart moves start_time and forks the series
+    "start_time",
+    "flag",
     "is_monotonic",
     "trace_id",
     "span_id",
@@ -224,6 +232,8 @@ pub struct RequestQuery {
     pub time: Option<String>,
     /// Evaluation timeout.
     pub timeout: Option<String>,
+    #[serde(flatten)]
+    pub search_event_context: SearchEventContext,
 }
 
 /// Range query.
@@ -258,6 +268,8 @@ pub struct RequestRangeQuery {
         deserialize_with = "deserialize_string_or_vec"
     )]
     pub clusters: Vec<String>, // default query all clusters, local: only query local cluster
+    #[serde(flatten)]
+    pub search_event_context: SearchEventContext,
 }
 
 #[derive(Debug, Deserialize)]
@@ -739,6 +751,7 @@ mod tests {
             search_type: None,
             regions: vec![],
             clusters: vec![],
+            search_event_context: Default::default(),
         };
         let json = serde_json::to_value(&q).unwrap();
         let obj = json.as_object().unwrap();
@@ -760,6 +773,7 @@ mod tests {
             search_type: Some(SearchEventType::UI),
             regions: vec!["us-east".to_string()],
             clusters: vec!["c1".to_string()],
+            search_event_context: Default::default(),
         };
         let json = serde_json::to_value(&q).unwrap();
         let obj = json.as_object().unwrap();

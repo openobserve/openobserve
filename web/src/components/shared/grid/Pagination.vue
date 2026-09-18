@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="position === 'bottom' && maxRecords"
       class="flex w-50 items-center justify-center justify-start whitespace-nowrap"
     >
-      <span class="mr-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
+      <span class="me-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
       <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
     <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
         variant="ghost"
         size="icon"
-        class="mr-2"
+        class="me-2"
         @click="toggleSidePanel"
       >
         <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
@@ -38,18 +38,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
         variant="ghost"
         size="icon"
-        class="mr-2"
+        class="me-2"
         @click="toggleSidePanel"
       >
         <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
       </OButton>
-      <div class="ml-1">
+      <div class="ms-1">
         {{ resultTotal }}
         {{ countedPageTitle }}
       </div>
     </div>
-    <div class="ml-auto">
-      <span class="mr-4 text-xs font-semibold">
+    <div class="ms-auto">
+      <span class="me-4 text-xs font-semibold">
         {{ t("search.showing") }}
         {{ resultTotal > 0 ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }}
         -
@@ -67,14 +67,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <div v-if="position === 'bottom'" class="flex items-center">
-        <OSeparator vertical class="my-2 mr-4" />
+        <OSeparator vertical class="my-2 me-4" />
 
-        <span class="mr-4 text-xs font-semibold">
+        <span class="me-4 text-xs font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
         <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="mr-3"
+          class="me-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />

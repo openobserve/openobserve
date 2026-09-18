@@ -101,11 +101,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :class="[
                 isAnimating ? 'auto-refresh-icon--spinning' : '',
                 isAnimating ? 'text-primary' : '',
-                'mr-0.5',
+                'me-0.5',
               ]"
             />
             <div class="text-compact text-center leading-4">{{ selectedLabel }}</div>
-            <OIcon name="arrow-drop-down" size="sm" class="ml-0.5" />
+            <OIcon name="arrow-drop-down" size="sm" class="ms-0.5" />
           </div>
         </OButton>
       </template>
@@ -172,6 +172,7 @@ import {
   onActivated,
   onDeactivated,
   onMounted,
+  onUnmounted,
   type PropType,
 } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -360,6 +361,10 @@ export default defineComponent({
     });
 
     onDeactivated(() => {
+      clearInterval(intervalInstance);
+    });
+
+    onUnmounted(() => {
       clearInterval(intervalInstance);
     });
 

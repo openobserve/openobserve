@@ -360,35 +360,18 @@ test.describe("Alerts Regression Bugs — Batch 1", () => {
     await page.waitForTimeout(1000);
     testLogger.info('Switched to SQL tab');
 
-    // Click into the inline Monaco editor (use .last() per alert creation wizard pattern)
-    // then type via keyboard — same approach used by the POM wizard methods
-    const sqlEditor = pm.alertsPage.getMonacoEditorLast();
-    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 5000 });
+    // Editor id, not .last(): the wizard's DOM-last Monaco instance is offscreen.
+    const sqlEditor = pm.alertsPage.getInlineSqlEditor();
+    // QueryEditor is lazily loaded, so 5s is not enough on a loaded runner.
+    await expect(sqlEditor, 'SQL editor should be visible').toBeVisible({ timeout: 30000 });
     await sqlEditor.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Use Monaco API to set editor content reliably.
-    // Keyboard shortcuts (Cmd/Ctrl+A + type) are unreliable
-    // with Monaco because the virtualised viewport, focus management,
-    // and IME handling can swallow synthesized keystrokes.
-    // Retry until Monaco editors are fully initialized (parallel test runs
-    // may delay Monaco boot).
-    await expect(async () => {
-      const content = await page.evaluate(() => {
-        const editors = window.monaco?.editor?.getEditors?.();
-        if (editors && editors.length > 0) {
-          const editor = editors[editors.length - 1];
-          editor.setValue('SELECT * FROM default');
-          return editor.getValue();
-        }
-        return null;
-      });
-      expect(content).toContain('default');
-    }).toPass({ timeout: 10000, intervals: [1000] });
+    // Monaco swallows synthesized keystrokes, so the value is set through its API.
+    await pm.alertsPage.setInlineSqlEditorValue('SELECT * FROM default');
     await page.waitForTimeout(500);
 
-    // Verify the rendered .view-lines contain "default"
-    const linesText = await sqlEditor.locator('.view-lines').first().textContent().catch(() => '');
+    const linesText = await pm.alertsPage.getInlineSqlEditorLinesText();
     testLogger.info(`Monaco view-lines content: "${linesText.substring(0, 100)}"`);
 
     expect(linesText,

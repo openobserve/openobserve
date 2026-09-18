@@ -95,17 +95,26 @@ const flashing = ref(false);
 const FLASH_MS = 1200;
 let flashTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** Called by the Score panel's warning, so the notice and its fix are one gesture. */
-function focus() {
-  void nextTick(() => fieldRef.value?.querySelector("textarea")?.focus());
+/** Visual cue only — no keyboard focus move. Called when a sample lands: the
+ *  field earns a glance, but the user's actual focus can be anywhere else on
+ *  the page at that moment and must stay there. */
+function flash() {
   flashing.value = true;
   if (flashTimer) clearTimeout(flashTimer);
   flashTimer = setTimeout(() => (flashing.value = false), FLASH_MS);
+}
+
+/** Called by the Score panel's warning, so the notice and its fix are one
+ *  gesture — that link is a deliberate "take me there" click, unlike a
+ *  sample landing passively, so this is the one seam allowed to move focus. */
+function focus() {
+  flash();
+  void nextTick(() => fieldRef.value?.querySelector("textarea")?.focus());
 }
 
 onBeforeUnmount(() => {
   if (flashTimer) clearTimeout(flashTimer);
 });
 
-defineExpose({ focus });
+defineExpose({ focus, flash });
 </script>

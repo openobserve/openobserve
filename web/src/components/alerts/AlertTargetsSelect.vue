@@ -30,14 +30,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   in the parent (AlertSettings) so the two alert-type layouts keep their chrome.
 -->
 <template>
-  <div class="flex items-center">
+  <div class="flex items-center max-md:flex-wrap max-md:gap-y-2">
     <OSelect
       :model-value="model"
       :options="options"
       multiple
       :error="error"
       :collapsible-groups="workflowsEnabled"
-      class="max-w-[18.75rem] min-w-[11.25rem]"
+      class="max-w-[18.75rem] min-w-[11.25rem] max-md:max-w-none max-md:min-w-0 max-md:flex-1 max-md:basis-[calc(100%-2rem)]"
       data-test="alert-destinations-select"
       @update:model-value="onUpdate"
     >
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <OButton
       data-test="alert-settings-refresh-destinations-btn"
-      class="ml-1"
+      class="ms-1"
       variant="ghost"
       size="icon-circle-sm"
       :title="t('alerts.alertSettings.refreshDestinations')"
@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-destination-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2 max-md:ms-0"
       @click="emit('create-destination')"
     >
       {{ t("alerts.alertSettings.addNewDestination") }}
@@ -72,7 +72,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="create-workflow-btn"
       variant="outline"
       size="sm"
-      class="ml-2"
+      class="ms-2"
       @click="emit('create-workflow')"
     >
       {{ t("workflow.create") }}

@@ -98,6 +98,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("workflow.ndv.editStep") }}
           </OButton>
+          <!-- Replays the run from THIS step down (from_node). Only for a run the
+               backend stored input for — a Test/Retry run shows nothing here. -->
+          <OButton
+            v-if="canRetryFromHere"
+            variant="outline"
+            size="sm-action"
+            :loading="retryingFromHere"
+            data-test="workflow-node-retry-from"
+            @click="retryFromHere"
+          >
+            {{ t("workflow.test.stepResult.replay") }}
+            <OTooltip side="bottom" :content="t('workflow.test.stepResult.replayHint')" />
+          </OButton>
           <!-- Hidden (not disabled) on a historical run: canvasReadOnly means it
                could never be enabled there, and a permanently dead control just
                advertises an action the surface refuses. -->
@@ -147,18 +160,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mt-0.5 flex items-center gap-2">
             <span class="text-text-secondary truncate text-xs">{{ typeBreadcrumb }}</span>
 
-            <!-- Run label + switcher — read-only history only. The chip shows the run id
-               (already on the result — no fetch); the history button opens a menu of
-               runs to load onto THIS node. -->
+            <!-- Run label + switcher — read-only history only. A run is identified by
+               WHEN it ran, as the runs table and the switcher menu both do; the raw id
+               is support-only, so it stays on the tooltip. The history button opens a
+               menu of runs to load onto THIS node. -->
             <template v-if="historyRunId">
-              <span
-                data-test="workflow-ndv-run-label"
-                class="border-border-default text-text-secondary rounded-default inline-flex max-w-[20rem] shrink-0 items-center border px-1.5 py-0.5 text-xs"
-                :title="raw(historyRunId)"
-              >
-                <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ historyRunId }}</span>
-              </span>
-
               <WorkflowRunSwitcher
                 :current-run-id="historyRunId"
                 :org-id="store.state.selectedOrganization.identifier"
@@ -166,15 +172,37 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 @select="switchRun"
               >
                 <template #trigger>
-                  <OButton
-                    variant="outline"
-                    size="icon-xs-sq"
-                    class="shrink-0"
+                  <!-- The chip IS the control: a detached icon never said it switched
+                       runs, while the chip already names the run it would replace. -->
+                  <button
+                    type="button"
                     data-test="workflow-ndv-run-switcher"
+                    class="bg-select-bg border-select-border hover:border-select-border-hover data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 text-text-body rounded-default group inline-flex max-w-[20rem] shrink-0 items-center gap-1 border px-2 py-0.5 text-xs transition-[color,background-color,border-color,box-shadow] duration-150 focus:outline-none data-[state=open]:ring-[0.125rem]"
+                    :title="raw(historyRunId)"
+                    :aria-label="t('workflow.ndv.switchRun')"
                   >
-                    <OIcon name="history" size="xs" />
+                    <OIcon name="history" size="xs" class="text-text-secondary shrink-0" />
+                    <span
+                      data-test="workflow-ndv-run-label"
+                      class="inline-flex min-w-0 items-center gap-1"
+                    >
+                      <span class="shrink-0">{{ t("workflow.ndv.runLabel") }}</span>
+                      <span class="shrink-0" aria-hidden="true">·</span>
+                      <OTimeCell
+                        :value="loadedRunRow?.start_time"
+                        unit="us"
+                        mode="absolute"
+                        :timezone="store.state.timezone"
+                        :empty-label="raw('—')"
+                      />
+                    </span>
+                    <OIcon
+                      name="chevron-down"
+                      size="xs"
+                      class="text-text-secondary shrink-0 transition-transform duration-150 group-data-[state=open]:rotate-180"
+                    />
                     <OTooltip :content="t('workflow.ndv.switchRun')" side="bottom" />
-                  </OButton>
+                  </button>
                 </template>
               </WorkflowRunSwitcher>
             </template>
@@ -194,20 +222,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the same navigator the results dock had. Click a step to walk the panel to
            it; the active step is highlighted, the count-badge/leaf-dot mirrors its run
            status. Shown with the I/O panes only (showIo). -->
-      <!-- `-mr-2` tightens ONLY the Steps→Input gap (the row's gap-4 is kept elsewhere
+      <!-- `-me-2` tightens ONLY the Steps→Input gap (the row's gap-4 is kept elsewhere
            because the Input/Output resize handles live in those gaps). -->
       <section
         v-if="showIo"
         data-test="workflow-ndv-steps"
-        class="-mr-2 flex shrink-0 flex-col gap-2"
-        :class="stepsCollapsed ? 'w-11' : 'w-48'"
+        class="-me-2 flex shrink-0 flex-col gap-2"
+        :class="stepsCollapsed ? 'w-11' : 'w-64'"
       >
         <!-- h-8 matches the Input/Output/Config header height (their dense tabs are
              h-8) so all four pane titles sit on the same line. Collapsed: the title
              drops and the chevron centers (it's the only affordance that fits). -->
         <div
           class="flex h-8 items-center"
-          :class="stepsCollapsed ? 'justify-center' : 'justify-between pl-2'"
+          :class="stepsCollapsed ? 'justify-center' : 'justify-between ps-2'"
         >
           <span v-if="!stepsCollapsed" class="text-text-body text-sm font-bold">
             {{ t("workflow.results.nodesTitle") }}
@@ -249,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`workflow-ndv-step-${row.id}`"
             class="relative flex h-9 shrink-0 items-center text-sm"
             :class="[
-              stepsCollapsed ? 'w-full justify-center' : 'w-max min-w-full pr-2 pl-2 text-left',
+              stepsCollapsed ? 'w-full justify-center' : 'w-max min-w-full ps-2 pe-2 text-left',
               row.id === nodeId
                 ? 'bg-select-item-hover-bg text-text-body'
                 : 'text-text-secondary hover:bg-surface-subtle',
@@ -269,7 +297,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OTooltip side="right" align="center" :side-offset="8" max-width="18rem">
                 <template #content>
                   <div class="flex flex-col gap-0.5 p-1 text-left">
-                    <div class="text-xs font-semibold">{{ row.label }}</div>
+                    <div class="text-xs font-semibold">
+                      {{ row.label }}{{ row.detail ? ` · ${row.detail}` : "" }}
+                    </div>
                     <div v-if="row.breadcrumb" class="text-text-secondary text-xs">
                       {{ row.breadcrumb }}
                     </div>
@@ -287,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span
                   v-if="i < row.depth ? row.guides[i - 1] : true"
-                  class="border-border-default absolute top-0 left-1/2 border-l"
+                  class="border-border-default absolute top-0 left-1/2 border-s"
                   :class="i < row.depth ? 'bottom-0' : row.guides[i - 1] ? 'h-full' : 'h-1/2'"
                 />
                 <span
@@ -310,10 +340,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   aria-hidden="true"
                 />
               </span>
-              <span class="flex items-center gap-1.5 pl-1.5">
+              <span class="flex min-w-0 items-center gap-1.5 ps-1.5">
                 <OIcon :name="row.icon" size="xs" class="shrink-0" />
-                <span class="whitespace-nowrap">{{ row.label }}</span>
+                <span class="truncate">{{ row.label }}</span>
+                <span v-if="row.detail" class="text-text-secondary truncate text-xs">
+                  {{ row.detail }}
+                </span>
               </span>
+              <OTooltip side="right" align="center" :side-offset="8" max-width="18rem">
+                <template #content>
+                  <div class="flex flex-col gap-0.5 p-1 text-left">
+                    <div class="text-xs font-semibold">
+                      {{ row.label }}{{ row.detail ? ` · ${row.detail}` : "" }}
+                    </div>
+                    <div v-if="row.breadcrumb" class="text-text-secondary text-xs">
+                      {{ row.breadcrumb }}
+                    </div>
+                  </div>
+                </template>
+              </OTooltip>
             </template>
           </button>
         </div>
@@ -322,13 +367,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- This node wasn't part of the loaded run (added later / never reached): a plain
            notice in place of the panes — no misleading sample data. The Steps rail stays
            so the user can jump to a step that IS in this run. -->
+      <!-- Sized to its text, not flex-1: sharing the row with Config would strand the
+           config in a narrow column beside a large void. -->
       <div
         v-if="nodeMissingFromRun"
         data-test="workflow-ndv-not-in-run"
-        class="text-text-secondary flex min-w-0 flex-1 flex-col items-center justify-center gap-2 text-center"
+        class="text-text-secondary flex min-w-0 shrink-0 flex-col items-center justify-center gap-2 px-6 text-center"
       >
         <OIcon name="info" size="lg" class="text-text-placeholder" />
         <span class="text-sm">{{ t("workflow.ndv.notInRun") }}</span>
+      </div>
+
+      <div
+        v-else-if="runStoredNoData"
+        data-test="workflow-ndv-no-run-data"
+        class="text-text-secondary flex min-w-0 shrink-0 flex-col items-center justify-center gap-2 px-6 text-center"
+      >
+        <OIcon name="info" size="lg" class="text-text-placeholder" />
+        <span class="text-sm">{{ t("workflow.ndv.noRunData") }}</span>
       </div>
 
       <!-- INPUT — the upstream SOURCES list (immediate parent = this node's real input,
@@ -336,9 +392,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            for the trigger: it has no input (its output IS the event), so Config expands
            into the space and only Config · Output show. -->
       <section
-        v-if="showIo && !readonlyBody && !nodeMissingFromRun"
+        v-if="showIo && !readonlyBody && !nodeMissingFromRun && !runStoredNoData"
         data-test="workflow-ndv-input"
-        class="relative flex w-[var(--io-w,16.25rem)] min-w-0 shrink-0 flex-col gap-2"
+        class="relative flex w-[var(--io-w,21.25rem)] min-w-0 shrink-0 flex-col gap-2"
         :style="{ '--io-w': inputWidth + 'px' }"
       >
         <!-- Drag handle on Input's RIGHT edge (sits in the gap toward Config).
@@ -353,8 +409,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-border-default hover:bg-accent h-full w-0.5 rounded-full transition-colors"
           />
         </div>
-        <div class="flex h-8 items-center pl-2">
+        <div class="flex h-8 items-center gap-2 ps-2">
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
+          <div
+            v-if="inputPaged && inputCount > 1"
+            data-test="workflow-ndv-input-pager"
+            class="text-text-secondary flex items-center gap-1 text-xs"
+          >
+            <span>{{ t("workflow.ndv.eventPager", { n: inputPage + 1, total: inputCount }) }}</span>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              data-test="workflow-ndv-input-prev"
+              :title="t('workflow.ndv.prevEvent')"
+              @click="stepInput(-1)"
+            >
+              <OIcon name="chevron-left" size="xs" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              data-test="workflow-ndv-input-next"
+              :title="t('workflow.ndv.nextEvent')"
+              @click="stepInput(1)"
+            >
+              <OIcon name="chevron-right" size="xs" />
+            </OButton>
+          </div>
+          <OButton
+            v-if="!canvasReadOnly"
+            variant="ghost"
+            size="xs"
+            class="ms-auto"
+            data-test="workflow-ndv-input-reset"
+            @click="resetEditableInput"
+          >
+            {{ t("workflow.ndv.resetInput") }}
+          </OButton>
         </div>
         <!-- Just the IMMEDIATE input — no source-chain accordion, node name, or nav
              arrow. In editor mode this is ALWAYS an editable JSON test input (Run Step
@@ -366,16 +457,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             v-if="!canvasReadOnly || (immediateSrc && immediateRecords.length)"
-            class="flex h-full flex-col pl-2"
+            class="flex h-full flex-col ps-2"
           >
             <CodeQueryEditor
               editor-id="workflow-ndv-input-editor"
               language="json"
-              :query="editableInput"
+              :query="shownInput"
               :read-only="canvasReadOnly"
               :show-auto-complete="false"
               class="min-h-0 flex-1"
-              @update:query="editableInput = $event"
+              @update:query="onEditInput($event)"
             />
             <div
               v-if="inputInvalid"
@@ -406,10 +497,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- CONFIG — ONE body instance so it never remounts when the I/O panes toggle
            (e.g. entering the inline function editor). Each body exposes submit(). -->
-      <!-- Config — hidden for the read-only trigger (nothing to configure; its event
-           fills the Output pane instead of leaving this pane empty). -->
+      <!-- Config belongs to the WORKFLOW, not the run, so a step the run skipped still
+           shows it — that is what answers "why didn't this branch fire?". Only the
+           read-only trigger hides it (nothing to configure; its event fills Output). -->
       <section
-        v-if="!nodeMissingFromRun && !isReadonlyTrigger"
+        v-if="!isReadonlyTrigger"
         data-test="workflow-ndv-config"
         class="flex min-h-0 min-w-0 flex-1 flex-col gap-4"
       >
@@ -424,6 +516,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Read-only (Runs history): a per-type config READOUT, not the editable
                form — so it doesn't read as "what do I change here?". Editing lives in
                the editor surface (a historical run is immutable). -->
+          <!-- A past run is a record of what HAPPENED; without this the disabled
+               config just looked broken, with no route back to the editable step. -->
+          <div
+            v-if="canvasReadOnly && historyRunId"
+            data-test="workflow-ndv-readonly-note"
+            class="border-border-default bg-surface-subtle text-text-secondary rounded-default flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border px-2 py-1.5 text-xs"
+          >
+            <OIcon name="history" size="xs" class="shrink-0" />
+            <span class="min-w-0">{{ t("workflow.ndv.readOnlyRun") }}</span>
+            <button
+              type="button"
+              data-test="workflow-ndv-readonly-note-edit"
+              class="text-text-link shrink-0 font-medium underline underline-offset-2"
+              @click="editThisStep"
+            >
+              {{ t("workflow.ndv.readOnlyRunEdit") }}
+            </button>
+          </div>
           <WorkflowConfigSummary v-if="canvasReadOnly" :key="nodeId" />
           <component v-else-if="bodyComponent" :is="bodyComponent" :key="nodeId" ref="bodyRef" />
           <div
@@ -463,10 +573,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- OUTPUT (only with run data). For the TRIGGER there's no config to sit beside,
            so the event (its output) fills the width instead of a narrow pane. -->
       <section
-        v-if="showIo && !nodeMissingFromRun"
+        v-if="showIo && !nodeMissingFromRun && !runStoredNoData"
         data-test="workflow-ndv-output"
         class="relative flex min-w-0 flex-col gap-2"
-        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,16.25rem)] shrink-0'"
+        :class="isReadonlyTrigger ? 'flex-1' : 'w-[var(--io-w,21.25rem)] shrink-0'"
         :style="isReadonlyTrigger ? undefined : { '--io-w': outputWidth + 'px' }"
       >
         <!-- Drag handle on Output's LEFT edge (sits in the gap toward Config). Extends
@@ -482,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-border-default hover:bg-accent h-full w-0.5 rounded-full transition-colors"
           />
         </div>
-        <div class="flex h-8 items-center gap-2 pl-2">
+        <div class="flex h-8 items-center gap-2 ps-2">
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
@@ -494,6 +604,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t(`workflow.test.stepResult.status.${outputStatus}`) }}
           </OBadge>
+          <div
+            v-if="outputCount > 1"
+            data-test="workflow-ndv-output-pager"
+            class="text-text-secondary ms-auto flex items-center gap-1 text-xs"
+          >
+            <span>{{
+              t("workflow.ndv.eventPager", { n: outputPage + 1, total: outputCount })
+            }}</span>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              data-test="workflow-ndv-output-prev"
+              :title="t('workflow.ndv.prevEvent')"
+              @click="stepOutput(-1)"
+            >
+              <OIcon name="chevron-left" size="xs" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-xs"
+              data-test="workflow-ndv-output-next"
+              :title="t('workflow.ndv.nextEvent')"
+              @click="stepOutput(1)"
+            >
+              <OIcon name="chevron-right" size="xs" />
+            </OButton>
+          </div>
         </div>
         <div
           class="border-border-default bg-code-bg rounded-default flex min-h-0 flex-1 flex-col overflow-hidden border"
@@ -519,6 +656,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
+          <!-- A filtering step's real verdict — forwarded counts must never read as success when 0-of-N. -->
+          <div
+            v-if="showOutcomeSummary"
+            data-test="workflow-ndv-output-outcome"
+            class="flex shrink-0 flex-col gap-1 p-2.5"
+            :class="{ 'border-border-default border-b': outputRecords }"
+          >
+            <div
+              v-if="outputNoMatch"
+              data-test="workflow-ndv-output-nomatch"
+              class="text-status-warning-text text-xs font-semibold"
+            >
+              {{ t("workflow.ndv.noMatchForwarded", { total: runInputTotal }, runInputTotal) }}
+            </div>
+            <div
+              v-else
+              data-test="workflow-ndv-output-forwarded-count"
+              class="text-text-secondary text-xs font-semibold"
+            >
+              {{
+                t(
+                  "workflow.ndv.forwardedCount",
+                  { out: forwardedTotal, total: runInputTotal },
+                  runInputTotal,
+                )
+              }}
+            </div>
+            <template v-if="isBranchNode">
+              <div
+                v-for="p in branchPaths"
+                :key="p.handle"
+                data-test="workflow-ndv-branch-path"
+                class="text-text-secondary flex items-center justify-between gap-2 text-xs"
+              >
+                <span class="truncate">{{ p.label }}</span>
+                <span class="font-semibold" :class="{ 'text-text-body': p.count > 0 }">{{
+                  p.count
+                }}</span>
+              </div>
+              <div
+                v-if="branchDroppedCount > 0"
+                data-test="workflow-ndv-branch-dropped"
+                class="text-status-warning-text text-xs"
+              >
+                {{
+                  t("workflow.ndv.branchDropped", { count: branchDroppedCount }, branchDroppedCount)
+                }}
+              </div>
+            </template>
+          </div>
+
           <template v-if="outputRecords">
             <div
               v-if="outputHasError"
@@ -526,11 +714,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("workflow.test.stepResult.forwardedHeading") }}
             </div>
-            <div class="min-h-0 flex-1 pl-2">
+            <div class="min-h-0 flex-1 ps-2">
               <CodeQueryEditor
                 editor-id="workflow-ndv-output-editor"
                 language="json"
-                :query="prettyRecords(outputRecords)"
+                :query="prettyRecords(shownOutput)"
                 :read-only="true"
                 :show-auto-complete="false"
               />
@@ -538,7 +726,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <div
-            v-else-if="!outputHasError"
+            v-else-if="!outputHasError && !outputNoMatch"
             class="text-text-secondary flex h-full items-center justify-center p-4 text-center text-sm italic"
           >
             {{ hasResult ? t("workflow.ndv.noOutput") : t("workflow.ndv.noRunYet") }}
@@ -595,10 +783,13 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
+import { branchPathCounts, forwardedRunCount, isNoMatchRun } from "./nodeRunOutcome";
 import WorkflowTrigger from "@/plugins/workflows/nodes/WorkflowTrigger.vue";
 import WorkflowCondition from "@/plugins/workflows/nodes/WorkflowCondition.vue";
+import WorkflowBranch from "@/plugins/workflows/nodes/WorkflowBranch.vue";
 import WorkflowFunction from "@/plugins/workflows/nodes/WorkflowFunction.vue";
 import WorkflowDestination from "@/plugins/workflows/nodes/WorkflowDestination.vue";
 import WorkflowConfigSummary from "@/plugins/workflows/nodes/WorkflowConfigSummary.vue";
@@ -606,6 +797,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useWorkflowCanvas, {
   workflowObj,
   nodeMeta,
+  nodeConfigDetail,
   triggerDef,
   nodeCustomName,
   nodeComment as readNodeComment,
@@ -617,7 +809,13 @@ import useWorkflowCanvas, {
   executeTestRun,
   currentTriggerKind,
   buildStepTree,
+  loadRunsHistory,
   loadWorkflowRun,
+  isRetryableRun,
+  retryWorkflowRun,
+  setNodeEditedInput,
+  getNodeEditedInput,
+  clearNodeEditedInput,
 } from "@/plugins/workflows/useWorkflowCanvas";
 
 const { t } = useI18nTyped();
@@ -664,6 +862,7 @@ const nodeName = computed(() => nodeCustomName(workflowObj.currentSelectedNodeDa
 const BODY_COMPONENTS: Record<string, any> = {
   workflow_trigger: WorkflowTrigger,
   condition: WorkflowCondition,
+  branch: WorkflowBranch,
   function: WorkflowFunction,
   destination: WorkflowDestination,
 };
@@ -702,6 +901,59 @@ const nodeId = computed(() => workflowObj.currentSelectedNodeData?.id || "");
 const historyRunId = computed<string>(() =>
   workflowObj.testRun.result?.mode === "history" ? workflowObj.testRun.result.runId || "" : "",
 );
+// The loaded run's history row — only it carries event_type, which decides
+// whether the backend kept the input this replay needs.
+const loadedRunRow = computed(() =>
+  historyRunId.value
+    ? (workflowObj.runsHistory?.list || []).find((r: any) => r.run_id === historyRunId.value) ||
+      null
+    : null,
+);
+// Deep-linking into a run never populates the list, so the chip would name the run
+// "—" and the switcher would open empty until the Runs page had been visited.
+watch(
+  [historyRunId, () => workflowObj.runsHistory?.list?.length],
+  ([runId, count]) => {
+    const id = workflowObj.currentSelectedWorkflow?.id;
+    if (!runId || count || !id || workflowObj.runsHistory?.loading) return;
+    const nowUs = Date.now() * 1000;
+    const { start, end } = workflowObj.runsHistory.params || ({} as any);
+    loadRunsHistory({
+      orgId: store.state.selectedOrganization.identifier,
+      workflowId: id,
+      start: start || nowUs - 10 * 365 * 24 * 60 * 60 * 1_000_000,
+      end: end || nowUs,
+    });
+  },
+  { immediate: true },
+);
+const canRetryFromHere = computed(
+  () => canvasReadOnly.value && !!historyRunId.value && isRetryableRun(loadedRunRow.value),
+);
+
+const retryingFromHere = ref(false);
+const retryFromHere = async () => {
+  const workflowId = workflowObj.currentSelectedWorkflow?.id;
+  if (!workflowId || !nodeId.value || retryingFromHere.value) return;
+  retryingFromHere.value = true;
+  const r = await retryWorkflowRun({
+    orgId: store.state.selectedOrganization.identifier,
+    workflowId,
+    runId: historyRunId.value,
+    fromNode: nodeId.value,
+    run: loadedRunRow.value,
+  });
+  retryingFromHere.value = false;
+  if (!r.ok) {
+    toast({
+      message: raw(r.error || t("workflow.history.retryError")),
+      variant: "error",
+    });
+    return;
+  }
+  toast({ message: t("workflow.history.retryStarted"), variant: "success" });
+};
+
 const editThisStep = () => {
   const workflowId = workflowObj.currentSelectedWorkflow?.id;
   if (!workflowId || !nodeId.value) return;
@@ -748,7 +1000,22 @@ const nodeInRun = computed(() => {
 });
 // This node wasn't part of the loaded run — show a plain notice in place of the panes
 // (which would otherwise fall back to the trigger SAMPLE and look like real data).
-const nodeMissingFromRun = computed(() => !!historyRunId.value && !nodeInRun.value);
+// A loaded run that keyed NO node at all stored nothing (it predates per-node
+// persistence, or the retention sweep removed it) — the graph is fine, so claiming
+// the step is absent from the run would state something false about it.
+const runStoredNoData = computed(() => {
+  if (!historyRunId.value) return false;
+  const r: any = workflowObj.testRun.result;
+  if (!r) return false;
+  return (
+    Object.keys(r.inputs || {}).length === 0 &&
+    Object.keys(r.outputs || {}).length === 0 &&
+    Object.keys(r.errors || {}).length === 0
+  );
+});
+const nodeMissingFromRun = computed(
+  () => !!historyRunId.value && !nodeInRun.value && !runStoredNoData.value,
+);
 // Read-only TRIGGER: its Config summary is just the kind (nothing to configure), which
 // leaves a big empty pane. Drop Config and let the event (Output) fill the width. Only
 // in read-only — the editor's trigger body IS a useful payload reference.
@@ -758,6 +1025,9 @@ const isReadonlyTrigger = computed(() => canvasReadOnly.value && readonlyBody.va
 // drawer), so the prev/next walk stays in NDV format the whole way.
 const hasResult = computed(() => !!workflowObj.testRun.result);
 const prettyRecords = (recs: any) => (recs == null ? "" : JSON.stringify(recs, null, 2));
+// A batch of one is the common case (a trigger fires a single event); showing its
+// `[ ... ]` wrapper reads as a list and indents every field a level deeper.
+const unwrapLone = (recs: any[]) => (recs.length === 1 ? recs[0] : recs);
 
 // Input = the UPSTREAM SOURCES list. The graph is a single-incoming tree, so a node's
 // ancestry is a linear back-walk: immediate parent first (its output IS this node's
@@ -783,7 +1053,11 @@ const sourceChain = computed<SourceRow[]>(() => {
     if (!edge) break;
     const parent = byId(edge.source);
     if (!parent) break;
-    chain.push({ node: parent, records: nodeTestInput(childId) });
+    // The child's recorded input (a full run) OR — when the child never ran but its
+    // parent did (e.g. a single-node Run Step) — the parent's recorded output, so a
+    // step's result flows straight into the next node's Input. `??` keeps a real empty
+    // input (child ran, 0 records reached it) from falling back to the parent's output.
+    chain.push({ node: parent, records: nodeTestInput(childId) ?? nodeTestOutput(parent.id) });
     childId = parent.id;
   }
   // No upstream: the trigger's own input IS the event payload, so show it as a single
@@ -851,30 +1125,62 @@ const inputEmptyMessage = computed<I18nText>(() =>
 // → else an empty array. Read-only history shows the recorded input / empty state,
 // so its seed is never displayed.
 const editableInput = ref("");
+// Unwraps like the seed does: a payload stored as `[event]` before the unwrap existed
+// would otherwise replay with its array wrapper for anyone with a saved edit.
+const reprettyJson = (text: string): string => {
+  try {
+    const v = JSON.parse(text);
+    return prettyRecords(Array.isArray(v) ? unwrapLone(v) : v);
+  } catch {
+    return text;
+  }
+};
 const seedEditableInput = () => {
   if (immediateRecords.value.length) {
-    editableInput.value = prettyRecords(immediateRecords.value);
+    editableInput.value = prettyRecords(unwrapLone(immediateRecords.value));
     return;
   }
   editableInput.value =
     !canvasReadOnly.value && defaultTriggerSample.value.length
-      ? prettyRecords(defaultTriggerSample.value)
+      ? prettyRecords(unwrapLone(defaultTriggerSample.value))
       : "[]";
 };
-watch([nodeId, () => workflowObj.testRun.result], seedEditableInput, { immediate: true });
-// Parsed edited input: an array of records, or null when the JSON is invalid (blank
-// counts as an empty array — a valid "no input" run).
+// A hand-edited payload belongs to the NODE, so the stored edit wins over the seed.
+const applyEditableInput = () => {
+  const saved = getNodeEditedInput(nodeId.value);
+  if (saved !== undefined) {
+    // Re-pretty-print so a restored edit reads like the seeded sample.
+    editableInput.value = reprettyJson(saved);
+    return;
+  }
+  seedEditableInput();
+};
+watch([nodeId, () => workflowObj.testRun.result], applyEditableInput, { immediate: true });
+const onEditInput = (text: string) => {
+  editableInput.value = text;
+  setNodeEditedInput(nodeId.value, text);
+};
+const resetEditableInput = () => {
+  clearNodeEditedInput(nodeId.value);
+  seedEditableInput();
+};
+// Null when the JSON is invalid; blank is an empty array, a valid "no input" run.
+// A trigger delivers ONE event, so a bare object is the natural payload — it is
+// re-wrapped here because the backend contract stays `inputs: [...]`.
 const parsedInput = computed<any[] | null>(() => {
   const text = editableInput.value.trim();
   if (!text) return [];
   try {
     const v = JSON.parse(text);
-    return Array.isArray(v) ? v : null;
+    if (Array.isArray(v)) return v;
+    return v && typeof v === "object" ? [v] : null;
   } catch {
     return null;
   }
 });
-const inputInvalid = computed(() => parsedInput.value === null);
+// Read-only runs display a recorded record, not something being entered, so the
+// editable-array validator has nothing to say about them.
+const inputInvalid = computed(() => !canvasReadOnly.value && parsedInput.value === null);
 
 const outputRecords = computed<any[] | null>(() => {
   // The node's OUTPUT is reported directly by the backend `outputs` map.
@@ -887,6 +1193,35 @@ const outputRecords = computed<any[] | null>(() => {
   return null;
 });
 
+// Dumping the whole batch array is what makes authors reach for `row[0]`.
+const outputPage = ref(0);
+const inputPage = ref(0);
+watch([nodeId, () => workflowObj.testRun.result], () => {
+  outputPage.value = 0;
+  inputPage.value = 0;
+});
+const pageOf = (recs: any[] | null, page: number) =>
+  recs && recs.length ? recs[Math.min(page, recs.length - 1)] : recs;
+const outputCount = computed(() => outputRecords.value?.length ?? 0);
+const shownOutput = computed(() => pageOf(outputRecords.value, outputPage.value));
+const stepOutput = (delta: number) => {
+  // The count is reactive and can drop to 0 under a stale page, and `% 0` is NaN.
+  if (outputCount.value < 2) return;
+  outputPage.value = (outputPage.value + delta + outputCount.value) % outputCount.value;
+};
+// The EDITABLE input must stay a full array — parsedInput rejects a non-array, disabling Run Step.
+const inputPaged = computed(() => canvasReadOnly.value);
+const inputCount = computed(() => (inputPaged.value ? immediateRecords.value.length : 0));
+const shownInput = computed<string>(() =>
+  inputPaged.value && inputCount.value
+    ? prettyRecords(pageOf(immediateRecords.value, inputPage.value))
+    : editableInput.value,
+);
+const stepInput = (delta: number) => {
+  if (inputCount.value < 2) return;
+  inputPage.value = (inputPage.value + delta + inputCount.value) % inputCount.value;
+};
+
 // Run error for THIS node (e.g. a Function that threw). The node can still pass its
 // input downstream, so Output shows the error AND the forwarded records — same source
 // and framing as the results dock / canvas badge.
@@ -896,26 +1231,63 @@ const outputErrorMessages = computed<string[]>(() => {
   return entries.map((e: any) => (Array.isArray(e) ? String(e[0]) : String(e)));
 });
 const outputHasError = computed(() => outputErrorMessages.value.length > 0);
-const outputStatus = computed<"ok" | "error" | "skipped">(() => {
+
+// "Executed clean" and "matched something" are different claims — a green Passed on 0-of-N hides a dead workflow.
+const runEdges = () => workflowObj.currentSelectedWorkflow?.edges || [];
+const isBranchNode = computed(
+  () => workflowObj.currentSelectedNodeData?.data?.node_type === "branch",
+);
+const isFilteringNode = computed(
+  () => isBranchNode.value || workflowObj.currentSelectedNodeData?.data?.node_type === "condition",
+);
+const runInputTotal = computed(() => nodeTestInput(nodeId.value)?.length ?? 0);
+const forwardedTotal = computed(() =>
+  forwardedRunCount(workflowObj.currentSelectedNodeData, workflowObj.testRun.result, runEdges()),
+);
+const outputNoMatch = computed(() =>
+  isNoMatchRun(workflowObj.currentSelectedNodeData, workflowObj.testRun.result, runEdges()),
+);
+const branchPaths = computed(() =>
+  isBranchNode.value
+    ? branchPathCounts(
+        workflowObj.currentSelectedNodeData,
+        runEdges(),
+        workflowObj.testRun.result?.inputs,
+        t,
+      )
+    : [],
+);
+const branchDroppedCount = computed(() => Math.max(0, runInputTotal.value - forwardedTotal.value));
+const showOutcomeSummary = computed(
+  () =>
+    hasResult.value && isFilteringNode.value && runInputTotal.value > 0 && !outputHasError.value,
+);
+
+const outputStatus = computed<"ok" | "error" | "skipped" | "noMatch">(() => {
   const r = workflowObj.testRun.result;
   if (!r) return "ok";
   if (r.errors?.[nodeId.value]) return "error";
+  if (outputNoMatch.value) return "noMatch";
   if (r.inputs) return r.inputs[nodeId.value]?.length ? "ok" : "skipped";
   if (r.blockedNodeIds?.includes(nodeId.value)) return "skipped";
   return "ok";
 });
-const outputStatusVariant = computed<"error-soft" | "success-soft" | "default-soft">(() =>
+const outputStatusVariant = computed<
+  "error-soft" | "success-soft" | "warning-soft" | "default-soft"
+>(() =>
   outputStatus.value === "error"
     ? "error-soft"
-    : outputStatus.value === "ok"
-      ? "success-soft"
-      : "default-soft",
+    : outputStatus.value === "noMatch"
+      ? "warning-soft"
+      : outputStatus.value === "ok"
+        ? "success-soft"
+        : "default-soft",
 );
 
 // The node types that open the NDV, each showing the full Input · Config · Output
 // panes. Used only to skip the fallback body padding — an unknown/coming-soon node
 // type falls back to the placeholder body and keeps its p-4.
-const IO_NODE_TYPES = ["workflow_trigger", "condition", "function", "destination"];
+const IO_NODE_TYPES = ["workflow_trigger", "condition", "branch", "function", "destination"];
 const isIoNode = computed(() => IO_NODE_TYPES.includes(workflowObj.dialog.name));
 
 // The I/O panes show except while the function's full-width inline editor owns the
@@ -937,17 +1309,24 @@ const containerWidth = computed(() => NDV_WIDTH);
 // config first (there's no Save button — navigating is a commit point, same as closing)
 // then opens the neighbor's Input · Config · Output; the body remounts on the id change
 // (`:key`), loading the neighbor's config.
-const nodeDisplay = (node: any): { label: string; icon: string } => {
+const nodeDisplay = (node: any): { label: string; icon: string; detail: string } => {
   const type = node?.data?.node_type;
   const m = nodeMeta(type);
+  const custom = nodeCustomName(node);
   const label =
-    nodeCustomName(node) ||
+    custom ||
     (type === "workflow_trigger"
       ? t(triggerDef(node?.data?.trigger_kind).nodeTitleKey)
       : m
         ? t(m.titleKey)
         : type || "");
-  return { label, icon: m?.image ? `img:${m.image}` : m?.icon || "help" };
+  // A Branch's arms are all "Destination"; the configured detail is the only thing
+  // that tells them apart — the same disambiguator the canvas card already shows.
+  return {
+    label,
+    detail: custom ? "" : nodeConfigDetail(node?.data, 24),
+    icon: m?.image ? `img:${m.image}` : m?.icon || "help",
+  };
 };
 // Steps TREE (left rail of the panel) — the workflow's nodes as a top-down tree
 // (traces-waterfall guides), the same navigator the results dock had. Built with
@@ -955,10 +1334,12 @@ const nodeDisplay = (node: any): { label: string; icon: string } => {
 // tree, not just the executed steps). Clicking one walks the panel to that node
 // (navigateTo → editNode); the dot/ring mirrors the canvas ✓/✗ for the last run
 // (null = didn't run / no run).
-const stepStatusFor = (id: string): "ok" | "error" | "skipped" | null => {
+const stepStatusFor = (id: string): "ok" | "error" | "skipped" | "noMatch" | null => {
   const r = workflowObj.testRun.result;
   if (!r || !r.ranNodeIds?.includes(id)) return null;
   if (r.errors?.[id]) return "error";
+  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === id);
+  if (isNoMatchRun(node, r, runEdges())) return "noMatch";
   if (r.inputs) return r.inputs[id]?.length ? "ok" : "skipped";
   if (r.blockedNodeIds?.includes(id)) return "skipped";
   return "ok";
@@ -968,16 +1349,20 @@ const stepDotClass = (status: string | null): string =>
     ? "bg-status-negative"
     : status === "ok"
       ? "bg-status-positive"
-      : status === "skipped"
-        ? "bg-badge-default-solid-bg"
-        : "bg-border-strong";
+      : status === "noMatch"
+        ? "bg-status-warning-text"
+        : status === "skipped"
+          ? "bg-badge-default-solid-bg"
+          : "bg-border-strong";
 // Circle badge (child count) ring + text colour, keyed to the step's run status.
 const stepRingClass = (status: string | null): string =>
   status === "error"
     ? "border-status-negative text-status-negative"
     : status === "ok"
       ? "border-status-positive text-status-positive"
-      : "border-border-strong text-text-secondary";
+      : status === "noMatch"
+        ? "border-status-warning-text text-status-warning-text"
+        : "border-border-strong text-text-secondary";
 const stepTree = computed(() => {
   const wf = workflowObj.currentSelectedWorkflow;
   const nodes = wf.nodes || [];
@@ -988,6 +1373,7 @@ const stepTree = computed(() => {
     return {
       id: s.id,
       label: d.label,
+      detail: d.detail,
       icon: d.icon,
       status: stepStatusFor(s.id),
       depth: s.depth,
@@ -1003,7 +1389,7 @@ const stepTree = computed(() => {
   for (const r of rows) {
     ancestors.length = r.depth;
     r.breadcrumb = ancestors.join(" › ");
-    ancestors[r.depth] = r.label;
+    ancestors[r.depth] = r.detail ? `${r.label} · ${r.detail}` : r.label;
   }
   return rows;
 });
@@ -1062,9 +1448,9 @@ const nextStepId = computed(() => nextStep.value?.id || "");
 // Output's left edge; Config (flex-1) absorbs the change. Widths are px, clamped;
 // applied via a CSS var so no literal px lands in a class.
 const IO_MIN = 160;
-const IO_MAX = 640;
-const inputWidth = ref(260);
-const outputWidth = ref(260);
+const IO_MAX = 720;
+const inputWidth = ref(340);
+const outputWidth = ref(340);
 const clampIo = (w: number) => Math.min(IO_MAX, Math.max(IO_MIN, w));
 let resizing: "input" | "output" | null = null;
 let resizeStartX = 0;
@@ -1116,6 +1502,8 @@ const executeStep = async () => {
     inputs: Array.isArray(input) ? input : [],
     fromNode: id,
     singleNode: true,
+    // Honour the Test drawer's choice: a Run Step on a Destination is a real dispatch too.
+    suppressDestinations: workflowObj.testRun.suppressDestinations !== false,
   });
   executing.value = false;
   if (!r.ok) toast({ message: raw(r.error || t("workflow.test.runError")), variant: "error" });

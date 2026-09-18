@@ -16,7 +16,10 @@
       @submit="saveOrgSettings"
       v-slot="{ isSubmitting }"
     >
-      <div data-test="add-role-rolename-input-btn" class="trace-id-field-name o2-input mb-2 w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="trace-id-field-name o2-input mb-2 w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-trace-id-input"
           name="traceIdFieldName"
@@ -27,7 +30,10 @@
         />
       </div>
 
-      <div data-test="add-role-rolename-input-btn" class="span-id-field-name o2-input w-100">
+      <div
+        data-test="add-role-rolename-input-btn"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
+      >
         <OFormInput
           data-test="settings-org-span-id-input"
           name="spanIdFieldName"
@@ -41,7 +47,7 @@
       <div
         v-if="config.isCloud !== 'true'"
         data-test="add-toggle-ingestion"
-        class="span-id-field-name o2-input w-100"
+        class="span-id-field-name o2-input w-100 max-md:w-full"
       >
         <OFormSwitch
           data-test="add-toggle-ingestion-btn"
@@ -94,7 +100,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
-import organizations from "@/services/organizations";
+import { updateOrgSettingsMutation } from "@/services/organizations.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { useStore } from "vuex";
 import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -112,6 +120,8 @@ import {
 const { t } = useI18nTyped();
 
 const store = useStore();
+const orgId = useOrgId();
+const updateOrgSettings = useMutation(() => updateOrgSettingsMutation(orgId.value));
 
 // Schema-driven validation replaces the hand-rolled validate()/error refs.
 const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
@@ -155,10 +165,7 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
       usage_stream_enabled: value.usageStreamEnabled,
     };
 
-    await organizations.post_organization_settings(
-      store.state.selectedOrganization.identifier,
-      payload,
-    );
+    await updateOrgSettings.mutateAsync(payload);
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,

@@ -27,6 +27,8 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+#[cfg(feature = "enterprise")]
+mod agent_signals;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -41,6 +43,7 @@ pub(crate) mod files;
 mod flatten_compactor;
 #[cfg(feature = "enterprise")]
 mod incidents;
+mod leader;
 #[cfg(feature = "enterprise")]
 mod llm_experiment_cleanup;
 #[cfg(feature = "enterprise")]
@@ -53,6 +56,8 @@ mod llm_review_reconciliation;
 mod llm_secret_cleanup;
 pub mod metrics;
 mod mmdb_downloader;
+#[cfg(feature = "enterprise")]
+mod oncall_maintenance;
 #[cfg(feature = "enterprise")]
 mod org_storage;
 #[cfg(feature = "enterprise")]
@@ -69,6 +74,15 @@ mod stats;
 
 use enrichment_data::enrichment_table::geoip::wait_for_initialization;
 use openobserve_core::org_cleanup::StreamDataCleanup;
+
+/// The anomaly claim supervisor's per-tick verdict, pure so the handover rules are testable.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+#[derive(Debug, PartialEq, Eq)]
+enum AnomalyClaimTransition {
+    Start,
+    Stop,
+    Hold,
+}
 
 struct CompactionStreamDataCleanup;
 
@@ -320,10 +334,9 @@ pub async fn get_nats_lock(key: String) -> Result<String, anyhow::Error> {
 #[cfg(feature = "cloud")]
 fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks> {
     Some(openobserve_synthetics::pool::StepPoolHooks {
-        try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
-        refund: openobserve_core::trial_quota::synthetics_steps_refund,
-        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
-        dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
+        remaining_for_orgs: |org_ids| {
+            Box::pin(openobserve_core::trial_quota::synthetics_remaining_for_orgs(org_ids))
+        },
     })
 }
 
@@ -413,6 +426,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(db::user::watch());
     tokio::task::spawn(db::org_users::watch());
     tokio::task::spawn(db::org_ingestion_tokens::watch());
+    tokio::task::spawn(db::org_ingestion_tokens::run_splunk_token_reload());
     tokio::task::spawn(db::organization::watch());
     tokio::task::spawn(db::org_status::watch());
     if let Err(e) = db::org_status::load_from_db().await {
@@ -547,6 +561,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // every node, so every node must hear invalidations — including routers,
     // which serve the probe auth path.
     tokio::task::spawn(infra::coordinator::synthetics::watch());
+    // Every node watches: API nodes serve the screens an admin reloads after editing a rotation.
+    #[cfg(feature = "enterprise")]
+    if get_o2_config().oncall.enabled {
+        tokio::task::spawn(infra::coordinator::oncall::watch(|tag, expires_at| {
+            // An ack token is single-use, and single-use on one node only is not single-use.
+            o2_enterprise::enterprise::oncall::token::mark_spent(tag, expires_at);
+        }));
+    }
     // org_settings_watch already started above for all nodes including routers
     // Watch needed on queriers (UI APIs) and on whichever node role is the configured
     // processing node (ingester or compactor) so their local cache stays in sync with
@@ -699,6 +721,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(compactor::run());
     tokio::task::spawn(flatten_compactor::run());
     #[cfg(feature = "enterprise")]
+    tokio::task::spawn(agent_signals::run());
+    #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are
     // enterprise-only, but this rollup works on ordinary database spans and is
@@ -711,6 +735,17 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // so callbacks must be available everywhere before consumers start.
     #[cfg(feature = "enterprise")]
     {
+        o2_enterprise::enterprise::llm_evaluations::llm_scores_search::register_schema_initializer(
+            |org_id| {
+                Box::pin(async move {
+                    openobserve_core::self_reporting::llm_scores_schema::ensure_llm_scores_stream_initialized(
+                        &org_id,
+                    )
+                    .await
+                })
+            },
+        );
+
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_score_writer(
             |org_id, records| {
                 Box::pin(async move {
@@ -744,7 +779,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::register_execution_record_writer(
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::register_execution_record_writer(
             |org_id, records| {
                 Box::pin(async move {
                     openobserve_core::self_reporting::llm_experiment_schema::ensure_llm_experiment_stream_initialized(&org_id)
@@ -929,12 +964,12 @@ pub async fn init() -> Result<(), anyhow::Error> {
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::register_experiment_task_runner(
             |pointer| {
                 Box::pin(async move {
-                    o2_enterprise::enterprise::llm_evaluations::experiment_runner::run_scorer_task(pointer).await
+                    o2_enterprise::enterprise::llm_evaluations::experiments::runner::run_scorer_task(pointer).await
                 })
             },
         );
 
-        o2_enterprise::enterprise::llm_evaluations::provider::register_provider_cost_calculator(
+        o2_enterprise::enterprise::llm_evaluations::providers::register_provider_cost_calculator(
             |org_id, model, input_tokens, output_tokens, timestamp| {
                 let entries = db::model_pricing::get_org_pricing_entries(org_id);
                 let definition =
@@ -956,7 +991,7 @@ pub async fn init() -> Result<(), anyhow::Error> {
 
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::async_executor::start_eval_task_consumers();
         o2_enterprise::enterprise::llm_evaluations::eval_jobs::scheduler::start_eval_scheduler();
-        o2_enterprise::enterprise::llm_evaluations::experiment_runner::start();
+        o2_enterprise::enterprise::llm_evaluations::experiments::runner::start();
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_query_executor(
             |org_id, sql, start, end, cfg_id, stream_type| {
@@ -984,30 +1019,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
 
         o2_enterprise::enterprise::anomaly_detection::query_executor::register_alert_sender(
-            |org_id,
-             dest_id,
-             cfg_name,
-             cfg_id,
-             anomaly_count,
-             stream_name,
-             max_deviation_percent,
-             worst_actual_value,
-             window_start_us,
-             window_end_us| {
+            |dest_id, context| {
                 Box::pin(async move {
-                    openobserve_core::anomaly_detection::send_anomaly_alert(
-                        org_id,
-                        dest_id,
-                        cfg_name,
-                        cfg_id,
-                        anomaly_count,
-                        stream_name,
-                        max_deviation_percent,
-                        worst_actual_value,
-                        window_start_us,
-                        window_end_us,
-                    )
-                    .await
+                    openobserve_core::anomaly_detection::send_anomaly_alert(dest_id, context).await
                 })
             },
         );
@@ -1066,23 +1080,14 @@ pub async fn init() -> Result<(), anyhow::Error> {
         );
     }
 
-    // The scheduler and startup recovery only run on scheduler nodes.
-    // Skip entirely when anomaly detection is disabled — no training and no detection.
+    // Supervised per tick, not started here: init runs before the job-cluster election resolves.
     #[cfg(feature = "enterprise")]
     if LOCAL_NODE.is_scheduler()
         && !o2_enterprise::enterprise::common::config::get_config()
             .anomaly_detection
             .disabled
     {
-        // Ensure every enabled anomaly config has a live detection trigger after restart.
-        // Handles: trigger row missing, or stuck in Processing from a previous crash.
-        openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
-
-        if let Err(e) =
-            o2_enterprise::enterprise::anomaly_detection::scheduler::start_scheduler().await
-        {
-            log::error!("Failed to start anomaly detection scheduler: {e}");
-        }
+        tokio::task::spawn(anomaly_claim_supervisor());
     }
     if LOCAL_NODE.is_scheduler() {
         // Ungated: synthetics is OSS, and without this an OSS build accepts a
@@ -1231,6 +1236,9 @@ pub async fn init() -> Result<(), anyhow::Error> {
     // climbs past what its window can hold. Also releases expired budget
     // residuals (S-14c).
     slo_maintenance::run();
+    // Nothing else notices a lost escalation timer: the thing that would have is the timer.
+    #[cfg(feature = "enterprise")]
+    oncall_maintenance::run();
     // `_llm_scores` is authoritative for Workbench reviews. Repair the narrow
     // failure window where ingestion succeeded but QueueItem status did not.
     #[cfg(feature = "enterprise")]
@@ -1330,6 +1338,84 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/// Follows the `scheduler::run` election, never holds one; a failed read fails CLOSED.
+#[cfg(feature = "enterprise")]
+async fn anomaly_holds_job_cluster_claim() -> bool {
+    use o2_enterprise::enterprise::super_cluster::kv;
+
+    if !get_o2_config().super_cluster.enabled {
+        return true;
+    }
+
+    let claim = match kv::scheduler::get_job_cluster().await {
+        Ok(name) => name,
+        Err(e) => {
+            log::error!("[ANOMALY] could not read the job cluster, not running here: {e}");
+            return false;
+        }
+    };
+    let local = config::get_cluster_name();
+    if claim.is_empty() {
+        log::debug!("[ANOMALY] no cluster holds the job-cluster claim yet — not running here");
+        return false;
+    }
+    if claim == local {
+        return true;
+    }
+
+    let live = match kv::cluster::list_by_role_group(None).await {
+        Ok(clusters) => clusters.into_iter().map(|c| c.name).collect::<Vec<_>>(),
+        Err(e) => {
+            log::error!("[ANOMALY] could not list clusters, not running here: {e}");
+            return false;
+        }
+    };
+    // A departed claimant leaves a TTL-less key behind; deferring to it forever would
+    // mean no region ever trains again.
+    let held_elsewhere = kv::scheduler::claim_is_held_elsewhere(&claim, &local, &live);
+    if held_elsewhere {
+        log::debug!("[ANOMALY] job cluster is {claim} — anomaly detection not running here");
+    }
+    !held_elsewhere
+}
+
+/// Re-checks the claim every tick so ownership arrives or leaves without a restart.
+#[cfg(feature = "enterprise")]
+async fn anomaly_claim_supervisor() {
+    use o2_enterprise::enterprise::anomaly_detection::scheduler;
+
+    let mut ticker = tokio::time::interval(std::time::Duration::from_secs(60));
+    loop {
+        ticker.tick().await;
+        let holds_claim = anomaly_holds_job_cluster_claim().await;
+        match anomaly_claim_transition(holds_claim, scheduler::is_running().await) {
+            AnomalyClaimTransition::Start => {
+                // Idempotent: re-creates missing detection triggers on every ownership gain.
+                openobserve_core::anomaly_detection::recover_detection_triggers_on_startup().await;
+                if let Err(e) = scheduler::start_scheduler().await {
+                    log::error!("Failed to start anomaly detection scheduler: {e}");
+                }
+            }
+            AnomalyClaimTransition::Stop => {
+                if let Err(e) = scheduler::stop_scheduler().await {
+                    log::error!("Failed to stop anomaly detection scheduler: {e}");
+                }
+            }
+            AnomalyClaimTransition::Hold => {}
+        }
+    }
+}
+
+/// Fail-closed handover rule: run exactly while the claim is provably held here.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn anomaly_claim_transition(holds_claim: bool, running: bool) -> AnomalyClaimTransition {
+    match (holds_claim, running) {
+        (true, false) => AnomalyClaimTransition::Start,
+        (false, true) => AnomalyClaimTransition::Stop,
+        _ => AnomalyClaimTransition::Hold,
+    }
+}
+
 /// Additional jobs that init processes should be deferred until the gRPC service
 /// starts in the main thread
 pub async fn init_deferred() -> Result<(), anyhow::Error> {
@@ -1372,32 +1458,35 @@ pub async fn init_deferred() -> Result<(), anyhow::Error> {
 
 #[cfg(test)]
 mod tests {
-    /// **SPEC §6, item 2.3.** Losing the pool argument is silent: `init` still
-    /// starts every worker, every check still runs, and the pool is simply never
-    /// consulted — an unmetered, ungated fleet with no error anywhere (§11 F6).
-    /// The needles are assembled at runtime so this test's own source does not
-    /// count towards the totals it asserts.
+    use super::{AnomalyClaimTransition, anomaly_claim_transition};
+
+    /// A claim resolving after init grants scheduling on the next tick, with no restart.
     #[test]
-    fn the_synthetics_scheduler_is_handed_the_step_pool() {
-        let source = include_str!("mod.rs");
+    fn a_claim_appearing_later_starts_scheduling_without_reinit() {
         assert_eq!(
-            source
-                .matches(&["openobserve_synthetics::init(synthetics_step", "_pool())"].concat())
-                .count(),
-            1,
-            "`init` must be handed the pool; passing `None` unconditionally is an unmetered fleet"
+            anomaly_claim_transition(true, false),
+            AnomalyClaimTransition::Start
         );
-        for hook in [
-            "synthetics_steps_try_deduct",
-            "synthetics_steps_refund",
-            "synthetics_steps_remaining",
-            "synthetics_steps_dead_letter_refund",
-        ] {
-            assert_eq!(
-                source.matches(&["trial_quota::", hook].concat()).count(),
-                1,
-                "the `cloud` build must wire {hook} into the scheduler\'s pool hooks"
-            );
-        }
+    }
+
+    /// A migrated (or unreadable) claim stands the former owner down within one tick.
+    #[test]
+    fn a_claim_moving_away_stops_scheduling_within_one_tick() {
+        assert_eq!(
+            anomaly_claim_transition(false, true),
+            AnomalyClaimTransition::Stop
+        );
+    }
+
+    #[test]
+    fn steady_states_hold() {
+        assert_eq!(
+            anomaly_claim_transition(true, true),
+            AnomalyClaimTransition::Hold
+        );
+        assert_eq!(
+            anomaly_claim_transition(false, false),
+            AnomalyClaimTransition::Hold
+        );
     }
 }

@@ -107,10 +107,11 @@ impl PartialEq for DataField {
     }
 }
 
-pub const ALL_STREAM_TYPES: [StreamType; 8] = [
+pub const ALL_STREAM_TYPES: [StreamType; 9] = [
     StreamType::Logs,
     StreamType::Metrics,
     StreamType::Traces,
+    StreamType::Profiles,
     StreamType::ServiceGraph,
     StreamType::EnrichmentTables,
     StreamType::Filelist,
@@ -125,6 +126,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     #[serde(rename = "service_graph")]
     ServiceGraph,
     #[serde(rename = "enrichment_tables")]
@@ -155,6 +157,7 @@ impl StreamType {
             StreamType::Logs => "logs",
             StreamType::Metrics => "metrics",
             StreamType::Traces => "traces",
+            StreamType::Profiles => "profiles",
             StreamType::ServiceGraph => "service_graph",
             StreamType::EnrichmentTables => "enrichment_tables",
             StreamType::Filelist => "file_list",
@@ -170,6 +173,7 @@ impl From<&str> for StreamType {
             "logs" => StreamType::Logs,
             "metrics" => StreamType::Metrics,
             "traces" => StreamType::Traces,
+            "profiles" => StreamType::Profiles,
             "service_graph" => StreamType::ServiceGraph,
             "enrichment_tables" | "enrich" => StreamType::EnrichmentTables,
             "file_list" => StreamType::Filelist,
@@ -192,6 +196,7 @@ impl std::fmt::Display for StreamType {
             StreamType::Logs => write!(f, "logs"),
             StreamType::Metrics => write!(f, "metrics"),
             StreamType::Traces => write!(f, "traces"),
+            StreamType::Profiles => write!(f, "profiles"),
             StreamType::ServiceGraph => write!(f, "service_graph"),
             StreamType::EnrichmentTables => write!(f, "enrichment_tables"),
             StreamType::Filelist => write!(f, "file_list"),
@@ -1767,6 +1772,7 @@ mod tests {
         assert!(StreamType::Logs.support_index());
         assert!(StreamType::Metrics.support_index());
         assert!(StreamType::Traces.support_index());
+        assert!(!StreamType::Profiles.support_index());
         assert!(StreamType::Metadata.support_index());
         assert!(!StreamType::EnrichmentTables.support_index());
         assert!(!StreamType::Filelist.support_index());
@@ -1780,6 +1786,7 @@ mod tests {
         assert!(StreamType::Metrics.support_uds());
         assert!(StreamType::Traces.support_uds());
         assert!(!StreamType::EnrichmentTables.support_uds());
+        assert!(!StreamType::Profiles.support_uds());
         assert!(!StreamType::Filelist.support_uds());
         assert!(!StreamType::Metadata.support_uds());
         assert!(!StreamType::Index.support_uds());
@@ -1791,6 +1798,7 @@ mod tests {
         assert_eq!(StreamType::Logs.as_str(), "logs");
         assert_eq!(StreamType::Metrics.as_str(), "metrics");
         assert_eq!(StreamType::Traces.as_str(), "traces");
+        assert_eq!(StreamType::Profiles.as_str(), "profiles");
         assert_eq!(StreamType::ServiceGraph.as_str(), "service_graph");
         assert_eq!(StreamType::EnrichmentTables.as_str(), "enrichment_tables");
         assert_eq!(StreamType::Filelist.as_str(), "file_list");

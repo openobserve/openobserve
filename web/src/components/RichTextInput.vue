@@ -50,8 +50,18 @@
 </template>
 
 <script lang="ts">
+import DOMPurify from "dompurify";
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { computed, defineComponent, ref, onMounted, watch, nextTick, PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+  PropType,
+} from "vue";
 
 export interface ReferenceChip {
   id: string;
@@ -109,13 +119,24 @@ export default defineComponent({
     const detailCardContent = ref("");
     const cardPosition = ref({ top: 0, left: 0, below: false });
 
+    // Escape before embedding in HTML — mirrors anomalySummaryGenerator.ts's esc().
+    // JSON.stringify doesn't escape </>/&, so an unescaped token (e.g. a string value
+    // containing "<b>") would be parsed as markup by DOMPurify instead of shown as text.
+    const esc = (s: string) =>
+      String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+
     // Helper to format JSON with syntax highlighting
     const formatContent = (content: string): string => {
       try {
         const parsed = JSON.parse(content);
         const formatted = JSON.stringify(parsed, null, 2);
         // Apply syntax highlighting
-        return formatted.replace(
+        const highlighted = formatted.replace(
           /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
           (match) => {
             let cls = "json-number";
@@ -130,9 +151,14 @@ export default defineComponent({
             } else if (/null/.test(match)) {
               cls = "json-null";
             }
-            return `<span class="${cls}">${match}</span>`;
+            return `<span class="${cls}">${esc(match)}</span>`;
           },
         );
+        // matched tokens are already escaped above; DOMPurify stays as defense-in-depth
+        return DOMPurify.sanitize(highlighted, {
+          ALLOWED_TAGS: ["span"],
+          ALLOWED_ATTR: ["class"],
+        });
       } catch {
         // Not JSON, return plain text with line breaks preserved
         return content.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
@@ -600,6 +626,15 @@ export default defineComponent({
       },
     );
 
+    // Add global click handler to close detail card when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Close detail card if clicking outside of chip and card
+      if (!target.closest(".reference-chip") && !target.closest(".chip-detail-card")) {
+        showDetailCard.value = false;
+      }
+    };
+
     onMounted(() => {
       // Initialize empty state
       updateEmptyState();
@@ -608,21 +643,12 @@ export default defineComponent({
         setContent(props.modelValue);
       }
 
-      // Add global click handler to close detail card when clicking outside
-      const handleClickOutside = (event: MouseEvent) => {
-        const target = event.target as HTMLElement;
-        // Close detail card if clicking outside of chip and card
-        if (!target.closest(".reference-chip") && !target.closest(".chip-detail-card")) {
-          showDetailCard.value = false;
-        }
-      };
-
       document.addEventListener("click", handleClickOutside);
+    });
 
-      // Cleanup on unmount
-      return () => {
-        document.removeEventListener("click", handleClickOutside);
-      };
+    // Vue discards a value returned from onMounted, so removal must be its own hook.
+    onUnmounted(() => {
+      document.removeEventListener("click", handleClickOutside);
     });
 
     return {

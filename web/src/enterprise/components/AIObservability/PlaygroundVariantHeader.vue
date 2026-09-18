@@ -80,16 +80,12 @@
          property resolve by stylesheet order, so an unmarked background loses
          to it silently. -->
     <OButton
-      :variant="variant.responseSchema ? 'ghost-primary' : 'ghost-muted'"
+      :variant="schemaButton.variant"
       size="icon-xs"
       icon-left="data-object"
       class="shrink-0"
-      :class="variant.responseSchema ? 'bg-accent/12!' : ''"
-      :title="
-        variant.responseSchema
-          ? t('aiObservability.playground.schemaOn')
-          : t('aiObservability.playground.schema')
-      "
+      :class="schemaButton.tint"
+      :title="schemaButton.title"
       :data-test="`ai-playground-schema-btn-${variant.id}`"
       @click="schemaOpen = true"
     />
@@ -119,6 +115,18 @@
       :data-test="`ai-playground-variant-experiment-${label}`"
       @click="emit('create-experiment')"
     />
+    <!-- Scoped to this bench alone: the page-level Reset wipes every bench and
+         confirms first, because there is nothing left to recover from. This one
+         only throws away one column's own edits, so it stays a single click. -->
+    <OButton
+      variant="ghost-muted"
+      size="icon-xs"
+      class="shrink-0"
+      icon-left="refresh"
+      :title="t('aiObservability.playground.resetVariant')"
+      :data-test="`ai-playground-variant-reset-${label}`"
+      @click="emit('reset')"
+    />
     <OButton
       variant="ghost-muted"
       size="icon-xs"
@@ -133,6 +141,8 @@
     <PlaygroundSchemaDialog
       v-model:open="schemaOpen"
       :schema="variant.responseSchema"
+      :dropped="schemaDropped"
+      :approximated="schemaApproximated"
       @apply="(responseSchema) => patch({ responseSchema })"
     />
   </div>
@@ -152,6 +162,7 @@ import {
   type PlaygroundVariant,
 } from "@/enterprise/views/AIObservability/playgroundDraft";
 import type { Provider } from "@/services/online-evals.service";
+import { responseSchemaSupport } from "@/services/llm-playground.service";
 
 /** Provider id and model travel as one select value but stay two fields on the
  *  variant — the run request, the experiment handoff and the draft titles all
@@ -175,6 +186,7 @@ const props = withDefaults(
 const emit = defineEmits<{
   change: [variant: PlaygroundVariant];
   duplicate: [];
+  reset: [];
   remove: [];
   "create-experiment": [];
 }>();
@@ -235,9 +247,49 @@ const modelOptions = computed<SelectOption[]>(() => {
   return options;
 });
 
-const providerName = computed(
-  () => props.providers.find((candidate) => candidate.id === props.variant.providerId)?.name ?? "",
+const selectedProvider = computed(() =>
+  props.providers.find((candidate) => candidate.id === props.variant.providerId),
 );
+
+const providerName = computed(() => selectedProvider.value?.name ?? "");
+
+/** A provider unknown to the list (a draft from another org) counts as native, or every unresolved provider would cry wolf. */
+const schemaSupport = computed(() => {
+  const provider = selectedProvider.value;
+  return responseSchemaSupport(provider?.providerType ?? provider?.provider_type);
+});
+const schemaDropped = computed(() => schemaSupport.value === "dropped");
+const schemaApproximated = computed(() => schemaSupport.value === "approximated");
+
+/** Icon-only, so tint and tooltip are the whole message: an accent tint on a dropped or approximated schema would claim a guarantee the provider never made. */
+const schemaButton = computed(() => {
+  if (!props.variant.responseSchema) {
+    return {
+      variant: "ghost-muted" as const,
+      tint: "",
+      title: t("aiObservability.playground.schema"),
+    };
+  }
+  if (schemaDropped.value) {
+    return {
+      variant: "ghost-warning" as const,
+      tint: "bg-banner-warning-bg!",
+      title: t("aiObservability.playground.schemaIgnored"),
+    };
+  }
+  if (schemaApproximated.value) {
+    return {
+      variant: "ghost-warning" as const,
+      tint: "bg-banner-warning-bg!",
+      title: t("aiObservability.playground.schemaApproximated"),
+    };
+  }
+  return {
+    variant: "ghost-primary" as const,
+    tint: "bg-accent/12!",
+    title: t("aiObservability.playground.schemaOn"),
+  };
+});
 
 function keyFor(providerId: string, model: string): string {
   return `${providerId}${KEY_SEPARATOR}${model}`;

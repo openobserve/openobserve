@@ -48,6 +48,9 @@ const ATTEMPTS = STRICT ? 3 : 1;
 const TIMEOUT_MS =
   Number(process.env.DS_CONTENT_TIMEOUT_MS) || (STRICT ? 60_000 : 30_000);
 const GIT_OPTS = { stdio: "inherit", timeout: TIMEOUT_MS };
+const BACKOFF_MS = [2_000, 8_000, 30_000];
+const sleepMs = (ms) =>
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
 // Validate the git inputs before they reach `git`. execFileSync already prevents
 // shell injection (no shell is spawned), but an attacker who can set these env
@@ -102,6 +105,8 @@ function cloneRepo() {
     } catch (e) {
       lastErr = e;
       log(`clone attempt ${attempt}/${ATTEMPTS} failed: ${e.message}`);
+      // Anonymous clones from shared CI egress IPs get throttled; a pause gives the limit time to clear.
+      if (attempt < ATTEMPTS) sleepMs(BACKOFF_MS[attempt - 1] ?? 30_000);
     }
   }
   throw lastErr;

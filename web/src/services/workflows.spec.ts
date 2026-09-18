@@ -152,6 +152,40 @@ describe("workflows service", () => {
 
       expect(mockHttpInstance.post.mock.calls[0][0]).toBe("/api/o/workflows");
     });
+
+    it("names the destination folder", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "ops" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows?folder=ops", {});
+    });
+
+    // A folderless draft is appended to every folder's listing, so the folder has
+    // to travel with the draft save too, not only the published one.
+    it("names the destination folder on a draft save", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({
+        org_identifier: "o",
+        data: {},
+        draft: true,
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows?draft=true&folder=ops",
+        {},
+      );
+    });
+
+    it("omits the folder query when no folder is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.createWorkflow({ org_identifier: "o", data: {}, folder: "" });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith("/api/o/workflows", {});
+    });
   });
 
   describe("updateWorkflow", () => {
@@ -289,6 +323,36 @@ describe("workflows service", () => {
         workflows.promoteWorkflow({ org_identifier: "o", id: "w1", trigger_type: "AlertFired" }),
       ).rejects.toEqual(error);
     });
+
+    it("names the folder to publish into", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+        folder: "ops",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired&folder=ops",
+      );
+    });
+
+    // The backend then publishes into the folder the draft already sits in.
+    it("omits the folder query when none is given", async () => {
+      mockHttpInstance.post.mockResolvedValue({});
+
+      await workflows.promoteWorkflow({
+        org_identifier: "o",
+        id: "w1",
+        trigger_type: "AlertFired",
+      });
+
+      expect(mockHttpInstance.post).toHaveBeenCalledWith(
+        "/api/o/workflows/promote/w1?trigger_type=AlertFired",
+      );
+    });
   });
 
   describe("enableWorkflow", () => {
@@ -350,6 +414,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs,
         from_node: undefined,
+        suppress_destinations: true,
       });
     });
 
@@ -368,6 +433,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs,
         from_node: "node-3",
+        suppress_destinations: true,
       });
     });
 
@@ -380,6 +446,7 @@ describe("workflows service", () => {
         workflow: wf,
         inputs: [],
         from_node: undefined,
+        suppress_destinations: true,
       });
     });
 
@@ -389,7 +456,27 @@ describe("workflows service", () => {
       await workflows.testWorkflow({ org_identifier: "o", workflow: wf, inputs: [] });
 
       const body = mockHttpInstance.post.mock.calls[0][1];
-      expect(Object.keys(body).sort()).toEqual(["from_node", "inputs", "workflow"]);
+      expect(Object.keys(body).sort()).toEqual([
+        "from_node",
+        "inputs",
+        "suppress_destinations",
+        "workflow",
+      ]);
+    });
+
+    // The one value that makes a test dispatch for real, so it must survive the
+    // default rather than being clamped back to the safe one.
+    it("forwards an explicit suppress_destinations=false for a live test", async () => {
+      mockHttpInstance.post.mockResolvedValue({ data: {} });
+
+      await workflows.testWorkflow({
+        org_identifier: "o",
+        workflow: wf,
+        inputs: [],
+        suppress_destinations: false,
+      });
+
+      expect(mockHttpInstance.post.mock.calls[0][1].suppress_destinations).toBe(false);
     });
 
     it("propagates a test failure", async () => {

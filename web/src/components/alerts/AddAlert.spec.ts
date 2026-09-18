@@ -47,7 +47,10 @@ vi.mock("@/composables/useFunctions", () => ({
   default: () => ({ getAllFunctions: vi.fn().mockResolvedValue({ functions: [] }) }),
 }));
 
-vi.mock("@/services/search", () => ({ default: { search: vi.fn() } }));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { search: vi.fn() } });
+});
 
 vi.mock("@/composables/useParser", () => ({
   default: () => ({
@@ -77,38 +80,44 @@ vi.mock("@/utils/zincutils", async () => {
 // Toast returns a dismiss fn (loading toast). No-op in tests.
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn(() => vi.fn()) }));
 
-vi.mock("@/services/alerts", () => ({
-  default: {
-    create_by_alert_id: vi.fn(() =>
-      Promise.resolve({ data: { code: 200, message: "Alert saved" } }),
-    ),
-    update_by_alert_id: vi.fn(() => Promise.resolve({ data: { success: true } })),
-    generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
-    validateComposite: vi.fn(() =>
-      Promise.resolve({
-        data: {
-          valid: true,
-          canonical_expression: "({id-a} && {id-b})",
-          children: [],
-          warnings: [],
-          errors: [],
-          result: true,
-          result_level: "critical",
-        },
-      }),
-    ),
-    listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create_by_alert_id: vi.fn(() =>
+        Promise.resolve({ data: { code: 200, message: "Alert saved" } }),
+      ),
+      update_by_alert_id: vi.fn(() => Promise.resolve({ data: { success: true } })),
+      generate_sql: vi.fn(() => Promise.resolve({ data: { sql: "SELECT * FROM test" } })),
+      validateComposite: vi.fn(() =>
+        Promise.resolve({
+          data: {
+            valid: true,
+            canonical_expression: "({id-a} && {id-b})",
+            children: [],
+            warnings: [],
+            errors: [],
+            result: true,
+            result_level: "critical",
+          },
+        }),
+      ),
+      listByFolderId: vi.fn(() => Promise.resolve({ data: { list: [] } })),
+    },
+  });
+});
 
-vi.mock("@/services/anomaly_detection", () => ({
-  default: {
-    get: vi.fn(),
-    create: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
-    update: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
-    triggerTraining: vi.fn(() => Promise.resolve({})),
-  },
-}));
+vi.mock("@/services/anomaly_detection", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: vi.fn(),
+      create: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
+      update: vi.fn(() => Promise.resolve({ data: { id: "anom-1" } })),
+      triggerTraining: vi.fn(() => Promise.resolve({})),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
 vi.mock("@/services/reodotdev_analytics", () => ({ useReo: () => ({ track: vi.fn() }) }));
@@ -124,6 +133,8 @@ const stubs = {
   // Custom stub exposing validate() so the template ref (anomalyStep2Ref) the
   // orchestrator calls during saveAnomalyDetection resolves truthy.
   AnomalyDetectionConfig: {
+    name: "AnomalyDetectionConfigStub",
+    props: ["previewSql"],
     template: "<div />",
     methods: {
       async validate() {
@@ -133,7 +144,7 @@ const stubs = {
   },
   AnomalyAlerting: true,
   AnomalySummary: true,
-  QueryEditor: true,
+  AnomalyDataPreview: true,
   JsonEditor: true,
   InlineSelectFolderDropdown: true,
   OPageHeader: true,
@@ -642,6 +653,7 @@ describe("AddAlert (OForm owner)", () => {
           "trigger_condition",
           "updatedAt",
           "workflows",
+          "pending_period_sec",
         ].sort(),
       );
 
@@ -742,6 +754,45 @@ describe("AddAlert (OForm owner)", () => {
     });
   });
 
+  // The right rail's Preview card holds the DATA preview for every non-composite
+  // alert type; anomaly used to put its generated SQL there instead.
+  describe("right-rail Preview card", () => {
+    it("renders the anomaly data preview for an anomaly alert", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(false);
+    });
+
+    it("hands the generated SQL to the detection-config step, not the rail", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "anomaly");
+      wrapper.vm.form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+
+      const step = wrapper.findComponent({ name: "AnomalyDetectionConfigStub" });
+      expect(step.props("previewSql")).toContain("time_bucket");
+    });
+
+    it("renders the scheduled data preview for a scheduled alert", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+
+      wrapper.vm.form.setFieldValue("is_real_time", "false");
+      wrapper.vm.form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+
+      expect(wrapper.findComponent({ name: "PreviewAlert" }).exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "AnomalyDataPreview" }).exists()).toBe(false);
+    });
+  });
+
   describe("anomaly save path", () => {
     it("saves via anomalyDetectionService.create with the anomaly_config payload", async () => {
       wrapper = mountAlert();
@@ -778,6 +829,34 @@ describe("AddAlert (OForm owner)", () => {
       expect(payload.stream_name).toBe("_rundata");
       expect(payload.anomaly_config).toBeTruthy();
       expect(payload.anomaly_config.query_mode).toBe("filters");
+      // Percentile mode: threshold on the wire, and never the budget key.
+      expect(payload.anomaly_config.threshold).toBe(97);
+      expect(payload.anomaly_config).not.toHaveProperty("alert_budget_per_day");
+    });
+
+    it("budget mode sends alert_budget_per_day and omits threshold — the API rejects both", async () => {
+      // While a budget is set, `threshold` is controller-derived state; a
+      // payload carrying both is rejected server-side.
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+      wrapper.vm.anomalyConfig.alert_enabled = false;
+      wrapper.vm.anomalyConfig.query_mode = "filters";
+      wrapper.vm.anomalyConfig.alert_budget_per_day = 2;
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      const [, payload] = (anomalyDetectionService.create as any).mock.calls[0];
+      expect(payload.anomaly_config.alert_budget_per_day).toBe(2);
+      expect(payload.anomaly_config).not.toHaveProperty("threshold");
     });
 
     it("blocks anomaly save when the anomaly name is empty", async () => {

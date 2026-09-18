@@ -119,7 +119,7 @@
                   <span class="text-compact text-text-body truncate leading-snug">{{
                     entry.label
                   }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
@@ -138,7 +138,7 @@
         </div>
 
         <!-- Right column -->
-        <div class="border-border-default flex flex-col border-l pl-8">
+        <div class="border-border-default flex flex-col border-s ps-8">
           <div
             v-for="(m, idx) in filteredColumns[1]"
             :key="m.title"
@@ -176,7 +176,7 @@
                   <span class="text-compact text-text-body truncate leading-snug">{{
                     entry.label
                   }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
@@ -220,6 +220,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch, onUnmounted } from "vue";
+import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -227,8 +228,9 @@ import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import { useShortcut } from "./composables";
 import { SHORTCUT_REGISTRY, SHORTCUT_MODULES } from "./shortcutRegistry";
-import type { ShortcutEntry } from "./shortcutRegistry";
+import type { ShortcutEntry, ShortcutCapabilities } from "./shortcutRegistry";
 import { isMacOS } from "@/utils/keyboardShortcuts";
+import config from "@/aws-exports";
 
 const props = withDefaults(
   defineProps<{
@@ -246,6 +248,20 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+const store = useStore();
+
+// Edition + `/config` flags that decide which feature pages the build can reach.
+const capabilities = computed<ShortcutCapabilities>(() => ({
+  isEnterprise: config.isEnterprise === "true",
+  isCloud: config.isCloud === "true",
+  isMetaOrg:
+    !!store.state.zoConfig?.meta_org &&
+    store.state.selectedOrganization?.identifier === store.state.zoConfig.meta_org,
+  onlineEvalsEnabled: Boolean(store.state.zoConfig?.online_evals_enabled),
+  incidentsEnabled: Boolean(store.state.zoConfig?.incidents_enabled),
+  modelPricingEnabled: Boolean(store.state.zoConfig?.model_pricing_enabled),
+  rbacEnabled: Boolean(store.state.zoConfig?.rbac_enabled),
+}));
 
 const open = computed({
   get: () => props.open,
@@ -290,11 +306,12 @@ function entryDisplay(e: ShortcutEntry): string {
 }
 
 const allModules = computed<DisplayModule[]>(() => {
+  const caps = capabilities.value;
   return SHORTCUT_MODULES.map((m) => ({
     title: m.title ? raw(m.title) : t(m.titleKey),
     sections: m.pages.flatMap((pageKey) => {
       const group = groupByPage.get(pageKey);
-      if (!group) return [];
+      if (!group || (group.visible && !group.visible(caps))) return [];
       return [
         {
           title: t(group.pageKey, PAGE_TITLE_PARAMS[group.pageKey] ?? {}),
@@ -306,7 +323,8 @@ const allModules = computed<DisplayModule[]>(() => {
         },
       ];
     }),
-  }));
+    // A module whose every page is gated off (e.g. Settings on OSS) drops its chip entirely.
+  })).filter((m) => m.sections.length > 0);
 });
 
 const filteredModules = computed<DisplayModule[]>(() => {

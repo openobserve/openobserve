@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "summary", "findings", "prior_findings"],
+  "properties": {
+    "verdict": { "type": "string", "enum": ["approve", "request_changes"] },
+    "summary": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "category", "repo", "file", "line", "title", "detail", "suggestion"],
+        "properties": {
+          "id": { "type": "string" },
+          "repo": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "category": { "type": "string", "enum": ["correctness", "concurrency", "security", "performance", "error-handling", "api-contract", "convention", "test-coverage", "other"] },
+          "file": { "type": "string" },
+          "line": { "type": ["integer", "null"] },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "suggestion": { "type": "string" }
+        }
+      }
+    },
+    "prior_findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "note"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "type": "string", "enum": ["resolved", "still_open", "withdrawn"] },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

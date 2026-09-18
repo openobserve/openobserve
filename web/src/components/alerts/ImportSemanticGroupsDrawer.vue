@@ -297,7 +297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ field }}
             <template #trailing>
-              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ml-1" />
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ms-1" />
             </template>
           </OTag>
         </div>
