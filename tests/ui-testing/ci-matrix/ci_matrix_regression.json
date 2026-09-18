@@ -32,7 +32,6 @@
       "alerts-stream-switching.spec.js",
       "alerts-bugs.spec.js",
       "alerts-14306-composite-clone.spec.js",
-      "alerts-clone-dialog.spec.js",
       "alerts-14308-composite-trigger-timestamps.spec.js",
       "alerts-measure-column-default.spec.js",
       "alerts-from-dashboard-panel.spec.js"

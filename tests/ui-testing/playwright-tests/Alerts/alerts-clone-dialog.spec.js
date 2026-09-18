@@ -1,7 +1,7 @@
 // Copyright 2026 OpenObserve Inc.
 
 /**
- * Alerts Regression — the clone dialog for ordinary (non-composite) alerts
+ * Alerts — the clone dialog for ordinary (non-composite) alerts
  *
  * The composite family routes through the dedicated /clone endpoint and is
  * covered by alerts-14306-composite-clone.spec.js. Ordinary alerts take the
@@ -12,16 +12,16 @@
  * the two validations the stream selects impose.
  */
 
-const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
-const logData = require('../../../fixtures/log.json');
-const PageManager = require('../../../pages/page-manager.js');
-const testLogger = require('../../utils/test-logger.js');
-const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
+const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
+const logData = require('../../fixtures/log.json');
+const PageManager = require('../../pages/page-manager.js');
+const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 const {
   STREAM, uniq, simpleAlert,
   createAlert, listAlerts, findAlertId, findAlertIdInFolder, getAlert,
   deleteAlertInFolder, deleteAlertFolder, seedAlertFixtures, createAlertFolder,
-} = require('../../utils/alerts-api-helpers.js');
+} = require('../utils/alerts-api-helpers.js');
 
 // Ingested by global setup on every run, so it exists on any server the suite
 // is pointed at — unlike the alert fixtures' own notification sink.
