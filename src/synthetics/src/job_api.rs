@@ -506,6 +506,9 @@ use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 #[derive(Debug, Deserialize)]
 pub struct ResolveRequest {
     pub job_id: String,
+    /// Wire names of the capabilities the probe announces; a pre-`start_load` probe sends none.
+    #[serde(default)]
+    pub probe_features: Vec<String>,
 }
 
 /// Viewport dimensions delivered to the probe so it doesn't need hardcoded device tables.
@@ -1063,6 +1066,7 @@ pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
 pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
 pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
+pub const REASON_CONFIG_START_LOAD_UNSUPPORTED: &str = "config_start_load_unsupported";
 
 /// Expansion could not produce a runnable journey (§5.11); `guard_failure` marks family 2 — a guard
 /// of ours failed.
@@ -1189,6 +1193,31 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     )?;
     expand_for_resolve(conn, &mut synthetic).await?;
 
+    // Private locations run relaxed SSRF: probing the customer's own network is the point.
+    let location_record = synthetics_locations::get(&check.location)
+        .await
+        .ok()
+        .flatten();
+    let ssrf_policy = match &location_record {
+        Some(l) if l.kind == synthetics_locations::KIND_PRIVATE => "relaxed".to_string(),
+        _ => "strict".to_string(),
+    };
+    // Human label for the result record (id fallback keeps it non-empty).
+    let location_label = location_record
+        .map(|l| l.label)
+        .unwrap_or_else(|| check.location.clone());
+
+    // Gated on the expanded list: the probe decides the start load from the list it receives.
+    if synthetic.check_type == SyntheticType::Browser {
+        let steps = synthetic
+            .config
+            .get("steps")
+            .and_then(|s| s.as_array())
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        start_load_gate(steps, &req.probe_features, &location_label).map_err(anyhow::Error::new)?;
+    }
+
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
     // Redact cookie values — probe reads from env_inject._AUTH_COOKIES instead.
@@ -1238,21 +1267,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         metadata["environment"] =
             serde_json::json!(environment_display_name(&check.org_id, env_id).await);
     }
-
-    // SSRF policy from the location registry: private locations run relaxed
-    // (probing the customer's own network is the point), everything else strict.
-    let location_record = synthetics_locations::get(&check.location)
-        .await
-        .ok()
-        .flatten();
-    let ssrf_policy = match &location_record {
-        Some(l) if l.kind == synthetics_locations::KIND_PRIVATE => "relaxed".to_string(),
-        _ => "strict".to_string(),
-    };
-    // Human label for the result record (id fallback keeps it non-empty).
-    let location_label = location_record
-        .map(|l| l.label)
-        .unwrap_or_else(|| check.location.clone());
 
     // Ingest destination for agent-mode probes — looked up at resolve time so
     // the token is never at rest in the queue (01 §7.1).
@@ -1472,7 +1486,7 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     synthetic: &mut config::meta::synthetics::Synthetic,
 ) -> anyhow::Result<()> {
     use config::meta::{
-        synthetics::{BrowserConfig, SyntheticType},
+        synthetics::BrowserConfig,
         synthetics_composition::{ChildJourney, subtest_refs},
     };
     if synthetic.check_type != SyntheticType::Browser {
@@ -1526,6 +1540,33 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     })?;
     synthetic.config["steps"] = serde_json::Value::Array(expanded);
     Ok(())
+}
+
+/// Skip rule A1: only the first executed step decides; a later navigate is a reload.
+fn needs_start_load(steps: &[serde_json::Value]) -> bool {
+    !steps
+        .first()
+        .is_some_and(|s| s.get("action").and_then(|a| a.as_str()) == Some("navigate"))
+}
+
+/// Old probes (B1): a probe that cannot open the Starting URL is not handed a journey needing it.
+fn start_load_gate(
+    steps: &[serde_json::Value],
+    probe_features: &[String],
+    location_label: &str,
+) -> Result<(), ConfigError> {
+    if !needs_start_load(steps) || probe_features.iter().any(|f| f == "start_load") {
+        return Ok(());
+    }
+    Err(ConfigError {
+        status_reason: REASON_CONFIG_START_LOAD_UNSUPPORTED,
+        message: format!(
+            "Location {location_label} runs an agent that cannot open the Starting URL. Upgrade \
+             the agent, or add a Navigate first Step."
+        ),
+        // Customer-fixable (upgrade the agent or add a navigate), not a guard of ours failing.
+        guard_failure: false,
+    })
 }
 
 /// The 200 an ack that did not apply gets: a duplicate, or a late one from a

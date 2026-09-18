@@ -1328,8 +1328,8 @@ const V2_ELEMENT_ACTIONS: &[&str] = &[
 /// sees a journey.
 pub const V2_COMPOSITION_ACTIONS: &[&str] = &["subtest"];
 
-/// The evidence panel's "no step" sentinel; a step may not claim it.
-const STEP_ID_RESERVED: &str = "__unattributed__";
+/// Row ids the results UI owns ("no step" sentinel, start load row 0); a step may not claim them.
+const STEP_ID_RESERVED: &[&str] = &["__unattributed__", "_start"];
 
 /// The closed set of assertion kinds (spec P5.1).
 ///
@@ -2072,14 +2072,6 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        // The probe opens about:blank and never auto-navigates.
-        if i == 0 && step.action != "navigate" {
-            return Err(format!(
-                "config.steps[0]: first step must be 'navigate', got '{}'",
-                step.action
-            ));
-        }
-
         if step.action == "navigate" {
             let url = step
                 .url
@@ -2204,7 +2196,7 @@ fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
             "config.steps[{i}]: step id '{id}' may only contain letters, digits, '-' and '_'"
         ));
     }
-    if id == STEP_ID_RESERVED {
+    if STEP_ID_RESERVED.contains(&id) {
         return Err(format!("config.steps[{i}]: step id '{id}' is reserved"));
     }
     Ok(())
