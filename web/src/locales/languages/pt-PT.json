@@ -17881,6 +17881,7 @@
     "target_rotation_all": "Todos em {rotation}",
     "target_rotation_deleted": "Uma rotação que esta equipe não tem mais",
     "target_rotation_legacy": "Quem estiver de plantão",
+    "target_unrecognized": "Um alvo que esta tela não reconhece",
     "ladderPoolEveryone": "todos em {rotation}",
     "target_user": "Uma pessoa específica",
     "target_whole_team": "Toda a equipe",

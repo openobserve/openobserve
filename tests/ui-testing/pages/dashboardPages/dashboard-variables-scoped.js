@@ -355,6 +355,43 @@ export default class DashboardVariablesScoped {
   }
 
   /**
+   * Wait for a variable selector to stop moving: OSelect renders a spinner while
+   * the variable's values query runs, and until it resolves the selector shows
+   * the "(No Data Found)" placeholder (VariableQueryValueSelector falls back to
+   * it whenever there are no options and nothing selected). A value read before
+   * then captures the placeholder rather than what the variable settles on —
+   * which may legitimately be the placeholder itself, so this waits for the
+   * rendered value to hold rather than for any particular value.
+   * @param {string} variableName - Variable name
+   * @param {Object} options - Wait options
+   * @param {number} options.timeout - Timeout in ms (default: 20000)
+   * @param {number} options.quietMs - How long the value must hold (default: 1500)
+   * @returns {Promise<import('@playwright/test').Locator>}
+   */
+  async waitForVariableValueSettled(variableName, options = {}) {
+    const { timeout = 20000, quietMs = 1500 } = options;
+    const selector = this.getVariableSelectorLocator(variableName);
+    await selector.waitFor({ state: "visible", timeout });
+    const spinner = this.getVariableDropdown(variableName).locator('[role="status"]');
+
+    const deadline = Date.now() + timeout;
+    let lastText = null;
+    let stableSince = Date.now();
+    while (Date.now() < deadline) {
+      const isLoading = (await spinner.count().catch(() => 0)) > 0;
+      const text = await selector.innerText().catch(() => null);
+      if (isLoading || text === null || text !== lastText) {
+        lastText = text;
+        stableSince = Date.now();
+      } else if (Date.now() - stableSince >= quietMs) {
+        return selector;
+      }
+      await this.page.waitForTimeout(250);
+    }
+    return selector;
+  }
+
+  /**
    * Get variable loading indicator
    * @param {string} variableName - Variable name
    * @returns {import('@playwright/test').Locator}

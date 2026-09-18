@@ -124,11 +124,18 @@ const stubs = {
     // visible from the outside rather than only in a prop.
     template: "<div :data-test=\"compact ? 'oncall-setup-banner' : 'oncall-setup-checklist'\" />",
   },
-  ConfirmDialog: {
-    name: "ConfirmDialog",
-    props: ["modelValue", "title", "message"],
-    emits: ["update:ok", "update:cancel"],
-    template: "<div />",
+  // `open`, not `modelValue`: ODialog has no `modelValue` prop, and unstubbed
+  // it pulls reka-ui's Dialog primitives into every mount that opens one.
+  ODialog: {
+    name: "ODialog",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  OTextarea: {
+    name: "OTextarea",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: `<textarea :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   // "vue-router" is mocked wholesale above, so the real RouterLink (which
   // navigates via the router injected by its plugin) never resolves — this
@@ -1119,7 +1126,7 @@ describe("OnCallResponses", () => {
       // Nothing is closed on the click alone.
       expect(service.resolveResponse).not.toHaveBeenCalled();
 
-      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await wrapper.find('[data-test="oncall-bulk-resolve-confirm"]').trigger("click");
       await flushPromises();
 
       expect(service.resolveResponse).toHaveBeenCalledTimes(2);

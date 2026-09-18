@@ -47,6 +47,52 @@ describe("cleanAggregationQuery", () => {
     expect((out.match(/'/g) || []).length % 2).toBe(0);
     expect(out).toContain("'items group by owner'");
   });
+
+  it("renames the aggregate alias and injects a time bucket for a plain aggregation query", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'production\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toContain("AS zo_sql_num");
+    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
+    expect(cleaned).not.toContain("HAVING");
+    expect(cleaned).not.toContain("zo_sql_min_time");
+  });
+
+  it("does not rewrite zo_sql_val when it only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'value zo_sql_val here\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("'value zo_sql_val here'");
+    expect(cleaned).not.toContain("'value zo_sql_num here'");
+  });
+
+  it("does not rewrite alert_agg_value when it only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'alert_agg_value spotted\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("'alert_agg_value spotted'");
+    expect(cleaned).not.toContain("'zo_sql_num spotted'");
+  });
+
+  it("still injects the time bucket when zo_sql_key only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'zo_sql_key is here\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    // The literal filter value must survive untouched...
+    expect(cleaned).toContain("'zo_sql_key is here'");
+    // ...and the chart must still get its own real time axis.
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
+  });
 });
 
 describe("withCompositeGroupLabel", () => {
