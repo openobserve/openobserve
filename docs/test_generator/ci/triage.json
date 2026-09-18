@@ -1,0 +1,32 @@
+{
+  "feature_slug": "ai-assistant-chat",
+  "feature_title": "AI Assistant Chat",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiAssistantChat.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/aiAssistantChat.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/O2AIChat.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatInput.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatMessage.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatHistoryMenu.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatToolCallBlock.vue",
+    "web/src/components/ai-assistant/chat/O2AIChatToolCallIndicator.vue",
+    "web/src/composables/useChatStream.ts",
+    "web/src/composables/useChatHistoryList.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All 38 changed files live under web/src/ (components/ and composables/) — the open-source Vue 3 frontend. No path touches an enterprise-owned directory (no enterprise/, o2_enterprise/, src/enterprise/), and no enterprise keyword modules (SSO/SAML/RBAC/SDR/cipher/logo-management) appear in the changed paths or symbol names, so this is an OSS change.",
+    "skip": "Not skipped. The trigger context has no tests-added label and no skip comment. The change is a substantial refactor of the user-facing AI Assistant chat panel (O2AIChat.vue split into sub-components and composables) — it is frontend UI behavior, not docs/CI-only or comment/test-data-only.",
+    "e2e": "E2E is warranted. The refactor rewrites the rendering and interaction of chat messages, tool-call blocks, the chat history menu, and the input control in web/src — user-facing flows (streaming, markdown rendering, keyboard navigation, session/history management) that could regress. The dev-authored .spec.ts files are Vitest unit tests, not Playwright E2E, so there is no browser-level coverage of the new structure.",
+    "area": "The bulk of the UI changes live in web/src/components/ai-assistant/chat/ and web/src/composables/ — a general, app-wide AI assistant feature not tied to Logs/Metrics/Traces/Dashboards. The closest existing test area is GeneralTests (which holds general app-level specs such as sanity, theme, landingPage, and languageTranslation).",
+    "group": "GeneralTests is the matrix shard (actual_folder GeneralTests) whose run_files hold general app-level specs, so the new aiAssistantChat.spec.js joins it. No dedicated AI-assistant shard exists in ci_matrix; the Engineer may create one if a dedicated group is preferred.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test files changed are Vitest unit specs under web/src/components/**/*.spec.ts and web/src/composables/*.spec.ts, which are not E2E coverage, so existing_tests_in_diff is false."
+  }
+}

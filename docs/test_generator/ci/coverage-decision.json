@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/aiAssistantChat.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/status-pages-enterprise-gating.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the AI Assistant Chat feature (grep for ai-chat / aiChat / menu-link-ai-item / home-tab-ai / ai_enabled returns only the unused homePage.aiChatButton locator). The feature is its own distinct area and belongs in GeneralTests as a new spec. The closest existing assets are the two enterprise-gating specs (edition-features.spec.js and status-pages-enterprise-gating.spec.js), which define the edition-detection + test.skip convention this new spec mirrors: the only reachable behavior in an OSS run is asserting the gated entry points are absent; the functional chat flows are enterprise-gated and must be edition-gated (skip on OSS), not fixme. Register the new spec in ci_matrix.json under the GeneralTests run_files list."
+}
