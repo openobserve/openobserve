@@ -196,8 +196,7 @@ export const cleanAggregationQuery = (query: string): string => {
       const limitMatch = maskForKeywordSearch(cleaned).match(/\bLIMIT\b/i);
       if (orderByMatch && orderByMatch.index !== undefined) {
         const end = orderByMatch.index + orderByMatch[0].length;
-        cleaned =
-          cleaned.slice(0, orderByMatch.index) + "GROUP BY 1 ORDER BY" + cleaned.slice(end);
+        cleaned = cleaned.slice(0, orderByMatch.index) + "GROUP BY 1 ORDER BY" + cleaned.slice(end);
       } else if (limitMatch && limitMatch.index !== undefined) {
         const end = limitMatch.index + limitMatch[0].length;
         cleaned = cleaned.slice(0, limitMatch.index) + "GROUP BY 1 LIMIT" + cleaned.slice(end);
