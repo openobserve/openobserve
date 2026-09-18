@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Stepper -->
     <div class="bg-card-glass-bg h-[calc(100vh-7rem)] overflow-auto px-3 py-2">
-      <div style="max-width: 45rem">
+      <div class="max-w-180">
         <OForm
           ref="storageForm"
           :schema="orgStorageEditorSchema"
@@ -49,33 +49,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ t("storage_settings.selectProviderDesc") }}
                 {{ t("settings.orgStorageEditor.selectProviderDescCont") }}
               </div>
-              <div
+              <OBanner
                 v-if="!isEditMode"
-                class="rounded-default bg-banner-warning-bg border-banner-warning-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
+                variant="warning"
+                icon="warning"
+                dense
+                class="mb-3"
+                data-test="storage-settings-irreversible-warning"
               >
-                <OIcon name="warning" size="sm" class="mt-px flex-shrink-0" />
-                <div class="text-compact text-text-body leading-[1.55]">
-                  {{ t("settings.orgStorageEditor.irreversibleWarnPre")
-                  }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong
-                  >{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
-                </div>
-              </div>
-              <div
+                {{ t("settings.orgStorageEditor.irreversibleWarnPre")
+                }}<strong>{{ t("settings.orgStorageEditor.irreversibleWarnEmphasis") }}</strong
+                >{{ t("settings.orgStorageEditor.irreversibleWarnPost") }}
+              </OBanner>
+              <OBanner
                 v-if="!isEditMode"
-                class="rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
-              >
-                <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
-                <div class="text-compact text-text-body leading-[1.55]">
-                  {{ t("settings.orgStorageEditor.credentialsOnlyInfo") }}
-                </div>
-              </div>
+                variant="info"
+                icon="info"
+                dense
+                class="mb-3"
+                :content="t('settings.orgStorageEditor.credentialsOnlyInfo')"
+                data-test="storage-settings-credentials-only-info"
+              />
               <div class="mb-2 text-sm font-medium">
                 {{ t("settings.orgStorageEditor.selectStorageProviderLabel")
                 }}<span class="text-status-negative">*</span>
               </div>
-              <div
-                class="destination-type-grid grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3"
-              >
+              <div class="grid grid-cols-[repeat(auto-fill,minmax(8.75rem,1fr))] gap-3">
                 <div
                   v-for="provider in availableProviders"
                   :key="provider.value"
@@ -92,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-if="provider.image"
                     :src="provider.image"
                     :alt="provider.label"
-                    class="card-image mb-2 h-12 w-12 object-contain"
+                    class="mb-2 h-12 w-12 object-contain"
                   />
                   <OIcon
                     v-else
@@ -107,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
                   <div
                     v-if="selectedProvider === provider.value"
-                    class="check-icon bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
+                    class="bg-status-positive absolute top-1.5 right-1.5 z-1 flex h-5 w-5 items-center justify-center overflow-hidden rounded-full text-white"
                   >
                     <OIcon name="check" size="xs" />
                   </div>
@@ -132,16 +131,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="storage-settings-server-url-input"
                       name="server_url"
                       :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
                       data-test="storage-settings-region-input"
                       name="region"
                       :label="t('settings.orgStorageEditor.regionLabel')"
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode || !!cloudRegion"
                     />
                     <OFormInput
@@ -149,8 +144,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -158,16 +151,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="access_key"
                       :label="t('settings.orgStorageEditor.accessKeyLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                     />
                     <OFormInput
                       data-test="storage-settings-secret-key-input"
                       name="secret_key"
                       :label="t('settings.orgStorageEditor.secretKeyLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       type="password"
                     />
                   </div>
@@ -181,8 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="storage_account"
                       :label="t('settings.orgStorageEditor.storageAccountNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -190,8 +177,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -199,8 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="secret_key"
                       :label="t('settings.orgStorageEditor.secretKeyLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       type="password"
                     />
                     <OFormInput
@@ -208,68 +191,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       data-test="storage-settings-server-url-input"
                       name="server_url"
                       :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                   </div>
                 </template>
 
-                <!-- GcpCredentials Fields -->
-                <template v-if="selectedProvider === 'GcpCredentials'">
+                <!-- GcpServiceAccount Fields -->
+                <template v-if="selectedProvider === 'GcpServiceAccount'">
+                  <OBanner
+                    variant="info"
+                    icon="info"
+                    dense
+                    class="mb-3"
+                    data-test="storage-settings-gcp-sa-info"
+                  >
+                    <template v-if="isCloud">
+                      {{ t("storage_settings.gcpSaCloudInfo", { product: raw("OpenObserve") }) }}
+                    </template>
+                    <template v-else>
+                      {{ t("storage_settings.gcpSaSelfHostedInfo") }}
+                    </template>
+                  </OBanner>
                   <div class="flex flex-col gap-y-3">
                     <OFormInput
                       data-test="storage-settings-bucket-name-input"
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
-                      data-test="storage-settings-access-key-input"
-                      name="access_key"
-                      :label="t('settings.orgStorageEditor.accessKeyLabel')"
+                      data-test="storage-settings-project-name-input"
+                      name="project_name"
+                      :label="t('settings.orgStorageEditor.projectNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
+                      :disabled="isEditMode"
                     />
                     <OFormInput
-                      v-if="!isCloud"
-                      data-test="storage-settings-server-url-input"
-                      name="server_url"
-                      :label="t('settings.orgStorageEditor.serverUrlLabel')"
-                      class="no-border showLabelOnTop"
-                      flat
-                      :disabled="isEditMode"
+                      data-test="storage-settings-service-account-name-input"
+                      name="service_account_name"
+                      :label="t('settings.orgStorageEditor.serviceAccountNameLabel')"
+                      required
                     />
                   </div>
                 </template>
 
                 <!-- AwsRoleArn Fields -->
                 <template v-if="selectedProvider === 'AwsRoleArn'">
-                  <div
-                    class="rounded-default bg-banner-info-bg border-banner-info-border mb-3 flex items-start gap-2.5 border px-3 py-2.5"
+                  <OBanner
+                    variant="info"
+                    icon="info"
+                    dense
+                    class="mb-3"
+                    data-test="storage-settings-aws-sts-info"
                   >
-                    <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
-                    <div class="text-compact text-text-body leading-[1.55]">
-                      <template v-if="isCloud">
-                        {{ t("storage_settings.awsStsCloudInfo", { product: raw("OpenObserve") }) }}
-                      </template>
-                      <template v-else>
-                        {{ t("storage_settings.awsStsSelfHostedInfo") }}
-                      </template>
-                    </div>
-                  </div>
+                    <template v-if="isCloud">
+                      {{ t("storage_settings.awsStsCloudInfo", { product: raw("OpenObserve") }) }}
+                    </template>
+                    <template v-else>
+                      {{ t("storage_settings.awsStsSelfHostedInfo") }}
+                    </template>
+                  </OBanner>
                   <div class="flex flex-col gap-y-3">
                     <OFormInput
                       data-test="storage-settings-bucket-name-input"
                       name="bucket_name"
                       :label="t('settings.orgStorageEditor.bucketNameLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode"
                     />
                     <OFormInput
@@ -277,8 +265,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="region"
                       :label="t('settings.orgStorageEditor.regionLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                       :disabled="isEditMode || !!cloudRegion"
                     />
                     <OFormInput
@@ -286,16 +272,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       name="role_arn"
                       :label="t('settings.orgStorageEditor.roleArnLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                     />
                     <OFormInput
                       data-test="storage-settings-role-external-id-input"
                       name="external_id"
                       :label="t('settings.orgStorageEditor.externalIdLabel')"
                       required
-                      class="no-border showLabelOnTop"
-                      flat
                     />
                   </div>
                 </template>
@@ -305,12 +287,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Form buttons -->
           <div class="mt-3 flex justify-start">
-            <div v-if="step === 1">
+            <div v-if="step === 1" class="flex gap-2">
               <OButton
                 data-test="step1-cancel-btn"
                 variant="outline"
-                class="o2-secondary-button me-2 h-9"
-                :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                size="sm-action"
                 @click="emit('cancel')"
               >
                 {{ t("alerts.cancel") }}
@@ -318,21 +299,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="step1-continue-btn"
                 variant="primary"
-                class="no-border o2-primary-button h-9"
-                :class="isDark ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                size="sm-action"
                 :disabled="!canProceedStep1"
                 @click="nextStep"
               >
                 {{ t("storage_settings.continue") }}
               </OButton>
             </div>
-            <div v-if="step > 1">
+            <div v-if="step > 1" class="flex gap-2">
               <OButton
                 v-if="!isEditMode"
                 data-test="step2-back-btn"
                 variant="outline"
-                class="o2-secondary-button me-2 h-9"
-                :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                size="sm-action"
                 @click="prevStep"
               >
                 {{ t("storage_settings.back") }}
@@ -340,8 +319,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="step2-cancel-btn"
                 variant="outline"
-                class="o2-secondary-button h-9"
-                :class="isDark ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+                size="sm-action"
                 @click="emit('cancel')"
               >
                 {{ t("alerts.cancel") }}
@@ -349,8 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OButton
                 data-test="storage-settings-submit-btn"
                 variant="primary"
-                class="no-border o2-primary-button ms-2 h-9"
-                :class="isDark ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+                size="sm-action"
                 type="submit"
               >
                 {{ isEditMode ? t("storage_settings.update") : t("storage_settings.save") }}
@@ -369,12 +346,12 @@ import { ref, computed, onMounted, watch } from "vue";
 defineOptions({ name: "OrgStorageEditor" });
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import orgStorageService from "@/services/org_storage";
 import { getImageURL } from "@/utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
@@ -393,7 +370,6 @@ const emit = defineEmits<{
 }>();
 
 const store = useStore();
-const { isDark } = useTheme();
 const { t } = useI18nTyped();
 
 const step = ref(1);
@@ -429,6 +405,8 @@ function blankFormValues(provider: string): OrgStorageEditorForm {
     secret_key: "",
     role_arn: "",
     external_id: "",
+    project_name: "",
+    service_account_name: "",
   };
 }
 
@@ -472,14 +450,11 @@ const providerDefinitions: Array<{
     value: "AzureCredentials",
     image: getImageURL("images/org_storage/azure.png"),
   },
-  // for now we do not support gcp specifically, use the  aws route to use gcp
-  // keeping this for future use or remove later
-  // {
-  //   label: "GCP Credentials",
-  //   value: "GcpCredentials",
-  //   icon: "cloud",
-  //   image: getImageURL("images/org_storage/gcp.png"),
-  // },
+  {
+    label: t("settings.orgStorageSettings.googleCloudStorage"),
+    value: "GcpServiceAccount",
+    image: getImageURL("images/org_storage/gcp.png"),
+  },
   {
     label: t("settings.orgStorageSettings.awsRoleArn"),
     value: "AwsRoleArn",
@@ -513,10 +488,10 @@ function buildDataPayload(value: OrgStorageEditorForm) {
       data.storage_account = value.storage_account;
       data.secret_key = value.secret_key;
       break;
-    case "GcpCredentials":
+    case "GcpServiceAccount":
       data.bucket_name = value.bucket_name;
-      data.server_url = isCloud.value ? "" : value.server_url;
-      data.access_key = value.access_key;
+      data.project_name = value.project_name;
+      data.service_account_name = value.service_account_name;
       break;
     case "AwsRoleArn":
       data.bucket_name = value.bucket_name;
@@ -589,8 +564,9 @@ onMounted(async () => {
         const parsed = res.data.data || {};
         // Prefill the form once the (async) config arrives. Non-credential
         // fields are disabled in the form; credentials must be entered fresh —
-        // never prefill with masked values. external_id is a credential but not
-        // masked, so it IS prefilled.
+        // never prefill with masked values. role_arn, external_id and
+        // service_account_name are credentials get_redacted_config leaves
+        // unmasked, so they ARE prefilled.
         storageForm.value?.form?.reset({
           selectedProvider: res.data.provider,
           bucket_name: parsed.bucket_name || "",
@@ -598,9 +574,11 @@ onMounted(async () => {
           region: parsed.region || "",
           access_key: "",
           secret_key: "",
-          role_arn: "",
+          role_arn: parsed.role_arn || "",
           external_id: parsed.external_id || "",
           storage_account: parsed.storage_account || "",
+          project_name: parsed.project_name || "",
+          service_account_name: parsed.service_account_name || "",
         });
       }
     } catch {

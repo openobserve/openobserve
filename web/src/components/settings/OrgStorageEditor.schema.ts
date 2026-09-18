@@ -5,10 +5,10 @@
 // into the form as `selectedProvider` and `superRefine` branches on it.
 //
 // Per-provider required credentials (all trimmed):
-//   • AwsCredentials  → bucket_name, access_key, secret_key
-//   • AzureCredentials→ storage_account, bucket_name, secret_key
-//   • GcpCredentials  → bucket_name, access_key
-//   • AwsRoleArn      → bucket_name, region, role_arn, external_id
+//   • AwsCredentials    → bucket_name, access_key, secret_key
+//   • AzureCredentials  → storage_account, bucket_name, secret_key
+//   • GcpServiceAccount → bucket_name, project_name, service_account_name
+//   • AwsRoleArn        → bucket_name, region, role_arn, external_id
 
 import { z } from "zod";
 
@@ -27,6 +27,8 @@ export const makeOrgStorageEditorSchema = (t: (_key: string) => string) =>
       secret_key: z.string().optional().default(""),
       role_arn: z.string().optional().default(""),
       external_id: z.string().optional().default(""),
+      project_name: z.string().optional().default(""),
+      service_account_name: z.string().optional().default(""),
     })
     .superRefine((val, ctx) => {
       const require = (field: keyof typeof val, msgKey: string) => {
@@ -50,9 +52,10 @@ export const makeOrgStorageEditorSchema = (t: (_key: string) => string) =>
           require("bucket_name", "storage_settings.bucketNameRequired");
           require("secret_key", "storage_settings.secretKeyRequired");
           break;
-        case "GcpCredentials":
+        case "GcpServiceAccount":
           require("bucket_name", "storage_settings.bucketNameRequired");
-          require("access_key", "storage_settings.accessKeyRequired");
+          require("project_name", "storage_settings.projectNameRequired");
+          require("service_account_name", "storage_settings.serviceAccountNameRequired");
           break;
         case "AwsRoleArn":
           require("bucket_name", "storage_settings.bucketNameRequired");
