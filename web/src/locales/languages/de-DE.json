@@ -3572,7 +3572,6 @@
     "title": "Verbinden wir zunächst Ihre erste Datenquelle.",
     "description": "Wir haben Ihnen viel zu zeigen, aber zuerst müssen wir Ihre Daten verbinden. Die meisten Teams sehen ihre ersten Logs in etwa einer Minute.",
     "connectButton": "Datenquelle verbinden",
-    "dismissLink": "Das mache ich später",
     "slackLink": "Auch unserer Slack-Community beitreten"
   },
   "confirmDialog": {
