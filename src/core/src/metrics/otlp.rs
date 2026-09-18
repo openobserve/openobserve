@@ -763,7 +763,10 @@ fn columnar_base_labels(rec: &json::Value) -> Option<Vec<(String, String)>> {
     rec.as_object()?
         .iter()
         .map(|(name, value)| match value {
-            json::Value::String(value) if name.is_ascii() => Some((name.clone(), value.clone())),
+            // a resource or scope attribute named `exemplars` is dropped from every record
+            json::Value::String(value) if name.is_ascii() && name != EXEMPLARS_LABEL => {
+                Some((name.clone(), value.clone()))
+            }
             _ => None,
         })
         .collect()
@@ -1920,6 +1923,42 @@ mod tests {
         }
         let expected_size: usize = accepted.iter().map(json::estimate_json_bytes).sum();
         assert_eq!(written_size, expected_size);
+    }
+
+    #[test]
+    fn test_append_number_points_leaves_a_base_exemplars_attribute_to_the_json_path() {
+        let mut rec = json!({});
+        insert_attributes(
+            &mut rec,
+            &[
+                string_attr("exemplars", "attr"),
+                string_attr("region", "eu"),
+            ],
+        );
+        rec[NAME_LABEL] = json!("requests");
+        let points = vec![number_point(vec![string_attr("host", "a")], 1.5, 0)];
+
+        let fields = vec![
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+            Field::new("region", DataType::Utf8, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new("host", DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+            Field::new("flag", DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, true),
+        ];
+        let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+            .into_iter()
+            .map(|record| flatten_record(record).unwrap())
+            .collect();
+        assert!(columnar.into_entries("org", "requests").unwrap().is_empty());
+        assert_eq!(rejected.len(), 1);
+        assert!(rejected[0].get(EXEMPLARS_LABEL).is_none());
+        assert_eq!(rejected[0]["region"], json!("eu"));
     }
 
     #[test]
