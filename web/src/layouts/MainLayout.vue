@@ -45,6 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Operator-authored announcement bars (enterprise) -->
         <AnnouncementBanner v-if="config.isEnterprise === 'true'" />
+        <PasswordExpiryBanner v-if="config.isEnterprise === 'true'" />
       </div>
 
       <!-- Header component containing logo, navigation, and user controls -->
@@ -273,6 +274,7 @@ import useSearchWebSocket from "@/composables/useSearchWebSocket";
 import O2AIChat from "@/components/O2AIChat.vue";
 import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
+import PasswordExpiryBanner from "@/components/common/PasswordExpiryBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -293,6 +295,7 @@ export default defineComponent({
     AppHeader,
     WebinarBanner,
     AnnouncementBanner,
+    PasswordExpiryBanner,
     "keep-alive": KeepAlive,
     ONavbar,
     "router-view": RouterView,

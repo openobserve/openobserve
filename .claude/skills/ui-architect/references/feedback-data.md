@@ -208,7 +208,7 @@ function copyLink(url: string) {
 **Don't use for:** Indeterminate "still working" states — use [OSpinner](#ospinner) or [OInnerLoading](#oinnerloading).
 **Key props:**
 - `value` (`number`, required) — between 0 and 1; clamped to that range internally.
-- `variant` (`"default" | "warning" | "danger"` — default `"default"`) — semantic fill color.
+- `variant` (`"default" | "success" | "warning" | "danger"` — default `"default"`) — semantic fill color.
 - `size` (`"xs" | "sm" | "md" | "lg"` — default `"sm"`) — track height.
 **Slots:** `default` — content rendered inside the filled bar (e.g. a percentage label).
 **Emits:** none.

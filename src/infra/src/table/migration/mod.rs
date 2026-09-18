@@ -193,6 +193,9 @@ mod m20260912_000002_add_anomaly_last_recovery_notified_at;
 mod m20260915_000001_add_profiles_streams_to_service_streams;
 mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_create_llm_experiment_slot_retries;
+mod m20260918_000001_add_password_policy_columns_to_users;
+mod m20260918_000002_create_user_password_history_table;
+mod m20260918_000003_create_user_auth_state_table;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
 
@@ -446,12 +449,12 @@ impl MigratorTrait for Migrator {
             Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
             Box::new(m20260820_000001_add_icon_to_folders::Migration),
             Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
             Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
             Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
-            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
-            Box::new(m20260822_000001_create_status_pages_tables::Migration),
             Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
             Box::new(m20260806_000001_create_oncall_tables::Migration),
             Box::new(m20260807_000001_create_oncall_ownership::Migration),
             Box::new(m20260811_000001_create_oncall_unrouted_signals::Migration),
@@ -471,6 +474,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+            Box::new(m20260918_000001_add_password_policy_columns_to_users::Migration),
+            Box::new(m20260918_000002_create_user_password_history_table::Migration),
+            Box::new(m20260918_000003_create_user_auth_state_table::Migration),
         ]
     }
 }
@@ -512,6 +518,7 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+        (86, "m20260918_000001_add_password_policy_columns_to_users"),
     ];
 
     #[test]
@@ -548,11 +555,19 @@ mod tests {
     }
 
     #[test]
-    fn composite_alert_migration_is_registered_after_existing_migrations() {
+    fn auth_policy_migrations_are_registered_after_existing_migrations() {
         let names: Vec<String> = Migrator::migrations()
             .into_iter()
             .map(|migration| migration.name().to_string())
             .collect();
+        for name in [
+            "m20260812_000001_create_composite_alerts",
+            "m20260917_000001_add_password_policy_columns_to_users",
+            "m20260917_000002_create_user_password_history_table",
+            "m20260917_000003_create_user_auth_state_table",
+        ] {
+            assert_eq!(names.iter().filter(|n| n.as_str() == name).count(), 1);
+        }
         assert_eq!(
             names
                 .iter()
