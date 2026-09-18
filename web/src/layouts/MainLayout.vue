@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isMobile
+              !store.state.isAiChatEnabled || isChatOverlay
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
             'pe-2 pb-2',
-            isMobile
+            isChatOverlay
               ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
           ]"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
               maxWidth: '100%',
             },
-            isMobile
+            isChatOverlay
               ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
               : // Full-screen just widens the panel (25% → 50%) beside the content —
                 // same top position + height, so the main header stays visible.
@@ -374,7 +374,9 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18nTyped();
     const miniMode = ref(false);
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
+    // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -1478,6 +1480,7 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       isMobile,
+      isChatOverlay,
       miniMode,
       mobileNavOpen,
       user,

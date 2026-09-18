@@ -129,7 +129,7 @@ impl Engine {
                 let match_sample = if end_index > 0 {
                     metric.samples.get(end_index - 1).and_then(|sample| {
                         let adjusted_ts = sample.timestamp + offset_modifier;
-                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                        if adjusted_ts > start && adjusted_ts <= eval_ts {
                             Some(sample)
                         } else {
                             None
