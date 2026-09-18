@@ -34,7 +34,8 @@
       "alerts-14306-composite-clone.spec.js",
       "alerts-14308-composite-trigger-timestamps.spec.js",
       "alerts-measure-column-default.spec.js",
-      "alerts-from-dashboard-panel.spec.js"
+      "alerts-from-dashboard-panel.spec.js",
+      "incidents-status-filter.spec.js"
     ],
     "disabled": []
   },
