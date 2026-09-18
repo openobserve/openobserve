@@ -3572,7 +3572,6 @@
     "title": "시작하려면 먼저 첫 번째 데이터 소스를 연결하세요.",
     "description": "보여드릴 것이 많지만, 먼저 데이터를 연결해야 합니다. 대부분의 팀은 약 1분 안에 첫 로그를 확인합니다.",
     "connectButton": "데이터 소스 연결",
-    "dismissLink": "나중에 할게요",
     "slackLink": "저희 Slack 커뮤니티에도 참여해 주세요"
   },
   "confirmDialog": {
