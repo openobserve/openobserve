@@ -17881,6 +17881,7 @@
     "target_rotation_all": "Wszyscy w {rotation}",
     "target_rotation_deleted": "Rotacja, której ten zespół już nie ma",
     "target_rotation_legacy": "Kto jest na dyżurze",
+    "target_unrecognized": "Cel, którego ten ekran nie rozpoznaje",
     "ladderPoolEveryone": "wszyscy w {rotation}",
     "target_user": "Konkretna osoba",
     "target_whole_team": "Cały zespół",
