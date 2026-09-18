@@ -802,7 +802,12 @@ import {
   convertUnixToDateFormat as convertUnixToFormat,
   formatTimestampInTimezone,
 } from "@/utils/date";
-import streamService from "../../services/stream";
+import {
+  deleteStreamFieldsMutation,
+  updateStreamSettingsMutation,
+} from "@/services/stream.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import segment from "../../services/segment_analytics";
 import {
   formatSizeFromMB,
@@ -946,6 +951,10 @@ export default defineComponent({
     const pendingSelectedFields = ref<string[]>([]);
     const formDirtyFlag = ref(false);
     const loadingState = ref(true);
+
+    const streamOrgId = useOrgId();
+    const updateStreamSettings = useMutation(() => updateStreamSettingsMutation(streamOrgId.value));
+    const deleteStreamFields = useMutation(() => deleteStreamFieldsMutation(streamOrgId.value));
     const rowsPerPage = ref(20);
     const filterField = ref("");
     const qTable = ref(null);
@@ -1226,14 +1235,13 @@ export default defineComponent({
     };
     const deleteFields = async () => {
       loadingState.value = true;
-      await streamService
-        .deleteFields(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
+      await deleteStreamFields
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
           // Cast: service signature mistypes `fields` as the empty tuple `[]`.
-          selectedFields.value.map((field: any) => field.name) as [],
-        )
+          fields: selectedFields.value.map((field: any) => field.name) as [],
+        })
         .then(async (res) => {
           loadingState.value = false;
           if (res.data.code == 200) {
@@ -1659,13 +1667,12 @@ export default defineComponent({
         };
       }
 
-      await streamService
-        .updateSettings(
-          store.state.selectedOrganization.identifier,
-          indexData.value.name,
-          indexData.value.stream_type,
-          modifiedSettings,
-        )
+      await updateStreamSettings
+        .mutateAsync({
+          name: indexData.value.name,
+          type: indexData.value.stream_type,
+          settings: modifiedSettings,
+        })
         .then(async () => {
           if (
             store.state.logs?.logs?.data?.stream?.selectedStream?.includes(indexData.value.name)

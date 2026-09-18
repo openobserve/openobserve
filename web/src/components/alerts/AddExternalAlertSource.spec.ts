@@ -7,13 +7,19 @@ import AddExternalAlertSource from "./AddExternalAlertSource.vue";
 import alertSources from "@/services/alert_sources";
 import destinationService from "@/services/alert_destination";
 
-vi.mock("@/services/alert_sources", () => ({
-  default: { create: vi.fn(), listSenders: vi.fn(), update: vi.fn() },
-}));
+vi.mock("@/services/alert_sources", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { create: vi.fn(), listSenders: vi.fn(), update: vi.fn() },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: { list: vi.fn() },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: vi.fn() },
+  });
+});
 
 // ODrawer teleports its body, which wrapper.find()/html() can't traverse.
 // Same stub the codebase uses in AddRegexPattern.spec.ts.

@@ -1386,8 +1386,7 @@ import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useT
 import hljs from "highlight.js";
 import "highlight.js/styles/github.css";
 import "highlight.js/styles/github-dark.css";
-import { marked } from "marked";
-import { MarkedOptions } from "marked";
+import { marked, MarkedOptions } from "marked";
 import DOMPurify from "dompurify";
 import { useStore } from "vuex";
 import { useTheme } from "@/composables/useTheme";

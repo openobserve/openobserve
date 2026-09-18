@@ -15,6 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
+import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -53,7 +58,6 @@ import { CHROME_UI_LABELS, SETUP_QUERY_PARAM } from "@/constants/synthetics";
 import { getFoldersListByType } from "@/utils/commons";
 import { syntheticsListRoute } from "@/utils/synthetics/routes";
 import syntheticsService from "@/services/synthetics";
-import destinationService from "@/services/alert_destination";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -79,6 +83,8 @@ import BetaBadge from "@/components/common/BetaBadge.vue";
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
+const orgIdForWrites = useOrgId();
+const saveMonitor = useMutation(() => saveMonitorMutation(orgIdForWrites.value));
 
 // Private locations are served by agents deployed inside the customer's network,
 // the one enterprise part of synthetics. Gated on its own /config flag so an OSS
@@ -315,8 +321,7 @@ async function openAgentSetup(locationId?: string) {
   showAgentSetup.value = true;
   if (agentSetup.value) return;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getAgentSetup(org);
+    const res = await syntheticsService.getAgentSetup(orgIdForWrites.value);
     agentSetup.value = (res.data ?? null) as AgentSetup | null;
   } catch {
     agentSetup.value = null;
@@ -326,8 +331,7 @@ async function openAgentSetup(locationId?: string) {
 async function fetchLocations() {
   locationsLoading.value = true;
   try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.getLocations(org);
+    const res = await syntheticsService.getLocations(orgIdForWrites.value);
     const data = res.data ?? {};
     // Public browser locations (Lambda) plus private locations whose agents
     // advertise `browser` (self-hosted browser agent). A protocol-only private
@@ -351,16 +355,19 @@ async function fetchLocations() {
   }
 }
 
-async function fetchDestinations() {
+async function loadDestinations(force = false) {
   try {
-    const res = await destinationService.list({
-      org_identifier: store.state.selectedOrganization.identifier,
-      page_num: 1,
-      page_size: 1000,
-      sort_by: "name",
-      desc: false,
-    });
-    destinations.value = (res.data ?? []).map((d: any) => d.name as string);
+    const options = destinationsQuery(store.state.selectedOrganization.identifier);
+    // A destination created in another tab never expires this tab's cache, so refresh forces.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    destinations.value = list.map((d: any) => d.name as string);
   } catch {
     destinations.value = [];
   }
@@ -428,7 +435,7 @@ onMounted(() => {
 
   fetchFolders();
   fetchLocations();
-  fetchDestinations();
+  loadDestinations();
 
   if (props.editId) {
     loadForEdit(props.editId).catch(console.error);
@@ -752,13 +759,19 @@ async function persist(): Promise<boolean> {
     timeout: 0,
   });
   try {
-    const org = store.state.selectedOrganization.identifier;
     if (props.editId) {
-      await syntheticsService.update(org, props.editId, apiPayload.value, check.value.folder);
+      await saveMonitor.mutateAsync({
+        id: props.editId,
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.updated") });
     } else {
-      await syntheticsService.create(org, apiPayload.value, check.value.folder);
+      await saveMonitor.mutateAsync({
+        payload: apiPayload.value,
+        folderId: check.value.folder,
+      });
       dismiss();
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
@@ -1260,7 +1273,7 @@ function onClearResults() {
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
               class="border-border-default w-full! border-t"
-              @refresh:destinations="fetchDestinations"
+              @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"
               @new-location="openAgentSetup()"
               @add-agent="(id: string) => openAgentSetup(id)"

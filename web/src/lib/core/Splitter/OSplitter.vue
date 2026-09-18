@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick } from "vue";
+import { computed, ref, nextTick, watch } from "vue";
 import useResizer from "@/composables/useResizer";
 import type { OSplitterProps, OSplitterEmits } from "./OSplitter.types";
 
@@ -149,7 +149,6 @@ const handleKeyDown = (event: KeyboardEvent) => {
 };
 
 // Watch for external prop changes
-import { watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 watch(
   () => props.modelValue,

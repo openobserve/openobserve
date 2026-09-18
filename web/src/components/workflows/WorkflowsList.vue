@@ -155,16 +155,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </template>
 
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
                 data-test="workflow-list-refresh"
-                @click="() => getWorkflows()"
-              >
-                <OTooltip side="bottom" :content="t('workflow.refresh')" />
-              </OButton>
+                @click="refreshWorkflows"
+              />
             </template>
 
             <template #cell-name="{ row }">
@@ -337,6 +335,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { workflowKeys } from "@/services/workflows.querykeys";
+import { workflowFolderQuery, workflowSearchQuery } from "@/services/workflows.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, computed, defineAsyncComponent, onMounted, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
@@ -357,6 +358,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
@@ -397,6 +399,7 @@ const openMoveDialog = (row: any) => {
 const onMoveUpdated = () => {
   showMoveDialog.value = false;
   workflowIdsToMove.value = [];
+  invalidateWorkflowsCache();
   getWorkflows();
 };
 
@@ -410,7 +413,18 @@ const store = useStore();
 const currentRouteName = computed(() => router.currentRoute.value.name);
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
 
+const shapeWorkflows = (list: any[]) =>
+  list.map((wf: any, index: number) => ({
+    ...wf,
+    "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
+    trigger: triggerLabel(wf),
+    updated_at_display: formatTs(wf.updated_at),
+  }));
+
 const loading = ref(true);
+// Separate from `loading`, the cold-read skeleton: this spins the refresh button on every read.
+const fetching = ref(false);
+const lastUpdatedAt = ref<number | null>(null);
 const forbidden = ref(false);
 const filterQuery = ref("");
 
@@ -592,32 +606,59 @@ const otableColumns = computed(() => {
   return cols;
 });
 
-const getWorkflows = async (folderId?: string) => {
-  loading.value = true;
+// The list on screen, and the newest read: a slower earlier read must not overwrite a later folder or search.
+let shownListKey = "";
+let latestRead = 0;
+
+const getWorkflows = async (folderId?: string, force = false) => {
+  const options = crossFolderActive.value
+    ? workflowSearchQuery(orgId.value, filterQuery.value.trim())
+    : workflowFolderQuery(orgId.value, folderId ?? activeFolderId.value);
+  const read = ++latestRead;
+  const listKey = JSON.stringify(options.queryKey);
+  // Only a switch to another list repaints up front: a reload of the same list keeps its rows, including an in-place toggle.
+  if (listKey !== shownListKey) {
+    shownListKey = listKey;
+    const cached = queryClient.getQueryData<any[]>(options.queryKey);
+    workflows.value = cached ? shapeWorkflows(cached) : [];
+    lastUpdatedAt.value = cached
+      ? (queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? null)
+      : null;
+    loading.value = !cached;
+  }
+  fetching.value = true;
   forbidden.value = false;
   try {
-    const across = crossFolderActive.value;
-    const response = await workflowService.listWorkflows(
-      orgId.value,
-      folderId ?? activeFolderId.value,
-      across,
-      across ? filterQuery.value.trim() : undefined,
-    );
-    // list handler returns a bare array of Workflow.
-    const list = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
-    workflows.value = list.map((wf: any, index: number) => ({
-      ...wf,
-      "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-      trigger: triggerLabel(wf),
-      updated_at_display: formatTs(wf.updated_at),
-    }));
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const list = await queryClient.fetchQuery(options);
+    if (read !== latestRead) return;
+    workflows.value = shapeWorkflows(list);
+    // The cache records the fetch time; fetchQuery does not hand it back.
+    lastUpdatedAt.value = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
+    if (read !== latestRead) return;
     console.error(error);
     forbidden.value = error?.response?.status === 403;
   } finally {
-    loading.value = false;
+    if (read === latestRead) {
+      loading.value = false;
+      fetching.value = false;
+    }
   }
 };
+
+// Named handler: binding getWorkflows straight to @click would put the MouseEvent in `folderId`.
+const refreshWorkflows = () => getWorkflows(undefined, true);
+
+// Every workflow read shares this scope, so a write here expires the folder lists, searches and the alert form's picker.
+const invalidateWorkflowsCache = () =>
+  queryClient.invalidateQueries({ queryKey: workflowKeys.all(orgId.value) });
 
 // --- navigation --------------------------------------------------------------
 // Every child route carries the folder. The list is the PARENT route, so pushing
@@ -692,6 +733,7 @@ const toggleWorkflow = (row: any) => {
           : t("workflow.pauseSuccess", { name: row.name }),
         variant: "success",
       });
+      invalidateWorkflowsCache();
       getWorkflows();
     })
     .catch((error: any) => {
@@ -737,6 +779,7 @@ const deleteWorkflow = async () => {
       draft: !!row.is_draft,
     });
     toast({ message: t("workflow.deleteSuccess"), variant: "success" });
+    invalidateWorkflowsCache();
     await getWorkflows();
   } catch (error: any) {
     if (error?.response?.status !== 403) {
@@ -752,16 +795,19 @@ const deleteWorkflow = async () => {
 
 // Chained (not fire-and-forget) so restorePageIndex schedules its macrotask after the fetch's data update, not before.
 const onEditorSaved = async () => {
-  await getWorkflows();
+  invalidateWorkflowsCache();
+  await refreshWorkflows();
   restorePageIndex();
 };
 
 onMounted(async () => {
+  // Started first: the list does not need the folders, and a cached one should paint without waiting on them.
+  const listRead = getWorkflows();
   // FolderList reads the store, so the folders must be there before it renders.
   await getFoldersListByType(store, "workflows").catch((err: unknown) =>
     console.error("failed to load workflow folders", err),
   );
-  await getWorkflows();
+  await listRead;
   restorePageIndex();
 });
 </script>
