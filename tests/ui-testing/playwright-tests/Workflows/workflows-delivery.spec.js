@@ -69,6 +69,18 @@ test.describe(
       await pm.workflowsPage.testRunFromEditor({ liveSend: true });
       await pm.workflowsPage.expectNodeTestPassed('destination');
       await pm.workflowsPage.expectNodeTestPassed('workflow_trigger');
+
+      // A badge alone (✓ or rehearsal flask) is painted for a SUPPRESSED rehearsal too.
+      // Only the destination's OUTPUT distinguishes a real send: for the self-ingest
+      // sink that output is OpenObserve's own ingest receipt, where successful > 0 is
+      // delivery confirmed by the receiving side. Assert it here or a change that made
+      // every send silently suppress would still green this test.
+      const receipt = await pm.workflowsPage.destinationIngestReceipt();
+      testLogger.info('destination node output (ingest receipt)', { receipt });
+      const status = (receipt.status || [])[0] || {};
+      expect(status.name).toBe(sinkStream(id));
+      expect(status.successful).toBeGreaterThan(0);
+      expect(status.failed).toBe(0);
       testLogger.info('destination reported a successful send', { name });
     });
 
@@ -96,6 +108,59 @@ test.describe(
       expect(status.name).toBe(sinkStream(id));
       expect(status.successful).toBeGreaterThan(0);
       expect(status.failed).toBe(0);
+    });
+
+    // SUP-01 — the DEFAULT path, and the safety-critical half of the decision. A Test
+    // run that never touches the suppress switch must NOT dispatch, so a rehearsal can
+    // never page on-call. The destination still passes (it received records) but its
+    // output is the {"suppressed": true} preview, not a delivery receipt, and no sink
+    // stream is created.
+    test('SUP-01: a default test run suppresses the destination (no real send)', async () => {
+      const id = uniq();
+      const name = `wf_auto_del_${id}`;
+      await pm.workflowsPage.buildTriggerToDestinationAndSave({
+        name,
+        destName: `wf_auto_dest_${id}`,
+        url: sinkUrl(id),
+        headers: { Authorization: basicAuth() },
+      });
+      await pm.workflowsPage.goToList();
+      await pm.workflowsPage.openEdit(name);
+      // No liveSend — suppression stays ON. Runs the drawer with the default (safe) state.
+      await pm.workflowsPage.testRunFromEditor();
+      await pm.workflowsPage.expectNodeTestRehearsal('destination');
+
+      const preview = await pm.workflowsPage.destinationSuppressionPreview();
+      testLogger.info('destination node output (suppression preview)', { preview });
+      expect(preview.suppressed).toBe(true);
+      expect(preview.record_count).toBeGreaterThan(0);
+      expect(preview.destination_id).toBe(`wf_auto_dest_${id}`);
+      // A real delivery receipt carries status[]; its absence proves no sink was created.
+      expect(preview.status).toBeUndefined();
+      testLogger.info('default test run suppressed the destination', { name });
+    });
+
+    // SUP-02 — the warning banner is the ONLY signal that a run will dispatch for real.
+    // It must be absent by default and appear (naming the destination) only after the
+    // switch is flipped off.
+    test('SUP-02: toggling suppression off reveals the live-dispatch warning banner', async () => {
+      const id = uniq();
+      const name = `wf_auto_del_${id}`;
+      const destName = `wf_auto_dest_${id}`;
+      await pm.workflowsPage.buildTriggerToDestinationAndSave({
+        name,
+        destName,
+        url: sinkUrl(id),
+        headers: { Authorization: basicAuth() },
+      });
+      await pm.workflowsPage.goToList();
+      await pm.workflowsPage.openEdit(name);
+      await pm.workflowsPage.openTestDrawer();
+      await pm.workflowsPage.expectSuppressChecked(true);
+      await pm.workflowsPage.expectDispatchWarningAbsent();
+      await pm.workflowsPage.disableSuppression();
+      await pm.workflowsPage.expectDispatchWarningVisible(destName);
+      testLogger.info('live-dispatch warning banner appeared and named the destination', { destName });
     });
   }
 );
