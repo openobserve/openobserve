@@ -18,7 +18,10 @@ use axum::{
     response::Response,
 };
 use hashbrown::HashMap;
-use o2_enterprise::enterprise::cloud::{billing_group, billings};
+use o2_enterprise::enterprise::cloud::{
+    billing_group,
+    billings::{self, MeteringProvider},
+};
 
 use super::IntoHttpResponse;
 use crate::{
@@ -52,35 +55,30 @@ pub async fn get_org_usage(
     Path((org_id, query_range)): Path<(String, String)>,
     Query(query): Query<HashMap<String, String>>,
 ) -> Response {
-    let usage_range = match query_range.parse::<billings::org_usage::UsageRange>() {
-        Ok(usage_range) => usage_range,
-        Err(e) => return e.into_http_response(),
-    };
-    let unit = query.get("data_type").map(|h| h.as_str()).unwrap_or("mb");
-
-    let member_query = query.get("member").map(|h| h.as_str());
-
-    // if member is present in the query, check if it part of the member group, and if so use that
-    // else error out. If member is not present in the query, use the normal org_id
-    let query_org = if let Some(member) = member_query {
-        let members = match billing_group::list_billing_group_members_of(&org_id).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("error listing billing group members of {org_id} : {e}");
-                return MetaHttpResponse::internal_error(format!("error listing members : {e}"));
+    if let Ok(billings) =
+        o2_enterprise::enterprise::cloud::customer_billings::get_by_org_id(&org_id).await
+    {
+        // if subscription is present, and stripe is provider , and range is cycle and subscription
+        // id is present, we will try to get the cycle based usage
+        if let Some(b) = billings.first()
+            && b.provider == MeteringProvider::Stripe
+            && let Some(id) = &b.customer_id
+        {
+            match o2_enterprise::enterprise::cloud::billings::get_metering_details(id).await {
+                Ok(v) => {
+                    return MetaHttpResponse::json(serde_json::json!({
+                        "price_details":v
+                    }));
+                }
+                Err(e) => {
+                    return MetaHttpResponse::internal_error(format!(
+                        "error getting metering details : {e}"
+                    ));
+                }
             }
-        };
-
-        if members.iter().find(|m| m.member_org_id == member).is_none() {
-            return MetaHttpResponse::bad_request(format!("no member with org id {member} found"));
         }
-        member
-    } else {
-        &org_id
-    };
-
-    match org_usage::get_org_usage(&org_id, query_org, &usage_range, unit).await {
-        Err(e) => e.into_http_response(),
-        Ok(body) => MetaHttpResponse::json(body),
     }
+    MetaHttpResponse::json(serde_json::json!({
+        "price_details": serde_json::Value::Null,
+    }))
 }
