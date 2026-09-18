@@ -75,7 +75,7 @@ export default class LogsVisualise {
     const pipelineIdle = this.waitForVisualizePipelineIdle();
     await this.openVisualiseTab();
     await pipelineIdle;
-    await this.ensureTableChartSelected();
+    await this.ensureTableRendered();
   }
 
   // Opening the visualise tab decides the chart type asynchronously off the result_schema response (auto-selection first, then the VRL table override), so nothing may touch the panel until that traffic has finished and stayed quiet, or the chart type still changes under the test.
@@ -118,19 +118,35 @@ export default class LogsVisualise {
     }
   }
 
-  // The chart-type auto-selection above wins over a table click issued while it is still running, so re-select until the selection holds (VRL only works with the table chart type).
-  async ensureTableChartSelected(timeout = 30000) {
+  // The chart-type auto-selection wins over a table click issued while it is still running, and it can land even after the request wait above gives up (a loaded CI run can delay the tab's first request past that cap) - so re-select until the table renderer is on screen and has stayed there. VRL only works with the table chart type, so every caller needs that end state.
+  async ensureTableRendered({ timeout = 60000, quietMs = 1500 } = {}) {
     const tableChartItem = this.getChartTypeItem("table");
+    const tablePanel = this.getTablePanel();
     await tableChartItem.waitFor({ state: "visible", timeout: 10000 });
 
-    await expect(async () => {
-      if ((await tableChartItem.getAttribute("data-selected")) !== "true") {
-        await tableChartItem.click();
+    const deadline = Date.now() + timeout;
+    let renderedSince = null;
+    while (Date.now() < deadline) {
+      const isSelected =
+        (await tableChartItem.getAttribute("data-selected").catch(() => null)) === "true";
+      const isRendered = await tablePanel.isVisible().catch(() => false);
+
+      if (!isSelected) {
+        await tableChartItem.click({ timeout: 5000 }).catch(() => {});
+        renderedSince = null;
+      } else if (!isRendered) {
+        renderedSince = null;
+      } else if (renderedSince === null) {
+        renderedSince = Date.now();
+      } else if (Date.now() - renderedSince >= quietMs) {
+        return;
       }
-      await expect(tableChartItem).toHaveAttribute("data-selected", "true", {
-        timeout: 5000,
-      });
-    }).toPass({ timeout, intervals: [500, 1000, 2000] });
+      await this.page.waitForTimeout(250);
+    }
+
+    throw new Error(
+      "Visualise tab never settled on a rendered table chart (VRL requires the table type)"
+    );
   }
 
   //Apply: Logs
