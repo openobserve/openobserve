@@ -378,6 +378,74 @@ class APICleanup {
     }
 
     /**
+     * Create a dashboard with `panelCount` stacked bar panels, each laid out at
+     * full width (w:24, h:8) and offset vertically (y: 0, 9, 18, ...) so the grid
+     * is tall enough to exceed one print page. Used by the dashboard print-layout
+     * specs, which need a deterministic multi-panel grid geometry.
+     * @param {string} title - Dashboard title
+     * @param {number} [panelCount=4] - Number of stacked panels
+     * @param {string} [streamName='e2e_automate'] - Logs stream each panel queries
+     * @returns {Promise<{dashboardId: string, folderId: string}>}
+     */
+    async createDashboardWithStackedPanels(title, panelCount = 4, streamName = 'e2e_automate') {
+        const panels = [];
+        for (let i = 0; i < panelCount; i++) {
+            panels.push({
+                id: `Panel_ID${Date.now()}_${i}`,
+                type: 'bar',
+                title: `${title} Panel ${i + 1}`,
+                description: '',
+                config: { show_legends: false, decimals: 2, drilldown: [] },
+                queryType: 'sql',
+                queries: [
+                    {
+                        query: `SELECT histogram(_timestamp) as "x_axis_1", count(_timestamp) as "y_axis_1" FROM "${streamName}" GROUP BY x_axis_1`,
+                        vrlFunctionQuery: '',
+                        customQuery: false,
+                        fields: {
+                            stream: streamName,
+                            stream_type: 'logs',
+                            x: [{ label: 'Timestamp', alias: 'x_axis_1', column: '_timestamp', color: null, aggregationFunction: 'histogram' }],
+                            y: [{ label: 'Count', alias: 'y_axis_1', column: '_timestamp', color: '#5960b2', aggregationFunction: 'count' }],
+                            z: [],
+                            breakdown: [],
+                            filter: { filterType: 'group', logicalOperator: 'AND', conditions: [] },
+                        },
+                        config: { promql_legend: '', layer_type: 'scatter', weight_fixed: 1, limit: 0, min: 0, max: 100 },
+                    },
+                ],
+                layout: { x: 0, y: i * 9, w: 24, h: 8, i: i + 1 },
+            });
+        }
+        const payload = {
+            version: 5,
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels }],
+            variables: {},
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent('default')}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createDashboardWithStackedPanels: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const inner = result[`v${result.version}`] || result;
+        const dashboardId = inner.dashboardId || inner.dashboard_id || result.dashboard_id || result.id;
+        testLogger.info('Created dashboard with stacked panels', { dashboardId, panelCount, folderId: 'default' });
+        return { dashboardId, folderId: 'default' };
+    }
+
+    /**
      * Delete a single dashboard
      * @param {string} dashboardId - The dashboard ID
      * @param {string} folderId - The folder ID
