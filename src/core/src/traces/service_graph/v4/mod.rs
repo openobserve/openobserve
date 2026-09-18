@@ -15,6 +15,7 @@
 
 //! Service graph v4: per-window rollup of trace streams into `traces_service_graph_*` metrics.
 
+pub mod read;
 pub mod resolution;
 pub mod resolve;
 pub mod schedule;
@@ -42,6 +43,8 @@ pub const NODE_HARD_CAP: usize = 15_000;
 pub const LEARN_SAMPLE: u32 = 64;
 /// An offset further behind than this jumps to the present; there is no history backfill.
 pub const MAX_BACKLOG_MICROS: i64 = 24 * 3600 * SECOND_MICRO_SECS;
+/// With `O2_SERVICE_GRAPH_V1_AUTO_STOP` on, v1 stops once v4 has run this long; not configurable.
+pub const V1_STOP_AFTER_MICROS: i64 = 7 * 24 * 3600 * SECOND_MICRO_SECS;
 pub const PROCESSED_TIMESTAMP_STREAM: &str = "traces_service_graph_processed_timestamp";
 /// Ancestor levels the JOIN form of Q5/Q6 climbs to find the owning agent (design §4.2).
 pub const AGENT_INHERIT_DEPTH: usize = 4;
@@ -59,16 +62,19 @@ pub(crate) static ORG_RETAINED: LazyLock<DashMap<String, (usize, usize)>> =
     LazyLock::new(DashMap::new);
 /// `started_at` is write-once per process; this guard avoids a meta-db read on every window.
 pub(crate) static STARTED_AT_WRITTEN: AtomicBool = AtomicBool::new(false);
+/// `v1/stopped` is write-once, so a true reading never has to be repeated.
+pub(crate) static V1_STOPPED_SEEN: AtomicBool = AtomicBool::new(false);
 
 pub type StateRef = Arc<Mutex<StreamState>>;
 pub type TableRef = Arc<RwLock<ResolutionTable>>;
 
-/// The three env-backed knobs plus the reused `ZO_CACHE_DELAY_SECS`; nothing else is configurable.
+/// The four env-backed knobs plus the reused `ZO_CACHE_DELAY_SECS`; nothing else is configurable.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
     pub interval_secs: u64,
     pub flush_secs: u64,
     pub cache_delay_secs: i64,
+    pub v1_auto_stop: bool,
 }
 
 impl Settings {
@@ -79,6 +85,7 @@ impl Settings {
             interval_secs: sg.interval_secs,
             flush_secs: sg.flush_secs.max(1),
             cache_delay_secs: config::get_config().limit.cache_delay_secs,
+            v1_auto_stop: sg.v1_auto_stop,
         }
     }
 
@@ -110,6 +117,7 @@ mod tests {
             interval_secs: 60,
             flush_secs: 60,
             cache_delay_secs: 300,
+            v1_auto_stop: false,
         };
         assert_eq!(s.flush_micros(), 60 * SECOND_MICRO_SECS);
         assert_eq!(

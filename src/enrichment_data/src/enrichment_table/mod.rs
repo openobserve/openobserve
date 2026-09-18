@@ -177,7 +177,7 @@ pub async fn save_enrichment_data(
     let db_schema = stream_schema_map
         .get(&stream_name)
         .map(|s| s.schema().as_ref().clone())
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(Schema::empty);
     if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
         log::error!("Schema mismatch for enrichment table {org_id}/{stream_name}");
         return Ok(MetaHttpResponse::error_with_header(

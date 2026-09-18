@@ -25,14 +25,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <nav
-    class="bg-surface-panel flex h-full min-h-0 flex-col"
+    class="bg-surface-panel flex h-full min-h-0 flex-col max-md:h-auto"
     :aria-label="ariaLabel"
     data-test="dbm-metrics-rail"
   >
-    <div class="flex-1 overflow-y-auto px-1.5 pt-2 pb-3">
+    <div class="flex-1 overflow-y-auto px-1.5 pt-2 pb-3 max-md:pt-0 max-md:pb-0">
       <OTabs
         :model-value="activeKey ?? ''"
-        orientation="vertical"
+        :orientation="isMobile ? 'horizontal' : 'vertical'"
         class="w-full"
         @change="onTabChange"
       >
@@ -41,7 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="item.key"
           :name="item.key"
           :label="item.label"
-          class="w-full"
+          :class="{ 'w-full': !isMobile }"
           :data-test="`dbm-metrics-rail-item-${item.key}`"
           @click="emit('select', item.key)"
         />
@@ -51,6 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import useBreakpoint from "@/composables/useBreakpoint";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import type { I18nText } from "@/types/i18n";
@@ -68,6 +69,8 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ select: [key: string] }>();
+
+const { isMobile } = useBreakpoint();
 
 // OTabs requires @change; selection is handled per-tab so the jump fires even
 // when the clicked tab is already the active one.

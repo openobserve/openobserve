@@ -104,7 +104,7 @@ pub async fn get_usage(
 pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLicenseUsageResponse> {
     let node = get_node_by_uuid(&node_id)
         .await
-        .ok_or(anyhow::anyhow!("node {node_id} not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("node {node_id} not found"))?;
     let node = std::sync::Arc::new(node) as std::sync::Arc<dyn NodeInfo>;
 
     let task = tokio::task::spawn(async move {

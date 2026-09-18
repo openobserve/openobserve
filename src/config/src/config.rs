@@ -79,7 +79,10 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // last_alert_fired_at, alert_budget_per_day, and last_recovery_notified_at —
 // one bump for the whole anomaly phase, same rationale as 79.
 // 82: add profiles_streams to service_streams.
-pub const DB_SCHEMA_VERSION: u64 = 82;
+// 83: add folder_id to workflows.
+// 84: add folder_id to workflow_drafts.
+// 85: create llm_experiment_slot_retries.
+pub const DB_SCHEMA_VERSION: u64 = 85;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -471,6 +474,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         SyntheticsReloadClass::Hot,
     ),
+    (
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        SyntheticsReloadClass::Hot,
+    ),
 ];
 
 /// The warning an operator sees when they change a key a reload cannot carry.
@@ -503,6 +510,7 @@ pub(crate) fn synthetics_restart_required_changes(
         max_check_budget_secs: _,
         job_lease_secs: _,
         max_net_timeout_ms: _,
+        browser_max_steps: _,
         browsers: _,
         devices: _,
         scheduler_jitter_enabled: _,
@@ -1106,6 +1114,14 @@ pub struct Synthetics {
         help = "Ceiling for one attempt of a non-browser check, in milliseconds."
     )]
     pub max_net_timeout_ms: u32,
+    /// How many steps one browser journey may hold. The 256KB `config` payload
+    /// cap still binds above roughly 200, whatever this says.
+    #[env_config(
+        name = "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
+        default = 50,
+        help = "How many steps one browser journey may hold."
+    )]
+    pub browser_max_steps: usize,
     /// Comma-separated list of enabled browser engine names.
     /// Probe must have the corresponding Lambda function deployed.
     /// firefox temporarily disabled by default — re-add once ready.
@@ -1859,8 +1875,8 @@ pub struct Common {
     pub feature_shared_memtable_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_WAL_PACK_ENABLED",
-        default = false,
-        help = "Persist memtables into packed wal files (one file per rotation instead of one file per stream)"
+        default = true,
+        help = "Persist metrics memtables into packed wal files (one file per rotation instead of one file per stream)"
     )]
     pub feature_wal_pack_enabled: bool,
     #[env_config(name = "ZO_UI_ENABLED", default = true)]
@@ -2317,8 +2333,8 @@ pub struct Limit {
     #[env_config(
         name = "ZO_MEM_TABLE_BUCKET_NUM",
         default = 0,
-        help = "MemTable bucket num, default is 1"
-    )] // default is 1
+        help = "MemTable bucket num, 0 derives it from the memtable budget: ZO_MEM_TABLE_MAX_SIZE / ZO_MAX_FILE_SIZE_IN_MEMORY / 2, between 1 and the cpu num"
+    )]
     pub mem_table_bucket_num: usize,
     #[env_config(name = "ZO_MEM_PERSIST_INTERVAL", default = 2)] // seconds
     pub mem_persist_interval: u64,
@@ -4105,7 +4121,11 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         cfg.limit.mem_table_max_size *= 1024 * 1024;
     }
     if cfg.limit.mem_table_bucket_num == 0 {
-        cfg.limit.mem_table_bucket_num = 1;
+        cfg.limit.mem_table_bucket_num = default_mem_table_bucket_num(
+            cfg.limit.mem_table_max_size,
+            cfg.limit.max_file_size_in_memory,
+            cfg.limit.cpu_num,
+        );
     }
 
     // wal
@@ -4196,6 +4216,16 @@ pub fn deverbatim(path: &Path) -> std::borrow::Cow<'_, str> {
         }
     }
     path.to_string_lossy()
+}
+
+/// Half of what the budget holds, so full memtables can rotate out while the next ones fill.
+fn default_mem_table_bucket_num(
+    mem_table_max_size: usize,
+    max_file_size_in_memory: usize,
+    cpu_num: usize,
+) -> usize {
+    let by_memory = mem_table_max_size / max_file_size_in_memory.max(1) / 2;
+    by_memory.clamp(1, cpu_num.max(1))
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
@@ -4774,6 +4804,7 @@ mod tests {
         "ZO_SYNTHETICS_JOB_LEASE_SECS",
         "ZO_SYNTHETICS_MAX_NET_TIMEOUT_MS",
         "ZO_SYNTHETICS_BROWSERS",
+        "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
         "ZO_SYNTHETICS_DEVICES",
         "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
         "ZO_SYNTHETICS_ORPHAN_DETECTION_ENABLED",
@@ -4796,8 +4827,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            14,
-            "Synthetics has 14 keys; every one needs a reload class"
+            15,
+            "Synthetics has 15 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4823,6 +4854,7 @@ mod tests {
                 "ZO_SYNTHETICS_AGENT_STALE_SECS",
                 "ZO_SYNTHETICS_API_ENDPOINT",
                 "ZO_SYNTHETICS_BROWSERS",
+                "ZO_SYNTHETICS_BROWSER_MAX_STEPS",
                 "ZO_SYNTHETICS_DEVICES",
                 "ZO_SYNTHETICS_INSTALL_SCRIPT_URL",
                 "ZO_SYNTHETICS_JOB_LEASE_SECS",
@@ -4884,6 +4916,7 @@ mod tests {
         cfg.max_check_budget_secs += 1;
         cfg.job_lease_secs += 1;
         cfg.max_net_timeout_ms += 1;
+        cfg.browser_max_steps += 1;
         cfg.browsers = "chromium,firefox".to_string();
         cfg.devices = "desktop:800:600".to_string();
         cfg.scheduler_jitter_enabled = !cfg.scheduler_jitter_enabled;
@@ -5502,6 +5535,61 @@ mod tests {
         assert_eq!(cfg.pipeline.remote_stream_wal_dir, "/custom/wal/");
         assert_eq!(cfg.pipeline.offset_flush_interval, 5);
         assert_eq!(cfg.pipeline.remote_request_max_retry_time, 3600);
+    }
+
+    #[test]
+    fn test_default_mem_table_bucket_num() {
+        let mb = 1024 * 1024;
+        // 32 GB holds 64 memtables of 512 MB; half of that, then the core count caps it
+        assert_eq!(
+            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 64),
+            32
+        );
+        assert_eq!(
+            default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 28),
+            28
+        );
+        assert_eq!(default_mem_table_bucket_num(4 * 1024 * mb, 512 * mb, 28), 4);
+        assert_eq!(
+            default_mem_table_bucket_num(4 * 1024 * mb, 128 * mb, 28),
+            16
+        );
+        // a budget of one memtable or less still gets one bucket
+        assert_eq!(default_mem_table_bucket_num(512 * mb, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(0, 512 * mb, 28), 1);
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 0, 28), 28);
+        assert_eq!(default_mem_table_bucket_num(32 * 1024 * mb, 512 * mb, 0), 1);
+    }
+
+    #[test]
+    fn test_check_memory_config_derives_mem_table_bucket_num() {
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 8 * 1024;
+        cfg.limit.mem_table_bucket_num = 0;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 8);
+
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 2 * 1024;
+        cfg.limit.mem_table_bucket_num = 0;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 2);
+
+        // an explicit value is kept as is
+        let mut cfg = Config::default();
+        cfg.common.node_role = "all".to_string();
+        cfg.limit.cpu_num = 8;
+        cfg.limit.max_file_size_in_memory = 512 * 1024 * 1024;
+        cfg.limit.mem_table_max_size = 8 * 1024;
+        cfg.limit.mem_table_bucket_num = 3;
+        check_memory_config(&mut cfg).unwrap();
+        assert_eq!(cfg.limit.mem_table_bucket_num, 3);
     }
 
     #[test]

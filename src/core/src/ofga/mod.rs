@@ -70,6 +70,7 @@ struct PendingMigrations {
     oncall: bool,
     annotation_queues_datasets: bool,
     llm_workbench: bool,
+    workflow_folders: bool,
 }
 
 pub async fn init() -> Result<(), anyhow::Error> {
@@ -346,6 +347,18 @@ pub async fn init() -> Result<(), anyhow::Error> {
                         }
                     }
                 }
+                if pending.workflow_folders {
+                    match migrations::migrate_workflow_folders().await {
+                        Ok(_) => {
+                            log::info!("[OFGA:Local] Workflow folders migrated to openfga");
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "[OFGA:Local] Error migrating workflow folders to openfga: {e}"
+                            );
+                        }
+                    }
+                }
                 if pending.report_folders {
                     match migrations::migrate_report_folders().await {
                         Ok(_) => {
@@ -494,6 +507,9 @@ fn all_org_ownership_keys(pending: &PendingMigrations) -> Vec<&'static str> {
     if pending.annotation_queues_datasets {
         keys.extend(["annotation_queues", "datasets"]);
     }
+    if pending.workflow_folders {
+        keys.push("workflow_folder");
+    }
     keys
 }
 
@@ -529,6 +545,7 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     let v0_0_39 = version_compare::Version::from("0.0.39").unwrap();
     let v0_0_42 = version_compare::Version::from("0.0.42").unwrap();
     let v0_0_46 = version_compare::Version::from("0.0.46").unwrap();
+    let v0_0_47 = version_compare::Version::from("0.0.47").unwrap();
 
     if meta_version > v0_0_5 && existing_model_version < v0_0_6 {
         pending.pipeline = true;
@@ -624,6 +641,10 @@ fn pending_migrations(latest: &str, existing: &str) -> PendingMigrations {
     if existing_model_version < v0_0_46 {
         log::info!("[OFGA:Local] on-call permissions migration needed");
         pending.oncall = true;
+    }
+    if existing_model_version < v0_0_47 {
+        log::info!("[OFGA:Local] workflow folders permissions migration needed");
+        pending.workflow_folders = true;
     }
 
     pending
