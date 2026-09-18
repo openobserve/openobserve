@@ -26,7 +26,7 @@ use promql_parser::{
     parser::{
         AggregateExpr, BinModifier, BinaryExpr, Call, Expr as PromExpr, Function, FunctionArgs,
         LabelModifier, MatrixSelector, NumberLiteral, Offset, ParenExpr, StringLiteral, UnaryExpr,
-        VectorMatchCardinality, VectorSelector, token,
+        VectorMatchCardinality, VectorSelector, token, value::ValueType,
     },
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
@@ -241,15 +241,10 @@ impl Engine {
                 let return_bool = expr.return_bool();
                 let op = expr.op.is_comparison_operator();
 
-                // This is a very special case, as we treat the float also a
-                // `Value::Matrix(vec![element])` therefore, better convert it
-                // back to its representation.
-                let rhs = match rhs {
-                    Value::Matrix(m) if m.len() == 1 && m[0].samples.len() == 1 => {
-                        Value::Float(m[0].samples[0].value)
-                    }
-                    _ => rhs,
-                };
+                let lhs = scalar_operand(lhs, &expr.lhs, &self.eval_ctx);
+                let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
+                let lhs_scalar = expr.lhs.value_type() == ValueType::Scalar;
+                let rhs_scalar = expr.rhs.value_type() == ValueType::Scalar;
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value = binaries::scalar_binary_operations(
@@ -260,6 +255,17 @@ impl Engine {
                             op,
                         )?;
                         Value::Float(value)
+                    }
+                    // a range-query scalar is one label-less series that label matching would drop
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if rhs_scalar && !lhs_scalar && right.len() == 1 =>
+                    {
+                        binaries::vector_step_scalar_bin_op(expr, left, &right[0].samples, false)?
+                    }
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if lhs_scalar && !rhs_scalar && left.len() == 1 =>
+                    {
+                        binaries::vector_step_scalar_bin_op(expr, right, &left[0].samples, true)?
                     }
                     (Value::Matrix(left), Value::Matrix(right)) => {
                         binaries::vector_bin_op(expr, left, right)?
@@ -1343,6 +1349,22 @@ fn get_offset_modifier(offset: Option<Offset>) -> i64 {
         }
     } else {
         0
+    }
+}
+
+/// Folds a scalar-typed instant operand back into a scalar without broadcasting range samples.
+fn scalar_operand(value: Value, expr: &PromExpr, eval_ctx: &EvalContext) -> Value {
+    // a one-sample vector is not a scalar: it keeps its labels for matching
+    match value {
+        Value::Matrix(m)
+            if eval_ctx.is_instant()
+                && expr.value_type() == ValueType::Scalar
+                && m.len() == 1
+                && m[0].samples.len() == 1 =>
+        {
+            Value::Float(m[0].samples[0].value)
+        }
+        other => other,
     }
 }
 
@@ -2949,6 +2971,95 @@ mod tests {
             clusters: vec![],
             is_super_cluster: false,
         })
+    }
+
+    /// Evaluates `query` on the empty mock provider over `steps` one-minute steps.
+    async fn eval_on_empty(query: &str, steps: i64) -> Result<Value> {
+        let trace_id = "test_trace";
+        let ctx = Arc::new(PromqlContext::new(
+            create_test_query_ctx(trace_id, "test_org", 30),
+            SimpleMockProvider,
+            vec![],
+        ));
+        let start = 1640995200000000i64;
+        let eval_ctx = EvalContext::new(
+            start,
+            start + (steps - 1) * 60000000,
+            60000000,
+            trace_id.to_string(),
+        );
+        let expr = promql_parser::parser::parse(query).unwrap();
+        Engine::new(trace_id, ctx, eval_ctx).exec_expr(&expr).await
+    }
+
+    fn matrix(value: Value) -> Vec<RangeValue> {
+        match value {
+            Value::Matrix(series) => series,
+            other => panic!("expected a matrix, got {:?}", other.get_type()),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sparse_scalar_operands_preserve_timestamps() {
+        for (filter, timestamp) in [
+            ("== 1640995200", 1640995200000000),
+            (">= 1640995320", 1640995320000000),
+        ] {
+            let sparse = format!("scalar(timestamp(vector(1)) {filter})");
+            for query in [
+                format!("{sparse} + vector(1)"),
+                format!("vector(1) + {sparse}"),
+            ] {
+                let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+                assert_eq!(series.len(), 1, "{query}");
+                // a scalar holds a value at every step, so a rejected step is NaN, not absent
+                assert_eq!(series[0].samples.len(), 3, "{query}");
+                let matched: Vec<_> = series[0]
+                    .samples
+                    .iter()
+                    .filter(|sample| !sample.value.is_nan())
+                    .collect();
+                assert_eq!(matched.len(), 1, "{query}");
+                assert_eq!(matched[0].timestamp, timestamp, "{query}");
+                assert_eq!(
+                    matched[0].value,
+                    timestamp as f64 / 1_000_000.0 + 1.0,
+                    "{query}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_scalar_operand_broadcasts_to_labelled_series() {
+        let labelled = r#"label_replace(vector(6), "job", "x", "", "")"#;
+        for (query, expected) in [
+            (format!("{labelled} / scalar(vector(3))"), 2.0),
+            (format!("scalar(vector(3)) / {labelled}"), 0.5),
+            (format!("{labelled} > scalar(vector(3))"), 6.0),
+            (format!("scalar(vector(3)) < {labelled}"), 6.0),
+        ] {
+            let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            assert_eq!(series[0].labels.len(), 1, "{query}");
+            assert_eq!(series[0].labels[0].value, "x", "{query}");
+            let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+            assert_eq!(values, vec![expected; 3], "{query}");
+        }
+    }
+
+    #[test]
+    fn test_scalar_operand_keeps_single_step_range_timestamp() {
+        let eval_ctx = EvalContext::new(1_000_000, 1_500_000, 1_000_000, "test".into());
+        assert_eq!(eval_ctx.timestamps(), vec![1_000_000]);
+        let expr = promql_parser::parser::parse("scalar(vector(1))").unwrap();
+        let value = Value::Matrix(vec![RangeValue {
+            samples: vec![Sample::new(1_000_000, 1.0)],
+            ..Default::default()
+        }]);
+        let series = matrix(scalar_operand(value, &expr, &eval_ctx));
+        assert_eq!(series[0].samples[0].timestamp, 1_000_000);
+        assert_eq!(series[0].samples[0].value, 1.0);
     }
 
     // Helper function to create test EvalContext
