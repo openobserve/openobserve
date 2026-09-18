@@ -130,10 +130,11 @@ describe("SplunkHec", () => {
       wrapper = createWrapper();
       const parsed = JSON.parse(wrapper.vm.payloadContent);
       expect(parsed.index).toBe("application");
-      // Fractional epoch SECONDS, which is what the collector reads. Asserted as
-      // a range: a literal pins a date that silently ages out of the window.
-      expect(parsed.time).toBeGreaterThan(1_000_000_000);
-      expect(parsed.time).toBeLessThan(10_000_000_000);
+      // Fractional epoch SECONDS, which is what the collector reads, and within the
+      // ingestion window: a literal ages out and is then discarded behind a code 0.
+      const nowSeconds = Date.now() / 1000;
+      expect(parsed.time).toBeGreaterThan(nowSeconds - 60);
+      expect(parsed.time).toBeLessThanOrEqual(nowSeconds + 60);
       expect(parsed.time % 1).not.toBe(0);
       expect(parsed.host).toBeDefined();
       expect(parsed.source).toBeDefined();

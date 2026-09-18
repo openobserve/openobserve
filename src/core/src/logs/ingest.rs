@@ -766,12 +766,7 @@ fn is_wholly_discarded(status: &RecordStatus) -> bool {
 fn warn_and_count_discards(org_id: &str, endpoint: &str, status: &StreamStatus) {
     if status.status.policy_dropped > 0 {
         metrics::INGEST_RECORDS_DROPPED
-            .with_label_values(&[
-                org_id,
-                StreamType::Logs.as_str(),
-                &status.name,
-                "ingestion_window",
-            ])
+            .with_label_values(&[org_id, StreamType::Logs.as_str(), "ingestion_window"])
             .inc_by(status.status.policy_dropped as u64);
     }
     if status.status.failed == 0 {

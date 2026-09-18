@@ -188,10 +188,12 @@ export default defineComponent({
   -H "Authorization: Splunk [SPLUNK_HEC_TOKEN]" \\
   -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default"}'`;
 
+    // Rendered at page load, not a literal: this block is copyable too, and any
+    // fixed epoch eventually ages out of the window and is silently discarded.
     const payloadContent = `{
   "event": { "level": "info", "log": "test message for openobserve" },
   "index": "application",
-  "time": 1758184800.123,
+  "time": ${(Date.now() / 1000).toFixed(3)},
   "host": "web-01",
   "source": "/var/log/app.log",
   "sourcetype": "app:json"

@@ -2599,7 +2599,11 @@ pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
-/// Records the write path dropped by policy, which every route answers with a success status.
+/// Count of records dropped by an ingestion policy on the write path, which still answers success.
+///
+/// Not labelled by stream: streams are auto-created from client-supplied names, and this fires on
+/// a path a client controls, so a per-stream label is unbounded cardinality. The warn log carries
+/// the name.
 pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -2608,7 +2612,7 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
-        &["organization", "stream_type", "stream", "reason"],
+        &["organization", "stream_type", "reason"],
     )
     .expect("Metric created")
 });
