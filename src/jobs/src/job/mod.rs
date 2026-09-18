@@ -27,6 +27,8 @@ use {
 
 use crate::common::meta::user::{UserOrgRole, UserRequest};
 
+#[cfg(feature = "enterprise")]
+mod agent_signals;
 mod alert_eval_ledger_reaper;
 mod alert_group_reaper;
 #[cfg(feature = "enterprise")]
@@ -725,6 +727,8 @@ pub async fn init() -> Result<(), anyhow::Error> {
     tokio::task::spawn(stats::run());
     tokio::task::spawn(compactor::run());
     tokio::task::spawn(flatten_compactor::run());
+    #[cfg(feature = "enterprise")]
+    tokio::task::spawn(agent_signals::run());
     #[cfg(feature = "enterprise")]
     tokio::task::spawn(service_graph::run());
     // No cfg, unlike service_graph above: parts of DBM's read API are

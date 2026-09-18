@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <transition name="slide-fade">
       <div
         v-if="show"
-        class="charts-wrapper h-40 min-h-[8.5rem] overflow-hidden py-0! will-change-[transform,opacity]"
+        class="charts-wrapper dashboard-strip h-40 min-h-[8.5rem] overflow-hidden py-0! will-change-[transform,opacity]"
       >
         <div class="dark:border-[rgba(255,255,255,0.1)] dark:hover:shadow-sm">
           <RenderDashboardCharts
