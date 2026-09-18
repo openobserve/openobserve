@@ -2989,6 +2989,57 @@ mod tests {
             assert!(records[0].get("zone").is_none());
         }
 
+        // ---- OTLP per-point metadata: `start_time` and `flag` are not dimensions
+
+        /// A cumulative counter restarts and reports a new `start_time` for the same stream. That
+        /// is the collector behaving correctly, so it must not cost the series its identity.
+        #[test]
+        fn test_process_sum_start_time_does_not_fork_the_series() {
+            let restarted = NumberDataPoint {
+                start_time_unix_nano: 1_700_000_000_000_000_000,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = sum_records(vec![number_dp(1.0, vec![attr("pod", "a")]), restarted]);
+
+            assert_eq!(records.len(), 2);
+            assert_ne!(
+                records[0]["start_time"], records[1]["start_time"],
+                "the two points must genuinely differ in start_time, or this proves nothing"
+            );
+            assert_eq!(
+                records[0][HASH_LABEL], records[1][HASH_LABEL],
+                "a restart must not fork one counter into two series"
+            );
+        }
+
+        /// A staleness marker flips `flag` to `DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK` on a
+        /// stream that is otherwise the same series.
+        #[test]
+        fn test_process_gauge_flag_does_not_fork_the_series() {
+            let stale = NumberDataPoint {
+                flags: 1,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
+
+            assert_eq!(records.len(), 2);
+            assert_ne!(records[0]["flag"], records[1]["flag"]);
+            assert_eq!(
+                records[0][HASH_LABEL], records[1][HASH_LABEL],
+                "a staleness marker must not fork the series"
+            );
+        }
+
+        /// The columns are still written and still queryable; only their hold on series identity
+        /// is dropped.
+        #[test]
+        fn test_per_point_metadata_is_still_recorded() {
+            let records = sum_records(vec![number_dp(1.0, vec![])]);
+
+            assert_eq!(records[0]["start_time"], json!("0"));
+            assert_eq!(records[0]["flag"], json!("DATA_POINT_FLAGS_DO_NOT_USE"));
+        }
+
         // ---- classic histogram
 
         #[test]
