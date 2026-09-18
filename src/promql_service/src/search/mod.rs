@@ -564,7 +564,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.samples.iter().for_each(|v| {
+        ser.samples.iter().chain(ser.sample.iter()).for_each(|v| {
             entry.insert(v.time, v.value);
         });
         merged_metrics.insert(signature(&labels), labels);
@@ -746,6 +746,50 @@ fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_merge_matrix_preserves_instant_worker_sample_with_cached_prefix() {
+        let latest = Sample::new(3_000_000, 3.0);
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        for (worker_value, expected_labels) in [
+            (Value::Sample(latest), Labels::default()),
+            (
+                Value::Vector(vec![InstantValue {
+                    labels: labels.clone(),
+                    sample: latest,
+                }]),
+                labels,
+            ),
+        ] {
+            let mut response = cluster_rpc::MetricsQueryResponse::default();
+            grpc::add_value(&mut response, worker_value);
+            grpc::add_value(
+                &mut response,
+                Value::Matrix(vec![RangeValue::new(
+                    expected_labels.clone(),
+                    vec![Sample::new(1_000_000, 1.0), Sample::new(2_000_000, 2.0)],
+                )]),
+            );
+
+            let value = merge_matrix_query(&response.series, "test_instant_worker_merge")
+                .await
+                .unwrap();
+            let Value::Matrix(matrix) = value else {
+                panic!("expected matrix result");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels, expected_labels);
+            let samples: Vec<_> = matrix[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect();
+            assert_eq!(
+                samples,
+                vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
+            );
+        }
+    }
 
     #[test]
     fn test_should_truncate_series_within_limit() {
