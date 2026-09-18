@@ -30,9 +30,6 @@ const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPrevie
 const ChartRenderer = defineAsyncComponent(
   () => import("@/components/dashboards/panels/ChartRenderer.vue"),
 );
-const TableRenderer = defineAsyncComponent(
-  () => import("@/components/dashboards/panels/TableRenderer.vue"),
-);
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
@@ -86,30 +83,19 @@ const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
 
-const cols = computed((): string[] => {
-  if (!events.value.length) return [];
-  const keys = Object.keys(events.value[0]);
-  return [
-    ...keys.filter((k) => k === "_timestamp"),
-    ...keys.filter((k) => k !== "_timestamp" && !k.startsWith("_")),
-  ];
-});
-// Feed the dashboard table-panel renderer so results match native table panels.
-const tableData = computed(() => ({
-  columns: [
-    ...(cols.value.length ? cols.value : ["_timestamp", "source"]).map((f) => ({
-      name: f,
-      field: f,
-      label: f === "_timestamp" ? t("panel.logExplorer.timestamp") : f,
-      align: "left",
-      ...(f === "_timestamp" ? { format: (v: any) => fmtTs(v) } : {}),
-    })),
-    // Trailing right-pinned open-insights affordance (rendered via #cell-__action).
-    { name: "__action", field: "__action", label: "", pinned: "right", size: 48, minSize: 48 },
-  ],
-  rows: events.value,
-}));
 const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+
+// Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
+const resultExpandedIdx = ref(new Set<number>());
+function toggleResultExpand(i: number) {
+  const next = new Set(resultExpandedIdx.value);
+  if (next.has(i)) next.delete(i);
+  else next.add(i);
+  resultExpandedIdx.value = next;
+}
+function isResultExpanded(i: number) {
+  return resultExpandedIdx.value.has(i);
+}
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 const customSql = ref("");
@@ -583,6 +569,7 @@ async function runSql(sql: string, fromOffset: number) {
     );
     events.value = res.data?.hits ?? [];
     total.value = res.data?.total ?? events.value.length;
+    resultExpandedIdx.value = new Set();
   } catch (e: any) {
     errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
     events.value = [];
@@ -787,44 +774,69 @@ function openInLogs() {
         data-test="log-explorer-results-table"
       >
         <OInnerLoading :showing="loading" size="sm" :label="t('common.loading')" />
-        <TableRenderer
-          :data="tableData"
-          :show-pagination="false"
-          class="min-h-0 flex-1"
-          @row-click="(_evt: any, row: any) => openEventDetail(row)"
+
+        <!-- Empty state (after the fetch settles) -->
+        <div
+          v-if="!loading && !events.length"
+          class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10"
         >
-          <!-- Plain clickable icon (16px) — visible chevron that stays under the 22px row height. -->
-          <template #cell-__action="{ row }">
-            <div class="flex h-full w-full items-center justify-end">
+          <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
+          <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
+          <code
+            class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
+            >{{ customSql }}</code
+          >
+        </div>
+
+        <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
+        <div v-else class="min-h-0 flex-1 overflow-y-auto">
+          <template v-for="(ev, i) in events" :key="i">
+            <div
+              class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
+              @click="toggleResultExpand(i)"
+            >
+              <button
+                class="dld-expand-btn shrink-0"
+                :aria-label="isResultExpanded(i) ? t('common.collapse') : t('common.expand')"
+                @click.stop="toggleResultExpand(i)"
+              >
+                <OIcon :name="isResultExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
+              </button>
+              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
+                fmtTs(ev._timestamp)
+              }}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-xs">
+                <LogsHighLighting :data="ev" :show-braces="true" />
+              </span>
               <span
-                class="text-text-secondary hover:text-accent flex cursor-pointer"
+                class="text-text-secondary hover:text-accent flex shrink-0 cursor-pointer"
                 data-test="log-explorer-row-open"
-                @click.stop="openEventDetail(row)"
+                @click.stop="openEventDetail(ev)"
               >
                 <OIcon name="chevron-right" size="sm" />
                 <OTooltip :content="t('panel.logExplorer.detail.insights')" />
               </span>
             </div>
-          </template>
-          <!-- Always render a container so TableRenderer's default "No Data" fallback
-               never triggers; the loader overlay covers this while fetching. -->
-          <template #empty>
-            <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
-              <template v-if="!loading">
-                <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
-                <span class="text-text-secondary text-sm">{{
-                  t("panel.logExplorer.noEvents")
-                }}</span>
-                <code
-                  class="text-text-secondary bg-surface-subtle rounded-default max-w-full overflow-x-auto px-3 py-2 text-center font-mono text-xs break-all whitespace-pre-wrap"
-                  >{{ customSql }}</code
-                >
-              </template>
+            <div
+              v-if="isResultExpanded(i)"
+              class="dld-json-preview border-border-default bg-surface-panel border-b px-2 py-2"
+              @click.stop
+            >
+              <JsonPreview
+                :value="ev"
+                mode="sidebar"
+                :stream-name="stream"
+                :show-copy-button="true"
+                hide-view-related
+                hide-search-term-actions
+                hide-field-options
+                @copy="copyToClipboard"
+              />
             </div>
           </template>
-        </TableRenderer>
+        </div>
 
-        <!-- Server pagination: TableRenderer shows one loaded page; controls fetch the next. -->
+        <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
         <div
           v-if="total > 0"
           class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
