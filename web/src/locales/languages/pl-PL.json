@@ -14690,7 +14690,6 @@
       "updateFailed": "Nie udało się zaktualizować kontroli."
     },
     "validation": {
-      "firstStepMustNavigate": "Pierwszym krokiem musi być \"Nawigacja\"",
       "locationsRequired": "Wybierz co najmniej jedną lokalizację",
       "nameRequired": "Nazwa jest wymagana",
       "locatorRequired": "Dodaj co najmniej jeden lokalizator, aby ten krok wiedział, na którym elemencie działać",

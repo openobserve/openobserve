@@ -14690,7 +14690,6 @@
       "updateFailed": "チェックの更新に失敗しました。"
     },
     "validation": {
-      "firstStepMustNavigate": "最初のステップは「ナビゲート」である必要があります。",
       "locationsRequired": "少なくとも1つのロケーションを選択してください",
       "nameRequired": "名前は必須です",
       "locatorRequired": "このステップが操作する要素を認識できるように、ロケーターを少なくとも1つ追加してください",

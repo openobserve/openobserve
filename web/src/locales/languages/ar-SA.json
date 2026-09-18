@@ -14690,7 +14690,6 @@
       "updateFailed": "فشل في تحديث الاختبار."
     },
     "validation": {
-      "firstStepMustNavigate": "يجب أن تكون الخطوة الأولى هي \"التنقل\"",
       "locationsRequired": "اختر موقعا واحدا على الأقل",
       "nameRequired": "الاسم مطلوب",
       "locatorRequired": "أضف على الأقل محددا واحدا حتى تعرف هذه الخطوة أي عنصر يجب أن تتصرف عليه",

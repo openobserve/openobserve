@@ -14690,7 +14690,6 @@
       "updateFailed": "Impossibile aggiornare il controllo."
     },
     "validation": {
-      "firstStepMustNavigate": "Il primo passaggio deve essere \"Navigazione\"",
       "locationsRequired": "Seleziona almeno una posizione",
       "nameRequired": "Il nome è obbligatorio",
       "locatorRequired": "Aggiungi almeno un localizzatore affinché questo passo sappia su quale elemento agire",

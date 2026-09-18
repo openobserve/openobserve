@@ -14690,7 +14690,6 @@
       "updateFailed": "Không thể cập nhật kiểm tra."
     },
     "validation": {
-      "firstStepMustNavigate": "Bước đầu tiên phải là \"Điều hướng\"",
       "locationsRequired": "Chọn ít nhất một vị trí",
       "nameRequired": "Tên là bắt buộc",
       "locatorRequired": "Thêm ít nhất một bộ định vị để bước này biết phần tử nào cần thao tác",

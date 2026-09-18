@@ -14690,7 +14690,6 @@
       "updateFailed": "Falha ao atualizar verificação."
     },
     "validation": {
-      "firstStepMustNavigate": "A primeira etapa deve ser \"Navegar\"",
       "locationsRequired": "Selecione pelo menos um local",
       "nameRequired": "O nome é obrigatório",
       "locatorRequired": "Adicione pelo menos um localizador para que esta etapa saiba em qual elemento agir",

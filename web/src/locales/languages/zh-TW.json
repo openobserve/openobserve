@@ -14685,7 +14685,6 @@
       "updateFailed": "更新檢查失敗。"
     },
     "validation": {
-      "firstStepMustNavigate": "第一步必須是「導航」",
       "locationsRequired": "至少選擇一個位置",
       "nameRequired": "名稱為必填",
       "locatorRequired": "至少新增一個定位器，讓此步驟知道要對哪個元素操作",

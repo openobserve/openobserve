@@ -133,6 +133,9 @@ export function isCompositionAction(action: StepAction): boolean {
   return COMPOSITION_ACTIONS.includes(action);
 }
 
+/** Row 0's id on every result record, so no authored step may carry it; mirrors `STEP_ID_RESERVED`. */
+export const START_LOAD_STEP_ID = "_start";
+
 /**
  * Oldest recorder extension this build of the web app knows how to talk to.
  *

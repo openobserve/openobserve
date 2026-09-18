@@ -54,6 +54,7 @@ import { useSharedVariables } from "@/components/synthetics/variables/useSharedV
 import {
   expandJourney,
   loadChildren,
+  opensStartingUrl,
   type ChildJourney,
   type ExpansionMap,
 } from "@/utils/synthetics/expandJourney";
@@ -577,6 +578,13 @@ const executedStepCount = computed(() => {
   }
 });
 
+/** Under Configure's Starting URL, only while the run would not open it (skip rule A1). */
+const targetHint = computed(() =>
+  opensStartingUrl(check.value.journey, childrenCache.value)
+    ? undefined
+    : t("synthetics.checkDetails.startingUrlNotOpened"),
+);
+
 /**
  * The set of referenced-check ids the journey currently names, as a stable
  * string — so the watcher below only re-fetches when that SET actually
@@ -790,6 +798,25 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.preventDefault();
 }
 
+function urlHost(url: string | undefined): string | null {
+  try {
+    return new URL(url ?? "").host || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The hosts the journey's navigates go to, when none of them is the Starting URL's; null otherwise. */
+function startUrlHostMismatch(): { host: string; other: string } | null {
+  const host = urlHost(check.value.url);
+  const navigateHosts = check.value.journey
+    .filter((step) => step.action === "navigate")
+    .map((step) => urlHost(step.value))
+    .filter((h): h is string => !!h);
+  if (!host || navigateHosts.length === 0 || navigateHosts.includes(host)) return null;
+  return { host, other: navigateHosts[0] };
+}
+
 /**
  * Validates and persists the check. Owns validation, the API call and all
  * toasts — but deliberately NOT navigation, so the footer buttons can decide
@@ -860,6 +887,15 @@ async function persist(): Promise<boolean> {
     currentStep.value = 2;
     toast({ variant: "error", message });
     return false;
+  }
+
+  // A warning, not a block: the journey may leave the Starting URL on purpose.
+  const mismatch = startUrlHostMismatch();
+  if (mismatch) {
+    toast({
+      variant: "warning",
+      message: t("synthetics.validation.startUrlHostMismatch", mismatch),
+    });
   }
 
   isSaving.value = true;
@@ -1235,7 +1271,7 @@ function onReplayUpTo(upTo: number) {
 }
 
 /**
- * Block replay on the same target/first-step rules the Continue button uses.
+ * Block replay on the same missing-target rule the Continue button uses.
  *
  * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
  * reports against the journey the editor is showing, and a partial pass would
@@ -1581,10 +1617,17 @@ function onClearResults() {
                     :own-step-count="executedStepCount"
                     :journey-budget-ms="journeyBudgetMs"
                     :variable-names="variableNames"
+                    :variables="check.variables"
                     :children-cache="childrenCache"
                     :refused-child-ids="refusedChildIds"
                     :expansion-map="expansionMap"
                     class="h-full!"
+                    @update:start-url="
+                      (url: string) => {
+                        check.url = url;
+                        isDirty = true;
+                      }
+                    "
                     @toggle-variables-panel="variablesPanelOpen = !variablesPanelOpen"
                     @open-child="onOpenChild"
                     @replay="onReplay"
@@ -1635,6 +1678,7 @@ function onClearResults() {
               :folders-loading="foldersLoading"
               :validation-errors="validationErrors"
               :allow-private-locations="privateLocationsEnabled"
+              :target-hint="targetHint"
               class="border-border-default w-full! border-t"
               @refresh:destinations="loadDestinations(true)"
               @update:check="onConfigureUpdate"

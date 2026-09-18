@@ -1556,6 +1556,21 @@ describe("useSyntheticsRecorder", () => {
       expect(getLastCommand()?.action).not.toBe("startRecordingFrom");
     });
 
+    // The refusal must happen before any state flips, or the editor stays locked on a replay that never ran.
+    it("leaves no phantom running replay behind an unresolved Starting URL", async () => {
+      const r = useSyntheticsRecorder(gt);
+      const promise = r.replay(click, "https://{{missing}}/x", vars);
+      const outcome = expect(promise).rejects.toThrow("unresolved variable {{missing}}");
+
+      await settleProbeDelay();
+      if (getLastCommandNonce()) respondToLastCommand({ success: true, passed: true });
+      await outcome;
+
+      expect(r.isReplaying.value).toBe(false);
+      expect(r.replayPhase.value).toBe("idle");
+      expect(getLastCommand()?.action).not.toBe("replay");
+    });
+
     it("sends a Starting URL with no placeholders unchanged when no variables are given", async () => {
       const r = useSyntheticsRecorder(gt);
       const promise = r.startRecording("https://app.test/x");

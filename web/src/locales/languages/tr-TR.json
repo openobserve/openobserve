@@ -14690,7 +14690,6 @@
       "updateFailed": "Kontrol güncellenemedi."
     },
     "validation": {
-      "firstStepMustNavigate": "İlk adım \"Navigate\" olmalıdır.",
       "locationsRequired": "En az bir konum seçin",
       "nameRequired": "Ad gereklidir",
       "locatorRequired": "Bu adımın hangi öğeye etki edeceğini bilmesi için en az bir konumlandırıcı ekleyin",

@@ -14690,7 +14690,6 @@
       "updateFailed": "체크 업데이트에 실패했습니다."
     },
     "validation": {
-      "firstStepMustNavigate": "첫 번째 단계는 \"탐색\"이어야 합니다.",
       "locationsRequired": "위치를 하나 이상 선택하세요",
       "nameRequired": "이름은 필수입니다.",
       "locatorRequired": "이 단계가 작동할 요소를 알 수 있도록 로케이터를 하나 이상 추가하세요.",

@@ -728,4 +728,78 @@ describe("RunDetail — start load (row 0)", () => {
     expect(w.find('[data-test="o2-table-row-0"]').text()).toContain("Click Sign In");
     w.unmount();
   });
+
+  // The probe stops at the failure, so a start load that failed ran no Step at all.
+  it("renders row 0 alone when the start load failed before any Step ran", async () => {
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "_start",
+        error: "net::ERR_NAME_NOT_RESOLVED",
+        lastAttemptSteps: [],
+        startLoad: startLoad({ status: "fail", error: "net::ERR_NAME_NOT_RESOLVED" }),
+        failureDetail: {
+          stepId: "_start",
+          stepName: "",
+          stepIndex: 0,
+          error: "net::ERR_NAME_NOT_RESOLVED",
+          candidatesTried: [],
+          settleSignals: [],
+          settleMs: null,
+          cls: 0,
+          ttfbMs: 0,
+        },
+      }),
+    );
+
+    const row0 = w.find('[data-test="synthetics-journey-start-row"]');
+    expect(row0.exists(), "no start row rendered").toBe(true);
+    expect(row0.text()).toContain("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+    expect(
+      w
+        .findAll("[data-test]")
+        .filter((el) => /^o2-table-row-\d+$/.test(el.attributes("data-test")!)),
+    ).toHaveLength(0);
+    expect(
+      w.find('[data-test="synthetics-run-detail-tab-steps"]').find(".obadge-stub").text(),
+    ).toBe("0");
+    expect(w.find('[data-test="synthetics-run-detail-info-bar"]').text()).toContain(
+      "synthetics.runDetail.failedAtStartLoad",
+    );
+    w.unmount();
+  });
+
+  // Initial-load events are attributed to `_start`, which names no recorded Step.
+  it("names row 0's evidence by its label, never by the raw id", async () => {
+    globalThis.fetch = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: "OK",
+      text: async () =>
+        [
+          '{"ts":50,"kind":"console","level":"error","text":"boot failed","step_id":"_start"}',
+          '{"ts":200,"kind":"console","level":"error","text":"boom","step_id":"s1"}',
+        ].join("\n"),
+    })) as any;
+    const w = await mountWithRun(
+      withStartLoad({
+        status: "failed",
+        failedStep: "s1",
+        evidenceKey: "synthetics/org/mon/RUN/EXEC/evidence.ndjson",
+        lastAttemptSteps: [
+          { step_id: "s1", status: "fail", duration_ms: 300, error: "boom", screenshot_key: null },
+        ],
+      }),
+    );
+    w.findComponent(StepPageActivity).vm.$emit("view-all", "s1");
+    await flushPromises();
+
+    const panel = w.findComponent(EvidencePanel);
+    expect(panel.exists()).toBe(true);
+    const defs = panel.props("stepDefs") as Map<string, { name: string }>;
+    expect(defs.get("_start")?.name).toBe("synthetics.runDetail.startLoadLabel https://app.test/");
+    expect(panel.text()).not.toContain("_start");
+    w.unmount();
+  });
 });

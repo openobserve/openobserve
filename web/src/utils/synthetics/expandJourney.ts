@@ -95,6 +95,19 @@ export function expandJourney(
   return { steps: out, map };
 }
 
+/** The skip rule, read off the EXPANDED list's head as the probe does; an unloaded child claims no navigate. */
+export function opensStartingUrl(
+  steps: BrowserStep[],
+  children: Map<string, ChildJourney>,
+): boolean {
+  const first = steps[0];
+  if (!first) return true;
+  const executed = isCompositionAction(first.action)
+    ? children.get(first.subtest?.id ?? "")?.steps[0]
+    : first;
+  return executed?.action !== "navigate";
+}
+
 /** Mirrors the server's placeholder scan over `PLACEHOLDER_FIELDS`: names in text order, deduped. */
 export function placeholdersIn(steps: BrowserStep[]): string[] {
   const found = new Set<string>();

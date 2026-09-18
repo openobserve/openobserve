@@ -202,6 +202,13 @@ const headingColspan = computed(
 </script>
 
 <template>
+  <!-- Own tbody: VueDraggableNext maps DOM child index to model index, so a foreign leading row would shift every reorder. -->
+  <tbody
+    v-if="!isVirtual() && rowReorderEnabled && slots['body-start']"
+    data-test="o2-table-body-start"
+  >
+    <slot name="body-start" />
+  </tbody>
   <!-- Normal draggable body -->
   <VueDraggableNext
     v-if="!isVirtual() && rowReorderEnabled"
@@ -266,6 +273,7 @@ const headingColspan = computed(
   <!-- Normal (non-virtual, non-draggable) body. One loop over heading-or-row
        items, so sectioned and unsectioned bodies share the row markup. -->
   <tbody v-else-if="!isVirtual()" data-test="o2-table-body">
+    <slot name="body-start" />
     <template v-for="item in plainBodyItems" :key="item.itemKey">
       <!-- Spans every visible column: a heading is about the run below it, not
          about one column. -->
@@ -330,6 +338,7 @@ const headingColspan = computed(
        reserve the offset above first and below last visible row so cells
        inherit the parent table's column layout (same as non-virtual). -->
   <tbody v-else data-test="o2-table-body">
+    <slot name="body-start" />
     <tr v-if="virtualRows && virtualRows.length && virtualRows[0].start > 0" aria-hidden="true">
       <td
         :style="{ height: `${virtualRows[0].start + (baseOffset ?? 0)}px`, padding: 0, border: 0 }"
