@@ -15,13 +15,34 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
+use config::meta::promql::value::{EvalContext, Labels, RangeValue, Sample, Value};
 use datafusion::error::Result;
 
 use crate::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#absent_over_time
 pub(crate) fn absent_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+    // A selector matching nothing arrives as None or as an empty matrix, and eval_range walks
+    // series, so it has none to report on - the absence this function exists for is the one case
+    // it cannot see. Answer that here, before delegating the per-series case to it.
+    let nothing_matched = match &data {
+        Value::None => true,
+        Value::Matrix(matrix) => matrix.is_empty(),
+        _ => false,
+    };
+    if nothing_matched {
+        return Ok(Value::Matrix(vec![RangeValue {
+            labels: Labels::default(),
+            samples: eval_ctx
+                .timestamps()
+                .into_iter()
+                .map(|timestamp| Sample::new(timestamp, 1.0))
+                .collect(),
+            exemplars: None,
+            time_window: None,
+        }]));
+    }
+
     super::eval_range(data, AbsentOverTimeFunc::new(), eval_ctx)
 }
 
@@ -48,7 +69,21 @@ impl RangeFunc for AbsentOverTimeFunc {
 
 #[cfg(test)]
 mod tests {
+    use config::meta::promql::value::TimeWindow;
+
     use super::*;
+
+    // Test helper
+    fn reported(value: &Value) -> Vec<(i64, f64)> {
+        match value {
+            Value::Matrix(v) => v
+                .iter()
+                .flat_map(|series| series.samples.iter())
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect(),
+            _ => panic!("Expected Matrix result"),
+        }
+    }
 
     // Test helper
     fn absent_over_time_test_helper(data: Value) -> Result<Value> {
@@ -59,7 +94,46 @@ mod tests {
     #[test]
     fn test_absent_over_time_value_none_input() {
         let result = absent_over_time_test_helper(Value::None).unwrap();
-        assert!(matches!(result, Value::None));
+
+        match &result {
+            Value::Matrix(v) => assert_eq!(
+                v.len(),
+                1,
+                "a metric that is entirely gone is still one answer"
+            ),
+            _ => panic!("Expected Matrix result"),
+        }
+        assert_eq!(reported(&result), vec![(3000, 1.0)]);
+    }
+
+    #[test]
+    fn test_absent_over_time_reports_every_step_of_a_range_query() {
+        let eval_ctx = EvalContext::new(1000, 3000, 1000, "test".to_string());
+        let result = absent_over_time(Value::None, &eval_ctx).unwrap();
+
+        assert_eq!(
+            reported(&result),
+            vec![(1000, 1.0), (2000, 1.0), (3000, 1.0)]
+        );
+    }
+
+    #[test]
+    fn test_absent_over_time_is_silent_while_the_metric_reports() {
+        let range_value = RangeValue {
+            labels: Labels::default(),
+            samples: vec![Sample::new(3000, 5.0)],
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+        let result = absent_over_time_test_helper(Value::Matrix(vec![range_value])).unwrap();
+
+        match result {
+            Value::Matrix(v) => assert!(v.is_empty(), "present data must report no absence"),
+            _ => panic!("Expected Matrix result"),
+        }
     }
 
     #[test]
@@ -87,11 +161,6 @@ mod tests {
         let empty_matrix = Value::Matrix(vec![]);
         let result = absent_over_time_test_helper(empty_matrix).unwrap();
 
-        match result {
-            Value::Matrix(v) => {
-                assert_eq!(v.len(), 0);
-            }
-            _ => panic!("Expected Matrix result"),
-        }
+        assert_eq!(reported(&result), vec![(3000, 1.0)]);
     }
 }
