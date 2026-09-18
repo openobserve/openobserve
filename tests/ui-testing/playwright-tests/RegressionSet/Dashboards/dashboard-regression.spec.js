@@ -442,6 +442,38 @@ test.describe(
       }
     );
 
+    // Bug #14236: a panel with numeric layout.i of 0 was rejected on import as "missing a layout.i value".
+    test(
+      "should import a dashboard whose panel has layout.i = 0 @bug-14236 @P1",
+      async ({ page }) => {
+        testLogger.info("Test: import dashboard JSON with layout.i = 0 (Bug #14236)");
+
+        const pm = new PageManager(page);
+        const title = `Layout I Zero_${Math.random().toString(36).slice(2, 8)}_${Date.now()}`;
+
+        await pm.dashboardList.menuItem("dashboards-item");
+        await waitForDashboardPage(page);
+        await pm.dashboardImport.clickImportDashboard();
+
+        await pm.dashboardImport.uploadDashboardFile("../test-data/dashboards-import.json", {
+          title,
+          transform: (json) => {
+            json.tabs[0].panels[0].layout.i = 0;
+          },
+        });
+        await pm.dashboardImport.waitForEditorContains('"i": 0');
+
+        try {
+          await pm.dashboardImport.clickImportButton();
+          await waitForDashboardPage(page);
+          await pm.dashboardImport.expectImportedDashboardVisible(title);
+          testLogger.info("✅ Bug #14236 guard passed — dashboard with layout.i = 0 imported");
+        } finally {
+          await pm.dashboardImport.deleteImportedDashboard("01", title).catch(() => {});
+        }
+      }
+    );
+
     test.afterEach(async () => {
       testLogger.info("Dashboard regression test completed");
     });
