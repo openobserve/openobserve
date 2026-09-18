@@ -2047,6 +2047,28 @@ mod tests {
         assert_eq!(req.browser_ms, 0);
     }
 
+    /// A probe built before the start load resolves with the job id alone; absence must parse.
+    #[test]
+    fn an_old_probe_resolves_without_probe_features_and_announces_none() {
+        let req: ResolveRequest =
+            serde_json::from_value(serde_json::json!({ "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv" }))
+                .expect("a resolve without probe_features must still deserialize");
+
+        assert_eq!(req.job_id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
+        assert!(req.probe_features.is_empty());
+    }
+
+    #[test]
+    fn a_probe_announcing_the_start_load_is_read_verbatim() {
+        let req: ResolveRequest = serde_json::from_value(serde_json::json!({
+            "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
+            "probe_features": ["start_load"],
+        }))
+        .unwrap();
+
+        assert_eq!(req.probe_features, vec!["start_load".to_string()]);
+    }
+
     // Step billing. Every guard is a pure function, so these need no database.
     #[cfg(feature = "cloud")]
     mod billing {
@@ -2060,6 +2082,7 @@ mod tests {
             AckRequest, AlertDecision,
             billing::{
                 BillingFlags, BillingInputs, Venue, events_for_ack, frozen_combos, inputs_from,
+                resolve_billable,
             },
             stale_lease_response,
         };
@@ -2804,6 +2827,42 @@ mod tests {
             );
         }
 
+        /// The ack carries only counters, so a run that opened row 0 acks like one that did not.
+        #[test]
+        fn a_run_with_a_start_load_acks_the_same_counters_and_bills_the_same() {
+            fn inputs<'a>(row: &'a LeasedRow, req: &'a AckRequest) -> BillingInputs<'a> {
+                inputs_from(row, req, 0, Venue::Public, NOW_US, None)
+            }
+            // A `[click, assert]` journey: two steps defined, two executed, row 0 opened first.
+            let mut opened = probe_ack(2, 2);
+            opened.browser_ms = 8_400;
+            // The same journey with a navigate first step, so no row 0.
+            let mut plain = probe_ack(2, 2);
+            plain.browser_ms = 8_400;
+
+            let row = LeasedRow {
+                steps_configured: 2,
+                browser_devices: Some(one_combo()),
+                ..leased_row()
+            };
+            let with_row0 = resolve_billable(LIVE, &inputs(&row, &opened));
+            assert_eq!(with_row0, resolve_billable(LIVE, &inputs(&row, &plain)));
+            assert_eq!(
+                with_row0.billable, 2,
+                "the start load is never a billed step"
+            );
+            assert!(!with_row0.clamped);
+
+            let opened_events = events_for_ack(LIVE, inputs(&row, &opened));
+            let plain_events = events_for_ack(LIVE, inputs(&row, &plain));
+            assert_eq!(billed(&opened_events), billed(&plain_events));
+            assert_eq!(defined(&opened_events), defined(&plain_events));
+            assert_eq!(
+                size_for(&opened_events, UsageEvent::_SyntheticsBrowserMs),
+                size_for(&plain_events, UsageEvent::_SyntheticsBrowserMs)
+            );
+        }
+
         /// A zero definition is a zero clamp ceiling, which bills real work as nothing.
         #[test]
         fn the_frozen_definition_is_never_zero() {
@@ -3030,6 +3089,104 @@ mod tests {
             let err = expand_journey(&parent(&["nested"], 1), &children, &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
+        }
+    }
+
+    // The old-probe gate (B1). Pure over the EXPANDED list, so these need no database.
+    mod start_load {
+        use std::collections::HashMap;
+
+        use config::meta::synthetics_composition::ChildJourney;
+        use serde_json::json;
+
+        use super::super::*;
+
+        const LOCATION: &str = "Berlin office";
+        const OLD_PROBE: &[String] = &[];
+
+        fn nav(id: &str) -> serde_json::Value {
+            json!({ "id": id, "action": "navigate", "url": "https://x" })
+        }
+
+        fn click(id: &str) -> serde_json::Value {
+            json!({ "id": id, "action": "click", "name": "Sign in",
+                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] } })
+        }
+
+        fn start_load_probe() -> Vec<String> {
+            vec!["start_load".to_string()]
+        }
+
+        /// Only the FIRST executed step decides; a later navigate is a reload, not the opener.
+        #[test]
+        fn the_start_load_happens_unless_the_first_step_navigates() {
+            assert!(!needs_start_load(&[nav("s1"), click("s2")]));
+            assert!(needs_start_load(&[click("s1"), nav("s2")]));
+        }
+
+        #[test]
+        fn an_old_probe_dispatches_a_navigate_first_journey_normally() {
+            start_load_gate(&[nav("s1"), click("s2")], OLD_PROBE, LOCATION).unwrap();
+        }
+
+        #[test]
+        fn a_probe_with_the_start_load_dispatches_a_click_first_journey() {
+            start_load_gate(&[click("s1")], &start_load_probe(), LOCATION).unwrap();
+        }
+
+        #[test]
+        fn an_old_probe_fails_a_click_first_journey_as_a_config_error_naming_the_location() {
+            let err = start_load_gate(&[click("s1")], OLD_PROBE, LOCATION).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
+            // Customer-fixable (upgrade the agent or add a navigate), not a guard of ours failing.
+            assert!(!err.guard_failure);
+            assert_eq!(
+                err.message,
+                "Location Berlin office runs an agent that cannot open the Starting URL. Upgrade \
+                 the agent, or add a Navigate first Step."
+            );
+        }
+
+        /// The feature is matched by its wire name; an unrelated announcement unlocks nothing.
+        #[test]
+        fn only_the_start_load_feature_unlocks_a_click_first_journey() {
+            let other = vec!["something_else".to_string()];
+            let err = start_load_gate(&[click("s1")], &other, LOCATION).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
+        }
+
+        fn login_child(first: serde_json::Value) -> HashMap<String, ChildJourney> {
+            HashMap::from([(
+                "login".to_string(),
+                ChildJourney {
+                    id: "login".into(),
+                    name: "login".into(),
+                    steps: vec![first, click("c1")],
+                },
+            )])
+        }
+
+        fn parent_opening_with_login() -> Vec<serde_json::Value> {
+            vec![json!({ "id": "r0", "action": "subtest", "subtest": { "id": "login" } })]
+        }
+
+        /// A1: the gate reads the list the probe receives, so the child's opener counts.
+        #[test]
+        fn a_parent_whose_child_opens_with_navigate_dispatches_to_an_old_probe() {
+            let children = login_child(nav("c0"));
+            let expanded = expand_journey(&parent_opening_with_login(), &children, &[]).unwrap();
+            assert!(!needs_start_load(&expanded));
+            start_load_gate(&expanded, OLD_PROBE, LOCATION).unwrap();
+        }
+
+        #[test]
+        fn a_parent_whose_child_opens_with_click_needs_the_start_load() {
+            let children = login_child(click("c0"));
+            let expanded = expand_journey(&parent_opening_with_login(), &children, &[]).unwrap();
+            assert!(needs_start_load(&expanded));
+            let err = start_load_gate(&expanded, OLD_PROBE, LOCATION).unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
+            start_load_gate(&expanded, &start_load_probe(), LOCATION).unwrap();
         }
     }
 }
