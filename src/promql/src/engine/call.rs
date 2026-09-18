@@ -372,8 +372,10 @@ mod tests {
             ("3 < vector(5)", 5.0),
             ("3 < bool vector(5)", 1.0),
             ("7 < bool vector(5)", 0.0),
+            // predict_linear is absent deliberately: vector(5) yields one sample per evaluation
+            // timestamp, and one reading is not a trend, so it has no value to preserve here.
+            // Its dispatch is covered in functions::predict_linear.
             ("quantile_over_time(0.5, vector(5)[1m:1s])", 5.0),
-            ("predict_linear(vector(5)[1m:1s], 10)", 5.0),
             (r#"label_join(vector(5), "dst", ",", "src")"#, 5.0),
             (
                 r#"label_replace(vector(5), "dst", "$1", "src", "(.*)")"#,
