@@ -244,6 +244,41 @@ describe("prompt history (ArrowUp / ArrowDown)", () => {
     expect((input.vm as any).lastSetContent).toBe("recalled prompt");
   });
 
+  // setContent rewrites textContent, which destroys the reference chips and image spans in the composer.
+  it("does not rewrite the composer when there is nothing to recall", async () => {
+    localStorage.removeItem(HISTORY_KEY);
+    const vm = await mountChat();
+
+    vm.handleKeyDown(key("ArrowUp", editableAt("")));
+
+    const input = wrapper!.findComponent({ name: "RichTextInput" });
+    expect((input.vm as any).lastSetContent).toBeUndefined();
+  });
+
+  it("does not rewrite the composer on an ArrowUp past the oldest prompt", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["only one"]));
+    const vm = await mountChat();
+    const editable = editableAt("");
+    const input = wrapper!.findComponent({ name: "RichTextInput" });
+
+    vm.handleKeyDown(key("ArrowUp", editable));
+    (input.vm as any).lastSetContent = undefined;
+    vm.handleKeyDown(key("ArrowUp", editable));
+
+    expect((input.vm as any).lastSetContent).toBeUndefined();
+  });
+
+  // The chips are gone from the rewritten composer, so keeping them would attach files the user cannot see.
+  it("drops reference chips when a recalled prompt replaces them", async () => {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(["recalled prompt"]));
+    const vm = await mountChat();
+    vm.contextReferences = [{ name: "app.log", fullContent: "x" }];
+
+    vm.handleKeyDown(key("ArrowUp", editableAt("")));
+
+    expect(vm.contextReferences).toEqual([]);
+  });
+
   it("leaves the caret alone when it is below the first line of the composer", async () => {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(["newest"]));
     const vm = await mountChat();

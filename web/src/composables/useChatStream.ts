@@ -191,7 +191,14 @@ export function useChatStream(options: UseChatStreamOptions) {
         const lastMessage = chatMessages.value[chatMessages.value.length - 1];
         if (lastMessage.role === "assistant") {
           if (!lastMessage.content) {
-            chatMessages.value.pop();
+            // Steps that already ran must survive the Stop; only an empty streaming placeholder is dropped.
+            if (lastMessage.contentBlocks?.length) {
+              const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
+              lastMessage.content = raw(stoppedNote);
+              lastMessage.contentBlocks.push({ type: "text", text: stoppedNote });
+            } else {
+              chatMessages.value.pop();
+            }
           } else if (currentStreamingMessage.value) {
             if (lastMessage.contentBlocks) {
               const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
@@ -909,7 +916,9 @@ export function useChatStream(options: UseChatStreamOptions) {
       if (
         chatMessages.value.length > 0 &&
         chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
-        !chatMessages.value[chatMessages.value.length - 1].content
+        !chatMessages.value[chatMessages.value.length - 1].content &&
+        // Steps that already ran must survive the failure; only an empty streaming placeholder is dropped.
+        !chatMessages.value[chatMessages.value.length - 1].contentBlocks?.length
       ) {
         chatMessages.value.pop();
       }

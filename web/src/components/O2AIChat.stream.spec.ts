@@ -1427,6 +1427,20 @@ describe("O2AIChat SSE protocol", () => {
       expect(blocks(vm)[1].text).toBe("here you go");
     });
 
+    // Creating a dashboard finishes with no assistant text, so nothing else would persist the turn.
+    it("saves an action-only turn that never streams text", async () => {
+      const before = mockSaveToHistory.mock.calls.length;
+      await stream(vm, [
+        sse({ type: "tool_call", tool: "createDashboard", message: "Creating", call_id: "c1" }),
+        sse({ type: "tool_result", call_id: "c1", success: true }),
+        sse({ type: "complete" }),
+      ]);
+
+      // The saved array is the live chatMessages, so only the call count proves the turn was persisted.
+      expect(mockSaveToHistory.mock.calls.slice(before)).toHaveLength(2);
+      expect(blocks(vm).map((b: any) => b.type)).toEqual(["tool_call"]);
+    });
+
     it("throttles saves during a burst of deltas", async () => {
       const before = mockSaveToHistory.mock.calls.length;
       await stream(vm, [
@@ -1760,6 +1774,31 @@ describe("O2AIChat SSE protocol", () => {
       expect(vm.isLoading).toBe(false);
       expect(vm.activeToolCall).toBeNull();
       expect(vm.currentAbortController).toBeNull();
+
+      gate.close();
+      await turn;
+    });
+
+    // The steps already ran, so dropping them hides work the user paid for.
+    it("keeps tool calls that completed before the user stopped generation", async () => {
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "first question";
+      const turn = vm.sendMessage();
+      await flushPromises();
+
+      gate.push(sse({ type: "tool_call", tool: "A", message: "a", call_id: "c1" }));
+      gate.push(sse({ type: "tool_result", call_id: "c1", success: true }));
+      await flushPromises();
+
+      await vm.cancelCurrentRequest();
+      await flushPromises();
+
+      expect(assistant(vm)).toBeDefined();
+      expect(blocks(vm).map((b: any) => b.type)).toEqual(["tool_call", "text"]);
+      expect(blocks(vm)[0].tool).toBe("A");
+      expect(blocks(vm)[0].success).toBe(true);
+      expect(String(assistant(vm).content)).toContain("stopped");
 
       gate.close();
       await turn;

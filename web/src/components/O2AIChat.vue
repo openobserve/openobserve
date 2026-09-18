@@ -906,7 +906,13 @@ export default defineComponent({
     };
 
     // RichTextInput ignores modelValue while focused, so a recalled prompt must be pushed in.
-    const applyRecalledPrompt = () => {
+    const recallHistory = (direction: "up" | "down") => {
+      const before = inputMessage.value;
+      navigateHistory(direction);
+      // setContent rewrites textContent, so it must not run when nothing was recalled: it would flatten the chips.
+      if (inputMessage.value === before) return;
+      // The recalled text replaced the chips in the composer, so their references must not linger.
+      contextReferences.value = [];
       if (chatInput.value && typeof chatInput.value.setContent === "function") {
         chatInput.value.setContent(inputMessage.value);
       }
@@ -921,13 +927,11 @@ export default defineComponent({
       } else if (e.key === "ArrowUp") {
         if (isOnFirstLine(e.target as HTMLElement)) {
           e.preventDefault();
-          navigateHistory("up");
-          applyRecalledPrompt();
+          recallHistory("up");
         }
       } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
         e.preventDefault();
-        navigateHistory("down");
-        applyRecalledPrompt();
+        recallHistory("down");
       }
     };
 

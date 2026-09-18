@@ -254,9 +254,34 @@ describe("reduce: complete", () => {
       messages: [msg],
       activeToolCall: { tool: "search", message: raw("Searching"), context: {} },
     });
-    expect(reduce(state, { type: "complete" }, makeCtx())).toEqual([]);
+    reduce(state, { type: "complete" }, makeCtx());
     expect(msg.contentBlocks).toHaveLength(1);
     expect(state.activeToolCall).toBeNull();
+  });
+
+  // An action-only turn produces no text, so `complete` is its only chance to persist.
+  it("saves a turn that finished a tool call without producing any text", () => {
+    const state = makeState({
+      messages: [assistant()],
+      activeToolCall: { tool: "createDashboard", message: raw("Creating"), context: {} },
+    });
+    expect(reduce(state, { type: "complete" }, makeCtx())).toEqual([
+      { kind: "throttledSave", force: true },
+    ]);
+  });
+
+  it("does not save a turn that already streamed text", () => {
+    const state = makeState({ messages: [assistant()], messageComplete: true });
+    state.activeToolCall = { tool: "search", message: raw("Searching"), context: {} };
+    expect(reduce(state, { type: "complete" }, makeCtx())).toEqual([]);
+  });
+
+  it("does not save when detached", () => {
+    const state = makeState({
+      messages: [assistant()],
+      activeToolCall: { tool: "search", message: raw("Searching"), context: {} },
+    });
+    expect(reduce(state, { type: "complete" }, makeCtx({ isActive: false }))).toEqual([]);
   });
 
   it("keeps the active tool call set when detached", () => {
