@@ -740,7 +740,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <ODialog
       :open="confirmBulkResolve"
-      @update:open="(v: boolean) => (confirmBulkResolve = v)"
+      @update:open="(v: boolean) => (v ? (confirmBulkResolve = v) : closeBulkResolveDialog())"
       :title="t('oncall.bulkResolveTitle')"
       data-test="oncall-bulk-resolve-dialog"
     >
@@ -749,30 +749,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("oncall.bulkResolveConfirm", { count: selectedIds.length }) }}
         </p>
 
-        <div class="flex flex-col gap-1">
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCause") }}</span>
-          <span class="text-text-secondary text-xs">{{ t("oncall.resolveCauseHint") }}</span>
-          <OSelect
-            v-model="bulkResolveCause"
-            :options="resolveCauseOptions"
-            clearable
-            :placeholder="t('oncall.resolveCausePlaceholder')"
-            data-test="oncall-bulk-resolve-cause"
-          />
-        </div>
-
-        <OTextarea
-          v-model="bulkResolveNote"
-          :label="t('oncall.resolveCauseNote')"
-          :placeholder="t('oncall.resolveCauseNotePlaceholder')"
-          :rows="2"
-          data-test="oncall-bulk-resolve-cause-note"
+        <OnCallResolveCauseForm
+          v-model:cause="bulkResolveCause"
+          v-model:note="bulkResolveNote"
+          data-test-prefix="oncall-bulk-resolve"
         />
       </div>
 
       <template #footer>
         <div class="flex justify-end gap-2">
-          <OButton variant="outline" size="sm-action" @click="confirmBulkResolve = false">
+          <OButton variant="outline" size="sm-action" @click="closeBulkResolveDialog">
             {{ t("oncall.cancel") }}
           </OButton>
           <OButton
@@ -797,6 +783,7 @@ import { useStore } from "vuex";
 
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
+import OnCallResolveCauseForm from "@/components/oncall/OnCallResolveCauseForm.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
@@ -811,7 +798,6 @@ import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
-import OTextarea from "@/lib/forms/Input/OTextarea.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -1276,11 +1262,6 @@ const causeOptions = computed(() => [
   ...RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
 ]);
 
-// No "any" entry: this feeds the bulk-resolve picker, not a filter.
-const resolveCauseOptions = computed(() =>
-  RESOLUTION_CAUSES.map((cause) => ({ label: t(`oncall.cause_${cause}`), value: cause })),
-);
-
 function onCauseFilter(value: unknown) {
   causeFilter.value = (value as ResolutionCause) || "";
   void fetchResponses();
@@ -1579,10 +1560,16 @@ async function bulkSnooze(minutes: number) {
   );
 }
 
-async function bulkResolve() {
+function closeBulkResolveDialog() {
   confirmBulkResolve.value = false;
+  bulkResolveCause.value = "";
+  bulkResolveNote.value = "";
+}
+
+async function bulkResolve() {
   const cause = bulkResolveCause.value || undefined;
   const cause_note = bulkResolveNote.value.trim() || undefined;
+  closeBulkResolveDialog();
   await runBulk(
     selectedRecords((r) => r.firings.filter((f) => f.state !== "resolved")),
     (id) =>
@@ -1595,8 +1582,6 @@ async function bulkResolve() {
     "bulkResolveDone",
     "bulkResolvePartial",
   );
-  bulkResolveCause.value = "";
-  bulkResolveNote.value = "";
 }
 
 /// Which run a row belongs to. Asked of the row rather than the record so a
