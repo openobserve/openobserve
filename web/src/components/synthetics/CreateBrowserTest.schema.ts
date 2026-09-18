@@ -23,7 +23,7 @@
 import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
-import { assertionNeedsExpected } from "@/constants/synthetics";
+import { assertionNeedsExpected, START_LOAD_STEP_ID } from "@/constants/synthetics";
 import type { AssertionKind } from "@/types/synthetics";
 
 /**
@@ -125,16 +125,6 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
         .default([]),
     })
     .superRefine((val, ctx) => {
-      // First step must be "navigate"
-      const first = val.journey[0];
-      if (first && first.action !== "navigate" && first.action !== "subtest") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["journey", 0, "action"],
-          message: t("synthetics.validation.firstStepMustNavigate"),
-        });
-      }
-
       // The two rules that decide whether a journey can be stored at all.
       // They used to be answered by isV2Journey, whose only consequence was a
       // quiet fall back to the version-1 payload shape — which discarded every
@@ -142,6 +132,14 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       // answer has to reach the author, on the step it is about.
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
+
+        if (step.id === START_LOAD_STEP_ID) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ["journey", i, "id"],
+            message: t("synthetics.validation.stepIdReserved"),
+          });
+        }
 
         if (step.action === "subtest") {
           if (!step.subtest?.id) {

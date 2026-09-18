@@ -285,7 +285,7 @@ function toggleSteps(executionId: string) {
               </div>
 
               <!-- Steps -->
-              <div v-if="loc.steps.length" class="px-4 py-3">
+              <div v-if="loc.steps.length || loc.startLoad" class="px-4 py-3">
                 <OButton
                   variant="ghost"
                   size="xs"
@@ -312,6 +312,36 @@ function toggleSteps(executionId: string) {
                 </OButton>
 
                 <div v-if="expandedSteps.has(loc.executionId)" class="flex flex-col gap-1">
+                  <!-- Row 0: the Starting URL, above the numbered Steps and counted in none of them. -->
+                  <div
+                    v-if="loc.startLoad"
+                    class="flex items-start gap-2.5 py-1.5 text-xs"
+                    :data-test="`synthetics-run-detail-start-row-${loc.executionId}`"
+                  >
+                    <span
+                      class="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-white"
+                      :class="loc.startLoad.status === 'ok' ? 'bg-success-600' : 'bg-error-500'"
+                    >
+                      <OIcon name="language" size="xs" aria-hidden="true" />
+                    </span>
+                    <div class="min-w-0 flex-1">
+                      <div class="flex items-center gap-2">
+                        <span class="text-text-secondary truncate" :title="loc.startLoad.url">{{
+                          t("synthetics.runDetail.startLoadLabel", { url: loc.startLoad.url })
+                        }}</span>
+                        <span class="text-text-muted ms-auto shrink-0 tabular-nums">{{
+                          fmtDuration(loc.startLoad.durationMs)
+                        }}</span>
+                      </div>
+                      <p
+                        v-if="loc.startLoad.error"
+                        class="text-status-error-text mt-0.5 truncate"
+                        :title="loc.startLoad.error"
+                      >
+                        {{ loc.startLoad.error }}
+                      </p>
+                    </div>
+                  </div>
                   <div
                     v-for="(step, idx) in loc.steps"
                     :key="step.stepId"

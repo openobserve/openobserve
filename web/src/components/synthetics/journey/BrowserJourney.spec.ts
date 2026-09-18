@@ -3516,6 +3516,65 @@ describe("BrowserJourney — a restore that never reached the recording point", 
     expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("s1");
   });
 
+  // A refused start before row 1 leaves no session for the kept anchor's marker to describe.
+  it("should lift the marker when the extension refuses to record before step 1", async () => {
+    wrapper = mountAnchored();
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[0]);
+    await settleProbeDelay();
+    expect(lastCommand()?.action).toBe("startRecording");
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("s1");
+
+    respondToLastCommand({ success: false, error: "Recording is not allowed here" });
+    await flushPromises();
+
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("");
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  // Record-from-failure continues on the page the restore stopped on, so a leading navigate is the author's own.
+  it("should keep a navigate recorded from a failure at step 1", async () => {
+    wrapper = mountAnchored();
+    await startAnchoredRestore(wrapper);
+    await failWith({ ...STEP_FAILED, stepId: "s1" });
+
+    await wrapper
+      .find('[data-test="synthetics-journey-prefix-failed-record-btn"]')
+      .trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({
+      method: "setActions",
+      actions: [],
+      sources: [],
+      browserSteps: [
+        { id: "n1", action: "navigate", url: "https://app.test/login", name: "Open login" },
+        { id: "n2", action: "click", selector: "#consent", name: "Accept cookies" },
+      ],
+    });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    const next = emitted![emitted!.length - 1][0] as any[];
+    expect(next.map((s) => s.name)).toEqual([
+      "Open login",
+      "Accept cookies",
+      "Open app",
+      "Sign in",
+      "Open cart",
+    ]);
+  });
+
   // An extension that cannot record on an open session would answer the command
   // with a refusal, so the button must not be there to press.
   it("should not offer the recovery to an extension that cannot do it", async () => {

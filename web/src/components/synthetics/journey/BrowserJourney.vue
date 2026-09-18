@@ -40,7 +40,7 @@ import {
 } from "@/utils/synthetics/journeySuggestions";
 // Chrome UI element names stay in English in every locale — they name the
 // actual Chrome interface the user is looking at.
-import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR } from "@/constants/synthetics";
+import { CHROME_UI_LABELS, DEFAULT_TEST_ID_ATTR, START_LOAD_STEP_ID } from "@/constants/synthetics";
 import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
@@ -54,6 +54,7 @@ import {
   translateStepId,
   loadChildren,
   expandJourney,
+  opensStartingUrl,
   undefinedPlaceholders,
   type ChildJourney,
   type ExpansionMap,
@@ -62,7 +63,8 @@ import {
 const props = defineProps<{
   modelValue: BrowserStep[];
   readonly?: boolean;
-  startUrl?: string; // URL shown in the recording banner
+  /** The check's Starting URL: row 0's value and the page the recorder opens. */
+  startUrl?: string;
   /**
    * DOM attribute the recorder selects on, from the monitor's config.
    * Absent falls back to DEFAULT_TEST_ID_ATTR — see useSyntheticsRecorder.
@@ -127,6 +129,8 @@ const props = defineProps<{
   refusedChildIds?: Set<string>;
   /** Names this check defines, so a child's undefined placeholder can be named before save. */
   variableNames?: string[];
+  /** The check's variables, substituted into the Starting URL before the recorder opens it. */
+  variables?: { name: string; value: string }[];
   /**
    * The ONE cache of fetched child journeys, owned by the host (`CreateBrowserTest`).
    *
@@ -158,6 +162,8 @@ const { t } = useI18nTyped();
 
 const emit = defineEmits<{
   "update:modelValue": [value: BrowserStep[]];
+  /** Row 0's URL edit: the host's `check.url` is the one value both views read. */
+  "update:startUrl": [value: string];
   "clear-results": [];
   replay: [];
   /**
@@ -194,6 +200,9 @@ const emit = defineEmits<{
  * the same operation with a different anchor — see design §7.4.
  */
 const anchorStepId = ref<string | null>(null);
+
+/** Only a session the recorder opened on the Starting URL starts with a synthetic navigate. */
+const recordingOpensStartUrl = ref(false);
 
 /**
  * Composed-child-id → authored-row map for THIS restore's own prefix expansion.
@@ -604,7 +613,6 @@ watch(
 
 // ── Step validation (Continue button + save) ──────────────────────────────
 const selectorErrors = ref<Set<string>>(new Set());
-const firstStepError = ref(false);
 
 /**
  * Field errors for the expanded editor, keyed by step id then field name.
@@ -618,11 +626,11 @@ const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
 /**
  * Steps carrying at least one schema-level field error.
  *
- * `validateJourneySteps` enforces two rules of its own, but they are not the only
- * ones that block a save: `stepNameRequired`, `retiredAction`, the navigate URL,
+ * `validateJourneySteps` enforces one rule of its own, but it is not the only
+ * one that blocks a save: `stepNameRequired`, `retiredAction`, the navigate URL,
  * `typeTextRequired` and `expectedRequired` all live in the zod schema and reach
  * this component through `setStepFieldErrors` alone. Row highlighting and
- * auto-expand read this so those rules behave like the two local ones instead of
+ * auto-expand read this so those rules behave like the local one instead of
  * being announced by a toast and then shown nowhere.
  *
  * `clearFieldError` can leave a step with an empty record, so emptiness is
@@ -681,7 +689,7 @@ function applyStepFieldErrors(issues: readonly { path: PropertyKey[]; message: s
   }
   stepFieldErrors.value = next;
   // This is the schema's only channel into the journey, so it owns the expansion
-  // the way validateJourneySteps owns it for its own two rules. Without this the
+  // the way validateJourneySteps owns it for its own rule. Without this the
   // save's toast named fields that sat inside a collapsed row.
   revealErroredSteps(next.keys());
 }
@@ -710,13 +718,8 @@ function clearFieldError(stepId: string, field: string) {
 }
 
 function validateJourneySteps(): boolean {
-  // 1. First step must be "navigate"
-  const first = props.modelValue[0];
-  // A subtest may lead: the expanded journey starts with the child's own navigate (as the schema allows).
-  firstStepError.value = first ? first.action !== "navigate" && first.action !== "subtest" : false;
-
-  // 2. Element-acting steps must name their element — by a v1 `selector` or a
-  //    v2 locator bundle. See stepIsMissingTarget.
+  // Element-acting steps must name their element — by a v1 `selector` or a
+  // v2 locator bundle. See stepIsMissingTarget.
   const selErrs = new Set<string>();
   for (const step of props.modelValue) {
     if (stepIsMissingTarget(step)) selErrs.add(step.id);
@@ -725,10 +728,9 @@ function validateJourneySteps(): boolean {
 
   // Auto-expand errored steps so the inline error is visible
   const erroredIds = [...selErrs];
-  if (firstStepError.value && first) erroredIds.push(first.id);
   revealErroredSteps(erroredIds);
 
-  const valid = !firstStepError.value && selErrs.size === 0;
+  const valid = selErrs.size === 0;
   if (!valid) {
     // Surface the first error as a toast so the user knows why
     // navigation was blocked, then expand the step to see inline details.
@@ -737,14 +739,10 @@ function validateJourneySteps(): boolean {
     const stepLabel =
       props.modelValue[stepIdx]?.name ||
       t("synthetics.results.steps.step", { step: (stepIdx ?? 0) + 1 });
-    if (firstStepError.value && (!first || first.id === firstErrId)) {
-      toast({ variant: "error", message: t("synthetics.validation.firstStepMustNavigate") });
-    } else {
-      toast({
-        variant: "error",
-        message: t("synthetics.validation.selectorRequired", { step: stepLabel }),
-      });
-    }
+    toast({
+      variant: "error",
+      message: t("synthetics.validation.selectorRequired", { step: stepLabel }),
+    });
   }
 
   return valid;
@@ -754,10 +752,6 @@ function clearSelectorError(stepId: string) {
   const next = new Set(selectorErrors.value);
   next.delete(stepId);
   selectorErrors.value = next;
-}
-
-function clearFirstStepError() {
-  firstStepError.value = false;
 }
 
 // Expose selection state + validation for the parent's sticky footer
@@ -789,15 +783,22 @@ async function startRecording() {
   const prefix = props.modelValue.slice(0, insertAt);
 
   if (prefix.length === 0 || !props.canRecordFrom) {
-    // Nothing was restored, so the capture starts on a browser that knows nothing about
-    // the prefix — steps from it cannot be filed at the anchor.
-    anchorStepId.value = null;
+    // An empty prefix keeps the anchor: the browser sits on the Starting URL, which is what precedes row 1.
+    if (prefix.length > 0) anchorStepId.value = null;
     restoreExpansionMap.value = undefined;
-    recorder.startRecording(props.startUrl ?? "", props.testIdAttr).catch((err) => {
-      recorder.error.value = err instanceof Error ? err.message : String(err);
-    });
+    recordingOpensStartUrl.value = true;
+    recorder
+      .startRecording(props.startUrl ?? "", props.testIdAttr, props.variables)
+      .catch((err) => {
+        recorder.error.value = err instanceof Error ? err.message : String(err);
+      })
+      .finally(() => {
+        // A refused start leaves no session for the kept anchor's marker to describe.
+        if (!recorder.isRecording.value) anchorStepId.value = null;
+      });
     return;
   }
+  recordingOpensStartUrl.value = false;
 
   // The prefix is what gets restored, so a subtest reference in it has to be
   // expanded first — the anchor cannot land inside a reference because `data`
@@ -817,6 +818,7 @@ async function startRecording() {
     .startRecordingFrom(journeyToWireSteps(expandedPrefix), {
       targetUrl: props.startUrl,
       testIdAttr: props.testIdAttr,
+      variables: props.variables,
     })
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
@@ -837,6 +839,7 @@ function onRecordFromFailure() {
   anchorStepId.value = restoreExpansionMap.value
     ? translateStepId(restoreExpansionMap.value, failed.stepId)
     : failed.stepId;
+  recordingOpensStartUrl.value = false;
   recorder.recordFromHere().catch((err) => {
     recorder.error.value = err instanceof Error ? err.message : String(err);
   });
@@ -933,12 +936,18 @@ function announceRecordedSteps(insertAt: number, count: number) {
  * invalidation rule cannot drift apart between them. The toast lives here for that
  * same reason: hung off the Stop button it would have missed the other two.
  */
-function commitRecordedSteps(steps: BrowserStep[]) {
+function commitRecordedSteps(recorded: BrowserStep[]) {
+  const insertAt = currentInsertAt();
+  // A plain recording session opened the Starting URL, so its leading navigate is that page, not a Step.
+  const steps =
+    insertAt === 0 && recordingOpensStartUrl.value && recorded[0]?.action === "navigate"
+      ? recorded.slice(1)
+      : recorded;
+  recordingOpensStartUrl.value = false;
   if (steps.length === 0) {
     anchorStepId.value = null;
     return;
   }
-  const insertAt = currentInsertAt();
   const next = [...props.modelValue];
   next.splice(insertAt, 0, ...steps);
   emit("update:modelValue", next);
@@ -1389,16 +1398,21 @@ const executedTotal = computed(() =>
     : props.modelValue.length,
 );
 
+/** Row 0 — the Starting URL as a navigate-shaped row — exactly when the run opens it (skip rule A1). */
+const startRow = computed<BrowserStep | null>(() =>
+  opensStartingUrl(props.modelValue, childrenCache.value)
+    ? { id: START_LOAD_STEP_ID, action: "navigate", value: props.startUrl ?? "" }
+    : null,
+);
+
 // ── Row status color: red left border for rows with validation errors ──────
 function getRowStatusColor(row: BrowserStep): string | undefined {
-  const first = props.modelValue[0];
-  const hasFirstStepErr = firstStepError.value && first?.id === row.id;
   const hasSelectorErr = selectorErrors.value.has(row.id);
   // Schema-level errors count too, or "fix the highlighted fields" would name a
-  // row that carries no highlight — every rule except these two local ones
-  // reaches the journey only as a field error.
+  // row that carries no highlight — every rule except the local one reaches the
+  // journey only as a field error.
   const hasFieldErr = fieldErrorStepIds.value.has(row.id);
-  if (hasFirstStepErr || hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
+  if (hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
   // Transient "this is the one you just added". It clears itself a moment later; the
   // list says nothing lasting about a row's age, only about whether it is broken.
   if (flashStepId.value === row.id) return "var(--color-status-info-text)";
@@ -1647,11 +1661,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         data-test="synthetics-journey-prefix-failed-detail"
         >{{ restoreStepFailure.error }}</pre>
       <div class="flex items-center gap-2">
-        <!-- Recording before step 1 would leave the journey starting with something
-             that is not a navigate, which validateJourneySteps rejects — the same
-             guardrail the row button carries. -->
         <OButton
-          v-if="canRecordFromFailure && failedStepNumber > 1"
+          v-if="canRecordFromFailure"
           variant="primary"
           size="sm"
           data-test="synthetics-journey-prefix-failed-record-btn"
@@ -2052,6 +2063,8 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :selected-ids="selectedStepIds"
       :expanded-ids="expandedStepIds"
       :get-row-status-color="getRowStatusColor"
+      :start-row="startRow"
+      @update:start-url="(url: string) => emit('update:startUrl', url)"
       @update:data="handleRowReorder"
       @update:selected-ids="handleUpdateSelected"
       @update:expanded-ids="handleUpdateExpanded"
@@ -2101,11 +2114,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :own-check-id="ownCheckId"
           :own-step-count="ownStepCount"
           :journey-budget-ms="journeyBudgetMs"
-          :action-error-message="
-            (firstStepError && props.modelValue[0]?.id === row.id
-              ? t('synthetics.validation.firstStepMustNavigate')
-              : raw('')) || fieldError(row.id, 'action')
-          "
+          :action-error-message="fieldError(row.id, 'action')"
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
             (selectorErrors.has(row.id) ? t('synthetics.validation.locatorRequired') : raw('')) ||
@@ -2114,10 +2123,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :value-error-message="fieldError(row.id, 'value')"
           :expected-error-message="fieldError(row.id, 'assertion.expected')"
           @update:step="(next: BrowserStep) => handleStepReplace(row, next)"
-          @action-edited="
-            clearFirstStepError();
-            clearFieldError(row.id, 'action');
-          "
+          @action-edited="clearFieldError(row.id, 'action')"
           @selector-edited="
             clearSelectorError(row.id);
             clearFieldError(row.id, 'selector');

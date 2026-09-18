@@ -14486,7 +14486,6 @@
       "updateFailed": "Error al actualizar la verificación."
     },
     "validation": {
-      "firstStepMustNavigate": "El primer paso debe ser \"Navegar\"",
       "locationsRequired": "Seleccione al menos una ubicación",
       "nameRequired": "El nombre es obligatorio",
       "locatorRequired": "Agrega al menos un localizador para que este paso sepa sobre qué elemento actuar.",

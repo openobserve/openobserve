@@ -14486,7 +14486,6 @@
       "updateFailed": "Échec de la mise à jour de la vérification."
     },
     "validation": {
-      "firstStepMustNavigate": "La première étape doit être \"Naviguer\"",
       "locationsRequired": "Sélectionnez au moins un emplacement",
       "nameRequired": "Le nom est requis",
       "locatorRequired": "Ajoutez au moins un localisateur pour que cette étape sache sur quel élément agir",

@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import type {
   BrowserCheck,
   SyntheticCheckType,
@@ -52,6 +52,8 @@ const props = defineProps<{
   allowPrivateLocations?: boolean;
   /** When true, CheckLocations shows skeleton rows instead of the list. */
   loadingLocations?: boolean;
+  /** Forwarded verbatim to `CheckDetails`: the hint under the Starting URL field. */
+  targetHint?: I18nText;
 }>();
 
 const { t } = useI18nTyped();
@@ -116,6 +118,7 @@ function handleUpdate(value: BrowserCheck) {
               :validation-errors="props.validationErrors ?? {}"
               :target-label="targetLabel"
               :target-placeholder="targetPlaceholder"
+              :target-hint="targetHint"
               data-test="synthetics-check-configure-details"
               @update:check="handleUpdate"
             />
