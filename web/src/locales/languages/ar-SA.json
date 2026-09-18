@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "تحديث لتطبيق أحدث تغييرات المتغيرات",
       "refresh": "تحديث",
+      "refreshCacheReload": "تحديث ذاكرة التخزين المؤقت وإعادة التحميل",
+      "moreRefreshOptions": "خيارات تحديث إضافية",
       "dashboard": "لوحة المعلومات",
       "dashboardNotFound": "لم يتم العثور على لوحة المعلومات أو تم حذفها. إعادة التوجيه إلى قائمة لوحة التحكم.",
       "failedToLoadDashboard": "فشل تحميل لوحة التحكم. إعادة التوجيه إلى قائمة لوحة التحكم.",

@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
       "refresh": "Làm mới",
+      "refreshCacheReload": "Làm mới cache & tải lại",
+      "moreRefreshOptions": "Thêm tùy chọn làm mới",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
