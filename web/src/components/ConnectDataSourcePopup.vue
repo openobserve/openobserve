@@ -193,7 +193,6 @@ const handleOpenChange = (open: boolean) => {
     data-test="connect-data-source-popup-dialog"
     :open="isOpen"
     size="sm"
-    :show-close="false"
     @update:open="handleOpenChange"
   >
     <div class="flex flex-col gap-4 p-2">
@@ -214,23 +213,14 @@ const handleOpenChange = (open: boolean) => {
         {{ t("connectDataSourcePopup.description") }}
       </p>
 
-      <div class="flex flex-col items-center gap-3 pt-1">
-        <OButton
-          data-test="connect-data-source-popup-connect-btn"
-          variant="primary"
-          class="w-full"
-          @click="connectDataSource"
-        >
-          {{ t("connectDataSourcePopup.connectButton") }}
-        </OButton>
-        <OButton
-          data-test="connect-data-source-popup-dismiss-link"
-          variant="ghost-muted"
-          @click="dismiss"
-        >
-          {{ t("connectDataSourcePopup.dismissLink") }}
-        </OButton>
-      </div>
+      <OButton
+        data-test="connect-data-source-popup-connect-btn"
+        variant="primary"
+        class="w-full"
+        @click="connectDataSource"
+      >
+        {{ t("connectDataSourcePopup.connectButton") }}
+      </OButton>
 
       <OButton
         v-if="showSlackInviteButton"
