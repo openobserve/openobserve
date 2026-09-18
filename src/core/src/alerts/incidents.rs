@@ -2314,6 +2314,20 @@ pub async fn trigger_rca_for_incident(
         return Ok(());
     }
 
+    // I20: the run must be refused here — before the billable agent call below — or `Off` only
+    // stops the ladder from waiting while the agent still runs and still bills.
+    if o2_enterprise::enterprise::alerts::rca_service::l0_off_for_incident(&org_id, &incident_id)
+        .await
+    {
+        log::debug!("[INCIDENTS::RCA] L0 is off for {incident_id}'s priority, skipping trigger");
+        o2_enterprise::enterprise::alerts::rca_service::skip_analysis_for_incident(
+            &org_id,
+            &incident_id,
+        )
+        .await;
+        return Ok(());
+    }
+
     // When the caller already emitted Begin synchronously, skip the guards and Begin emission
     // to avoid a DB race where the spawned task can't yet see the freshly-init'd events row.
     if !begin_already_emitted {
