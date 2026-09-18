@@ -28,7 +28,7 @@ use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    CompactParquetOutput, FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
+    CompactMergeOutput, FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
@@ -229,8 +229,8 @@ pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
-    /// Where a single merged Parquet file is built.
-    pub parquet_output: CompactParquetOutput,
+    /// Where a single merged file is built.
+    pub sink: CompactMergeOutput,
 }
 
 impl MergeOutput {
@@ -243,7 +243,7 @@ impl MergeOutput {
                 .common
                 .feature_ingester_none_compression
                 .then_some("none"),
-            parquet_output: CompactParquetOutput::Memory,
+            sink: CompactMergeOutput::Memory,
         }
     }
 
@@ -253,7 +253,7 @@ impl MergeOutput {
         Self {
             file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
-            parquet_output: cfg.compact.parquet_output,
+            sink: cfg.compact.merge_output,
         }
     }
 }

@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use config::{
-    CompactParquetOutput, FileFormat,
+    CompactMergeOutput, FileFormat,
     meta::stream::FileMeta,
     utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
@@ -25,9 +25,14 @@ use datafusion::{
     arrow::datatypes::Schema,
     error::{DataFusionError, Result},
 };
+use parquet::arrow::async_writer::AsyncFileWriter;
 use vortex::{
-    VortexSessionDefault, array::ArrayRef, arrow::ArrowSessionExt, file::VortexWriteOptions,
-    io::session::RuntimeSessionExt, session::VortexSession,
+    VortexSessionDefault,
+    array::ArrayRef,
+    arrow::ArrowSessionExt,
+    file::VortexWriteOptions,
+    io::{VortexWrite, session::RuntimeSessionExt},
+    session::VortexSession,
 };
 
 use super::{MergeMode, MergeOutput, MergedFile, append_metadata, new_temp_file};
@@ -42,13 +47,36 @@ pub(super) async fn write(
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
+    // hash-sorted metrics stay buffered: the ingester consumes them in memory
+    if output.sink == CompactMergeOutput::Disk && !matches!(mode, MergeMode::MetricsHashSorted) {
+        let (file, data_path) = new_temp_file()?;
+        let mut meta = match output.file_format {
+            FileFormat::Parquet => {
+                write_parquet_to(
+                    file,
+                    &schema,
+                    bloom_filter_fields,
+                    &metadata,
+                    output.parquet_compression,
+                    &mut rx,
+                    read_task,
+                )
+                .await?
+            }
+            FileFormat::Vortex => {
+                write_vortex_to(file, schema, &metadata, rx, read_task).await?;
+                metadata
+            }
+        };
+        meta.compressed_size = tokio::fs::metadata(&data_path).await?.len() as i64;
+        return Ok(vec![MergedFile::StandardFile { data_path, meta }]);
+    }
+
     let buf = match output.file_format {
-        // hash-sorted metrics stay buffered: the ingester consumes them in memory
-        FileFormat::Parquet
-            if output.parquet_output == CompactParquetOutput::Disk
-                && !matches!(mode, MergeMode::MetricsHashSorted) =>
-        {
-            let (data_path, meta) = write_parquet_to_disk(
+        FileFormat::Parquet => {
+            let mut buf = Vec::new();
+            metadata = write_parquet_to(
+                &mut buf,
                 &schema,
                 bloom_filter_fields,
                 &metadata,
@@ -57,20 +85,9 @@ pub(super) async fn write(
                 read_task,
             )
             .await?;
-            return Ok(vec![MergedFile::StandardFile { data_path, meta }]);
+            buf
         }
-        FileFormat::Parquet => {
-            write_parquet(
-                &schema,
-                bloom_filter_fields,
-                &metadata,
-                output.parquet_compression,
-                &mut rx,
-                read_task,
-            )
-            .await?
-        }
-        FileFormat::Vortex => write_vortex(schema, &metadata, rx, read_task).await?,
+        FileFormat::Vortex => write_vortex_to(Vec::new(), schema, &metadata, rx, read_task).await?,
     };
     metadata.compressed_size = buf.len() as i64;
 
@@ -86,17 +103,18 @@ pub(super) async fn write(
     }])
 }
 
-async fn write_parquet(
+/// Returns the file meta with the rows actually written; `compressed_size` is the caller's.
+async fn write_parquet_to<W: AsyncFileWriter>(
+    sink: W,
     schema: &Arc<Schema>,
     bloom_filter_fields: &[String],
     metadata: &FileMeta,
     compression: Option<&str>,
     rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<Vec<u8>> {
-    let mut buf = Vec::new();
+) -> Result<FileMeta> {
     let mut writer = new_parquet_writer(
-        &mut buf,
+        sink,
         schema,
         bloom_filter_fields,
         metadata,
@@ -119,68 +137,29 @@ async fn write_parquet(
         .map_err(|e| DataFusionError::External(Box::new(e)))??;
     append_metadata(&mut writer, &new_file_meta)?;
     writer.close().await?;
-    Ok(buf)
+    Ok(new_file_meta)
 }
 
-/// Each finished row group goes to a temp file, so peak memory no longer scales with the
-/// output file; the caller reads the file back only when it uploads it.
-async fn write_parquet_to_disk(
-    schema: &Arc<Schema>,
-    bloom_filter_fields: &[String],
-    metadata: &FileMeta,
-    compression: Option<&str>,
-    rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
-    read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<(tempfile::TempPath, FileMeta)> {
-    let (file, data_path) = new_temp_file()?;
-    let mut writer = new_parquet_writer(
-        file,
-        schema,
-        bloom_filter_fields,
-        metadata,
-        false,
-        compression,
-    );
-
-    let mut new_file_meta = metadata.clone();
-    new_file_meta.records = 0;
-    while let Some(batch) = rx.recv().await {
-        new_file_meta.records += batch.num_rows() as i64;
-        if let Err(e) = writer.write(&batch).await {
-            log::error!("merge_parquet_files write error: {e}");
-            return Err(e.into());
-        }
-    }
-
-    read_task
-        .await
-        .map_err(|e| DataFusionError::External(Box::new(e)))??;
-    append_metadata(&mut writer, &new_file_meta)?;
-    writer.finish().await?;
-    let file = writer.into_inner();
-    new_file_meta.compressed_size = file.metadata().await?.len() as i64;
-    drop(file);
-    Ok((data_path, new_file_meta))
-}
-
-async fn write_vortex(
+/// Encode into `sink` and hand it back once the file is finished.
+async fn write_vortex_to<W: VortexWrite + Unpin + 'static>(
+    sink: W,
     schema: Arc<Schema>,
     metadata: &FileMeta,
     mut rx: tokio::sync::mpsc::Receiver<RecordBatch>,
     read_task: tokio::task::JoinHandle<Result<()>>,
-) -> Result<Vec<u8>> {
+) -> Result<W> {
     // Metadata segments belong to the write options and can't be appended at
     // close time like Parquet metadata, so `records` may drift from the rows written.
     let file_meta = encode_vortex_file_meta(metadata);
     let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
         VORTEX_RUNTIME.block_on(async move {
-            let mut buf = Vec::new();
+            let mut sink = sink;
             let session = VortexSession::default().with_tokio();
             let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
             let write_options = VortexWriteOptions::new(session.clone())
                 .with_strategy(vortex_write_strategy(&session))
                 .with_metadata_segment(VORTEX_FILE_META_KEY, file_meta);
-            let mut writer = write_options.writer(&mut buf, dtype);
+            let mut writer = write_options.writer(&mut sink, dtype);
 
             while let Some(batch) = rx.recv().await {
                 let array: ArrayRef = session
@@ -196,7 +175,7 @@ async fn write_vortex(
 
             writer.finish().await?;
 
-            Ok::<Vec<u8>, anyhow::Error>(buf)
+            Ok::<W, anyhow::Error>(sink)
         })
     });
 
@@ -222,7 +201,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn write_parquet_to_disk_spools_file_and_meta() {
+    async fn write_parquet_to_file_carries_file_meta() {
         let schema = Arc::new(Schema::new(vec![
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new("field1", DataType::Utf8, true),
@@ -248,14 +227,13 @@ mod tests {
         drop(tx);
         let read_task = tokio::task::spawn(async { Ok(()) });
 
-        let (data_path, meta) =
-            write_parquet_to_disk(&schema, &[], &metadata, None, &mut rx, read_task)
-                .await
-                .unwrap();
+        let (file, data_path) = new_temp_file().unwrap();
+        let meta = write_parquet_to(file, &schema, &[], &metadata, None, &mut rx, read_task)
+            .await
+            .unwrap();
 
         let bytes = std::fs::read(&data_path).unwrap();
         assert_eq!(meta.records, 3);
-        assert_eq!(meta.compressed_size, bytes.len() as i64);
         let reader = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
             bytes::Bytes::from(bytes),
         )
@@ -297,13 +275,24 @@ mod tests {
         };
 
         let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
-        tx.send(batch).await.unwrap();
+        tx.send(batch.clone()).await.unwrap();
         drop(tx);
         let read_task = tokio::task::spawn(async { Ok(()) });
 
-        let buf = write_vortex(schema, &metadata, rx, read_task)
+        let buf = write_vortex_to(Vec::new(), schema.clone(), &metadata, rx, read_task)
             .await
             .unwrap();
+
+        // the disk sink must produce the same file
+        let (tx, rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+        tx.send(batch).await.unwrap();
+        drop(tx);
+        let read_task = tokio::task::spawn(async { Ok(()) });
+        let (file, data_path) = new_temp_file().unwrap();
+        write_vortex_to(file, schema, &metadata, rx, read_task)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&data_path).unwrap(), buf);
 
         let session = VortexSession::default().with_tokio();
         let vxf = session
