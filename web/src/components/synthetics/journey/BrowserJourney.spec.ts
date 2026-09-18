@@ -295,10 +295,13 @@ describe("BrowserJourney recording", () => {
     respondToLastCommand({ success: true });
     await flushPromises();
 
-    // Steps stream in live over the bridge, then Stop merges them.
+    // The recorder opened the Starting URL, so its leading navigate is that page, not a Step.
     emitStreamEvent({
       method: "setActions",
-      browserSteps: [{ id: "s1", action: "navigate", url: "https://app.test" }],
+      browserSteps: [
+        { id: "s1", action: "navigate", url: "https://app.test" },
+        { id: "s2", action: "click", selector: "#login", name: "Sign in" },
+      ],
     });
     await flushPromises();
 
@@ -310,8 +313,8 @@ describe("BrowserJourney recording", () => {
     expect(emitted).toBeTruthy();
     const finalSteps = emitted![emitted!.length - 1][0] as any[];
     expect(finalSteps).toHaveLength(1);
-    expect(finalSteps[0].action).toBe("navigate");
-    expect(finalSteps[0].value).toBe("https://app.test");
+    expect(finalSteps[0].action).toBe("click");
+    expect(finalSteps[0].name).toBe("Sign in");
   });
 
   it("should auto-start recording on mount when autoRecord is set", async () => {
@@ -494,12 +497,24 @@ describe("BrowserJourney step validation", () => {
     ).toBe(false);
   });
 
-  it("should fail when the first step does not navigate", () => {
-    expect(validate([{ id: "1", action: "click", selector: "#login" }])).toBe(false);
+  // The Starting URL opens the run; the locator keeps every other rule satisfied.
+  it("passes a journey that opens with a click", async () => {
+    mockToast.mockClear();
+    expect(
+      validate([
+        {
+          id: "1",
+          action: "click",
+          name: "Sign in",
+          locator: { candidates: [{ kind: "css", value: "#login" }] },
+        },
+      ]),
+    ).toBe(true);
+    await wrapper.vm.$nextTick();
+    expect(mockToast).not.toHaveBeenCalled();
+    expect(wrapper.findComponent(JourneyStepsStub).props("expandedIds")).not.toContain("1");
   });
 
-  // The expanded journey starts with the child's own navigate, which is why the save
-  // schema and the server already accept this; the client rule has to agree.
   it("accepts a subtest as the first step, like the save schema does", async () => {
     mockToast.mockClear();
     expect(
@@ -514,28 +529,8 @@ describe("BrowserJourney step validation", () => {
       ]),
     ).toBe(true);
     await wrapper.vm.$nextTick();
-    expect(mockToast).not.toHaveBeenCalledWith(
-      expect.objectContaining({ message: "synthetics.validation.firstStepMustNavigate" }),
-    );
     expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "error" }));
-    // No first-step error means nothing auto-expands row 0.
     expect(wrapper.findComponent(JourneyStepsStub).props("expandedIds")).not.toContain("s1");
-  });
-
-  // The case above is not isolated: that step names no element either, so it
-  // fails the target rule too and would keep failing with the first-step rule
-  // deleted. This one carries a valid locator, so only the first-step rule can
-  // reject it.
-  it("should fail a first step that does not navigate even when it names its element", () => {
-    expect(
-      validate([
-        {
-          id: "1",
-          action: "click",
-          locator: { candidates: [{ kind: "css", value: "#login" }] },
-        },
-      ]),
-    ).toBe(false);
   });
 });
 
@@ -570,7 +565,8 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
     expect(expandedIds()).toContain("s2");
   });
 
-  it("should expand the first step when it does not navigate", async () => {
+  // A first step that does not navigate is not an error any more, so nothing opens.
+  it("should leave a leading click collapsed and raise no toast", async () => {
     wrapper = mountJourney({
       modelValue: [
         {
@@ -585,7 +581,37 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
     (wrapper.vm as any).validateStepSelectors();
     await wrapper.vm.$nextTick();
 
-    expect(expandedIds()).toContain("s1");
+    expect(expandedIds()).not.toContain("s1");
+    expect(mockToast).not.toHaveBeenCalled();
+  });
+
+  // The red spine followed the first-step rule, which is gone.
+  it("should not colour a leading click's row after validation", async () => {
+    const StubWithStatusColor = {
+      props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
+      template: `<div class="journey-steps-stub">
+        <div v-for="item in data" :key="item.id" class="step-row"
+             :data-status-color="getRowStatusColor ? getRowStatusColor(item) : ''" />
+      </div>`,
+    };
+    wrapper = mount(BrowserJourney, {
+      props: {
+        modelValue: [
+          {
+            id: "s1",
+            action: "click",
+            name: "Sign in",
+            locator: { candidates: [{ kind: "css", value: "#a" }] },
+          },
+        ],
+      },
+      global: { stubs: { ...STUBS, JourneySteps: StubWithStatusColor } },
+    }) as VueWrapper;
+
+    (wrapper.vm as any).validateStepSelectors();
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find(".step-row").attributes("data-status-color")).toBeFalsy();
   });
 
   // A filtered-out row is not rendered, so expanding it puts nothing on screen.
@@ -611,7 +637,7 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
 });
 
 // ── Schema-issue auto-expand ──────────────────────────────────────────────
-// `validateJourneySteps` knows two rules (first-step-navigate, missing target).
+// `validateJourneySteps` knows one rule of its own (missing target).
 // Every OTHER save-blocking rule lives in the zod schema and reaches this
 // component only through `setStepFieldErrors`, which recorded the message but
 // never opened the row — so "fix the highlighted fields" pointed at a collapsed
@@ -2859,6 +2885,352 @@ describe("BrowserJourney restore-then-record", () => {
   });
 });
 
+// A recording at index 0 started on the Starting URL, so its leading navigate is not a Step.
+describe("BrowserJourney recorder strip", () => {
+  let wrapper: VueWrapper;
+
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://app.test/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+    { id: "s3", action: "click", name: "Open cart", selector: "#cart" },
+  ] as any[];
+
+  const NAV = { id: "n1", action: "navigate", url: "https://app.test/", name: "Open app" };
+  const CLICK = { id: "n2", action: "click", selector: "#consent", name: "Accept cookies" };
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+    mockToast.mockClear();
+    mockT.mockClear();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  /** Answer the start command, stream `steps` in, then stop — the committed journey. */
+  async function recordAndStop(steps: Record<string, unknown>[]): Promise<any[]> {
+    respondToLastCommand({ success: true });
+    await flushPromises();
+    emitStreamEvent({
+      method: "recordingStarted",
+      tabId: 1,
+      url: "https://app.test/",
+      mode: "insert",
+      baselineStepCount: 0,
+    });
+    emitStreamEvent({ method: "setActions", actions: [], sources: [], browserSteps: steps });
+    await flushPromises();
+
+    await wrapper.find('[data-test="synthetics-journey-stop-btn"]').trigger("click");
+    respondToLastCommand({ success: true });
+    await flushPromises();
+
+    const emitted = wrapper.emitted("update:modelValue");
+    return emitted ? (emitted[emitted.length - 1][0] as any[]) : [];
+  }
+
+  it("drops a leading navigate recorded at index 0 on an empty journey", async () => {
+    wrapper = mountJourney({ modelValue: [], extensionReady: true, canRecordFrom: true });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+
+    const next = await recordAndStop([NAV, CLICK]);
+
+    expect(next.map((s) => s.action)).toEqual(["click"]);
+    expect(next[0].name).toBe("Accept cookies");
+  });
+
+  it("keeps a leading navigate recorded at the end of a journey", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+    expect(lastCommandAction()).toBe("startRecordingFrom");
+
+    const next = await recordAndStop([NAV, CLICK]);
+
+    expect(next.map((s) => s.action)).toEqual(["navigate", "click", "click", "navigate", "click"]);
+    expect(next[3].value).toBe("https://app.test/");
+  });
+
+  it("keeps a navigate that is not the first recorded step at index 0", async () => {
+    wrapper = mountJourney({ modelValue: [], extensionReady: true, canRecordFrom: true });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+
+    const next = await recordAndStop([CLICK, NAV]);
+
+    expect(next.map((s) => s.action)).toEqual(["click", "navigate"]);
+  });
+
+  // Record-before-row-1 restores nothing and opens the Starting URL: an index-0 recording.
+  it("drops a leading navigate recorded before Step 1", async () => {
+    wrapper = mountJourney({ modelValue: journey, extensionReady: true, canRecordFrom: true });
+    await wrapper.findComponent(".journey-steps-stub").vm.$emit("record-before", journey[0]);
+    await settleProbeDelay();
+    expect(lastCommandAction()).toBe("startRecording");
+
+    const next = await recordAndStop([NAV, CLICK]);
+
+    expect(next.map((s) => s.id)).toEqual([expect.any(String), "s1", "s2", "s3"]);
+    expect(next[0].action).toBe("click");
+  });
+
+  // The toast counts what was committed, not what the extension sent.
+  it("announces only the steps that were kept", async () => {
+    wrapper = mountJourney({ modelValue: [], extensionReady: true, canRecordFrom: true });
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+
+    await recordAndStop([NAV, CLICK]);
+
+    const call = [...(mockT.mock.calls as unknown as unknown[][])]
+      .reverse()
+      .find((c) => c[0] === "synthetics.journey.recordedStepsAdded");
+    expect(call?.[1]).toEqual({ count: 1, first: 1, last: 1 });
+  });
+
+  /** The action of the command the composable last put on the bridge. */
+  function lastCommandAction(): string | null {
+    const calls = postMessageSpy.mock.calls;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const data = calls[i]?.[0];
+      if (data?.msg?.type === "synthetics-command") return data.msg.command?.action ?? null;
+    }
+    return null;
+  }
+});
+
+// A `{{baseUrl}}` sent verbatim opens a page that does not exist, on every record path.
+describe("BrowserJourney Starting URL variables", () => {
+  let wrapper: VueWrapper;
+
+  const variables = [{ name: "baseUrl", value: "example.com" }];
+  const journey = [
+    { id: "s1", action: "navigate", name: "Open app", value: "https://example.com/" },
+    { id: "s2", action: "click", name: "Sign in", selector: "#login" },
+  ] as any[];
+
+  beforeEach(() => {
+    postMessageSpy = vi.fn();
+    vi.spyOn(window, "postMessage").mockImplementation(postMessageSpy);
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  function lastCommand(): any {
+    const calls = postMessageSpy.mock.calls;
+    for (let i = calls.length - 1; i >= 0; i--) {
+      const data = calls[i]?.[0];
+      if (data?.msg?.type === "synthetics-command") return data.msg.command;
+    }
+    return null;
+  }
+
+  it("records on the resolved Starting URL", async () => {
+    wrapper = mountJourney({
+      modelValue: [],
+      extensionReady: true,
+      startUrl: "https://{{baseUrl}}/x",
+      variables,
+    });
+
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+
+    expect(lastCommand()).toMatchObject({
+      action: "startRecording",
+      targetUrl: "https://example.com/x",
+    });
+  });
+
+  // The prefix and the Starting URL resolve from one `variables`; a restore that forgets it fails both.
+  it("restores on the resolved Starting URL", async () => {
+    wrapper = mountJourney({
+      modelValue: [{ ...journey[0], value: "https://{{baseUrl}}/" }, journey[1]],
+      extensionReady: true,
+      canRecordFrom: true,
+      startUrl: "https://{{baseUrl}}/x",
+      variables,
+    });
+
+    await wrapper.find('[data-test="synthetics-journey-record-btn"]').trigger("click");
+    await settleProbeDelay();
+
+    const cmd = lastCommand();
+    expect(cmd).toMatchObject({
+      action: "startRecordingFrom",
+      targetUrl: "https://example.com/x",
+    });
+    expect(cmd.prefixSteps[0].url).toBe("https://example.com/");
+  });
+});
+
+// Surfaces the start row and its edit channel, so the skip rule is assertable without the table.
+const JourneyStepsStubWithStartRow = {
+  props: ["data", "mode", "selectedIds", "expandedIds", "startRow"],
+  emits: ["update:start-url"],
+  template: `
+    <div class="journey-steps-stub" :data-start-url="startRow ? startRow.value : ''">
+      <input
+        v-if="startRow"
+        data-test="synthetics-journey-start-url-input"
+        :value="startRow.value"
+        @input="$emit('update:start-url', $event.target.value)"
+      />
+      <div v-for="item in data" :key="item.id" class="step-row">{{ item.name }}</div>
+    </div>`,
+};
+
+describe("BrowserJourney ghost row 0", () => {
+  let wrapper: VueWrapper;
+
+  const click = (id: string, name: string) => ({
+    id,
+    action: "click",
+    name,
+    locator: { candidates: [{ kind: "css", value: "#x" }] },
+  });
+  const nav = (id: string) => ({
+    id,
+    action: "navigate",
+    name: "Open",
+    value: "https://app.test/",
+  });
+  const ref = (id: string, child: string) => ({
+    id,
+    action: "subtest",
+    name: "Log in (shared)",
+    subtest: { id: child },
+  });
+  const navFirst: ChildJourney = {
+    id: "login-test",
+    name: "Login",
+    steps: [nav("c1"), click("c2", "submit")] as BrowserStep[],
+  };
+  const clickFirst: ChildJourney = {
+    id: "consent-test",
+    name: "Consent",
+    steps: [click("k1", "accept"), click("k2", "close")] as BrowserStep[],
+  };
+
+  function mountWithStartRow(props: Record<string, unknown>) {
+    return mount(BrowserJourney, {
+      props: { startUrl: "https://app.test/{{path}}", ...props },
+      global: { stubs: { ...STUBS, JourneySteps: JourneyStepsStubWithStartRow } },
+    }) as VueWrapper;
+  }
+
+  function startRowProp(w: VueWrapper) {
+    return w.findComponent(JourneyStepsStubWithStartRow).props("startRow");
+  }
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  it("shows row 0 carrying the Starting URL when the first Step is not a navigate", () => {
+    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
+
+    expect(startRowProp(wrapper)).toMatchObject({
+      id: "_start",
+      value: "https://app.test/{{path}}",
+    });
+  });
+
+  it("hides row 0 when the first Step navigates", () => {
+    wrapper = mountWithStartRow({ modelValue: [nav("s1"), click("s2", "Sign in")] });
+
+    expect(startRowProp(wrapper)).toBeFalsy();
+  });
+
+  it("hides row 0 when a leading Subtest's child starts with a navigate", () => {
+    wrapper = mountWithStartRow({
+      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
+      childrenCache: new Map([["login-test", navFirst]]),
+    });
+
+    expect(startRowProp(wrapper)).toBeFalsy();
+  });
+
+  it("shows row 0 when a leading Subtest's child starts with a click", () => {
+    wrapper = mountWithStartRow({
+      modelValue: [ref("s1", "consent-test"), nav("s2")],
+      childrenCache: new Map([["consent-test", clickFirst]]),
+    });
+
+    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
+  });
+
+  // An unresolved child cannot claim the navigate, so the run still opens the Starting URL.
+  it("shows row 0 when a leading Subtest's child is not in the cache", () => {
+    wrapper = mountWithStartRow({
+      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
+      childrenCache: new Map(),
+    });
+
+    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
+  });
+
+  it("shows row 0 when a leading Subtest's child was refused", () => {
+    wrapper = mountWithStartRow({
+      modelValue: [ref("s1", "login-test"), click("s2", "Logs")],
+      childrenCache: new Map(),
+      refusedChildIds: new Set(["login-test"]),
+    });
+
+    expect(startRowProp(wrapper)).toMatchObject({ id: "_start" });
+  });
+
+  it("re-evaluates the skip rule when the journey changes", async () => {
+    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
+    expect(startRowProp(wrapper)).toBeTruthy();
+
+    await wrapper.setProps({ modelValue: [nav("s0"), click("s1", "Sign in")] });
+
+    expect(startRowProp(wrapper)).toBeFalsy();
+  });
+
+  // Configure → row 0: the Starting URL is a prop, so the row follows it.
+  it("follows Configure's Starting URL", async () => {
+    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
+
+    await wrapper.setProps({ startUrl: "https://other.test/" });
+
+    expect(startRowProp(wrapper)).toMatchObject({ value: "https://other.test/" });
+  });
+
+  // Row 0 → Configure: the host's `check.url` is the one value both views read.
+  it("emits the edited URL as update:startUrl", async () => {
+    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in")] });
+
+    const input = wrapper.find('[data-test="synthetics-journey-start-url-input"]');
+    expect(input.exists(), "no start row rendered").toBe(true);
+    await input.setValue("https://app.test/login");
+
+    expect(wrapper.emitted("update:startUrl")).toEqual([["https://app.test/login"]]);
+    // The Steps are untouched: the Starting URL is not one of them.
+    expect(wrapper.emitted("update:modelValue")).toBeFalsy();
+  });
+
+  it("never counts row 0 in the step badge", () => {
+    wrapper = mountWithStartRow({ modelValue: [click("s1", "Sign in"), click("s2", "Submit")] });
+
+    expect(startRowProp(wrapper)).toBeTruthy();
+    const heading = wrapper.findAll("h3").find((h) => h.text() === "synthetics.journey.steps");
+    expect(heading?.element.nextElementSibling?.textContent?.trim()).toBe("2");
+  });
+});
+
 // ── When a restore does not reach the recording point ──────────────────────
 //
 // A restore ends early for two quite different reasons, and the surface has to
@@ -3123,24 +3495,25 @@ describe("BrowserJourney — a restore that never reached the recording point", 
     expect(wrapper.emitted("update:modelValue")).toBeFalsy();
   });
 
-  /**
-   * Recording before step 1 would leave the journey starting with something other
-   * than a navigate, which `validateJourneySteps` rejects — the same guardrail the
-   * row button carries. Cancel is still offered; there is simply nowhere to record.
-   */
-  it("should not offer to record before the first step", async () => {
+  // The browser is sitting on the Starting URL, which is what comes before step 1.
+  it("should offer to record before the first step", async () => {
     wrapper = mountAnchored();
     await startAnchoredRestore(wrapper);
 
     await failWith({ ...STEP_FAILED, stepId: "s1" });
 
     expect(wrapper.find('[data-test="synthetics-journey-prefix-failed"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="synthetics-journey-prefix-failed-record-btn"]').exists()).toBe(
-      false,
-    );
+    const record = wrapper.find('[data-test="synthetics-journey-prefix-failed-record-btn"]');
+    expect(record.exists()).toBe(true);
     expect(wrapper.find('[data-test="synthetics-journey-prefix-failed-cancel-btn"]').exists()).toBe(
       true,
     );
+
+    await record.trigger("click");
+    await flushPromises();
+
+    expect(lastCommand()?.action).toBe("recordFromHere");
+    expect(wrapper.find(".journey-steps-stub").attributes("data-anchor")).toBe("s1");
   });
 
   // An extension that cannot record on an open session would answer the command

@@ -28,7 +28,7 @@ import CheckConfigure from "./CheckConfigure.vue";
 
 // ── Child Component Stubs ─────────────────────────────────────────────────
 const CheckDetailsStub = {
-  props: ["check", "folders", "validationErrors", "targetLabel", "targetPlaceholder"],
+  props: ["check", "folders", "validationErrors", "targetLabel", "targetPlaceholder", "targetHint"],
   emits: ["update:check"],
   template:
     '<div class="check-details-stub" :data-test="$attrs[\'data-test\']" :data-url="check.url"><slot /></div>',
@@ -295,6 +295,26 @@ describe("CheckConfigure", () => {
 
       const details = wrapper.findComponent(CheckDetailsStub);
       expect(details.props("targetLabel")).toBeUndefined();
+    });
+  });
+
+  // The host decides whether the Starting URL is opened; Configure only passes the word along.
+  describe("target hint forwarding", () => {
+    it("should forward targetHint to CheckDetails", () => {
+      wrapper = mountConfigure({
+        checkType: "browser",
+        check: { ...mockMonitorHttp },
+        targetHint: "synthetics.checkDetails.startingUrlNotOpened",
+      });
+
+      const details = wrapper.findComponent(CheckDetailsStub);
+      expect(details.props("targetHint")).toBe("synthetics.checkDetails.startingUrlNotOpened");
+    });
+
+    it("should pass undefined targetHint when the host gives none", () => {
+      wrapper = mountConfigure({ checkType: "browser", check: { ...mockMonitorHttp } });
+
+      expect(wrapper.findComponent(CheckDetailsStub).props("targetHint")).toBeUndefined();
     });
   });
 });

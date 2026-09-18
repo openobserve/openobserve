@@ -263,6 +263,7 @@ const baseStubs = {
       "refusedChildIds",
       "journeyBudgetMs",
       "variableNames",
+      "variables",
       "ownStepCount",
       "class",
     ],
@@ -306,6 +307,7 @@ const baseStubs = {
       "folders",
       "foldersLoading",
       "validationErrors",
+      "targetHint",
       "class",
     ],
   },
@@ -1821,6 +1823,164 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(ctaDisabled(wrapper)).toBe(true);
+    });
+  });
+  // `check.url` is one value with two views: Configure's field and the journey's row 0.
+  describe("Starting URL opens the run", () => {
+    const journeyStub = (w: VueWrapper) =>
+      w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
+    const configureStub = (w: VueWrapper) => w.findComponent(baseStubs.CheckConfigure);
+    const HINT = "Not opened — the first Step navigates.";
+    const click: BrowserStep = {
+      id: "s1",
+      action: "click",
+      name: "Sign in",
+      locator: { candidates: [{ kind: "css", value: "#login" }] },
+    };
+    const nav = (url: string): BrowserStep => ({
+      id: "n1",
+      action: "navigate",
+      name: "Open",
+      value: url,
+    });
+
+    async function mountEditWith(extra: Record<string, unknown>) {
+      mockServiceGet.mockResolvedValue({
+        data: {
+          name: "Test Check",
+          url: "https://example.com/start",
+          folder: "folder-1",
+          journey: [],
+          ...extra,
+        },
+      });
+      const w = mountPage({ editId: "check-123" });
+      await flushPromises();
+      return w;
+    }
+
+    /** Edit mode: Save & Continue is the only way onto Configure. */
+    async function goToConfigure(w: VueWrapper) {
+      await w.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
+      await flushPromises();
+    }
+
+    it("passes the check's variables to the journey, so record paths can resolve the Starting URL", async () => {
+      const variables = [{ name: "baseUrl", value: "example.com" }];
+      wrapper = await mountEditWith({ variables });
+
+      expect(journeyStub(wrapper).props("variables")).toEqual(variables);
+    });
+
+    it("tells Configure the Starting URL is not opened when the first Step navigates", async () => {
+      wrapper = await mountEditWith({ journey: [nav("https://example.com/login"), click] });
+      await goToConfigure(wrapper);
+
+      expect(configureStub(wrapper).props("targetHint")).toBe(HINT);
+    });
+
+    it("gives Configure no hint when the first Step is not a navigate", async () => {
+      wrapper = await mountEditWith({ journey: [click] });
+      await goToConfigure(wrapper);
+
+      expect(configureStub(wrapper).props("targetHint")).toBeFalsy();
+    });
+
+    // The skip rule reads the EXPANDED first step, so a leading Subtest's child decides.
+    it("reads the hint through a leading Subtest whose child starts with a navigate", async () => {
+      const subtestStep: BrowserStep = {
+        id: "s1",
+        action: "subtest",
+        name: "Log in (shared)",
+        subtest: { id: "login-test", name: "Login" },
+      };
+      mockServiceGet.mockImplementation(async (_org: string, id: string) => {
+        if (id === "login-test") {
+          return {
+            data: {
+              name: "Login",
+              folder_id: "shared",
+              config: {
+                steps: [
+                  {
+                    id: "c1",
+                    action: "navigate",
+                    name: "Open login",
+                    value: "https://example.com/login",
+                  },
+                ],
+              },
+            },
+          };
+        }
+        return {
+          data: {
+            name: "Test Check",
+            url: "https://example.com/start",
+            folder: "folder-1",
+            journey: [subtestStep, click],
+          },
+        };
+      });
+      wrapper = mountPage({ editId: "check-123" });
+      await flushPromises();
+      await goToConfigure(wrapper);
+
+      expect(configureStub(wrapper).props("targetHint")).toBe(HINT);
+    });
+
+    it("writes an edit from row 0 into the check's Starting URL", async () => {
+      wrapper = await mountEditWith({ journey: [click] });
+
+      journeyStub(wrapper).vm.$emit("update:startUrl", "https://example.com/edited");
+      await flushPromises();
+
+      // The prop the journey reads is the same value it just wrote.
+      expect(journeyStub(wrapper).props("startUrl")).toBe("https://example.com/edited");
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+      expect(mockServiceUpdate).toHaveBeenCalledWith(
+        "default",
+        "check-123",
+        expect.objectContaining({ url: "https://example.com/edited" }),
+        "folder-1",
+      );
+    });
+
+    it("warns, and still saves, when no navigate shares the Starting URL's host", async () => {
+      wrapper = await mountEditWith({ journey: [click, nav("https://other.test/login")] });
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "warning",
+        message: "This test opens example.com, but its steps navigate to other.test.",
+      });
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+      expect(mockRouterPush).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not warn when a navigate shares the Starting URL's host", async () => {
+      wrapper = await mountEditWith({
+        journey: [click, nav("https://other.test/x"), nav("https://example.com/y")],
+      });
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not warn when nothing in the journey navigates", async () => {
+      wrapper = await mountEditWith({ journey: [click] });
+
+      await wrapper.find('[data-test="synthetics-create-save-exit-btn"]').trigger("click");
+      await flushPromises();
+
+      expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "warning" }));
+      expect(mockServiceUpdate).toHaveBeenCalledTimes(1);
     });
   });
 });
