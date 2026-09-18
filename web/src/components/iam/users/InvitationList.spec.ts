@@ -33,23 +33,29 @@ const mockInvitations = [
   },
 ];
 
-vi.mock("@/services/users", () => ({
-  default: {
-    getPendingInvites: vi.fn(async () => ({
-      data: { data: mockInvitations },
-    })),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPendingInvites: vi.fn(async () => ({
+        data: { data: mockInvitations },
+      })),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    process_subscription: vi.fn(async () => ({})),
-    decline_subscription: vi.fn(async () => ({})),
-    list: vi.fn(async () => ({
-      data: { data: [{ identifier: "org-1", name: "Org One" }] },
-    })),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      process_subscription: vi.fn(async () => ({})),
+      decline_subscription: vi.fn(async () => ({})),
+      list: vi.fn(async () => ({
+        data: { data: [{ identifier: "org-1", name: "Org One" }] },
+      })),
+    },
+  });
+});
 
 import InvitationList from "@/components/iam/users/InvitationList.vue";
 import usersService from "@/services/users";

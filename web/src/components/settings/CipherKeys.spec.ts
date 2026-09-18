@@ -27,12 +27,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
 }));
 
 // Mock external services and components
-vi.mock("@/services/cipher_keys", () => ({
-  default: {
-    list: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/cipher_keys", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/services/segment_analytics", () => ({
   default: {
@@ -263,8 +266,8 @@ describe("CipherKeys", () => {
   describe("Data loading", () => {
     it("should populate table data after successful fetch", async () => {
       const wrapper = createWrapper();
-      await nextTick();
-      await wrapper.vm.$nextTick();
+      // The read resolves through the query cache, which needs more than one tick.
+      await flushPromises();
 
       expect(wrapper.vm.tabledata).toHaveLength(2);
       expect(wrapper.vm.tabledata[0]).toEqual({

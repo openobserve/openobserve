@@ -242,15 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </template>
 
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              class="w-8!"
-              icon-left="refresh"
-              :loading="loading"
-              :title="t('common.refresh')"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
               data-test="synthetic-monitoring-refresh-btn"
-              @click="loadMonitors()"
+              @click="loadMonitors(undefined, true)"
             />
           </template>
         </MonitorTable>
@@ -430,12 +428,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useQuery } from "@tanstack/vue-query";
+import { syntheticsMonitorsQuery } from "@/services/synthetics.queries";
+import { ref, computed, onMounted, watch, nextTick } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -581,12 +584,33 @@ type DisplayMonitor = ReturnType<typeof mapMonitor>;
 // ── Data loading ───────────────────────────────────────────────────────
 // Start in loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
-const loading = ref(true);
-const forbidden = ref(false);
-
+// The folder a read is currently aimed at. `loadMonitors` may be handed a
+// folder the route refs have not caught up with, and "search across folders"
+// means *no* folder, so the key tracks this rather than `activeFolderId`.
 const orgIdentifier = computed<string>(
   () => (store.state as any).selectedOrganization?.identifier ?? "",
 );
+
+const readFolder = ref<string | undefined>(undefined);
+// Distinct from readFolder being undefined, which is the "All folders" scope.
+const folderResolved = ref(false);
+
+const monitorsList = useQuery(() =>
+  Object.assign(syntheticsMonitorsQuery(orgIdentifier.value, readFolder.value), {
+    enabled: !!orgIdentifier.value && folderResolved.value,
+  }),
+);
+
+const loading = monitorsList.isPending;
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = monitorsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+// Request in flight, with rows still on screen — the refresh button's
+// spinner. `loading` stays for the skeleton, which only a cold read wants.
+const fetching = monitorsList.isFetching;
+const lastUpdatedAt = monitorsList.dataUpdatedAt;
 
 /** Resolves once orgIdentifier is populated — on browser back-navigation the
  *  store may not be hydrated synchronously yet. */
@@ -602,28 +626,19 @@ function waitForOrgIdentifier(): Promise<void> {
   });
 }
 
-async function loadMonitors(folderId?: string) {
+async function loadMonitors(folderId?: string, force = false) {
   if (!orgIdentifier.value) return;
-  loading.value = true;
-  forbidden.value = false;
-  try {
-    const targetFolder =
-      folderId !== undefined
-        ? folderId
-        : searchAcrossFolders.value
-          ? undefined
-          : activeFolderId.value;
-    const res = await syntheticsService.listByFolderId(orgIdentifier.value, targetFolder);
-    // The API field was renamed `monitors` -> `checks`. Both are read so a
-    // bundle and a server on opposite sides of that rename still render.
-    const rows = (res.data as any).checks ?? (res.data as any).monitors ?? [];
-    monitors.value = rows.map(mapMonitor);
-  } catch (err: any) {
-    forbidden.value = err?.response?.status === 403;
-    throw err;
-  } finally {
-    loading.value = false;
-  }
+  const targetFolder =
+    folderId !== undefined
+      ? folderId
+      : searchAcrossFolders.value
+        ? undefined
+        : activeFolderId.value;
+  readFolder.value = targetFolder;
+  folderResolved.value = true;
+  // Let the key pick up the new folder before asking for the data.
+  await nextTick();
+  if (force) await monitorsList.refetch();
 }
 
 async function initPage() {
@@ -780,7 +795,7 @@ const bulkDeleteMonitors = async () => {
     selectedMonitorIds.value = [];
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.bulkDeleteSuccess") });
-    await loadMonitors();
+    await loadMonitors(undefined, true);
   } catch (err: any) {
     dismiss();
     toast({
@@ -810,7 +825,7 @@ const moveSingleMonitor = (row: any) => {
 const onMoveUpdated = async () => {
   selectedMonitorIds.value = [];
   showMoveDialog.value = false;
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 };
 
 // ── Row click → Monitor Results page ───────────────────────────────────
@@ -1054,7 +1069,9 @@ async function loadLocations() {
   }
 }
 
-const monitors = ref<DisplayMonitor[]>([]);
+// The list is the query, not a copy of it: a monitor write invalidates the
+// synthetics scope and these rows repaint with no wiring here.
+const monitors = computed<DisplayMonitor[]>(() => (monitorsList.data.value ?? []).map(mapMonitor));
 
 // Enrich monitors with folder names from Vuex store
 const enrichedMonitors = computed(() => {
@@ -1222,7 +1239,7 @@ async function bulkPauseMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkEnableMonitors() {
@@ -1260,7 +1277,7 @@ async function bulkEnableMonitors() {
   }
   bulkActionLoading.value = false;
   selectedMonitorIds.value = [];
-  await loadMonitors();
+  await loadMonitors(undefined, true);
 }
 
 async function bulkTriggerMonitors() {
@@ -1351,8 +1368,13 @@ async function toggleEnabled(m: any) {
   });
   try {
     await syntheticsService.enable(org, id, { enabled: newEnabled }, m.folderId);
-    const found = monitors.value.find((mon) => String(mon.id) === id);
-    if (found) found.enabled = newEnabled;
+    // `monitors` is a computed over the cached rows, so patching a mapped copy would be thrown away on the next re-evaluation.
+    queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) =>
+      // `undefined` leaves an entry without this monitor untouched instead of re-stamping it as fresh.
+      Array.isArray(old) && old.some((mon: any) => String(mon.id) === id)
+        ? old.map((mon: any) => (String(mon.id) === id ? { ...mon, enabled: newEnabled } : mon))
+        : old,
+    );
     dismiss();
     toast({
       variant: "success",
@@ -1460,7 +1482,7 @@ async function saveDuplicate() {
     if (!searchAcrossFolders.value && targetFolder !== activeFolderId.value) {
       activeFolderId.value = targetFolder;
     } else {
-      await loadMonitors();
+      await loadMonitors(undefined, true);
     }
   } catch (err: any) {
     dismiss();
@@ -1536,7 +1558,13 @@ async function deleteMonitor(m: any) {
   });
   try {
     await syntheticsService.delete(org, String(m.id), activeFolderId.value);
-    monitors.value = monitors.value.filter((mon) => String(mon.id) !== String(m.id));
+    // Every cached folder, not just the one on screen: a cross-folder view deletes rows another folder's entry still holds.
+    queryClient.setQueriesData({ queryKey: syntheticsKeys.monitorsAll(org) }, (old: any) => {
+      if (!Array.isArray(old)) return undefined;
+      const next = old.filter((mon: any) => String(mon.id) !== String(m.id));
+      // `undefined` leaves a folder without this monitor untouched instead of re-stamping it as fresh.
+      return next.length === old.length ? undefined : next;
+    });
     dismiss();
     toast({ variant: "success", message: t("synthetics.toast.deleteSuccessSingle") });
   } catch (err: any) {

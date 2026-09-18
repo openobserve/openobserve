@@ -31,6 +31,12 @@ import { cloneDeep, debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import {
+  saveAnomalyConfigMutation,
+  triggerAnomalyTrainingMutation,
+} from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import segment from "@/services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -423,6 +429,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyRetraining = ref(false);
   const anomalySaving = ref(false);
 
+  const anomalyOrgId = useOrgId();
+  const saveAnomalyConfig = useMutation(() =>
+    saveAnomalyConfigMutation(
+      anomalyOrgId.value,
+      () => router.currentRoute.value.params.anomaly_id as string | undefined,
+    ),
+  );
+  const triggerAnomalyTraining = useMutation(() =>
+    triggerAnomalyTrainingMutation(anomalyOrgId.value),
+  );
+
   const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
@@ -447,10 +464,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!anomalyId) return;
     anomalyRetraining.value = true;
     try {
-      await anomalyDetectionService.triggerTraining(
-        store.state.selectedOrganization.identifier,
-        anomalyId,
-      );
+      await triggerAnomalyTraining.mutateAsync(anomalyId);
       toast({
         variant: "success",
         message: t("alerts.messages.trainingTriggered"),
@@ -1934,23 +1948,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       };
 
       const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
-      if (routeAnomalyId) {
-        await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
-        toast({
-          variant: "success",
-          message: t("alerts.messages.anomalyConfigUpdated"),
-        });
-      } else {
-        await anomalyDetectionService.create(
-          orgId,
-          payload,
-          (activeFolderId.value as string) || "default",
-        );
-        toast({
-          variant: "success",
-          message: t("alerts.anomalyCreated"),
-        });
-      }
+      await saveAnomalyConfig.mutateAsync({
+        payload,
+        folderId: (activeFolderId.value as string) || "default",
+      });
+      toast({
+        variant: "success",
+        message: routeAnomalyId
+          ? t("alerts.messages.anomalyConfigUpdated")
+          : t("alerts.anomalyCreated"),
+      });
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
