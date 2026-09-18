@@ -93,7 +93,8 @@ export const alertHistoryQuery = (org: string, query: AlertHistoryQuery) => {
   }
   return queryOptions({
     queryKey: alertKeys.history(org, q),
-    queryFn: async () => (await alerts.getHistory(org, q)).data ?? {},
+    // Only the key buckets: a bucketed `end` would hide every evaluation from the current minute.
+    queryFn: async () => (await alerts.getHistory(org, query)).data ?? {},
     staleTime: LIVE_STALE_TIME,
   });
 };

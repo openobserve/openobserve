@@ -28,13 +28,13 @@ export const pipelinesQuery = (org: string) =>
 
 export const pipelineHistoryQuery = (org: string, params: Record<string, string>) => {
   // Callers anchor the range to a raw `now`; bucket it so a revisit inside the
-  // freshness window is a cache hit instead of a new key per mount. The request
-  // itself still carries the bucketed values, so key and payload agree.
+  // freshness window is a cache hit instead of a new key per mount.
   const { start, end } = quantizeRange(Number(params.start_time), Number(params.end_time));
   const q = { ...params, start_time: String(start), end_time: String(end) };
   return queryOptions({
     queryKey: pipelineKeys.history(org, stableFilters(q)),
-    queryFn: async () => (await pipelines.getPipelineHistory(org, q)).data,
+    // Only the key buckets: a bucketed `end` would hide every run from the current minute.
+    queryFn: async () => (await pipelines.getPipelineHistory(org, params)).data,
     staleTime: NORMAL_STALE_TIME,
   });
 };
