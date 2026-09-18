@@ -3469,28 +3469,29 @@ export class LogsPage {
     }
 
     async getSelectedStreamTriggerLabel() {
-        const trigger = this.page.locator('[data-test="log-search-index-list-select-stream-trigger"]');
+        const trigger = this.page.locator(this.indexDropDownTrigger);
         await trigger.waitFor({ state: 'visible', timeout: 15000 });
         return await trigger.getAttribute('data-test-selected-label');
     }
 
     async getRenderedStreamNameStyles() {
         // Assert computed text-transform, not textContent — o2-enterprise#1745 regresses via CSS capitalize, not the stored name.
-        return await this.page.evaluate(() => {
+        const triggerSel = this.indexDropDownTrigger;
+        return await this.page.evaluate((sel) => {
             const out = [];
             const record = (el) => {
                 const text = (el.textContent || '').trim();
                 if (text) out.push({ text, textTransform: getComputedStyle(el).textTransform });
             };
-            const trigger = document.querySelector('[data-test="log-search-index-list-select-stream-trigger"]');
+            const trigger = document.querySelector(sel);
             if (trigger) trigger.querySelectorAll('span').forEach(record);
             document.querySelectorAll('.text-field-list-group-text').forEach(record);
             return out;
-        });
+        }, triggerSel);
     }
 
     async getResultHitsCount() {
-        const title = this.page.locator('[data-test="logs-search-result-title"]');
+        const title = this.page.locator(this.searchResultTitle);
         await title.waitFor({ state: 'attached', timeout: 15000 });
         const raw = await title.getAttribute('data-hits-count');
         return parseInt(raw ?? '0', 10);
