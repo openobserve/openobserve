@@ -180,6 +180,15 @@ async fn run_merge_query(
     Ok((schema, rx, read_task))
 }
 
+/// A temp file under `data_tmp_dir`, never the OS temp dir (often a RAM-backed tmpfs).
+pub(super) fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
+    // data_tmp_dir is wiped at startup, reclaiming files a crash orphaned
+    let tmp_dir = &get_config().common.data_tmp_dir;
+    std::fs::create_dir_all(tmp_dir)?;
+    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
+    Ok((tokio::fs::File::from_std(file), path))
+}
+
 pub fn append_metadata<W: AsyncFileWriter>(
     writer: &mut AsyncArrowWriter<W>,
     file_meta: &FileMeta,

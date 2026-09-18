@@ -70,6 +70,8 @@ vi.mock("@/services/llm-datasets.service", () => ({
 }));
 
 import ExperimentDetailPage from "@/enterprise/views/AIObservability/ExperimentDetailPage.vue";
+import { queryClient } from "@/composables/query/queryClient";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
 
 beforeEach(() => {
   getRow.mockReset();
@@ -680,9 +682,14 @@ describe("ExperimentDetailPage", () => {
     };
     const initialGetCalls = get.mock.calls.length;
     const initialListCalls = listRows.mock.calls.length;
+    // The experiments list shows run status, so it expires on submit and again once the retry settles.
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const listScope = { queryKey: experimentKeys.all("acme") };
 
     await state.retryRowSlot(failedSlot);
     await flushPromises();
+    expect(invalidate).toHaveBeenCalledWith(listScope);
+    const invalidationsAfterSubmit = invalidate.mock.calls.length;
 
     expect(state.selectedRowDetail?.trials[0]).toMatchObject({
       status: "pending",
@@ -776,12 +783,16 @@ describe("ExperimentDetailPage", () => {
       taskStatus: "ok",
       scores: [scoringScore],
     });
+    expect(invalidate).toHaveBeenCalledTimes(invalidationsAfterSubmit);
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();
     expect(get).toHaveBeenCalledTimes(initialGetCalls + 2);
     expect(state.detail?.experiment.status).toBe("execution_failed");
     expect(state.selectedRowDetail?.trials[0].scores).toEqual([finalScore]);
+    expect(invalidate).toHaveBeenCalledTimes(invalidationsAfterSubmit + 1);
+    expect(invalidate).toHaveBeenLastCalledWith(listScope);
+    invalidate.mockRestore();
 
     await vi.advanceTimersByTimeAsync(2_000);
     await flushPromises();

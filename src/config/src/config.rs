@@ -797,6 +797,40 @@ impl std::str::FromStr for VortexCompression {
     }
 }
 
+/// Where a single-file compaction builds its merged file, see `ZO_COMPACT_MERGE_OUTPUT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CompactMergeOutput {
+    /// A temp file under `data_tmp_dir`, read back only for the upload.
+    #[default]
+    Disk,
+    /// The whole file in a `Vec<u8>`.
+    Memory,
+}
+
+impl std::fmt::Display for CompactMergeOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disk => write!(f, "disk"),
+            Self::Memory => write!(f, "memory"),
+        }
+    }
+}
+
+impl std::str::FromStr for CompactMergeOutput {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "disk" => Ok(Self::Disk),
+            "memory" => Ok(Self::Memory),
+            _ => Err(anyhow::anyhow!(
+                "Invalid compact merge output '{s}': expected disk or memory"
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileFormatConfig {
     default: FileFormat,
@@ -1858,7 +1892,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
         parse,
-        default = "file_num"
+        default = "file_hash"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(
@@ -2867,6 +2901,13 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
     pub max_file_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_MERGE_OUTPUT",
+        parse,
+        default = "disk",
+        help = "Where a logs/traces compaction builds its merged file (Parquet or Vortex): `disk` streams it to a temp file under ZO_DATA_TMP_DIR as it is encoded and reads it back only for the upload; `memory` buffers the whole file in a Vec<u8>, which costs the file size in RAM per running merge."
+    )]
+    pub merge_output: CompactMergeOutput,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
@@ -5173,6 +5214,22 @@ mod tests {
             );
         }
         assert!("true".parse::<VortexCompression>().is_err());
+    }
+
+    #[test]
+    fn test_compact_merge_output_from_str() {
+        assert_eq!(CompactMergeOutput::default(), CompactMergeOutput::Disk);
+        for (text, expected) in [
+            ("disk", CompactMergeOutput::Disk),
+            (" Memory ", CompactMergeOutput::Memory),
+        ] {
+            assert_eq!(text.parse::<CompactMergeOutput>().unwrap(), expected);
+            assert_eq!(
+                expected.to_string().parse::<CompactMergeOutput>().unwrap(),
+                expected
+            );
+        }
+        assert!("vec".parse::<CompactMergeOutput>().is_err());
     }
 
     #[test]

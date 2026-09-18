@@ -18,12 +18,15 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("@/services/incidents", () => ({
-  default: {
-    list: vi.fn(),
-    updateStatus: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      updateStatus: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/date", () => ({
   formatToReadable: vi.fn((ts: number) => `ts-${ts}`),
@@ -244,7 +247,9 @@ describe("IncidentList.vue", () => {
     it("calls list with correct org identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0, undefined);
+      // Reads through incidentsQuery now, which passes the four arguments its key
+      // is built from — the fifth was always undefined.
+      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0);
     });
 
     it("populates allIncidents after successful load", async () => {
@@ -660,7 +665,8 @@ describe("IncidentList.vue", () => {
       (wrapper.vm as any).qTableRef.table = { setPageIndex };
 
       await flushPromises();
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
 
       expect(setPageIndex).toHaveBeenCalledWith(2);
       store.state.incidents = { incidents: {}, isInitialized: false };
