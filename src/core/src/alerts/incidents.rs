@@ -2439,30 +2439,29 @@ pub async fn trigger_rca_for_incident(
     }
 
     // Analyze incident
-    // §7: the agent is told how loudly this pages, and stops rendering
-    // `Severity: Unknown` on every automatic run.
-    let severity = o2_enterprise::enterprise::alerts::rca_service::paging_severity_for_incident(
+    // `build_on_previous` opts into continuity: the prior report is sent so the
+    // agent extends it rather than starting over. Extracted via typed
+    // `IncidentTopology` (same deserialization path used by `save_rca_result`)
+    // so field renames are caught at compile time.
+    let previous_analysis: Option<String> = if build_on_previous {
+        incident
+            .topology_context
+            .as_ref()
+            .and_then(|v| serde_json::from_value::<IncidentTopology>(v.clone()).ok())
+            .and_then(|t| t.suggested_root_cause)
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
+    // §7/C1: the single builder, so this and the manual endpoint cannot tell
+    // the agent different things about the same incident.
+    let context = o2_enterprise::enterprise::alerts::rca_service::build_incident_context(
         &org_id,
         &incident_id,
+        previous_analysis,
     )
     .await;
-    // §7: what this same subject turned out to be the last few times, which is
-    // the cross-incident memory the agent otherwise has none of.
-    let past_causes = o2_enterprise::enterprise::alerts::rca_service::past_causes_for_incident(
-        &org_id,
-        &incident_id,
-    )
-    .await;
-    match client
-        .analyze_incident(
-            &incident,
-            &auth_header,
-            build_on_previous,
-            severity,
-            past_causes,
-        )
-        .await
-    {
+    match client.analyze_incident(context, &auth_header).await {
         Ok(rca_result) => {
             log::info!(
                 "[INCIDENTS::RCA] RCA completed for {incident_id}: {} chars",
