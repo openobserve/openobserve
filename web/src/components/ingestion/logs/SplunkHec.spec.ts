@@ -143,6 +143,22 @@ describe("SplunkHec", () => {
       expect(parsed.sourcetype).toBeDefined();
     });
 
+    it("should refresh the reference epoch on a page held open past the window", async () => {
+      vi.useFakeTimers();
+      try {
+        wrapper = createWrapper();
+        const before = JSON.parse(wrapper.vm.payloadContent).time;
+
+        // Longer than ZO_INGEST_ALLOWED_UPTO's 5h default, which is when a frozen
+        // epoch starts being discarded behind a code 0.
+        await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+
+        expect(JSON.parse(wrapper.vm.payloadContent).time).toBeGreaterThan(before);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("should point the health check at the unauthenticated health path", () => {
       wrapper = createWrapper();
       expect(wrapper.vm.healthContent).toContain("/services/collector/health");
