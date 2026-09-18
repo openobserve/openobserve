@@ -479,9 +479,8 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
-    // with cache maybe we only get the last point from original data, then the result_type will
-    // return as vector, but if the query is range query, the result_type should be matrix
-    if result_type == "vector" && original_start != end {
+    // a worker left with a lone point answers as an instant query, the range is still a matrix
+    if (result_type == "vector" || result_type == "scalar") && original_start != end {
         result_type = "matrix".to_string();
     }
 

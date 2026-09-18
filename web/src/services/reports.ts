@@ -116,3 +116,10 @@ const reports = {
 };
 
 export default reports;
+
+export interface ReportListFilters {
+  /** undefined = search across every folder. */
+  folder?: string;
+  isCache?: boolean;
+  nameQuery?: string;
+}

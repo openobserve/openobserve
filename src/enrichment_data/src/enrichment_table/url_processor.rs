@@ -1665,7 +1665,7 @@ async fn process_enrichment_table_url(
     let schema = stream_schema_map
         .get(&stream_name)
         .map(|s| s.schema().as_ref().clone())
-        .unwrap_or(arrow_schema::Schema::empty());
+        .unwrap_or_else(arrow_schema::Schema::empty);
 
     // Calculate total expected size
     let current_size_in_bytes = if append_data {
@@ -1844,7 +1844,7 @@ async fn save_enrichment_batch(
         let db_schema = stream_schema_map
             .get(&stream_name)
             .map(|s| s.schema().as_ref().clone())
-            .unwrap_or(arrow_schema::Schema::empty());
+            .unwrap_or_else(arrow_schema::Schema::empty);
 
         if !db_schema.fields().is_empty() && db_schema.fields().ne(inferred_schema.fields()) {
             return Err(anyhow!(

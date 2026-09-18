@@ -20,10 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent } from "vue";
-import { onMounted } from "vue";
+import { defineAsyncComponent, defineComponent, onMounted, ref } from "vue";
 import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
-import { ref } from "vue";
 
 export default defineComponent({
   name: "VariablesDependenciesGraph",

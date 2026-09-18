@@ -397,27 +397,28 @@ const osToggleLabel = (slug: string) =>
     </div>
 
     <!-- Undetected: onboarding, not a dead end — the embedded card carries the auto-import wiring. -->
-    <div
-      v-else-if="hostsState !== 'detected'"
-      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
-      data-test="hosts-empty-state"
-    >
-      <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>
-      <OText variant="meta">{{ t("infra.hosts.emptyRbacHint") }}</OText>
-      <div class="flex items-center gap-2 pt-2">
-        <OButton
-          v-for="slug in OS_SLUGS"
-          :key="slug"
-          :variant="osSlug === slug ? 'primary' : 'outline'"
-          size="sm-action"
-          :data-test="`hosts-os-toggle-${slug}`"
-          @click="osSlug = slug"
-        >
-          {{ osToggleLabel(slug) }}
-        </OButton>
+    <div v-else-if="hostsState !== 'detected'" class="min-h-0 flex-1 overflow-y-auto">
+      <div
+        class="mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-3 py-6"
+        data-test="hosts-empty-state"
+      >
+        <OText tag="h2" class="text-xl font-semibold">{{ t("infra.hosts.emptyHeadline") }}</OText>
+        <OText variant="meta">{{ t("infra.hosts.emptyRbacHint") }}</OText>
+        <div class="flex items-center gap-2 pt-2">
+          <OButton
+            v-for="slug in OS_SLUGS"
+            :key="slug"
+            :variant="osSlug === slug ? 'primary' : 'outline'"
+            size="sm-action"
+            :data-test="`hosts-os-toggle-${slug}`"
+            @click="osSlug = slug"
+          >
+            {{ osToggleLabel(slug) }}
+          </OButton>
+        </div>
+        <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
+        <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
       </div>
-      <!-- Detection connecting inside the embedded card must flip this page live (design 4.8). -->
-      <DataSourceSetupCard :slug="osSlug" @detected="detection.refresh({ force: true })" />
     </div>
 
     <!-- Total failure: ONE page-level surface, never stacked column warnings. -->

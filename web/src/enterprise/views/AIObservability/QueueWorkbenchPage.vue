@@ -690,6 +690,11 @@ import llmQueuesService, {
   type ScoreConfigDataType,
 } from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
+import {
+  pushQueueItemToDatasetMutation,
+  submitQueueReviewMutation,
+} from "@/services/llm-queues.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import { toggleFullscreen as domToggleFullscreen } from "@/utils/dom";
 
 defineOptions({ name: "AIQueueWorkbenchPage" });
@@ -705,6 +710,9 @@ const router = useRouter();
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const queueId = computed<string>(() => String(route.params.id ?? ""));
+
+const submitReview = useMutation(() => submitQueueReviewMutation(orgId.value));
+const pushToDataset = useMutation(() => pushQueueItemToDatasetMutation(orgId.value));
 
 const queue = ref<LlmQueue | null>(null);
 
@@ -1043,22 +1051,26 @@ async function submit() {
   currentSubmissionId.value = submissionId;
   submitting.value = true;
   try {
-    await llmQueuesService.submitReview(orgId.value, queueId.value, item.id, {
-      submissionId,
-      sourceStream: detail.sourceStream,
-      scores: boundConfigs.value.map((config) => {
-        const value = draft[config.scoreConfigId];
-        return {
-          scoreConfigRowId: config.rowId,
-          value:
-            config.dataType === "boolean"
-              ? value === "true"
-              : config.dataType === "numeric"
-                ? Number(value)
-                : String(value),
-        };
-      }),
-      comments: comment.value.trim() || null,
+    await submitReview.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        submissionId,
+        sourceStream: detail.sourceStream,
+        scores: boundConfigs.value.map((config) => {
+          const value = draft[config.scoreConfigId];
+          return {
+            scoreConfigRowId: config.rowId,
+            value:
+              config.dataType === "boolean"
+                ? value === "true"
+                : config.dataType === "numeric"
+                  ? Number(value)
+                  : String(value),
+          };
+        }),
+        comments: comment.value.trim() || null,
+      },
     });
     item.status = "reviewed";
     item.reviewedAt = Date.now();
@@ -1136,11 +1148,15 @@ async function confirmDistill() {
   if (!item || !canConfirmDistill.value || distilling.value) return;
   distilling.value = true;
   try {
-    const result = await llmQueuesService.pushToDataset(orgId.value, queueId.value, item.id, {
-      datasetId: distillDatasetId.value,
-      reviewSubmissionId: adjudicationSubmissionId.value,
-      expectedOutput: distillExpected.value.trim(),
-      tags: distillTags.value,
+    const result = await pushToDataset.mutateAsync({
+      queueId: queueId.value,
+      itemId: item.id,
+      payload: {
+        datasetId: distillDatasetId.value,
+        reviewSubmissionId: adjudicationSubmissionId.value,
+        expectedOutput: distillExpected.value.trim(),
+        tags: distillTags.value,
+      },
     });
     const datasetId = distillDatasetId.value;
     distillOpen.value = false;

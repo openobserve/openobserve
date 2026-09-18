@@ -223,7 +223,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         class="pt-4"
                       />
                     </div>
-                    <div v-else-if="!isStreamSelected">
+                    <div v-else-if="!isStreamSelected" class="max-lg:h-full">
                       <TracesNoStreamState
                         :org-id="store.state.selectedOrganization?.identifier"
                         data-test="traces-no-stream-selected-text"

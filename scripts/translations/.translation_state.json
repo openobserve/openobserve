@@ -2666,6 +2666,7 @@
       "checkEveryTooltip": "1d060aeac4423111",
       "destinationRequired": "10d0b2a6b1b39964",
       "detectionCharts": "bff6c2f71314f27d",
+      "detectionFunctionTooltip": "5446cf66c0f39c24",
       "detectionResolution": "12d1318bffed4742",
       "detectionResolutionTooltip": "d5da8afe60842fa5",
       "deviationChart": "eff37edc81c0f1e4",
@@ -2689,7 +2690,8 @@
       "noFieldsFound": "06b05d1636030e56",
       "notifications": "788011833a5a0f22",
       "notificationsTooltip": "6be62e6d3cce3112",
-      "percentile": "bb13af3d0ba72ee2",
+      "percentile": "1709305c9fa966d1",
+      "previewCaption": "8c330d6626e8bc99",
       "queryMode": "f93202944f8f5b93",
       "retrainEvery": "f0207dc1b4d4c620",
       "retrainEveryTooltip": "58f3d7ff0d271b4a",
@@ -2706,7 +2708,8 @@
       "sensitivityBalanced": "5386ea5db81c8579",
       "sensitivityBudgetTooltip": "268d2ec2a9cf3927",
       "sensitivityConservative": "75e1783e4e517e54",
-      "sensitivityHintPercentile": "af18ccd63ba2748a",
+      "sensitivityHintPercentile": "99ff83f5381c312c",
+      "sensitivityNotDataPercentile": "983f3edcdb12e25a",
       "sensitivityRange": "8fdc44006812bb32",
       "sensitivityTooltip": "c7e2ec81613d9cf6",
       "seriesAnomaly": "79622828d2d8d988",
@@ -2735,7 +2738,7 @@
       "summaryRetrainEveryDays": "fe194d44b92571b4",
       "summarySchedule": "9ca338ab03aabdd4",
       "summaryThreshold": "1e4fada9d2ab1f32",
-      "summaryThresholdPercentile": "72ffbcff0f2533ee",
+      "summaryThresholdPercentile": "20ff1b9e29e00400",
       "summaryTraining": "e54a950976befa4b",
       "summaryTrainingDays": "a2246fbc2542d1dd",
       "timestampAliasBanned": "f5eabfdd326c0964",
@@ -12075,6 +12078,7 @@
     "target_rotation_everyone": "dafdb710c5de874e",
     "target_rotation_legacy": "76bd2aa23090f2bb",
     "target_rotation_on_call": "8a61c67a8ea27cf5",
+    "target_unrecognized": "66e648461a86c5d9",
     "target_user": "232709417a644e56",
     "target_whole_team": "f73315fde5db9e11",
     "team": "5985039f106df054",
@@ -18716,6 +18720,7 @@
     "edit": "464c4ffd019e1e96",
     "editMode": "e7945ee25eb63c57",
     "finishStepsBeforePublish": "a5fc67e0214af8f6",
+    "folder": "74ccd43303847f26",
     "header": "e2073645cb0dbbdd",
     "history": {
       "button": "848f54e89660cea4",
@@ -18767,6 +18772,8 @@
       "title": "089c03463a1425d3"
     },
     "loadError": "0369fba2135ee9dc",
+    "modeInFolder": "d6720d82a0d1d94c",
+    "moveToFolder": "91d631e150a39784",
     "name": "43d40c5c912ac933",
     "namePlaceholder": "942ce282b041e034",
     "nameRequired": "604fd1b2e29c688a",
@@ -18944,12 +18951,17 @@
     "saveDraft": "6c462142d3681836",
     "saveError": "dcd1c0b44e7e420d",
     "search": "a5b9f624c06b9981",
+    "searchAllFolders": "226fd0e51f770b0b",
+    "searchAllFoldersTooltip": "0d0ce170f89122a2",
+    "searchThisFolder": "ab7db04c96526507",
+    "searchThisFolderTooltip": "adb0c3857eea4b10",
     "start": {
       "actionHint": "3ebd524d3730efcc",
       "chooseAction": "f3009e224e14fc87",
       "triggerHint": "b7cc692397818e23"
     },
     "subtitle": "42349f7319e8d8fe",
+    "tabAll": "a52ace420f2175d0",
     "test": {
       "button": "532eaabd9574880d",
       "dirtySelf": "548f87ca62ee4357",
@@ -19018,13 +19030,15 @@
         "desc": "bc5a598b7e8469b4",
         "intro": "a4827ff008e634fb",
         "label": "58ac3a0377867548",
-        "node": "3a187f50000132fe"
+        "node": "3a187f50000132fe",
+        "tab": "f62e9267d196c761"
       },
       "incidentEvent": {
         "desc": "7aff51af193679b7",
         "intro": "2a34d4a2a6466302",
         "label": "c1f3512f947eb9f7",
-        "node": "24e205fc0fb0d4e0"
+        "node": "24e205fc0fb0d4e0",
+        "tab": "bfe868931580fb3b"
       }
     },
     "triggerMeta": {

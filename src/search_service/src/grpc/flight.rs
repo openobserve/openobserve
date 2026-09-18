@@ -150,7 +150,7 @@ pub async fn search(
 
     let db_schema = infra::schema::get(&org_id, &stream_name, stream_type)
         .await
-        .unwrap_or(arrow_schema::Schema::empty());
+        .unwrap_or_else(|_| arrow_schema::Schema::empty());
     let stream_settings = unwrap_stream_settings(&db_schema);
     let stream_created_at = unwrap_stream_created_at(&db_schema);
     let fst_fields = get_stream_setting_fts_fields(&stream_settings)
@@ -178,11 +178,8 @@ pub async fn search(
         .index_info
         .equal_keys
         .iter()
-        .filter_map(|v| {
-            latest_schema_map
-                .contains_key(&v.key)
-                .then_some((v.key.to_string(), v.value.to_string()))
-        })
+        .filter(|v| latest_schema_map.contains_key(&v.key))
+        .map(|v| (v.key.to_string(), v.value.to_string()))
         .collect::<Vec<_>>();
 
     // get all tables

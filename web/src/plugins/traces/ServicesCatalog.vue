@@ -441,7 +441,8 @@ import useBreakpoint from "@/composables/useBreakpoint";
 import useTraces from "@/composables/useTraces";
 import useStreams from "@/composables/useStreams";
 import useHttpStreaming from "@/composables/useStreamingSearch";
-import streamService from "@/services/stream";
+import { streamSchemaQuery } from "@/services/stream.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { classifyEntity } from "@/utils/traces/serviceClassification";
 import {
   b64EncodeUnicode,
@@ -541,6 +542,9 @@ function serviceRowId(row: {
 }
 
 const isLoading = ref(false);
+// A search in flight with results still on screen — the spinner, not the
+// empty state.
+const isSearching = ref(false);
 // Epoch-ms of the last completed load, shown on the page header's refresh control.
 const lastRunAt = ref<number | null>(null);
 const services = ref<ServiceRow[]>([]);
@@ -959,8 +963,10 @@ async function loadServicesCatalog() {
     });
   }
 
-  isLoading.value = true;
-  services.value = [];
+  // Search-driven, so deliberately never cached — but the previous results
+  // stay on screen while the next search runs rather than the panel emptying.
+  isLoading.value = services.value.length === 0;
+  isSearching.value = true;
 
   const { start_time, end_time } = getTimeRange();
 
@@ -968,8 +974,10 @@ async function loadServicesCatalog() {
   if (hasInferColumns.value === null) {
     try {
       const org = searchObj.organizationIdentifier;
-      const schemaResponse = await streamService.schema(org, streamName, "traces");
-      const schemaFields = schemaResponse.data?.schema || schemaResponse.data?.fields || [];
+      const schemaPayload = await queryClient.fetchQuery(
+        streamSchemaQuery(org, streamName, "traces"),
+      );
+      const schemaFields = schemaPayload?.schema || schemaPayload?.fields || [];
       hasInferColumns.value = schemaFields.some((f: any) => f.name === "infer_service_name");
     } catch {
       // If schema check fails, default to false (use service_name only)
@@ -1080,14 +1088,17 @@ ORDER BY total_requests DESC`;
       },
       error: () => {
         isLoading.value = false;
+        isSearching.value = false;
       },
       complete: () => {
         isLoading.value = false;
+        isSearching.value = false;
         lastRunAt.value = Date.now();
       },
       reset: () => {
         services.value = [];
         isLoading.value = false;
+        isSearching.value = false;
       },
     },
   );

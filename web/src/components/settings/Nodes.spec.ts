@@ -19,11 +19,14 @@ import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import Nodes from "./Nodes.vue";
 
-vi.mock("@/services/common", () => ({
-  default: {
-    list_nodes: vi.fn(),
-  },
-}));
+vi.mock("@/services/common", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_nodes: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/composables/useIsMetaOrg", () => ({
   default: () => ({

@@ -90,7 +90,9 @@ const pageSizeSelectOptions = computed(() => {
     </div>
 
     <!-- Right: controls -->
-    <div class="flex items-center gap-3 max-md:flex-1 max-md:justify-between max-md:gap-2">
+    <div
+      class="flex min-w-0 flex-wrap items-center justify-end gap-x-3 gap-y-1 max-md:flex-1 max-md:justify-between max-md:gap-x-2"
+    >
       <span
         v-if="loading"
         class="o2-pag-skel rounded-default inline-block h-3 w-36 [animation:o2-skel-shimmer_1.5s_ease-in-out_infinite] [background-size:200%_100%] [background:linear-gradient(90deg,var(--color-skeleton-base)_0%,var(--color-skeleton-highlight)_50%,var(--color-skeleton-base)_100%)]"
