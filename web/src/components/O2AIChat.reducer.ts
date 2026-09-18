@@ -278,7 +278,7 @@ function reduceComplete(state: StreamState, data: any, ctx: ReducerCtx): StreamE
     pushCompletedToolCall(state, completedBlockFrom(state.activeToolCall));
     if (ctx.isActive) state.activeToolCall = null;
   }
-  if (!ctx.isActive || state.messageComplete) return [];
+  if (state.messageComplete) return [];
   const lastMessage = lastMessageOf(state);
   // An action-only turn streams no text, so the post-loop save never runs and this is its only chance to persist.
   if (lastMessage?.role !== "assistant" || !lastMessage.contentBlocks?.length) return [];

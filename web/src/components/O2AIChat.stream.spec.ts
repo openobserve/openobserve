@@ -1719,6 +1719,39 @@ describe("O2AIChat SSE protocol", () => {
       }
     });
 
+    it("saves a detached action-only turn with its completed tool call", async () => {
+      const gate = gatedResponse();
+      mockFetchAiChat.mockResolvedValueOnce(gate.response);
+      vm.inputMessage = "create a dashboard";
+      const turn = vm.sendMessage();
+      await flushPromises();
+      const original = vm.chatMessages;
+
+      gate.push(
+        sse({ type: "tool_call", tool: "createDashboard", message: "Creating", call_id: "c1" }),
+      );
+      gate.push(
+        sse({ type: "tool_result", tool: "createDashboard", call_id: "c1", success: true }),
+      );
+      await flushPromises();
+
+      vm.addNewChat();
+      await flushPromises();
+      mockSaveToHistory.mockClear();
+
+      gate.push(sse({ type: "complete" }));
+      await flushPromises();
+      gate.close();
+      await turn;
+
+      const detachedSaves = mockSaveToHistory.mock.calls.filter((c: any[]) => c[0] === original);
+      expect(detachedSaves.length).toBeGreaterThan(0);
+      const saved = detachedSaves[0][0];
+      const savedBlocks = saved[saved.length - 1].contentBlocks;
+      expect(savedBlocks.map((b: any) => b.type)).toContain("tool_call");
+      expect(savedBlocks.some((b: any) => b.type === "text" && b.text)).toBe(false);
+    });
+
     it("does not raise the loading indicator of the new session", async () => {
       const gate = gatedResponse();
       mockFetchAiChat.mockResolvedValueOnce(gate.response);

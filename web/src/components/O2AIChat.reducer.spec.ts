@@ -276,11 +276,18 @@ describe("reduce: complete", () => {
     expect(reduce(state, { type: "complete" }, makeCtx())).toEqual([]);
   });
 
-  it("does not save when detached", () => {
+  it("saves an action-only turn when detached, against the captured messages", () => {
     const state = makeState({
       messages: [assistant()],
       activeToolCall: { tool: "search", message: raw("Searching"), context: {} },
     });
+    expect(reduce(state, { type: "complete" }, makeCtx({ isActive: false }))).toEqual([
+      { kind: "throttledSave", force: true },
+    ]);
+  });
+
+  it("does not save a detached turn with no assistant content blocks", () => {
+    const state = makeState({ messages: [{ role: "user", content: raw("hi") }] });
     expect(reduce(state, { type: "complete" }, makeCtx({ isActive: false }))).toEqual([]);
   });
 
