@@ -113,6 +113,7 @@ sea-orm.workspace = true
 serde.workspace = true
 sha2.workspace = true
 serde_json.workspace = true
+sqlparser.workspace = true
 snap.workspace = true
 svix-ksuid.workspace = true
 thiserror.workspace = true

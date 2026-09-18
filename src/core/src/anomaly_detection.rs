@@ -52,6 +52,10 @@ const ERROR_VOCABULARY: [&str; 6] = ["error", "errors", "fatal", "critical", "5x
 /// but it has legitimate standalone uses and no measured failure behind it.
 const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 
+/// §4.6: the one statement of the coverage floor, shared by every surface that reports it.
+const WINDOW_FLOOR_RULE: &str =
+    "detection_window_seconds must be at least schedule_interval plus histogram_interval";
+
 /// Value column names tried when a config declares none. Kept so configs created before
 /// `value_column` existed keep resolving exactly as they did.
 #[cfg(feature = "enterprise")]
@@ -282,6 +286,7 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
         );
     }
     add_effective_shingle_size(&mut val);
+    add_notice_class(&mut val);
     val
 }
 
@@ -313,6 +318,23 @@ fn add_effective_shingle_size(val: &mut serde_json::Value) {
             serde_json::Value::from(effective),
         );
     }
+}
+
+/// §4.8: the UI keys on this class, never on the enterprise notice text riding `last_error`.
+fn add_notice_class(val: &mut serde_json::Value) {
+    let Some(obj) = val.as_object_mut() else {
+        return;
+    };
+    let class = obj
+        .get("last_error")
+        .and_then(|v| v.as_str())
+        .and_then(o2_enterprise::enterprise::anomaly_detection::scheduler::notice_class);
+    obj.insert(
+        "notice_class".to_string(),
+        class.map_or(serde_json::Value::Null, |c| {
+            serde_json::Value::String(c.to_string())
+        }),
+    );
 }
 
 /// Merge the run state the scheduler recorded on the trigger into a config row.
@@ -666,6 +688,8 @@ pub async fn create_config(
     }
 
     let mut val = serde_json::to_value(result)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert(
             "folder_id".to_string(),
@@ -707,6 +731,7 @@ pub async fn update_config(
     validated_intervals(&req, &existing).map_err(validation_error)?;
     validated_detection_window(&req, &existing).map_err(validation_error)?;
     validated_detection_function(&req, &existing).map_err(validation_error)?;
+    validated_custom_sql(&req, &existing).map_err(validation_error)?;
     validated_denominator(&req, &existing).map_err(validation_error)?;
     validated_budget_update(
         req.percentile,
@@ -790,7 +815,21 @@ pub async fn update_config(
         active_model.detection_function = Set(combined);
     }
     if let Some(histogram_interval) = req.histogram_interval {
-        retryable_change |= previous.histogram_interval != histogram_interval;
+        if previous.histogram_interval != histogram_interval {
+            retryable_change = true;
+            // §4.2: the edit redefines the grid, so judgment restarts — cursor and watermark.
+            active_model.last_processed_timestamp = Set(None);
+            if let Err(e) =
+                o2_enterprise::enterprise::anomaly_detection::storage::delete_graded_until_blob(
+                    org_id, anomaly_id,
+                )
+                .await
+            {
+                log::warn!(
+                    "[anomaly_detection {anomaly_id}] failed to clear the grading watermark on an interval edit: {e}"
+                );
+            }
+        }
         active_model.histogram_interval = Set(histogram_interval);
     }
     if let Some(schedule_interval) = req.schedule_interval {
@@ -1008,6 +1047,8 @@ pub async fn update_config(
 
     let name = pk_to_name(Some(&updated.folder_id)).await;
     let mut val = serde_json::to_value(updated)?;
+    // §4.8: this path bypasses model_to_api_json, so the class is added here too.
+    add_notice_class(&mut val);
     if let Some(obj) = val.as_object_mut() {
         obj.insert("folder_id".to_string(), serde_json::Value::String(name));
     }
@@ -1625,7 +1666,18 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
 
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
-    validate_detection_window(&req.schedule_interval, req.detection_window_seconds)?;
+    validate_detection_window(
+        &req.schedule_interval,
+        &req.histogram_interval,
+        req.detection_window_seconds,
+    )?;
+
+    // §4.1.1: a custom query's own histogram() must sit on the config's grid.
+    if req.query_mode == "custom_sql"
+        && let Some(sql) = req.custom_sql.as_deref()
+    {
+        validate_custom_sql_grid(sql, &req.histogram_interval)?;
+    }
 
     // The COMBINED form is what the row stores, what update sees, and what the trainer reads,
     // so both rules below are spelled against it rather than the two raw fields.
@@ -1822,20 +1874,58 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
 
 /// The look-back caps the cursor (`detect_start = max(cursor, now - detection_window)`), so a
 /// window shorter than the gap between runs drops every bucket in between, permanently.
-fn validate_detection_window(schedule_interval: &str, detection_window_seconds: i64) -> Result<()> {
-    let schedule_secs = parse_interval(schedule_interval)?;
+fn validate_detection_window(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): W > 0 is unconditional; each later comparison skips only on its own parse.
     if detection_window_seconds <= 0 {
         anyhow::bail!(
             "detection_window_seconds ({}) must be positive",
             detection_window_seconds
         );
     }
-    if detection_window_seconds < schedule_secs {
+    if let Ok(schedule_secs) = parse_interval(schedule_interval)
+        && detection_window_seconds < schedule_secs
+    {
         anyhow::bail!(
             "detection_window_seconds ({}) must not be shorter than schedule_interval ({}): the \
              look-back caps the cursor, so buckets between runs would never be scored",
             detection_window_seconds,
             schedule_interval
+        );
+    }
+    validate_coverage_floor(
+        schedule_interval,
+        histogram_interval,
+        detection_window_seconds,
+    )
+}
+
+/// §4.3's validity floor, never health: under `schedule + histogram` no cadence can both
+/// cover the previous run's gap and still hold one complete bucket at an off-grid phase.
+fn validate_coverage_floor(
+    schedule_interval: &str,
+    histogram_interval: &str,
+    detection_window_seconds: i64,
+) -> Result<()> {
+    // §4.5 (D9): the floor needs both parses, so an unparsable value skips only this rule.
+    let (Ok(schedule_secs), Ok(histogram_secs)) = (
+        parse_interval(schedule_interval),
+        parse_interval(histogram_interval),
+    ) else {
+        return Ok(());
+    };
+    let minimum = schedule_secs.saturating_add(histogram_secs);
+    if detection_window_seconds < minimum {
+        anyhow::bail!(
+            "{WINDOW_FLOOR_RULE}: detection_window_seconds ({}) is under the floor of {} \
+             (schedule_interval {} + histogram_interval {})",
+            detection_window_seconds,
+            minimum,
+            schedule_interval,
+            histogram_interval
         );
     }
     Ok(())
@@ -1893,24 +1983,151 @@ fn validated_detection_window(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
-    let schedule = req
-        .schedule_interval
-        .clone()
-        .unwrap_or_else(|| existing.schedule_interval.clone());
+    let (schedule, histogram) = merged_interval_pair(req, existing);
     let window = req
         .detection_window_seconds
         .unwrap_or(existing.detection_window_seconds);
+    // The coverage floor reads histogram_interval, so an edit to it is held to the rule too.
     if req
         .schedule_interval
         .as_ref()
         .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
         && req
             .detection_window_seconds
             .is_none_or(|v| v == existing.detection_window_seconds)
     {
         return Ok(());
     }
-    validate_detection_window(&schedule, window)
+    validate_detection_window(&schedule, &histogram, window)
+}
+
+/// §4.1.1 grandfathering: a stored violating row stays editable; a grid-touching edit is not.
+fn validated_custom_sql(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    if req
+        .custom_sql
+        .as_ref()
+        .is_none_or(|v| existing.custom_sql.as_deref() == Some(v.as_str()))
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+        && req
+            .query_mode
+            .as_ref()
+            .is_none_or(|v| *v == existing.query_mode)
+    {
+        return Ok(());
+    }
+    let query_mode = req.query_mode.as_deref().unwrap_or(&existing.query_mode);
+    // The other mode's leftover SQL is not the query the detector runs (see G4's verdict).
+    if !query_mode.eq_ignore_ascii_case("custom_sql") {
+        return Ok(());
+    }
+    let Some(sql) = req.custom_sql.as_deref().or(existing.custom_sql.as_deref()) else {
+        return Ok(());
+    };
+    let (_, histogram) = merged_interval_pair(req, existing);
+    validate_custom_sql_grid(sql, &histogram)
+}
+
+/// §4.1.1: an AST walk, because substring checks lose to nesting, comments and IANA names.
+fn validate_custom_sql_grid(sql: &str, histogram_interval: &str) -> Result<()> {
+    use std::ops::ControlFlow;
+    let statements =
+        sqlparser::parser::Parser::parse_sql(&sqlparser::dialect::PostgreSqlDialect {}, sql)
+            .map_err(|e| anyhow::anyhow!("custom_sql could not be parsed: {e}"))?;
+    // §4.5 (D9): only the interval-equality rule needs the stored interval's parse.
+    let config_interval_secs = parse_interval(histogram_interval).ok();
+    let walk =
+        sqlparser::ast::visit_expressions(&statements, |expr| {
+            match validated_histogram_call(expr, config_interval_secs, histogram_interval) {
+                Ok(()) => ControlFlow::Continue(()),
+                Err(e) => ControlFlow::Break(e),
+            }
+        });
+    match walk {
+        ControlFlow::Continue(()) => Ok(()),
+        ControlFlow::Break(e) => Err(e),
+    }
+}
+
+/// One `histogram()` call held to §4.1.1's four rules; every other expression passes through.
+fn validated_histogram_call(
+    expr: &sqlparser::ast::Expr,
+    config_interval_secs: Option<i64>,
+    configured_interval: &str,
+) -> Result<()> {
+    let sqlparser::ast::Expr::Function(func) = expr else {
+        return Ok(());
+    };
+    if !func.name.to_string().eq_ignore_ascii_case("histogram") {
+        return Ok(());
+    }
+    let args: &[sqlparser::ast::FunctionArg] = match &func.args {
+        sqlparser::ast::FunctionArguments::List(list) => &list.args,
+        _ => &[],
+    };
+    if args.len() > 2 {
+        anyhow::bail!(
+            "custom_sql histogram() must not take a timezone or origin argument: the detector's \
+             grid is UTC on the date_bin origin, and a shifted grid never lines up with it"
+        );
+    }
+    let Some(interval_arg) = args.get(1) else {
+        anyhow::bail!(
+            "custom_sql histogram() must state its interval explicitly, e.g. \
+             histogram(_timestamp, '{configured_interval}'): an omitted interval is injected \
+             at query time and desyncs from the config's grid"
+        );
+    };
+    let raw = interval_arg.to_string();
+    let raw = raw.trim().trim_matches(|c| c == '\'' || c == '"');
+    let sql_secs = custom_sql_interval_seconds(raw)?;
+    if let Some(config_secs) = config_interval_secs
+        && sql_secs != config_secs
+    {
+        anyhow::bail!(
+            "custom_sql histogram() interval '{raw}' does not equal the config's \
+             histogram_interval '{configured_interval}': the two grids would never line up"
+        );
+    }
+    Ok(())
+}
+
+/// The engine's own interval grammar, compared as µs-equivalent seconds ("300s" == "5m").
+fn custom_sql_interval_seconds(interval: &str) -> Result<i64> {
+    let interval = interval.trim();
+    let split = interval
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(interval.len());
+    let (number, unit) = interval.split_at(split);
+    let number: i64 = number.parse().map_err(|_| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is not a number plus unit")
+    })?;
+    let unit_seconds = match unit.trim().to_ascii_lowercase().as_str() {
+        "second" | "seconds" | "sec" | "secs" | "s" => 1,
+        "minute" | "minutes" | "min" | "mins" | "m" => 60,
+        "hour" | "hours" | "hr" | "hrs" | "h" => 3600,
+        "day" | "days" | "d" => 86400,
+        "month" | "months" | "mon" | "year" | "years" | "y" => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' uses a calendar unit with no fixed \
+             stride; use seconds, minutes, hours or days"
+        ),
+        _ => anyhow::bail!(
+            "custom_sql histogram() interval '{interval}' has an unsupported unit; use seconds, \
+             minutes, hours or days"
+        ),
+    };
+    number.checked_mul(unit_seconds).ok_or_else(|| {
+        anyhow::anyhow!("custom_sql histogram() interval '{interval}' is out of range")
+    })
 }
 
 /// G4. True for the aggregations that grow with population size and carry no normalizer.
@@ -2282,22 +2499,28 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
     }
 }
 
-/// Parse interval string like "1h", "30m" into seconds
+/// Parse "90s" / "30m" / "1h" / "1d" into seconds — §4.5's one grammar with the UI form.
 fn parse_interval(interval: &str) -> Result<i64> {
-    if let Some(stripped) = interval.strip_suffix('h') {
-        let hours: i64 = stripped.parse()?;
-        // A positive wrap lands on a plausible schedule that clears every downstream guard.
-        hours
-            .checked_mul(3600)
-            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
+    let (value, unit_seconds) = if let Some(stripped) = interval.strip_suffix('s') {
+        (stripped, 1)
     } else if let Some(stripped) = interval.strip_suffix('m') {
-        let minutes: i64 = stripped.parse()?;
-        minutes
-            .checked_mul(60)
-            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
+        (stripped, 60)
+    } else if let Some(stripped) = interval.strip_suffix('h') {
+        (stripped, 3600)
+    } else if let Some(stripped) = interval.strip_suffix('d') {
+        (stripped, 86400)
     } else {
-        anyhow::bail!("Invalid interval format. Use '1h' or '30m'");
-    }
+        anyhow::bail!("Invalid interval format. Use a number plus 's', 'm', 'h' or 'd'");
+    };
+    let value: i64 = value.parse().map_err(|_| {
+        anyhow::anyhow!(
+            "Invalid interval format ('{interval}'). Use a number plus 's', 'm', 'h' or 'd'"
+        )
+    })?;
+    // A positive wrap lands on a plausible schedule that clears every downstream guard.
+    value
+        .checked_mul(unit_seconds)
+        .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
 }
 
 #[cfg(feature = "enterprise")]
@@ -2395,6 +2618,8 @@ pub async fn execute_anomaly_query(
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            // §4.1.1: the tantivy fast path bins on the epoch grid, not date_bin's origin.
+            bypass_index_optimizer: true,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -3088,10 +3313,17 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_interval_seconds_and_days() {
+        assert_eq!(parse_interval("10s").unwrap(), 10);
+        assert_eq!(parse_interval("90s").unwrap(), 90);
+        assert_eq!(parse_interval("1d").unwrap(), 86400);
+    }
+
+    #[test]
     fn test_parse_interval_invalid_suffix() {
-        assert!(parse_interval("10s").is_err());
-        assert!(parse_interval("10d").is_err());
+        assert!(parse_interval("10x").is_err());
         assert!(parse_interval("abc").is_err());
+        assert!(parse_interval("5").is_err());
     }
 
     #[test]
@@ -3115,7 +3347,7 @@ mod tests {
             detection_function_field: None,
             histogram_interval: "5m".to_string(),
             schedule_interval: "1h".to_string(),
-            detection_window_seconds: 3600,
+            detection_window_seconds: 7200,
             training_window_days: Some(7),
             retrain_interval_days: Some(7),
             percentile: Some(97.0),
@@ -3284,7 +3516,7 @@ mod tests {
     #[test]
     fn test_validate_invalid_histogram_interval() {
         let mut req = make_valid_filters_req();
-        req.histogram_interval = "10d".to_string();
+        req.histogram_interval = "10x".to_string();
         assert!(validate_config_request(&req).is_err());
     }
 
@@ -3309,11 +3541,14 @@ mod tests {
         );
     }
 
+    /// §4.3: `W == schedule` clears the cadence rule yet still misses every off-grid phase.
     #[test]
-    fn test_detection_window_equal_to_schedule_is_accepted() {
+    fn test_detection_window_equal_to_schedule_is_under_the_floor() {
         let mut req = make_valid_filters_req();
         req.schedule_interval = "1h".to_string();
         req.detection_window_seconds = 3600;
+        assert!(validate_config_request(&req).is_err());
+        req.detection_window_seconds = 3900;
         assert!(validate_config_request(&req).is_ok());
     }
 
@@ -3322,6 +3557,91 @@ mod tests {
         let mut req = make_valid_filters_req();
         req.detection_window_seconds = 0;
         assert!(validate_config_request(&req).is_err());
+    }
+
+    /// The live defect shape: `k8s_events_anomaly` at 300s window / 5m schedule / 5m buckets
+    /// passed both older rules yet could never judge a bucket at any off-grid phase (§4.3).
+    #[test]
+    fn the_window_that_can_never_judge_a_bucket_is_rejected() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 300;
+        let err = validate_config_request(&req).expect_err("the live broken config's shape");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("600"),
+            "the message must state the locally computed floor: {msg}"
+        );
+        assert!(
+            !msg.contains("O2_ANOMALY_EDGE_SETTLE_SECONDS"),
+            "the deleted margin must not be named anywhere: {msg}"
+        );
+    }
+
+    /// N7, boundary-exact on both sides: exactly `schedule + histogram` is accepted and one
+    /// second under is refused, with the schedule rule unable to fake either verdict.
+    #[test]
+    fn the_coverage_floor_is_boundary_exact() {
+        for (histogram, histogram_secs) in [("1m", 60i64), ("5m", 300)] {
+            let minimum = 1800 + histogram_secs;
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = "30m".to_string();
+            req.histogram_interval = histogram.to_string();
+            req.detection_window_seconds = minimum;
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "exactly the floor must be accepted ({histogram})"
+            );
+            req.detection_window_seconds = minimum - 1;
+            assert!(
+                validate_config_request(&req).is_err(),
+                "one second under the floor must be refused ({histogram})"
+            );
+        }
+    }
+
+    /// N7's other half: both dead formulas' minima give the wrong verdict under this floor.
+    #[test]
+    fn the_coverage_floor_rejects_both_dead_formulas_minima() {
+        // The schedule-only formula (`W >= schedule`) accepted 1800 here; the floor refuses.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "30m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 1800;
+        assert!(
+            validate_config_request(&req).is_err(),
+            "the schedule-only minimum must be refused"
+        );
+        // The settle-inclusive formula (600 + histogram) refused 600..900 here; margin-free,
+        // that band is valid and refusing it would strand working configs.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "5m".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 600;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the margin-free floor sits at 600, not the settle-inclusive 900"
+        );
+        req.detection_window_seconds = 899;
+        assert!(
+            validate_config_request(&req).is_ok(),
+            "the settle-inclusive formula must not resurrect"
+        );
+        req.detection_window_seconds = 599;
+        assert!(validate_config_request(&req).is_err());
+    }
+
+    /// §4.6: the floor is computed locally and every surface shares one message constant.
+    #[test]
+    fn the_floor_message_is_the_shared_constant_with_the_computed_minimum() {
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1h".to_string();
+        req.histogram_interval = "5m".to_string();
+        req.detection_window_seconds = 3899;
+        let msg = validate_config_request(&req).unwrap_err().to_string();
+        assert!(msg.contains(WINDOW_FLOOR_RULE), "one rule text: {msg}");
+        assert!(msg.contains("3900"), "the computed minimum: {msg}");
     }
 
     // ── model_to_api_json ───────────────────────────────────────────────────
@@ -3752,11 +4072,11 @@ mod tests {
         /// error and substituted its own text would otherwise satisfy a bare `is_err()`.
         #[test]
         fn rejects_unparseable_intervals_rather_than_ignoring_them() {
-            for bad in ["bad", "10d", "", "5"] {
+            for bad in ["bad", "10x", "", "5"] {
                 let err = validate_interval_pair(bad, "5m").unwrap_err().to_string();
                 assert!(err.contains("Invalid interval format"), "{bad}: {err}");
             }
-            let err = validate_interval_pair("5m", "10d").unwrap_err().to_string();
+            let err = validate_interval_pair("5m", "10x").unwrap_err().to_string();
             assert!(err.contains("Invalid interval format"), "got: {err}");
         }
 
@@ -4178,6 +4498,228 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_detection_window(&req, &stored).is_err());
+        }
+
+        /// Widening the buckets can push a valid window under the floor; that edit is held
+        /// to the rule, or grandfathering becomes a back door to the broken shape.
+        #[test]
+        fn widening_the_histogram_under_the_coverage_floor_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "1m".to_string();
+            stored.detection_window_seconds = 400;
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_window(&req, &stored).is_err(),
+                "400 clears 300+60 but not 300+300"
+            );
+        }
+
+        /// The other side of the same rule: a row that already violates the coverage floor
+        /// stays administrable so long as the edit touches none of the three fields.
+        #[test]
+        fn an_edit_elsewhere_leaves_a_violating_coverage_floor_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "5m".to_string();
+            stored.detection_window_seconds = 300;
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_window(&req, &stored).is_ok());
+        }
+    }
+
+    // ── §4.1.1: the custom-SQL grid rules, enforced by AST walk ─────────────
+
+    mod custom_sql_grid_rules {
+        use super::*;
+
+        fn custom_sql_req(sql: &str) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.query_mode = "custom_sql".to_string();
+            req.filters = None;
+            req.custom_sql = Some(sql.to_string());
+            req
+        }
+
+        /// A stored custom-SQL row; the SQL passed in may deliberately violate the rules.
+        fn stored_custom_sql_config(
+            sql: &str,
+        ) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = update_interval_validation::stored_config();
+            stored.query_mode = "custom_sql".to_string();
+            stored.custom_sql = Some(sql.to_string());
+            stored
+        }
+
+        /// Rule (iii) is semantic µs equality: "300s" and "5m" name the same grid.
+        #[test]
+        fn a_respelled_equal_interval_is_accepted() {
+            for interval in ["5m", "300s", "300 seconds", "300sec"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                assert!(
+                    validate_config_request(&custom_sql_req(&sql)).is_ok(),
+                    "'{interval}' equals the config's 5m and must be accepted"
+                );
+            }
+        }
+
+        /// Rule (iii): a mismatched interval is a permanent grid desync.
+        #[test]
+        fn a_mismatched_interval_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("does not equal"), "got: {err}");
+        }
+
+        /// Rule (iv): the argless form's interval is injected at query time — guaranteed desync.
+        #[test]
+        fn the_argless_histogram_form_is_rejected() {
+            let err = validate_config_request(&custom_sql_req(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(err.contains("explicitly"), "got: {err}");
+        }
+
+        /// Rule (i): a third argument shifts the grid off the detector's, IANA names included.
+        #[test]
+        fn a_timezone_argument_is_rejected() {
+            for timezone in ["'+05:30'", "'America/Los_Angeles'", "'UTC'"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '5m', {timezone}) AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("timezone"), "{timezone}: {err}");
+            }
+        }
+
+        /// Rule (ii): calendar units have no fixed stride, so no grid exists to match.
+        #[test]
+        fn a_calendar_unit_interval_is_rejected() {
+            for interval in ["1 month", "1 year", "2 months"] {
+                let sql = format!(
+                    "SELECT histogram(_timestamp, '{interval}') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                );
+                let err = validate_config_request(&custom_sql_req(&sql))
+                    .unwrap_err()
+                    .to_string();
+                assert!(err.contains("calendar"), "'{interval}': {err}");
+            }
+        }
+
+        /// The defeats that beat a substring check — nesting, comments, casing — reach the AST.
+        #[test]
+        fn substring_defeats_are_caught_by_the_ast_walk() {
+            for sql in [
+                "SELECT ts, value FROM (SELECT histogram(_timestamp, '10m') AS ts, \
+                 count(*) AS value FROM logs GROUP BY ts) sub",
+                "SELECT histogram /* tz */ (_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+                "SELECT HISTOGRAM(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            ] {
+                assert!(
+                    validate_config_request(&custom_sql_req(sql)).is_err(),
+                    "a violation a substring check would miss must still be caught: {sql}"
+                );
+            }
+        }
+
+        /// Refused rather than waved through unexamined: what cannot be parsed cannot be walked.
+        #[test]
+        fn unparsable_sql_is_rejected() {
+            assert!(validate_config_request(&custom_sql_req("SELECT FROM WHERE ((")).is_err());
+        }
+
+        /// §4.1.1 grandfathering: an unrelated edit on a stored violating row still passes.
+        #[test]
+        fn an_unrelated_edit_on_a_violating_row_is_grandfathered() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// A full-body PUT resends the stored SQL byte-identically; that is not an edit.
+        #[test]
+        fn a_resent_identical_custom_sql_is_not_a_change() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: stored.custom_sql.clone(),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
+        }
+
+        /// An edit that touches `custom_sql` is held to the rules.
+        #[test]
+        fn an_edit_touching_custom_sql_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                custom_sql: Some(
+                    "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                     FROM logs GROUP BY ts"
+                        .to_string(),
+                ),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// An interval edit under a custom query desyncs the same grid through the back door.
+        #[test]
+        fn an_interval_edit_under_a_custom_query_is_validated() {
+            let stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_err());
+        }
+
+        /// Filters mode's leftover `custom_sql` column is not the running query (G4's rule).
+        #[test]
+        fn a_filters_mode_row_is_not_held_to_the_sql_rules() {
+            let mut stored = stored_custom_sql_config(
+                "SELECT histogram(_timestamp, '10m') AS ts, count(*) AS value \
+                 FROM logs GROUP BY ts",
+            );
+            stored.query_mode = "filters".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_custom_sql(&req, &stored).is_ok());
         }
     }
 
@@ -4680,7 +5222,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, count(*) AS value FROM nginx_access \
+                "SELECT histogram(_timestamp, '5m') AS ts, count(*) AS value FROM nginx_access \
                  WHERE status >= 500 GROUP BY ts"
                     .to_string(),
             );
@@ -4698,7 +5240,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(CASE WHEN status >= 500 THEN 1 END) AS value \
                  FROM nginx_access GROUP BY ts"
                     .to_string(),
@@ -4739,7 +5281,7 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             req.custom_sql = Some(
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
                  FROM nginx_access GROUP BY ts"
                     .to_string(),
@@ -4949,10 +5491,10 @@ mod tests {
             req.filters = None;
             req.detection_function = "count".to_string();
             for sql in [
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  sum(CASE WHEN status >= 500 THEN 1 ELSE 0 END) * 1.0 / count(*) AS value \
                  FROM nginx_access GROUP BY ts",
-                "SELECT histogram(_timestamp) AS ts, \
+                "SELECT histogram(_timestamp, '5m') AS ts, \
                  count(*) FILTER (WHERE status >= 500) / count(*) AS value \
                  FROM nginx_access GROUP BY ts",
             ] {
@@ -5220,7 +5762,7 @@ mod tests {
             let to_a_ratio = UpdateAnomalyConfigRequest {
                 query_mode: Some("custom_sql".to_string()),
                 custom_sql: Some(
-                    "SELECT histogram(_timestamp) AS ts, \
+                    "SELECT histogram(_timestamp, '5m') AS ts, \
                      count(CASE WHEN status >= 500 THEN 1 END) / count(*) AS value \
                      FROM nginx_access GROUP BY ts"
                         .to_string(),

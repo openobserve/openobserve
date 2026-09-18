@@ -3436,6 +3436,9 @@ pub struct IndexInfo {
     pub equal_keys: ::prost::alloc::vec::Vec<KvItem>,
     #[prost(message, optional, tag = "5")]
     pub index_optimize_mode: ::core::option::Option<IdxOptimizeMode>,
+    /// anomaly queries bin via date_bin; the tantivy fast path bins on the epoch grid
+    #[prost(bool, tag = "6")]
+    pub bypass_index_optimizer: bool,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct SuperClusterInfo {
