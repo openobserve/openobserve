@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use arrow::array::RecordBatch;
 use config::{
-    FileFormat,
+    CompactParquetOutput, FileFormat,
     meta::stream::FileMeta,
     utils::parquet::{VORTEX_FILE_META_KEY, encode_vortex_file_meta, new_parquet_writer},
 };
@@ -30,7 +30,7 @@ use vortex::{
     io::session::RuntimeSessionExt, session::VortexSession,
 };
 
-use super::{MergeMode, MergeOutput, MergedFile, ParquetOutput, append_metadata, new_temp_file};
+use super::{MergeMode, MergeOutput, MergedFile, append_metadata, new_temp_file};
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 pub(super) async fn write(
@@ -45,7 +45,7 @@ pub(super) async fn write(
     let buf = match output.file_format {
         // hash-sorted metrics stay buffered: the ingester consumes them in memory
         FileFormat::Parquet
-            if output.parquet_output == ParquetOutput::Disk
+            if output.parquet_output == CompactParquetOutput::Disk
                 && !matches!(mode, MergeMode::MetricsHashSorted) =>
         {
             let (data_path, meta) = write_parquet_to_disk(

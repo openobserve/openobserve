@@ -797,6 +797,40 @@ impl std::str::FromStr for VortexCompression {
     }
 }
 
+/// Where a single-file compaction builds its merged Parquet file, see `ZO_COMPACT_PARQUET_OUTPUT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CompactParquetOutput {
+    /// A temp file under `data_tmp_dir`, read back only for the upload.
+    #[default]
+    Disk,
+    /// The whole file in a `Vec<u8>`.
+    Memory,
+}
+
+impl std::fmt::Display for CompactParquetOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Disk => write!(f, "disk"),
+            Self::Memory => write!(f, "memory"),
+        }
+    }
+}
+
+impl std::str::FromStr for CompactParquetOutput {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "disk" => Ok(Self::Disk),
+            "memory" => Ok(Self::Memory),
+            _ => Err(anyhow::anyhow!(
+                "Invalid compact parquet output '{s}': expected disk or memory"
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FileFormatConfig {
     default: FileFormat,
@@ -2869,10 +2903,11 @@ pub struct Compact {
     pub max_file_size: usize,
     #[env_config(
         name = "ZO_COMPACT_PARQUET_OUTPUT",
+        parse,
         default = "disk",
         help = "Where a logs/traces compaction builds its merged Parquet file: `disk` streams each finished row group to a temp file under ZO_DATA_TMP_DIR and reads it back only for the upload; `memory` buffers the whole file in a Vec<u8>, which costs the file size in RAM per running merge."
     )]
-    pub parquet_output: String,
+    pub parquet_output: CompactParquetOutput,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split
@@ -5179,6 +5214,25 @@ mod tests {
             );
         }
         assert!("true".parse::<VortexCompression>().is_err());
+    }
+
+    #[test]
+    fn test_compact_parquet_output_from_str() {
+        assert_eq!(CompactParquetOutput::default(), CompactParquetOutput::Disk);
+        for (text, expected) in [
+            ("disk", CompactParquetOutput::Disk),
+            (" Memory ", CompactParquetOutput::Memory),
+        ] {
+            assert_eq!(text.parse::<CompactParquetOutput>().unwrap(), expected);
+            assert_eq!(
+                expected
+                    .to_string()
+                    .parse::<CompactParquetOutput>()
+                    .unwrap(),
+                expected
+            );
+        }
+        assert!("vec".parse::<CompactParquetOutput>().is_err());
     }
 
     #[test]

@@ -39,7 +39,7 @@ pub mod mode;
 mod result;
 mod single_file;
 
-pub use mode::{MergeMode, MergeOutput, ParquetOutput};
+pub use mode::{MergeMode, MergeOutput};
 pub use result::{MergeResult, MergedFile};
 
 /// Merge `tables` (the union of the input files) into one or more files

@@ -28,7 +28,7 @@ use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
 use config::meta::promql::DownsamplingRule;
 use config::{
-    FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
+    CompactParquetOutput, FileFormat, FileFormatConfig, TIMESTAMP_COL_NAME, get_config,
     meta::stream::{FileKey, StreamType},
     utils::util::is_trace_time_index_stream,
 };
@@ -230,25 +230,7 @@ pub struct MergeOutput {
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
     /// Where a single merged Parquet file is built.
-    pub parquet_output: ParquetOutput,
-}
-
-/// Sink of a single-file Parquet merge, see `ZO_COMPACT_PARQUET_OUTPUT`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ParquetOutput {
-    /// A temp file under `data_tmp_dir`, read back only for the upload.
-    Disk,
-    /// The whole file in a `Vec<u8>`.
-    Memory,
-}
-
-impl ParquetOutput {
-    fn from_config(value: &str) -> Self {
-        match value.trim().to_ascii_lowercase().as_str() {
-            "memory" | "mem" | "vec" => Self::Memory,
-            _ => Self::Disk,
-        }
-    }
+    pub parquet_output: CompactParquetOutput,
 }
 
 impl MergeOutput {
@@ -261,7 +243,7 @@ impl MergeOutput {
                 .common
                 .feature_ingester_none_compression
                 .then_some("none"),
-            parquet_output: ParquetOutput::Memory,
+            parquet_output: CompactParquetOutput::Memory,
         }
     }
 
@@ -271,7 +253,7 @@ impl MergeOutput {
         Self {
             file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
-            parquet_output: ParquetOutput::from_config(&cfg.compact.parquet_output),
+            parquet_output: cfg.compact.parquet_output,
         }
     }
 }
@@ -330,14 +312,6 @@ mod tests {
             MergeMode::MetricsIndexed.output_sort_order(),
             FileSortOrder::HashTimestampAsc
         );
-    }
-
-    #[test]
-    fn parquet_output_from_config() {
-        assert_eq!(ParquetOutput::from_config("disk"), ParquetOutput::Disk);
-        assert_eq!(ParquetOutput::from_config("memory"), ParquetOutput::Memory);
-        assert_eq!(ParquetOutput::from_config(" Vec "), ParquetOutput::Memory);
-        assert_eq!(ParquetOutput::from_config("bogus"), ParquetOutput::Disk);
     }
 
     #[test]
