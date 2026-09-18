@@ -1858,7 +1858,7 @@ pub struct Common {
     #[env_config(
         name = "ZO_FEATURE_QUERY_PARTITION_STRATEGY",
         parse,
-        default = "file_num"
+        default = "file_hash"
     )]
     pub feature_query_partition_strategy: QueryPartitionStrategy,
     #[env_config(
