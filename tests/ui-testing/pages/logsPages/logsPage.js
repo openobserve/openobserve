@@ -3509,13 +3509,6 @@ export class LogsPage {
         }, triggerSel);
     }
 
-    async getResultHitsCount() {
-        const title = this.page.locator(this.searchResultTitle);
-        await title.waitFor({ state: 'attached', timeout: 15000 });
-        const raw = await title.getAttribute('data-hits-count');
-        return parseInt(raw ?? '0', 10);
-    }
-
     async clearPersistedStreamSelection() {
         const orgId = getOrgIdentifier();
         await this.page.evaluate((id) => {

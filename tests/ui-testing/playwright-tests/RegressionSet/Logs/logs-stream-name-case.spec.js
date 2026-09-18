@@ -1,8 +1,8 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const logData = require("../../../fixtures/log.json");
+const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 // o2-enterprise#1745 regression lock: lowercase stream names render verbatim, no CSS capitalize/uppercase.
 test.describe("Logs stream-name capitalisation (o2-enterprise#1745)", () => {
@@ -33,7 +33,7 @@ test.describe("Logs stream-name capitalisation (o2-enterprise#1745)", () => {
   });
 
   test("selected lowercase stream names are not auto-capitalised", {
-    tag: ['@logsStreamNameCapitalize', '@logs', '@all', '@P2']
+    tag: ['@bug-ent-1745', '@P2', '@regression', '@logsRegression', '@logsRegressionStreamNameCase']
   }, async ({ page }) => {
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('domcontentloaded');

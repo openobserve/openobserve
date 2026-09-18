@@ -1,8 +1,8 @@
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
-const logData = require("../../fixtures/log.json");
-const { ingestTestData } = require('../utils/data-ingestion.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const logData = require("../../../fixtures/log.json");
+const { ingestTestData } = require('../../utils/data-ingestion.js');
 
 // o2-enterprise#2038 regression lock: Logs with no stream selected shows the select-stream prompt and fires no search.
 test.describe("Logs no-stream prompt (o2-enterprise#2038)", () => {
@@ -19,7 +19,7 @@ test.describe("Logs no-stream prompt (o2-enterprise#2038)", () => {
   });
 
   test("shows select-stream prompt and fires no query when no stream is selected", {
-    tag: ['@logsNoStreamPrompt', '@logs', '@all', '@P2']
+    tag: ['@bug-ent-2038', '@P2', '@regression', '@logsRegression', '@logsRegressionNoStreamPrompt']
   }, async ({ page }) => {
     let searchPostCount = 0;
     const searchRequests = [];
