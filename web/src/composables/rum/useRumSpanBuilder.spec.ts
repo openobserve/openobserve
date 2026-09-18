@@ -74,14 +74,46 @@ function makeSearchResponse(hits: any[] = []) {
   return { data: { hits } } as any;
 }
 
-/**
- * A minimal RUM stream schema that includes the _oo_trace_id field so
- * fetchRumEventsForTrace proceeds past the schema guard.
- */
-function makeRumStream(hasTraceIdField = true) {
+// Trace window in ns; every value divides by 1000 exactly so the µs assertions are exact.
+const TRACE_START_NS = 1_755_853_746_000_000_000;
+const TRACE_END_NS = 1_755_853_747_000_000_000;
+const TRACE_START_US = 1_755_853_746_000_000;
+const TRACE_END_US = 1_755_853_747_000_000;
+// The browser request is stamped on completion, 23.5 s after the trace's last span.
+const BROWSER_REQUEST_MS = 1_755_853_770_500;
+const BROWSER_REQUEST_US = BROWSER_REQUEST_MS * 1000;
+const ONE_MINUTE_US = 60_000_000;
+const FIVE_MINUTES_US = 300_000_000;
+const ONE_HOUR_US = 3_600_000_000;
+
+// The schema guard needs at least one trace-id column spelling to let the fetch proceed.
+function makeRumStream(traceIdFields: string[] = ["_oo_trace_id"]) {
   return {
-    schema: hasTraceIdField ? [{ name: "_oo_trace_id" }, { name: "type" }] : [{ name: "type" }],
+    schema: [...traceIdFields.map((name) => ({ name })), { name: "type" }],
   };
+}
+
+function makeTraceSpan(overrides: Record<string, any> = {}) {
+  return {
+    span_id: "span-root",
+    reference_parent_span_id: "browser-span",
+    start_time: TRACE_START_NS,
+    end_time: TRACE_END_NS,
+    ...overrides,
+  };
+}
+
+// A root whose parent no span owns is the one shape that opens the RUM leg.
+function makeDanglingTrace() {
+  return [
+    makeTraceSpan(),
+    makeTraceSpan({
+      span_id: "span-child",
+      reference_parent_span_id: "span-root",
+      start_time: TRACE_START_NS + 100_000_000,
+      end_time: TRACE_END_NS - 100_000_000,
+    }),
+  ];
 }
 
 function makeTracedResource(overrides: Record<string, any> = {}) {
@@ -100,6 +132,15 @@ function makeTracedResource(overrides: Record<string, any> = {}) {
     action_id: '["action-1"]',
     ...overrides,
   };
+}
+
+function makeBrowserRequest(overrides: Record<string, any> = {}) {
+  return makeTracedResource({
+    date: BROWSER_REQUEST_MS,
+    // Offset from date × 1000 so the exact-bound assertions tell a date anchor from a _timestamp one.
+    _timestamp: BROWSER_REQUEST_US + 2_000_000,
+    ...overrides,
+  });
 }
 
 function makeViewEvent(overrides: Record<string, any> = {}) {
@@ -212,6 +253,30 @@ function buildComposable(logStreamNames: string[] = ["_rumdata"], searchObjOverr
   return useRumSpanBuilder(logStreams, searchObj, t);
 }
 
+type SearchRoutes = {
+  tracedResources?: any[];
+  viewEvents?: any[];
+  actionEvents?: any[];
+  allViewEvents?: any[];
+};
+
+// Routes each mocked search by its SQL so the call order is not part of the contract.
+function mockSearchRoutes(routes: SearchRoutes) {
+  vi.mocked(searchService.search).mockImplementation(async (payload: any) => {
+    const sql: string = payload.query.query.sql;
+    if (sql.includes("type = 'view'")) return makeSearchResponse(routes.viewEvents);
+    if (sql.includes("action_id IN")) return makeSearchResponse(routes.actionEvents);
+    if (sql.includes("type = 'error'")) return makeSearchResponse(routes.allViewEvents);
+    return makeSearchResponse(routes.tracedResources);
+  });
+}
+
+function searchCalls(sqlFragment: string) {
+  return vi
+    .mocked(searchService.search)
+    .mock.calls.filter((call) => (call[0].query.query.sql as string).includes(sqlFragment));
+}
+
 // ---------------------------------------------------------------------------
 // Suite
 // ---------------------------------------------------------------------------
@@ -219,9 +284,9 @@ function buildComposable(logStreamNames: string[] = ["_rumdata"], searchObjOverr
 describe("useRumSpanBuilder", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(searchService.search).mockReset();
     mockRouterCurrentRoute.value.query = {};
-    // Default: stream has _oo_trace_id
-    mockGetStream.mockResolvedValue(makeRumStream(true));
+    mockGetStream.mockResolvedValue(makeRumStream());
   });
 
   afterEach(() => {
@@ -236,7 +301,7 @@ describe("useRumSpanBuilder", () => {
     it("should return empty result when _rumdata is not in logStreams", async () => {
       const { fetchRumEventsForTrace } = buildComposable(["other-stream"]);
 
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
       expect(result.viewEvents).toEqual([]);
@@ -248,17 +313,17 @@ describe("useRumSpanBuilder", () => {
     it("should return empty result when traceId is an empty string", async () => {
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
 
-      const result = await fetchRumEventsForTrace("", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
       expect(searchService.search).not.toHaveBeenCalled();
     });
 
-    it("should return empty result when RUM stream schema lacks _oo_trace_id field", async () => {
-      mockGetStream.mockResolvedValue(makeRumStream(false));
+    it("should return empty result when RUM stream schema lacks a trace-id field", async () => {
+      mockGetStream.mockResolvedValue(makeRumStream([]));
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
 
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
       expect(searchService.search).not.toHaveBeenCalled();
@@ -268,29 +333,28 @@ describe("useRumSpanBuilder", () => {
       mockGetStream.mockResolvedValue(null);
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
 
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
+      expect(searchService.search).not.toHaveBeenCalled();
     });
 
-    it("should return empty result when no traced resources are found", async () => {
-      // First search (traced resources by _oo_trace_id) returns empty
-      vi.mocked(searchService.search).mockResolvedValueOnce(makeSearchResponse([]));
+    it("should return empty result when no browser request is found", async () => {
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
-      // Only the first search should fire — the subsequent 3 should not
       expect(searchService.search).toHaveBeenCalledTimes(1);
     });
 
     it("should use org_identifier from router query when present", async () => {
       mockRouterCurrentRoute.value.query = { org_identifier: "router-org" };
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({ org_identifier: "router-org" }),
@@ -300,15 +364,388 @@ describe("useRumSpanBuilder", () => {
 
     it("should fall back to store org identifier when router query has none", async () => {
       mockRouterCurrentRoute.value.query = {};
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(searchService.search).toHaveBeenCalledWith(
         expect.objectContaining({ org_identifier: "test-org" }),
         "RUM",
       );
+    });
+  });
+
+  describe("fetchRumEventsForTrace — dangling-parent gate", () => {
+    it("should not search _rumdata when the root span has an empty parent id", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ reference_parent_span_id: "" }),
+      ]);
+
+      expect(searchService.search).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+      expect(result.tracedResources).toEqual([]);
+    });
+
+    it("should not search _rumdata when the root span has a null parent id", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ reference_parent_span_id: null }),
+      ]);
+
+      expect(searchService.search).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should not search _rumdata when the root span has no parent id field", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { reference_parent_span_id: _omitted, ...rootWithoutParent } = makeTraceSpan();
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [rootWithoutParent]);
+
+      expect(searchService.search).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should not search _rumdata when every parent id is owned by a span in the trace", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ span_id: "span-root", reference_parent_span_id: "" }),
+        makeTraceSpan({ span_id: "span-child", reference_parent_span_id: "span-root" }),
+        makeTraceSpan({ span_id: "span-leaf", reference_parent_span_id: "span-child" }),
+      ]);
+
+      expect(searchService.search).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should not search _rumdata for an empty span list", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", []);
+
+      expect(searchService.search).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should search _rumdata when the root span has a dangling parent", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+      expect(searchCalls("_rumdata")).toHaveLength(1);
+    });
+
+    it("should not filter the browser-request search by the dangling parent id", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const sql: string = searchCalls("_rumdata")[0][0].query.query.sql;
+      expect(sql).not.toContain("browser-span");
+    });
+
+    it("should search _rumdata when one of several roots has a dangling parent", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ span_id: "span-root", reference_parent_span_id: "" }),
+        makeTraceSpan({ span_id: "span-orphan", reference_parent_span_id: "browser-span" }),
+      ]);
+
+      expect(searchService.search).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("fetchRumEventsForTrace — browser-request window", () => {
+    it("should bound the browser-request search to trace start − 1 min and trace end + 5 min", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [makeTraceSpan()]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+    });
+
+    it("should derive the trace window from the earliest start and latest end across spans", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({
+          span_id: "span-mid",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS + 100_000_000,
+          end_time: TRACE_END_NS - 100_000_000,
+        }),
+        makeTraceSpan({
+          span_id: "span-late",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS + 200_000_000,
+          end_time: TRACE_END_NS + 1_000_000_000,
+        }),
+        makeTraceSpan({
+          span_id: "span-root",
+          start_time: TRACE_START_NS - 500_000_000,
+          end_time: TRACE_END_NS,
+        }),
+      ]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - 500_000 - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + 1_000_000 + FIVE_MINUTES_US);
+    });
+
+    it("should skip spans with a missing or non-numeric end_time when deriving the window", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan(),
+        makeTraceSpan({
+          span_id: "span-no-end",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS - 500_000_000,
+          end_time: undefined,
+        }),
+        makeTraceSpan({
+          span_id: "span-bad-end",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS - 900_000_000,
+          end_time: "not-a-number",
+        }),
+      ]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+    });
+
+    it("should skip spans with a missing start_time when deriving the window", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan(),
+        makeTraceSpan({
+          span_id: "span-no-start",
+          reference_parent_span_id: "span-root",
+          start_time: undefined,
+          end_time: TRACE_END_NS + 1_000_000_000,
+        }),
+      ]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+    });
+
+    it("should send integer microsecond bounds for spans whose ns timestamps do not divide by 1000", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({
+          start_time: 1_755_853_746_625_720_300,
+          end_time: 1_755_853_746_921_707_300,
+        }),
+      ]);
+
+      // The search API's start_time/end_time are i64, so a fractional µs bound is rejected.
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(1_755_853_686_625_720);
+      expect(query.end_time).toBe(1_755_854_046_921_708);
+      expect(Number.isInteger(query.start_time)).toBe(true);
+      expect(Number.isInteger(query.end_time)).toBe(true);
+    });
+
+    it("should skip a span with a blank-string end_time whole when deriving the window", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan(),
+        makeTraceSpan({
+          span_id: "span-blank-end",
+          reference_parent_span_id: "span-root",
+          start_time: TRACE_START_NS - 500_000_000,
+          end_time: "",
+        }),
+      ]);
+
+      const query = searchCalls("_rumdata")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_START_US - ONE_MINUTE_US);
+      expect(query.end_time).toBe(TRACE_END_US + FIVE_MINUTES_US);
+    });
+
+    it("should not search _rumdata when every span is malformed even with a dangling parent", async () => {
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", [
+        makeTraceSpan({ start_time: "", end_time: TRACE_END_NS }),
+        makeTraceSpan({ span_id: "span-b", start_time: TRACE_START_NS, end_time: undefined }),
+      ]);
+
+      expect(searchCalls("_rumdata")).toHaveLength(0);
+      expect(result.tracedResources).toEqual([]);
+    });
+  });
+
+  describe("fetchRumEventsForTrace — page-view window", () => {
+    it("should bound the view query to the browser request's date ± 1 h", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'view'")[0][0].query.query;
+      expect(query.start_time).toBe(BROWSER_REQUEST_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
+    });
+
+    it("should bound the sibling-event query to the browser request's date ± 1 h", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'error'")[0][0].query.query;
+      expect(query.start_time).toBe(BROWSER_REQUEST_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
+    });
+
+    it("should bound the action query to the browser request's date ± 1 h", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("action_id IN")[0][0].query.query;
+      expect(query.start_time).toBe(BROWSER_REQUEST_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
+    });
+
+    it("should anchor the page-view window on the trace end when the browser request has no date", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest({ date: undefined })] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'view'")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_END_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(TRACE_END_US + ONE_HOUR_US);
+    });
+
+    it("should anchor the page-view window on the first returned browser-request row", async () => {
+      const later = makeBrowserRequest({
+        date: BROWSER_REQUEST_MS + 700,
+        _timestamp: (BROWSER_REQUEST_MS + 700) * 1000 + 2_000_000,
+      });
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest(), later] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'view'")[0][0].query.query;
+      expect(query.start_time).toBe(BROWSER_REQUEST_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
+    });
+  });
+
+  describe("fetchRumEventsForTrace — action query", () => {
+    it("should send the action query with the parsed ids when action_id is a non-empty array", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest({ action_id: '["action-1","action-2"]' })],
+      });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const actionCalls = searchCalls("action_id IN");
+      expect(actionCalls).toHaveLength(1);
+      expect(actionCalls[0][0].query.query.sql).toContain("action_id IN ('action-1','action-2')");
+    });
+
+    it("should send no action query when action_id is an empty array", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest({ action_id: "[]" })] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      expect(searchService.search).toHaveBeenCalledTimes(3);
+      expect(searchCalls("action_id IN")).toHaveLength(0);
+      expect(result.tracedResources).toHaveLength(1);
+      expect(result.actionEvents).toEqual([]);
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should send no action query when action_id is absent", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest({ action_id: undefined })] });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      expect(searchService.search).toHaveBeenCalledTimes(3);
+      expect(searchCalls("action_id IN")).toHaveLength(0);
+      expect(result.tracedResources).toHaveLength(1);
+      expect(result.actionEvents).toEqual([]);
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should send no action query when action_id is not valid JSON", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest({ action_id: "not-valid-json" })],
+      });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      expect(searchService.search).toHaveBeenCalledTimes(3);
+      expect(searchCalls("action_id IN")).toHaveLength(0);
+      expect(result.tracedResources).toHaveLength(1);
+      expect(result.actionEvents).toEqual([]);
+      expect(consoleSpy).not.toHaveBeenCalled();
+    });
+
+    it("should send no action query when action_id is valid JSON but not an array", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest({ action_id: '{"id":"action-1"}' })],
+      });
+      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      expect(searchService.search).toHaveBeenCalledTimes(3);
+      expect(searchCalls("action_id IN")).toHaveLength(0);
+      expect(result.tracedResources).toHaveLength(1);
+      expect(result.actionEvents).toEqual([]);
+      expect(consoleSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -318,10 +755,10 @@ describe("useRumSpanBuilder", () => {
 
   describe("fetchRumEventsForTrace — traceId sanitisation", () => {
     it("should strip single quotes from traceId in the SQL query", async () => {
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace'with'quotes", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace'with'quotes", makeDanglingTrace());
 
       const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
         .sql as string;
@@ -330,10 +767,10 @@ describe("useRumSpanBuilder", () => {
     });
 
     it("should strip backslashes from traceId in the SQL query", async () => {
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace\\injection", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace\\injection", makeDanglingTrace());
 
       const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
         .sql as string;
@@ -347,21 +784,13 @@ describe("useRumSpanBuilder", () => {
 
   describe("fetchRumEventsForTrace — view_id escaping", () => {
     it("escapes an embedded single quote in view_id for both view-event queries", async () => {
-      const tracedResource = makeTracedResource({ view_id: "view'1" });
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([tracedResource]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest({ view_id: "view'1" })] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
-      // Call order: tracedResources(0), viewEvents(1), actionEvents(2), allViewEvents(3)
-      const viewEventsSql: string = vi.mocked(searchService.search).mock.calls[1][0].query.query
-        .sql as string;
-      const allViewEventsSql: string = vi.mocked(searchService.search).mock.calls[3][0].query.query
-        .sql as string;
+      const viewEventsSql: string = searchCalls("type = 'view'")[0][0].query.query.sql;
+      const allViewEventsSql: string = searchCalls("type = 'error'")[0][0].query.query.sql;
 
       expect(viewEventsSql).toContain("view_id IN ('view''1')");
       expect(allViewEventsSql).toContain("view_id IN ('view''1')");
@@ -374,12 +803,11 @@ describe("useRumSpanBuilder", () => {
 
   describe("fetchRumEventsForTrace — trace-id variants", () => {
     it("should query both padded and legacy zero-stripped trace ids", async () => {
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      // 32-char canonical id as it arrives from the traces page; SDK 0.4.x
-      // stored the same id zero-stripped (31 chars) in _rumdata
-      await fetchRumEventsForTrace("01a034c1aabc72f78880daf6c9755cff", 1_000_000, 2_000_000);
+      // SDK 0.4.x stored the canonical 32-char id zero-stripped (31 chars) in _rumdata.
+      await fetchRumEventsForTrace("01a034c1aabc72f78880daf6c9755cff", makeDanglingTrace());
 
       const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
         .sql as string;
@@ -388,14 +816,40 @@ describe("useRumSpanBuilder", () => {
     });
 
     it("should keep exact matching for non-hex ids", async () => {
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
         .sql as string;
       expect(sql).toContain("= 'trace-abc'");
+    });
+
+    it("should match the trace id under both column spellings when the schema has both", async () => {
+      mockGetStream.mockResolvedValue(makeRumStream(["_o2_trace_id", "_oo_trace_id"]));
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
+      expect(sql).toContain("_o2_trace_id = 'trace-abc'");
+      expect(sql).toContain("_oo_trace_id = 'trace-abc'");
+    });
+
+    it("should match only the _o2_ column when the schema lacks _oo_trace_id", async () => {
+      mockGetStream.mockResolvedValue(makeRumStream(["_o2_trace_id"]));
+      mockSearchRoutes({ tracedResources: [] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
+        .sql as string;
+      expect(sql).toContain("_o2_trace_id = 'trace-abc'");
+      expect(sql).not.toContain("_oo_trace_id");
     });
   });
 
@@ -405,20 +859,15 @@ describe("useRumSpanBuilder", () => {
 
   describe("fetchRumEventsForTrace — successful fetch", () => {
     it("should return tracedResources, viewEvents, actionEvents and allViewEvents", async () => {
-      const tracedResource = makeTracedResource();
-      const viewEvent = makeViewEvent();
-      const actionEvent = makeActionEvent();
-      const allEvent = makeResourceEvent();
-
-      // Call order: tracedResources, viewEvents, actionEvents, allViewEvents
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([tracedResource]))
-        .mockResolvedValueOnce(makeSearchResponse([viewEvent]))
-        .mockResolvedValueOnce(makeSearchResponse([actionEvent]))
-        .mockResolvedValueOnce(makeSearchResponse([allEvent]));
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest()],
+        viewEvents: [makeViewEvent()],
+        actionEvents: [makeActionEvent()],
+        allViewEvents: [makeResourceEvent()],
+      });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toHaveLength(1);
       expect(result.tracedResources[0]._oo_trace_id).toBe("trace-abc");
@@ -427,67 +876,33 @@ describe("useRumSpanBuilder", () => {
       expect(result.allViewEvents).toHaveLength(1);
     });
 
-    it("should fire 4 search calls in total for a full flow", async () => {
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([makeTracedResource()]))
-        .mockResolvedValueOnce(makeSearchResponse([makeViewEvent()]))
-        .mockResolvedValueOnce(makeSearchResponse([makeActionEvent()]))
-        .mockResolvedValueOnce(makeSearchResponse([makeResourceEvent()]));
+    it("should fire exactly 4 _rumdata search calls when the browser request has an action", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest()],
+        viewEvents: [makeViewEvent()],
+        actionEvents: [makeActionEvent()],
+        allViewEvents: [makeResourceEvent()],
+      });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(searchService.search).toHaveBeenCalledTimes(4);
+      expect(searchCalls("_rumdata")).toHaveLength(4);
     });
 
-    it("should include timestamp buffer in search time ranges", async () => {
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([makeTracedResource()]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]));
+    it("should fire exactly 3 _rumdata search calls when the browser request has no action", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest({ action_id: "[]" })],
+        viewEvents: [makeViewEvent()],
+        allViewEvents: [makeResourceEvent()],
+      });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 5_000_000, 10_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
-      // All queries use ±60s buffer around the trace window
-      const firstCall = vi.mocked(searchService.search).mock.calls[0][0];
-      expect(firstCall.query.query.start_time).toBe(5_000_000 - 60_000_000);
-      expect(firstCall.query.query.end_time).toBe(10_000_000 + 60_000_000);
-    });
-
-    it("should skip fetchActionEvents when parsed action_id array is empty", async () => {
-      // When action_id parses to [] the source does: primaryActionId = [] || "" which
-      // evaluates to [] (truthy), so fetchActionEvents IS still called with an empty array.
-      // The result is an empty actionEvents array because the SQL IN () call returns [].
-      const resource = makeTracedResource({ action_id: "[]" });
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([resource]))
-        .mockResolvedValueOnce(makeSearchResponse([makeViewEvent()]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([makeResourceEvent()]));
-
-      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
-
-      // 4 calls: tracedRes + viewEvents + actionEvents (empty array) + allViewEvents
-      expect(searchService.search).toHaveBeenCalledTimes(4);
-      expect(result.actionEvents).toEqual([]);
-    });
-
-    it("should handle invalid JSON in action_id gracefully", async () => {
-      const resource = makeTracedResource({ action_id: "not-valid-json" });
-      vi.mocked(searchService.search)
-        .mockResolvedValueOnce(makeSearchResponse([resource]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]))
-        .mockResolvedValueOnce(makeSearchResponse([]));
-
-      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
-
-      // Should not throw; actionEvents defaults to []
-      expect(result.actionEvents).toEqual([]);
+      expect(searchService.search).toHaveBeenCalledTimes(3);
+      expect(searchCalls("_rumdata")).toHaveLength(3);
     });
 
     it("should return empty result and not throw when search rejects", async () => {
@@ -495,7 +910,7 @@ describe("useRumSpanBuilder", () => {
       const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      const result = await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      const result = await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       expect(result.tracedResources).toEqual([]);
       expect(consoleSpy).toHaveBeenCalled();
@@ -503,14 +918,40 @@ describe("useRumSpanBuilder", () => {
     });
 
     it("should use timestamp_column from store in SQL ORDER BY clause", async () => {
-      vi.mocked(searchService.search).mockResolvedValue(makeSearchResponse([]));
+      mockSearchRoutes({ tracedResources: [] });
 
       const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
-      await fetchRumEventsForTrace("trace-abc", 1_000_000, 2_000_000);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
 
       const sql: string = vi.mocked(searchService.search).mock.calls[0][0].query.query
         .sql as string;
       expect(sql).toContain("ORDER BY _timestamp");
+    });
+
+    it("should build the same bridge spans from the fetched rows", async () => {
+      mockSearchRoutes({
+        tracedResources: [makeBrowserRequest()],
+        viewEvents: [makeViewEvent()],
+        actionEvents: [makeActionEvent()],
+        allViewEvents: [makeResourceEvent({ action_id: '["action-1"]' }), makeErrorEvent()],
+      });
+
+      const { fetchRumEventsForTrace, formatRumEventsAsSpans } = buildComposable(["_rumdata"]);
+      const { tracedResources, viewEvents, actionEvents, allViewEvents } =
+        await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+      const spans = formatRumEventsAsSpans(
+        tracedResources,
+        viewEvents,
+        actionEvents,
+        allViewEvents,
+      );
+
+      expect(spans.map((s) => [s.span_id, s.reference_parent_span_id])).toEqual([
+        ["rum_view_view-1", ""],
+        ["rum_action_action-1", "rum_view_view-1"],
+        ["rum_resource_1100000", "rum_action_action-1"],
+        ["rum_error_err-1", "rum_view_view-1"],
+      ]);
     });
   });
 
