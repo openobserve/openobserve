@@ -19,6 +19,8 @@ import logging
 import os
 import time
 
+import pytest
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -134,17 +136,20 @@ class TestRealtimePipelineExclusivity:
             _delete_by_name(session, base_url, name_a)
             _delete_by_name(session, base_url, name_b)
 
-    def test_source_without_org_id_documents_the_bypass(
+    @pytest.mark.xfail(
+        strict=False,
+        reason="#6443 org_id bypass: with org_id omitted from source, the incoming stream "
+               "compares unequal to the fully-qualified entries in list_streams_with_pipeline, "
+               "so the exclusivity check is skipped. XPASSes once that gap is closed.",
+    )
+    def test_source_without_org_id_rejects_the_second_pipeline(
         self, create_session, base_url, random_string
     ):
-        """
-        Records a real gap rather than the desired behaviour: with `org_id`
-        omitted from `source`, the incoming stream compares unequal to the
-        fully-qualified entries in `list_streams_with_pipeline`, so the
-        exclusivity check is skipped and a second realtime pipeline is accepted.
+        """Asserts the DESIRED behaviour (400) for the org_id bypass, marked xfail.
 
-        Flip this to expect 400 when the comparison is made org-agnostic, or
-        when `org_id` becomes required on the source.
+        Written this way round so the suite never goes red at the moment the gap is
+        fixed: it XFAILs while the bypass is open and XPASSes once the comparison is
+        made org-agnostic or org_id becomes required on the source. Drop the marker then.
         """
         session = create_session
         suffix = random_string(6).lower()
@@ -160,9 +165,9 @@ class TestRealtimePipelineExclusivity:
 
             resp = _create(session, base_url, _realtime_pipeline(second, stream, include_org_id=False))
             logger.info("second (no org_id in source) -> %s %s", resp.status_code, resp.text[:200])
-            assert resp.status_code == 200, (
-                "#6443: this test records the org_id bypass — a 400 here means the gap is "
-                f"closed and the assertion should be inverted. Got {resp.status_code} {resp.text}"
+            assert resp.status_code == 400, (
+                "#6443: a second realtime pipeline on the same source stream must be rejected "
+                f"even when org_id is omitted from source. Got {resp.status_code} {resp.text}"
             )
         finally:
             _delete_by_name(session, base_url, first)

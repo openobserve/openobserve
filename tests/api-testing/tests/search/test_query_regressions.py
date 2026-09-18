@@ -86,7 +86,9 @@ class TestQueryRegressions:
             assert len(hits) == 1, f"#3864: an aggregate must return exactly one row, got {hits}"
             assert "latest_timestamp" in hits[0], \
                 f"#3864: the alias must be projected, got keys {list(hits[0])}"
-            assert isinstance(hits[0]["latest_timestamp"], int) and hits[0]["latest_timestamp"] > 0, \
+            assert isinstance(hits[0]["latest_timestamp"], int), \
+                f"#3864: the alias must carry an integer timestamp, got {hits[0]}"
+            assert hits[0]["latest_timestamp"] > 0, \
                 f"#3864: the alias must carry the max timestamp, got {hits[0]}"
         finally:
             _drop(session, base_url, stream)
@@ -169,6 +171,8 @@ class TestQueryRegressions:
                     if baseline is None:
                         baseline = values
                     else:
+                        # Safe despite ties: the projection is the sort key alone, so any
+                        # physical order among rows sharing a val yields an identical list.
                         assert values == baseline, (
                             f"#9664: the same query must return the same order every time; "
                             f"attempt {attempt + 1} (use_cache={use_cache}) gave {values}, "

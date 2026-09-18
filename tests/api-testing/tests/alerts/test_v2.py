@@ -405,7 +405,9 @@ def test_trigger_populates_last_triggered_at(
         f"#5745: last_triggered_at must be populated after a trigger, got {last!r} "
         f"(was {before!r} before)"
     )
-    assert isinstance(last, int) and last > 0, \
+    assert isinstance(last, int), \
+        f"#5745: last_triggered_at must be an integer epoch value, got {last!r}"
+    assert last > 0, \
         f"#5745: last_triggered_at must be a positive epoch value, got {last!r}"
 
 
