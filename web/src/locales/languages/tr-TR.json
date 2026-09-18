@@ -17881,6 +17881,7 @@
     "target_rotation_all": "{rotation} rotasyonundaki herkes",
     "target_rotation_deleted": "Bu ekibin artık sahip olmadığı bir rotasyon",
     "target_rotation_legacy": "Nöbette olan kişi",
+    "target_unrecognized": "Bu ekranın tanımadığı bir hedef",
     "ladderPoolEveryone": "{rotation} rotasyonundaki herkes",
     "target_user": "Belirli bir kişi",
     "target_whole_team": "Tüm ekip",

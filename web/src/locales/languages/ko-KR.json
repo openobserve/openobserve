@@ -17881,6 +17881,7 @@
     "target_rotation_all": "{rotation} 로테이션의 모든 구성원",
     "target_rotation_deleted": "이 팀에 더 이상 없는 로테이션",
     "target_rotation_legacy": "현재 온콜 담당자",
+    "target_unrecognized": "이 화면에서 인식할 수 없는 대상",
     "ladderPoolEveryone": "{rotation} 로테이션의 모든 구성원",
     "target_user": "특정 사용자",
     "target_whole_team": "팀 전체",

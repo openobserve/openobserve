@@ -17881,6 +17881,7 @@
     "target_rotation_all": "Все участники {rotation}",
     "target_rotation_deleted": "Ротация, которой у команды больше нет",
     "target_rotation_legacy": "Дежурный",
+    "target_unrecognized": "Цель, которую этот экран не распознаёт",
     "ladderPoolEveryone": "все участники {rotation}",
     "target_user": "Конкретный человек",
     "target_whole_team": "Вся команда",
