@@ -659,6 +659,17 @@ describe("useRumSpanBuilder", () => {
       expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
     });
 
+    it("should anchor the page-view window on the trace end when the browser request has no date", async () => {
+      mockSearchRoutes({ tracedResources: [makeBrowserRequest({ date: undefined })] });
+
+      const { fetchRumEventsForTrace } = buildComposable(["_rumdata"]);
+      await fetchRumEventsForTrace("trace-abc", makeDanglingTrace());
+
+      const query = searchCalls("type = 'view'")[0][0].query.query;
+      expect(query.start_time).toBe(TRACE_END_US - ONE_HOUR_US);
+      expect(query.end_time).toBe(TRACE_END_US + ONE_HOUR_US);
+    });
+
     it("should anchor the page-view window on the first returned browser-request row", async () => {
       const later = makeBrowserRequest({
         date: BROWSER_REQUEST_MS + 700,

@@ -214,7 +214,9 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
     expect(selected.trace_start_time).toBe(TRACE_START_US + 100_000);
     expect(selected.trace_end_time).toBe(TRACE_END_US - 100_000);
-    expect(consoleSpy).not.toHaveBeenCalled();
+    // The axios mock logs every request msw does not handle; only errors from the span path matter here.
+    const renderErrors = consoleSpy.mock.calls.filter((c) => c[0] !== "Mock Interceptor Error");
+    expect(renderErrors).toEqual([]);
   });
 
   it("floors the start and ceils the end of the embedded header window", async () => {

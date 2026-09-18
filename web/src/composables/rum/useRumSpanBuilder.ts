@@ -174,10 +174,7 @@ export default function useRumSpanBuilder(
     }
   };
 
-  /**
-   * Fetch RUM events that have the matching trace_id, plus the full view context.
-   * Returns structured data for building the Session→View→Action→Resource hierarchy.
-   */
+  /** Fetches the browser request and its page view for a trace with a dangling parent, searching only around the window its spans span. */
   const fetchRumEventsForTrace = async (traceId: string, spans: any[]) => {
     const empty = {
       tracedResources: [] as any[],
@@ -234,8 +231,9 @@ export default function useRumSpanBuilder(
 
       const viewIds = [...new Set(tracedResources.map((r: any) => r.view_id).filter(Boolean))];
 
-      // RUM `date` is milliseconds.
-      const anchorUs = (tracedResources[0]?.date || 0) * 1000;
+      // RUM `date` is milliseconds; without it the trace end is the nearest known instant.
+      const dateMs = Number(tracedResources[0]?.date);
+      const anchorUs = dateMs > 0 ? dateMs * 1000 : traceWindow.end;
       const viewStart = anchorUs - PAGE_VIEW_WINDOW_US;
       const viewEnd = anchorUs + PAGE_VIEW_WINDOW_US;
       const actionIds = parseActionIds(tracedResources[0]?.action_id);
