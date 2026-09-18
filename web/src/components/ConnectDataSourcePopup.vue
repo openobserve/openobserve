@@ -23,6 +23,8 @@ import config from "@/aws-exports";
 import organizationService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
 import {
+  connectDataPopupSettled,
+  connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteOffered,
   markSlackInviteResolved,
@@ -50,7 +52,7 @@ const userEmail = store.state.userInfo?.email ?? "anonymous";
 // sessionStorage (not localStorage): clears on tab close, which is exactly
 // the "new session" boundary the spec wants — re-show every session until
 // data exists, unlike the Slack popup's one-time-ever persistence.
-const sessionShownKey = `connectDataSourcePromptShown:${userEmail}`;
+const sessionShownKey = connectDataPromptSessionKey(userEmail);
 // Survives a reload mid-onboarding, before GetStarted dispatches its
 // completion event.
 const PENDING_KEY = "connectDataSourcePromptPending";
@@ -76,19 +78,31 @@ const track = (event: string, properties: Record<string, any> = {}) => {
 };
 
 const checkAndMaybeShow = async () => {
-  if (config.isCloud !== "true") return;
-  if (sessionStorage.getItem(sessionShownKey) === "true") return;
+  // Held false until this session's open/no-open decision is final — CommunitySlackInvite
+  // waits on this so the two popups never end up open at the same time.
+  connectDataPopupSettled.value = false;
+
+  if (config.isCloud !== "true") {
+    connectDataPopupSettled.value = true;
+    return;
+  }
+  if (sessionStorage.getItem(sessionShownKey) === "true") {
+    connectDataPopupSettled.value = true;
+    return;
+  }
   // Already known true elsewhere (MainLayout, useStreams, ...) — skip the summary call.
   if (store.state.organizationData.isDataIngested) {
     // This popup won't open, so this is the account's day-1 touchpoint — starts the Slack day-2 clock silently.
     markSlackInviteOffered(userEmail);
+    connectDataPopupSettled.value = true;
     return;
   }
 
   const orgIdentifier = store.state.selectedOrganization?.identifier;
   if (!orgIdentifier) {
     // Fresh session — the default org is still resolving asynchronously.
-    // Wait for it once instead of silently skipping this session.
+    // Wait for it once instead of silently skipping this session. Stays
+    // unsettled until the watcher re-invokes this.
     if (!stopOrgWatch) {
       stopOrgWatch = watch(
         () => store.state.selectedOrganization?.identifier,
@@ -118,6 +132,8 @@ const checkAndMaybeShow = async () => {
     // Fail closed — this is a marketing prompt, not a navigation gate.
     console.warn("ConnectDataSourcePopup: failed to check organization summary:", error);
     return;
+  } finally {
+    connectDataPopupSettled.value = true;
   }
 
   // Read before marking, so the button renders on the same open that starts the clock.

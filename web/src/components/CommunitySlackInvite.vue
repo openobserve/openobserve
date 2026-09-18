@@ -15,13 +15,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
 import segment from "@/services/segment_analytics";
 import {
+  connectDataPopupSettled,
+  connectDataPromptSessionKey,
   getCommunitySlackUrl,
   markSlackInviteResolved,
   shouldShowStandaloneSlackInvite,
@@ -54,6 +56,16 @@ const track = (event: string, properties: Record<string, any> = {}) => {
   }
 };
 
+const maybeShowStandaloneInvite = () => {
+  // ConnectDataSourcePopup gets first refusal on this session — if it claimed the
+  // session (shown, or about to be), the two popups must not stack.
+  if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
+  if (shouldShowStandaloneSlackInvite(userEmail)) {
+    isOpen.value = true;
+    track("community_slack_prompt_shown");
+  }
+};
+
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
   // captured or shown there.
@@ -63,10 +75,16 @@ onMounted(() => {
   // first-login session — the day-2 clock only starts once that session ends.
   if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
-  if (shouldShowStandaloneSlackInvite(userEmail)) {
-    isOpen.value = true;
-    track("community_slack_prompt_shown");
+  if (connectDataPopupSettled.value) {
+    maybeShowStandaloneInvite();
+    return;
   }
+  // ConnectDataSourcePopup is still deciding whether it opens this session — wait for it.
+  const stopWaiting = watch(connectDataPopupSettled, (settled) => {
+    if (!settled) return;
+    stopWaiting();
+    maybeShowStandaloneInvite();
+  });
 });
 
 // Real member count, sourced from the backend `/config` response
@@ -104,10 +122,10 @@ const avatarBgClasses = [
   "bg-avatar-tint-4",
 ];
 
-// × / overlay / Escape / Maybe later: this is the day-2 ask, the last one —
-// declining it stops the invite for good, same as joining does.
+// × / overlay / Escape / Maybe later: closes the dialog only. Only joinSlack()
+// resolves the invite for good — "Maybe later" means the day-2 popup can show
+// again on a later session.
 const dismiss = () => {
-  markSlackInviteResolved(userEmail);
   track("community_slack_prompt_dismissed");
   isOpen.value = false;
 };
