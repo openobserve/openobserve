@@ -45,6 +45,7 @@ pub mod oncall_overrides;
 pub mod oncall_ownership_rules;
 pub mod oncall_policies;
 pub mod oncall_response_events;
+pub mod oncall_response_reports;
 pub mod oncall_responses;
 pub mod oncall_routing_config;
 pub mod oncall_schedules;
