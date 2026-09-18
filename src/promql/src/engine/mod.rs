@@ -768,10 +768,18 @@ pub(crate) mod tests {
             ] {
                 let series = matrix(eval_on_empty(&query, 3).await.unwrap());
                 assert_eq!(series.len(), 1, "{query}");
-                assert_eq!(series[0].samples.len(), 1, "{query}");
-                assert_eq!(series[0].samples[0].timestamp, timestamp, "{query}");
+                // a scalar holds a value at every step, so the steps the filter rejects are
+                // NaN rather than absent
+                assert_eq!(series[0].samples.len(), 3, "{query}");
+                let matched: Vec<_> = series[0]
+                    .samples
+                    .iter()
+                    .filter(|sample| !sample.value.is_nan())
+                    .collect();
+                assert_eq!(matched.len(), 1, "{query}");
+                assert_eq!(matched[0].timestamp, timestamp, "{query}");
                 assert_eq!(
-                    series[0].samples[0].value,
+                    matched[0].value,
                     timestamp as f64 / 1_000_000.0 + 1.0,
                     "{query}"
                 );
