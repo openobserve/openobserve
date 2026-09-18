@@ -34,7 +34,10 @@ use crate::{
         promql::NAME_LABEL,
         search::{SearchEventContext, SearchEventType},
     },
-    utils::{json, sort::sort_float},
+    utils::{
+        json,
+        sort::{sort_float, sort_float_nan_last},
+    },
 };
 
 // https://prometheus.io/docs/concepts/data_model/#metric-names-and-labels
@@ -946,6 +949,13 @@ impl Value {
                 });
             }
             _ => {}
+        }
+    }
+
+    /// Orders an instant vector the way PromQL `sort`/`sort_desc` does.
+    pub fn sort_by_value(&mut self, descending: bool) {
+        if let Value::Vector(v) = self {
+            v.sort_by(|a, b| sort_float_nan_last(&a.sample.value, &b.sample.value, descending));
         }
     }
 

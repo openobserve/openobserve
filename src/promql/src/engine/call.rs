@@ -195,13 +195,16 @@ impl Engine {
 
                 functions::round(input, to_nearest)
             }
-            Func::HistogramCount
-            | Func::HistogramFraction
-            | Func::HistogramSum
-            | Func::Sort
-            | Func::SortDesc => Err(DataFusionError::NotImplemented(format!(
-                "Unsupported Function: {func_name:?}"
-            ))),
+            Func::Sort | Func::SortDesc => {
+                let err = "Invalid args, expected sort(v instant-vector)";
+                self.ensure_args_len(args, 1, err)?;
+                let input = self.call_expr_arg(args, 0).await?;
+
+                functions::sort(input, func_name == Func::SortDesc, &self.eval_ctx)
+            }
+            Func::HistogramCount | Func::HistogramFraction | Func::HistogramSum => Err(
+                DataFusionError::NotImplemented(format!("Unsupported Function: {func_name:?}")),
+            ),
             _ => self.call_single_arg_builtin(func_name, args).await,
         }
     }

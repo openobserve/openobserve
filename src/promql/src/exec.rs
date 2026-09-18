@@ -26,8 +26,9 @@ use tokio::sync::{RwLock, Semaphore};
 
 use super::engine::Engine;
 use crate::{
-    DEFAULT_LOOKBACK, TableProvider, ast::selector_visitor::MetricSelectorVisitor, micros,
-    micros_since_epoch,
+    DEFAULT_LOOKBACK, TableProvider,
+    ast::{result_order::top_level_sort_descending, selector_visitor::MetricSelectorVisitor},
+    micros, micros_since_epoch,
 };
 
 #[derive(Clone)]
@@ -85,6 +86,7 @@ impl PromqlContext {
         }
 
         let ctx = Arc::new(self.clone());
+        let sort_descending = top_level_sort_descending(&stmt.expr);
         let expr = Arc::new(stmt.expr);
         let is_instant = self.start == self.end;
 
@@ -139,7 +141,10 @@ impl PromqlContext {
         };
 
         let mut sorted_value = final_value;
-        sorted_value.sort();
+        match sort_descending {
+            Some(descending) if is_instant => sorted_value.sort_by_value(descending),
+            _ => sorted_value.sort(),
+        }
         Ok((
             sorted_value,
             final_result_type,
