@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요.",
       "refresh": "새로고침",
+      "refreshCacheReload": "캐시 새로 고침 및 다시 로드",
+      "moreRefreshOptions": "추가 새로 고침 옵션",
       "dashboard": "대시보드",
       "dashboardNotFound": "대시보드를 찾을 수 없거나 삭제되었습니다. 대시보드 목록으로 이동합니다.",
       "failedToLoadDashboard": "대시보드를 불러오지 못했습니다. 대시보드 목록으로 이동합니다.",

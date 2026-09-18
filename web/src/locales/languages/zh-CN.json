@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "刷新以应用最新的变量更改",
       "refresh": "刷新",
+      "refreshCacheReload": "刷新缓存并重新加载",
+      "moreRefreshOptions": "更多刷新选项",
       "dashboard": "仪表盘",
       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",

@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Actualiser pour appliquer les dernières modifications de variables",
       "refresh": "Actualiser",
+      "refreshCacheReload": "Actualiser le cache et recharger",
+      "moreRefreshOptions": "Plus d'options d'actualisation",
       "dashboard": "Tableau de bord",
       "dashboardNotFound": "Tableau de bord introuvable ou supprimé. Redirection vers la liste des tableaux de bord.",
       "failedToLoadDashboard": "Échec du chargement du tableau de bord. Redirection vers la liste des tableaux de bord.",

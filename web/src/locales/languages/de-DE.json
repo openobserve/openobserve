@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen zu übernehmen",
       "refresh": "Aktualisieren",
+      "refreshCacheReload": "Cache aktualisieren & neu laden",
+      "moreRefreshOptions": "Weitere Aktualisierungsoptionen",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard nicht gefunden oder wurde gelöscht. Weiterleitung zur Dashboard-Liste.",
       "failedToLoadDashboard": "Dashboard konnte nicht geladen werden. Weiterleitung zur Dashboard-Liste.",

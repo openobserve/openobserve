@@ -5380,6 +5380,8 @@
     "viewDashboard": {
       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
       "refresh": "Vernieuwen",
+      "refreshCacheReload": "Cache vernieuwen en herladen",
+      "moreRefreshOptions": "Meer vernieuwingsopties",
       "dashboard": "Dashboard",
       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
