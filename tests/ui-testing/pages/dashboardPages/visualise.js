@@ -1,6 +1,10 @@
 //logs visualise page object
 //Methods: openLogs, openVisualiseTab, logsApplyQueryButton, Visualize run query button, setRelative, searchAndAddField, showQueryToggle, enableSQLMode, streamIndexList, logsSelectStream, logsToggle, selectChartType, removeField, chartRender, backToLogs, openQueryEditor, fillQueryEditor
 import { expect } from "@playwright/test";
+import DashboardTimeRefresh from "./dashboard-refresh.js";
+
+// Long enough for the empty-state overlay to reappear if the panel is genuinely empty.
+const quietPeriodProbeMs = 3000;
 export default class LogsVisualise {
   constructor(page) {
     this.page = page;
@@ -729,19 +733,48 @@ export default class LogsVisualise {
   }
 
   // Open query inspector from a panel dropdown
+  // metaData gating the Query Inspector item populates only on a non-empty query, so the panel has to come back with rows. It can come back empty two ways: the rows are not searchable yet (WAL lag under CI load), which a refresh clears, or the dashboard's own 15m default window no longer covers the fixture - ingestion is deduped per worker, so by a late test it can be older than that - which only a wider range clears.
+  async waitForPanelToLoadData({ refreshAttempts = 3, attemptTimeout = 10000 } = {}) {
+    const noData = this.page.locator('[data-test="no-data"]');
+    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
+
+    // A refresh unmounts the empty-state overlay for as long as its query runs, so "absent
+    // right now" is not "the panel came back with rows" - it has to stay absent.
+    const hasData = async (timeout, quietMs = 1500) => {
+      const deadline = Date.now() + timeout;
+      let goneSince = null;
+      while (Date.now() < deadline) {
+        if (await noData.isVisible().catch(() => false)) {
+          goneSince = null;
+        } else if (goneSince === null) {
+          goneSince = Date.now();
+        } else if (Date.now() - goneSince >= quietMs) {
+          return true;
+        }
+        await this.page.waitForTimeout(250);
+      }
+      return false;
+    };
+
+    if (await hasData(quietPeriodProbeMs)) return;
+
+    for (let attempt = 0; attempt < refreshAttempts; attempt++) {
+      await refreshBtn.click({ timeout: 5000 }).catch(() => {});
+      if (await hasData(attemptTimeout)) return;
+    }
+
+    await new DashboardTimeRefresh(this.page).setRelative("6", "h");
+    if (await hasData(attemptTimeout * 2)) return;
+
+    throw new Error(
+      "Dashboard panel still reports no data after refreshing and widening the range to 6h"
+    );
+  }
+
   async openPanelQueryInspector(panelName) {
     // The Query Inspector item is v-if-gated on the panel's metaData, populated only after its query executes, so wait for the panel to render before opening the menu.
     await this.verifyChartRenders(this.page);
-
-    // The dashboard panel query can transiently return empty under CI load (WAL lag) though the data exists (it rendered in Visualize) — metaData gating the Query Inspector item only populates on a non-empty query, so refresh until the panel loads data.
-    const noData = this.page.locator('[data-test="no-data"]');
-    const refreshBtn = this.page.locator('[data-test="dashboard-refresh-btn"]');
-    await expect(async () => {
-      if (await noData.isVisible().catch(() => false)) {
-        await refreshBtn.click({ timeout: 5000 }).catch(() => {});
-        await expect(noData).toBeHidden({ timeout: 5000 });
-      }
-    }).toPass({ timeout: 30000, intervals: [1000, 2000, 3000] });
+    await this.waitForPanelToLoadData();
 
     const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
