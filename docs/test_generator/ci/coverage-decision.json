@@ -1,0 +1,10 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/splunk-hec-ingestion-window.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/ingestion-config.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Pipelines/pipeline-regression.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the Splunk HEC ingestion page. ingestion-config.spec.js exercises the Fluentd/Prometheus/Kubernetes/Postgres integration pages (generic navigation + copy) but never visits /ingestion/custom/logs/splunkhec and asserts nothing about the ingestion-window warning banner — the feature's headline. pipeline-regression.spec.js only mentions 'splunk' in passing. The feature doc names a dedicated spec_path (splunk-hec-ingestion-window.spec.js) with a distinctive banner (role=alert, setting-name text), so a new spec in GeneralTests is the correct home. Must register the new file in tests/ui-testing/ci-matrix/ci_matrix.json under the GeneralTests shard run_files."
+}

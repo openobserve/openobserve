@@ -1,0 +1,26 @@
+{
+  "feature_slug": "splunk-hec-ingestion-window",
+  "feature_title": "Splunk HEC Ingestion Window Warning",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "splunk-hec-ingestion-window.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/splunk-hec-ingestion-window.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/ingestion/logs/SplunkHec.vue",
+    "web/src/components/ingestion/logs/SplunkHec.spec.ts"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives in OSS-owned locations — src/config/src/metrics.rs, src/core/src/logs/ingest.rs, web/src/components/ingestion/logs/SplunkHec.vue, web/src/locales/languages/*.json, and scripts/translations/. None are under o2_enterprise/ or any enterprise-gated module, and no enterprise keyword (cipher/SSO/SAML/RBAC/SDR/logo-management) appears in the paths or symbols, so this is an OSS change.",
+    "skip": "Not skipping: there is no tests-added label or skip comment, and the change is user-facing — SplunkHec.vue adds a new warning banner and changes the example payload's time field, so it is not docs-only/CI-only/comment-only.",
+    "e2e": "E2E is warranted because the Splunk HEC ingestion config view gains a new user-visible warning banner about the ingestion window and the copyable example payload now derives its time field from a live clock, both of which are UI behaviors a user can see and copy from.",
+    "area": "The UI change lives in web/src/components/ingestion/logs/SplunkHec.vue, part of the ingestion configuration flow; the closest existing Playwright sibling is ingestion-config.spec.js, which the ci-matrix places in the GeneralTests group/area.",
+    "group": "GeneralTests is the existing testfolder shard that already carries ingestion-config.spec.js, the spec closest to this Splunk HEC ingestion UI; the new spec should join that shard. Note: there is no ci_matrix.json in the repo — the OSS base matrix is tests/ui-testing/ci-matrix/ci_matrix_env.json, and GeneralTests is its ingestion-config shard.",
+    "existing_tests": "No E2E specs in the diff — the only changed test file is web/src/components/ingestion/logs/SplunkHec.spec.ts, a Vitest unit test, which does not count as Playwright E2E coverage under tests/ui-testing/playwright-tests/."
+  }
+}
