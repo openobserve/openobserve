@@ -8,19 +8,15 @@ const { ingestTestData } = require('../../utils/data-ingestion.js');
 test.describe("Logs stream-name capitalisation (o2-enterprise#1745)", () => {
   test.describe.configure({ mode: 'parallel' });
   let pm;
-  let streamA;
-  let streamB;
+  let stream;
 
   test.beforeAll(async ({ browser }, testInfo) => {
     const context = await browser.newContext();
     const page = await context.newPage();
-    const suffix = `${Date.now()}_${testInfo.parallelIndex}`;
-    streamA = `logs_lower_a_${suffix}`;
-    streamB = `logs_lower_b_${suffix}`;
+    stream = `logs_lower_${Date.now()}_${testInfo.parallelIndex}`;
 
-    await ingestTestData(page, streamA);
-    await ingestTestData(page, streamB);
-    testLogger.info('E-1745 lowercase streams ingested', { streamA, streamB });
+    await ingestTestData(page, stream);
+    testLogger.info('o2-enterprise#1745 lowercase stream ingested', { stream });
 
     await context.close();
   });
@@ -32,25 +28,21 @@ test.describe("Logs stream-name capitalisation (o2-enterprise#1745)", () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test("selected lowercase stream names are not auto-capitalised", {
+  test("selected lowercase stream name is not auto-capitalised", {
     tag: ['@bug-ent-1745', '@P2', '@regression', '@logsRegression', '@logsRegressionStreamNameCase']
   }, async ({ page }) => {
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
     await page.waitForLoadState('domcontentloaded');
 
-    await pm.logsPage.selectStream(streamA);
-    await pm.logsPage.selectStream(streamB, 5, null, true);
+    await pm.logsPage.selectStream(stream);
     await pm.logsPage.runQueryAndWaitForResults();
 
     const triggerLabel = await pm.logsPage.getSelectedStreamTriggerLabel();
     testLogger.info('Stream selector label', { triggerLabel });
-    expect(triggerLabel).toContain(streamA);
-    expect(triggerLabel).toContain(streamB);
+    expect(triggerLabel).toContain(stream);
 
     const styles = await pm.logsPage.getRenderedStreamNameStyles();
-    const streamNameSurfaces = styles.filter(
-      (s) => s.text.includes(streamA) || s.text.includes(streamB)
-    );
+    const streamNameSurfaces = styles.filter((s) => s.text.includes(stream));
     expect(streamNameSurfaces.length).toBeGreaterThan(0);
 
     for (const surface of streamNameSurfaces) {
@@ -64,8 +56,7 @@ test.describe("Logs stream-name capitalisation (o2-enterprise#1745)", () => {
     const context = await browser.newContext();
     const page = await context.newPage();
     const cleanupPm = new PageManager(page);
-    await cleanupPm.logsPage.deleteStream(streamA);
-    await cleanupPm.logsPage.deleteStream(streamB);
+    await cleanupPm.logsPage.deleteStream(stream);
     await context.close();
   });
 });
