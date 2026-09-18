@@ -65,11 +65,72 @@ export class AlertManagement {
      * @param {string} streamType - Stream type for the cloned alert
      * @param {string} streamName - Stream name for the cloned alert
      */
-    async cloneAlert(alertName, streamType, streamName) {
+    /** The clone dialog, shared by every alert family on the list. */
+    cloneDialog() {
+        return this.page.locator(this.locators.cloneFormDialog);
+    }
+
+    /** Open the clone dialog from a row without submitting it. */
+    async openCloneDialog(alertName) {
+        await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
+        await expect(this.cloneDialog()).toBeVisible({ timeout: 10000 });
+    }
+
+    async submitCloneDialog() {
+        await this.page.locator(this.locators.cloneSubmitButton).click();
+    }
+
+    async cancelCloneDialog() {
+        await this.page.locator(this.locators.cloneCancelButton).click();
+    }
+
+    async selectCloneStreamType(streamType) {
+        await this.page
+            .locator(`${this.locators.cloneStreamType} ${this.locators.selectTrigger}`)
+            .first()
+            .click();
+        await this.page
+            .locator(this.locators.cloneStreamTypeOption.replace('{streamType}', streamType))
+            .first()
+            .click();
+    }
+
+    /** The row's pause/resume control, whose data-row-action names the state. */
+    rowEnableToggle(alertName) {
+        return this.page.locator(this.locators.pauseStartAlert.replace('{alertName}', alertName));
+    }
+
+    /**
+     * The visible half of a toast. OToast renders its message in three nodes
+     * (sr-only ARIA span, sr-only title, visible message), so matching on text
+     * alone trips strict mode.
+     */
+    toastWithText(text) {
+        return this.page
+            .locator(this.locators.toastMessage)
+            .filter({ hasText: text })
+            .first();
+    }
+
+    /**
+     * Clone an alert from its row.
+     *
+     * @param {string} alertName
+     * @param {string} streamType
+     * @param {string} streamName
+     * @param {{newName?: string, folderId?: string}} [options] `newName` renames
+     *   the copy (the dialog otherwise keeps the source's name, and alert names
+     *   are not unique); `folderId` routes it out of the current folder.
+     */
+    async cloneAlert(alertName, streamType, streamName, options = {}) {
         await this.page.locator(this.locators.alertCloneButton.replace('{alertName}', alertName)).click();
         // The clone ODialog has no dedicated title data-test; wait for the clone
         // name input (`to-be-clone-alert-name`) as the deterministic ready signal.
         await expect(this.page.locator('[data-test="to-be-clone-alert-name"]')).toBeVisible({ timeout: 10000 });
+
+        if (options.newName) {
+            await this.page.locator(this.locators.cloneAlertNameField).fill(options.newName);
+        }
 
         // Stream type is an OSelect: click its -trigger, then the option by data-test-value
         // (the old getByRole('option').locator('div').nth(2) structure no longer exists).
@@ -84,6 +145,20 @@ export class AlertManagement {
         await this.page.keyboard.type(streamName, { delay: 30 });
         await this.page.waitForTimeout(1000);
         await this.page.getByText(streamName, { exact: true }).click();
+
+        if (options.folderId) {
+            await this.page
+                .locator(this.locators.cloneFolderPicker)
+                .locator(this.locators.selectTrigger)
+                .first()
+                .click();
+            const folderOption = this.page
+                .locator(this.locators.cloneFolderOption.replace('{folderId}', options.folderId))
+                .first();
+            await expect(folderOption).toBeVisible({ timeout: 10000 });
+            await folderOption.click();
+        }
+
         await this.page.locator(this.locators.cloneSubmitButton).click();
         // Scope cloned-toast to the visible o-toast-message (strict-mode safe).
         await expect(
