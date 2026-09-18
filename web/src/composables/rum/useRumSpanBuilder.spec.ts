@@ -137,7 +137,7 @@ function makeTracedResource(overrides: Record<string, any> = {}) {
 function makeBrowserRequest(overrides: Record<string, any> = {}) {
   return makeTracedResource({
     date: BROWSER_REQUEST_MS,
-    // Offset from date × 1000 so an anchor read from _timestamp cannot satisfy the ±1 h window.
+    // Offset from date × 1000 so the exact-bound assertions tell a date anchor from a _timestamp one.
     _timestamp: BROWSER_REQUEST_US + 2_000_000,
     ...overrides,
   });
@@ -376,10 +376,6 @@ describe("useRumSpanBuilder", () => {
     });
   });
 
-  // =========================================================================
-  // fetchRumEventsForTrace — dangling-parent gate
-  // =========================================================================
-
   describe("fetchRumEventsForTrace — dangling-parent gate", () => {
     it("should not search _rumdata when the root span has an empty parent id", async () => {
       mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
@@ -479,10 +475,6 @@ describe("useRumSpanBuilder", () => {
       expect(searchService.search).toHaveBeenCalledTimes(1);
     });
   });
-
-  // =========================================================================
-  // fetchRumEventsForTrace — browser-request window
-  // =========================================================================
 
   describe("fetchRumEventsForTrace — browser-request window", () => {
     it("should bound the browser-request search to trace start − 1 min and trace end + 5 min", async () => {
@@ -621,10 +613,6 @@ describe("useRumSpanBuilder", () => {
     });
   });
 
-  // =========================================================================
-  // fetchRumEventsForTrace — page-view window
-  // =========================================================================
-
   describe("fetchRumEventsForTrace — page-view window", () => {
     it("should bound the view query to the browser request's date ± 1 h", async () => {
       mockSearchRoutes({ tracedResources: [makeBrowserRequest()] });
@@ -685,10 +673,6 @@ describe("useRumSpanBuilder", () => {
       expect(query.end_time).toBe(BROWSER_REQUEST_US + ONE_HOUR_US);
     });
   });
-
-  // =========================================================================
-  // fetchRumEventsForTrace — action query
-  // =========================================================================
 
   describe("fetchRumEventsForTrace — action query", () => {
     it("should send the action query with the parsed ids when action_id is a non-empty array", async () => {
