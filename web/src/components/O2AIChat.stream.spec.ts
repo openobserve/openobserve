@@ -1064,6 +1064,66 @@ describe("O2AIChat SSE protocol", () => {
       expect(blocks(vm)[0].context.navAction.action).toBe("load_query");
     });
 
+    // The turn keeps running after the detach, so clearing every indicator made a live chat look finished.
+    describe("clicking a navigation link mid-stream", () => {
+      const action = {
+        resource_type: "logs",
+        action: "load_query",
+        label: "View in Logs",
+        target: { query: "SELECT 1", sql_mode: true, from: 1, to: 2, stream: ["default"] },
+      };
+
+      it("keeps the working indicator until the turn really ends", async () => {
+        const gate = gatedResponse();
+        mockFetchAiChat.mockResolvedValueOnce(gate.response);
+        vm.inputMessage = "first question";
+        const turn = vm.sendMessage();
+        await flushPromises();
+
+        gate.push(sse({ type: "tool_call", tool: "A", message: "a", call_id: "c1" }));
+        await flushPromises();
+
+        await vm.handleNavigationAction(action);
+        await flushPromises();
+        expect(vm.isLoading).toBe(true);
+
+        gate.close();
+        await turn;
+        expect(vm.isLoading).toBe(false);
+      });
+
+      it("leaves a finished turn alone", async () => {
+        await stream(vm, [sse({ type: "message_delta", content: "done" })]);
+
+        await vm.handleNavigationAction(action);
+        await flushPromises();
+
+        expect(vm.isLoading).toBe(false);
+      });
+
+      it("still lets Stop abort the turn after a navigation click", async () => {
+        const gate = gatedResponse();
+        mockFetchAiChat.mockResolvedValueOnce(gate.response);
+        vm.inputMessage = "first question";
+        const turn = vm.sendMessage();
+        await flushPromises();
+
+        gate.push(sse({ type: "tool_call", tool: "A", message: "a", call_id: "c1" }));
+        await flushPromises();
+        await vm.handleNavigationAction(action);
+        await flushPromises();
+
+        await vm.cancelCurrentRequest();
+        await flushPromises();
+
+        expect(vm.isLoading).toBe(false);
+        expect(mockFetchAiChat.mock.calls.at(-1)[3].aborted).toBe(true);
+
+        gate.close();
+        await turn;
+      });
+    });
+
     it("stores navAction on pendingConfirmation so confirming can navigate", async () => {
       vm.isAutoNavigationEnabled = false;
       await stream(vm, [navFrame]);

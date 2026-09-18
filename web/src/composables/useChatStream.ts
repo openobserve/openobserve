@@ -670,9 +670,7 @@ export function useChatStream(options: UseChatStreamOptions) {
   ): NavigationAction | null => generateNavigation(toolName, callArgs, responseBody, t);
 
   const handleNavigationAction = async (action: NavigationAction) => {
-    // Detach before navigating so the route change can't abort the in-flight turn and its queued tool calls.
-    detachCurrentStream();
-
+    // No detach here: onUnmounted detaches without aborting, so a surviving instance keeps owning its turn and its indicator.
     const pageName = navigationPageName(action);
 
     const target = buildNavigationRoute(action, store.state.selectedOrganization.identifier);
@@ -747,19 +745,20 @@ export function useChatStream(options: UseChatStreamOptions) {
   };
 
   const runTurn = async (hasImages: boolean, messagesToSend: ImageAttachment[]) => {
-    isLoading.value = true;
-    currentStreamingMessage.value = "";
-    currentTextSegment.value = "";
-    resetTypewriterState();
-    startAnalyzingRotation();
-
     // Mint the session id before the try so every exit path's cleanup clears the SAME id, or a re-attached instance spins forever.
     if (!currentSessionId.value) {
       currentSessionId.value = getUUIDv7();
     }
     const streamSessionId = currentSessionId.value;
 
+    // Before isLoading: the registry watcher clears a spinner whose session has no live turn.
     sessionStreamingState[streamSessionId] = true;
+
+    isLoading.value = true;
+    currentStreamingMessage.value = "";
+    currentTextSegment.value = "";
+    resetTypewriterState();
+    startAnalyzingRotation();
 
     currentAbortController.value = new AbortController();
     // Captured now: a detach during the request nulls currentAbortController, but cleanup still needs this turn's controller.
@@ -876,8 +875,9 @@ export function useChatStream(options: UseChatStreamOptions) {
 
         // The streaming registry must follow the new id, or a re-attaching instance never sees this stream finish.
         const restoredSessionId = getUUIDv7();
-        currentSessionId.value = restoredSessionId;
+        // Marked before the id is published, or the registry watcher sees a session with no live turn and clears the spinner.
         sessionStreamingState[restoredSessionId] = true;
+        currentSessionId.value = restoredSessionId;
 
         const retry: any = await fetchAiChat(
           chatMessages.value,
@@ -1008,10 +1008,15 @@ export function useChatStream(options: UseChatStreamOptions) {
   });
 
   watch(
-    () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
-    (isStreaming) => {
-      // React to false, not true->false: a mid-stream re-attach never saw `true`, so it would skip cleanup and spin forever.
-      if (isStreaming === false && isLoading.value) {
+    () => [
+      currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined,
+      isLoading.value,
+    ],
+    ([isStreaming]) => {
+      // Only judge a named session: without one there is no turn to look up, and runTurn names it before raising the spinner.
+      if (!currentSessionId.value) return;
+      // Anything but `true` means no live turn owns this session, so a spinner here is stranded whatever stripped the controller.
+      if (isStreaming !== true && isLoading.value) {
         isLoading.value = false;
         activeToolCall.value = null;
         stopAnalyzingRotation();

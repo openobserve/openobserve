@@ -1001,6 +1001,62 @@ describe("O2AIChat session, persistence and lifecycle", () => {
       second.unmount();
     });
 
+    // A turn can lose its controller without clearing the flag, which stranded the spinner forever.
+    it("clears a spinner left behind for a session with no live turn", async () => {
+      mockLoadChat.mockResolvedValue({
+        id: 7,
+        sessionId: "no-live-turn",
+        title: "T",
+        messages: [],
+      });
+      await vm.loadChat(7);
+      await flushPromises();
+
+      vm.isLoading = true;
+      await flushPromises();
+
+      expect(vm.isLoading).toBe(false);
+    });
+
+    it("leaves the spinner alone while the session really is streaming", async () => {
+      const { gate } = await openTurn(vm);
+      await flushPromises();
+
+      expect(vm.isLoading).toBe(true);
+
+      gate.close();
+      await flushPromises();
+      expect(vm.isLoading).toBe(false);
+    });
+
+    // Home tab: click a navigation link mid-turn, land on another page, open the chat there.
+    it("a re-attached instance clears its spinner after a navigation detach unmounted the owner", async () => {
+      const { gate } = await openTurn(vm);
+      await vm.handleNavigationAction({
+        resource_type: "logs",
+        action: "load_query",
+        label: "View in Logs",
+        target: { query: "SELECT 1", sql_mode: true, from: 1, to: 2, stream: ["default"] },
+      });
+      await flushPromises();
+      wrapper?.unmount();
+      wrapper = null;
+
+      const second = mountO2AIChat({ isOpen: true });
+      const vm2: any = second.vm;
+      mockLoadChat.mockResolvedValue({ id: 42, sessionId: "uuid-1", title: "T", messages: [] });
+      await vm2.loadChat(42);
+      await flushPromises();
+      expect(vm2.isLoading).toBe(true);
+
+      gate.close();
+      await flushPromises();
+      await flushPromises();
+
+      expect(vm2.isLoading).toBe(false);
+      second.unmount();
+    });
+
     it("the detached turn keeps writing into its own array, not the new session", async () => {
       const { gate } = await openTurn(vm);
       vm.addNewChat();
