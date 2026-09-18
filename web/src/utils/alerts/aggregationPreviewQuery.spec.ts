@@ -147,9 +147,7 @@ describe("buildCountChartQuery", () => {
   });
 
   it("does not mistake a block comment's 'from' for the statement's real FROM", () => {
-    const chartQuery = buildCountChartQuery(
-      'SELECT _timestamp /* from here */ FROM "bugtest"',
-    );
+    const chartQuery = buildCountChartQuery('SELECT _timestamp /* from here */ FROM "bugtest"');
 
     expect(chartQuery).toBe(
       'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
@@ -182,7 +180,7 @@ describe("buildCountChartQuery", () => {
 
   it("still ignores a quoted filter value containing a real comment marker", () => {
     const chartQuery = buildCountChartQuery(
-      'SELECT _timestamp FROM "bugtest" WHERE (note = \'-- not a comment\')',
+      "SELECT _timestamp FROM \"bugtest\" WHERE (note = '-- not a comment')",
     );
 
     expect(chartQuery).toContain("WHERE (note = '-- not a comment')");
