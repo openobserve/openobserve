@@ -18042,6 +18042,7 @@
     "target_rotation_all": "جميع أعضاء {rotation}",
     "target_rotation_deleted": "تناوب لم يعد الفريق يمتلكه",
     "target_rotation_legacy": "المناوب",
+    "target_unrecognized": "هدف لا تتعرف عليه هذه الشاشة",
     "ladderPoolEveryone": "جميع أعضاء {rotation}",
     "target_user": "شخص محدد",
     "target_whole_team": "الفريق بأكمله",

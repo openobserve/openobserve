@@ -18042,6 +18042,7 @@
     "target_rotation_all": "Iedereen in {rotation}",
     "target_rotation_deleted": "Een rotatie die dit team niet meer heeft",
     "target_rotation_legacy": "Wie er dienst heeft",
+    "target_unrecognized": "Een doel dat dit scherm niet herkent",
     "ladderPoolEveryone": "iedereen in {rotation}",
     "target_user": "Een specifieke persoon",
     "target_whole_team": "Het hele team",

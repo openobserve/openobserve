@@ -18042,6 +18042,7 @@
     "target_rotation_all": "Tous les membres de {rotation}",
     "target_rotation_deleted": "Une rotation que cette équipe n'a plus",
     "target_rotation_legacy": "Toute personne en astreinte",
+    "target_unrecognized": "Une cible que cet écran ne reconnaît pas",
     "ladderPoolEveryone": "tous les membres de {rotation}",
     "target_user": "Une personne spécifique",
     "target_whole_team": "Toute l'équipe",
