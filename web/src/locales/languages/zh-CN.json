@@ -17870,6 +17870,7 @@
     "target_rotation_all": "{rotation} 中的所有人员",
     "target_rotation_deleted": "该团队已不再拥有的轮班",
     "target_rotation_legacy": "当前值班的人",
+    "target_unrecognized": "此界面无法识别的目标",
     "ladderPoolEveryone": "{rotation} 中的所有人员",
     "target_user": "特定人员",
     "target_whole_team": "整个团队",

@@ -17870,6 +17870,7 @@
     "target_rotation_all": "Alle in {rotation}",
     "target_rotation_deleted": "Eine Rotation, die dieses Team nicht mehr hat",
     "target_rotation_legacy": "Wer Bereitschaft hat",
+    "target_unrecognized": "Ein Ziel, das dieser Bildschirm nicht erkennt",
     "ladderPoolEveryone": "alle in {rotation}",
     "target_user": "Eine bestimmte Person",
     "target_whole_team": "Das gesamte Team",

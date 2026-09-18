@@ -242,6 +242,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { updateRoleMutation } from "@/services/iam.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { resourcesQuery } from "@/services/iam.queries";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { computed, defineAsyncComponent, nextTick, ref, watch, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
@@ -269,12 +276,10 @@ import {
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import { updateRole, getResources, getAllRolePermissions, getRoleUsers } from "@/services/iam";
+import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
-import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
 import savedviewsService from "@/services/saved_views";
@@ -294,6 +299,7 @@ import workflowService from "@/services/workflows";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import onlineEvalsService from "@/services/online-evals.service";
+
 import llmQueuesService from "@/services/llm-queues.service";
 import llmDatasetsService from "@/services/llm-datasets.service";
 import {
@@ -835,6 +841,9 @@ const applyPreset = async (presetId: string) => {
   else if (presetId === "k8s") await seedK8sViewerPreset();
 };
 
+const orgId = useOrgId();
+const updateRoleOne = useMutation(() => updateRoleMutation(orgId.value));
+
 const updateActiveTab = (tab: string) => {
   if (!tab) return;
   activeTab.value = tab;
@@ -843,9 +852,10 @@ const updateActiveTab = (tab: string) => {
 const getRoleDetails = () => {
   isFetchingInitialRoles.value = true;
 
-  getResources(store.state.selectedOrganization.identifier)
-    .then(async (res) => {
-      permissionsState.resources = res.data
+  queryClient
+    .fetchQuery(resourcesQuery(store.state.selectedOrganization.identifier))
+    .then(async (res: any) => {
+      permissionsState.resources = res
         .sort((a: any, b: any) => a.order - b.order)
         .filter((resource: any) => resource.visible);
 
@@ -1924,12 +1934,11 @@ const getFunctions = async () => {
 };
 
 const getDestinations = async () => {
-  const destinations = await destinationService.list({
-    sort_by: "name",
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const destinations = await queryClient.fetchQuery(
+    destinationsQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("destination", ["name"], [...destinations.data]);
+  updateResourceEntities("destination", ["name"], [...destinations]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1937,11 +1946,11 @@ const getDestinations = async () => {
 };
 
 const getTemplates = async () => {
-  const templates = await templateService.list({
-    org_identifier: store.state.selectedOrganization.identifier,
-  });
+  const templates = await queryClient.fetchQuery(
+    templatesQuery(store.state.selectedOrganization.identifier),
+  );
 
-  updateResourceEntities("template", ["name"], [...templates.data]);
+  updateResourceEntities("template", ["name"], [...templates]);
 
   return new Promise((resolve) => {
     resolve(true);
@@ -2541,11 +2550,9 @@ const saveRole = () => {
     return;
   }
 
-  updateRole({
-    role_id: editingRole.value,
-    org_identifier: store.state.selectedOrganization.identifier,
-    payload,
-  })
+  // Was: invalidate, then update — the refetch raced the write.
+  updateRoleOne
+    .mutateAsync({ role_id: editingRole.value, payload })
     .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 

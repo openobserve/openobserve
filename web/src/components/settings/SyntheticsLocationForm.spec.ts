@@ -27,7 +27,10 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/utils/zincutils", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which pulls other
+// zincutils exports — a wholesale mock leaves them undefined at import time.
+vi.mock("@/utils/zincutils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/utils/zincutils")>()),
   getImageURL: vi.fn((path) => path),
 }));
 
@@ -35,12 +38,15 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    createLocation: vi.fn(),
-    updateLocation: vi.fn(),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      createLocation: vi.fn(),
+      updateLocation: vi.fn(),
+    },
+  });
+});
 
 import syntheticsService from "@/services/synthetics";
 

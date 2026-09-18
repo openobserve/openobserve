@@ -17870,6 +17870,7 @@
     "target_rotation_all": "Mọi người trong {rotation}",
     "target_rotation_deleted": "Một vòng trực mà nhóm này không còn nữa",
     "target_rotation_legacy": "Bất kỳ ai đang trực",
+    "target_unrecognized": "Một mục tiêu mà màn hình này không nhận diện được",
     "ladderPoolEveryone": "mọi người trong {rotation}",
     "target_user": "Một người cụ thể",
     "target_whole_team": "Cả nhóm",

@@ -229,6 +229,12 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import {
+  activateRemoteTaskSigningMutation,
+  endRemoteTaskSigningGraceMutation,
+  rotateRemoteTaskSigningMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import remoteTasksService, {
   type RemoteTaskCredentialMetadata,
 } from "@/services/remote-tasks.service";
@@ -295,6 +301,11 @@ function reportError(error: any, fallback: I18nText) {
   toast({ variant: "error", message: raw(error?.response?.data?.message) || fallback });
 }
 
+// `refresh` only re-reads the signing status; the task's cached row carries that state too, which the mutations drop.
+const rotateSigning = useMutation(() => rotateRemoteTaskSigningMutation(props.orgId));
+const activateSigning = useMutation(() => activateRemoteTaskSigningMutation(props.orgId));
+const endSigningGrace = useMutation(() => endRemoteTaskSigningGraceMutation(props.orgId));
+
 async function refresh() {
   if (!props.enabled || !props.orgId || !props.entityId) return;
   try {
@@ -310,11 +321,10 @@ async function rotate() {
   busy.value = "rotate";
   try {
     const keyId = newKeyId.value.trim();
-    const written = await remoteTasksService.rotateSigning(
-      props.orgId,
-      props.entityId,
-      keyId ? { keyId } : {},
-    );
+    const written = await rotateSigning.mutateAsync({
+      entityId: props.entityId,
+      payload: keyId ? { keyId } : {},
+    });
     if (written.material.type === "token") {
       candidateKeyId.value = written.metadata.keyId ?? "";
       candidateKey.value = written.material.value;
@@ -358,11 +368,10 @@ async function testCandidate() {
 async function activate() {
   busy.value = "activate";
   try {
-    await remoteTasksService.activateSigning(
-      props.orgId,
-      props.entityId,
-      graceHours.value * HOUR_MS,
-    );
+    await activateSigning.mutateAsync({
+      entityId: props.entityId,
+      graceMs: graceHours.value * HOUR_MS,
+    });
     candidateVerified.value = false;
     testMessage.value = null;
     toast({
@@ -387,7 +396,7 @@ async function endGrace() {
   if (!ok) return;
   busy.value = "endGrace";
   try {
-    await remoteTasksService.endSigningGrace(props.orgId, props.entityId);
+    await endSigningGrace.mutateAsync(props.entityId);
     toast({
       variant: "success",
       message: t("aiObservability.remoteTasks.signingPanel.endGraceSuccess"),
