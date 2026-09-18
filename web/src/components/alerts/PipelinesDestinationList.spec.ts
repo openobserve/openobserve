@@ -575,4 +575,33 @@ describe("PipelinesDestinationList", () => {
       expect((wrapper.vm as any).destinations).toHaveLength(2);
     });
   });
+
+  // ── editor lifecycle ───────────────────────────────────────────────────────
+
+  describe("after saving from the editor", () => {
+    it("leaves the editor closed and re-reads the list from the server", async () => {
+      // The page's own route is registered lazily in the app; the component pushes to it by name.
+      if (!(router as any).hasRoute("pipelineDestinations")) {
+        (router as any).addRoute({
+          name: "pipelineDestinations",
+          path: "/settings/pipeline_destinations",
+          component: { template: "<div />" },
+        });
+      }
+      // The editor is reached with `?action=add`, which `updateRoute()` reopens from.
+      (router as any).currentRoute.value.query = { action: "add" };
+      wrapper = mountComponent();
+      await flushPromises();
+      expect((wrapper.vm as any).showDestinationEditor).toBe(true);
+
+      (destinationService.list as any).mockClear();
+      await (wrapper.vm as any).handleDestinationCreated("destination-new");
+      await flushPromises();
+
+      // A warm list reads the route synchronously, so the query must be gone first.
+      expect((wrapper.vm as any).showDestinationEditor).toBe(false);
+      // Forced: creating a destination does not expire the cached scope.
+      expect(destinationService.list).toHaveBeenCalled();
+    });
+  });
 });

@@ -527,20 +527,24 @@ export default defineComponent({
       confirmDelete.value.visible = false;
       confirmDelete.value.data = null;
     };
+    // Returns the navigation so callers can await it: `updateRoute()` reopens the
+    // editor while `?action=` is still on the URL, and a warm list reads it synchronously.
     const toggleDestinationEditor = () => {
       showDestinationEditor.value = !showDestinationEditor.value;
       if (!showDestinationEditor.value)
-        router.push({
+        return router.push({
           name: "pipelineDestinations",
           query: {
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
+      return Promise.resolve();
     };
 
-    const handleDestinationCreated = (destinationName: string) => {
-      toggleDestinationEditor();
-      getDestinations();
+    const handleDestinationCreated = async (destinationName: string) => {
+      await toggleDestinationEditor();
+      // Forced: the create does not expire this scope, so a cached read would drop the new row.
+      getDestinations(true);
 
       toast({
         variant: "success",
@@ -550,9 +554,10 @@ export default defineComponent({
       });
     };
 
-    const handleDestinationUpdated = (destinationName: string) => {
-      toggleDestinationEditor();
-      getDestinations();
+    const handleDestinationUpdated = async (destinationName: string) => {
+      await toggleDestinationEditor();
+      // Forced: the update does not expire this scope, so a cached read would show the old row.
+      getDestinations(true);
 
       toast({
         variant: "success",
