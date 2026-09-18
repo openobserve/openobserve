@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Callable
 from typing import Any
 
 import requests
@@ -95,6 +96,21 @@ def fast_eval(alert: dict, stream: str) -> dict:
     alert["trigger_condition"]["period"] = 5
     alert["trigger_condition"]["silence"] = 1
     return alert
+
+
+def pending_silence_alert(name: str, stream: str, *, pending_sec: int, silence_min: int, period_min: int = 5) -> dict:
+    """A single-level scheduled alert with an explicit pending ('for') window and a
+    silence far longer than it, so arming silence during pending is observable (#14556):
+    the fix keeps evaluating and fires at ~pending_sec, the bug defers to ~silence_min."""
+    a = simple_alert(name)
+    a["stream_name"] = stream
+    a["trigger_condition"]["frequency"] = 1
+    a["trigger_condition"]["period"] = period_min
+    a["trigger_condition"]["threshold"] = 1
+    a["trigger_condition"]["silence"] = silence_min
+    a["trigger_condition"]["align_time"] = False
+    a["pending_period_sec"] = pending_sec
+    return a
 
 
 class AlertsClient:
@@ -230,6 +246,43 @@ class AlertsClient:
             return wait_until(_check, timeout=timeout_s, interval=poll_s, msg=f"alert {name} level={level}")
         except AssertionError:
             return last["item"]
+
+    def track_last_outcome(
+        self,
+        name: str,
+        stop: Callable[[Any], bool],
+        timeout_s: float,
+        poll_s: float = 5,
+        on_poll: Callable[[], None] | None = None,
+    ) -> tuple[dict | None, float, list]:
+        """Poll the alert list until stop(last_outcome) or timeout, returning the last
+        item seen, elapsed seconds, and the de-duplicated sequence of last_outcome
+        values observed (so a test can assert both what it reached and the path there).
+        on_poll (if given) runs each cycle — e.g. to keep feeding the stream so the
+        condition stays true while waiting for a transition.
+
+        Mirrors `wait_for_alert_outcome`: built on `wait_until`, swallowing the
+        timeout so the caller can assert on the returned path even when `stop`
+        was never reached."""
+        last = {"item": None}
+        seen: list = []
+
+        def _check():
+            if on_poll is not None:
+                on_poll()
+            item = next((a for a in self.list_alerts() if a.get("name") == name), None)
+            last["item"] = item
+            outcome = item.get("last_outcome") if item else None
+            if not seen or seen[-1] != outcome:
+                seen.append(outcome)
+            return item if (item and stop(outcome)) else None
+
+        start = time.monotonic()
+        try:
+            wait_until(_check, timeout=timeout_s, interval=poll_s, msg=f"alert {name} outcome path")
+        except AssertionError:
+            pass
+        return last["item"], time.monotonic() - start, seen
 
 
 def is_firing_outcome(outcome: Any) -> bool:
