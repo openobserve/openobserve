@@ -16,9 +16,10 @@
  * snooze either claims the record (so nobody else picks it up and nobody is
  * working it) or releases every pending rung the instant it ends (so the whole
  * team is woken at once). Both have shipped in real pagers. The fast half of
- * TS-17.01 pins the first; the second needs a full 15-minute window — the
- * shortest duration the menu offers — so it is a separate `@slow` test,
- * excluded from the CI lane the way the plan excludes TS-10.07.
+ * TS-17.01 pins the first; the second has to outlive a real snooze window, so
+ * it lives in `oncall-snooze-lapse.spec.js` — the snooze API's floor is one
+ * minute (the 15-minute floor is the menu's), which lets that test run a
+ * 2-minute snooze over a 40-second ladder inside the CI lane.
  *
  * WHAT IS DELIBERATELY *NOT* ASSERTED HERE:
  *   - That handing off to an UNSTAFFED team is refused. Verified on this build,

@@ -26,6 +26,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { observeUntil } = require('../../playwright-tests/utils/oncall-settle.js');
 
 /** URL segment -> the tab's internal name, which is what the data-test carries. */
 const URL_TAB_NAME = {
@@ -493,7 +494,9 @@ export class OnCallTeamDetailPage {
     this.page.on('request', watch);
     try {
       if (!disabled) await apply.click();
-      await this.page.waitForTimeout(settleMs);
+      // Whether a request fires at all IS the observation here — Apply is enabled but
+      // issues none on this build — so poll and report, never assert.
+      await observeUntil(this.page, async () => requestSeen, { timeout: settleMs });
     } finally {
       this.page.off('request', watch);
     }

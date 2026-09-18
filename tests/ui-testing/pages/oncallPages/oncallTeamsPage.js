@@ -18,6 +18,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { settleRows } = require('../../playwright-tests/utils/oncall-settle.js');
 const { getAuthHeaders, getOrgIdentifier: orgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 function baseUrl() {
@@ -158,8 +159,9 @@ export class OnCallTeamsPage {
     const field = this.page.locator(`${this.locators.search} [data-test$="-field"]`).first();
     await field.waitFor({ state: 'visible', timeout: 15000 });
     await field.fill(text);
-    // Client-side filter, debounced; let it settle rather than racing the assertion.
-    await this.page.waitForTimeout(600);
+    // `filteredTeams` is a plain computed over `search` — no debounce and no refetch —
+    // so the only thing to wait out is the repaint it triggers.
+    await settleRows(this.page);
   }
 
   async openCreateDrawer() {
@@ -221,7 +223,6 @@ export class OnCallTeamsPage {
       const search = this.page.locator(part(fieldSelector, 'search')).first();
       await search.waitFor({ state: 'visible', timeout: 15000 });
       await search.fill(searchTerm);
-      await this.page.waitForTimeout(300);
     }
 
     const option = this.page

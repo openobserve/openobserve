@@ -22,6 +22,13 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { settleRows } = require('../../playwright-tests/utils/oncall-settle.js');
+
+/** Rules and signals are plain rows, not an OTable, so each tab has its own hook. */
+const ROUTING_ROWS = {
+  rules: '[data-test^="oncall-routing-row-"]',
+  signals: '[data-test^="oncall-routing-signal-"]',
+};
 
 /**
  * `[data-test="x"]` + `field` -> `[data-test="x-field"]`.
@@ -231,7 +238,9 @@ export class OnCallRoutingPage {
     await tab.waitFor({ state: 'visible', timeout: 20000 });
     await tab.click();
     await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    await this.page.waitForTimeout(400);
+    // Routing does NOT use OTable, so the shared default row hook matches nothing
+    // here and would settle instantly on an empty sample — pass this screen's own.
+    await settleRows(this.page, { rowSelector: ROUTING_ROWS[key] });
   }
 
   // ------------------------------------------------------------------- actions
@@ -386,7 +395,7 @@ export class OnCallRoutingPage {
     await item.waitFor({ state: 'visible', timeout: 20000 });
     await item.click();
     await expect(item).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    await this.page.waitForTimeout(400);
+    await settleRows(this.page, { rowSelector: ROUTING_ROWS.signals });
   }
 
   // ------------------------------------------------------------------ reading

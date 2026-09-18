@@ -56,8 +56,8 @@ const PREFIX = 'e2e_oncall_snoozelapse';
 
 const workerPrefix = (testInfo) => `${PREFIX}_w${testInfo.workerIndex}`;
 
-/** The shortest duration the snooze menu offers. There is nothing quicker. */
-const SHORTEST_SNOOZE_MINUTES = 15;
+/** Must outlast every rung of the shortened ladder: a snooze that lapses before the last rung leaves nothing held, and the one-instant-per-rung assertion below would then pass on a single rung. */
+const SNOOZE_MINUTES = 2;
 
 const gate = { checked: false, available: false, reason: '' };
 
@@ -112,18 +112,17 @@ test.describe('On-call snooze expiry', {
   test('a lapsed snooze resumes the ladder instead of consuming it', {
     tag: ['@P0', '@slow'],
   }, async ({ page }, testInfo) => {
-    test.setTimeout(20 * 60 * 1000);
-    const f = await seedOpenPage(page, testInfo, 'snoozelapse', { delaysSeconds: [0, 45, 90] });
+    test.setTimeout(10 * 60 * 1000);
+    const f = await seedOpenPage(page, testInfo, 'snoozelapse', { delaysSeconds: [0, 20, 40] });
     const id = f.record.id;
 
     const before = await getDeliveries(page, id);
-    await snoozeResponse(page, id, SHORTEST_SNOOZE_MINUTES);
+    await snoozeResponse(page, id, SNOOZE_MINUTES);
     const snoozedUntil = (await getResponseRecord(page, id)).snoozed_until;
     expect(snoozedUntil, 'the snooze must be on the record before its expiry can be watched').toBeTruthy();
 
-    // Sleep past the end of the snooze plus two of the shortened rung delays,
-    // so a ladder that resumes has had time to actually fire.
-    await page.waitForTimeout((SHORTEST_SNOOZE_MINUTES * 60 + 180) * 1000);
+    // Sleep past the snooze, then leave room for every held rung to fire at its own instant.
+    await page.waitForTimeout((SNOOZE_MINUTES * 60 + 120) * 1000);
 
     const after = await getDeliveries(page, id);
     const progress = await getEscalationProgress(page, id);
@@ -144,8 +143,7 @@ test.describe('On-call snooze expiry', {
         .toBeGreaterThanOrEqual(snoozedUntil);
     }
 
-    // And not all at once. Rungs are 45 seconds apart in this ladder, so two
-    // different rungs landing at the same second is the burst this case is for.
+    // Rungs are 20s apart here, so two of them landing on the same second is the burst this case exists to catch.
     const byRung = new Map();
     for (const row of laterRungs) {
       const second = Math.round(row.at / 1_000_000);

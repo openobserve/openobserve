@@ -25,6 +25,7 @@
 
 import { expect } from '@playwright/test';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { settleRows, observeUntil } = require('../../playwright-tests/utils/oncall-settle.js');
 
 /** The sections, in the order the table lays them out. */
 const SECTION_ORDER = ['ringing', 'snoozed', 'handled', 'resolved'];
@@ -205,7 +206,7 @@ export class OnCallPagesListPage {
     await tab.waitFor({ state: 'visible', timeout: 20000 });
     await tab.click();
     await expect(tab).toHaveAttribute('data-state', 'on', { timeout: 15000 });
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   /**
@@ -241,7 +242,7 @@ export class OnCallPagesListPage {
     await option.waitFor({ state: 'visible', timeout: 20000 });
     await option.scrollIntoViewIfNeeded();
     await option.click();
-    await this.page.waitForTimeout(500);
+    await this._settleList();
   }
 
   async filterByTeam(teamId) {
@@ -261,11 +262,12 @@ export class OnCallPagesListPage {
     await this._selectFilter(this.locators.causeFilter, cause);
   }
 
+  /** Client-side: `search` feeds the `scopedResponses` computed directly, so there is no debounce and no refetch to outwait — only Vue's next flush. */
   async search(text) {
     const field = this.page.locator(`${this.locators.search} [data-test$="-field"]`).first();
     await field.waitFor({ state: 'visible', timeout: 15000 });
     await field.fill(text);
-    await this.page.waitForTimeout(600);
+    await this._settleList();
   }
 
   /**
@@ -291,7 +293,7 @@ export class OnCallPagesListPage {
     const before = await control.getAttribute('data-state');
     await control.click();
     await expect(control).not.toHaveAttribute('data-state', before ?? '', { timeout: 15000 });
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   /** Narrow to pages the signed-in user is on the hook for. Hidden when the viewer is unknown. */
@@ -307,22 +309,22 @@ export class OnCallPagesListPage {
 
   async goToNextPage() {
     await this.page.locator(this.locators.nextPage).click();
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   async goToPrevPage() {
     await this.page.locator(this.locators.prevPage).click();
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   async goToFirstPage() {
     await this.page.locator(this.locators.firstPage).click();
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   async goToLastPage() {
     await this.page.locator(this.locators.lastPage).click();
-    await this.page.waitForTimeout(400);
+    await this._settleList();
   }
 
   /** The pagination strip's own sentence, verbatim. Never reconstruct it. */
@@ -469,8 +471,19 @@ export class OnCallPagesListPage {
   async clickRowExpand(index = null, { rowKey = null, settleMs = 1200 } = {}) {
     const target = index ?? (await this.readRowIndices())[0];
     const before = this.page.url();
+    const expansion = rowKey
+      ? this.page.locator(this.rowExpansion(rowKey))
+      : this.page.locator('[data-test^="oncall-expansion-"]');
     await this.page.locator(this.expandControl(target)).click();
-    await this.page.waitForTimeout(settleMs);
+    // Deliberately a poll and NOT an assertion: "neither happened" is one of the
+    // three answers this method reports, so it must return it rather than throw.
+    // Whichever the build does is observed as soon as it happens; a build that
+    // does neither still waits out the full window before that becomes the answer.
+    await observeUntil(
+      this.page,
+      async () => this.page.url() !== before || (await expansion.count()) > 0,
+      { timeout: settleMs },
+    );
     const url = this.page.url();
 
     const expandedInline = rowKey
@@ -502,6 +515,12 @@ export class OnCallPagesListPage {
     const node = this.page.locator(this.locators.bulkCount);
     if ((await node.count()) === 0) return null;
     return ((await node.first().textContent()) ?? '').trim();
+  }
+
+  /** Guard first: a row count means nothing until the screen has drawn a table or the setup checklist. */
+  async _settleList(options = {}) {
+    await this.expectScreenSettled();
+    await settleRows(this.page, options);
   }
 
   // ---------------------------------------------------------------- assertions
