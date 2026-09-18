@@ -2,7 +2,12 @@
 Report folders API — openobserve#11219.
 
 Folders existed in the DB but the API hardcoded "default". The v2 surface now
-offers folder CRUD plus a bulk move, mirroring alerts and dashboards.
+offers folder CRUD, create-into-folder and a bulk move, mirroring alerts and
+dashboards.
+
+Folders are a v2-only feature: the v1 routes still pass DEFAULT_FOLDER for every
+operation and ignore `?folder=`, so these tests use v2 throughout, as the UI does
+(`reports.queries.ts` calls createReportV2).
 
 Every contract below was probed against a live deployment before the assertions
 were written. Three things are not guessable from the issue:
@@ -17,8 +22,6 @@ were written. Three things are not guessable from the issue:
 import logging
 import os
 import time
-
-import pytest
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -63,7 +66,7 @@ def _create_dashboard(session, base_url, title):
 def _create_report(session, base_url, name, dashboard_id, folder_id=None):
     suffix = f"?folder={folder_id}" if folder_id else ""
     return session.post(
-        f"{base_url}api/{ORG_ID}/reports{suffix}",
+        f"{base_url}api/v2/{ORG_ID}/reports{suffix}",
         json={
             "name": name,
             "title": "pytest 11219",
@@ -204,16 +207,10 @@ class TestReportFolders:
             if dst_id:
                 _delete_folder(session, base_url, dst_id)
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="#11219: POST /reports?folder=<id> ignores the folder and files the report "
-               "under 'default' — the hardcoding the issue was raised about. XPASSes once "
-               "create honours the folder.",
-    )
     def test_report_create_honours_the_folder_parameter(
         self, create_session, base_url, random_string
     ):
-        """Asserts the DESIRED behaviour, marked xfail so the suite flips green on the fix."""
+        """Creating straight into a folder, rather than creating then moving."""
         session = create_session
         suffix = random_string(6).lower()
         report_name = f"pytest_11219_cf_{suffix}"
