@@ -2867,6 +2867,12 @@ pub struct Compact {
     pub sync_to_db_interval: u64,
     #[env_config(name = "ZO_COMPACT_MAX_FILE_SIZE", default = 2048)] // MB
     pub max_file_size: usize,
+    #[env_config(
+        name = "ZO_COMPACT_PARQUET_OUTPUT",
+        default = "disk",
+        help = "Where a logs/traces compaction builds its merged Parquet file: `disk` streams each finished row group to a temp file under ZO_DATA_TMP_DIR and reads it back only for the upload; `memory` buffers the whole file in a Vec<u8>, which costs the file size in RAM per running merge."
+    )]
+    pub parquet_output: String,
     #[env_config(name = "ZO_COMPACT_EXTENDED_DATA_RETENTION_DAYS", default = 3650)] // days
     pub extended_data_retention_days: i64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_STREAMS", default = "")] // use comma to split

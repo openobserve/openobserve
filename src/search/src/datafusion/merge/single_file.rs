@@ -30,7 +30,7 @@ use vortex::{
     io::session::RuntimeSessionExt, session::VortexSession,
 };
 
-use super::{MergeMode, MergeOutput, MergedFile, append_metadata};
+use super::{MergeMode, MergeOutput, MergedFile, ParquetOutput, append_metadata, new_temp_file};
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 pub(super) async fn write(
@@ -43,6 +43,22 @@ pub(super) async fn write(
     read_task: tokio::task::JoinHandle<Result<()>>,
 ) -> Result<Vec<MergedFile>> {
     let buf = match output.file_format {
+        // hash-sorted metrics stay buffered: the ingester consumes them in memory
+        FileFormat::Parquet
+            if output.parquet_output == ParquetOutput::Disk
+                && !matches!(mode, MergeMode::MetricsHashSorted) =>
+        {
+            let (data_path, meta) = write_parquet_to_disk(
+                &schema,
+                bloom_filter_fields,
+                &metadata,
+                output.parquet_compression,
+                &mut rx,
+                read_task,
+            )
+            .await?;
+            return Ok(vec![MergedFile::StandardFile { data_path, meta }]);
+        }
         FileFormat::Parquet => {
             write_parquet(
                 &schema,
@@ -106,6 +122,47 @@ async fn write_parquet(
     Ok(buf)
 }
 
+/// Each finished row group goes to a temp file, so peak memory no longer scales with the
+/// output file; the caller reads the file back only when it uploads it.
+async fn write_parquet_to_disk(
+    schema: &Arc<Schema>,
+    bloom_filter_fields: &[String],
+    metadata: &FileMeta,
+    compression: Option<&str>,
+    rx: &mut tokio::sync::mpsc::Receiver<RecordBatch>,
+    read_task: tokio::task::JoinHandle<Result<()>>,
+) -> Result<(tempfile::TempPath, FileMeta)> {
+    let (file, data_path) = new_temp_file()?;
+    let mut writer = new_parquet_writer(
+        file,
+        schema,
+        bloom_filter_fields,
+        metadata,
+        false,
+        compression,
+    );
+
+    let mut new_file_meta = metadata.clone();
+    new_file_meta.records = 0;
+    while let Some(batch) = rx.recv().await {
+        new_file_meta.records += batch.num_rows() as i64;
+        if let Err(e) = writer.write(&batch).await {
+            log::error!("merge_parquet_files write error: {e}");
+            return Err(e.into());
+        }
+    }
+
+    read_task
+        .await
+        .map_err(|e| DataFusionError::External(Box::new(e)))??;
+    append_metadata(&mut writer, &new_file_meta)?;
+    writer.finish().await?;
+    let file = writer.into_inner();
+    new_file_meta.compressed_size = file.metadata().await?.len() as i64;
+    drop(file);
+    Ok((data_path, new_file_meta))
+}
+
 async fn write_vortex(
     schema: Arc<Schema>,
     metadata: &FileMeta,
@@ -163,6 +220,56 @@ mod tests {
     use vortex::file::OpenOptionsSessionExt;
 
     use super::*;
+
+    #[tokio::test]
+    async fn write_parquet_to_disk_spools_file_and_meta() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("field1", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(Int64Array::from(vec![300, 200, 100])),
+                Arc::new(StringArray::from(vec!["a", "b", "c"])),
+            ],
+        )
+        .unwrap();
+        let metadata = FileMeta {
+            min_ts: 100,
+            max_ts: 300,
+            records: 0,
+            original_size: 1024,
+            ..Default::default()
+        };
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<RecordBatch>(2);
+        tx.send(batch.clone()).await.unwrap();
+        drop(tx);
+        let read_task = tokio::task::spawn(async { Ok(()) });
+
+        let (data_path, meta) =
+            write_parquet_to_disk(&schema, &[], &metadata, None, &mut rx, read_task)
+                .await
+                .unwrap();
+
+        let bytes = std::fs::read(&data_path).unwrap();
+        assert_eq!(meta.records, 3);
+        assert_eq!(meta.compressed_size, bytes.len() as i64);
+        let reader = parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
+            bytes::Bytes::from(bytes),
+        )
+        .unwrap();
+        let footer = reader
+            .metadata()
+            .file_metadata()
+            .key_value_metadata()
+            .unwrap();
+        let records = footer.iter().find(|kv| kv.key == "records").unwrap();
+        assert_eq!(records.value.as_deref(), Some("3"));
+        let read: Vec<RecordBatch> = reader.build().unwrap().map(|b| b.unwrap()).collect();
+        assert_eq!(read, vec![batch]);
+    }
 
     #[tokio::test]
     async fn test_write_vortex_carries_file_meta() {

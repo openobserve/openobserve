@@ -229,6 +229,26 @@ pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
+    /// Where a single merged Parquet file is built.
+    pub parquet_output: ParquetOutput,
+}
+
+/// Sink of a single-file Parquet merge, see `ZO_COMPACT_PARQUET_OUTPUT`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParquetOutput {
+    /// A temp file under `data_tmp_dir`, read back only for the upload.
+    Disk,
+    /// The whole file in a `Vec<u8>`.
+    Memory,
+}
+
+impl ParquetOutput {
+    fn from_config(value: &str) -> Self {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "memory" | "mem" | "vec" => Self::Memory,
+            _ => Self::Disk,
+        }
+    }
 }
 
 impl MergeOutput {
@@ -241,14 +261,17 @@ impl MergeOutput {
                 .common
                 .feature_ingester_none_compression
                 .then_some("none"),
+            parquet_output: ParquetOutput::Memory,
         }
     }
 
     /// Compactor: the configured format for the stream.
     pub fn for_compactor(stream_type: StreamType) -> Self {
+        let cfg = get_config();
         Self {
-            file_format: output_file_format(stream_type, false, get_config().common.file_format),
+            file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
+            parquet_output: ParquetOutput::from_config(&cfg.compact.parquet_output),
         }
     }
 }
@@ -307,6 +330,14 @@ mod tests {
             MergeMode::MetricsIndexed.output_sort_order(),
             FileSortOrder::HashTimestampAsc
         );
+    }
+
+    #[test]
+    fn parquet_output_from_config() {
+        assert_eq!(ParquetOutput::from_config("disk"), ParquetOutput::Disk);
+        assert_eq!(ParquetOutput::from_config("memory"), ParquetOutput::Memory);
+        assert_eq!(ParquetOutput::from_config(" Vec "), ParquetOutput::Memory);
+        assert_eq!(ParquetOutput::from_config("bogus"), ParquetOutput::Disk);
     }
 
     #[test]
