@@ -374,6 +374,7 @@ import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import TracesNoDataState from "@/plugins/traces/TracesNoDataState.vue";
 import TracesNoStreamState from "@/plugins/traces/TracesNoStreamState.vue";
 import { saveTracesStream, restoreTracesStream } from "@/utils/streamPersist";
+import { resolveTraceStream } from "@/utils/traces/streamSelection";
 import { useCorrelationFilters } from "@/composables/useCorrelationDefaultSlug";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -582,60 +583,34 @@ function loadStreamLists() {
   try {
     const queryParams = router.currentRoute.value.query;
     const previouslySelectedStream = searchObj.data.stream.selectedStream.value;
-    const persistedStream =
-      store.state.zoConfig?.auto_query_enabled && !queryParams.stream
-        ? restoreTracesStream(store.state.selectedOrganization.identifier)
-        : "";
-    searchObj.data.stream.streamLists = [];
-    if (searchObj.data.streamResults.list.length > 0) {
-      let selectedStreamItemObj = {};
-      let foundPriorityMatch = false;
-      searchObj.data.streamResults.list.map((item: any) => {
-        let itemObj = {
-          label: item.name,
-          value: item.name,
-        };
-        searchObj.data.stream.streamLists.push(itemObj);
+    const persistedStream = restoreTracesStream(store.state.selectedOrganization.identifier);
+    const streams = searchObj.data.streamResults.list;
+    searchObj.data.stream.streamLists = streams.map((item: any) => ({
+      label: item.name,
+      value: item.name,
+    }));
 
-        if (queryParams.stream === item.name) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          previouslySelectedStream === item.name
-        ) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        } else if (
-          !foundPriorityMatch &&
-          !queryParams.stream &&
-          !previouslySelectedStream &&
-          persistedStream === item.name
-        ) {
-          selectedStreamItemObj = itemObj;
-          foundPriorityMatch = true;
-        }
-      });
+    const selectedStream = resolveTraceStream(streams, [
+      typeof queryParams.stream === "string" ? queryParams.stream : "",
+      previouslySelectedStream,
+      persistedStream,
+    ]);
 
-      if (selectedStreamItemObj.label != undefined) {
-        searchObj.data.stream.selectedStream = selectedStreamItemObj;
-      } else {
-        searchObj.data.stream.selectedStream = {
-          label: "",
-          value: "",
-        };
-        searchObj.loading = false;
-        searchObj.data.queryResults = {};
-        searchObj.data.sortedQueryResults = [];
-        searchObj.data.stream.selectedStreamFields = [];
-        searchObj.data.histogram = {
-          layout: {},
-          data: [],
-        };
-      }
+    if (selectedStream) {
+      searchObj.data.stream.selectedStream = {
+        label: selectedStream,
+        value: selectedStream,
+      };
     } else {
+      searchObj.data.stream.selectedStream = { label: "", value: "" };
       searchObj.loading = false;
+      searchObj.data.queryResults = {};
+      searchObj.data.sortedQueryResults = [];
+      searchObj.data.stream.selectedStreamFields = [];
+      searchObj.data.histogram = {
+        layout: {},
+        data: [],
+      };
     }
   } catch (e) {
     searchObj.loading = false;
@@ -1948,7 +1923,7 @@ const moveSplitter = computed(() => {
 watch(
   () => searchObj.data.stream.selectedStream.value,
   (streamValue: string) => {
-    if (store.state.zoConfig?.auto_query_enabled && streamValue) {
+    if (streamValue) {
       saveTracesStream(store.state.selectedOrganization.identifier, streamValue);
     }
   },
