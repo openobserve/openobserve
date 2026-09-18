@@ -22,6 +22,7 @@ import streams from "./streams";
 import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
+import { purgeAllQueries } from "@/composables/query/queryClient";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -279,11 +280,8 @@ export default createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      // Every caller commits ONE type's folders ({ alerts: [...] }), so replacing
-      // the whole map made each module's fetch wipe every other module's cached
-      // folders. Worst with a late-resolving fetch from a page the user has left:
-      // opening the alert form and going back to Dashboards landed on a folder
-      // sidebar holding nothing but Favorites.
+      // Merge, not replace: callers pass a single `{ [type]: folders }` entry,
+      // and replacing dropped every sibling type's cached list.
       state.organizationData.foldersByType = {
         ...state.organizationData.foldersByType,
         ...payload,
@@ -442,6 +440,9 @@ export default createStore({
     },
     logout(context) {
       context.commit("logout");
+      // Nothing from the previous session may survive — including anything the
+      // query layer persisted to localStorage/IndexedDB.
+      purgeAllQueries();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);

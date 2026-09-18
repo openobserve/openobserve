@@ -14,7 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, ref } from "vue";
-import destinationService from "@/services/alert_destination";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import type { Destination } from "@/ts/interfaces/alert";
 
 /**
@@ -25,8 +26,9 @@ import type { Destination } from "@/ts/interfaces/alert";
  * hits `/alerts/destinations/{name}` with no `module` parameter and 404s on a
  * pipeline destination. The list endpoint is the only one that accepts `module`.
  *
- * The result is cached per org and the in-flight request is shared, so stepping
- * through a run's nodes issues one call rather than one per destination node.
+ * It reads the shared pipeline-destinations query, so stepping through a run's
+ * nodes issues one call, the list expires on the destinations tier, and a
+ * destination save anywhere in the app refreshes it.
  */
 const byName = ref<Record<string, Destination>>({});
 const loadedOrg = ref<string | null>(null);
@@ -35,16 +37,9 @@ let inflight: Promise<void> | null = null;
 
 const fetchDestinations = async (org: string) => {
   try {
-    const res = await destinationService.list({
-      org_identifier: org,
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      module: "pipeline",
-    });
+    const list = await queryClient.fetchQuery(destinationsQuery(org, "pipeline"));
     const map: Record<string, Destination> = {};
-    for (const d of res.data || []) map[d.name] = d;
+    for (const d of list || []) map[d.name] = d;
     byName.value = map;
     loadedOrg.value = org;
     loadFailed.value = false;
@@ -59,9 +54,8 @@ const fetchDestinations = async (org: string) => {
   }
 };
 
-/** Loads the destination map once per org; concurrent callers share one request. */
+/** Loads the destination map; the query cache decides whether that costs a request. */
 export const ensureWorkflowDestinations = (org: string): Promise<void> => {
-  if (loadedOrg.value === org && !loadFailed.value) return Promise.resolve();
   if (!inflight) inflight = fetchDestinations(org);
   return inflight;
 };

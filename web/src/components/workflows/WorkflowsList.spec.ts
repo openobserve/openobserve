@@ -17,7 +17,7 @@
 // (pause/resume, edit, delete), the history drawer and the child-route escape
 // hatch. Heavy children (OTable, drawers, the graph preview) are stubbed.
 
-import { vi } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 
 const { mockRouter, mockRoute, mockToast, mockHydrate, mockGetFolders } = vi.hoisted(() => ({
   mockRouter: {
@@ -47,13 +47,16 @@ vi.mock("@/utils/commons", async (importOriginal) => ({
   getFoldersListByType: (...a: any[]) => mockGetFolders(...a),
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: {
-    listWorkflows: vi.fn(),
-    deleteWorkflow: vi.fn(),
-    enableWorkflow: vi.fn(),
-  },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listWorkflows: vi.fn(),
+      deleteWorkflow: vi.fn(),
+      enableWorkflow: vi.fn(),
+    },
+  });
+});
 
 // Re-export the real trigger registry so triggerLabel() resolves kinds to labels
 // (the list mocks the canvas composable, but the registry is pure data).
@@ -73,7 +76,6 @@ vi.mock("@/components/workflows/WorkflowView.vue", () => ({
   },
 }));
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick } from "vue";
 import i18n from "@/locales";
@@ -126,6 +128,13 @@ const OButtonStub = {
 const globalStubs = {
   OTable: OTableStub,
   OButton: OButtonStub,
+  // The real one ticks its "1m ago" label on an interval, which never lets vi.runAllTimers() finish.
+  ORefreshButton: {
+    name: "ORefreshButton",
+    props: ["layout", "variant", "lastRunAt", "loading"],
+    emits: ["click"],
+    template: '<button class="o-refresh" v-bind="$attrs" @click="$emit(\'click\', $event)" />',
+  },
   OInput: {
     name: "OInput",
     inheritAttrs: false,
@@ -271,8 +280,53 @@ describe("WorkflowsList", () => {
       wrapper = mountList();
       await flushPromises();
       // org, folder from ?folder= (default), not cross-folder, so no search term.
-      expect(listWorkflows).toHaveBeenCalledWith("default", "default", false, undefined);
+      expect(listWorkflows).toHaveBeenCalledWith("default", "default");
       expect(rows(wrapper)).toHaveLength(2);
+    });
+
+    it("serves a revisit from the cache without a request or a skeleton", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+
+      wrapper = mountList();
+      await nextTick();
+      expect(table(wrapper).props("loading")).toBe(false);
+      expect(rows(wrapper)).toHaveLength(2);
+      await flushPromises();
+      expect(listWorkflows).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps each folder's list, so going back to one costs no request", async () => {
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+      mockRoute.query = { folder: "team-b" };
+      wrapper = mountList();
+      await flushPromises();
+      wrapper.unmount();
+
+      mockRoute.query = { folder: "team-a" };
+      wrapper = mountList();
+      await flushPromises();
+      expect(listWorkflows.mock.calls.map((c: any[]) => c[1])).toEqual(["team-a", "team-b"]);
+    });
+
+    it("keeps the rows on screen while a write reloads the same list", async () => {
+      wrapper = mountList();
+      await flushPromises();
+      let resolveReload: (v: any) => void = () => {};
+      listWorkflows.mockReturnValueOnce(new Promise((r) => (resolveReload = r)));
+
+      await wrapper.find('[data-test="workflow-list-refresh"]').trigger("click");
+      await flushPromises();
+      expect(table(wrapper).props("loading")).toBe(false);
+      expect(rows(wrapper)).toHaveLength(2);
+
+      resolveReload({ data: [makeWorkflow(1)] });
+      await flushPromises();
+      expect(rows(wrapper)).toHaveLength(1);
     });
 
     it("renders the list page shell", async () => {
@@ -432,7 +486,7 @@ describe("WorkflowsList", () => {
       mockRoute.query = { folder: "team-a" };
       wrapper = mountList();
       await flushPromises();
-      expect(listWorkflows).toHaveBeenCalledWith("default", "team-a", false, undefined);
+      expect(listWorkflows).toHaveBeenCalledWith("default", "team-a");
     });
 
     it("stays in the current folder while the search box is empty", async () => {
@@ -443,7 +497,8 @@ describe("WorkflowsList", () => {
       scopeGroup(wrapper).vm.$emit("update:model-value", "all");
       await flushPromises();
       // Cross-folder is a search mode: an empty box must not pull the whole org.
-      expect(listWorkflows).toHaveBeenCalledWith("default", "default", false, undefined);
+      expect(listWorkflows).not.toHaveBeenCalledWith("default", undefined, true, expect.anything());
+      expect(rows(wrapper)).toHaveLength(2);
     });
 
     it("hands the term to the backend once a cross-folder search is typed", async () => {
@@ -458,7 +513,7 @@ describe("WorkflowsList", () => {
         await search(wrapper).setValue("  workflow-2  ");
         vi.runAllTimers();
         await flushPromises();
-        expect(listWorkflows).toHaveBeenCalledWith("default", "default", true, "workflow-2");
+        expect(listWorkflows).toHaveBeenCalledWith("default", undefined, true, "workflow-2");
       } finally {
         vi.useRealTimers();
       }
@@ -1025,7 +1080,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.restorePageIndex();
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -1049,7 +1105,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
 
@@ -1080,7 +1137,8 @@ describe("WorkflowsList", () => {
       wrapper.vm.oTableRef = { table: { setPageIndex } };
       expect(setPageIndex).not.toHaveBeenCalled();
 
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
       expect(setPageIndex).toHaveBeenCalledWith(2);
     });
   });

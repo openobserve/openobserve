@@ -230,6 +230,8 @@ import {
   onUnmounted,
   onMounted,
   defineAsyncComponent,
+  provide,
+  inject,
 } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import {
@@ -246,7 +248,6 @@ import useDashboardPanelData from "../../../composables/dashboard/useDashboardPa
 import DateTimePickerDashboard from "../../../components/DateTimePickerDashboard.vue";
 import AddSettingVariable from "../../../components/dashboards/settings/AddSettingVariable.vue";
 import { debounce, isEqual } from "lodash-es";
-import { provide, inject } from "vue";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import useBreakpoint from "@/composables/useBreakpoint";
 import useNotifications from "@/composables/useNotifications";

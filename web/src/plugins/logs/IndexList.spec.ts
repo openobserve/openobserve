@@ -30,20 +30,23 @@ const mockGetFilterExpressionByFieldType = vi.fn(() => "field = 'value'");
 const mockFetchQueryDataWithHttpStream = vi.fn();
 const mockCancelStreamQueryBasedOnRequestId = vi.fn();
 
-vi.mock("@/services/search", () => ({
-  default: {
-    partition: vi.fn(() => {
-      return Promise.resolve({
-        data: {
-          partitions: [
-            [1, 2],
-            [3, 4],
-          ],
-        },
-      });
-    }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      partition: vi.fn(() => {
+        return Promise.resolve({
+          data: {
+            partitions: [
+              [1, 2],
+              [3, 4],
+            ],
+          },
+        });
+      }),
+    },
+  });
+});
 
 vi.mock("@/composables/useLogs", () => {
   const mockSearchObj = {

@@ -25,13 +25,16 @@ import IngestionTokens from "@/components/iam/IngestionTokens.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    list_org_ingestion_tokens: vi.fn(() => Promise.resolve({ data: { data: [] } })),
-    create_org_ingestion_token: vi.fn(),
-    enable_disable_org_ingestion_token: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_org_ingestion_tokens: vi.fn(() => Promise.resolve({ data: { data: [] } })),
+      create_org_ingestion_token: vi.fn(),
+      enable_disable_org_ingestion_token: vi.fn(),
+    },
+  });
+});
 
 const { mockToast } = vi.hoisted(() => ({ mockToast: vi.fn() }));
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: mockToast }));

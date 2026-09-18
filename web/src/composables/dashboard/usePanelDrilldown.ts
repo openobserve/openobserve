@@ -1010,13 +1010,7 @@ export function usePanelDrilldown({
         // so we have to get id of folder, dashboard and tab
 
         // get folder id
-        if (
-          !store.state.organizationData.folders ||
-          (Array.isArray(store.state.organizationData.folders) &&
-            store.state.organizationData.folders.length === 0)
-        ) {
-          await getFoldersList(store);
-        }
+        await getFoldersList(store);
         const folderId = store.state.organizationData.folders.find(
           (folder: any) => folder.name == drilldownData.data.folder,
         )?.folderId;

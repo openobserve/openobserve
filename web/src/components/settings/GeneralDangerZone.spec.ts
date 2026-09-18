@@ -26,8 +26,14 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
   useToast: () => ({ toast: vi.fn(), toasts: [] }),
 }));
-vi.mock("@/services/settings", () => ({ default: {} }));
-vi.mock("@/services/config", () => ({ default: { get_config: vi.fn() } }));
+vi.mock("@/services/settings", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/services/config", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: { get_config: vi.fn() } });
+});
 vi.mock("@/composables/useLoading", () => ({
   useLoading: (fn: Function) => ({ execute: fn, isLoading: { value: false } }),
 }));
@@ -45,13 +51,16 @@ const summarySpy = vi.fn().mockResolvedValue({
   },
 });
 const deleteOrgSpy = vi.hoisted(() => vi.fn());
-vi.mock("@/services/organizations", () => ({
-  default: {
-    post_organization_settings: vi.fn(),
-    get_organization_summary: (...a: any[]) => summarySpy(...a),
-    delete_org: (...a: any[]) => deleteOrgSpy(...a),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      post_organization_settings: vi.fn(),
+      get_organization_summary: (...a: any[]) => summarySpy(...a),
+      delete_org: (...a: any[]) => deleteOrgSpy(...a),
+    },
+  });
+});
 
 // Default: two humans + one service account -> "Affects 2 members", caller is an
 // admin. Individual tests override to exercise the role gate.
@@ -61,9 +70,12 @@ const ADMIN_MEMBERS = [
   { email: "svc@o2.ai", role: "admin", is_system: true },
 ];
 const orgUsersSpy = vi.fn();
-vi.mock("@/services/users", () => ({
-  default: { orgUsers: (...a: any[]) => orgUsersSpy(...a) },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { orgUsers: (...a: any[]) => orgUsersSpy(...a) },
+  });
+});
 
 const mockStore = {
   state: {

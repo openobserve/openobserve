@@ -41,9 +41,12 @@ vi.mock("@/utils/zincutils", () => ({
   getUUID: () => "new-uuid",
 }));
 
-vi.mock("@/services/workflows", () => ({
-  default: { testWorkflow: vi.fn(), getWorkflowRun: vi.fn() },
-}));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { testWorkflow: vi.fn(), getWorkflowRun: vi.fn() },
+  });
+});
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
