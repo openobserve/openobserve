@@ -28,8 +28,9 @@ use {
         http::{Method, StatusCode, Uri, header},
     },
     chrono::Utc,
-    common::infra::config::USERS,
+    common::infra::config::{ORG_USERS, USERS},
     o2_enterprise::enterprise::password_policy::enforcement::{PolicyDecision, decide},
+    openobserve_core::auth::V2_API_PREFIX,
 };
 
 /// The header `auth_middleware` writes the authenticated email into. Reading it here rather than
@@ -65,15 +66,29 @@ async fn check_request(user_email: &str, uri: &Uri, method: &Method) -> Option<R
     // authenticated hot path.
     // Authentication succeeding against something this cache does not hold — a token or an
     // enterprise identity — means there is nothing here that applies to it.
-    let user = USERS.get(&user_email.to_lowercase())?;
+    let user_email = user_email.to_lowercase();
+    let user = USERS.get(&user_email)?;
 
     // Root's exemption is settled inside `decide`, which is the only place that holds both the user
     // and the policy. An early return here could only guess at the policy it has not read yet.
     let policy = db::password_policy::get_effective_policy().await;
-    match decide(&user, uri, method, &policy, Utc::now()) {
+    let is_service_account = is_service_account(&user_email, uri);
+    match decide(&user, is_service_account, uri, method, &policy, Utc::now()) {
         PolicyDecision::Allow => None,
         PolicyDecision::Block { code, reason } => Some(blocked_response(code, &reason)),
     }
+}
+
+/// The role lives on `org_users`, keyed by the org the validator also reads off the path.
+#[cfg(feature = "enterprise")]
+fn is_service_account(user_email: &str, uri: &Uri) -> bool {
+    let mut segments = uri.path().split('/').filter(|s| !s.is_empty());
+    let org = match segments.next() {
+        Some(V2_API_PREFIX) => segments.next(),
+        org => org,
+    };
+    org.and_then(|org| ORG_USERS.get(&format!("{org}/{user_email}")))
+        .is_some_and(|org_user| org_user.role.is_service_account())
 }
 
 #[cfg(feature = "enterprise")]
@@ -312,6 +327,7 @@ mod tests {
             assert_eq!(
                 decide(
                     &flagged,
+                    false,
                     &seen.parse().unwrap(),
                     &Method::GET,
                     &PasswordPolicy::default(),
@@ -320,5 +336,32 @@ mod tests {
                 PolicyDecision::Allow
             );
         }
+    }
+
+    /// The role is read off the org in the path, the same way the validator resolves it.
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_service_account_is_recognised_from_the_org_in_the_path() {
+        use config::meta::user::UserRole;
+        use infra::table::org_users::OrgUserRecord;
+
+        let email = "sa@b.com";
+        ORG_USERS.insert(
+            format!("default/{email}"),
+            OrgUserRecord::new("default", email, UserRole::ServiceAccount, "tok", None),
+        );
+        ORG_USERS.insert(
+            format!("other/{email}"),
+            OrgUserRecord::new("other", email, UserRole::Admin, "tok", None),
+        );
+
+        let uri = |s: &str| s.parse::<Uri>().unwrap();
+        assert!(is_service_account(email, &uri("/default/streams")));
+        assert!(is_service_account(email, &uri("/v2/default/streams")));
+        assert!(!is_service_account(email, &uri("/other/streams")));
+        assert!(!is_service_account(email, &uri("/organizations")));
+
+        ORG_USERS.remove(&format!("default/{email}"));
+        ORG_USERS.remove(&format!("other/{email}"));
     }
 }
