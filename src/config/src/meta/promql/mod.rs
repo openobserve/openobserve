@@ -87,6 +87,9 @@ pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
     VALUE_LABEL,
     HASH_LABEL,
     EXEMPLARS_LABEL,
+    // OTLP per-point metadata, not dimensions: a restart moves start_time and forks the series
+    "start_time",
+    "flag",
     "is_monotonic",
     "trace_id",
     "span_id",
