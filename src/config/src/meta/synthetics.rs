@@ -3950,12 +3950,22 @@ mod tests {
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
     }
 
+    /// The start load opens the Starting URL, so the first step may be any action.
     #[test]
-    fn test_v2_first_step_must_be_navigate() {
+    fn a_journey_may_start_with_click() {
         let (locs, brs, devs) = allowed();
         let s = v2_synthetic(serde_json::json!([v2_click_step()]));
-        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("navigate"), "{err}");
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    /// The expanded parent runs the same rules, so it may also open on a non-navigate step.
+    #[test]
+    fn an_expanded_parent_may_open_on_a_non_navigate_step() {
+        let mut first = v2_click_step();
+        first["id"] = serde_json::json!("r0_c0");
+        let mut second = v2_click_step();
+        second["id"] = serde_json::json!("r0_c1");
+        validate_expanded_steps(&[first, second]).unwrap();
     }
 
     fn subtest_journey() -> serde_json::Value {
@@ -4062,7 +4072,7 @@ mod tests {
     #[test]
     fn step_ids_are_restricted_to_the_composed_id_alphabet() {
         let (locs, brs, devs) = allowed();
-        for bad in ["s/1", "s,1", "s 1", "__unattributed__"] {
+        for bad in ["s/1", "s,1", "s 1", "__unattributed__", "_start"] {
             let mut s = valid_browser_synthetic();
             s.config = serde_json::json!({
                 "steps": [ { "id": bad, "action": "navigate", "url": "https://example.com" } ],
@@ -4070,6 +4080,21 @@ mod tests {
             });
             let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
             assert!(err.contains("step id"), "{bad}: {err}");
+        }
+    }
+
+    /// `_start` is the start load's row id; a real step claiming it would collide with row 0.
+    #[test]
+    fn the_start_load_id_is_reserved_alongside_the_unattributed_sentinel() {
+        for reserved in ["_start", "__unattributed__"] {
+            let err = validate_step_id(0, reserved).unwrap_err();
+            assert_eq!(
+                err,
+                format!("config.steps[0]: step id '{reserved}' is reserved")
+            );
+        }
+        for ok in ["start", "r0_start", "_s1"] {
+            assert!(validate_step_id(0, ok).is_ok(), "{ok}");
         }
     }
 
@@ -4471,26 +4496,6 @@ mod tests {
 
         crate::CONFIG.store(saved);
         assert!(accepted.is_ok(), "{accepted:?}");
-    }
-
-    #[test]
-    fn test_validate_first_step_must_navigate() {
-        let (locs, brs, devs) = allowed();
-        let mut s = valid_browser_synthetic();
-        s.config = serde_json::json!({
-            "steps": [
-                {
-                    "id": "s1",
-                    "action": "click",
-                    "name": "Sign in",
-                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] }
-                }
-            ],
-            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ],
-            "timeout_ms": 30000
-        });
-        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("first step must be 'navigate'"), "{err}");
     }
 
     #[test]
