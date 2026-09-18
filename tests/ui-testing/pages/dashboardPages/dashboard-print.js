@@ -15,7 +15,6 @@ export default class DashboardPrintPage {
     );
     this.printPageStyle = page.locator("#o2-print-page");
     this.captureReadySpan = page.locator("#dashboardVariablesAndPanelsDataLoaded");
-    this.placeholder = page.locator('[data-test^="dashboard-panel-placeholder-"]');
     this.emptyStateArt = page.locator('[data-test="empty-panel-art"]');
     this.emptyStateAddPanelBtn = page.locator(
       '[data-test="dashboard-if-no-panel-add-panel-btn"]'
