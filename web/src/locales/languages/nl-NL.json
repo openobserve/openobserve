@@ -14486,7 +14486,6 @@
       "updateFailed": "Bijwerken van controle mislukt."
     },
     "validation": {
-      "firstStepMustNavigate": "Eerste stap moet \"Navigeren\" zijn",
       "locationsRequired": "Selecteer minstens één locatie",
       "nameRequired": "Naam is verplicht",
       "locatorRequired": "Voeg ten minste één locator toe zodat deze stap weet op welk element te handelen",

@@ -14486,7 +14486,6 @@
       "updateFailed": "Fehler beim Aktualisieren der Prüfung."
     },
     "validation": {
-      "firstStepMustNavigate": "Erster Schritt muss \"Navigieren\" sein",
       "locationsRequired": "Wählen Sie mindestens einen Standort aus",
       "nameRequired": "Name ist erforderlich",
       "locatorRequired": "Fügen Sie mindestens einen Locator hinzu, damit dieser Schritt weiß, auf welches Element er einwirken soll.",

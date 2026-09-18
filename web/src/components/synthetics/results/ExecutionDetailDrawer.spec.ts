@@ -456,6 +456,24 @@ describe("ExecutionDetailDrawer", () => {
       );
     });
 
+    // A failed start load ran no Step; a Step that never ran is not a failed one.
+    it("should render only a failed start load when no Step ran", () => {
+      wrapper = mountDrawer({
+        execution: makeExecution({
+          status: "failed",
+          steps: [],
+          startLoad: startLoad({ status: "fail", error: "net::ERR_NAME_NOT_RESOLVED" }),
+        } as any),
+      });
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists(), "no start row rendered").toBe(true);
+      expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+      expect(wrapper.findAll("span").filter((el) => /^\d+$/.test(el.text()))).toHaveLength(0);
+      expect(wrapper.text()).not.toContain("Go to page");
+      expect(wrapper.text()).not.toContain("No step data available.");
+    });
+
     it("should render an execution with no start load exactly as before", () => {
       wrapper = mountDrawer({ execution: makeExecution({ startLoad: null } as any) });
 

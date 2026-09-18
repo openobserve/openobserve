@@ -199,6 +199,27 @@ describe("RunDetailDrawer", () => {
       expect(second.text()).toContain("910 ms");
     });
 
+    // The probe stops at the failure, so a failed start load leaves no Step results at all.
+    it("renders row 0 alone when the start load failed before any Step ran", async () => {
+      wrapper = await mountOpenWith([
+        rawRow({
+          status: "failed",
+          last_attempt_steps: "[]",
+          start_load: JSON.stringify(
+            startLoad({ status: "failed", error: "net::ERR_NAME_NOT_RESOLVED" }),
+          ),
+        }),
+      ]);
+
+      const row0 = startRow(wrapper);
+      expect(row0.exists(), "no start row rendered").toBe(true);
+      expect(row0.text()).toContain("Open https://app.test/");
+      expect(row0.text()).toContain("net::ERR_NAME_NOT_RESOLVED");
+      expect(wrapper.text()).toContain("Steps (0)");
+      expect(wrapper.text()).not.toContain("1 failed");
+      expect(wrapper.findAll("span").filter((el) => /^\d+$/.test(el.text()))).toHaveLength(0);
+    });
+
     it("renders a location with no start load exactly as before", async () => {
       wrapper = await mountOpenWith([rawRow()]);
       await expandSteps(wrapper);

@@ -48,6 +48,7 @@ import {
   buildStepAggregateSql,
   buildStepDimensionSql,
   buildStepSparklineSql,
+  foldEvidenceBundle,
   foldStepStream,
   mapRunLocationResult,
 } from "./syntheticResultsSchema";
@@ -967,6 +968,24 @@ const evidenceEv = (over: Partial<EvidenceEvent>): EvidenceEvent => ({
   durationMs: null,
   firstParty: true,
   ...over,
+});
+
+// Initial-load events carry `_start`, which is no recorded step; the caller's defs name it.
+describe("evidence naming for the start load", () => {
+  it("names a _start event from the step defs instead of the raw id", () => {
+    const event = evidenceEv({
+      ts: 50,
+      stepId: "_start",
+      kind: "console",
+      level: "error",
+      text: "boot failed",
+    });
+    const defs = new Map([["_start", { name: "Open https://app.test/", selector: null }]]);
+
+    const named = foldEvidenceBundle([event], defs).groups.flatMap((g) => g.events);
+
+    expect(named.map((e) => e.stepName)).toEqual(["Open https://app.test/"]);
+  });
 });
 
 describe("evidence origin", () => {

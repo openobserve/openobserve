@@ -1312,6 +1312,23 @@ describe("JourneySteps", () => {
       );
     });
 
+    // The running session already consumed the URL, so an edit mid-replay would describe nothing.
+    it("locks the start row's URL while the table is locked", async () => {
+      wrapper = mount(JourneySteps, {
+        props: {
+          data: makeSteps(2),
+          mode: "editor",
+          startRow: editorStartRow(),
+          locked: true,
+        } as any,
+        global: { stubs: STUBS },
+      });
+      await flushPromises();
+
+      const input = requireStartRow(wrapper).find<HTMLInputElement>("input");
+      expect(input.element.readOnly).toBe(true);
+    });
+
     it("gives the editor start row no name, no action picker and no locator", async () => {
       wrapper = mount(JourneySteps, {
         props: {

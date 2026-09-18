@@ -304,7 +304,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- ══ Split: Replay Player (left) + Steps Timeline (right) ══ -->
-              <div v-else-if="steps.length > 0" class="flex min-h-0 flex-1 items-start">
+              <div v-else-if="steps.length > 0 || startRow" class="flex min-h-0 flex-1 items-start">
                 <!-- ── Left: Session Replay Player ── -->
                 <OCard v-if="currentRun.hasReplay" class="w-[30%] min-w-[30rem] gap-0 p-0">
                   <OCardSection role="header" class="gap-2">
@@ -337,6 +337,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- JourneySteps in results mode -->
                     <JourneySteps
                       :data="steps"
+                      :start-row="startRow"
                       mode="results"
                       :total-duration-ms="totalDurationMs"
                       action-key="action"
@@ -652,6 +653,7 @@ import type {
   SyntheticRunDetail,
   RecordedStep,
 } from "@/composables/synthetics/syntheticResultsSchema";
+import { START_LOAD_STEP_ID } from "@/constants/synthetics";
 import awsSvgUrl from "@/assets/images/ingestion/aws.svg";
 import gcpSvgUrl from "@/assets/images/ingestion/gcp.svg";
 import chromiumSvgUrl from "@/assets/images/synthetics/chromium.svg";
@@ -900,6 +902,38 @@ function buildSteps(
   });
 }
 
+/** Row 0 in the steps' own shape, so the table renders it with the same slots; never in `steps`. */
+function buildStartRow(
+  detail: SyntheticRunDetail,
+  attempt: AttemptView | null,
+  eventsByStep: Map<string, EvidenceEvent[]>,
+): StepRow | null {
+  const load = attempt?.startLoad ?? detail.startLoad;
+  if (!load) return null;
+  const isFail = load.status === "fail";
+  const failureDetail = attempt ? attempt.failureDetail : detail.failureDetail;
+  return {
+    id: 0,
+    stepId: START_LOAD_STEP_ID,
+    action: "navigate",
+    name: t("synthetics.runDetail.startLoadLabel", { url: load.url }),
+    detail: load.url,
+    url: load.url,
+    duration: load.duration_ms,
+    offsetMs: 0,
+    status: isFail ? "fail" : "pass",
+    icon: actionIcon("navigate"),
+    statusIcon: isFail ? "cancel" : "check-circle",
+    durStr: fmtDur(load.duration_ms),
+    durColor: "",
+    error: load.error,
+    screenshotKey: attempt?.screenshotKeys.get(START_LOAD_STEP_ID) ?? load.screenshot_key,
+    evidence: stepOwnDetail(load, failureDetail),
+    appEvidence: detail.evidenceByStep.find((e) => e.stepId === START_LOAD_STEP_ID) ?? null,
+    bundleEvents: eventsByStep.get(START_LOAD_STEP_ID) ?? [],
+  };
+}
+
 function capitalizeEngine(engine: string): string {
   if (!engine) return engine;
   return engine.charAt(0).toUpperCase() + engine.slice(1);
@@ -1023,6 +1057,14 @@ const evidenceKey = computed(
  *  later edit to the check cannot relabel this run's history. */
 const evidenceStepDefs = computed(() => {
   const m = new Map<string, { name: string; selector: string | null }>();
+  const load = synthetics.runDetail.value?.startLoad;
+  // Initial-load events are attributed to `_start`, which names no recorded step.
+  if (load) {
+    m.set(START_LOAD_STEP_ID, {
+      name: t("synthetics.runDetail.startLoadLabel", { url: load.url }),
+      selector: null,
+    });
+  }
   for (const rs of synthetics.runDetail.value?.recordedSteps ?? []) {
     m.set(rs.id, { name: rs.name || rs.id, selector: rs.selector });
   }
@@ -1085,9 +1127,12 @@ function toDisplayRun(detail: SyntheticRunDetail | null): DisplayRun {
           errorReason: detail.error || "",
           errorStack: detail.error || "",
           errorSource: detail.errorSource,
-          failedStepLabel: detail.failedStep
-            ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
-            : undefined,
+          failedStepLabel:
+            detail.failedStep === START_LOAD_STEP_ID
+              ? t("synthetics.runDetail.failedAtStartLoad")
+              : detail.failedStep
+                ? t("synthetics.runDetail.failedAtStep", { step: detail.failedStep })
+                : undefined,
           failedStepId: 1,
         }
       : {}),
@@ -1318,6 +1363,12 @@ const steps = computed<StepRow[]>(() => {
   return [];
 });
 
+const startRow = computed<StepRow | null>(() => {
+  const detail = synthetics.runDetail.value;
+  if (!detail) return null;
+  return buildStartRow(detail, currentAttempt.value, evidence.eventsByStep.value);
+});
+
 /**
  * Options for the evidence step select, sourced from `steps` — the EXECUTED
  * steps this attempt actually ran — not from `evidenceStepDefs`
@@ -1408,11 +1459,14 @@ const statusChip = computed(() => {
   }
   if (currentRun.value.status === "fail") {
     const stepNum = failedStepInfo.value?.step?.id;
+    const atStartLoad = synthetics.runDetail.value?.failedStep === START_LOAD_STEP_ID;
     return {
       label: t("synthetics.results.status"),
       value: stepNum
         ? t("synthetics.runDetail.failedAtStep", { step: stepNum })
-        : t("synthetics.results.failed"),
+        : atStartLoad
+          ? t("synthetics.runDetail.failedAtStartLoad")
+          : t("synthetics.results.failed"),
       icon: "cancel",
       colorClass: "text-status-error-text",
     };

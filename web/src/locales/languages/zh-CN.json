@@ -14486,7 +14486,6 @@
       "updateFailed": "更新检查失败。"
     },
     "validation": {
-      "firstStepMustNavigate": "第一步必须是“导航”",
       "locationsRequired": "至少选择一个位置",
       "nameRequired": "名称是必填项",
       "locatorRequired": "至少添加一个定位器，以便此步骤知道要对哪个元素执行操作。",
