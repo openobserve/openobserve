@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, type VueWrapper } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
@@ -59,6 +59,24 @@ vi.mock("vue-router", () => ({
 
 const service = vi.mocked(oncallService);
 const destinations = vi.mocked(destinationService);
+
+// Every `mount()` in this file — across all three top-level `describe`s —
+// stays alive as a real, reactive component instance unless something
+// unmounts it. Nothing did, so by the end of the file dozens of past
+// instances were still watching the shared `store`: any test that mutates
+// shared state (e.g. `store.state.userInfo`) forced every one of them to
+// re-render, and the cost compounded test over test until a mount+flush that
+// takes milliseconds in isolation blew a 5s timeout deep into the run.
+const mountedWrappers: VueWrapper[] = [];
+function mountTracked(...args: Parameters<typeof mount>): VueWrapper {
+  const wrapper = mount(...args) as VueWrapper;
+  mountedWrappers.push(wrapper);
+  return wrapper;
+}
+
+afterEach(() => {
+  mountedWrappers.splice(0).forEach((wrapper) => wrapper.unmount());
+});
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
@@ -201,23 +219,11 @@ const team = {
   updated_at: 0,
 };
 
-// Nothing here ever unmounts on its own account, so every mount from every
-// test would otherwise sit alive (watchers, listeners) through the rest of
-// the 70+ tests in this file — the accumulation is exactly what pushed the
-// last few tests in the file past the default 5s timeout under load.
-const mountedWrappers: VueWrapper[] = [];
-
 function render() {
-  const wrapper = mount(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
-  mountedWrappers.push(wrapper);
-  return wrapper;
+  return mountTracked(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
 }
 
 describe("OnCallResponses", () => {
-  afterEach(() => {
-    for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount();
-  });
-
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -1250,7 +1256,7 @@ describe("OnCallResponses — the rows' own fields", () => {
 
   async function withRows(rows: Record<string, unknown>[]) {
     service.listResponses.mockResolvedValue({ data: rows } as any);
-    const wrapper = mount(OnCallResponses, {
+    const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs: stubsForList },
     });
     await flushPromises();
@@ -1372,7 +1378,7 @@ describe("OnCallResponses — filtering by cause", () => {
         },
       ],
     } as any);
-    const wrapper = mount(OnCallResponses, {
+    const wrapper = mountTracked(OnCallResponses, {
       global: { plugins: [i18n, store], stubs },
     });
     await flushPromises();
