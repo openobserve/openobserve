@@ -505,7 +505,9 @@ pub async fn otlp_logs_write(
             }
         },
         CONTENT_TYPE_JSON => {
-            match serde_json::from_slice::<ExportLogsServiceRequest>(body.as_ref()) {
+            match config::utils::json::from_slice_lenient_floats::<ExportLogsServiceRequest>(
+                body.as_ref(),
+            ) {
                 Ok(req) => (req, OtlpRequestType::HttpJson),
                 Err(e) => {
                     log::error!("[LOGS:OTLP] Invalid json: org_id: {org_id} {e}");
