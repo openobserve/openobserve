@@ -13797,7 +13797,8 @@
       "tags": "タグ",
       "title": "チェックの詳細",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "開かれていません — 最初のステップがナビゲートします。"
     },
     "createBrowserTest": {
       "buildManually": "手動で構築",
@@ -13898,7 +13899,8 @@
         "scroll": "スクロール",
         "wait": "待機",
         "assert": "アサート",
-        "screenshot": "スクリーンショット"
+        "screenshot": "スクリーンショット",
+        "subtest": "サブテスト"
       },
       "clickTypeLabel": "クリックの種類",
       "clickTypeHelp": "右クリックでコンテキストメニューが開きます。ダブルクリックでは 2 回のクリックが送信されます。",
@@ -14086,7 +14088,75 @@
       "valueFallback": "値",
       "showSetupSteps": "セットアップ手順を表示",
       "waitingForActions": "ブラウザでのアクションを待機中...",
-      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。"
+      "unboundVariables": "{names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。 | {names} はこのチェック、その環境、またはグローバルで定義されていないため、記述どおりに入力されます。",
+      "addSubtest": "サブテストを追加",
+      "extract": {
+        "action": "サブテストに抽出",
+        "confirm": "抽出",
+        "created": "「{name}」を作成しました。参照を保持するにはこのテストを保存してください。",
+        "every": "{n} {unit}ごと",
+        "folderForbidden": "「{folder}」にはテストを作成できません。別のフォルダーを選択してください。",
+        "folderLabel": "フォルダー",
+        "historyNotice": "ステップ履歴はリセットされます。これらのステップは新しいテストで新しい ID を受け取るため、ステップごとのグラフは今日から分かれます。",
+        "labelThisTest": "このテスト",
+        "nameLabel": "テスト名",
+        "nameTooLong": "名前は 256 バイト未満にしてください",
+        "orphan": "「{name}」を作成しましたが、このジャーニーを更新できませんでした。新しいテストを開くか削除してください。",
+        "reason": {
+          "contains-subtest": "サブテストは別のサブテストを含められません",
+          "no-navigate-first": "選択はナビゲートのステップで始まる必要があります",
+          "not-contiguous": "隣り合ったステップを選択してください",
+          "not-contiguous-filtered": "隣り合ったステップを選択してください — フィルターを解除すると全リストが表示されます",
+          "referenced": "このテストは他のテストからサブテストとして使われているため、サブテストを持てません",
+          "referenced-pending": "このテストの使用箇所を確認しています…",
+          "referenced-unknown": "このテストの使用箇所を確認できませんでした",
+          "undefined-placeholder": "抽出する前に変数で {name} を定義してください"
+        },
+        "schedule": "{locations} · {frequency}（このテストと同じ）",
+        "status": "一時停止で作成されます。有効化するまで、このテストの一部としてのみ実行されます。",
+        "steps": "ステップ {first} · {path} から開始 | ステップ {first} – {last} · {path} から開始",
+        "subtitle": "ステップは今作成される新しいブラウザーテストへ移動します。このジャーニーはその場所にサブテスト参照を保持します — 保持するにはこのテストを保存してください。",
+        "thisTest": "抽出後 {authored} ステップ · 同じ {executed} ステップを実行",
+        "title": "{count} 個のステップを新しいテストに抽出",
+        "unit": {
+          "hours": "時間",
+          "minutes": "分"
+        },
+        "variablesCopied": "新しいテストにコピーされました: {names}。",
+        "variablesToDefine": "単独で実行する前に新しいテストで定義してください: {names}。"
+      },
+      "startRowLabel": "開く",
+      "subtest": {
+        "capChild": "「{name}」から {count}",
+        "capOwn": "自身の {count}",
+        "capRemedy": "サブテストを削除するか、このテスト自身のステップを短くしてください。",
+        "capTitle": "このテストは {total} ステップを実行します — 上限は {limit} です。",
+        "delta": "「{name}」を追加すると、このテストの実行ステップは {before} → {after} になります。上限は {limit} です。",
+        "deltaUnknown": "ステップへの影響は不明です — 参照先のテストを読み込めませんでした。",
+        "failedAt": "{number} — {child} › {step}",
+        "ignoredEnv": "その開始 URL、変数、認証、Cookie はここでは無視されます — 親テストの設定が適用されます。",
+        "lastRun": "前回の実行は許容 {budget} 秒のうち {seconds} 秒かかりました。",
+        "lastRunUnknown": "時間への影響は不明です — このテストはまだ実行を完了していません。",
+        "noAccess": "「{name}」へのアクセス権がないため、そのステップをここに表示できません。",
+        "noAccessBadge": "アクセス不可",
+        "noAccessRemedy": "そのフォルダーへの読み取りアクセスを依頼するか、参照を削除してください。",
+        "noAccessToast": "このテストが参照しているテストのいずれかへのアクセス権がありません。",
+        "notRun": "未実行",
+        "openChild": "「{name}」を開く",
+        "pickEmpty": "この組織にはまだ他のブラウザーテストがありません。",
+        "pickLabel": "ここで実行するテスト",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "ブラウザーテストの一覧を読み込めませんでした。もう一度お試しください。",
+        "pickNested": "すでにサブテストを含んでいます — ネストは 1 階層までです",
+        "pickSteps": "{count} ステップ",
+        "pickUsedBy": "{count} 件のテストで使用中",
+        "previewLabel": "ここで実行されるステップ",
+        "progressAria": "{total} 個中 {done} 個のサブステップが完了",
+        "raiseBudget": "途中で打ち切られるようになったら、このテストの実行時間の許容値を増やしてください。",
+        "stepsBadge": "{count} ステップ",
+        "undefinedVariable": "「{name}」は、このテストで定義されていない {variable} を使用しています。",
+        "undefinedVariableAction": "変数に追加する"
+      }
     },
     "labels": {
       "copyOf": "{name} のコピー",
@@ -14465,7 +14535,9 @@
       "pageActivity": "ページアクティビティ",
       "pageActivityEvents": "{count} イベント | {count} イベント",
       "pageActivityViewAllShort": "Evidenceですべて表示",
-      "expandScreenshot": "展開"
+      "expandScreenshot": "展開",
+      "failedAtStartLoad": "開始 URL を開けませんでした",
+      "startLoadLabel": "{url} を開く"
     },
     "runRowExpansion": {
       "browserHeader": "ブラウザ",
@@ -14643,7 +14715,9 @@
       "triggering": "トリガー中...",
       "type": "タイプ",
       "uptime": "稼働率 7日",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "使用元",
+      "usedByCount": "{count} 件のテスト"
     },
     "tabs": {
       "all": "すべて",
@@ -14704,7 +14778,13 @@
       "retiredAction": "「{action}」はサポートされなくなりました — 「{step}」を削除または置換してください",
       "runBudgetExceeded": "このチェックは実行ごとに最大 {worstCase} かかり、制限の {limit} を超えます。ブラウザ/デバイスの組み合わせを削除するか、再試行回数を減らしてください。({combos} コンボ × {attempts} 試行 × {perAttempt} ずつ。)",
       "runBudgetRetriesHint": "再試行回数を減らすと、このチェックは {limit} の実行制限内に戻ります。",
-      "folderUnavailable": "フォルダ「{folder}」はこの組織で利用できません — デフォルトフォルダに保存します。"
+      "folderUnavailable": "フォルダ「{folder}」はこの組織で利用できません — デフォルトフォルダに保存します。",
+      "compositionChildFailed": "「{name}」は保存時の検証に失敗しました — 開いて修正が必要なステップを確認してください。",
+      "startUrlHostMismatch": "このテストは {host} を開きますが、ステップは {other} へナビゲートします。",
+      "stepIdReserved": "このステップ ID は実行の開始 URL 用に予約されています",
+      "subtestCap": "実行ステップが多すぎます — ステップ上部の通知をご覧ください。",
+      "subtestFlags": "サブテストは任意実行や常時実行にできません — その失敗は常にこのテストを失敗させます",
+      "subtestRequired": "ここで実行するテストを選択してください"
     },
     "privateLocations": {
       "searchPlaceholder": "ロケーションを検索...",
@@ -14794,7 +14874,18 @@
     "secondsAgo": "{count} 秒前",
     "stepsQueryFailed": "ステップ クエリが失敗しました",
     "queryFailed": "クエリが失敗しました",
-    "relationNotContaining": "含まない"
+    "relationNotContaining": "含まない",
+    "delete": {
+      "blockedBody": "先にそれらの参照を削除するか、テストをまとめて削除してください。",
+      "blockedBulkTitle": "選択した {count} 件のテストが、この選択の外のテストで使われています",
+      "blockedTitle": "「{name}」は他のテストで使われています",
+      "hiddenReferences": "アクセス権のないテスト {count} 件"
+    },
+    "save": {
+      "blockedBody": "保存できませんでした。先にそれらの参照を削除してから、もう一度保存してください。",
+      "usedByBody": "変更は次回の実行時にすべてに適用されます。",
+      "usedByTitle": "「{name}」は他の {count} 件のテストで使われています"
+    }
   },
   "statusPages": {
     "tabTitle": "ステータスページ",

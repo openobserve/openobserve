@@ -38,8 +38,16 @@ export const JOB_LEASE_MS = 900_000;
 /** `DEFAULT_JOURNEY_BUDGET_MS` — wall-clock ceiling for ONE browser attempt. */
 export const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
 
-/** `MAX_STEPS` — executed-step cap on a browser check, measured after subtest expansion. */
-export const MAX_STEPS = 50;
+/** Fallback for the executed-step cap when /config does not carry it. */
+export const DEFAULT_MAX_STEPS = 50;
+
+/** The server's `ZO_SYNTHETICS_BROWSER_MAX_STEPS` cap, read from /config since it is configurable. */
+export function browserMaxSteps(zoConfig?: { synthetics_browser_max_steps?: unknown }): number {
+  const cap = zoConfig?.synthetics_browser_max_steps;
+  return typeof cap === "number" && Number.isFinite(cap) && cap > 0
+    ? Math.floor(cap)
+    : DEFAULT_MAX_STEPS;
+}
 
 export interface RunBudgetInput {
   /** Number of browser x device combos. The probe runs them SEQUENTIALLY inside

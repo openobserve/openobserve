@@ -13797,7 +13797,8 @@
       "tags": "Tags",
       "title": "Détails de la vérification",
       "urlTarget": "URL",
-      "urlTargetPlaceholder": "https://api.example.com/health"
+      "urlTargetPlaceholder": "https://api.example.com/health",
+      "startingUrlNotOpened": "Non ouverte — la première étape navigue."
     },
     "createBrowserTest": {
       "buildManually": "Construire manuellement",
@@ -13898,7 +13899,8 @@
         "scroll": "Faire défiler",
         "wait": "Attendre",
         "assert": "Vérifier",
-        "screenshot": "Capture d'écran"
+        "screenshot": "Capture d'écran",
+        "subtest": "Sous-test"
       },
       "clickTypeLabel": "Type de clic",
       "clickTypeHelp": "Le clic droit ouvre un menu contextuel ; le double-clic envoie deux clics.",
@@ -14086,7 +14088,75 @@
       "valueFallback": "Valeur",
       "showSetupSteps": "Afficher les étapes de configuration",
       "waitingForActions": "En attente d'actions dans le navigateur…",
-      "unboundVariables": "{names} n'est pas défini dans cette vérification, ses environnements ou global ; il est donc saisi tel quel. | {names} ne sont pas définis dans cette vérification, ses environnements ou global ; ils sont donc saisis tels quels."
+      "unboundVariables": "{names} n'est pas défini dans cette vérification, ses environnements ou global ; il est donc saisi tel quel. | {names} ne sont pas définis dans cette vérification, ses environnements ou global ; ils sont donc saisis tels quels.",
+      "addSubtest": "Ajouter un sous-test",
+      "extract": {
+        "action": "Extraire en sous-test",
+        "confirm": "Extraire",
+        "created": "« {name} » a été créé. Enregistrez ce test pour conserver la référence.",
+        "every": "toutes les {n} {unit}",
+        "folderForbidden": "Vous ne pouvez pas créer de tests dans « {folder} ». Choisissez un autre dossier.",
+        "folderLabel": "Dossier",
+        "historyNotice": "L'historique des étapes repart de zéro. Ces étapes reçoivent de nouveaux identifiants dans le nouveau test, les graphiques par étape se scindent donc à partir d'aujourd'hui.",
+        "labelThisTest": "Ce test",
+        "nameLabel": "Nom du test",
+        "nameTooLong": "Gardez le nom sous 256 octets",
+        "orphan": "« {name} » a été créé mais ce parcours n'a pas pu être mis à jour. Ouvrez le nouveau test ou supprimez-le.",
+        "reason": {
+          "contains-subtest": "Un sous-test ne peut pas contenir un autre sous-test",
+          "no-navigate-first": "La sélection doit commencer par une étape de navigation",
+          "not-contiguous": "Sélectionnez des étapes contiguës",
+          "not-contiguous-filtered": "Sélectionnez des étapes contiguës — effacez le filtre pour voir la liste complète",
+          "referenced": "Ce test est utilisé comme sous-test par d'autres tests et ne peut pas en contenir un",
+          "referenced-pending": "Vérification des usages de ce test…",
+          "referenced-unknown": "Impossible de vérifier où ce test est utilisé",
+          "undefined-placeholder": "Définissez {name} dans Variables avant d'extraire"
+        },
+        "schedule": "{locations} · {frequency} (comme ce test)",
+        "status": "Créé en pause. Ne s'exécute que dans ce test jusqu'à ce que vous l'activiez.",
+        "steps": "Étape {first} · commence à {path} | Étapes {first} – {last} · commence à {path}",
+        "subtitle": "Les étapes passent dans un nouveau test navigateur, créé maintenant. Ce parcours garde une référence de sous-test à leur place — enregistrez ce test pour la conserver.",
+        "thisTest": "{authored} étapes après extraction · exécute les mêmes {executed} étapes",
+        "title": "Extraire {count} étape vers un nouveau test | Extraire {count} étapes vers un nouveau test",
+        "unit": {
+          "hours": "heure | heures",
+          "minutes": "minute | minutes"
+        },
+        "variablesCopied": "Copiées dans le nouveau test : {names}.",
+        "variablesToDefine": "À définir sur le nouveau test avant de l'exécuter seul : {names}."
+      },
+      "startRowLabel": "Ouvre",
+      "subtest": {
+        "capChild": "{count} de « {name} »",
+        "capOwn": "{count} qui lui sont propres",
+        "capRemedy": "Retirez un sous-test, ou raccourcissez les étapes propres à ce test.",
+        "capTitle": "Ce test exécute {total} étapes — la limite est {limit}.",
+        "delta": "Ajouter « {name} » fait passer ce test de {before} → {after} étapes exécutées. La limite est {limit}.",
+        "deltaUnknown": "Impact en étapes inconnu — un test référencé n'a pas pu être chargé.",
+        "failedAt": "{number} — {child} › {step}",
+        "ignoredEnv": "Son URL de départ, ses variables, son authentification et ses cookies sont ignorés ici — ceux du parent s'appliquent.",
+        "lastRun": "Sa dernière exécution a pris {seconds}s sur les {budget}s alloués.",
+        "lastRunUnknown": "Impact en temps inconnu — ce test n'a pas encore terminé d'exécution.",
+        "noAccess": "Vous n'avez pas accès à « {name} », ses étapes ne peuvent donc pas être affichées ici.",
+        "noAccessBadge": "pas d'accès",
+        "noAccessRemedy": "Demandez l'accès en lecture à son dossier, ou supprimez la référence.",
+        "noAccessToast": "Vous n'avez pas accès à l'un des tests que ce test référence.",
+        "notRun": "Non exécuté",
+        "openChild": "Ouvrir « {name} »",
+        "pickEmpty": "Aucun autre test navigateur dans cette organisation pour le moment.",
+        "pickLabel": "Test à exécuter ici",
+        "pickLastRun": "{status} {ago}",
+        "pickLoadFailed": "Impossible de charger la liste des tests navigateur. Réessayez.",
+        "pickNested": "Contient déjà un sous-test — l'imbrication est limitée à un niveau",
+        "pickSteps": "{count} étapes",
+        "pickUsedBy": "Utilisé par {count} test | Utilisé par {count} tests",
+        "previewLabel": "Étapes exécutées ici",
+        "progressAria": "{done} sous-étapes sur {total} terminées",
+        "raiseBudget": "Augmentez le temps d'exécution alloué à ce test s'il commence à être interrompu.",
+        "stepsBadge": "{count} étapes",
+        "undefinedVariable": "« {name} » utilise {variable}, que ce test ne définit pas.",
+        "undefinedVariableAction": "L'ajouter dans Variables"
+      }
     },
     "labels": {
       "copyOf": "Copie de {name}",
@@ -14465,7 +14535,9 @@
       "pageActivity": "Activité de la page",
       "pageActivityEvents": "{count} événement | {count} événements",
       "pageActivityViewAllShort": "Voir tout dans Evidence",
-      "expandScreenshot": "Développer"
+      "expandScreenshot": "Développer",
+      "failedAtStartLoad": "Échec de l'ouverture de l'URL de départ",
+      "startLoadLabel": "Ouvrir {url}"
     },
     "runRowExpansion": {
       "browserHeader": "Navigateur",
@@ -14643,7 +14715,9 @@
       "triggering": "Déclenchement en cours...",
       "type": "Type",
       "uptime": "Disponibilité 7j",
-      "url": "URL"
+      "url": "URL",
+      "usedBy": "Utilisé par",
+      "usedByCount": "{count} test | {count} tests"
     },
     "tabs": {
       "all": "Tous",
@@ -14704,7 +14778,13 @@
       "retiredAction": "\"{action}\" n'est plus pris en charge — supprimez ou remplacez \"{step}\"",
       "runBudgetExceeded": "Cette vérification pourrait prendre jusqu'à {worstCase} par exécution, au-delà de la limite {limit}. Supprimez une combinaison navigateur/appareil ou réduisez les nouvelles tentatives. ({combos} combinaison(s) × {attempts} tentative(s) × {perAttempt} chacune.)",
       "runBudgetRetriesHint": "Réduire les nouvelles tentatives ramène cette vérification dans la limite d'exécution {limit}.",
-      "folderUnavailable": "Le dossier \"{folder}\" n'est pas disponible dans cette organisation — enregistrement dans le dossier par défaut."
+      "folderUnavailable": "Le dossier \"{folder}\" n'est pas disponible dans cette organisation — enregistrement dans le dossier par défaut.",
+      "compositionChildFailed": "« {name} » a échoué à la validation lors de l'enregistrement — ouvrez-le pour voir quelle étape corriger.",
+      "startUrlHostMismatch": "Ce test ouvre {host}, mais ses étapes naviguent vers {other}.",
+      "stepIdReserved": "Cet identifiant d'étape est réservé à l'URL de départ de l'exécution",
+      "subtestCap": "Trop d'étapes exécutées — voir l'avis au-dessus des étapes.",
+      "subtestFlags": "Un sous-test ne peut pas être optionnel ni « always-run » — son échec fait toujours échouer ce test",
+      "subtestRequired": "Choisissez le test à exécuter ici"
     },
     "privateLocations": {
       "searchPlaceholder": "Rechercher des emplacements...",
@@ -14794,7 +14874,18 @@
     "secondsAgo": "il y a {count} s",
     "stepsQueryFailed": "Échec de la requête d'étapes",
     "queryFailed": "Échec de la requête",
-    "relationNotContaining": "ne contenant pas"
+    "relationNotContaining": "ne contenant pas",
+    "delete": {
+      "blockedBody": "Supprimez d'abord ces références, ou supprimez les tests ensemble.",
+      "blockedBulkTitle": "{count} tests sélectionnés sont utilisés par des tests hors de cette sélection",
+      "blockedTitle": "« {name} » est utilisé par d'autres tests",
+      "hiddenReferences": "{count} tests auxquels vous n'avez pas accès"
+    },
+    "save": {
+      "blockedBody": "L'enregistrement n'a pas abouti. Supprimez d'abord ces références, puis enregistrez à nouveau.",
+      "usedByBody": "Vos modifications s'appliquent à tous lors de leur prochaine exécution.",
+      "usedByTitle": "« {name} » est utilisé par {count} autres tests"
+    }
   },
   "statusPages": {
     "tabTitle": "Pages de statut",

@@ -98,6 +98,8 @@ const store = createStore({
       // Composition (subtest steps) defaults on in the fixture too, matching the
       // enterprise-shaped default above — specs covering the flag OFF set it themselves.
       synthetics_composition_enabled: true,
+      // The server's configurable step cap; specs covering an override set it themselves.
+      synthetics_browser_max_steps: 50,
       sql_mode: false,
       sql_reserved_keywords: [
         "all",

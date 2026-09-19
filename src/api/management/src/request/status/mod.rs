@@ -221,6 +221,8 @@ struct ConfigResponse<'a> {
     synthetics_private_locations_enabled: bool,
     /// False under super-cluster regardless of the flag — §5.9 parity with composites.
     synthetics_composition_enabled: bool,
+    /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
+    synthetics_browser_max_steps: usize,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
     /// (`ZO_SYNTHETICS_RECORDER_EXTENSION_URL`) — the browser-test setup UI
     /// links its install button here.
@@ -491,6 +493,7 @@ pub async fn zo_config(
     // cannot serve.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
+    let synthetics_browser_max_steps = cfg.synthetics.browser_max_steps;
     let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
 
     #[cfg(feature = "cloud")]
@@ -608,6 +611,7 @@ pub async fn zo_config(
         oncall_enabled,
         synthetics_private_locations_enabled,
         synthetics_composition_enabled,
+        synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
         enable_cross_linking: cfg.common.enable_cross_linking,

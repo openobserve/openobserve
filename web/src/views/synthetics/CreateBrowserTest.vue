@@ -59,10 +59,10 @@ import {
   type ExpansionMap,
 } from "@/utils/synthetics/expandJourney";
 import {
+  browserMaxSteps,
   computeRunBudget,
   formatBudgetDuration,
   JOB_LEASE_MS,
-  MAX_STEPS,
 } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -939,6 +939,7 @@ async function persist(): Promise<boolean> {
       toast({ variant: "warning", message: t("synthetics.newCheck.notFoundInOrg") });
       return false;
     }
+    if (mapReferencedSaveConflict(err)) return false;
     if (mapCompositionSaveError(err)) return false;
     toast({
       variant: "error",
@@ -994,6 +995,31 @@ function mapCompositionSaveError(err: any): boolean {
   return true;
 }
 
+// A save-time 409 only occurs in a race: something referenced this check after it was loaded.
+const saveBlockedInfo = ref<{ references: UsedByReference[]; hidden: number } | null>(null);
+const saveBlockedOpen = computed({
+  get: () => saveBlockedInfo.value !== null,
+  set: (open: boolean) => {
+    if (!open) saveBlockedInfo.value = null;
+  },
+});
+
+/** Renders the 409 body's references through the delete flow's used-by presentation. */
+function mapReferencedSaveConflict(err: any): boolean {
+  const data = err?.response?.data;
+  if (
+    err?.response?.status !== 409 ||
+    (data?.code !== "child_referenced" && data?.code !== "referenced_check_cannot_hold_subtest")
+  ) {
+    return false;
+  }
+  saveBlockedInfo.value = {
+    references: (data.references ?? []) as UsedByReference[],
+    hidden: data.hidden_reference_count ?? 0,
+  };
+  return true;
+}
+
 // ── Selection state (synced from BrowserJourney) ───────────────────────────
 const journeyRef = ref<InstanceType<typeof BrowserJourney>>();
 
@@ -1017,6 +1043,7 @@ const showBulkDeleteDialog = ref(false);
 const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_composition_enabled === true,
 );
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 
 /** Load-time lookup only; the save-time `checkUsageThenSave` asks again on its own. */
 const referencedByState = ref<ReferencedByState>("none");
@@ -1108,6 +1135,8 @@ async function onExtractSubmit(values: ExtractForm) {
       { id, name: child.name },
     );
   } catch (err) {
+    // The cache entry must roll back with the child, or it would serve steps for a deleted check.
+    childrenCache.value.delete(id);
     await syntheticsService.delete(org, id, values.folder).catch(() => {
       toast({
         variant: "error",
@@ -1167,7 +1196,7 @@ let pendingSaveAction: (() => Promise<void>) | null = null;
  */
 async function checkUsageThenSave(afterPersist: () => Promise<void>) {
   // Before the usage lookup, so an over-cap save sends no request at all.
-  if (executedStepCount.value !== undefined && executedStepCount.value > MAX_STEPS) {
+  if (executedStepCount.value !== undefined && executedStepCount.value > maxSteps.value) {
     currentStep.value = 1;
     toast({ variant: "error", message: t("synthetics.validation.subtestCap") });
     nextTick(() => journeyRef.value?.revealCapNotice());
@@ -1904,6 +1933,28 @@ function onClearResults() {
           {{ t("synthetics.delete.hiddenReferences", { count: usedByInfo?.hidden ?? 0 }) }}
         </p>
         <p class="m-0">{{ t("synthetics.save.usedByBody") }}</p>
+      </div>
+    </ODialog>
+
+    <!-- Save-time 409 (§5.3 race): something referenced this check after it was loaded. -->
+    <ODialog
+      v-model:open="saveBlockedOpen"
+      size="sm"
+      :title="t('synthetics.delete.blockedTitle', { name: check.name })"
+      :primary-button-label="t('common.close')"
+      data-test="synthetics-create-save-blocked-dialog"
+      @click:primary="saveBlockedOpen = false"
+    >
+      <div class="flex flex-col gap-3 py-1">
+        <ul class="m-0 flex list-none flex-col gap-1 p-0">
+          <li v-for="ref in saveBlockedInfo?.references ?? []" :key="ref.id">
+            <span class="text-sm">{{ ref.name }}</span>
+          </li>
+        </ul>
+        <p v-if="(saveBlockedInfo?.hidden ?? 0) > 0" class="text-text-secondary m-0 text-xs">
+          {{ t("synthetics.delete.hiddenReferences", { count: saveBlockedInfo?.hidden ?? 0 }) }}
+        </p>
+        <p class="m-0">{{ t("synthetics.save.blockedBody") }}</p>
       </div>
     </ODialog>
 

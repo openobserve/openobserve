@@ -1297,6 +1297,12 @@ async fn settle_config_error(
     };
     if let Err(e) = process_ack(ack, org_id).await {
         tracing::error!(job_id, "[synthetics] job_resolve: config-error ack: {e}");
+        // 5xx so the probe retries the resolve and the settlement runs again.
+        return MetaHttpResponse::error(
+            StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+            format!("config-error settlement failed: {e}"),
+        )
+        .into_response();
     }
     if let Err(e) =
         openobserve_synthetics::job_api::report_config_error_result(org_id, job_id, err).await

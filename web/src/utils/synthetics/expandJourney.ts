@@ -18,8 +18,8 @@ import { isCompositionAction } from "@/constants/synthetics";
 
 export const COMPOSED_ID_DELIMITER = "_";
 export const COMPOSED_NAME_SEPARATOR = " › ";
-/** Actions whose `value` maps to a wire field (`text`, `options`, `files`) the server never scans. */
-const UNSCANNED_VALUE_ACTIONS = new Set(["assert", "select", "upload"]);
+/** Actions whose editor value never reaches a scanned wire field (assert is unstored; upload maps to `files`). */
+const UNSCANNED_VALUE_ACTIONS = new Set(["assert", "upload"]);
 const PLACEHOLDER_RE = /\{\{\s*(\w+)\s*\}\}/g;
 
 export interface ExpansionEntry {
@@ -62,8 +62,17 @@ export function expandJourney(
 ): { steps: BrowserStep[]; map: ExpansionMap } {
   const out: BrowserStep[] = [];
   const map: ExpansionMap = new Map();
+  // Mirrors the server's `IdCollision`: an authored id like `s2_c1` can collide with a composed one.
+  const seen = new Set<string>();
+  const claim = (id: string) => {
+    if (seen.has(id)) {
+      throw new Error(`expansion produced duplicate step id "${id}"; rename the colliding step`);
+    }
+    seen.add(id);
+  };
   for (const step of steps) {
     if (!isCompositionAction(step.action)) {
+      claim(step.id);
       out.push(step);
       continue;
     }
@@ -77,6 +86,7 @@ export function expandJourney(
         );
       }
       const id = composedStepId(step.id, childStep.id);
+      claim(id);
       const name = composedStepName(step.name, child.name, childStep.name);
       out.push({
         ...childStep,

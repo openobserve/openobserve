@@ -118,6 +118,18 @@ watch(
   },
 );
 
+// The dialog persists across opens, so the setup-time schema goes stale when a locations edit flips the flag.
+watch(
+  () => props.needsSchedule,
+  (needs) => {
+    const schema = makeExtractSubtestSchema(t, needs);
+    form.update({
+      ...form.options,
+      validators: { onDynamic: schema as any, onDynamicAsync: schema as any },
+    });
+  },
+);
+
 function onUpdateOpen(value: boolean) {
   if (!isSubmitting.value) emit("update:open", value);
 }

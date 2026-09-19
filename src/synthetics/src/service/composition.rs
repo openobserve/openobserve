@@ -224,7 +224,13 @@ fn check_rules(
             )));
         }
     }
-    let defined: HashSet<&str> = body.variables.iter().map(|v| v.name.as_str()).collect();
+    // Secret names count as defined: resolve injects their decrypted values into env_inject.
+    let defined: HashSet<&str> = body
+        .variables
+        .iter()
+        .map(|v| v.name.as_str())
+        .chain(cfg.secrets.iter().map(|s| s.name.as_str()))
+        .collect();
     for child_id in &refs {
         let child = &children[child_id];
         if let Some(var) = placeholders_in(&child.steps)
@@ -341,6 +347,17 @@ mod tests {
             name: "PASSWORD".into(),
             ..Default::default()
         }];
+        check_rules(Some("p"), &body, &children, &[]).unwrap();
+    }
+
+    // Resolve injects decrypted secret values into env_inject, so a secret name defines the token.
+    #[test]
+    fn a_parent_secret_defines_a_child_placeholder() {
+        let mut child = login(2);
+        child.steps[1]["value"] = json!("{{PASSWORD}}");
+        let children = HashMap::from([("login".to_string(), child)]);
+        let mut body = parent_with(&["login"], 0);
+        body.config["secrets"] = json!([{ "name": "PASSWORD", "value": "AESenc:x" }]);
         check_rules(Some("p"), &body, &children, &[]).unwrap();
     }
 

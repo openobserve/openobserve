@@ -190,15 +190,15 @@ fn push_unique(
 
 fn collect_placeholders(text: &str, into: &mut BTreeSet<String>) {
     let mut rest = text;
-    while let Some(start) = rest.find("{{") {
-        let Some(len) = rest[start + 2..].find("}}") else {
-            break;
-        };
-        let name = rest[start + 2..start + 2 + len].trim();
-        if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            into.insert(name.to_owned());
+    while let Some(close) = rest.find("}}") {
+        // Nearest `{{` before each `}}` — the web regex's semantics, so "{{x {{HOST}}" finds HOST.
+        if let Some(open) = rest[..close].rfind("{{") {
+            let name = rest[open + 2..close].trim();
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                into.insert(name.to_owned());
+            }
         }
-        rest = &rest[start + 2 + len + 2..];
+        rest = &rest[close + 2..];
     }
 }
 
@@ -372,5 +372,13 @@ mod tests {
         ];
         let found: Vec<String> = placeholders_in(&steps).into_iter().collect();
         assert_eq!(found, ["HOST", "KEY", "PASSWORD"]);
+    }
+
+    // The web regex finds HOST here; a greedy scan that eats through the first `}}` finds nothing.
+    #[test]
+    fn a_stray_open_brace_does_not_hide_the_placeholder_behind_it() {
+        let steps = [json!({ "id": "a", "action": "fill", "value": "{{x {{HOST}}" })];
+        let found: Vec<String> = placeholders_in(&steps).into_iter().collect();
+        assert_eq!(found, ["HOST"]);
     }
 }

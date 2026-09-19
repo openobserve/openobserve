@@ -47,7 +47,7 @@ import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { journeyToWireSteps, mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
-import { MAX_STEPS } from "@/utils/synthetics/runBudget";
+import { browserMaxSteps } from "@/utils/synthetics/runBudget";
 import syntheticsService from "@/services/synthetics";
 import {
   composedStepId,
@@ -1235,7 +1235,10 @@ const isCompositionEnabled = computed(
 
 // ── Executed step cap ────────────────────────────────────────────────────
 // Undefined `ownStepCount` (a child could not be loaded) shows no notice; the server backstop applies.
-const overCap = computed(() => props.ownStepCount !== undefined && props.ownStepCount > MAX_STEPS);
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
+const overCap = computed(
+  () => props.ownStepCount !== undefined && props.ownStepCount > maxSteps.value,
+);
 const ownStepTotal = computed(() => props.modelValue.filter((s) => s.action !== "subtest").length);
 /** One entry per reference row in journey order — the same child twice runs twice. */
 const capChildren = computed(() =>
@@ -1933,7 +1936,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       <OIcon name="error" size="sm" class="text-badge-error-ol-text mt-0.5" aria-hidden="true" />
       <div class="text-badge-error-ol-text flex min-w-0 flex-1 flex-col gap-0.5 text-xs">
         <span class="font-semibold">{{
-          t("synthetics.journey.subtest.capTitle", { total: ownStepCount, limit: MAX_STEPS })
+          t("synthetics.journey.subtest.capTitle", { total: ownStepCount, limit: maxSteps })
         }}</span>
         <span data-test="synthetics-journey-cap-breakdown"
           >{{

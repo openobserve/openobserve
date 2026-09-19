@@ -25,7 +25,7 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { syntheticsFolderName } from "@/utils/synthetics/routes";
-import { MAX_STEPS } from "@/utils/synthetics/runBudget";
+import { browserMaxSteps } from "@/utils/synthetics/runBudget";
 
 /**
  * `ownStepCount` is the EXECUTED count of the journey as it stands, not
@@ -51,6 +51,7 @@ const emit = defineEmits<{
 
 const { t } = useI18nTyped();
 const store = useStore();
+const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 const org = computed(() => store.state.selectedOrganization.identifier as string);
 
 const DEFAULT_JOURNEY_BUDGET_MS = 300_000;
@@ -134,13 +135,29 @@ onMounted(async () => {
 });
 
 async function onPick(id: string) {
-  const check = (await syntheticsService.get(org.value, id)).data;
-  const runs = (await syntheticsService.getRuns(org.value, id, { page_size: 1 })).data.runs ?? [];
-  const last = runs[0];
+  let check;
+  try {
+    check = (await syntheticsService.get(org.value, id)).data;
+  } catch (err) {
+    // No emit: a pick whose GET failed would store a reference the caller cannot expand.
+    console.error("[synthetics] failed to load the picked browser test", err);
+    toast({ variant: "error", message: t("synthetics.journey.subtest.pickLoadFailed") });
+    return;
+  }
   emit("update:modelValue", { id, name: check.name });
   // Written after the emit and in one tick: a half-applied pick would render this component's
   // new child against the host's previous count.
   childSteps.value = check.config?.steps?.length ?? 0;
+  // Cleared before the await so a previous pick's run time never shows against this child.
+  lastRunSeconds.value = null;
+  // A run-history failure must not undo the pick; the time impact just reads unknown.
+  let last;
+  try {
+    const runs = (await syntheticsService.getRuns(org.value, id, { page_size: 1 })).data.runs ?? [];
+    last = runs[0];
+  } catch (err) {
+    console.error("[synthetics] failed to load runs for the picked browser test", err);
+  }
   lastRunSeconds.value = last?.completed_at
     ? Math.round((last.completed_at - last.created_at) / 1_000_000)
     : null;
@@ -190,7 +207,7 @@ const isSlow = computed(
             name: modelValue?.name ?? "",
             before,
             after,
-            limit: MAX_STEPS,
+            limit: maxSteps,
           })
         }}
       </p>

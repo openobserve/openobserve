@@ -154,12 +154,7 @@ pub async fn child_step_counts<C: ConnectionTrait>(
         return Ok(HashMap::new());
     }
     let backend = conn.get_database_backend();
-    // `config` is `jsonb` on Postgres and TEXT-backed JSON elsewhere, so the length
-    // function differs; MySQL and SQLite share `json_array_length`.
-    let length_expr = match backend {
-        sea_orm::DatabaseBackend::Postgres => "jsonb_array_length(config->'steps')",
-        _ => "json_array_length(json_extract(config, '$.steps'))",
-    };
+    let length_expr = step_length_expr(backend);
     let placeholders: Vec<String> = (0..child_ids.len())
         .map(|i| match backend {
             sea_orm::DatabaseBackend::Postgres => format!("${}", i + 2),
@@ -191,6 +186,16 @@ pub async fn child_step_counts<C: ConnectionTrait>(
         counts.insert(id, usize::try_from(count.max(0)).unwrap_or(0));
     }
     Ok(counts)
+}
+
+// `config` is plain `json` on Postgres (not jsonb) and each backend names the array-length function
+// differently.
+fn step_length_expr(backend: sea_orm::DatabaseBackend) -> &'static str {
+    match backend {
+        sea_orm::DatabaseBackend::Postgres => "json_array_length(config->'steps')",
+        sea_orm::DatabaseBackend::MySql => "JSON_LENGTH(config, '$.steps')",
+        sea_orm::DatabaseBackend::Sqlite => "json_array_length(json_extract(config, '$.steps'))",
+    }
 }
 
 /// The child ids a check's stored journey references, in order and with multiplicity.
@@ -422,6 +427,22 @@ mod tests {
             .unwrap();
         assert_eq!(many["a"].len(), 2);
         assert!(!many.contains_key("zzz"));
+    }
+
+    #[test]
+    fn step_length_expr_names_the_right_function_per_backend() {
+        assert_eq!(
+            step_length_expr(sea_orm::DatabaseBackend::Postgres),
+            "json_array_length(config->'steps')"
+        );
+        assert_eq!(
+            step_length_expr(sea_orm::DatabaseBackend::MySql),
+            "JSON_LENGTH(config, '$.steps')"
+        );
+        assert_eq!(
+            step_length_expr(sea_orm::DatabaseBackend::Sqlite),
+            "json_array_length(json_extract(config, '$.steps'))"
+        );
     }
 
     #[tokio::test]

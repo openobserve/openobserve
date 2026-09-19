@@ -58,12 +58,8 @@ pub async fn create_synthetic(
     // every exit from the critical section releases the lock exactly once (see
     // `composite_graph_lock`'s callers in src/core, the precedent this follows).
     let mutation = create_synthetic_under_lock(org_id, body, created_by).await;
-    let unlock = guard
-        .release()
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    release_composition_guard(guard, org_id).await;
     let mut result = mutation?;
-    unlock?;
 
     // The public slug behind the stored PK. Derived from what was written
     // rather than from the request, so a request that named its folder by PK
@@ -184,12 +180,8 @@ pub async fn update_synthetic(
     // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
     // released, so every exit releases the lock exactly once.
     let mutation = update_synthetic_under_lock(conn, org_id, id, body).await;
-    let unlock = guard
-        .release()
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    release_composition_guard(guard, org_id).await;
     let (old_folder_pk, new_folder_pk, mut check) = mutation?;
-    unlock?;
 
     // Recompute next_run_at so the scheduler uses the new frequency immediately.
     let now_us = config::utils::time::now_micros();
@@ -270,12 +262,8 @@ pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
     // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
     // released, so every exit releases the lock exactly once.
     let mutation = delete_synthetic_under_lock(conn, org_id, id).await;
-    let unlock = guard
-        .release()
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    release_composition_guard(guard, org_id).await;
     let deleted = mutation?;
-    unlock?;
     #[cfg(feature = "enterprise")]
     if deleted
         && o2_enterprise::enterprise::common::config::get_config()
@@ -486,12 +474,8 @@ pub async fn delete_synthetics_bulk(
         replicate,
     )
     .await;
-    let unlock = guard
-        .release()
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())));
+    release_composition_guard(guard, org_id).await;
     mutation?;
-    unlock?;
     Ok(())
 }
 
@@ -611,6 +595,15 @@ pub async fn run_synthetic_now(org_id: &str, id: &str) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("[synthetics] run_synthetic_now advance_schedule: {e}"))
 }
 
+// A completed mutation must not surface as an unlock failure: the lock expires on its own.
+async fn release_composition_guard(guard: composition_lock::CompositionGuard, org_id: &str) {
+    if let Err(e) = guard.release().await {
+        log::warn!(
+            "[SYNTHETICS] org {org_id}: composition unlock failed, the lock will expire on its own: {e}"
+        );
+    }
+}
+
 /// The create mutation run while `checks.rs`'s callers hold the composition lock — kept as
 /// its own `?`-propagating scope so the lock is always released exactly once, win or lose.
 async fn create_synthetic_under_lock(
@@ -618,7 +611,9 @@ async fn create_synthetic_under_lock(
     mut body: Synthetic,
     created_by: &str,
 ) -> anyhow::Result<Synthetic> {
-    composition::validate_for_save(get_orm_client_ro().await, org_id, None, &body)
+    let conn = get_orm_client_rw().await;
+    // On the RW connection: a lagging read replica would reopen the race the lock closes.
+    composition::validate_for_save(conn, org_id, None, &body)
         .await
         .map_err(anyhow::Error::new)?;
 
@@ -626,7 +621,6 @@ async fn create_synthetic_under_lock(
     body = encrypt_synthetic_auth(org_id, body).await?;
     body.owner = Some(created_by.to_owned());
 
-    let conn = get_orm_client_rw().await;
     synthetics_checks::create(conn, org_id, body, false)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))
@@ -641,7 +635,8 @@ async fn update_synthetic_under_lock(
     id: &str,
     mut body: Synthetic,
 ) -> anyhow::Result<(Option<String>, Option<String>, Synthetic)> {
-    composition::validate_for_save(get_orm_client_ro().await, org_id, Some(id), &body)
+    // On the RW connection: a lagging read replica would reopen the race the lock closes.
+    composition::validate_for_save(conn, org_id, Some(id), &body)
         .await
         .map_err(anyhow::Error::new)?;
 

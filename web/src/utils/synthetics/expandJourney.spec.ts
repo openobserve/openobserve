@@ -21,6 +21,7 @@ import {
   expandJourney,
   loadChildren,
   opensStartingUrl,
+  placeholdersIn,
   translateStepId,
   undefinedPlaceholders,
   type ChildJourney,
@@ -93,6 +94,16 @@ describe("expandJourney", () => {
     ).toThrow(/one level/);
   });
 
+  // Mirrors the server's `ExpansionError::IdCollision`; `s2_c1` is a legal authored id.
+  it("throws when an authored id collides with a composed id", () => {
+    expect(() =>
+      expandJourney(
+        [nav("s1"), subtest("s2", "login-test"), click("s2_c1", "Logs")],
+        new Map([["login-test", login]]),
+      ),
+    ).toThrow(/duplicate step id "s2_c1"/);
+  });
+
   it("rewrites a spliced step's wire id and name so the extension reports under the composed id", () => {
     const withWire: ChildJourney = {
       ...login,
@@ -163,13 +174,13 @@ describe("undefinedPlaceholders", () => {
     ]);
   });
 
-  it("ignores assert steps and defined names", () => {
+  it("ignores assert/upload steps and defined names, but scans a select value", () => {
     const child: ChildJourney = {
       id: "login-test",
       name: "Login",
       steps: [
         typeStep("c1", "{{USER}}"),
-        // assert/select/upload `value`s map to wire `text`/`options`/`files`, which the server never scans.
+        // assert is unstored and upload maps to wire `files`; a select value maps to scanned `value`.
         { id: "c2", action: "assert", name: "Landed", value: "{{TOKEN}}" },
         { id: "c4", action: "select", name: "Pick plan", value: "{{PLAN}}" },
         { id: "c5", action: "upload", name: "Attach", value: "{{FILE}}" },
@@ -181,8 +192,15 @@ describe("undefinedPlaceholders", () => {
         },
       ],
     };
-    expect(undefinedPlaceholders(child, ["USER"])).toEqual([]);
-    expect(undefinedPlaceholders(child, [])).toEqual(["USER"]);
+    expect(undefinedPlaceholders(child, ["USER", "PLAN"])).toEqual([]);
+    expect(undefinedPlaceholders(child, [])).toEqual(["PLAN", "USER"]);
+  });
+
+  // A select step's editor value substitutes into the scanned wire field `value`.
+  it("finds a placeholder in a select value via placeholdersIn", () => {
+    expect(
+      placeholdersIn([{ id: "c1", action: "select", name: "Pick plan", value: "{{PLAN}}" }]),
+    ).toEqual(["PLAN"]);
   });
 
   // Regression guards for the delegation to `placeholdersIn`: same answer both ways.
