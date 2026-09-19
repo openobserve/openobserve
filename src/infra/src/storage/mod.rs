@@ -56,6 +56,12 @@ pub enum StorageTier {
     InfrequentAccess,
 }
 
+#[derive(Debug)]
+pub struct LocalFile {
+    pub file: std::fs::File,
+    pub meta: ObjectMeta,
+}
+
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
@@ -80,6 +86,15 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
         location: &Path,
         opts: PutMultipartOptions,
     ) -> Result<Box<dyn MultipartUpload>>;
+    /// Optional positive capability; unknown/custom backends must not be probed.
+    async fn try_open_local_file(
+        &self,
+        _account: &str,
+        _location: &Path,
+    ) -> Result<Option<LocalFile>> {
+        Ok(None)
+    }
+
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult>;
     async fn get_opts(
         &self,
@@ -157,6 +172,12 @@ pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
     MULTI_ACCOUNTS.add_account(key, acc).await;
 }
 
+pub async fn try_open_local_file(account: &str, file: &str) -> Result<Option<LocalFile>> {
+    MULTI_ACCOUNTS
+        .try_open_local_file(account, &file.into())
+        .await
+}
+
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
     MULTI_ACCOUNTS.get(account, &file.into()).await
 }
@@ -179,6 +200,36 @@ pub async fn get_ranges(
     MULTI_ACCOUNTS
         .get_ranges(account, &file.into(), ranges)
         .await
+}
+
+#[cfg(unix)]
+pub(crate) fn read_ranges_from_file(
+    file: &std::fs::File,
+    ranges: &[Range<u64>],
+) -> std::io::Result<Vec<Bytes>> {
+    use std::os::unix::fs::FileExt;
+
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
+    let size = file.metadata()?.len();
+    let ranges = ranges
+        .iter()
+        .map(|range| {
+            object_store::GetRange::Bounded(range.clone())
+                .as_range(size)
+                .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
+        })
+        .collect::<std::io::Result<Vec<_>>>()?;
+    let mut output = Vec::with_capacity(ranges.len());
+    for range in ranges {
+        let len = usize::try_from(range.end - range.start)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+        let mut bytes = vec![0; len];
+        file.read_exact_at(&mut bytes, range.start)?;
+        output.push(Bytes::from(bytes));
+    }
+    Ok(output)
 }
 
 pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
@@ -511,6 +562,49 @@ impl From<Error> for object_store::Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_order_overlap_and_eof() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        let ranges = [10..14, 1..5, 3..7, 1..5, 14..20];
+        assert_eq!(
+            read_ranges_from_file(file.as_file(), &ranges).unwrap(),
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"ef"),
+            ]
+        );
+        assert!(
+            read_ranges_from_file(file.as_file(), &[])
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_read_ranges_from_file_rejects_invalid_and_bounds_huge_end() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), b"0123456789abcdef").unwrap();
+        for range in [Range { start: 7, end: 3 }, 3..3, 16..17, u64::MAX..u64::MAX] {
+            let error = read_ranges_from_file(file.as_file(), &[range]).unwrap_err();
+            assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        }
+        let result = read_ranges_from_file(file.as_file(), std::slice::from_ref(&(14..u64::MAX)));
+        if usize::BITS == 64 {
+            assert_eq!(result.unwrap(), vec![Bytes::from_static(b"ef")]);
+        } else {
+            // Match GetRange::is_valid on 32-bit targets: reject before clipping.
+            assert_eq!(result.unwrap_err().kind(), std::io::ErrorKind::InvalidInput);
+        }
+        std::fs::write(file.path(), b"").unwrap();
+        assert!(read_ranges_from_file(file.as_file(), std::slice::from_ref(&(0..1))).is_err());
+    }
 
     #[test]
     fn test_error_display_out_of_range() {

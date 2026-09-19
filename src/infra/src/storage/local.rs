@@ -15,9 +15,6 @@
 
 #[cfg(unix)]
 use std::ops::Range;
-#[cfg(unix)]
-use std::os::unix::fs::FileExt;
-use std::path::PathBuf;
 
 use async_trait::async_trait;
 #[cfg(unix)]
@@ -34,8 +31,6 @@ use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
-    #[cfg_attr(not(unix), expect(dead_code))]
-    root_dir: PathBuf,
     with_prefix: bool,
 }
 
@@ -47,19 +42,36 @@ impl Local {
     pub fn new(root_dir: &str, with_prefix: bool) -> Self {
         Self {
             client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
-            root_dir: PathBuf::from(root_dir),
             with_prefix,
         }
     }
 
-    /// Resolve an object-store Path to a filesystem path.
-    /// For local storage format_key is a no-op, so the file lives at
-    /// `root_dir / key`.
-    #[cfg_attr(not(unix), expect(dead_code))]
-    #[inline]
-    fn full_path(&self, location: &Path) -> PathBuf {
-        self.root_dir
-            .join(format_key(location.as_ref(), self.with_prefix))
+    pub(super) async fn try_open_file(&self, location: &Path) -> Result<Option<super::LocalFile>> {
+        let start = std::time::Instant::now();
+        let key = location.to_string();
+        let result = self
+            .client
+            .get_opts(
+                &Path::from(format_key(&key, self.with_prefix)),
+                GetOptions::default(),
+            )
+            .await?;
+        let object_store::GetResultPayload::File(file, _) = result.payload else {
+            return Ok(None);
+        };
+        let columns = key.split('/').collect::<Vec<_>>();
+        if columns.len() >= 3 && columns[0] == "files" {
+            metrics::STORAGE_READ_REQUESTS
+                .with_label_values(&[columns[1], columns[2], "open_local_file", "local"])
+                .inc();
+            metrics::STORAGE_TIME
+                .with_label_values(&[columns[1], columns[2], "open_local_file", "local"])
+                .inc_by(start.elapsed().as_secs_f64());
+        }
+        Ok(Some(super::LocalFile {
+            file,
+            meta: result.meta,
+        }))
     }
 }
 
@@ -182,42 +194,45 @@ impl ObjectStore for Local {
     /// overhead and repeated file-open cost.
     #[cfg(unix)]
     async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        if ranges.is_empty() {
+            return Ok(Vec::new());
+        }
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let full_path = self.full_path(location);
-        let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
-
-        let results = tokio::task::block_in_place(|| -> std::io::Result<Vec<Bytes>> {
-            let f = std::fs::File::open(&full_path)?;
-            let mut out = Vec::with_capacity(ranges_owned.len());
-            for range in &ranges_owned {
-                let len = (range.end - range.start) as usize;
-                let mut buf = vec![0u8; len];
-                f.read_exact_at(&mut buf, range.start)?;
-                out.push(Bytes::from(buf));
+        let location = Path::from(format_key(&file, self.with_prefix));
+        let result = self
+            .client
+            .get_opts(&location, GetOptions::default())
+            .await?;
+        let results = match result.payload {
+            object_store::GetResultPayload::File(handle, _) => {
+                tokio::task::block_in_place(|| super::read_ranges_from_file(&handle, ranges))
+                    .map_err(|error| {
+                        log::error!("[STORAGE] get_ranges local file: {file}, error: {error:?}");
+                        if error.kind() == std::io::ErrorKind::NotFound {
+                            Error::NotFound {
+                                path: file.clone(),
+                                source: Box::new(error),
+                            }
+                        } else {
+                            Error::Generic {
+                                store: "LocalFileSystem",
+                                source: Box::new(error),
+                            }
+                        }
+                    })?
             }
-            Ok(out)
-        })
-        .map_err(|e| {
-            log::error!("[STORAGE] get_ranges local file: {file}, error: {e:?}");
-            if e.kind() == std::io::ErrorKind::NotFound {
-                Error::NotFound {
-                    path: file.clone(),
-                    source: Box::new(e),
-                }
-            } else {
-                Error::Generic {
-                    store: "LocalFileSystem",
-                    source: Box::new(e),
-                }
+            object_store::GetResultPayload::Stream(stream) => {
+                drop(stream);
+                self.client.get_ranges(&location, ranges).await?
             }
-        })?;
+        };
 
         // metrics — count one read per input range so the counter reflects
         // actual pread calls, not just the outer batched API call.
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns.len() >= 3 && columns[0] == "files" {
-            let total_bytes: u64 = ranges.iter().map(|r| r.end - r.start).sum();
+            let total_bytes: u64 = results.iter().map(|bytes| bytes.len() as u64).sum();
             let n = ranges.len() as u64;
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
@@ -281,6 +296,367 @@ mod tests {
         Local::new(root, with_prefix)
     }
 
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_file_preserves_prefix_path_validation_and_readonly_mode() {
+        use std::io::Write;
+        for prefix in [false, true] {
+            let directory = tempfile::tempdir().unwrap();
+            let store = Local::new(directory.path().to_str().unwrap(), prefix);
+            let key = Path::from("nested/object");
+            store
+                .put_opts(
+                    &key,
+                    bytes::Bytes::from_static(b"native").into(),
+                    PutOptions::default(),
+                )
+                .await
+                .unwrap();
+            let opened = store.try_open_file(&key).await.unwrap().unwrap();
+            let normal = store.get_opts(&key, GetOptions::default()).await.unwrap();
+            assert_eq!(opened.meta, normal.meta);
+            assert_eq!(opened.file.metadata().unwrap().len(), 6);
+            assert!((&opened.file).write_all(b"overwrite").is_err());
+            let formatted = format_key(key.as_ref(), prefix);
+            assert!(directory.path().join(formatted).is_file());
+            let invalid = Path::ROOT;
+            let expected = store
+                .get_opts(&invalid, GetOptions::default())
+                .await
+                .unwrap_err();
+            let actual = store.try_open_file(&invalid).await.unwrap_err();
+            assert_eq!(actual.to_string(), expected.to_string());
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_file_records_open_without_counting_whole_body() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = Local::new(directory.path().to_str().unwrap(), false);
+        let org = directory.path().file_name().unwrap().to_str().unwrap();
+        let key = Path::from(format!("files/{org}/midx/test"));
+        store
+            .put_opts(
+                &key,
+                bytes::Bytes::from_static(b"body-not-read").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let labels = &[org, "midx", "open_local_file", "local"];
+        let requests = metrics::STORAGE_READ_REQUESTS.with_label_values(labels);
+        let body = metrics::STORAGE_READ_BYTES.with_label_values(labels);
+        let before = requests.get();
+        let bytes_before = body.get();
+        let opened = store.try_open_file(&key).await.unwrap().unwrap();
+        assert_eq!(opened.meta.size, 13);
+        assert_eq!(requests.get(), before + 1);
+        assert_eq!(body.get(), bytes_before);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_file_survives_atomic_replace_and_unlink() {
+        use std::os::unix::fs::FileExt;
+        let directory = tempfile::tempdir().unwrap();
+        let store = Local::new(directory.path().to_str().unwrap(), false);
+        let key = Path::from("immutable");
+        store
+            .put_opts(
+                &key,
+                Bytes::from_static(b"old").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let old = store.try_open_file(&key).await.unwrap().unwrap();
+        store
+            .put_opts(
+                &key,
+                Bytes::from_static(b"new").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let new = store.try_open_file(&key).await.unwrap().unwrap();
+        object_store::ObjectStoreExt::delete(&store, &key)
+            .await
+            .unwrap();
+        assert!(store.try_open_file(&key).await.is_err());
+        let mut bytes = [0; 3];
+        old.file.read_exact_at(&mut bytes, 0).unwrap();
+        assert_eq!(&bytes, b"old");
+        new.file.read_exact_at(&mut bytes, 0).unwrap();
+        assert_eq!(&bytes, b"new");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_preserves_bounded_reads_and_empty_request() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("ranges"), b"0123456789abcdef").unwrap();
+        let store = Local::new(directory.path().to_str().unwrap(), false);
+        let location = Path::from("ranges");
+        let ranges = [10..14, 1..5, 3..7, 1..5, 14..20];
+        let actual = store.get_ranges(&location, &ranges).await.unwrap();
+        for (range, bytes) in ranges.into_iter().zip(actual) {
+            let options = GetOptions {
+                range: Some(range.into()),
+                ..Default::default()
+            };
+            assert_eq!(
+                bytes,
+                store
+                    .get_opts(&location, options)
+                    .await
+                    .unwrap()
+                    .bytes()
+                    .await
+                    .unwrap()
+            );
+        }
+        assert!(
+            store
+                .get_ranges(&Path::from("missing"), &[])
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        let invalid = Range { start: 7, end: 3 };
+        assert!(store.get_ranges(&location, &[invalid]).await.is_err());
+        assert!(
+            store
+                .get_ranges(&location, std::slice::from_ref(&(16..17)))
+                .await
+                .is_err()
+        );
+        if usize::BITS == 64 {
+            assert_eq!(
+                store
+                    .get_ranges(&location, std::slice::from_ref(&(14..u64::MAX)))
+                    .await
+                    .unwrap(),
+                vec![Bytes::from_static(b"ef")]
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[derive(Debug)]
+    struct GatedLocalStore {
+        inner: LocalFileSystem,
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        entered: std::sync::Arc<tokio::sync::Notify>,
+        release: std::sync::Arc<tokio::sync::Notify>,
+    }
+
+    #[cfg(unix)]
+    impl std::fmt::Display for GatedLocalStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("gated-local")
+        }
+    }
+
+    #[cfg(unix)]
+    #[async_trait]
+    impl ObjectStore for GatedLocalStore {
+        async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+            if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                self.entered.notify_one();
+                self.release.notified().await;
+            }
+            self.inner.get_opts(location, options).await
+        }
+
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> Result<PutResult> {
+            self.inner.put_opts(location, payload, options).await
+        }
+
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            options: PutMultipartOptions,
+        ) -> Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, options).await
+        }
+
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, Result<Path>>,
+        ) -> BoxStream<'static, Result<Path>> {
+            self.inner.delete_stream(locations)
+        }
+
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+
+        async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+
+        async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_file_shares_admission_and_releases_on_cancellation() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("object"), b"data").unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let backend = GatedLocalStore {
+            inner: LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
+            calls: Arc::clone(&calls),
+            entered: Arc::new(tokio::sync::Notify::new()),
+            release: Arc::new(tokio::sync::Notify::new()),
+        };
+        let store = Local {
+            client: LimitStore::new(Box::new(backend) as Box<dyn ObjectStore>, 1),
+            with_prefix: false,
+        };
+        let key = Path::from("object");
+        let mut blocked_get = Box::pin(store.client.get_opts(&key, GetOptions::default()));
+        assert!(futures::poll!(blocked_get.as_mut()).is_pending());
+        let mut waiting_open = Box::pin(store.try_open_file(&key));
+        assert!(futures::poll!(waiting_open.as_mut()).is_pending());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        drop(waiting_open);
+        drop(blocked_get);
+        let opened =
+            tokio::time::timeout(std::time::Duration::from_secs(5), store.try_open_file(&key))
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        // Holding the returned file must not hold the open/metadata permit.
+        let second =
+            tokio::time::timeout(std::time::Duration::from_secs(5), store.try_open_file(&key))
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+        assert_eq!(opened.meta.size, second.meta.size);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_file_drops_unexpected_stream_permit() {
+        let memory = object_store::memory::InMemory::new();
+        let key = Path::from("object");
+        memory
+            .put_opts(
+                &key,
+                bytes::Bytes::from_static(b"data").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let store = Local {
+            client: LimitStore::new(Box::new(memory) as Box<dyn ObjectStore>, 1),
+            with_prefix: false,
+        };
+        assert!(store.try_open_file(&key).await.unwrap().is_none());
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_secs(5), store.try_open_file(&key))
+                .await
+                .unwrap()
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_shares_open_admission_with_get_opts() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("ranges"), b"0123456789abcdef").unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let entered = Arc::new(tokio::sync::Notify::new());
+        let release = Arc::new(tokio::sync::Notify::new());
+        let backend = GatedLocalStore {
+            inner: LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
+            calls: Arc::clone(&calls),
+            entered: Arc::clone(&entered),
+            release: Arc::clone(&release),
+        };
+        let store = Arc::new(Local {
+            client: LimitStore::new(Box::new(backend) as Box<dyn ObjectStore>, 1),
+            with_prefix: false,
+        });
+        let blocker = tokio::spawn({
+            let store = Arc::clone(&store);
+            async move {
+                store
+                    .client
+                    .get_opts(&Path::from("ranges"), GetOptions::default())
+                    .await
+            }
+        });
+        entered.notified().await;
+        let location = Path::from("ranges");
+        let ranges = [1..3, 5..7];
+        let mut batch = Box::pin(store.get_ranges(&location, &ranges));
+        assert!(futures::poll!(batch.as_mut()).is_pending());
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        release.notify_one();
+        let opened = blocker.await.unwrap().unwrap();
+        assert!(matches!(
+            &opened.payload,
+            object_store::GetResultPayload::File(..)
+        ));
+        assert_eq!(
+            batch.await.unwrap(),
+            vec![Bytes::from_static(b"12"), Bytes::from_static(b"56")]
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        drop(opened);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_drops_stream_permit_before_fallback() {
+        let inner = object_store::memory::InMemory::new();
+        let location = Path::from("ranges");
+        inner
+            .put_opts(
+                &location,
+                Bytes::from_static(b"0123456789abcdef").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let store = Local {
+            client: LimitStore::new(Box::new(inner) as Box<dyn ObjectStore>, 1),
+            with_prefix: false,
+        };
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            store.get_ranges(&location, &[1..3, 5..7]),
+        )
+        .await
+        .expect("stream fallback retained the only client permit")
+        .unwrap();
+        assert_eq!(
+            result,
+            vec![Bytes::from_static(b"12"), Bytes::from_static(b"56")]
+        );
+    }
+
     #[test]
     fn test_name_returns_local() {
         assert_eq!(Local::name(), "local");
@@ -297,12 +673,6 @@ mod tests {
         let l = make_local("/tmp", false);
         let s = format!("{l:?}");
         assert!(s.contains("storage for local disk"));
-    }
-
-    #[test]
-    fn test_new_stores_root_dir() {
-        let l = make_local("/tmp", false);
-        assert_eq!(l.root_dir, std::path::PathBuf::from("/tmp"));
     }
 
     #[test]

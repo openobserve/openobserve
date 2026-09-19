@@ -37,6 +37,19 @@ const DEFAULT_ACCOUNT: &str = "default";
 
 static ADD_ACCOUNT_LOCK: Lazy<Arc<Mutex<()>>> = Lazy::new(|| Arc::new(Mutex::new(())));
 
+struct NativeLocalClient {
+    client: Arc<Box<dyn ObjectStore>>,
+    local: Arc<super::local::Local>,
+}
+
+impl NativeLocalClient {
+    fn new(local: super::local::Local) -> Self {
+        let local = Arc::new(local);
+        let client: Arc<Box<dyn ObjectStore>> = Arc::new(Box::new(Arc::clone(&local)));
+        Self { client, local }
+    }
+}
+
 // The reason accounts has the type like this is
 // 1. arc swap so we can add a new store dynamically and swap the whole map with new map with store
 //    added
@@ -49,6 +62,7 @@ pub struct StorageClientFactory {
     accounts: ArcSwap<HashMap<String, Arc<Box<dyn ObjectStore>>>>,
     stream_strategy: StreamStrategy,
     only_default: bool,
+    native_local: Option<NativeLocalClient>,
 }
 
 impl Default for StorageClientFactory {
@@ -76,14 +90,14 @@ impl StorageClientFactory {
         let mut temp: HashMap<String, Arc<Box<dyn ObjectStore>>> =
             HashMap::with_capacity(accounts.len());
         let mut only_default = accounts.len() == 1;
+        let mut native_local = None;
 
         if local_mode {
             std::fs::create_dir_all(&get_config().common.data_stream_dir)
                 .expect("create stream data dir success");
-            temp.insert(
-                DEFAULT_ACCOUNT.to_string(),
-                Arc::new(Box::<super::local::Local>::default()),
-            );
+            let native = NativeLocalClient::new(super::local::Local::default());
+            temp.insert(DEFAULT_ACCOUNT.to_string(), Arc::clone(&native.client));
+            native_local = Some(native);
             // local storage only has one account
             only_default = true;
         } else {
@@ -96,6 +110,7 @@ impl StorageClientFactory {
             accounts: ArcSwap::from_pointee(temp),
             only_default,
             stream_strategy,
+            native_local,
         }
     }
 
@@ -345,6 +360,29 @@ impl ObjectStoreExt for StorageClientFactory {
             .await
     }
 
+    async fn try_open_local_file(
+        &self,
+        account: &str,
+        location: &Path,
+    ) -> Result<Option<super::LocalFile>> {
+        let Some(native) = &self.native_local else {
+            return Ok(None);
+        };
+        let name = if account.is_empty() {
+            DEFAULT_ACCOUNT
+        } else {
+            account
+        };
+        let client = self.accounts.load().get(name).cloned();
+        let Some(client) = client else {
+            return Ok(None);
+        };
+        if !Arc::ptr_eq(&client, &native.client) {
+            return Ok(None);
+        }
+        native.local.try_open_file(location).await
+    }
+
     async fn get(&self, account: &str, location: &Path) -> Result<GetResult> {
         self.get_client_by_name(account).get(location).await
     }
@@ -446,6 +484,228 @@ mod tests {
     use config::S3;
 
     use super::*;
+
+    #[derive(Debug)]
+    struct ProbeStore {
+        inner: Arc<dyn ObjectStore>,
+        gets: Arc<std::sync::atomic::AtomicUsize>,
+        heads: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl std::fmt::Display for ProbeStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            // A backend name is deliberately not proof of native capability.
+            f.write_str("storage for local disk")
+        }
+    }
+
+    #[async_trait]
+    impl ObjectStore for ProbeStore {
+        async fn get_opts(&self, path: &Path, options: GetOptions) -> Result<GetResult> {
+            let counter = if options.head {
+                &self.heads
+            } else {
+                &self.gets
+            };
+            counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.inner.get_opts(path, options).await
+        }
+        async fn put_opts(
+            &self,
+            path: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> Result<PutResult> {
+            self.inner.put_opts(path, payload, options).await
+        }
+        async fn put_multipart_opts(
+            &self,
+            path: &Path,
+            options: PutMultipartOptions,
+        ) -> Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(path, options).await
+        }
+        fn delete_stream(
+            &self,
+            paths: BoxStream<'static, Result<Path>>,
+        ) -> BoxStream<'static, Result<Path>> {
+            self.inner.delete_stream(paths)
+        }
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+        async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+        async fn copy_opts(
+            &self,
+            from: &Path,
+            to: &Path,
+            options: object_store::CopyOptions,
+        ) -> Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
+
+    fn probe(
+        inner: Arc<dyn ObjectStore>,
+    ) -> (
+        ProbeStore,
+        Arc<std::sync::atomic::AtomicUsize>,
+        Arc<std::sync::atomic::AtomicUsize>,
+    ) {
+        let gets = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let heads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        (
+            ProbeStore {
+                inner,
+                gets: Arc::clone(&gets),
+                heads: Arc::clone(&heads),
+            },
+            gets,
+            heads,
+        )
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_local_file_has_no_remote_or_custom_probes() {
+        use std::sync::atomic::Ordering;
+        let directory = tempfile::tempdir().unwrap();
+        let backends: Vec<Arc<dyn ObjectStore>> = vec![
+            Arc::new(object_store::memory::InMemory::new()),
+            Arc::new(
+                object_store::local::LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
+            ),
+        ];
+        for inner in backends {
+            let (store, gets, heads) = probe(inner);
+            let client: Arc<Box<dyn ObjectStore>> = Arc::new(Box::new(store));
+            let factory = StorageClientFactory {
+                accounts: ArcSwap::from_pointee(HashMap::from([(
+                    DEFAULT_ACCOUNT.to_owned(),
+                    client,
+                )])),
+                stream_strategy: StreamStrategy::Default,
+                only_default: true,
+                native_local: None,
+            };
+            for name in ["", DEFAULT_ACCOUNT, "unknown"] {
+                assert!(
+                    factory
+                        .try_open_local_file(name, &Path::from("missing"))
+                        .await
+                        .unwrap()
+                        .is_none()
+                );
+            }
+            assert_eq!(gets.load(Ordering::SeqCst), 0);
+            assert_eq!(heads.load(Ordering::SeqCst), 0);
+        }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn test_try_open_local_file_requires_current_native_identity() {
+        use std::sync::atomic::Ordering;
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("object"), b"native").unwrap();
+        let native = NativeLocalClient::new(super::super::local::Local::new(
+            directory.path().to_str().unwrap(),
+            false,
+        ));
+        let factory = StorageClientFactory {
+            accounts: ArcSwap::from_pointee(HashMap::from([(
+                DEFAULT_ACCOUNT.to_owned(),
+                Arc::clone(&native.client),
+            )])),
+            stream_strategy: StreamStrategy::Default,
+            only_default: true,
+            native_local: Some(native),
+        };
+        let key = Path::from("object");
+        let opened = factory
+            .try_open_local_file("", &key)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(opened.meta.size, 6);
+        assert_eq!(opened.file.metadata().unwrap().len(), 6);
+        assert!(
+            factory
+                .try_open_local_file(DEFAULT_ACCOUNT, &key)
+                .await
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            factory
+                .try_open_local_file("unknown", &key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(
+            factory
+                .get("unknown", &key)
+                .await
+                .unwrap()
+                .bytes()
+                .await
+                .unwrap(),
+            Bytes::from_static(b"native")
+        );
+
+        let custom_local: Arc<dyn ObjectStore> = Arc::new(
+            object_store::local::LocalFileSystem::new_with_prefix(directory.path()).unwrap(),
+        );
+        let (custom, gets, heads) = probe(custom_local);
+        factory.add_account("custom".into(), Box::new(custom)).await;
+        assert!(
+            factory
+                .try_open_local_file("custom", &key)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(gets.load(Ordering::SeqCst), 0);
+        assert_eq!(heads.load(Ordering::SeqCst), 0);
+
+        let replacement = object_store::memory::InMemory::new();
+        replacement
+            .put_opts(
+                &key,
+                Bytes::from_static(b"replacement").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let (replacement, gets, heads) = probe(Arc::new(replacement));
+        factory
+            .add_account(DEFAULT_ACCOUNT.to_owned(), Box::new(replacement))
+            .await;
+        for name in ["", DEFAULT_ACCOUNT, "unknown"] {
+            assert!(
+                factory
+                    .try_open_local_file(name, &key)
+                    .await
+                    .unwrap()
+                    .is_none()
+            );
+        }
+        assert_eq!(gets.load(Ordering::SeqCst), 0);
+        assert_eq!(heads.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            factory
+                .get("unknown", &key)
+                .await
+                .unwrap()
+                .bytes()
+                .await
+                .unwrap(),
+            Bytes::from_static(b"replacement")
+        );
+        assert_eq!(gets.load(Ordering::SeqCst), 1);
+        assert_eq!(heads.load(Ordering::SeqCst), 0);
+    }
 
     fn base_s3_config() -> S3 {
         S3 {

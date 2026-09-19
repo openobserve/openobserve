@@ -18,6 +18,8 @@
 //! a hash-sorted scan, one over an already-materialized matrix, behind the same
 //! contract.
 
+mod block_ranges;
+pub(crate) mod blocks;
 pub(crate) mod hash_sorted;
 pub(crate) mod matrix;
 pub(crate) mod plan;
@@ -33,6 +35,32 @@ pub(crate) trait SeriesStream: Send {
     fn labels(&mut self) -> Labels;
     /// Replaces `samples` with the time-ordered samples of the current series.
     fn consume(&mut self, samples: &mut Vec<Sample>) -> impl Future<Output = Result<()>> + Send;
+}
+
+pub(crate) enum SeriesSource {
+    Parquet(hash_sorted::HashSortedSeriesStream),
+    Block(blocks::BlockSeriesStream),
+}
+
+impl SeriesStream for SeriesSource {
+    async fn advance(&mut self) -> Result<Option<u64>> {
+        match self {
+            Self::Parquet(source) => source.advance().await,
+            Self::Block(source) => source.advance().await,
+        }
+    }
+    fn labels(&mut self) -> Labels {
+        match self {
+            Self::Parquet(source) => source.labels(),
+            Self::Block(source) => source.labels(),
+        }
+    }
+    async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
+        match self {
+            Self::Parquet(source) => source.consume(samples).await,
+            Self::Block(source) => source.consume(samples).await,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -61,7 +89,7 @@ mod tests {
     use promql_parser::{label::Matchers, parser::LabelModifier};
 
     use super::{
-        hash_sorted::HashSortedSeriesStream,
+        SeriesSource,
         plan::{LabelColumns, StreamingSelector, execute_partitioned},
     };
     use crate::{
@@ -211,7 +239,7 @@ mod tests {
         ctx: &SessionContext,
         label_cols: LabelColumns,
         range: Duration,
-    ) -> Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static>> {
+    ) -> Option<Vec<impl Future<Output = Result<SeriesSource>> + Send + 'static>> {
         let selector = StreamingSelector {
             table_name: "m",
             matchers: &Matchers::empty(),

@@ -32,52 +32,8 @@ pub async fn cache_files(
     scan_stats: &mut ScanStats,
     file_type: &str,
 ) -> (file_data::CacheType, u64, u64) {
-    let mut cached_files = HashSet::with_capacity(files.len());
-    let (mut cache_hits, mut cache_misses) = (0, 0);
-
-    let start = std::time::Instant::now();
-    for (_id, _account, file, _size, max_ts) in files.iter() {
-        if file_data::memory::exist(file).await {
-            scan_stats.querier_memory_cached_files += 1;
-            cached_files.insert(file);
-            cache_hits += 1;
-        } else if file_data::disk::exist(file).await {
-            scan_stats.querier_disk_cached_files += 1;
-            cached_files.insert(file);
-            cache_hits += 1;
-        } else {
-            cache_misses += 1;
-        }
-
-        let stream_type = if file_type == "index" || file_type == "midx" {
-            config::meta::stream::StreamType::Index
-        } else if file.contains("/logs/") {
-            config::meta::stream::StreamType::Logs
-        } else if file.contains("/metrics/") {
-            config::meta::stream::StreamType::Metrics
-        } else if file.contains("/traces/") {
-            config::meta::stream::StreamType::Traces
-        } else {
-            config::meta::stream::StreamType::Logs
-        };
-
-        let current_time = chrono::Utc::now().timestamp_micros();
-        let file_age_seconds = (current_time - max_ts) / 1_000_000;
-        let file_age_hours = file_age_seconds as f64 / 3600.0;
-
-        if file_age_hours > 0.0 {
-            config::metrics::FILE_ACCESS_TIME
-                .with_label_values(&[&stream_type.to_string()])
-                .observe(file_age_hours);
-        }
-    }
-
-    let check_cache_took = start.elapsed().as_millis() as usize;
-    if check_cache_took > 1000 {
-        log::warn!(
-            "[trace_id {trace_id}] search->storage: check file cache took: {check_cache_took} ms",
-        );
-    }
+    let (cached_files, cache_hits, cache_misses) =
+        inspect_file_cache(trace_id, files, scan_stats, file_type).await;
 
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
@@ -141,6 +97,63 @@ pub async fn cache_files(
     } else {
         (cache_type, cache_hits, cache_misses)
     }
+}
+
+/// Inspect cache membership without downloading or queuing object bodies.
+pub async fn inspect_file_cache<'a>(
+    trace_id: &str,
+    files: &'a [(i64, &String, &String, i64, i64)],
+    scan_stats: &mut ScanStats,
+    file_type: &str,
+) -> (HashSet<&'a String>, u64, u64) {
+    let mut cached_files = HashSet::with_capacity(files.len());
+    let (mut cache_hits, mut cache_misses) = (0, 0);
+
+    let start = std::time::Instant::now();
+    for (_id, _account, file, _size, max_ts) in files.iter() {
+        if file_data::memory::exist(file).await {
+            scan_stats.querier_memory_cached_files += 1;
+            cached_files.insert(*file);
+            cache_hits += 1;
+        } else if file_data::disk::exist(file).await {
+            scan_stats.querier_disk_cached_files += 1;
+            cached_files.insert(*file);
+            cache_hits += 1;
+        } else {
+            cache_misses += 1;
+        }
+
+        let stream_type = if file_type == "index" || file_type == "midx" {
+            config::meta::stream::StreamType::Index
+        } else if file.contains("/logs/") {
+            config::meta::stream::StreamType::Logs
+        } else if file.contains("/metrics/") {
+            config::meta::stream::StreamType::Metrics
+        } else if file.contains("/traces/") {
+            config::meta::stream::StreamType::Traces
+        } else {
+            config::meta::stream::StreamType::Logs
+        };
+
+        let current_time = chrono::Utc::now().timestamp_micros();
+        let file_age_seconds = (current_time - max_ts) / 1_000_000;
+        let file_age_hours = file_age_seconds as f64 / 3600.0;
+
+        if file_age_hours > 0.0 {
+            config::metrics::FILE_ACCESS_TIME
+                .with_label_values(&[&stream_type.to_string()])
+                .observe(file_age_hours);
+        }
+    }
+
+    let check_cache_took = start.elapsed().as_millis() as usize;
+    if check_cache_took > 1000 {
+        log::warn!(
+            "[trace_id {trace_id}] search->storage: check file cache took: {check_cache_took} ms",
+        );
+    }
+
+    (cached_files, cache_hits, cache_misses)
 }
 
 // one full GET per small file is cheaper than a cold range read, so fetch them before the search

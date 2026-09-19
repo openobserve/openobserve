@@ -733,7 +733,9 @@ pub async fn get_size(file: &str) -> Option<usize> {
 /// caller falls back to remote storage.
 #[cfg(unix)]
 pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Result<Vec<Bytes>> {
-    use std::os::unix::fs::FileExt;
+    if ranges.is_empty() {
+        return Ok(Vec::new());
+    }
 
     let Some(files) = get_file_reader(file) else {
         return Err(object_store::Error::NotFound {
@@ -756,21 +758,12 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
             path: file_label.clone(),
             source: Box::new(e),
         })?;
-        let mut out = Vec::with_capacity(ranges_owned.len());
-        for r in &ranges_owned {
-            if r.start > r.end {
-                return Err(crate::storage::Error::BadRange(file_label.clone()).into());
+        crate::storage::read_ranges_from_file(&f, &ranges_owned).map_err(|error| {
+            object_store::Error::Generic {
+                store: "DiskCache",
+                source: Box::new(error),
             }
-            let len = (r.end - r.start) as usize;
-            let mut buf = vec![0u8; len];
-            f.read_exact_at(&mut buf, r.start)
-                .map_err(|e| object_store::Error::Generic {
-                    store: "DiskCache",
-                    source: Box::new(e),
-                })?;
-            out.push(Bytes::from(buf));
-        }
-        Ok(out)
+        })
     })
 }
 
