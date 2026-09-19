@@ -67,14 +67,30 @@ export const makePrebuiltDestinationSchema = (
 
   const shape: Record<string, z.ZodTypeAny> = {};
   for (const field of fields) {
-    shape[field.key] = field.type === "toggle" ? toggleSchema() : z.string().optional();
+    if (field.type === "toggle") {
+      shape[field.key] = toggleSchema();
+    } else if (field.type === "email-multi") {
+      // Multi-select pickers hold a string[]; a legacy string (edit-prefill of a
+      // destination saved before the picker existed) is split into its addresses.
+      shape[field.key] = z
+        .union([z.array(z.string()), z.string()])
+        .transform((v) => (Array.isArray(v) ? v : v.split(",").map((s) => s.trim()).filter(Boolean)))
+        .optional();
+    } else {
+      shape[field.key] = z.string().optional();
+    }
   }
 
   return z.object(shape).superRefine((val, ctx) => {
     const values = val as Record<string, unknown>;
     for (const field of fields) {
       const value = values[field.key];
-      const isEmpty = value === undefined || value === null || value.toString().trim() === "";
+      const isEmpty =
+        value === undefined ||
+        value === null ||
+        (Array.isArray(value)
+          ? value.length === 0
+          : value.toString().trim() === "");
 
       // Required + empty → "<label> is required" (do NOT run the validator).
       if (field.required && isEmpty) {
@@ -123,6 +139,18 @@ export const prebuiltDestinationDefaults = (
       // then reads TRUTHY downstream (generateDestinationUrl → EU endpoint for a
       // US Opsgenie instance). See `toggleSchema` above for the full round-trip.
       out[field.key] = toBool(modelValue[field.key]);
+    } else if (field.type === "email-multi") {
+      // Pickers hold a string[]. A legacy comma-separated string (a destination
+      // saved before the picker existed) is split so the select can match options.
+      const v = modelValue[field.key];
+      out[field.key] = Array.isArray(v)
+        ? v.map(String)
+        : v === undefined || v === null
+          ? []
+          : String(v)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
     } else {
       const v = modelValue[field.key];
       out[field.key] = v !== undefined && v !== null ? String(v) : "";
