@@ -32,6 +32,9 @@ pub struct ServiceGraphQuery {
     pub agent_id: Option<String>,
     pub agent_name: Option<String>,
     pub agent_env: Option<String>,
+    /// `v1` or `v4` pins the engine for side-by-side checks; anything else follows the cutover
+    /// state.
+    pub source: Option<String>,
 }
 
 /// GetCurrentTopology
@@ -49,6 +52,7 @@ pub struct ServiceGraphQuery {
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("stream_name" = Option<String>, Query, description = "Optional stream name to filter service graph topology"),
+        ("source" = Option<String>, Query, description = "Force the engine: v1 (edge stream) or v4 (metrics); default follows the cutover state"),
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
@@ -74,7 +78,12 @@ pub async fn get_current_topology(
             (now - window_micros, now)
         };
 
-    if super::use_v4_source(&org_id).await {
+    let use_v4 = match query.source.as_deref() {
+        Some("v1") => false,
+        Some("v4") => true,
+        _ => super::use_v4_source(&org_id).await,
+    };
+    if use_v4 {
         return MetaHttpResponse::json(topology_v4(&org_id, &query, start_time, end_time).await);
     }
     MetaHttpResponse::json(topology_v1(&org_id, &query, start_time, end_time).await)
@@ -783,6 +792,7 @@ mod tests {
             agent_id: Some("id".to_string()),
             agent_name: Some("name".to_string()),
             agent_env: env.map(str::to_string),
+            source: None,
         };
         let f = v4_read_filter(&query(None, None));
         assert!(f.is_empty());

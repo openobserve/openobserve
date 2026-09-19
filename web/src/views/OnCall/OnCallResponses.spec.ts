@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
@@ -201,11 +201,23 @@ const team = {
   updated_at: 0,
 };
 
+// Nothing here ever unmounts on its own account, so every mount from every
+// test would otherwise sit alive (watchers, listeners) through the rest of
+// the 70+ tests in this file — the accumulation is exactly what pushed the
+// last few tests in the file past the default 5s timeout under load.
+const mountedWrappers: VueWrapper[] = [];
+
 function render() {
-  return mount(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
+  const wrapper = mount(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
 
 describe("OnCallResponses", () => {
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
