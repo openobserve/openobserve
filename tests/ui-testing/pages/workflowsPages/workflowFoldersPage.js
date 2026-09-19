@@ -246,7 +246,8 @@ class WorkflowFoldersPage {
 
   async renameFolder(folderName, newName) {
     await this.clickMoreIcon(folderName);
-    await this.editFolderIcon.click({ force: true });
+    await this.editFolderIcon.waitFor({ state: 'visible', timeout: 5000 });
+    await this.editFolderIcon.click();
     await expect(this.folderNameInput).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
     await this.folderNameInput.fill(newName);
     await this.folderSaveBtn.click();
@@ -279,7 +280,11 @@ class WorkflowFoldersPage {
   // ---------- move ----------
 
   async openMoveDialog(workflowName) {
-    await this.moveWorkflowBtn(workflowName).click({ force: true });
+    // The move control is rendered per-row but revealed on hover, so reveal it
+    // before clicking rather than bypassing actionability with force.
+    await this.workflowRowAnchor(workflowName).hover();
+    await this.moveWorkflowBtn(workflowName).waitFor({ state: 'visible', timeout: 5000 });
+    await this.moveWorkflowBtn(workflowName).click();
     await expect(this.moveDialog).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
   }
 
@@ -373,7 +378,7 @@ class WorkflowFoldersPage {
   }
 
   async refreshList() {
-    await this.listRefreshBtn.click({ force: true, timeout: 5000 }).catch(() => {});
+    await this.listRefreshBtn.click({ timeout: 5000 });
     await this.page.waitForLoadState('networkidle', { timeout: DIALOG_TIMEOUT_MS }).catch(() => {});
   }
 
