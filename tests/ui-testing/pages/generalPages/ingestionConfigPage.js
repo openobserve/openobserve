@@ -33,6 +33,9 @@ export class IngestionConfigPage {
         // Top-level Custom-page tabs (Logs / Metrics / Traces)
         this.customMetricsTab = page.locator('[data-test="ingestion-custom-tab-ingestMetrics"]');
         this.customLogsTab = page.locator('[data-test="ingestion-custom-tab-ingestLogs"]');
+        // Profiles and Traces tabs — Profiles is gated on profiling_enabled.
+        this.customProfilesTab = page.locator('[data-test="ingestion-custom-tab-ingestProfiles"]');
+        this.customTracesTab = page.locator('[data-test="ingestion-custom-tab-ingestTraces"]');
 
         // Inner tabs used as page-loaded markers
         this.logsCurlTab = page.locator('[data-test="ingestion-logs-tab-curl"]');
@@ -73,6 +76,32 @@ export class IngestionConfigPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         // Wait for Prometheus tab to be visible (first metrics integration)
         await this.metricsPrometheusTab.waitFor({ state: 'visible', timeout: 5000 });
+    }
+
+    async expectCustomProfilesTabHidden() {
+        await expect(this.customProfilesTab).toHaveCount(0);
+    }
+
+    async expectCustomProfilesTabVisible() {
+        await expect(this.customProfilesTab).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectCustomLogsTabVisible() {
+        await expect(this.customLogsTab).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectCustomMetricsTabVisible() {
+        await expect(this.customMetricsTab).toBeVisible({ timeout: 30000 });
+    }
+
+    async expectCustomTracesTabVisible() {
+        await expect(this.customTracesTab).toBeVisible({ timeout: 30000 });
+    }
+
+    async clickCustomProfilesTab() {
+        await expect(this.customProfilesTab).toBeVisible({ timeout: 30000 });
+        await this.customProfilesTab.click();
+        await this.page.waitForLoadState('domcontentloaded', { timeout: 10000 }).catch(() => {});
     }
 
     // ==================== Copy Functionality ====================
