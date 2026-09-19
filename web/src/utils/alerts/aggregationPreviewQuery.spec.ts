@@ -174,7 +174,7 @@ describe("buildCountChartQuery", () => {
     const chartQuery = buildCountChartQuery('SELECT _timestamp FROM "bugtest"');
 
     expect(chartQuery).toBe(
-      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY 1',
     );
   });
 
@@ -184,7 +184,7 @@ describe("buildCountChartQuery", () => {
     );
 
     expect(chartQuery).toBe(
-      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY 1',
     );
   });
 
@@ -192,7 +192,7 @@ describe("buildCountChartQuery", () => {
     const chartQuery = buildCountChartQuery('SELECT _timestamp /* from here */ FROM "bugtest"');
 
     expect(chartQuery).toBe(
-      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY 1',
     );
   });
 
