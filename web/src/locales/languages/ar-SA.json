@@ -3568,6 +3568,12 @@
     "joinSlack": "انضم إلى السلاك",
     "maybeLater": "ربما لاحقا"
   },
+  "connectDataSourcePopup": {
+    "title": "للبدء، لنقم بتوصيل مصدر البيانات الأول الخاص بك.",
+    "description": "لدينا الكثير لنعرضه لك، لكننا نحتاج أولاً إلى توصيل بياناتك. تشاهد معظم الفرق أول سجلاتها خلال حوالي دقيقة واحدة.",
+    "connectButton": "توصيل مصدر بيانات",
+    "slackLink": "انضم أيضًا إلى مجتمعنا على Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "تابع من حيث توقف",
     "startFromNow": "ابدأ من الآن.",
