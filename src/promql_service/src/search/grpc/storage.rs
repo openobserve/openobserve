@@ -18,8 +18,11 @@ use std::sync::Arc;
 use config::{
     get_config,
     meta::{
-        search::{ScanStats, Session as SearchSession, StorageType},
-        stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
+        promql::MetricsBlockScan,
+        search::{Session as SearchSession, StorageType},
+        stream::{
+            FileKey, FileSelection, PartitionTimeLevel, StreamParams, StreamPartition, StreamType,
+        },
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
 };
@@ -33,8 +36,8 @@ use itertools::Itertools;
 use metrics_index::MetricsFileLayout;
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
-    file_cache::{cache_files, calc_target_partitions},
+    datafusion::{exec::register_metrics_table_with_blocks, sort_order::FileSortOrder},
+    file_cache::{cache_files, calc_target_partitions, inspect_file_cache},
 };
 use search_service::match_source;
 use tracing::Instrument;
@@ -127,25 +130,31 @@ pub(crate) async fn create_context(
 
     // load files to local cache
     let cache_start = std::time::Instant::now();
-    let (cache_type, cache_hits, cache_misses) = cache_files(
-        trace_id,
-        &files
-            .iter()
-            .map(|f| {
-                (
-                    f.id,
-                    &f.account,
-                    &f.key,
-                    f.meta.compressed_size,
-                    f.meta.max_ts,
-                )
-            })
-            .collect_vec(),
-        &mut scan_stats,
-        "parquet",
-    )
-    .instrument(enter_span.clone())
-    .await;
+    let cfg = get_config();
+    let cache_inputs = files
+        .iter()
+        .map(|f| {
+            (
+                f.id,
+                &f.account,
+                &f.key,
+                f.meta.compressed_size,
+                f.meta.max_ts,
+            )
+        })
+        .collect_vec();
+    let (cache_type, cache_hits, cache_misses) =
+        if cfg.compact.metrics_index_enabled && cfg.compact.metrics_index_blocks_enabled {
+            let (_, hits, misses) =
+                inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats, "parquet")
+                    .instrument(enter_span.clone())
+                    .await;
+            (file_data::CacheType::None, hits, misses)
+        } else {
+            cache_files(trace_id, &cache_inputs, &mut scan_stats, "parquet")
+                .instrument(enter_span.clone())
+                .await
+        };
 
     // report cache hit and miss metrics
     metrics::QUERY_DISK_CACHE_HIT_COUNT
@@ -180,7 +189,6 @@ pub(crate) async fn create_context(
             .observe(cached_ratio);
     }
 
-    let cfg = get_config();
     let target_partitions =
         calc_target_partitions(cfg.limit.cpu_num, cfg.limit.query_thread_num, cached_ratio);
 
@@ -189,8 +197,6 @@ pub(crate) async fn create_context(
     );
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
-
-    cache_metrics_index_files(trace_id, org_id, &files).await;
 
     // Prune indexed metrics files through their `.midx` metrics indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
@@ -242,49 +248,74 @@ pub(crate) async fn create_context(
         FileSortOrder::None
     };
 
-    let ctx =
-        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
+    let block_scan = block_scan_candidate(
+        stream_name,
+        &files,
+        sort_order,
+        keep_filters,
+        cfg.compact.metrics_index_enabled && cfg.compact.metrics_index_blocks_enabled,
+    );
+    let ctx = register_metrics_table_with_blocks(
+        &session,
+        schema.clone(),
+        stream_name,
+        files,
+        sort_order,
+        block_scan,
+    )
+    .await?;
 
     // keep_filters=false only when the pruner proved its selections exact
     Ok(Some((ctx, schema, scan_stats, keep_filters)))
 }
 
-/// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:
-/// misses download in the background, this query reads them from storage.
-async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKey]) {
-    let sidecars = files
-        .iter()
-        .filter_map(|f| MetricsFileLayout::metrics_index_path(&f.key).map(|path| (f, path)))
-        .collect_vec();
-    if sidecars.is_empty() {
-        return;
+fn block_scan_candidate(
+    table_name: &str,
+    files: &[FileKey],
+    sort_order: FileSortOrder,
+    keep_filters: bool,
+    enabled: bool,
+) -> Option<Arc<MetricsBlockScan>> {
+    (enabled
+        && !keep_filters
+        && sort_order == FileSortOrder::HashTimestampAsc
+        && block_selection_fraction(files).is_some())
+    .then(|| {
+        Arc::new(MetricsBlockScan {
+            table_name: table_name.to_owned(),
+            files: files.to_vec(),
+        })
+    })
+}
+
+fn block_selection_fraction(files: &[FileKey]) -> Option<f64> {
+    let mut selected = 0u128;
+    let mut total = 0u128;
+    for file in files {
+        if file.deleted
+            || !file.key.ends_with(".parquet")
+            || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
+            || file.meta.compressed_size <= 0
+        {
+            return None;
+        }
+        let records = usize::try_from(file.meta.records)
+            .ok()
+            .filter(|rows| *rows > 0)?;
+        let Some(FileSelection::RowRanges(ranges)) = &file.selection else {
+            return None;
+        };
+        let mut previous_end = 0;
+        for range in ranges.iter() {
+            if range.start < previous_end || range.start >= range.end || range.end > records {
+                return None;
+            }
+            selected = selected.checked_add((range.end - range.start) as u128)?;
+            previous_end = range.end;
+        }
+        total = total.checked_add(records as u128)?;
     }
-    let start = std::time::Instant::now();
-    // sidecar sizes are not tracked in file_list; 0 lets the downloader skip the size check
-    let mut sidecar_stats = ScanStats::default();
-    let (cache_type, cache_hits, cache_misses) = cache_files(
-        trace_id,
-        &sidecars
-            .iter()
-            .map(|(f, path)| (f.id, &f.account, path, 0, f.meta.max_ts))
-            .collect_vec(),
-        &mut sidecar_stats,
-        "midx",
-    )
-    .await;
-    metrics::QUERY_DISK_CACHE_HIT_COUNT
-        .with_label_values(&[org_id, &StreamType::Metrics.to_string(), "midx"])
-        .inc_by(cache_hits);
-    metrics::QUERY_DISK_CACHE_MISS_COUNT
-        .with_label_values(&[org_id, &StreamType::Metrics.to_string(), "midx"])
-        .inc_by(cache_misses);
-    log::info!(
-        "[trace_id {trace_id}] promql->search->storage: metrics index files {}, memory cached {}, disk cached {}, downloading others into {cache_type:?} in background, took: {} ms",
-        sidecars.len(),
-        sidecar_stats.querier_memory_cached_files,
-        sidecar_stats.querier_disk_cached_files,
-        start.elapsed().as_millis()
-    );
+    (total > 0 && selected > 0).then(|| selected as f64 / total as f64)
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]
@@ -325,4 +356,97 @@ async fn get_file_list(
         }
     }
     Ok(files)
+}
+
+#[cfg(test)]
+mod block_selection_tests {
+    use std::ops::Range;
+
+    use config::meta::stream::FileMeta;
+
+    use super::*;
+
+    fn selected(records: i64, ranges: Vec<Range<usize>>) -> FileKey {
+        let mut file = FileKey::new(
+            1,
+            String::new(),
+            "files/org/metrics/metric/2026/01/01/00/indexed-v1-unique.parquet".to_string(),
+            FileMeta {
+                records,
+                compressed_size: 100,
+                ..Default::default()
+            },
+            false,
+        );
+        file.selection = Some(FileSelection::RowRanges(Arc::new(ranges)));
+        file
+    }
+
+    #[test]
+    fn density_is_weighted_by_rows_without_inspecting_matcher_labels() {
+        assert_eq!(
+            block_selection_fraction(&[
+                selected(100, std::iter::once(10..20).collect()),
+                selected(300, std::iter::once(0..30).collect())
+            ]),
+            Some(0.1)
+        );
+        assert_eq!(
+            block_selection_fraction(&[selected(100, std::iter::once(0..100).collect())]),
+            Some(1.0)
+        );
+        assert_eq!(
+            block_selection_fraction(&[selected(100, vec![0..10, 10..20])]),
+            Some(0.2)
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_or_incomplete_selection_coverage() {
+        assert_eq!(block_selection_fraction(&[]), None);
+        assert_eq!(block_selection_fraction(&[selected(0, vec![])]), None);
+        assert_eq!(block_selection_fraction(&[selected(100, vec![])]), None);
+        for ranges in [
+            std::iter::once(10..10).collect(),
+            std::iter::once(10..101).collect(),
+            vec![20..30, 10..20],
+            vec![0..20, 10..30],
+        ] {
+            assert_eq!(block_selection_fraction(&[selected(100, ranges)]), None);
+        }
+        let sparse = selected(100, std::iter::once(0..10).collect());
+        let mut unselected = sparse.clone();
+        unselected.selection = None;
+        assert_eq!(block_selection_fraction(&[sparse, unselected]), None);
+        for key in [
+            "files/org/metrics/metric/2026/01/01/00/indexed-v1-id.vortex",
+            "files/org/metrics/metric/2026/01/01/00/hash-sorted-v1-id.parquet",
+        ] {
+            let mut file = selected(100, std::iter::once(0..10).collect());
+            file.key = key.to_string();
+            assert_eq!(block_selection_fraction(&[file]), None);
+        }
+        let mut deleted = selected(100, std::iter::once(0..10).collect());
+        deleted.deleted = true;
+        assert_eq!(block_selection_fraction(&[deleted]), None);
+    }
+    #[test]
+    fn block_rollout_flag_gates_all_selection_densities() {
+        for end in [1, 25, 100] {
+            let files = vec![selected(100, std::iter::once(0..end).collect())];
+            assert!(
+                block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false, true)
+                    .is_some()
+            );
+            assert!(
+                block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false, false)
+                    .is_none()
+            );
+            assert!(
+                block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true, true)
+                    .is_none()
+            );
+            assert!(block_scan_candidate("m", &files, FileSortOrder::None, false, true).is_none());
+        }
+    }
 }

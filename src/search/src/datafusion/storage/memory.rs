@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::ops::Range;
+
 use async_trait::async_trait;
+use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use object_store::{
     CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
@@ -48,6 +51,36 @@ impl ObjectStore for FS {
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let (account, location) = format_location(location);
         infra::cache::storage::get_opts(&account, &location, options).await
+    }
+
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+        if ranges.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (account, location) = format_location(location);
+        if ranges.iter().any(|range| {
+            range.start > range.end || usize::try_from(range.end - range.start).is_err()
+        }) {
+            return Err(infra::storage::Error::BadRange(location.to_string()).into());
+        }
+        let can_block = tokio::runtime::Handle::try_current().is_ok_and(|handle| {
+            matches!(
+                handle.runtime_flavor(),
+                tokio::runtime::RuntimeFlavor::MultiThread
+            )
+        });
+        if can_block
+            && ranges.iter().all(|range| range.start < range.end)
+            && let Ok(bytes) = infra::cache::storage::get_ranges(&account, &location, ranges).await
+        {
+            return Ok(bytes);
+        }
+        object_store::coalesce_ranges(
+            ranges,
+            |range| infra::cache::storage::get_range(&account, &location, range),
+            object_store::OBJECT_STORE_COALESCE_DEFAULT,
+        )
+        .await
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -286,5 +319,272 @@ mod tests {
             let result = fs.get_opts(path, GetOptions::default()).await;
             assert!(result.is_err(), "Should fail for path: {path}");
         }
+    }
+
+    #[derive(Debug)]
+    struct RangeTrackingStore {
+        inner: object_store::memory::InMemory,
+        range_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        option_calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl std::fmt::Display for RangeTrackingStore {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("range-tracking")
+        }
+    }
+
+    #[async_trait]
+    impl ObjectStore for RangeTrackingStore {
+        async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
+            self.option_calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.inner.get_opts(location, options).await
+        }
+
+        async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
+            self.range_calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let data = self
+                .inner
+                .get_opts(location, GetOptions::default())
+                .await?
+                .bytes()
+                .await?;
+            if ranges.iter().any(|range| range.end > data.len() as u64) {
+                return Err(Error::Generic {
+                    store: "RangeTrackingStore",
+                    source: Box::new(std::io::Error::from(std::io::ErrorKind::UnexpectedEof)),
+                });
+            }
+            Ok(ranges
+                .iter()
+                .map(|range| data.slice(range.start as usize..range.end as usize))
+                .collect())
+        }
+
+        async fn put_opts(
+            &self,
+            location: &Path,
+            payload: PutPayload,
+            options: PutOptions,
+        ) -> Result<PutResult> {
+            self.inner.put_opts(location, payload, options).await
+        }
+
+        async fn put_multipart_opts(
+            &self,
+            location: &Path,
+            options: PutMultipartOptions,
+        ) -> Result<Box<dyn MultipartUpload>> {
+            self.inner.put_multipart_opts(location, options).await
+        }
+
+        fn delete_stream(
+            &self,
+            locations: BoxStream<'static, Result<Path>>,
+        ) -> BoxStream<'static, Result<Path>> {
+            self.inner.delete_stream(locations)
+        }
+
+        fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
+            self.inner.list(prefix)
+        }
+
+        async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+            self.inner.list_with_delimiter(prefix).await
+        }
+
+        async fn copy_opts(&self, from: &Path, to: &Path, options: CopyOptions) -> Result<()> {
+            self.inner.copy_opts(from, to, options).await
+        }
+    }
+
+    async fn range_tracking_fixture() -> (
+        Path,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    ) {
+        let id = config::ider::uuid();
+        let key = Path::from(format!("files/{id}/metrics/range_fixture"));
+        let inner = object_store::memory::InMemory::new();
+        inner
+            .put_opts(
+                &key,
+                Bytes::from_static(b"0123456789abcdef").into(),
+                PutOptions::default(),
+            )
+            .await
+            .unwrap();
+        let range_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let option_calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        infra::storage::add_account(
+            &id,
+            Box::new(RangeTrackingStore {
+                inner,
+                range_calls: std::sync::Arc::clone(&range_calls),
+                option_calls: std::sync::Arc::clone(&option_calls),
+            }),
+        )
+        .await;
+        let location = Path::from(format!("trace/$$/{id}:default/::/{key}"));
+        (location, range_calls, option_calls)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_cache_inspection_skips_sample_gets_and_preserves_on_demand_fallback() {
+        use std::sync::atomic::Ordering;
+
+        use config::meta::search::ScanStats;
+
+        use crate::file_cache::{cache_files, inspect_file_cache};
+
+        for size in [16, i64::MAX] {
+            let (location, range_calls, option_calls) = range_tracking_fixture().await;
+            let (account, key) = format_location(&location);
+            let key = key.to_string();
+            let entries = [(
+                0,
+                &account,
+                &key,
+                size,
+                chrono::Utc::now().timestamp_micros(),
+            )];
+            let mut stats = ScanStats {
+                compressed_size: size,
+                ..Default::default()
+            };
+            let (cached, hits, misses) =
+                inspect_file_cache("blocks", &entries, &mut stats, "parquet").await;
+            assert!(cached.is_empty());
+            assert_eq!((hits, misses), (0, 1));
+            assert_eq!(
+                stats.querier_memory_cached_files + stats.querier_disk_cached_files,
+                0
+            );
+            assert_eq!(option_calls.load(Ordering::Relaxed), 0);
+            assert_eq!(range_calls.load(Ordering::Relaxed), 0);
+            let payload = FS::new()
+                .get_ranges(&location, &[0..8, 8..16])
+                .await
+                .unwrap();
+            assert_eq!(
+                payload,
+                vec![
+                    Bytes::from_static(b"01234567"),
+                    Bytes::from_static(b"89abcdef")
+                ]
+            );
+            assert_eq!(range_calls.load(Ordering::Relaxed), 1);
+        }
+        if config::get_config().memory_cache.enabled {
+            let (location, _, option_calls) = range_tracking_fixture().await;
+            let (account, key) = format_location(&location);
+            let key = key.to_string();
+            let entries = [(0, &account, &key, 16, chrono::Utc::now().timestamp_micros())];
+            let mut stats = ScanStats {
+                compressed_size: 16,
+                ..Default::default()
+            };
+            cache_files("normal", &entries, &mut stats, "parquet").await;
+            assert!(option_calls.load(Ordering::Relaxed) > 0);
+            let mut inspected = ScanStats::default();
+            let (cached, hits, misses) =
+                inspect_file_cache("blocks", &entries, &mut inspected, "parquet").await;
+            assert_eq!((cached.len(), hits, misses), (1, 1, 0));
+            assert_eq!(inspected.querier_memory_cached_files, 1);
+            infra::cache::file_data::memory::remove(&key).await.unwrap();
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_delegates_batch_and_preserves_order_and_scope() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let ranges = [10..14, 1..5, 3..7, 1..5];
+        let result = FS::new().get_ranges(&location, &ranges).await.unwrap();
+        assert_eq!(
+            result,
+            vec![
+                Bytes::from_static(b"abcd"),
+                Bytes::from_static(b"1234"),
+                Bytes::from_static(b"3456"),
+                Bytes::from_static(b"1234"),
+            ]
+        );
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_empty_and_invalid_do_not_read_storage() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let fs = FS::new();
+        assert!(fs.get_ranges(&location, &[]).await.unwrap().is_empty());
+        let invalid = Range { start: 7, end: 3 };
+        assert!(fs.get_ranges(&location, &[invalid]).await.is_err());
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 0);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_preserves_eof_clipping_after_batch_error() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let result = FS::new()
+            .get_ranges(&location, std::slice::from_ref(&(14..20)))
+            .await
+            .unwrap();
+        assert_eq!(result, vec![Bytes::from_static(b"ef")]);
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_huge_endpoint_is_clipped_without_huge_allocation() {
+        let (location, ..) = range_tracking_fixture().await;
+        let result = FS::new()
+            .get_ranges(&location, std::slice::from_ref(&(14..u64::MAX)))
+            .await;
+        if usize::BITS == 64 {
+            assert_eq!(result.unwrap(), vec![Bytes::from_static(b"ef")]);
+        } else {
+            assert!(result.is_err());
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_backend_error_survives_fallback() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let missing = Path::from(format!("{location}-missing"));
+        let error = FS::new()
+            .get_ranges(&missing, std::slice::from_ref(&(1..3)))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, Error::NotFound { .. }));
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_ranges_current_thread_keeps_async_fallback() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let result = FS::new()
+            .get_ranges(&location, std::slice::from_ref(&(1..3)))
+            .await
+            .unwrap();
+        assert_eq!(result, vec![Bytes::from_static(b"12")]);
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_ranges_preserves_zero_width_subrange() {
+        let (location, range_calls, option_calls) = range_tracking_fixture().await;
+        let result = FS::new()
+            .get_ranges(&location, &[1..3, 3..3])
+            .await
+            .unwrap();
+        assert_eq!(result, vec![Bytes::from_static(b"12"), Bytes::new()]);
+        assert_eq!(range_calls.load(std::sync::atomic::Ordering::Relaxed), 0);
+        assert_eq!(option_calls.load(std::sync::atomic::Ordering::Relaxed), 1);
     }
 }

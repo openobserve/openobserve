@@ -2639,6 +2639,7 @@ dependencies = [
  "ingester",
  "itertools 0.14.0",
  "log",
+ "metrics_block",
  "metrics_index",
  "o2_enterprise",
  "object_store",
@@ -6862,11 +6863,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_block"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "parquet",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "zstd",
+]
+
+[[package]]
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
  "arrow",
  "arrow-schema",
+ "async-trait",
  "bytes",
  "config",
  "datafusion",
@@ -6874,9 +6892,13 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
+ "metrics_block",
+ "object_store",
+ "parquet",
  "promql",
  "promql-parser",
  "regex",
+ "tempfile",
  "tokio",
 ]
 
@@ -9297,8 +9319,10 @@ name = "promql"
 version = "0.1.0"
 dependencies = [
  "ahash 0.8.12",
+ "anyhow",
  "async-recursion",
  "async-trait",
+ "bytes",
  "chrono",
  "config",
  "datafusion",
@@ -9309,12 +9333,16 @@ dependencies = [
  "infra",
  "itertools 0.14.0",
  "log",
+ "memmap2",
+ "metrics_block",
  "o2_enterprise",
+ "object_store",
  "parking_lot 0.12.5",
  "promql-parser",
  "rayon",
  "regex",
  "strum 0.28.0",
+ "tempfile",
  "tokio",
  "tracing",
 ]

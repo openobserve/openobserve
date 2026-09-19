@@ -98,10 +98,12 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 
         let mut samples = Vec::with_capacity(timestamps.len());
         let mut cursors = vec![0usize; bucket_series.len()];
+        let mut buckets = Vec::with_capacity(bucket_series.len());
+        let mut coalesced = Vec::with_capacity(bucket_series.len());
 
         // For each timestamp, compute histogram_quantile
         for &eval_ts in &timestamps {
-            let mut buckets = Vec::with_capacity(bucket_series.len());
+            buckets.clear();
 
             // Collect bucket values at this timestamp
             for ((upper_bound, bucket_rv), cursor) in bucket_series.iter().zip(cursors.iter_mut()) {
@@ -121,7 +123,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
             }
 
             if !buckets.is_empty() {
-                let quantile_value = bucket_quantile_sorted(phi, buckets);
+                let quantile_value = bucket_quantile_sorted(phi, &mut buckets, &mut coalesced);
                 samples.push(Sample::new(eval_ts, quantile_value));
             }
         }
@@ -146,7 +148,7 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
 /// Compute a classic histogram quantile from buckets already sorted by upper bound.
-fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
+fn bucket_quantile_sorted(phi: f64, buckets: &mut Vec<Bucket>, coalesced: &mut Vec<Bucket>) -> f64 {
     if phi.is_nan() || buckets.is_empty() {
         return f64::NAN;
     }
@@ -162,9 +164,9 @@ fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
     {
         return f64::NAN;
     }
-    let mut buckets = coalesce_buckets(buckets);
-    ensure_monotonic(&mut buckets);
-    let buckets = buckets;
+    coalesce_buckets_into(buckets, coalesced);
+    ensure_monotonic(coalesced);
+    let buckets = coalesced;
     if buckets.len() < 2 {
         return f64::NAN;
     }
@@ -201,9 +203,9 @@ fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
 
 /// `coalesce_buckets` merges buckets with the same upper bound.
 /// The input buckets must be sorted.
-fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
-    let mut merged: Vec<Bucket> = Vec::new();
-    for bucket in buckets {
+fn coalesce_buckets_into(buckets: &mut Vec<Bucket>, merged: &mut Vec<Bucket>) {
+    merged.clear();
+    for bucket in buckets.drain(..) {
         if let Some(last) = merged.last_mut()
             && bucket.upper_bound == last.upper_bound
         {
@@ -212,6 +214,12 @@ fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
             merged.push(bucket);
         }
     }
+}
+
+#[cfg(test)]
+fn coalesce_buckets(mut buckets: Vec<Bucket>) -> Vec<Bucket> {
+    let mut merged = Vec::new();
+    coalesce_buckets_into(&mut buckets, &mut merged);
     merged
 }
 
@@ -236,6 +244,492 @@ mod tests {
     use expect_test::expect;
 
     use super::*;
+
+    mod legacy {
+        use super::*;
+        pub(super) fn histogram_quantile(
+            phi: f64,
+            data: Value,
+            eval_ctx: &EvalContext,
+        ) -> Result<Value> {
+            let start = std::time::Instant::now();
+            let trace_id = &eval_ctx.trace_id;
+
+            let in_matrix = match data {
+                Value::Matrix(m) => m,
+                Value::None => {
+                    return Ok(Value::None);
+                }
+                _ => {
+                    return Err(DataFusionError::Plan(
+                        "histogram_quantile: vector or matrix argument expected".to_owned(),
+                    ));
+                }
+            };
+
+            let timestamps = eval_ctx.timestamps();
+            log::info!(
+                "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} series and {} time points",
+                in_matrix.len(),
+                timestamps.len()
+            );
+
+            let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
+
+            for rv in in_matrix {
+                let Ok(upper_bound) = rv.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
+                    continue;
+                };
+
+                let sig =
+                    signature_without_labels(&rv.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
+                metrics_by_sig
+                    .entry(sig)
+                    .or_default()
+                    .push((upper_bound, rv));
+            }
+
+            let group_count = metrics_by_sig.len();
+            let mut range_values = Vec::with_capacity(group_count);
+
+            for (_sig, mut bucket_series) in metrics_by_sig {
+                bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
+                let base_labels = bucket_series[0]
+                    .1
+                    .labels
+                    .iter()
+                    .filter(|l| {
+                        l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL
+                    })
+                    .cloned()
+                    .collect();
+
+                let mut samples = Vec::with_capacity(timestamps.len());
+                let mut cursors = vec![0usize; bucket_series.len()];
+
+                for &eval_ts in &timestamps {
+                    let mut buckets = Vec::with_capacity(bucket_series.len());
+
+                    for ((upper_bound, bucket_rv), cursor) in
+                        bucket_series.iter().zip(cursors.iter_mut())
+                    {
+                        while *cursor < bucket_rv.samples.len()
+                            && bucket_rv.samples[*cursor].timestamp < eval_ts
+                        {
+                            *cursor += 1;
+                        }
+                        let sample = bucket_rv
+                            .samples
+                            .get(*cursor)
+                            .filter(|sample| sample.timestamp == eval_ts)
+                            .or_else(|| bucket_rv.samples.first());
+                        if let Some(sample) = sample {
+                            buckets.push(Bucket::new(*upper_bound, sample.value));
+                        }
+                    }
+
+                    if !buckets.is_empty() {
+                        let quantile_value = bucket_quantile_sorted(phi, buckets);
+                        samples.push(Sample::new(eval_ts, quantile_value));
+                    }
+                }
+
+                if !samples.is_empty() {
+                    range_values.push(RangeValue {
+                        labels: base_labels,
+                        samples,
+                        exemplars: None,
+                        time_window: None,
+                    });
+                }
+            }
+
+            log::info!(
+                "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) completed in {:?}, folded {group_count} groups into {} series",
+                start.elapsed(),
+                range_values.len()
+            );
+            Ok(Value::Matrix(range_values))
+        }
+
+        pub(super) fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
+            if phi.is_nan() || buckets.is_empty() {
+                return f64::NAN;
+            }
+            if phi < 0.0 {
+                return f64::NEG_INFINITY;
+            }
+            if phi > 1.0 {
+                return f64::INFINITY;
+            }
+            let highest_bucket = &buckets[buckets.len() - 1];
+            if !(highest_bucket.upper_bound.is_infinite()
+                && highest_bucket.upper_bound.is_sign_positive())
+            {
+                return f64::NAN;
+            }
+            let mut buckets = coalesce_buckets(buckets);
+            ensure_monotonic(&mut buckets);
+            let buckets = buckets;
+            if buckets.len() < 2 {
+                return f64::NAN;
+            }
+            let observations = buckets[buckets.len() - 1].count;
+            if observations == 0.0 {
+                return f64::NAN;
+            }
+            let mut rank = phi * observations;
+            let b = match buckets[..buckets.len() - 1]
+                .iter()
+                .position(|b| b.count >= rank)
+            {
+                Some(b) => b,
+                None => buckets.len() - 1, // Should not reach here if data is valid
+            };
+            if b == buckets.len() - 1 {
+                return buckets[buckets.len() - 2].upper_bound;
+            }
+            if b == 0 && buckets[0].upper_bound <= 0.0 {
+                return buckets[0].upper_bound;
+            }
+            let bucket_end = buckets[b].upper_bound;
+            let mut count = buckets[b].count;
+            let bucket_start = if b > 0 {
+                count -= buckets[b - 1].count;
+                rank -= buckets[b - 1].count;
+                buckets[b - 1].upper_bound
+            } else {
+                0.0
+            };
+
+            bucket_start + (bucket_end - bucket_start) * (rank / count)
+        }
+
+        pub(super) fn coalesce_buckets(buckets: Vec<Bucket>) -> Vec<Bucket> {
+            let mut merged: Vec<Bucket> = Vec::new();
+            for bucket in buckets {
+                if let Some(last) = merged.last_mut()
+                    && bucket.upper_bound == last.upper_bound
+                {
+                    last.count += bucket.count;
+                } else {
+                    merged.push(bucket);
+                }
+            }
+            merged
+        }
+
+        pub(super) fn ensure_monotonic(buckets: &mut [Bucket]) {
+            let mut max = buckets[0].count;
+            for bucket in &mut buckets[1..] {
+                if bucket.count > max {
+                    max = bucket.count;
+                } else if bucket.count < max {
+                    bucket.count = max;
+                }
+            }
+        }
+    }
+
+    fn random_word(state: &mut u64) -> u64 {
+        *state ^= *state << 13;
+        *state ^= *state >> 7;
+        *state ^= *state << 17;
+        *state
+    }
+
+    fn random_count(state: &mut u64) -> f64 {
+        let word = random_word(state);
+        match word % 13 {
+            0 => -0.0,
+            1 => f64::INFINITY,
+            2 => f64::NEG_INFINITY,
+            3 => f64::from_bits(0x7ff8_0000_0000_0042),
+            4 => f64::from_bits(1),
+            _ => (word % 100_000) as f64 / 17.0 - 100.0,
+        }
+    }
+
+    #[test]
+    fn test_histogram_scratch_quantiles_match_frozen_old_bits() {
+        let mut state = 0x8259_a03c_d71f_610bu64;
+        let phis = [
+            f64::NAN,
+            f64::NEG_INFINITY,
+            -1.0,
+            -0.0,
+            0.0,
+            0.1,
+            0.5,
+            0.9,
+            1.0,
+            2.0,
+            f64::INFINITY,
+        ];
+        let bounds = [
+            f64::NEG_INFINITY,
+            -1.0,
+            -0.0,
+            0.0,
+            0.5,
+            1.0,
+            1.0,
+            5.0,
+            f64::INFINITY,
+            f64::NAN,
+        ];
+        let mut raw = Vec::with_capacity(64);
+        let mut merged = Vec::with_capacity(64);
+        let raw_pointer = raw.as_ptr();
+        let merged_pointer = merged.as_ptr();
+        for case in 0..2000 {
+            let count = (random_word(&mut state) % 41) as usize;
+            let mut source = Vec::with_capacity(count + 1);
+            for _ in 0..count {
+                let bound = bounds[(random_word(&mut state) % bounds.len() as u64) as usize];
+                source.push(Bucket::new(bound, random_count(&mut state)));
+            }
+            if case % 2 == 0 {
+                source.push(Bucket::new(f64::INFINITY, random_count(&mut state)));
+            }
+            source.sort_by(|a, b| sort_float(&a.upper_bound, &b.upper_bound));
+            for phi in phis {
+                raw.clear();
+                raw.extend(source.iter().cloned());
+                let expected = legacy::bucket_quantile_sorted(phi, source.clone());
+                let actual = bucket_quantile_sorted(phi, &mut raw, &mut merged);
+                assert_eq!(
+                    actual.to_bits(),
+                    expected.to_bits(),
+                    "case={case}, phi={phi}, buckets={source:?}"
+                );
+                assert_eq!(raw.as_ptr(), raw_pointer);
+                assert_eq!(merged.as_ptr(), merged_pointer);
+                assert_eq!(raw.capacity(), 64);
+                assert_eq!(merged.capacity(), 64);
+            }
+        }
+    }
+
+    #[test]
+    fn test_histogram_scratch_reuse_across_empty_valid_and_phi_early_returns() {
+        let mut raw = Vec::with_capacity(8);
+        let mut merged = Vec::with_capacity(8);
+        let cases = [
+            (
+                0.9,
+                vec![Bucket::new(1.0, 2.0), Bucket::new(f64::INFINITY, 3.0)],
+            ),
+            (0.9, vec![]),
+            (f64::NAN, vec![Bucket::new(f64::INFINITY, 9.0)]),
+            (-1.0, vec![Bucket::new(1.0, 5.0)]),
+            (2.0, vec![Bucket::new(1.0, 5.0)]),
+            (0.5, vec![Bucket::new(1.0, 5.0)]),
+            (
+                0.5,
+                vec![
+                    Bucket::new(-0.0, -0.0),
+                    Bucket::new(0.0, 1.0),
+                    Bucket::new(f64::INFINITY, 2.0),
+                ],
+            ),
+            (
+                0.9,
+                vec![Bucket::new(1.0, 0.0), Bucket::new(f64::INFINITY, -0.0)],
+            ),
+            (
+                0.9,
+                vec![
+                    Bucket::new(1.0, 8.0),
+                    Bucket::new(2.0, 2.0),
+                    Bucket::new(f64::INFINITY, 10.0),
+                ],
+            ),
+        ];
+        for _ in 0..3 {
+            for (phi, source) in &cases {
+                raw.clear();
+                raw.extend(source.iter().cloned());
+                assert_eq!(
+                    bucket_quantile_sorted(*phi, &mut raw, &mut merged).to_bits(),
+                    legacy::bucket_quantile_sorted(*phi, source.clone()).to_bits()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_histogram_scratch_intermediate_bucket_bits_match_frozen_old() {
+        let nan = f64::from_bits(0x7ff8_0000_0000_0042);
+        let cases = [
+            vec![Bucket::new(-0.0, -0.0), Bucket::new(0.0, 0.0)],
+            vec![Bucket::new(0.0, -0.0), Bucket::new(-0.0, -0.0)],
+            vec![
+                Bucket::new(1.0, 1e16),
+                Bucket::new(1.0, -1e16),
+                Bucket::new(1.0, 1.0),
+            ],
+            vec![
+                Bucket::new(1.0, 1e16),
+                Bucket::new(1.0, 1.0),
+                Bucket::new(1.0, -1e16),
+            ],
+            vec![
+                Bucket::new(f64::INFINITY, f64::INFINITY),
+                Bucket::new(f64::INFINITY, f64::NEG_INFINITY),
+            ],
+            vec![
+                Bucket::new(nan, 2.0),
+                Bucket::new(nan, 3.0),
+                Bucket::new(1.0, 4.0),
+            ],
+            vec![
+                Bucket::new(0.0, nan),
+                Bucket::new(1.0, 3.0),
+                Bucket::new(2.0, 1.0),
+            ],
+            vec![
+                Bucket::new(0.0, 3.0),
+                Bucket::new(1.0, nan),
+                Bucket::new(2.0, 1.0),
+            ],
+        ];
+        let bits = |buckets: &[Bucket]| {
+            buckets
+                .iter()
+                .map(|bucket| (bucket.upper_bound.to_bits(), bucket.count.to_bits()))
+                .collect::<Vec<_>>()
+        };
+        let mut raw = Vec::with_capacity(8);
+        let mut merged = Vec::with_capacity(8);
+        for source in cases {
+            raw.clear();
+            raw.extend(source.iter().cloned());
+            let mut expected = legacy::coalesce_buckets(source);
+            coalesce_buckets_into(&mut raw, &mut merged);
+            assert!(raw.is_empty());
+            assert_eq!(bits(&merged), bits(&expected));
+            ensure_monotonic(&mut merged);
+            legacy::ensure_monotonic(&mut expected);
+            assert_eq!(bits(&merged), bits(&expected));
+        }
+    }
+
+    type MatrixBits = Vec<(Vec<(String, String)>, Vec<(i64, u64)>)>;
+    fn matrix_bits(mut value: Value) -> MatrixBits {
+        value.sort();
+        let Value::Matrix(rows) = value else {
+            panic!("expected matrix")
+        };
+        rows.into_iter()
+            .map(|row| {
+                assert!(row.exemplars.is_none());
+                assert!(row.time_window.is_none());
+                (
+                    row.labels
+                        .iter()
+                        .map(|label| (label.name.clone(), label.value.clone()))
+                        .collect(),
+                    row.samples
+                        .into_iter()
+                        .map(|sample| (sample.timestamp, sample.value.to_bits()))
+                        .collect(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn test_histogram_scratch_matrix_matches_frozen_old_labels_timestamps_and_bits() {
+        let mut state = 0xa2e1_765b_9003_23d7u64;
+        let bounds = [
+            "+Inf", "-0", "0", "1", "1.0", "2", "-1", "-Inf", "NaN", "NaN", "invalid",
+        ];
+        let valid_bounds = ["+Inf", "0", "0.5", "1", "2", "3", "4", "5", "8", "16", "32"];
+        let eval = EvalContext::new(-2, 5, 1, "histogram-differential".into());
+        for case in 0..80 {
+            let case_bounds = if case % 2 == 0 {
+                &valid_bounds
+            } else {
+                &bounds
+            };
+            let mut rows = Vec::new();
+            for group in 0..4 {
+                for (index, bound) in case_bounds.iter().enumerate() {
+                    let mut samples = Vec::new();
+                    if (case + index + group) % 9 != 0 {
+                        for timestamp in -4..=5 {
+                            if !random_word(&mut state).is_multiple_of(4) {
+                                let count = if case % 2 == 0 {
+                                    let level = if index == 0 {
+                                        1000.0
+                                    } else {
+                                        index as f64 * 10.0
+                                    };
+                                    level * (timestamp + 6) as f64
+                                        + (random_word(&mut state) % 1000) as f64 / 1000.0
+                                } else {
+                                    random_count(&mut state)
+                                };
+                                samples.push(Sample::new(timestamp, count));
+                            }
+                        }
+                        if case % 11 == 0 {
+                            samples.reverse();
+                        }
+                    }
+                    if case % 13 == 0 && samples.len() > 1 {
+                        samples.insert(
+                            1,
+                            Sample::new(samples[0].timestamp, random_count(&mut state)),
+                        );
+                    }
+                    rows.push(RangeValue {
+                        labels: vec![
+                            Arc::new(Label::new(NAME_LABEL, "generic_histogram")),
+                            Arc::new(Label::new("dimension", &format!("group-{group}"))),
+                            Arc::new(Label::new(BUCKET_LABEL, bound)),
+                            Arc::new(Label::new(HASH_LABEL, "ignored-series-hash")),
+                        ],
+                        samples,
+                        exemplars: None,
+                        time_window: None,
+                    });
+                }
+            }
+            rows.push(RangeValue {
+                labels: vec![Arc::new(Label::new("dimension", "missing-bucket-label"))],
+                samples: vec![Sample::new(0, 99.0)],
+                exemplars: None,
+                time_window: None,
+            });
+            // Change input order without changing within-timestamp accumulation.
+            let rotate = (random_word(&mut state) % rows.len() as u64) as usize;
+            rows.rotate_left(rotate);
+            for phi in [f64::NAN, -1.0, -0.0, 0.5, 0.9, 1.0, 2.0] {
+                let input = Value::Matrix(rows.clone());
+                let expected = legacy::histogram_quantile(phi, input.clone(), &eval).unwrap();
+                let actual = histogram_quantile(phi, input, &eval).unwrap();
+                assert_eq!(
+                    matrix_bits(actual),
+                    matrix_bits(expected),
+                    "case={case}, phi={phi}"
+                );
+            }
+        }
+        assert!(matches!(
+            histogram_quantile(0.9, Value::None, &eval).unwrap(),
+            Value::None
+        ));
+        assert_eq!(
+            histogram_quantile(0.9, Value::Float(1.0), &eval)
+                .unwrap_err()
+                .to_string(),
+            legacy::histogram_quantile(0.9, Value::Float(1.0), &eval)
+                .unwrap_err()
+                .to_string()
+        );
+    }
 
     #[test]
     fn test_histogram_quantile_handles_unsorted_buckets_and_sparse_timestamps() {
