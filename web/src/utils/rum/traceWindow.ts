@@ -15,6 +15,8 @@
 
 import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
+type SpanTimes = { start_time?: unknown; end_time?: unknown };
+
 // A found range can be a lower bound (`partial`), and span timestamps sit at
 // its very edges — pad before querying with it.
 export const TRACE_RANGE_PADDING_US = 60_000_000; // ±1 min
@@ -30,4 +32,29 @@ export function traceQueryWindow(
     startTime: range.start_time - TRACE_RANGE_PADDING_US,
     endTime: range.end_time + TRACE_RANGE_PADDING_US,
   };
+}
+
+// Number("") is 0, so a blank string must not be read as a valid timestamp.
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "string" && value.trim() === "") return null;
+  const parsed = typeof value === "number" || typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+/** The trace window of a span list: earliest start to latest end, ns in, integer µs out. */
+export function spanWindowUs(
+  spans: ReadonlyArray<SpanTimes | null | undefined> | null | undefined,
+): { start: number; end: number } | null {
+  if (!spans) return null;
+  let startNs = Infinity;
+  let endNs = -Infinity;
+  for (const span of spans) {
+    const start = toFiniteNumber(span?.start_time);
+    const end = toFiniteNumber(span?.end_time);
+    if (start === null || end === null) continue;
+    if (start < startNs) startNs = start;
+    if (end > endNs) endNs = end;
+  }
+  if (!Number.isFinite(startNs) || !Number.isFinite(endNs)) return null;
+  return { start: Math.floor(startNs / 1000), end: Math.ceil(endNs / 1000) };
 }

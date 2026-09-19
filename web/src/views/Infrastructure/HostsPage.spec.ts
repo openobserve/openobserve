@@ -35,7 +35,9 @@ vi.mock("@/composables/useWorkloadDetection", () => ({
 }));
 
 const makeRow = (over: any = {}) => ({
-  host_name: "web-01",
+  host_name: over.host_name ?? "web-01",
+  display_name: over.host_name ?? "web-01",
+  k8s_node_name: null,
   os_type: "linux",
   status: "ACTIVE",
   cpu: 95,
@@ -44,6 +46,8 @@ const makeRow = (over: any = {}) => ({
   memoryTotalBytes: 16_000_000_000,
   disk: 45,
   load: 1.5,
+  cores: 4,
+  loadPerCore: 0.375,
   lastSeen: "2026-09-03 10:00:00",
   // The raw µs the curated drawer badges off (design §7.3) — the formatted
   // string above cannot be compared against a doc_time_max.
@@ -77,7 +81,7 @@ const detectionRefresh = vi.fn();
 // Renders the page's #cell-* templates per row so tint/tooltip markup is real.
 const OTableStub = defineComponent({
   name: "OTable",
-  props: ["data", "columns", "loading"],
+  props: ["data", "columns", "loading", "sortBy", "sortDesc"],
   setup(props: any, { slots }: any) {
     return () =>
       h("div", { "data-test": "hosts-table-stub" }, [
@@ -116,10 +120,10 @@ const dateTimeStub = defineComponent({
 
 const drawerStub = {
   name: "HostDetailDrawer",
-  props: ["hostName", "status", "osType", "range", "lastSeenUs"],
+  props: ["hostName", "displayName", "status", "osType", "range", "lastSeenUs"],
   emits: ["close"],
   template:
-    "<div data-test='host-drawer-stub' :data-host='hostName' :data-os='osType' :data-last-seen-us='lastSeenUs' />",
+    "<div data-test='host-drawer-stub' :data-host='hostName' :data-display-name='displayName' :data-os='osType' :data-last-seen-us='lastSeenUs' />",
 };
 
 const setupCardStub = {
@@ -357,6 +361,68 @@ describe("HostsPage", () => {
     });
   });
 
+  describe("Load column shows raw, annotated per-core", () => {
+    // A column labelled "Load 15m" reading 0.38 when `uptime` on that box prints
+    // 1.50 would contradict the host's own tooling, so the raw value leads.
+    it("prints the RAW load, with the per-core figure only as a suffix", async () => {
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "web-01", load: 6.32, cores: 8, loadPerCore: 0.79 }),
+      ];
+      wrapper = await mountPage();
+      const cell = wrapper.find('[data-test="hosts-cell-load-web-01"]');
+      expect(cell.text()).toContain("6.32");
+      expect(cell.find('[data-test="hosts-load-per-core-web-01"]').text()).toBe("(0.79/core)");
+    });
+
+    it("renders no per-core suffix when the host has no core count", async () => {
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "nocores", load: 6.32, cores: null, loadPerCore: null }),
+      ];
+      wrapper = await mountPage();
+      const cell = wrapper.find('[data-test="hosts-cell-load-nocores"]');
+      // The row is never dropped or blanked for a missing core count.
+      expect(cell.text()).toContain("6.32");
+      expect(cell.find('[data-test="hosts-load-per-core-nocores"]').exists()).toBe(false);
+    });
+
+    it("renders no per-core suffix when the guard suppressed it fleet-wide", async () => {
+      // cpu_average makes the COLLECTOR divide by cores under the same metric name.
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "norm", load: 0.9, cores: 8, loadPerCore: null }),
+      ];
+      wrapper = await mountPage();
+      const cell = wrapper.find('[data-test="hosts-cell-load-norm"]');
+      expect(cell.text()).toContain("0.90");
+      expect(cell.find('[data-test="hosts-load-per-core-norm"]').exists()).toBe(false);
+      // The core count is still reported; only the derived figure is withheld.
+      expect(wrapper.find('[data-test="hosts-cell-cores-norm"]').text()).toBe("8");
+    });
+
+    it("renders a sortable Cores column, em-dashing an unknown count", async () => {
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "big", cores: 32 }),
+        makeRow({ host_name: "nocores", cores: null, loadPerCore: null }),
+      ];
+      wrapper = await mountPage();
+      expect(wrapper.find('[data-test="hosts-cell-cores-big"]').text()).toBe("32");
+      expect(wrapper.find('[data-test="hosts-cell-cores-nocores"]').text()).toBe("—");
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const cores = columns.find((c) => c.id === "cores");
+      expect(cores.sortable).toBe(true);
+      expect(cores.accessorKey).toBe("cores");
+    });
+
+    it("routes a Cores sort back through the field map", async () => {
+      wrapper = await mountPage();
+      wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("sort-change", { column: "cores", order: "desc" });
+      await flushPromises();
+      expect(hostsListState.sortBy.value).toBe("cores");
+      expect(hostsListState.sortDesc.value).toBe(true);
+    });
+  });
+
   describe("utilization bars", () => {
     it.each([
       ["cpu", 95],
@@ -426,6 +492,44 @@ describe("HostsPage", () => {
     });
   });
 
+  describe("Host column identity", () => {
+    // Nothing bound the column definition: flipping the accessor back to host_name
+    // left the whole suite green while every row silently showed the pod name.
+    it("reads the Host column from display_name, and renders that value", async () => {
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "collector-a", display_name: "node-1" }),
+      ];
+      wrapper = await mountPage();
+      await flushPromises();
+      const columns = wrapper.findComponent({ name: "OTable" }).props("columns") as any[];
+      const hostColumn = columns.find((c) => c.id === "host");
+      expect(hostColumn.accessorKey).toBe("display_name");
+      // The accessor and the painted cell must agree, so the sort key cannot drift from the label.
+      expect(wrapper.find('[data-test="hosts-row-collector-a"]').text()).toBe("node-1");
+    });
+
+    it("sorts the Host column by the field it displays", async () => {
+      wrapper = await mountPage();
+      await wrapper
+        .findComponent({ name: "OTable" })
+        .vm.$emit("sort-change", { column: "host", order: "asc" });
+      expect(hostsListState.sortBy.value).toBe("display_name");
+    });
+
+    it("shows the node name alone, with no host_name tooltip behind it", async () => {
+      // On a DaemonSet host_name is the collector POD, so a tooltip fires on every
+      // row and offers a pod name as the host's identity.
+      hostsListState.pagedRows.value = [
+        makeRow({ host_name: "collector-a", display_name: "node-1" }),
+      ];
+      wrapper = await mountPage();
+      await flushPromises();
+      const cell = wrapper.find('[data-test="hosts-row-collector-a"]');
+      expect(cell.text()).toBe("node-1");
+      expect(cell.attributes("title")).toBeUndefined();
+    });
+  });
+
   describe("drawer deep-link", () => {
     it("opens the drawer from ?host= and clears the param on close", async () => {
       wrapper = await mountPage({ host: "web-01" });
@@ -449,6 +553,27 @@ describe("HostsPage", () => {
     });
   });
 
+  describe("drawer heading fallback", () => {
+    it("passes the series key as the heading when the host is not in the loaded rows", async () => {
+      // ?host=X while X sits on another page or behind a facet resolved no row, and
+      // the drawer opened with a permanently empty heading.
+      hostsListState.rows.value = [];
+      wrapper = await mountPage({ host: "ghost-01" });
+      await flushPromises();
+      const drawer = wrapper.find('[data-test="host-drawer-stub"]');
+      expect(drawer.attributes("data-display-name")).toBe("ghost-01");
+    });
+
+    it("still prefers the node name when the row IS loaded", async () => {
+      hostsListState.rows.value = [makeRow({ host_name: "web-01", display_name: "ip-10-1-4-86" })];
+      wrapper = await mountPage({ host: "web-01" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="host-drawer-stub"]').attributes("data-display-name")).toBe(
+        "ip-10-1-4-86",
+      );
+    });
+  });
+
   describe("URL-carried state", () => {
     it("restores filter/facet/page/sort state from query params on mount", async () => {
       wrapper = await mountPage({
@@ -465,6 +590,23 @@ describe("HostsPage", () => {
       expect(hostsListState.page.value).toBe(2);
       expect(hostsListState.sortBy.value).toBe("memoryPct");
       expect(hostsListState.sortDesc.value).toBe(false);
+    });
+
+    it("keeps a pre-rename ?sort=host_name bookmark sorting AND highlighting the Host column", async () => {
+      // The Host column now reads display_name; an old link's host_name matched no
+      // column, so the CPU header lit up while the data sorted by host name.
+      wrapper = await mountPage({ sort: "host_name", desc: "false" });
+      expect(hostsListState.sortBy.value).toBe("display_name");
+      expect(wrapper.findComponent({ name: "OTable" }).props("sortBy")).toBe("host");
+    });
+
+    it("highlights the Host column even when the legacy field arrives by another path", async () => {
+      // restoreFromQuery maps ?sort=; a host_name set any other way fell through the
+      // reverse lookup to "cpu", lighting the wrong header while Host did the sorting.
+      wrapper = await mountPage();
+      hostsListState.sortBy.value = "host_name";
+      await flushPromises();
+      expect(wrapper.findComponent({ name: "OTable" }).props("sortBy")).toBe("host");
     });
 
     it("resets to page 1 (and clears ?page) when a filter changes", async () => {

@@ -14,7 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { cleanAggregationQuery, withCompositeGroupLabel } from "./aggregationPreviewQuery";
+import {
+  buildCountChartQuery,
+  cleanAggregationQuery,
+  withCompositeGroupLabel,
+} from "./aggregationPreviewQuery";
 
 describe("cleanAggregationQuery", () => {
   it("drops the HAVING clause on a plain query", () => {
@@ -42,6 +46,52 @@ describe("cleanAggregationQuery", () => {
     const out = cleanAggregationQuery(query);
     expect((out.match(/'/g) || []).length % 2).toBe(0);
     expect(out).toContain("'items group by owner'");
+  });
+
+  it("renames the aggregate alias and injects a time bucket for a plain aggregation query", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'production\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toContain("AS zo_sql_num");
+    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
+    expect(cleaned).not.toContain("HAVING");
+    expect(cleaned).not.toContain("zo_sql_min_time");
+  });
+
+  it("does not rewrite zo_sql_val when it only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'value zo_sql_val here\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("'value zo_sql_val here'");
+    expect(cleaned).not.toContain("'value zo_sql_num here'");
+  });
+
+  it("does not rewrite alert_agg_value when it only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'alert_agg_value spotted\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    expect(cleaned).toContain("'alert_agg_value spotted'");
+    expect(cleaned).not.toContain("'zo_sql_num spotted'");
+  });
+
+  it("still injects the time bucket when zo_sql_key only appears inside a quoted filter value", () => {
+    const sql =
+      'SELECT svc, count(latency) AS alert_agg_value, MIN(_timestamp) as zo_sql_min_time, MAX(_timestamp) AS zo_sql_max_time FROM "bugtest" WHERE ("k8s_cluster" = \'zo_sql_key is here\') GROUP BY svc HAVING count(latency) > 0';
+
+    const cleaned = cleanAggregationQuery(sql);
+
+    // The literal filter value must survive untouched...
+    expect(cleaned).toContain("'zo_sql_key is here'");
+    // ...and the chart must still get its own real time axis.
+    expect(cleaned).toContain("histogram(_timestamp) AS zo_sql_key");
+    expect(cleaned).toContain("GROUP BY zo_sql_key, svc");
   });
 });
 
@@ -74,5 +124,65 @@ describe("withCompositeGroupLabel", () => {
     expect(out).toContain("'sort order by name'");
     expect(out).toContain("zo_group_label");
     expect(out).toMatch(/GROUP BY zo_sql_key, zo_group_label/i);
+  });
+});
+
+describe("buildCountChartQuery", () => {
+  it("rewrites a plain custom SQL query into a count-over-time query", () => {
+    const chartQuery = buildCountChartQuery('SELECT _timestamp FROM "bugtest"');
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("does not mistake a line comment's 'from' for the statement's real FROM", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT _timestamp -- pick the from column\nFROM "bugtest"',
+    );
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("does not mistake a block comment's 'from' for the statement's real FROM", () => {
+    const chartQuery = buildCountChartQuery('SELECT _timestamp /* from here */ FROM "bugtest"');
+
+    expect(chartQuery).toBe(
+      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "bugtest" GROUP BY zo_sql_key',
+    );
+  });
+
+  it("returns null rather than a broken query for a query that starts with a CTE", () => {
+    const chartQuery = buildCountChartQuery(
+      'WITH x AS (SELECT _timestamp FROM "bugtest") SELECT _timestamp FROM x',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("returns null rather than a broken query for a UNION", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT _timestamp FROM "bugtest" UNION ALL SELECT _timestamp FROM "bugtest"',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("returns null rather than a broken query for a JOIN", () => {
+    const chartQuery = buildCountChartQuery(
+      'SELECT a._timestamp FROM "bugtest" a JOIN "bugtest" b ON a.svc = b.svc',
+    );
+
+    expect(chartQuery).toBeNull();
+  });
+
+  it("still ignores a quoted filter value containing a real comment marker", () => {
+    const chartQuery = buildCountChartQuery(
+      "SELECT _timestamp FROM \"bugtest\" WHERE (note = '-- not a comment')",
+    );
+
+    expect(chartQuery).toContain("WHERE (note = '-- not a comment')");
   });
 });

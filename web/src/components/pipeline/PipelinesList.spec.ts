@@ -22,15 +22,18 @@ import pipelineService from "@/services/pipelines";
 import { createStore } from "vuex";
 
 // Mock services
-vi.mock("@/services/pipelines", () => ({
-  default: {
-    getPipelines: vi.fn(),
-    toggleState: vi.fn(),
-    bulkToggleState: vi.fn(),
-    createPipeline: vi.fn(),
-    deletePipeline: vi.fn(),
-  },
-}));
+vi.mock("@/services/pipelines", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getPipelines: vi.fn(),
+      toggleState: vi.fn(),
+      bulkToggleState: vi.fn(),
+      createPipeline: vi.fn(),
+      deletePipeline: vi.fn(),
+    },
+  });
+});
 
 // Mock router — currentRoute.value is reactive() so the component's route-name watch fires on mutation, matching vue-router's real currentRoute.
 const mockRouter = {
@@ -599,7 +602,7 @@ describe("PipelinesList", () => {
         data: { list: [rt] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -631,7 +634,7 @@ describe("PipelinesList", () => {
         data: { list: [sch] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -664,7 +667,7 @@ describe("PipelinesList", () => {
         data: { list: [sch] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       if (wrapper.vm.pipelines.length > 0) {
         const p = wrapper.vm.pipelines[0];
@@ -677,7 +680,7 @@ describe("PipelinesList", () => {
         data: { list: [] },
       });
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       expect(wrapper.vm.pipelines).toHaveLength(0);
     });
@@ -688,7 +691,7 @@ describe("PipelinesList", () => {
         new Error("API Error"),
       );
 
-      await wrapper.vm.getPipelines();
+      await wrapper.vm.getPipelines(true);
 
       expect(consoleSpy).toHaveBeenCalledWith(expect.any(Error));
       consoleSpy.mockRestore();

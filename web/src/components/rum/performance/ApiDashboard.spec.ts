@@ -62,11 +62,14 @@ vi.mock("@/utils/rum/api.json", () => ({
   },
 }));
 
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
+    },
+  });
+});
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data || { variables: { list: [] } }),

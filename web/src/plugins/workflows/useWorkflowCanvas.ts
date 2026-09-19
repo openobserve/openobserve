@@ -41,6 +41,9 @@ import { getTruncatedConditions } from "@/utils/conditionPreview";
 import { convertV0ToV2, convertV1BEToV2, convertV1ToV2 } from "@/utils/alerts/alertDataTransforms";
 import { DEFAULT_TRIGGER_KIND, triggerTypeForKind } from "./triggers";
 import workflowService from "@/services/workflows";
+import { workflowRunsQuery } from "@/services/workflows.queries";
+import { workflowKeys } from "@/services/workflows.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { TranslateFn } from "@/types/i18n";
 
@@ -1088,6 +1091,10 @@ export const executeTestRun = async (opts: {
       draft,
       suppress_destinations: opts.suppressDestinations ?? true,
     });
+    // A test run can land in the history (event_type "Test"), so the cached runs list may be behind.
+    if (wf.id) {
+      void queryClient.invalidateQueries({ queryKey: workflowKeys.runsOf(opts.orgId, wf.id) });
+    }
     const errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received.
     const inputs = res.data?.inputs || {};
@@ -1327,6 +1334,8 @@ const flushTestStateToServer = async (orgId: string) => {
       },
       draft: !!wf.isDraft,
     });
+    // The list rows seed the editor, so a cached row would reopen it without these badges.
+    void queryClient.invalidateQueries({ queryKey: workflowKeys.all(orgId) });
   } catch {
     // A failed flush must not lose the run: the badges still render from memory, and
     // the state rides along on the author's next explicit save.
@@ -1559,6 +1568,9 @@ export const retryWorkflowRun = async (opts: {
       run_id: opts.runId,
       from_node: opts.fromNode,
     });
+    void queryClient.invalidateQueries({
+      queryKey: workflowKeys.runsOf(opts.orgId, opts.workflowId),
+    });
     return { ok: true };
   } catch (e: any) {
     const msg = e?.response?.data?.message;
@@ -1576,19 +1588,23 @@ export const loadRunsHistory = async (opts: {
   workflowId: string;
   start: number;
   end: number;
+  force?: boolean;
 }): Promise<{ ok: boolean; status?: number }> => {
   const rh = workflowObj.runsHistory;
   rh.loading = true;
   try {
-    const res = await workflowService.getWorkflowHistory({
-      org_identifier: opts.orgId,
-      id: opts.workflowId,
-      start_time: opts.start,
-      end_time: opts.end,
-    });
-    rh.list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    const options = workflowRunsQuery(opts.orgId, opts.workflowId, opts.start, opts.end);
+    if (opts.force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    // Copied: the shared state is reactive, and the array itself belongs to the cache.
+    rh.list = [...(await queryClient.fetchQuery(options))];
     rh.params = { start: opts.start, end: opts.end };
-    rh.fetchedAt = Date.now();
+    rh.fetchedAt = queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
     return { ok: true };
   } catch (e: any) {
     return { ok: false, status: e?.response?.status };

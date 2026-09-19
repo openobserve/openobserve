@@ -39,11 +39,14 @@ vi.mock("vuex", () => ({
 }));
 
 // Mock stream service
-vi.mock("../../services/stream", () => ({
-  default: {
-    fieldValues: vi.fn(),
-  },
-}));
+vi.mock("../../services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      fieldValues: vi.fn(),
+    },
+  });
+});
 
 // Mock child components
 vi.mock("./settings/VariableQueryValueSelector.vue", () => ({

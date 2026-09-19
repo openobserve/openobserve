@@ -19,8 +19,18 @@ import { useStreamDetect } from "./useStreamDetect";
 const nameList = vi.fn();
 const search = vi.fn();
 
-vi.mock("@/services/stream", () => ({ default: { nameList: (...a: any[]) => nameList(...a) } }));
-vi.mock("@/services/search", () => ({ default: { search: (...a: any[]) => search(...a) } }));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { nameList: (...a: any[]) => nameList(...a) },
+  });
+});
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { search: (...a: any[]) => search(...a) },
+  });
+});
 
 // The six sqlserver_* metric streams a real collector run produces.
 const SQLSERVER_STREAMS = [

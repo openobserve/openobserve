@@ -46,11 +46,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, defineAsyncComponent, computed } from "vue";
+import {
+  defineComponent,
+  ref,
+  watch,
+  defineAsyncComponent,
+  computed,
+  provide,
+  inject,
+  toRefs,
+  onActivated,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
-import { provide, inject, toRefs, onActivated } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { isSimpleSelectAllQuery } from "@/utils/query/sqlUtils";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";

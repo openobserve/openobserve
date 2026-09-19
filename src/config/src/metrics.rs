@@ -2599,6 +2599,24 @@ pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+/// Count of records dropped by an ingestion policy on the write path, which still answers success.
+///
+/// Not labelled by stream: streams are auto-created from client-supplied names, and this fires on
+/// a path a client controls, so a per-stream label is unbounded cardinality. The warn log carries
+/// the name.
+pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ingest_records_dropped_total",
+            "Records discarded by an ingestion policy rather than stored".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "reason"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2622,6 +2640,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_RECORDS_DROPPED.clone()))
         .expect("Metric registered");
 
     // ingester stats

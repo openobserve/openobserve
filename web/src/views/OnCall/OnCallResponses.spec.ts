@@ -13,8 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { flushPromises, mount } from "@vue/test-utils";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { flushPromises, mount, VueWrapper } from "@vue/test-utils";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
 import destinationService from "@/services/alert_destination";
@@ -124,11 +124,18 @@ const stubs = {
     // visible from the outside rather than only in a prop.
     template: "<div :data-test=\"compact ? 'oncall-setup-banner' : 'oncall-setup-checklist'\" />",
   },
-  ConfirmDialog: {
-    name: "ConfirmDialog",
-    props: ["modelValue", "title", "message"],
-    emits: ["update:ok", "update:cancel"],
-    template: "<div />",
+  // `open`, not `modelValue`: ODialog has no `modelValue` prop, and unstubbed
+  // it pulls reka-ui's Dialog primitives into every mount that opens one.
+  ODialog: {
+    name: "ODialog",
+    props: ["open"],
+    template: "<div v-if='open'><slot /><slot name='footer' /></div>",
+  },
+  OTextarea: {
+    name: "OTextarea",
+    props: ["modelValue"],
+    emits: ["update:modelValue"],
+    template: `<textarea :value="modelValue" @input="$emit('update:modelValue', $event.target.value)" />`,
   },
   // "vue-router" is mocked wholesale above, so the real RouterLink (which
   // navigates via the router injected by its plugin) never resolves — this
@@ -194,11 +201,23 @@ const team = {
   updated_at: 0,
 };
 
+// Nothing here ever unmounts on its own account, so every mount from every
+// test would otherwise sit alive (watchers, listeners) through the rest of
+// the 70+ tests in this file — the accumulation is exactly what pushed the
+// last few tests in the file past the default 5s timeout under load.
+const mountedWrappers: VueWrapper[] = [];
+
 function render() {
-  return mount(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
+  const wrapper = mount(OnCallResponses, { global: { plugins: [i18n, store], stubs } });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
 
 describe("OnCallResponses", () => {
+  afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0)) wrapper.unmount();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     for (const key of Object.keys(routeQuery)) delete routeQuery[key];
@@ -1107,7 +1126,7 @@ describe("OnCallResponses", () => {
       // Nothing is closed on the click alone.
       expect(service.resolveResponse).not.toHaveBeenCalled();
 
-      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await wrapper.find('[data-test="oncall-bulk-resolve-confirm"]').trigger("click");
       await flushPromises();
 
       expect(service.resolveResponse).toHaveBeenCalledTimes(2);
