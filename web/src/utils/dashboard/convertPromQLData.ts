@@ -28,6 +28,7 @@ import {
   getGridLineStyle,
 } from "./colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
+import { escapeHtml } from "@/utils/html";
 import { chartColor, chartNumber } from "@/utils/chartTheme";
 import { calculateBottomLegendHeight, calculateRightLegendWidth } from "./legendConfiguration";
 import { convertPromQLChartData } from "./promql/convertPromQLChartData";
@@ -281,7 +282,7 @@ export const convertPromQLData = async (
       },
       formatter: (params: any) => {
         hoveredSeriesState?.value?.setHoveredSeriesName(params?.name);
-        return params?.name;
+        return escapeHtml(params?.name);
       },
     },
     textStyle: {
@@ -433,29 +434,21 @@ export const convertPromQLData = async (
           if (it.data[1] != null) {
             // check if the series is the current series being hovered
             // if have than bold it
-            if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
-              hoverText.push(
-                `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ),
-                )} </strong>`,
-              );
-            // else normal text
-            else
-              hoverText.push(
-                `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                  getUnitValue(
-                    it.data[1],
-                    panelSchema.config?.unit,
-                    panelSchema.config?.unit_custom,
-                    panelSchema.config?.decimals,
-                  ) ?? "",
-                )}`,
-              );
+            const row = `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+              formatUnitValue(
+                getUnitValue(
+                  it.data[1],
+                  panelSchema.config?.unit,
+                  panelSchema.config?.unit_custom,
+                  panelSchema.config?.decimals,
+                ),
+              ),
+            )}`;
+            hoverText.push(
+              it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName
+                ? `<strong>${row} </strong>`
+                : row,
+            );
           }
         });
 
