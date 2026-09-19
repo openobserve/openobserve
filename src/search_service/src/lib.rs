@@ -167,7 +167,6 @@ pub async fn search(
         request.set_local_mode(Some(v));
     }
     request.set_use_cache(in_req.use_cache);
-    let meta = Sql::new_from_req(&request, &query).await?;
 
     #[cfg(feature = "enterprise")]
     {
@@ -236,9 +235,6 @@ pub async fn search(
 
     match res {
         Ok(mut res) => {
-            if in_req.query.streaming_output && meta.order_by.is_empty() {
-                res = crate::streaming::order_search_results(res, None);
-            }
             res.set_work_group(_work_group.clone());
             let time = start.elapsed().as_secs_f64();
             let (report_usage, search_type, search_event_context) = match in_req.search_type {
@@ -642,7 +638,7 @@ pub async fn search_partition(
         return Ok(resp);
     }
 
-    if ctx.detect_non_ts_order_by() {
+    if ctx.order_by_merge() == partition::sql_context::OrderByMerge::ByHeap {
         resp.non_ts_order_by_cols = ctx
             .sql
             .order_by

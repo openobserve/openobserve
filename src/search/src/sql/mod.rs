@@ -81,6 +81,7 @@ pub struct Sql {
     pub time_range: (i64, i64),
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>,
+    pub projection: Vec<String>,
     pub histogram_interval: Option<i64>,
     pub timezone: Option<String>,
     pub sorted_by_time: bool, // if only order by _timestamp
@@ -88,6 +89,15 @@ pub struct Sql {
 }
 
 impl Sql {
+    /// Whether an ORDER BY key sorts by the timestamp column, directly or through its alias.
+    pub fn is_timestamp_key(&self, key: &str) -> bool {
+        key == TIMESTAMP_COL_NAME
+            || self
+                .aliases
+                .iter()
+                .any(|(expr, alias)| expr == TIMESTAMP_COL_NAME && alias == key)
+    }
+
     pub async fn new_from_req(req: &Request, query: &SearchQuery) -> Result<Sql, Error> {
         let search_event_type = req
             .search_event_type
@@ -169,6 +179,7 @@ impl Sql {
             .collect::<Vec<_>>();
         let group_by = column_visitor.group_by;
         let mut order_by = column_visitor.order_by;
+        let projection = column_visitor.projection;
 
         // check if need sort by time
         if order_by.is_empty()
@@ -180,8 +191,15 @@ impl Sql {
         {
             order_by.push((TIMESTAMP_COL_NAME.to_string(), OrderBy::Desc));
         }
+        // The ORDER BY key is the output column, so a projected alias of _timestamp counts too.
+        let is_ts_key = |key: &str| {
+            key == TIMESTAMP_COL_NAME
+                || aliases
+                    .iter()
+                    .any(|(expr, alias)| expr == TIMESTAMP_COL_NAME && alias == key)
+        };
         let need_sort_by_time = order_by.len() == 1
-            && order_by[0].0 == TIMESTAMP_COL_NAME
+            && is_ts_key(&order_by[0].0)
             && order_by[0].1 == OrderBy::Desc
             && !total_schemas.iter().any(|(stream, _)| {
                 matches!(stream.get_stream_type(stream_type), StreamType::Metrics)
@@ -291,6 +309,7 @@ impl Sql {
             time_range: (query.start_time, query.end_time),
             group_by,
             order_by,
+            projection,
             histogram_interval,
             timezone,
             sorted_by_time: need_sort_by_time,

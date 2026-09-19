@@ -33,6 +33,7 @@ pub struct ColumnVisitor<'a> {
     pub schemas: &'a HashMap<TableReference, Arc<SchemaCache>>,
     pub group_by: Vec<String>,
     pub order_by: Vec<(String, OrderBy)>, // field_name, order_by
+    pub projection: Vec<String>,          // output column names, `*` kept as is
     pub offset: Option<i64>,
     pub limit: Option<i64>,
     pub is_wildcard: bool,
@@ -49,6 +50,7 @@ impl<'a> ColumnVisitor<'a> {
             schemas,
             group_by: Vec::new(),
             order_by: Vec::new(),
+            projection: Vec::new(),
             offset: None,
             limit: None,
             is_wildcard: false,
@@ -103,23 +105,26 @@ impl VisitorMut for ColumnVisitor<'_> {
     }
 
     fn pre_visit_query(&mut self, query: &mut Query) -> ControlFlow<Self::Break> {
-        if let Some(order_by) = query.order_by.as_mut()
-            && let OrderByKind::Expressions(exprs) = &mut order_by.kind
+        // Only the outermost ORDER BY and LIMIT bound the result, not a CTE's or subquery's.
+        let is_outermost = !self.outer_query_visited;
+        self.outer_query_visited = true;
+        if is_outermost {
+            self.projection = projection_of(&query.body).iter().map(output_name).collect();
+        }
+        if is_outermost
+            && let Some(order_by) = query.order_by.as_ref()
+            && let OrderByKind::Expressions(exprs) = &order_by.kind
         {
-            for order in exprs.iter_mut() {
-                let mut name_visitor = FieldNameVisitor::new();
-                let _ = order.expr.visit(&mut name_visitor);
-                if name_visitor.field_names.len() == 1 {
-                    let expr_name = name_visitor.field_names.iter().next().unwrap().to_string();
-                    self.order_by.push((
-                        expr_name,
-                        if order.options.asc.unwrap_or(true) {
-                            OrderBy::Asc
-                        } else {
-                            OrderBy::Desc
-                        },
-                    ));
-                }
+            let projection = projection_of(&query.body);
+            for order in exprs.iter() {
+                self.order_by.push((
+                    order_by_key(&order.expr, projection),
+                    if order.options.asc.unwrap_or(true) {
+                        OrderBy::Asc
+                    } else {
+                        OrderBy::Desc
+                    },
+                ));
             }
         }
         if let sqlparser::ast::SetExpr::Select(select) = query.body.as_mut() {
@@ -154,9 +159,6 @@ impl VisitorMut for ColumnVisitor<'_> {
         {
             self.is_wildcard = true;
         }
-        // Only the outermost LIMIT bounds the result, not a CTE, subquery or set-op branch's.
-        let is_outermost = !self.outer_query_visited;
-        self.outer_query_visited = true;
         let mut has_limit = false;
         if is_outermost
             && let Some(limit_clause) = query.limit_clause.as_ref()
@@ -182,6 +184,94 @@ impl VisitorMut for ColumnVisitor<'_> {
             self.offset = Some(0);
         }
         ControlFlow::Continue(())
+    }
+}
+
+/// Resolves an ORDER BY expression to the result column it sorts by, output alias first.
+fn order_by_key(expr: &Expr, projection: &[SelectItem]) -> String {
+    let text = expr.to_string();
+    let aliased = |pred: &dyn Fn(&Expr) -> bool| {
+        projection.iter().find_map(|item| match item {
+            SelectItem::ExprWithAlias { expr, alias } if pred(expr) => Some(alias.value.clone()),
+            _ => None,
+        })
+    };
+    match expr {
+        Expr::Identifier(ident) => {
+            let name = ident.value.clone();
+            if projection.iter().any(|item| {
+                matches!(item, SelectItem::ExprWithAlias { alias, .. } if alias.value == name)
+            }) {
+                return name;
+            }
+            aliased(&|e| column_name(e) == Some(name.as_str())).unwrap_or(name)
+        }
+        Expr::CompoundIdentifier(idents) => aliased(&|e| e.to_string() == text)
+            .or_else(|| idents.last().map(|ident| ident.value.clone()))
+            .unwrap_or(text),
+        Expr::Value(ValueWithSpan {
+            value: Value::Number(n, _),
+            ..
+        }) => {
+            // A wildcard before the position expands to an unknown number of columns.
+            let idx = n.parse::<usize>().ok().and_then(|n| n.checked_sub(1));
+            let item = idx.and_then(|i| projection.get(i));
+            let after_wildcard = idx.is_some_and(|i| {
+                projection
+                    .iter()
+                    .take(i + 1)
+                    .any(|item| output_name(item) == "*")
+            });
+            match item {
+                Some(_) if after_wildcard => text,
+                Some(SelectItem::ExprWithAlias { alias, .. }) => alias.value.clone(),
+                Some(SelectItem::UnnamedExpr(proj)) => order_by_key(proj, &[]),
+                _ => text,
+            }
+        }
+        _ => aliased(&|e| e.to_string() == text).unwrap_or_else(|| expr_output_name(expr)),
+    }
+}
+
+/// The name a projection item gets in the result; wildcards stay `*`.
+fn output_name(item: &SelectItem) -> String {
+    match item {
+        SelectItem::ExprWithAlias { alias, .. } => alias.value.clone(),
+        SelectItem::UnnamedExpr(expr) => column_name(expr)
+            .map(str::to_string)
+            .unwrap_or_else(|| expr_output_name(expr)),
+        SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(..) => "*".to_string(),
+        SelectItem::ExprWithAliases { expr, .. } => expr.to_string(),
+    }
+}
+
+fn column_name(expr: &Expr) -> Option<&str> {
+    match expr {
+        Expr::Identifier(ident) => Some(ident.value.as_str()),
+        Expr::CompoundIdentifier(idents) => idents.last().map(|ident| ident.value.as_str()),
+        _ => None,
+    }
+}
+
+/// DataFusion lower-cases function names in output column names.
+fn expr_output_name(expr: &Expr) -> String {
+    let Expr::Function(f) = expr else {
+        return expr.to_string();
+    };
+    let mut f = f.clone();
+    for part in f.name.0.iter_mut() {
+        if let sqlparser::ast::ObjectNamePart::Identifier(ident) = part {
+            ident.value = ident.value.to_lowercase();
+        }
+    }
+    f.to_string()
+}
+
+fn projection_of(set: &SetExpr) -> &[SelectItem] {
+    match set {
+        SetExpr::Select(select) => &select.projection,
+        SetExpr::SetOperation { left, .. } => projection_of(left),
+        _ => &[],
     }
 }
 
@@ -428,8 +518,7 @@ mod tests {
     }
 
     #[test]
-    fn test_column_visitor_order_by_compound_expr_skipped() {
-        // ORDER BY expression with multiple fields → field_names.len() != 1 → order_by skipped
+    fn test_column_visitor_order_by_multiple_columns() {
         let sql = "SELECT name FROM users ORDER BY name, age";
         let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
             .unwrap()
@@ -440,13 +529,121 @@ mod tests {
         let mut visitor = ColumnVisitor::new(&schemas);
         let _ = statement.visit(&mut visitor);
 
-        // Both single-field order_by expressions captured
-        assert_eq!(visitor.order_by.len(), 2);
-        assert!(
-            visitor
-                .order_by
-                .iter()
-                .any(|(f, _)| f == "name" || f == "age")
+        assert_eq!(
+            visitor.order_by,
+            vec![
+                ("name".to_string(), OrderBy::Asc),
+                ("age".to_string(), OrderBy::Asc)
+            ]
+        );
+    }
+
+    fn order_by_of(sql: &str) -> Vec<(String, OrderBy)> {
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+        visitor.order_by
+    }
+
+    #[test]
+    fn test_order_by_output_alias_wins_over_source_expression() {
+        assert_eq!(
+            order_by_of(
+                "SELECT _timestamp, duration AS score, score AS old_score FROM users ORDER BY score DESC"
+            ),
+            vec![("score".to_string(), OrderBy::Desc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_source_column_maps_to_its_alias() {
+        assert_eq!(
+            order_by_of("SELECT duration AS score FROM users ORDER BY duration"),
+            vec![("score".to_string(), OrderBy::Asc)]
+        );
+        assert_eq!(
+            order_by_of("SELECT u.name AS n FROM users u ORDER BY name"),
+            vec![("n".to_string(), OrderBy::Asc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_aggregate_expr_keyed_by_output_column_name() {
+        assert_eq!(
+            order_by_of("SELECT count(*), name FROM users GROUP BY name ORDER BY COUNT(*) ASC"),
+            vec![("count(*)".to_string(), OrderBy::Asc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_positional_uses_projection() {
+        assert_eq!(
+            order_by_of("SELECT name, count(*) AS cnt FROM users GROUP BY name ORDER BY 2 DESC, 1"),
+            vec![
+                ("cnt".to_string(), OrderBy::Desc),
+                ("name".to_string(), OrderBy::Asc)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_order_by_positional_after_wildcard_is_left_unresolved() {
+        assert_eq!(
+            order_by_of("SELECT *, message AS m FROM users ORDER BY 2"),
+            vec![("2".to_string(), OrderBy::Asc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_compound_identifier_uses_column_name() {
+        assert_eq!(
+            order_by_of("SELECT u.name FROM users u ORDER BY u.name DESC"),
+            vec![("name".to_string(), OrderBy::Desc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_ignores_subquery_and_cte_ordering() {
+        assert_eq!(
+            order_by_of(
+                "WITH t AS (SELECT name FROM users ORDER BY age) SELECT name FROM t WHERE name IN (SELECT name FROM users ORDER BY name DESC) ORDER BY name ASC"
+            ),
+            vec![("name".to_string(), OrderBy::Asc)]
+        );
+    }
+
+    #[test]
+    fn test_order_by_on_union_is_captured() {
+        assert_eq!(
+            order_by_of(
+                "SELECT name FROM users UNION ALL SELECT name FROM users ORDER BY name DESC"
+            ),
+            vec![("name".to_string(), OrderBy::Desc)]
+        );
+    }
+
+    #[test]
+    fn test_projection_records_output_names() {
+        let sql = "SELECT *, u.name, count(*) AS cnt, COUNT(*) FROM users u GROUP BY name";
+        let mut statement = sqlparser::parser::Parser::parse_sql(&GenericDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let schemas = make_schemas();
+        let mut visitor = ColumnVisitor::new(&schemas);
+        let _ = statement.visit(&mut visitor);
+        assert_eq!(visitor.projection, vec!["*", "name", "cnt", "count(*)"]);
+    }
+
+    #[test]
+    fn test_order_by_unaliased_expression_keeps_expression_text() {
+        assert_eq!(
+            order_by_of("SELECT _timestamp, duration FROM users ORDER BY duration + 1 DESC"),
+            vec![("duration + 1".to_string(), OrderBy::Desc)]
         );
     }
 

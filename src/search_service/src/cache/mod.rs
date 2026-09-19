@@ -60,6 +60,7 @@ use crate::{
     cache::{cacher::check_cache, result_utils::extract_timestamp_range},
     inspector::{SearchInspectorFieldsBuilder, search_inspector_fields},
     sql::RE_SELECT_FROM,
+    streaming::sorting::compare_hit_values,
 };
 
 pub mod cacher;
@@ -842,30 +843,11 @@ fn sort_response(
                 let b_ts = get_ts_value(ts_column, b);
                 a_ts.partial_cmp(&b_ts).unwrap_or(std::cmp::Ordering::Equal)
             } else {
-                let a_val = a.get(field).unwrap_or(&serde_json::Value::Null);
-                let b_val = b.get(field).unwrap_or(&serde_json::Value::Null);
-
-                match (a_val, b_val) {
-                    (serde_json::Value::String(a_str), serde_json::Value::String(b_str)) => {
-                        a_str.cmp(b_str)
-                    }
-                    (serde_json::Value::Number(a_num), serde_json::Value::Number(b_num)) => {
-                        if let (Some(a_f64), Some(b_f64)) = (a_num.as_f64(), b_num.as_f64()) {
-                            a_f64
-                                .partial_cmp(&b_f64)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                        } else {
-                            std::cmp::Ordering::Equal
-                        }
-                    }
-                    (serde_json::Value::String(_), serde_json::Value::Number(_)) => {
-                        std::cmp::Ordering::Less
-                    }
-                    (serde_json::Value::Number(_), serde_json::Value::String(_)) => {
-                        std::cmp::Ordering::Greater
-                    }
-                    _ => std::cmp::Ordering::Equal,
+                let ord = compare_hit_values(a.get(field), b.get(field), order == &OrderBy::Desc);
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
                 }
+                continue;
             };
 
             // Apply order direction

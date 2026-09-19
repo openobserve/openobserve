@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{cmp::Ordering, collections::BinaryHeap};
+use std::{cmp::Ordering, collections::BinaryHeap, sync::Arc};
 
 use ::search::SortStrategy;
 use config::{
@@ -42,12 +42,12 @@ fn determine_sort_strategy(
     search_res: &Response,
     fallback_order_by_col: Option<String>,
 ) -> SortStrategy {
-    // Check SQL ORDER BY first
-    if let Some(order_by) = search_res.order_by {
+    // The engine already sorted an explicit ORDER BY; re-sorting could only get it wrong.
+    if search_res.order_by.is_some() || !search_res.order_by_metadata.is_empty() {
         log::info!(
             "[trace_id: {}] Using user-specified ORDER BY: {:?}",
             search_res.trace_id,
-            order_by
+            search_res.order_by_metadata
         );
         return SortStrategy::SqlOrderBy;
     }
@@ -58,51 +58,26 @@ fn determine_sort_strategy(
         return SortStrategy::FallbackColumn(col, OrderBy::Desc);
     }
 
-    // Auto-determine as last resort
-    if let Some((col, is_string)) = determine_sort_column(&search_res.hits[0]) {
-        log::info!(
-            "[trace_id: {}] Auto-sorting by column: {}, type: {}",
-            search_res.trace_id,
-            col,
-            if is_string { "string" } else { "numeric" }
-        );
-        return SortStrategy::AutoDetermine(col, is_string);
-    }
-
     SortStrategy::NoSort
 }
 
 /// Applies the chosen sort strategy to results
 fn apply_sort_strategy(search_res: &mut Response, strategy: SortStrategy) {
-    match strategy {
-        SortStrategy::FallbackColumn(col, order) => {
-            // Auto-detect column type from first hit
-            let is_string = search_res
-                .hits
-                .first()
-                .and_then(|hit| hit.get(&col))
-                .map(|v| !v.is_number())
-                .unwrap_or(true);
-
-            // Sorting behavior:
-            // - String columns: Always sort ascending (A->Z)
-            // - Numeric columns: Respect the specified order (ASC/DESC)
-            let is_descending = if is_string {
-                false // Strings always sort ascending
-            } else {
-                order == OrderBy::Desc // Numbers follow specified order
-            };
-
-            sort_by_column(search_res, &col, is_string, is_descending);
-            if search_res.order_by.is_none() {
-                search_res.order_by = Some(order);
-                search_res.order_by_metadata.push((col, order));
-            }
-        }
-        SortStrategy::AutoDetermine(col, is_string) => {
-            sort_by_column(search_res, &col, is_string, !is_string);
-        }
-        _ => (),
+    let SortStrategy::FallbackColumn(col, order) = strategy else {
+        return;
+    };
+    let is_string = search_res
+        .hits
+        .first()
+        .and_then(|hit| hit.get(&col))
+        .map(|v| !v.is_number())
+        .unwrap_or(true);
+    // String fallback columns always sort ascending; only numeric ones follow the direction.
+    let is_descending = !is_string && order == OrderBy::Desc;
+    sort_by_column(search_res, &col, is_descending);
+    if search_res.order_by.is_none() {
+        search_res.order_by = Some(order);
+        search_res.order_by_metadata.push((col, order));
     }
 }
 
@@ -125,89 +100,50 @@ fn find_fallback_column(search_res: &Response, fallback_col: Option<String>) -> 
         })
 }
 
-/// Sorts results by a specific column
-fn sort_by_column(search_res: &mut Response, column: &str, is_string: bool, descending: bool) {
-    search_res.hits.sort_by(|a, b| {
-        let ordering = if is_string {
-            compare_string_values(a, b, column)
-        } else {
-            compare_numeric_values(a, b, column)
-        };
-        if descending {
-            ordering.reverse()
-        } else {
-            ordering
-        }
-    });
+fn sort_by_column(search_res: &mut Response, column: &str, descending: bool) {
+    let cols = [(column.to_string(), descending)];
+    search_res.hits.sort_by(|a, b| compare_hits(a, b, &cols));
 }
 
-/// Compares string values with null handling
-fn compare_string_values(a: &Value, b: &Value, column: &str) -> std::cmp::Ordering {
-    let a_val = a.get(column).and_then(|v| v.as_str());
-    let b_val = b.get(column).and_then(|v| v.as_str());
-    match (a_val, b_val) {
-        // When both values exist: "apple" vs "banana" -> normal alphabetical order
-        (Some(a), Some(b)) => a.cmp(b),
-
-        // When first value is null and second exists: null vs "apple" -> null goes last
-        // Example: [apple, banana, null] in ascending order
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-
-        // When first value exists and second is null: "apple" vs null -> non-null goes first
-        // Example: [apple, banana, null] in ascending order
-        (Some(_), None) => std::cmp::Ordering::Less,
-
-        // When both values are null: null vs null -> treat as equal
-        // Example: [null, null] -> order doesn't change
-        (None, None) => std::cmp::Ordering::Equal,
-    }
-}
-
-/// Compares numeric values with null handling
-fn compare_numeric_values(a: &Value, b: &Value, column: &str) -> std::cmp::Ordering {
-    let a_val = a.get(column).and_then(|v| v.as_f64());
-    let b_val = b.get(column).and_then(|v| v.as_f64());
-    match (a_val, b_val) {
-        // When both are numbers: 1 vs 2 -> normal numeric order
-        // If NaN encountered, treat values as equal
-        // Example: [1, 2, 3] in ascending order
-        (Some(a), Some(b)) => a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal),
-
-        // When first is null and second is a number: null vs 1 -> null goes last
-        // Example: [1, 2, null] in ascending order
-        (None, Some(_)) => std::cmp::Ordering::Greater,
-
-        // When first is a number and second is null: 1 vs null -> number goes first
-        // Example: [1, 2, null] in ascending order
-        (Some(_), None) => std::cmp::Ordering::Less,
-
-        // When both are null: null vs null -> treat as equal
-        // Example: [null, null] -> order doesn't change
-        (None, None) => std::cmp::Ordering::Equal,
-    }
-}
-
-/// Determines the best column to sort by from the first hit
-fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
-    if let Some(obj) = first_hit.as_object() {
-        // First try to find non-numeric columns
-        for (key, value) in obj {
-            if !value.is_number() {
-                log::debug!("Using string column for sorting: {key}");
-                return Some((key.clone(), true)); // (column, is_string)
-            }
-        }
-
-        // If no non-numeric column found, take first numeric column
-        for (key, value) in obj {
-            if value.is_number() {
-                log::debug!("Using numeric column for sorting: {key}");
-                return Some((key.clone(), false)); // (column, is_string)
-            }
+/// Orders two hits by ORDER BY columns given as (name, is_descending), first difference wins.
+pub fn compare_hits(a: &Value, b: &Value, cols: &[(String, bool)]) -> Ordering {
+    for (col, descending) in cols {
+        let ord = compare_hit_values(a.get(col), b.get(col), *descending);
+        if ord != Ordering::Equal {
+            return ord;
         }
     }
-    log::warn!("No suitable sort column found in results");
-    None
+    Ordering::Equal
+}
+
+/// Nulls last in either direction; numbers numerically, strings lexically, numbers first.
+pub fn compare_hit_values(a: Option<&Value>, b: Option<&Value>, descending: bool) -> Ordering {
+    let (a, b) = match (a.filter(|v| !v.is_null()), b.filter(|v| !v.is_null())) {
+        (None, None) => return Ordering::Equal,
+        (None, Some(_)) => return Ordering::Greater,
+        (Some(_), None) => return Ordering::Less,
+        (Some(a), Some(b)) => (a, b),
+    };
+    let ord = compare_values(a, b);
+    if descending { ord.reverse() } else { ord }
+}
+
+fn compare_values(a: &Value, b: &Value) -> Ordering {
+    if let (Some(x), Some(y)) = (a.as_i64(), b.as_i64()) {
+        return x.cmp(&y);
+    }
+    if let (Some(x), Some(y)) = (a.as_u64(), b.as_u64()) {
+        return x.cmp(&y);
+    }
+    match (a.as_f64(), b.as_f64()) {
+        (Some(x), Some(y)) => x.partial_cmp(&y).unwrap_or(Ordering::Equal),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => match (a.as_str(), b.as_str()) {
+            (Some(x), Some(y)) => x.cmp(y),
+            _ => a.to_string().cmp(&b.to_string()),
+        },
+    }
 }
 
 /// Incremental top-k heap for merging hits across partitions.
@@ -221,9 +157,7 @@ fn determine_sort_column(first_hit: &Value) -> Option<(String, bool)> {
 pub struct TopKHeap {
     heap: BinaryHeap<std::cmp::Reverse<HeapHit>>,
     k: usize,
-    /// (col_name, is_descending, is_numeric) — is_numeric detected lazily from first non-null
-    /// value.
-    cols: Vec<(String, bool, Option<bool>)>,
+    cols: Arc<[(String, bool)]>,
 }
 
 impl TopKHeap {
@@ -236,37 +170,16 @@ impl TopKHeap {
             // k comes from size or SQL LIMIT, so grow on demand instead of pre-reserving it.
             heap: BinaryHeap::with_capacity(k.min(default_k) + 1),
             k,
-            cols: order_by_cols
-                .iter()
-                .map(|(col, desc)| (col.clone(), *desc, None))
-                .collect(),
+            cols: order_by_cols.into(),
         }
     }
 
-    /// Feed one partition's hits into the heap. Hits that don't make the top-k are
-    /// dropped immediately — only k elements are retained in memory at any time.
     pub fn push_hits(&mut self, hits: Vec<Value>) {
         for hit in hits {
-            // Detect is_numeric lazily per column from the first non-null value seen.
-            for (col, _, is_numeric) in &mut self.cols {
-                if is_numeric.is_none()
-                    && let Some(v) = hit.get(col.as_str())
-                    && !v.is_null()
-                {
-                    *is_numeric = Some(v.is_number());
-                }
-            }
-
-            let resolved: Vec<(String, bool, bool)> = self
-                .cols
-                .iter()
-                .map(|(col, desc, is_num)| (col.clone(), *desc, is_num.unwrap_or(false)))
-                .collect();
             let candidate = HeapHit {
                 hit,
-                cols: resolved,
+                cols: Arc::clone(&self.cols),
             };
-
             if self.heap.len() < self.k {
                 self.heap.push(std::cmp::Reverse(candidate));
             } else if let Some(std::cmp::Reverse(min)) = self.heap.peek()
@@ -278,36 +191,14 @@ impl TopKHeap {
         }
     }
 
-    /// Drain the heap into a sorted vec and apply the `from` offset.
     pub fn into_sorted_vec(self, from: usize) -> Vec<Value> {
-        let cols: Vec<(String, bool, bool)> = self
-            .cols
-            .iter()
-            .map(|(col, desc, is_num)| (col.clone(), *desc, is_num.unwrap_or(false)))
-            .collect();
-
+        let cols = self.cols;
         let mut result: Vec<Value> = self
             .heap
             .into_iter()
             .map(|std::cmp::Reverse(h)| h.hit)
             .collect();
-
-        result.sort_by(|a, b| {
-            for (col, is_desc, is_numeric) in &cols {
-                let ord = if *is_numeric {
-                    compare_numeric_values(a, b, col)
-                } else {
-                    compare_string_values(a, b, col)
-                };
-                // DESC: sort descending (largest first)
-                let ord = if *is_desc { ord.reverse() } else { ord };
-                if ord != Ordering::Equal {
-                    return ord;
-                }
-            }
-            Ordering::Equal
-        });
-
+        result.sort_by(|a, b| compare_hits(a, b, &cols));
         if from >= result.len() {
             return vec![];
         }
@@ -315,17 +206,9 @@ impl TopKHeap {
     }
 }
 
-/// Wrapper around a JSON hit that implements `Ord` across all ORDER BY columns.
-///
-/// Direction-aware so that `Reverse<HeapHit>` always evicts the "current worst":
-/// - DESC col: ascending cmp → `Reverse` = min-heap → evicts smallest → keeps k largest
-/// - ASC  col: descending cmp → `Reverse` = max-heap → evicts largest  → keeps k smallest
-///
-/// Tiebreaking proceeds to the next column just as SQL does.
 struct HeapHit {
     hit: Value,
-    /// (col_name, is_descending, is_numeric) in ORDER BY order.
-    cols: Vec<(String, bool, bool)>,
+    cols: Arc<[(String, bool)]>,
 }
 
 impl PartialEq for HeapHit {
@@ -343,20 +226,9 @@ impl PartialOrd for HeapHit {
 }
 
 impl Ord for HeapHit {
+    // The min-heap evicts its smallest entry, so the row that sorts first must compare greatest.
     fn cmp(&self, other: &Self) -> Ordering {
-        for (col, is_desc, is_numeric) in &self.cols {
-            let ord = if *is_numeric {
-                compare_numeric_values(&self.hit, &other.hit, col)
-            } else {
-                compare_string_values(&self.hit, &other.hit, col)
-            };
-            // See struct doc: flip direction so Reverse<HeapHit> evicts the right element.
-            let ord = if *is_desc { ord } else { ord.reverse() };
-            if ord != Ordering::Equal {
-                return ord;
-            }
-        }
-        Ordering::Equal
+        compare_hits(&self.hit, &other.hit, &self.cols).reverse()
     }
 }
 
@@ -434,16 +306,28 @@ mod tests {
     }
 
     #[test]
-    fn test_order_search_results_auto_determine() {
+    fn test_order_search_results_without_order_info_keeps_engine_order() {
         let mut response = create_test_response();
         response.order_by = None;
+        let original = response.hits.clone();
 
-        let result = order_search_results(response.clone(), None);
+        let result = order_search_results(response, None);
 
-        // Should auto-determine sort column (first non-numeric column)
-        // In this case, "level" should be chosen as it's a string
         assert_eq!(result.order_by, None);
         assert_eq!(result.order_by_metadata.len(), 0);
+        assert_eq!(result.hits, original);
+    }
+
+    #[test]
+    fn test_order_search_results_metadata_only_keeps_engine_order() {
+        let mut response = create_test_response();
+        response.order_by = None;
+        response.order_by_metadata = vec![("count(*)".to_string(), OrderBy::Asc)];
+        let original = response.hits.clone();
+
+        let result = order_search_results(response, Some("timestamp".to_string()));
+
+        assert_eq!(result.hits, original);
     }
 
     #[test]
@@ -471,21 +355,6 @@ mod tests {
                 assert_eq!(order, OrderBy::Desc);
             }
             _ => panic!("Expected FallbackColumn strategy"),
-        }
-    }
-
-    #[test]
-    fn test_determine_sort_strategy_auto_determine() {
-        let response = create_test_response();
-
-        let strategy = determine_sort_strategy(&response, None);
-
-        match strategy {
-            SortStrategy::AutoDetermine(col, is_string) => {
-                assert_eq!(col, "level"); // First non-numeric column
-                assert!(is_string);
-            }
-            _ => panic!("Expected AutoDetermine strategy"),
         }
     }
 
@@ -529,7 +398,7 @@ mod tests {
     fn test_sort_by_column_string_ascending() {
         let mut response = create_test_response();
 
-        sort_by_column(&mut response, "level", true, false);
+        sort_by_column(&mut response, "level", false);
 
         // String columns should always sort ascending regardless of descending flag
         let levels: Vec<&str> = response
@@ -545,7 +414,7 @@ mod tests {
     fn test_sort_by_column_numeric_descending() {
         let mut response = create_test_response();
 
-        sort_by_column(&mut response, "count", false, true);
+        sort_by_column(&mut response, "count", true);
 
         // Numeric columns should respect the descending flag
         let counts: Vec<i64> = response
@@ -561,7 +430,7 @@ mod tests {
     fn test_sort_by_column_numeric_ascending() {
         let mut response = create_test_response();
 
-        sort_by_column(&mut response, "count", false, false);
+        sort_by_column(&mut response, "count", false);
 
         let counts: Vec<i64> = response
             .hits
@@ -573,121 +442,61 @@ mod tests {
     }
 
     #[test]
-    fn test_compare_string_values_both_exist() {
-        let a = json!({"field": "apple"});
-        let b = json!({"field": "banana"});
-
-        let result = compare_string_values(&a, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Less);
-
-        let result = compare_string_values(&b, &a, "field");
-        assert_eq!(result, std::cmp::Ordering::Greater);
+    fn test_compare_hit_values_ordering() {
+        use std::cmp::Ordering::*;
+        let n = |v: i64| json!(v);
+        let s = |v: &str| json!(v);
+        assert_eq!(compare_hit_values(Some(&n(1)), Some(&n(2)), false), Less);
+        assert_eq!(compare_hit_values(Some(&n(1)), Some(&n(2)), true), Greater);
+        assert_eq!(compare_hit_values(Some(&n(2)), Some(&n(2)), false), Equal);
+        assert_eq!(
+            compare_hit_values(Some(&s("a")), Some(&s("b")), false),
+            Less
+        );
+        assert_eq!(compare_hit_values(Some(&n(1)), Some(&s("a")), false), Less);
+        assert_eq!(compare_hit_values(Some(&json!(null)), None, false), Equal);
     }
 
     #[test]
-    fn test_compare_string_values_with_nulls() {
-        let a = json!({"field": "apple"});
-        let b = json!({});
-
-        // a has value, b is null -> a should come first
-        let result = compare_string_values(&a, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Less);
-
-        // b is null, a has value -> b should come last
-        let result = compare_string_values(&b, &a, "field");
-        assert_eq!(result, std::cmp::Ordering::Greater);
-
-        // Both null -> equal
-        let result = compare_string_values(&b, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Equal);
+    fn test_integers_compare_without_float_rounding() {
+        use std::cmp::Ordering::*;
+        let a = json!(9007199254740992_i64);
+        let b = json!(9007199254740993_i64);
+        assert_eq!(compare_hit_values(Some(&a), Some(&b), false), Less);
+        let a = json!(18446744073709551614_u64);
+        let b = json!(18446744073709551615_u64);
+        assert_eq!(compare_hit_values(Some(&a), Some(&b), true), Greater);
+        assert_eq!(
+            compare_hit_values(Some(&json!(1.5)), Some(&json!(1)), false),
+            Greater
+        );
     }
 
     #[test]
-    fn test_compare_numeric_values_both_exist() {
-        let a = json!({"field": 5});
-        let b = json!({"field": 10});
-
-        let result = compare_numeric_values(&a, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Less);
-
-        let result = compare_numeric_values(&b, &a, "field");
-        assert_eq!(result, std::cmp::Ordering::Greater);
-    }
-
-    #[test]
-    fn test_compare_numeric_values_with_nulls() {
-        let a = json!({"field": 5});
-        let b = json!({});
-
-        // a has value, b is null -> a should come first
-        let result = compare_numeric_values(&a, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Less);
-
-        // b is null, a has value -> b should come last
-        let result = compare_numeric_values(&b, &a, "field");
-        assert_eq!(result, std::cmp::Ordering::Greater);
-
-        // Both null -> equal
-        let result = compare_numeric_values(&b, &b, "field");
-        assert_eq!(result, std::cmp::Ordering::Equal);
-    }
-
-    #[test]
-    fn test_compare_numeric_values_nan_handling() {
-        let a = json!({"field": 5.0});
-        let b = json!({"field": f64::NAN});
-
-        // NaN should be treated as equal to avoid panics
-        let result = compare_numeric_values(&a, &b, "field");
-        // The function actually returns Less when comparing 5.0 with NaN
-        // This is the actual behavior, not Equal
-        assert_eq!(result, std::cmp::Ordering::Less);
-    }
-
-    #[test]
-    fn test_determine_sort_column_string_first() {
-        let hit = json!({
-            "level": "info",
-            "count": 5,
-            "timestamp": 1000
-        });
-
-        let result = determine_sort_column(&hit);
-
-        assert_eq!(result, Some(("level".to_string(), true)));
-    }
-
-    #[test]
-    fn test_determine_sort_column_numeric_only() {
-        let hit = json!({
-            "count": 5,
-            "timestamp": 1000
-        });
-
-        let result = determine_sort_column(&hit);
-
-        assert_eq!(result, Some(("count".to_string(), false)));
-    }
-
-    #[test]
-    fn test_determine_sort_column_no_suitable() {
-        let hit = json!({
-            "array": [1, 2, 3],
-            "null": serde_json::Value::Null
-        });
-
-        let result = determine_sort_column(&hit);
-
-        // The function actually finds "array" as a non-numeric column
-        // This is the actual behavior, not None
-        assert_eq!(result, Some(("array".to_string(), true)));
+    fn test_nulls_sort_last_in_both_directions() {
+        use std::cmp::Ordering::*;
+        let one = json!(1);
+        for descending in [false, true] {
+            assert_eq!(compare_hit_values(Some(&one), None, descending), Less);
+            assert_eq!(compare_hit_values(None, Some(&one), descending), Greater);
+            assert_eq!(
+                compare_hit_values(Some(&json!(null)), Some(&one), descending),
+                Greater
+            );
+        }
+        let mut hits = vec![json!({"c": null}), json!({"c": 1}), json!({"c": 2})];
+        hits.sort_by(|a, b| compare_hits(a, b, &[("c".to_string(), true)]));
+        assert_eq!(
+            hits,
+            vec![json!({"c": 2}), json!({"c": 1}), json!({"c": null})]
+        );
     }
 
     #[test]
     fn test_sort_by_column_missing_field() {
         let mut response = create_test_response();
 
-        sort_by_column(&mut response, "nonexistent", false, false);
+        sort_by_column(&mut response, "nonexistent", false);
 
         // Should not panic, should maintain original order
         assert_eq!(response.hits.len(), 3);
@@ -705,7 +514,7 @@ mod tests {
             ..Default::default()
         };
 
-        sort_by_column(&mut response, "field", true, false);
+        sort_by_column(&mut response, "field", false);
 
         // Should handle mixed types gracefully
         assert_eq!(response.hits.len(), 3);

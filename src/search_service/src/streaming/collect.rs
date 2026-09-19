@@ -61,7 +61,7 @@ pub async fn search_partition_mode(
         req.search_type,
     )
     .await?;
-    let req_order_by = sql.order_by.first().map(|v| v.1).unwrap_or_default();
+    let req_order_by = crate::cache::cacher::time_direction(&sql).unwrap_or_default();
 
     let mut res = search_stream_collect(
         org_id,

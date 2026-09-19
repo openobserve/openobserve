@@ -680,6 +680,17 @@ pub fn get_ts_col_order_by(
     }
 }
 
+/// Direction of the primary sort when it is by time, `None` when it sorts by anything else.
+pub fn time_direction(sql: &Sql) -> Option<OrderBy> {
+    let ts_col = get_ts_col_order_by(sql, TIMESTAMP_COL_NAME, sql.is_complex)
+        .map(|(col, _)| col)
+        .unwrap_or_else(|| TIMESTAMP_COL_NAME.to_string());
+    sql.order_by
+        .first()
+        .filter(|(key, _)| is_timestamp_field(key, &ts_col) || sql.is_timestamp_key(key))
+        .map(|(_, dir)| *dir)
+}
+
 /// Computes the cache file path based on query metadata and histogram information.
 /// This function ensures consistent file path generation across different code paths.
 ///
@@ -1168,6 +1179,7 @@ mod tests {
             time_range: (0, 0),
             group_by: vec![],
             order_by: vec![("_timestamp".to_string(), OrderBy::Desc)],
+            projection: vec!["_timestamp".to_string(), "field1".to_string()],
             histogram_interval: None,
             timezone: None,
             sorted_by_time: true,
@@ -1179,6 +1191,43 @@ mod tests {
         let (ts_col, is_descending) = result.unwrap();
         assert_eq!(ts_col, "_timestamp");
         assert!(is_descending);
+    }
+
+    #[test]
+    fn test_time_direction_recognizes_timestamp_alias() {
+        let mut sql = Sql {
+            sql: "SELECT _timestamp AS ts, field1 FROM logs ORDER BY _timestamp ASC".to_string(),
+            is_complex: false,
+            org_id: "test_org".to_string(),
+            stream_type: StreamType::Logs,
+            stream_names: vec![TableReference::from("logs")],
+            has_match_all: false,
+            equal_items: hashbrown::HashMap::new(),
+            columns: {
+                let mut cols = hashbrown::HashMap::new();
+                let mut set = hashbrown::HashSet::new();
+                set.insert("_timestamp".to_string());
+                cols.insert(TableReference::from("logs"), set);
+                cols
+            },
+            aliases: vec![("_timestamp".to_string(), "ts".to_string())],
+            schemas: hashbrown::HashMap::new(),
+            limit: 100,
+            offset: 0,
+            time_range: (0, 0),
+            group_by: vec![],
+            order_by: vec![("ts".to_string(), OrderBy::Asc)],
+            projection: vec!["ts".to_string(), "field1".to_string()],
+            histogram_interval: None,
+            timezone: None,
+            sorted_by_time: false,
+            sampling_config: None,
+        };
+        assert_eq!(time_direction(&sql), Some(OrderBy::Asc));
+        sql.order_by = vec![("field1".to_string(), OrderBy::Asc)];
+        assert_eq!(time_direction(&sql), None);
+        sql.order_by = vec![];
+        assert_eq!(time_direction(&sql), None);
     }
 
     #[tokio::test]

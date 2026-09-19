@@ -46,7 +46,7 @@ export const useSearchResponseHandler = () => {
 
   const { getHistogramTitle, getHistogramTitleParts, generateHistogramData } = useHistogram();
 
-  const { refreshPagination, sortResponse } = useSearchPagination(t);
+  const { refreshPagination } = useSearchPagination(t);
 
   const { clearCache } = useLogsHighlighter(t);
 
@@ -191,19 +191,6 @@ export const useSearchResponseHandler = () => {
         searchObj.data.queryResults.hits.length,
       );
       trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
-    }
-
-    if (
-      searchObj.data.queryResults.hits.length > 0 &&
-      store.state.zoConfig.timestamp_column != "" &&
-      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "order_by_metadata") &&
-      searchObj.data.queryResults.order_by_metadata.length > 0
-    ) {
-      sortResponse(
-        searchObj.data.queryResults.hits,
-        store.state.zoConfig.timestamp_column,
-        searchObj.data.queryResults.order_by_metadata,
-      );
     }
 
     refreshPagination(true);

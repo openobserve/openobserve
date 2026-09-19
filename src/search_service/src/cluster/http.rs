@@ -269,10 +269,8 @@ pub async fn search(
         result.response_type = "matrix".to_string();
     }
 
-    // set order by
-    if let Some(order_by) = sql.order_by.first() {
-        result.set_order_by(Some(order_by.1));
-    }
+    // The UI reads `order_by` as the time direction, so only a timestamp sort sets it.
+    result.set_order_by(crate::cache::cacher::time_direction(&sql));
 
     // set order by metadata
     let order_by_metadata = sql.order_by.clone();
