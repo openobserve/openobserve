@@ -21,7 +21,9 @@ use config::{
 use hashbrown::HashMap;
 use infra::errors::{Error, ErrorCodes};
 #[cfg(feature = "enterprise")]
-pub use openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions};
+pub use openobserve_core::authz::{
+    StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+};
 use search::sql::Sql;
 
 // ============================================================================

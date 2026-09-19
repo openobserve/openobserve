@@ -106,6 +106,55 @@ pub async fn check_stream_permissions(
     }
 }
 
+/// Requires GET permission on every cipher key the SQL references; `None` means allowed.
+#[cfg(feature = "enterprise")]
+pub async fn check_cipher_key_permissions(
+    org_id: &str,
+    user_id: &str,
+    sql: &str,
+) -> Option<Response> {
+    use o2_openfga::meta::mapping::OFGA_MODELS;
+
+    let keys_used = match search::sql::visitor::cipher_key::get_cipher_key_names(sql) {
+        Ok(v) => v,
+        Err(e) => return Some(MetaHttpResponse::bad_request(e.to_string())),
+    };
+    if keys_used.is_empty() || is_root_user(user_id) {
+        return None;
+    }
+    log::info!("keys used : {keys_used:?}");
+
+    let Some(user) = crate::users::get_user(Some(org_id), user_id).await else {
+        return Some(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+    };
+    let key_model = OFGA_MODELS
+        .get("cipher_keys")
+        .map_or("cipher_keys", |model| model.key);
+    for key in keys_used {
+        let allowed = check_permissions(
+            user_id,
+            AuthExtractor {
+                auth: "".to_string(),
+                method: "GET".to_string(),
+                o2_type: format!("{key_model}:{key}"),
+                org_id: org_id.to_string(),
+                bypass_check: false,
+                parent_id: "".to_string(),
+                use_all_org: false,
+                use_self_context: false,
+                use_self_parent: true,
+            },
+            user.role.clone(),
+            user.is_external,
+        )
+        .await;
+        if !allowed {
+            return Some(MetaHttpResponse::forbidden("Unauthorized Access to key"));
+        }
+    }
+    None
+}
+
 #[cfg(feature = "enterprise")]
 pub async fn check_permissions(
     user_id: &str,
