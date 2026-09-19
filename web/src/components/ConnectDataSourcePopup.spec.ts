@@ -177,8 +177,12 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_shown",
-        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
+        expect.objectContaining({ org_id: "default" }),
       );
+      const [, shownProps] = (segment.track as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([event]) => event === "onboarding_prompt_shown",
+      )!;
+      expect(shownProps).not.toHaveProperty("user_id");
     });
 
     it("stays closed and dispatches setIsDataIngested(true) when the org already has data", async () => {
@@ -217,7 +221,7 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("marks the session as resolved when the org already has data, so a later mount skips the summary call", async () => {
+    it("dispatches setIsDataIngested(true) when the org already has data, so a later mount skips the summary call via that flag (not the session key)", async () => {
       let summaryCalls = 0;
       global.server.use(
         http.get(SUMMARY_URL, () => {
@@ -228,7 +232,9 @@ describe("ConnectDataSourcePopup", () => {
 
       wrapper = buildWrapper();
       await flushPromises();
-      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBe("true");
+      expect(store.state.organizationData.isDataIngested).toBe(true);
+      // The session key belongs to CommunitySlackInvite's suppression check, not this popup's own gating.
+      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBeNull();
       expect(summaryCalls).toBe(1);
 
       wrapper.unmount();
@@ -317,8 +323,12 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_connect_clicked",
-        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
+        expect.objectContaining({ org_id: "default" }),
       );
+      const [, connectProps] = (segment.track as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([event]) => event === "onboarding_prompt_connect_clicked",
+      )!;
+      expect(connectProps).not.toHaveProperty("user_id");
       expect(routerSpy).toHaveBeenCalledWith({
         name: "ingestion",
         query: { org_identifier: "default" },
@@ -333,8 +343,12 @@ describe("ConnectDataSourcePopup", () => {
 
       expect(segment.track).toHaveBeenCalledWith(
         "onboarding_prompt_dismissed",
-        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
+        expect.objectContaining({ org_id: "default" }),
       );
+      const [, dismissedProps] = (segment.track as ReturnType<typeof vi.fn>).mock.calls.find(
+        ([event]) => event === "onboarding_prompt_dismissed",
+      )!;
+      expect(dismissedProps).not.toHaveProperty("user_id");
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
@@ -387,7 +401,9 @@ describe("ConnectDataSourcePopup", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
+        true,
+      );
       const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
       expect(record.status).toBe("pending_day2");
       expect(segment.track).toHaveBeenCalledWith(
@@ -402,7 +418,9 @@ describe("ConnectDataSourcePopup", () => {
       wrapper = buildWrapper();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
+        false,
+      );
     });
 
     it("starts the day-2 clock silently (no button, no track) when the org already has data", async () => {

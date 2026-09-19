@@ -45,9 +45,9 @@ const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custo
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
+    // org_id alone is enough to correlate events without transmitting the user's raw email as PII.
     segment.track(event, {
       org_id: store.state.selectedOrganization?.identifier,
-      user_id: store.state.userInfo?.email,
       source: "standalone_day2",
       ...properties,
     });

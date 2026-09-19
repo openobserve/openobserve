@@ -65,11 +65,9 @@ let stopOrgWatch: (() => void) | null = null;
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
-    // RudderStack is never identify()'d in this app, so every event is
-    // anonymous unless org/user context rides in the properties themselves.
+    // RudderStack is never identify()'d in this app; org_id alone is enough to correlate events.
     segment.track(event, {
       org_id: store.state.selectedOrganization?.identifier,
-      user_id: store.state.userInfo?.email,
       ...properties,
     });
   } catch {
@@ -122,9 +120,8 @@ const checkAndMaybeShow = async () => {
     const response = await organizationService.get_organization_summary(orgIdentifier);
     const hasData = !!response.data?.streams?.num_streams;
     if (hasData) {
+      // Don't also claim the session key here — CommunitySlackInvite reads it to know this popup already had its say this session.
       store.dispatch("setIsDataIngested", true);
-      // Mark this session resolved too, so a later mount skips the summary call.
-      sessionStorage.setItem(sessionShownKey, "true");
       markSlackInviteOffered(userEmail);
       return;
     }

@@ -79,7 +79,7 @@ export const markSlackInviteOffered = (email: string): void => {
   writeRecord(email, { status: "pending_day2", shownAt: Date.now() });
 };
 
-// Joining or declining the day-2 popup both end the ask for good — the two outcomes don't need to stay distinguishable in storage.
+// Only joining resolves the ask for good — dismiss()/"Maybe later" leaves it pending so the day-2 popup can re-show.
 export const markSlackInviteResolved = (email: string): void => {
   writeRecord(email, { status: "resolved", shownAt: readRecord(email).shownAt });
 };
