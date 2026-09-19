@@ -37,6 +37,20 @@ function apiOrigin(): string {
   return base.endsWith("/") ? base.slice(0, -1) : base;
 }
 
+export interface SyntheticsVariablePayload {
+  name: string;
+  value?: string;
+  kind: "plain" | "secret";
+  description?: string;
+  example?: string;
+  tags?: string[];
+}
+
+export interface SyntheticsEnvironmentPayload {
+  name: string;
+  description?: string;
+}
+
 export interface ListRunsPayload {
   query: {
     sql: string;
@@ -204,6 +218,104 @@ const syntheticsService = {
 
   bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
+
+  listGlobalVariables: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/variables`),
+
+  createGlobalVariable: (orgIdentifier: string, body: SyntheticsVariablePayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/variables`, body),
+
+  updateGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    body: SyntheticsVariablePayload,
+    force = false,
+  ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
+
+  deleteGlobalVariable: (orgIdentifier: string, id: string, force = false) =>
+    http().delete(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`),
+
+  listEnvironments: (orgIdentifier: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/environments`),
+
+  createEnvironment: (orgIdentifier: string, body: SyntheticsEnvironmentPayload) =>
+    http().post(`/api/${orgIdentifier}/synthetics/environments`, body),
+
+  updateEnvironment: (orgIdentifier: string, env: string, body: SyntheticsEnvironmentPayload) =>
+    http().put(`/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}`, body),
+
+  deleteEnvironment: (orgIdentifier: string, env: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}?force=${force}`,
+    ),
+
+  /** Copy an environment's variables into a new one. Checks are not copied. */
+  duplicateEnvironment: (orgIdentifier: string, env: string, name: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/duplicate`,
+      { name },
+    ),
+
+  createEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    body: SyntheticsVariablePayload,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables`,
+      body,
+    ),
+
+  updateEnvironmentVariable: (
+    orgIdentifier: string,
+    env: string,
+    id: string,
+    body: SyntheticsVariablePayload,
+    force = false,
+  ) =>
+    http().put(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
+      body,
+    ),
+
+  deleteEnvironmentVariable: (orgIdentifier: string, env: string, id: string, force = false) =>
+    http().delete(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
+    ),
+
+  replaySecrets: (orgIdentifier: string, checkId: string) =>
+    http().post(`/api/${orgIdentifier}/synthetics/${checkId}/replay-secrets`, {}),
+
+  /** The merged set for one check, with the scope each name comes from. */
+  resolvedVariables: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables`),
+
+  /** Every environment's resolved set in one call, keyed by environment name. */
+  resolvedVariablesGrouped: (orgIdentifier: string, checkId: string) =>
+    http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables?envs=all`),
+
+  promoteCheckVariable: (
+    orgIdentifier: string,
+    checkId: string,
+    name: string,
+    environment: string | null,
+  ) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/${checkId}/variables/${encodeURIComponent(name)}/promote`,
+      { environment },
+    ),
+
+  promoteEnvironmentVariable: (orgIdentifier: string, env: string, id: string) =>
+    http().post(
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}/promote`,
+      {},
+    ),
+
+  splitGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    targets: { environment: string; value: string }[],
+  ) => http().post(`/api/${orgIdentifier}/synthetics/variables/${id}/split`, { targets }),
 
   listRunsPayload(monitorId: string, startTime: number, endTime: number): ListRunsPayload {
     const sql = `SELECT * FROM "${STREAM_NAME}" WHERE synthetics_id = '${monitorId}' ORDER BY _timestamp DESC LIMIT 500`;

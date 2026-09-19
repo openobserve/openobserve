@@ -23,6 +23,7 @@ import logs from "./logs";
 import incidents from "./incidents";
 import { getDefaultTheme } from "@/constants/themes";
 import { purgeAllQueries } from "@/composables/query/queryClient";
+import { forgetReplaySecrets } from "@/components/synthetics/variables/replaySecrets";
 
 const pos = window.location.pathname.indexOf("/web/");
 
@@ -443,6 +444,7 @@ export default createStore({
       // Nothing from the previous session may survive — including anything the
       // query layer persisted to localStorage/IndexedDB.
       purgeAllQueries();
+      forgetReplaySecrets();
     },
     endpoint(context, payload) {
       context.commit("endpoint", payload);
@@ -454,6 +456,9 @@ export default createStore({
     //   context.commit("setIndexData", payload);
     // },
     setSelectedOrganization(context, payload) {
+      if (payload?.identifier !== context.state.selectedOrganization?.identifier) {
+        forgetReplaySecrets();
+      }
       context.commit("setSelectedOrganization", payload);
     },
     setOrganizations(context, payload) {

@@ -24,6 +24,7 @@ import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
 import { assertionNeedsExpected } from "@/constants/synthetics";
+import { isHttpUrlTemplate } from "@/components/synthetics/variables/placeholders";
 import type { AssertionKind } from "@/types/synthetics";
 
 /**
@@ -170,11 +171,15 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
       for (let i = 0; i < val.journey.length; i++) {
         const step = val.journey[i];
 
-        if (step.action === "navigate" && !/^https?:\/\/\S+$/i.test(step.value ?? "")) {
+        if (
+          step.action === "navigate" &&
+          !/^https?:\/\/\S+$/i.test(step.value ?? "") &&
+          !((step.value ?? "").includes("{{") && isHttpUrlTemplate(step.value ?? ""))
+        ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ["journey", i, "value"],
-            message: t("synthetics.validation.urlInvalid"),
+            message: t("synthetics.validation.navigateUrlInvalid"),
           });
         }
 
