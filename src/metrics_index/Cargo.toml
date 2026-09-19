@@ -15,9 +15,11 @@ futures.workspace = true
 hashlink.workspace = true
 infra.workspace = true
 log.workspace = true
+metrics_block.workspace = true
 promql.workspace = true
 promql-parser.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+parquet.workspace = true
 regex.workspace = true

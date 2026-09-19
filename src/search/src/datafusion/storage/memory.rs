@@ -432,6 +432,72 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
+    async fn test_cache_inspection_skips_sample_gets_and_preserves_on_demand_fallback() {
+        use std::sync::atomic::Ordering;
+
+        use config::meta::search::ScanStats;
+
+        use crate::file_cache::{cache_files, inspect_file_cache};
+
+        for size in [16, i64::MAX] {
+            let (location, range_calls, option_calls) = range_tracking_fixture().await;
+            let (account, key) = format_location(&location);
+            let key = key.to_string();
+            let entries = [(
+                0,
+                &account,
+                &key,
+                size,
+                chrono::Utc::now().timestamp_micros(),
+            )];
+            let mut stats = ScanStats {
+                compressed_size: size,
+                ..Default::default()
+            };
+            let (cached, hits, misses) =
+                inspect_file_cache("blocks", &entries, &mut stats, "parquet").await;
+            assert!(cached.is_empty());
+            assert_eq!((hits, misses), (0, 1));
+            assert_eq!(
+                stats.querier_memory_cached_files + stats.querier_disk_cached_files,
+                0
+            );
+            assert_eq!(option_calls.load(Ordering::Relaxed), 0);
+            assert_eq!(range_calls.load(Ordering::Relaxed), 0);
+            let payload = FS::new()
+                .get_ranges(&location, &[0..8, 8..16])
+                .await
+                .unwrap();
+            assert_eq!(
+                payload,
+                vec![
+                    Bytes::from_static(b"01234567"),
+                    Bytes::from_static(b"89abcdef")
+                ]
+            );
+            assert_eq!(range_calls.load(Ordering::Relaxed), 1);
+        }
+        if config::get_config().memory_cache.enabled {
+            let (location, _, option_calls) = range_tracking_fixture().await;
+            let (account, key) = format_location(&location);
+            let key = key.to_string();
+            let entries = [(0, &account, &key, 16, chrono::Utc::now().timestamp_micros())];
+            let mut stats = ScanStats {
+                compressed_size: 16,
+                ..Default::default()
+            };
+            cache_files("normal", &entries, &mut stats, "parquet").await;
+            assert!(option_calls.load(Ordering::Relaxed) > 0);
+            let mut inspected = ScanStats::default();
+            let (cached, hits, misses) =
+                inspect_file_cache("blocks", &entries, &mut inspected, "parquet").await;
+            assert_eq!((cached.len(), hits, misses), (1, 1, 0));
+            assert_eq!(inspected.querier_memory_cached_files, 1);
+            infra::cache::file_data::memory::remove(&key).await.unwrap();
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_get_ranges_delegates_batch_and_preserves_order_and_scope() {
         let (location, range_calls, option_calls) = range_tracking_fixture().await;
         let ranges = [10..14, 1..5, 3..7, 1..5];

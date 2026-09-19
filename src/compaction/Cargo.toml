@@ -28,6 +28,7 @@ ingester.workspace = true
 itertools.workspace = true
 log.workspace = true
 metrics_index.workspace = true
+metrics_block.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 object_store.workspace = true
 parking_lot.workspace = true

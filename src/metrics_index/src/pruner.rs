@@ -40,7 +40,7 @@ use promql_parser::label::Matchers;
 use crate::{
     cache::METRICS_INDEX_SELECTION_CACHE,
     layout::MetricsFileLayout,
-    reader::{evaluate_metrics_index, load_metrics_index_file},
+    reader::{evaluate_metrics_index, load_metrics_index_blocks, load_metrics_index_file},
 };
 
 /// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
@@ -60,9 +60,26 @@ pub async fn search(
     matchers: &Matchers,
     target_partitions: usize,
 ) -> Result<Option<(usize, bool)>> {
-    let Some(matcher_labels) = metrics_index_labels(table_schema, matchers) else {
-        return Ok(None);
+    let blocks_enabled = get_config().compact.metrics_index_enabled
+        && get_config().compact.metrics_index_blocks_enabled;
+    let matcher_labels = match metrics_index_labels(table_schema, matchers) {
+        Some(labels) => labels,
+        None if blocks_enabled
+            && matchers.matchers.is_empty()
+            && matchers.or_matchers.is_empty() =>
+        {
+            Vec::new()
+        }
+        None => return Ok(None),
     };
+    let block_files = Arc::new(if blocks_enabled {
+        files
+            .iter()
+            .map(|file| (file.key.clone(), file.clone()))
+            .collect::<HashMap<_, _>>()
+    } else {
+        HashMap::new()
+    });
     let matcher_labels = Arc::new(matcher_labels);
     if files.is_empty() {
         return Ok(None);
@@ -96,9 +113,14 @@ pub async fn search(
             continue;
         };
         let cache_key = if selection_cache_enabled {
+            let format_key = if blocks_enabled {
+                format!("{sidecar_path}\0series-block:{}", file.meta.compressed_size)
+            } else {
+                sidecar_path.clone()
+            };
             selection_cache_key(
                 &file.account,
-                &sidecar_path,
+                &format_key,
                 expected_rows,
                 &matcher_labels,
                 &filter_key,
@@ -151,11 +173,24 @@ pub async fn search(
         |(data_path, account, sidecar_path, cache_key, expected_rows)| {
             let labels = Arc::clone(&matcher_labels);
             let matchers = Arc::clone(&matchers);
+            let block_files = Arc::clone(&block_files);
             async move {
                 let result = async {
-                    let data =
+                    let data = if blocks_enabled {
+                        let file = block_files.get(&data_path).ok_or_else(|| {
+                            DataFusionError::Execution("Missing block index parent".into())
+                        })?;
+                        match load_metrics_index_blocks(file, Arc::clone(&labels)).await {
+                            Ok(data) => data,
+                            Err(error) => {
+                                log::debug!("[trace_id {trace_id}] block index unavailable for {data_path}, trying legacy metrics index: {error}");
+                                load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels)).await?
+                            }
+                        }
+                    } else {
                         load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels))
-                            .await?;
+                            .await?
+                    };
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
                         // indexes without the key predate it: written with the fixed size

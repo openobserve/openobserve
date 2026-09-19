@@ -308,25 +308,68 @@ pub async fn merge_files(
         let account = storage::get_account(org_id, &new_file_key).unwrap_or_default();
         storage::put_with_tier(&account, &new_file_key, buf.clone(), storage_tier).await?;
 
-        // Indexed metrics files own a `.midx` metrics index; it is not tracked in
-        // file_list and is deleted together with the data file
-        if let Some(metrics_index_path) = metrics_index_path {
-            let metrics_index_key = MetricsFileLayout::metrics_index_path(&new_file_key)
-                .ok_or_else(|| {
-                    anyhow::anyhow!("metrics index for a non-indexed metrics file: {new_file_key}")
-                })?;
-            let metrics_index = Bytes::from(tokio::fs::read(&metrics_index_path).await?);
-            storage::put_with_tier(
-                &account,
-                &metrics_index_key,
-                metrics_index.clone(),
-                storage_tier,
-            )
-            .await?;
-            log::debug!(
-                "[COMPACTOR:WORKER:{thread_id}] wrote metrics index {metrics_index_key}, size: {}",
-                metrics_index.len()
-            );
+        let pending_metrics_index = if let Some(metrics_index_path) = metrics_index_path {
+            let key = MetricsFileLayout::metrics_index_path(&new_file_key).ok_or_else(|| {
+                anyhow::anyhow!("metrics index for a non-indexed metrics file: {new_file_key}")
+            })?;
+            Some((
+                key,
+                Bytes::from(tokio::fs::read(&metrics_index_path).await?),
+            ))
+        } else {
+            None
+        };
+        let mut block_index_published = false;
+
+        if cfg.compact.metrics_index_enabled
+            && cfg.compact.metrics_index_blocks_enabled
+            && let Some(block_key) = metrics_block::sidecar_path(&new_file_key)
+        {
+            let started = std::time::Instant::now();
+            let parent = metrics_block::ParentIdentity {
+                object_key: new_file_key.clone(),
+                rows: u64::try_from(new_file_meta.records)?,
+                compressed_size: u64::try_from(new_file_meta.compressed_size)?,
+            };
+            let data = buf.clone();
+            let blocks = tokio::task::spawn_blocking(move || -> anyhow::Result<Option<Vec<u8>>> {
+                let reader =
+                    parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder::try_new(
+                        data.clone(),
+                    )?;
+                if !metrics_block::is_supported_schema(reader.schema().as_ref()) {
+                    return Ok(None);
+                }
+                let result = metrics_block::build_from_parquet(data, parent);
+                match result {
+                    Ok(blocks) => Ok(Some(blocks)),
+                    Err(error) => {
+                        log::warn!("metrics block encoding unavailable, keeping Parquet and legacy index: {error}");
+                        Ok(None)
+                    }
+                }
+            })
+            .await??;
+            if let Some(blocks) = blocks {
+                let block_size = blocks.len();
+                storage::put_with_tier(&account, &block_key, Bytes::from(blocks), storage_tier)
+                    .await?;
+                block_index_published = true;
+                log::info!(
+                    "[COMPACTOR:WORKER:{thread_id}] wrote metrics blocks {block_key}, size: {block_size}, build/upload took: {} ms",
+                    started.elapsed().as_millis()
+                );
+            } else {
+                log::debug!(
+                    "[COMPACTOR:WORKER:{thread_id}] metrics blocks not generated for this file, keeping Parquet fallback: {new_file_key}"
+                );
+            }
+        }
+
+        if let Some((key, bytes)) = pending_metrics_index
+            && !block_index_published
+        {
+            storage::put_with_tier(&account, &key, bytes, storage_tier).await?;
         }
 
         if cfg.search.inverted_index_enabled && stream_type.support_index() && need_index {

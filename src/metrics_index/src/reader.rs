@@ -44,6 +44,14 @@ pub(super) async fn load_metrics_index_file(
     path: &str,
     labels: Arc<Vec<String>>,
 ) -> Result<MetricsIndexData> {
+    let header = infra::cache::storage::get_range(account, &path.into(), 0..6)
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?;
+    if header.as_ref() != b"ARROW1" {
+        return Err(DataFusionError::Execution(
+            "Metrics index is not legacy Arrow metadata".into(),
+        ));
+    }
     let bytes = infra::cache::file_data::get(account, path, None)
         .await
         .map_err(|error| DataFusionError::External(Box::new(error)))?;
@@ -51,6 +59,16 @@ pub(super) async fn load_metrics_index_file(
     tokio::task::spawn_blocking(move || decode_metrics_index(&path, bytes, &labels))
         .await
         .map_err(|error| DataFusionError::External(Box::new(error)))?
+}
+
+pub(super) async fn load_metrics_index_blocks(
+    file: &config::meta::stream::FileKey,
+    labels: Arc<Vec<String>>,
+) -> Result<MetricsIndexData> {
+    let index = promql::load_metrics_block_index(file, &labels)
+        .await
+        .map_err(|e| DataFusionError::External(e.into()))?;
+    metrics_block_index_data(&index)
 }
 
 /// Read the row-range columns plus the requested labels from a sidecar.
@@ -108,23 +126,6 @@ pub(super) fn decode_metrics_index(
         parent_records,
         row_group_size,
     })
-}
-
-fn parse_metadata<T: std::str::FromStr>(
-    metadata: &HashMap<String, String>,
-    key: &str,
-    path: &str,
-) -> Result<Option<T>> {
-    metadata
-        .get(key)
-        .map(|value| {
-            value.parse::<T>().map_err(|_| {
-                DataFusionError::Execution(format!(
-                    "metrics index {path} has an invalid {key}: {value}"
-                ))
-            })
-        })
-        .transpose()
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -205,4 +206,147 @@ pub(super) fn evaluate_metrics_index(
         )));
     }
     Ok(ranges)
+}
+
+fn metrics_block_index_data(index: &metrics_block::Index) -> Result<MetricsIndexData> {
+    let row_group_size = index.row_group_size.ok_or_else(|| {
+        DataFusionError::Execution("Block index lacks parent row group size".into())
+    })?;
+    let mut fields = vec![arrow::datatypes::Field::new(
+        METRICS_INDEX_ROW_COUNT,
+        arrow::datatypes::DataType::UInt32,
+        false,
+    )];
+    let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
+        index.blocks.iter().map(|b| b.row_count),
+    ))];
+    for (i, field) in index.labels.schema().fields().iter().enumerate() {
+        if index.source_schema.field_with_name(field.name()).is_ok() {
+            fields.push(field.as_ref().clone());
+            columns.push(Arc::clone(index.labels.column(i)));
+        }
+    }
+    let schema = Arc::new(arrow::datatypes::Schema::new(fields));
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns)?;
+    Ok(MetricsIndexData {
+        schema,
+        batches: vec![batch],
+        parent_records: Some(
+            usize::try_from(index.parent.rows).map_err(|e| DataFusionError::External(e.into()))?,
+        ),
+        row_group_size: Some(row_group_size),
+    })
+}
+
+fn parse_metadata<T: std::str::FromStr>(
+    metadata: &HashMap<String, String>,
+    key: &str,
+    path: &str,
+) -> Result<Option<T>> {
+    metadata
+        .get(key)
+        .map(|value| {
+            value.parse::<T>().map_err(|_| {
+                DataFusionError::Execution(format!(
+                    "metrics index {path} has an invalid {key}: {value}"
+                ))
+            })
+        })
+        .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::{
+        array::{ArrayRef, Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+        ipc::writer::FileWriter,
+    };
+    use bytes::Bytes;
+    use parquet::arrow::ArrowWriter;
+    use promql_parser::label::{MatchOp, Matcher, Matchers};
+
+    use super::*;
+
+    #[test]
+    fn legacy_and_block_metadata_preserve_null_empty_negative_and_regex_pruning() {
+        let labels = vec!["tag".to_owned(), "missing".to_owned()];
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+            Field::new("tag", DataType::Utf8, true),
+        ]));
+        let tags: ArrayRef = Arc::new(StringArray::from(vec![
+            None,
+            Some(""),
+            Some("a"),
+            Some("b"),
+        ]));
+        let source = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 2, 3, 4])),
+                Arc::new(Int64Array::from(vec![10; 4])),
+                Arc::new(Float64Array::from(vec![1.; 4])),
+                Arc::clone(&tags),
+            ],
+        )
+        .unwrap();
+        let mut parquet = Vec::new();
+        let mut writer = ArrowWriter::try_new(&mut parquet, schema, None).unwrap();
+        writer.write(&source).unwrap();
+        writer.close().unwrap();
+        let parent = metrics_block::ParentIdentity {
+            object_key: "files/o/metrics/m/2026/09/18/06/indexed-v1-fixture.parquet".into(),
+            rows: 4,
+            compressed_size: parquet.len() as u64,
+        };
+        let bytes =
+            metrics_block::build_from_parquet(Bytes::from(parquet), parent.clone()).unwrap();
+        let footer = metrics_block::read_footer(
+            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+            bytes.len() as u64,
+        )
+        .unwrap();
+        let parsed = metrics_block::decode_index(
+            Bytes::copy_from_slice(
+                &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+            ),
+            &footer,
+            &parent,
+            &labels,
+        )
+        .unwrap();
+        let blocks = metrics_block_index_data(&parsed).unwrap();
+        let legacy_schema = Arc::new(Schema::new(vec![
+            Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false),
+            Field::new("tag", DataType::Utf8, true),
+        ]));
+        let legacy_batch = RecordBatch::try_new(
+            Arc::clone(&legacy_schema),
+            vec![Arc::new(UInt32Array::from(vec![1; 4])), tags],
+        )
+        .unwrap();
+        let mut legacy = Vec::new();
+        let mut writer = FileWriter::try_new(&mut legacy, &legacy_schema).unwrap();
+        writer.write(&legacy_batch).unwrap();
+        writer.finish().unwrap();
+        let old = decode_metrics_index("old.midx", Bytes::from(legacy), &labels).unwrap();
+        for matcher in [
+            Matcher::new(MatchOp::Equal, "tag", ""),
+            Matcher::new(MatchOp::NotEqual, "tag", "a"),
+            Matcher::new(MatchOp::Re("a|b".parse().unwrap()), "tag", "a|b"),
+            Matcher::new(MatchOp::NotRe("a".parse().unwrap()), "tag", "a"),
+            Matcher::new(MatchOp::Equal, "missing", ""),
+        ] {
+            let matchers = Matchers::new(vec![matcher]);
+            let selected = [&old, &blocks].map(|data| {
+                let filter =
+                    crate::pruner::create_physical_filter(&data.schema, &matchers).unwrap();
+                evaluate_metrics_index(data, filter.as_deref(), 4).unwrap()
+            });
+            assert_eq!(selected[0], selected[1], "{matchers:?}");
+        }
+    }
 }
