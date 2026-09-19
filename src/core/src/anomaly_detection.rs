@@ -528,6 +528,25 @@ pub async fn create_config(
         .await
         .ok_or_else(|| anyhow::anyhow!("Folder '{}' not found", folder_name))?;
 
+    let resolved_threshold = clamped_threshold(req.percentile.unwrap_or(DEFAULT_PERCENTILE));
+    let resolved_tree_size = req.rcf_tree_size.unwrap_or(
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .rcf_tree_size as i32,
+    );
+    let resolved_training_window_days = resolved_training_window_days(
+        req.training_window_days,
+        &req.histogram_interval,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+    let starvation_warning = training_window_starvation_warning(
+        &req.histogram_interval,
+        resolved_training_window_days,
+        resolved_threshold as f64,
+        resolved_tree_size,
+    );
+
     use infra::table::entity::anomaly_detection_config::Model as ConfigModel;
     let new_config = ConfigModel {
         anomaly_id: anomaly_id.clone(),
@@ -547,10 +566,11 @@ pub async fn create_config(
         histogram_interval: req.histogram_interval.clone(),
         schedule_interval: req.schedule_interval.clone(),
         detection_window_seconds: req.detection_window_seconds,
-        training_window_days: req.training_window_days.unwrap_or(7),
+        training_window_days: resolved_training_window_days,
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
-        // Whole-number percentiles suffice; the model clamps to 50–99.9 regardless.
-        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
+        // Delegated, not inlined: create used to carry its own copy of this clamp and the
+        // two drifted, so the update path's rule is the single authority.
+        threshold: resolved_threshold,
         alert_budget_per_day: req.alert_budget_per_day,
         is_trained: false,
         training_started_at: None,
@@ -563,11 +583,7 @@ pub async fn create_config(
                 .anomaly_detection
                 .rcf_num_trees as i32,
         ),
-        rcf_tree_size: req.rcf_tree_size.unwrap_or(
-            o2_enterprise::enterprise::common::config::get_config()
-                .anomaly_detection
-                .rcf_tree_size as i32,
-        ),
+        rcf_tree_size: resolved_tree_size,
         // Buckets of context per score, so the span is this times histogram_interval.
         rcf_shingle_size: req.rcf_shingle_size.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
@@ -690,6 +706,18 @@ pub async fn create_config(
             "folder_id".to_string(),
             serde_json::Value::String(folder_name_owned),
         );
+        // Returned rather than refused. Nine of the eighteen shipped interval x window
+        // cells are starved at the default p97 — including 30m/14d and 1h/30d, which train
+        // and serve today — so a hard rejection would break working configurations to
+        // enforce a bar the product has never enforced. The config is stored and trains;
+        // the operator is told, at the moment they can still act on it, instead of finding
+        // out from a log after the first training run.
+        if let Some(warning) = starvation_warning {
+            obj.insert(
+                "training_window_warning".to_string(),
+                serde_json::Value::String(warning),
+            );
+        }
     }
     Ok(val)
 }
@@ -1705,10 +1733,57 @@ fn validated_budget_create(percentile: Option<f64>, budget: Option<f64>) -> Resu
     Ok(())
 }
 
+/// The percentile as the `threshold` column can actually carry it.
+///
+/// The ceiling reads 99 rather than 99.9 to stop advertising a precision the column does not
+/// have. It is NOT a behaviour change: the column is `i32`, `99.9 as i32` is already 99, and
+/// a sweep of every finite value from -200 to 300 at 0.001 finds zero inputs where the two
+/// ceilings disagree. A request for p99.9 was stored as p99 before this and is stored as p99
+/// after; what changes is that the code now says so, so a reader deriving advice from the
+/// stored value is not misled about which percentile will run. Rounding up to 100 instead
+/// would store a value that reads as "flag nothing". Carrying the fraction would need the
+/// column widened, which is a migration and out of scope here.
+///
+/// The NaN branch is the one real behaviour change, and it is unreachable through the API
+/// (serde rejects a NaN literal for `f64`): `f64::NAN.clamp(..)` propagates NaN and
+/// `NaN as i32` saturates to **0**, so a NaN that ever did arrive stored percentile 0.
+///
 /// Shared with the update path so the replay gate compares exactly what an echo re-stores.
 fn clamped_threshold(percentile: f64) -> i32 {
-    percentile.clamp(50.0, 99.9) as i32
+    if percentile.is_nan() {
+        return DEFAULT_PERCENTILE as i32;
+    }
+    percentile.clamp(50.0, MAX_STORABLE_PERCENTILE) as i32
 }
+
+/// Lowest training window the derivation will ever propose: today's shipped default.
+///
+/// The derivation only ever WIDENS. A cadence fine enough to clear both bars in under a week
+/// keeps the 7 days it gets today, so the change is a no-op at 1m and 5m rather than a
+/// silent narrowing of every fine-cadence config's history.
+const DERIVED_WINDOW_FLOOR_DAYS: i32 = 7;
+
+/// Beyond this the honest requirement stops being advice the operator can act on.
+///
+/// A year is already an unusual retention ask; at a 1d interval p97's true requirement is
+/// 1002 days, and an unvalidated `rcf_tree_size` can push it to 89 million. Printing those
+/// numbers as an instruction does not help, and it teaches the reader to discount the rest
+/// of the message. Past the bound the message says so and points at the knobs that move.
+const MAX_ADVISABLE_WINDOW_DAYS: usize = 365;
+
+/// Highest training window the derivation will propose unasked.
+///
+/// Beyond a month the query cost and the staleness of the oldest history stop being the
+/// product's call to make on the operator's behalf: at 1h/p97 the honest requirement is 42
+/// days and at 6h it is 251, and silently provisioning either would surprise far more than
+/// it helps. The ceiling binds, and the warning then says what the real requirement is.
+const DERIVED_WINDOW_CEILING_DAYS: i32 = 30;
+
+/// The percentile a create request gets when it names none.
+const DEFAULT_PERCENTILE: f64 = 97.0;
+
+/// The highest percentile the `i32` `threshold` column can store without truncating.
+const MAX_STORABLE_PERCENTILE: f64 = 99.0;
 
 /// While a budget is in force the percentile is derived, so only a CHANGE to it is rejected.
 fn validated_budget_update(
@@ -1735,6 +1810,213 @@ fn validated_budget_update(
         );
     }
     Ok(())
+}
+
+/// The training window a create request ends up with.
+///
+/// An explicit value is ALWAYS honoured, however starved: the operator may be trading
+/// calibration for freshness knowingly, and silently widening a window they chose would
+/// change how much history the model sees without telling them. Only the absent field yields
+/// to the derivation — the same "a default yields to a rule, an explicit value overrides"
+/// shape `rcf_shingle_size` already ships. The `.max(1)` on the explicit branch is update's
+/// long-standing rule, which create never had.
+fn resolved_training_window_days(
+    requested: Option<i32>,
+    histogram_interval: &str,
+    percentile: f64,
+    tree_size: i32,
+) -> i32 {
+    match requested {
+        Some(explicit) => explicit.max(1),
+        None => derived_training_window_days(histogram_interval, percentile, tree_size),
+    }
+}
+
+/// Training windows a config of this shape will actually have to calibrate its bar on.
+///
+/// Mirrors what the trainer counts, which is not simply `days * buckets_per_day`: the
+/// still-filling trailing bucket is dropped, and the first `shingle - 1` buckets are spent
+/// building the first feature vector and are never scored. `None` when the interval will not
+/// parse — there is no window count to state then, and `validate_interval_pair` owns that
+/// rejection.
+fn expected_training_windows(
+    histogram_interval: &str,
+    training_window_days: i32,
+    tree_size: i32,
+) -> Option<i64> {
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    let days = training_window_days.max(1) as i64;
+    let buckets = days.checked_mul(86_400)?.checked_div(histogram_secs)?;
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            // The derivation runs before the row exists, and a create that omits the shingle
+            // stores the env default, which is exactly what yields to the span rule.
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )? as i64;
+    Some((buckets - 1 - (shingle - 1)).max(0))
+}
+
+/// The training window that would clear BOTH calibration bars at this cadence, clamped.
+///
+/// The shipped default is a flat 7 days at every cadence, and the requirement it has to meet
+/// spans 251x across the legal interval range: 1 day at 1m, 42 at 1h, 251 at 6h. One number
+/// cannot be right across that. Only used when the request omits the field.
+fn derived_training_window_days(histogram_interval: &str, percentile: f64, tree_size: i32) -> i32 {
+    let Ok(histogram_secs) = parse_interval(histogram_interval) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    if histogram_secs <= 0 {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    }
+    // Rounded UP, not truncated: a 202s cadence is 3.37 minutes, and calling it 3 understates
+    // how much wall-clock each window costs, so the derivation would propose a window that
+    // lands ~12% short of the bar it was derived to clear.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    // Widened by one window so the trailing partial bucket the trainer drops does not put
+    // the derived window back one short of the bar it was derived to clear.
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            DERIVED_WINDOW_CEILING_DAYS,
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    let Some(days) = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed.saturating_add(1),
+        interval_minutes,
+        shingle,
+    ) else {
+        return DERIVED_WINDOW_FLOOR_DAYS;
+    };
+    let proposal = (days.min(i32::MAX as usize) as i32)
+        .clamp(DERIVED_WINDOW_FLOOR_DAYS, DERIVED_WINDOW_CEILING_DAYS);
+    // A widening that does not cross the reservoir buys nothing: below `tree_size` the trees
+    // never evict, every percentile is compressed alike, and the config is starved at 30 days
+    // exactly as it was at 7 — so charging the operator 4x the query span for an identically
+    // uncalibrated model is a cost with no benefit. Above the reservoir the picture inverts:
+    // at a 1h interval the ceiling takes the config from 164 windows to 716, across the one
+    // boundary the design calls binding at every percentile. Propose only when it lands.
+    let clears_reservoir = expected_training_windows(histogram_interval, proposal, tree_size)
+        .is_some_and(|w| w >= tree_size.max(1) as i64);
+    if clears_reservoir {
+        proposal
+    } else {
+        DERIVED_WINDOW_FLOOR_DAYS
+    }
+}
+
+/// What to tell the operator when the config they are about to store cannot calibrate its bar.
+///
+/// `None` when the bar is calibrated, or when the interval will not parse (the interval rules
+/// reject that request on their own and a second message would only confuse the reason).
+/// Never an error: see the create path for why this is a warning and not a refusal.
+fn training_window_starvation_warning(
+    histogram_interval: &str,
+    training_window_days: i32,
+    percentile: f64,
+    tree_size: i32,
+) -> Option<String> {
+    let windows = expected_training_windows(histogram_interval, training_window_days, tree_size)?;
+    // The gate, not the sizing: `bar_starvation` decides WHETHER this config is starved, and
+    // returns `None` — short-circuiting the whole warning — when it is not.
+    o2_enterprise::enterprise::anomaly_detection::rcf_model::bar_starvation(
+        windows.max(0) as usize,
+        tree_size.max(1) as usize,
+        percentile,
+    )?;
+    let histogram_secs = parse_interval(histogram_interval).ok().filter(|s| *s > 0)?;
+    // Rounded up for the same reason the derivation rounds up: a truncated cadence would
+    // quote a day count that lands short of the bar it was computed to clear.
+    let interval_minutes = (histogram_secs as usize).div_ceil(60).max(1);
+    let shingle =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::effective_shingle_for_stored_config(
+            o2_enterprise::enterprise::common::config::get_config()
+                .anomaly_detection
+                .rcf_shingle_size as i32,
+            histogram_interval,
+            training_window_days.max(1),
+            tree_size.max(1),
+        )
+        .unwrap_or(1);
+    // Sized on every bar, not on `starvation.windows_needed()`. The starvation names the
+    // fault that trips first; a remedy built on it advises 11 days at 7d/1h/p97, and at 11
+    // days the config is still starved on the percentile's own 1000. Advice that has to be
+    // followed twice is worse than no advice.
+    let needed =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::windows_to_clear_every_bar(
+            tree_size.max(1) as usize,
+            percentile,
+        );
+    let days = o2_enterprise::enterprise::anomaly_detection::rcf_model::days_for_windows(
+        needed,
+        interval_minutes,
+        shingle,
+    );
+    let finer =
+        o2_enterprise::enterprise::anomaly_detection::rcf_model::interval_minutes_for_windows(
+            needed,
+            training_window_days.max(1) as usize,
+            shingle,
+        )
+        .filter(|m| *m < interval_minutes);
+    // A day count nobody can act on is not advice. Past a year the honest requirement stops
+    // being a window the operator can widen to — at a 1d interval p97 needs 1002 days — and
+    // printing it invites the reader to treat every other figure in the message as equally
+    // theoretical. Past the bound the remedy names the two knobs that CAN still move.
+    let days = days.filter(|d| *d <= MAX_ADVISABLE_WINDOW_DAYS);
+    let remedy = match (days, finer) {
+        (Some(d), Some(m)) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or use a \
+             histogram_interval of {m}m or finer at the current {training_window_days} days, or \
+             lower the percentile."
+        ),
+        (Some(d), None) => format!(
+            " Raise training_window_days to {d} at the current {histogram_interval}, or lower \
+             the percentile."
+        ),
+        (None, Some(m)) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days reaches the bar at a \
+             {histogram_interval} interval. Use a histogram_interval of {m}m or finer at the \
+             current {training_window_days} days, or lower the percentile."
+        ),
+        (None, None) => format!(
+            " No training window under {MAX_ADVISABLE_WINDOW_DAYS} days and no histogram_interval \
+             of a minute or coarser reaches the bar: this combination of interval and percentile \
+             cannot calibrate. Lower the percentile, or use a finer histogram_interval."
+        ),
+    };
+    // `0` is not a thin window, it is a config that can never train, and saying "gives 0
+    // training windows" alongside a widening remedy reads as a degree of the same problem.
+    let severity = if windows == 0 {
+        " This config produces no training windows at all and will never train."
+    } else {
+        ""
+    };
+    Some(format!(
+        "p{} at a {} interval over {} days gives {} training windows, but {} are needed, so \
+         the bar will flag more often than the percentile names. The config is saved and will \
+         train.{}{}",
+        percentile as i64,
+        histogram_interval,
+        training_window_days,
+        windows,
+        needed,
+        severity,
+        remedy,
+    ))
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
@@ -5807,5 +6089,154 @@ mod tests {
             .unwrap();
             assert_eq!(req.alert_budget_per_day, None);
         }
+    }
+
+    /// The whole change rests on this: a value the operator typed is never second-guessed.
+    #[test]
+    fn an_explicit_training_window_is_always_honoured_and_only_an_omitted_one_is_derived() {
+        // The create path's own expression, exercised directly. A derived value exists for
+        // 1h (30 days), so if an explicit value were ever routed through the derivation this
+        // would come back 30 instead of the 3 the operator asked for.
+        for explicit in [1_i32, 3, 7, 30, 365, i32::MAX] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                explicit,
+                "an explicit {explicit} days must be stored as {explicit}"
+            );
+        }
+        // Non-positive values take update's long-standing `.max(1)` rule rather than a
+        // derivation, so create and update finally agree on what 0 and -1 mean.
+        for explicit in [0_i32, -1, i32::MIN] {
+            assert_eq!(
+                resolved_training_window_days(Some(explicit), "1h", 97.0, 256),
+                1,
+                "a non-positive window clamps to 1, never to a derivation"
+            );
+        }
+        // Only the absent field derives, and at 1h it must actually move, or every assertion
+        // above would pass on a build where the derivation is never reached at all.
+        assert_eq!(resolved_training_window_days(None, "1h", 97.0, 256), 30);
+    }
+
+    #[test]
+    fn the_derived_training_window_never_narrows_and_only_widens_when_it_buys_something() {
+        // The shipped default is 7 at every cadence. The derivation may only ever widen: a
+        // narrowing would silently cut how much history an omitted-field config sees.
+        for interval in [
+            "1s", "30s", "1m", "5m", "15m", "30m", "1h", "90m", "2h", "6h", "12h", "1d", "202s",
+        ] {
+            for percentile in [50.0, 80.0, 90.0, 97.0, 99.0] {
+                let derived = derived_training_window_days(interval, percentile, 256);
+                assert!(
+                    derived >= 7,
+                    "{interval} at p{percentile} derived {derived}, narrower than the shipped 7"
+                );
+            }
+        }
+        // At 1m and 5m the floor binds and the change is a no-op, which is what makes it
+        // safe to ship: the cadences the ledger measured at are untouched.
+        assert_eq!(derived_training_window_days("1m", 97.0, 256), 7);
+        assert_eq!(derived_training_window_days("5m", 97.0, 256), 7);
+        // Where it widens, it must cross the reservoir — otherwise it is charging 4x the
+        // query span for a model that is starved exactly as it was at 7 days.
+        for (interval, expected) in [("15m", 11), ("30m", 21), ("1h", 30), ("6h", 7), ("1d", 7)] {
+            assert_eq!(
+                derived_training_window_days(interval, 97.0, 256),
+                expected,
+                "{interval} must derive {expected}"
+            );
+            let derived = derived_training_window_days(interval, 97.0, 256);
+            if derived > 7 {
+                let windows = expected_training_windows(interval, derived, 256)
+                    .expect("a parseable interval has a window count");
+                assert!(
+                    windows >= 256,
+                    "{interval} widened to {derived} days for {windows} windows, still below \
+                     the reservoir — a cost with no benefit"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_starvation_warning_advice_clears_the_bar_in_one_move() {
+        // The regression an adversarial review found: sizing the remedy on the starvation
+        // that trips first advised 11 days at 7d/1h/p97, and at 11 days the config is
+        // starved again on the percentile's own 1000.
+        let warning = training_window_starvation_warning("1h", 7, 97.0, 256)
+            .expect("7d/1h/p97 is starved at the shipped defaults");
+        assert!(
+            warning.contains("training_window_days to 42"),
+            "the advice must clear every bar at once: {warning}"
+        );
+        assert!(
+            !warning.contains("training_window_days to 11"),
+            "11 days clears only the reservoir: {warning}"
+        );
+        // And following it must genuinely work.
+        let after = expected_training_windows("1h", 42, 256).expect("parseable");
+        assert!(
+            after >= 1000,
+            "42 days at 1h gives {after} windows, short of 1000"
+        );
+
+        // A calibrated config says nothing at all.
+        assert!(
+            training_window_starvation_warning("1m", 7, 97.0, 256).is_none(),
+            "1m/7d/p97 clears both bars and must not be warned about"
+        );
+        // An unparseable interval is the interval rules' business, not this one's.
+        assert!(training_window_starvation_warning("junk", 7, 97.0, 256).is_none());
+    }
+
+    #[test]
+    fn an_unusable_requirement_is_named_as_such_rather_than_printed_as_an_instruction() {
+        // `rcf_tree_size` has no range validation anywhere, and this is the first code to
+        // consume it arithmetically. It must not launder a garbage input into a confident
+        // instruction to widen the window to 228,000 years.
+        let absurd = training_window_starvation_warning("1h", 7, 97.0, 2_000_000_000)
+            .expect("an absurd tree size is starved");
+        assert!(
+            !absurd.contains("training_window_days to 83333334"),
+            "a day count nobody can act on must not be printed as advice: {absurd}"
+        );
+        assert!(
+            absurd.contains("cannot calibrate") || absurd.contains("No training window"),
+            "past the advisable bound the message must say so: {absurd}"
+        );
+
+        // A config that can never train at all is a different fault from a thin one.
+        let never = training_window_starvation_warning("30d", 7, 97.0, 256)
+            .expect("a 30d bucket over a 7d window yields nothing");
+        assert!(
+            never.contains("will never train"),
+            "zero training windows is not a degree of thinness: {never}"
+        );
+    }
+
+    #[test]
+    fn the_percentile_ceiling_change_moves_no_finite_value() {
+        // The i32 column truncates, so p99.9 was ALREADY stored as 99. Lowering the stated
+        // ceiling to 99 is honesty, not behaviour: assert that, so nobody later "fixes" it
+        // back believing it changed something.
+        assert_eq!(clamped_threshold(99.9), 99);
+        assert_eq!(clamped_threshold(99.0), 99);
+        assert_eq!(clamped_threshold(97.0), 97);
+        assert_eq!(clamped_threshold(50.0), 50);
+        assert_eq!(clamped_threshold(0.0), 50);
+        assert_eq!(clamped_threshold(1000.0), 99);
+        let mut value = -200.0_f64;
+        while value < 300.0 {
+            assert_eq!(
+                value.clamp(50.0, 99.9) as i32,
+                clamped_threshold(value),
+                "the ceiling change must be a no-op at {value}"
+            );
+            value += 0.01;
+        }
+        // NaN is the one mapping that moved, and it moved off a nonsense value: `NaN as i32`
+        // saturates to 0, which would have stored percentile 0.
+        assert_eq!(f64::NAN.clamp(50.0, 99.9) as i32, 0);
+        assert_eq!(clamped_threshold(f64::NAN), 97);
     }
 }
