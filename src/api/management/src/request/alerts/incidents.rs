@@ -458,8 +458,7 @@ pub async fn trigger_incident_rca(
     Query(query): Query<TriggerRcaQuery>,
 ) -> Response {
     use o2_enterprise::enterprise::{
-        alerts::rca_service::{self, IncidentRcaContext},
-        common::config::get_config as get_o2_config,
+        alerts::rca_service, common::config::get_config as get_o2_config,
     };
 
     let o2_cfg = get_o2_config();
@@ -502,8 +501,8 @@ pub async fn trigger_incident_rca(
     )
     .await;
 
-    // Get incident with alerts
-    let incident =
+    // Existence check only: the builder below re-derives everything this used to supply.
+    let _incident =
         match openobserve_core::alerts::incidents::get_incident_with_alerts(&org_id, &incident_id)
             .await
         {
@@ -549,20 +548,10 @@ pub async fn trigger_incident_rca(
     } else {
         None
     };
-    // §7, through the same lookup the autonomous run uses — two spellings of
-    // "how loudly does this page" is how one path ends up telling the agent
-    // `Severity: Unknown` and the other does not.
-    let severity = rca_service::paging_severity_for_incident(&org_id, &incident_id).await;
-    let context = IncidentRcaContext {
-        incident_id: incident.incident.id.clone(),
-        org_id: incident.incident.org_id.clone(),
-        previous_analysis,
-        severity,
-        // TODO(l0 §7): still unpopulated. The field is all L0 defines; the
-        // retrieval, ranking and record schema behind it are deferred to their
-        // own document (§14, "cross-incident memory architecture").
-        past_causes: vec![],
-    };
+    // The single builder both this endpoint and the autonomous path call, so the two can no
+    // longer disagree about severity or past_causes (C1).
+    let context =
+        rca_service::build_incident_context(&org_id, &incident_id, previous_analysis).await;
 
     // Create RCA agent client with SA credentials
     let (email, token) =

@@ -275,6 +275,10 @@ pub enum L0Mode {
     Gate,
     /// The agent investigates and nobody is paged.
     Only,
+    /// The agent never runs; the page behaves exactly as it did before L0
+    /// existed. Never changes WHETHER a priority pages, only that nothing
+    /// investigates it.
+    Off,
 }
 
 impl L0Mode {
@@ -285,6 +289,7 @@ impl L0Mode {
             Self::Parallel => "parallel",
             Self::Gate => "gate",
             Self::Only => "only",
+            Self::Off => "off",
         }
     }
 }
@@ -323,11 +328,15 @@ pub struct L0Policy {
 /// Why an L0 block was rejected.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum L0Error {
-    /// P1 is not gateable. The invariant is not a setting.
-    P1MustBeParallel(L0Mode),
-    /// P4 and P5 page nobody, so there is nothing to hold. A gate there would
-    /// insert the trigger row §3 says a P4 never gets.
-    P4MustBeAgentOnly(L0Mode),
+    /// P1 is never held: the SLA §1 publishes is delay-free, so the only
+    /// legal modes are `Parallel` (agent runs) and `Off` (it does not).
+    P1MustNeverBeHeld(L0Mode),
+    /// `Only` would silence a severity that pages someone. Legal only at
+    /// P4/P5, where nobody pages to begin with.
+    OnlyWouldSilenceAPage(L0Mode),
+    /// P4 and P5 page nobody, so there is nothing to hold and no page to run
+    /// beside. Legal modes there are `Only` and `Off`.
+    NothingToHoldAtThisSeverity(L0Mode),
     /// Outside `MIN_TRIAGE_BUDGET_SECONDS..=MAX_TRIAGE_BUDGET_SECONDS`.
     BudgetOutOfRange(i64),
 }
@@ -335,13 +344,17 @@ pub enum L0Error {
 impl std::fmt::Display for L0Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::P1MustBeParallel(mode) => write!(
+            Self::P1MustNeverBeHeld(mode) => write!(
                 f,
-                "P1 always runs the agent in parallel and cannot be set to `{mode:?}`: holding a critical page behind a model is not a setting this product offers"
+                "P1 is never held and cannot be set to `{mode:?}`: holding, or silencing, a critical page is not a setting this product offers"
             ),
-            Self::P4MustBeAgentOnly(mode) => write!(
+            Self::OnlyWouldSilenceAPage(mode) => write!(
                 f,
-                "P4 and P5 page nobody, so the agent runs alone there and the mode cannot be `{mode:?}`: there is no page to hold and none to run beside"
+                "`{mode:?}` would silence a severity that pages someone; `only` is legal only at P4 and P5"
+            ),
+            Self::NothingToHoldAtThisSeverity(mode) => write!(
+                f,
+                "P4 and P5 page nobody, so the agent cannot be set to `{mode:?}`: there is no page to hold and none to run beside"
             ),
             Self::BudgetOutOfRange(v) => write!(
                 f,
@@ -373,11 +386,17 @@ impl L0Policy {
     }
 
     pub fn validate(&self) -> Result<(), L0Error> {
-        if self.mode.p1 != L0Mode::Parallel {
-            return Err(L0Error::P1MustBeParallel(self.mode.p1));
+        if !matches!(self.mode.p1, L0Mode::Parallel | L0Mode::Off) {
+            return Err(L0Error::P1MustNeverBeHeld(self.mode.p1));
         }
-        if self.mode.p4 != L0Mode::Only {
-            return Err(L0Error::P4MustBeAgentOnly(self.mode.p4));
+        // §4a's matrix: P2/P3 page someone, so `only` there would silence a paging severity.
+        for mode in [self.mode.p2, self.mode.p3] {
+            if mode == L0Mode::Only {
+                return Err(L0Error::OnlyWouldSilenceAPage(mode));
+            }
+        }
+        if !matches!(self.mode.p4, L0Mode::Only | L0Mode::Off) {
+            return Err(L0Error::NothingToHoldAtThisSeverity(self.mode.p4));
         }
         if !(MIN_TRIAGE_BUDGET_SECONDS..=MAX_TRIAGE_BUDGET_SECONDS)
             .contains(&self.triage_budget_seconds)
@@ -389,23 +408,30 @@ impl L0Policy {
 
     /// The mode that actually applies at `priority`.
     ///
-    /// Never a plain field read. P1 is parallel whatever the row says; `Only`
-    /// on a paging severity would silence it; `Gate` on P4/P5 would hold a
-    /// firing that pages nobody. Derived from [`severity_pages`] rather than
-    /// trusted from the column.
+    /// Never a plain field read. `Off` is checked first because it is legal at
+    /// every priority and must survive the severity and P1 derivations below
+    /// it, not be overwritten by them. `Only` on a paging severity would
+    /// silence it; `Gate` or `Parallel` on P4/P5 would treat a firing that
+    /// pages nobody as one that does. Derived from [`severity_pages`] rather
+    /// than trusted from the column.
     pub fn mode_for(&self, priority: AlertPriority) -> L0Mode {
+        let stored = match priority {
+            AlertPriority::P1 => self.mode.p1,
+            AlertPriority::P2 => self.mode.p2,
+            AlertPriority::P3 => self.mode.p3,
+            AlertPriority::P4 | AlertPriority::P5 => self.mode.p4,
+        };
+        if stored == L0Mode::Off {
+            return L0Mode::Off;
+        }
         // A severity that pages nobody has no page to hold, so the column is not trusted here.
         if !severity_pages(priority) {
             return L0Mode::Only;
         }
-        // The P1 invariant. Not a setting, so not a field read either.
+        // The P1 invariant. Not a setting, so not a field read either — Off aside, handled above.
         if priority == AlertPriority::P1 {
             return L0Mode::Parallel;
         }
-        let stored = match priority {
-            AlertPriority::P2 => self.mode.p2,
-            _ => self.mode.p3,
-        };
         match stored {
             // `only` on a paging severity would silence it for ever, so read the safest meaning.
             L0Mode::Only => L0Mode::Parallel,
@@ -556,6 +582,11 @@ pub fn gate_plan(
     match l0.mode_for(priority) {
         L0Mode::Only => GatePlan::L0Only,
         L0Mode::Parallel => GatePlan::Parallel,
+        // No agent runs, so the page enters the ladder exactly as it did before L0 existed: at
+        // t=0 where one pages at all (I19: this must NOT fall into `L0Only`, or a P1-P3 record
+        // gets no trigger row and becomes silently unpageable), and never where one does not.
+        L0Mode::Off if severity_pages(priority) => GatePlan::Parallel,
+        L0Mode::Off => GatePlan::L0Only,
         L0Mode::Gate => {
             // §6: a run that will not answer has no hold to sit in, so paging never waits.
             if !analysis.status.may_still_answer() {
@@ -652,6 +683,9 @@ pub fn apply_verdict(
     };
 
     match l0.mode_for(severity) {
+        // No agent ran, so no verdict — and therefore no promotion — can ever reach this arm in
+        // practice; kept exhaustive and inert rather than reachable by construction.
+        L0Mode::Off => VerdictOutcome::FollowUp { severity },
         // P4 and P5: no page to hold, so the only way anybody is woken is a promotion off P4.
         L0Mode::Only => match promotion {
             Some((from, to)) if severity_pages(to) => VerdictOutcome::Page {
@@ -1200,7 +1234,7 @@ mod tests {
             );
             assert_eq!(
                 p.validate(),
-                Err(L0Error::P1MustBeParallel(forbidden)),
+                Err(L0Error::P1MustNeverBeHeld(forbidden)),
                 "a policy that gates P1 must not be storable"
             );
             assert_eq!(
@@ -1214,11 +1248,37 @@ mod tests {
             );
         }
         assert!(
-            L0Error::P1MustBeParallel(L0Mode::Gate)
+            L0Error::P1MustNeverBeHeld(L0Mode::Gate)
                 .to_string()
                 .contains("P1"),
             "the message has to name the field somebody just tried to set"
         );
+    }
+
+    /// The fourth mode: unlike `Gate` and `Only`, `Off` IS legal at P1 — it
+    /// trades the agent away rather than holding or silencing the page, and
+    /// §4a's matrix admits it precisely because it changes neither.
+    #[test]
+    fn test_p1_off_is_legal_and_pages_exactly_like_parallel() {
+        let p = raw(
+            L0Mode::Off,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
+        p.validate().unwrap();
+        assert_eq!(p.mode_for(P1), L0Mode::Off);
+        assert_eq!(
+            gate_plan(&p, P1, &pending(FIRED_AT), FIRED_AT),
+            GatePlan::Parallel,
+            "no agent runs, but the page still goes out at t=0 exactly as before L0"
+        );
+        assert!(gate_plan(&p, P1, &pending(FIRED_AT), FIRED_AT).inserts_a_trigger_row());
     }
 
     /// The bound is inclusive at both ends; an off-by-one is a team that cannot
@@ -1306,7 +1366,7 @@ mod tests {
             );
             assert_eq!(
                 p.validate(),
-                Err(L0Error::P4MustBeAgentOnly(forbidden)),
+                Err(L0Error::NothingToHoldAtThisSeverity(forbidden)),
                 "a policy that gates a severity nobody is paged for must not be storable"
             );
             for pr in [P4, P5] {
@@ -1327,7 +1387,7 @@ mod tests {
             }
         }
         assert!(
-            L0Error::P4MustBeAgentOnly(L0Mode::Gate)
+            L0Error::NothingToHoldAtThisSeverity(L0Mode::Gate)
                 .to_string()
                 .contains("P4"),
             "the message has to name the field somebody just tried to set"
@@ -1346,8 +1406,68 @@ mod tests {
         );
         assert_eq!(
             p1_wrong.validate(),
-            Err(L0Error::P1MustBeParallel(L0Mode::Gate))
+            Err(L0Error::P1MustNeverBeHeld(L0Mode::Gate))
         );
+    }
+
+    /// Unlike `Gate` and `Parallel`, `Off` IS legal at P4/P5: it is the other
+    /// half of "nothing to hold or run beside" — no agent and no page, exactly
+    /// the pre-L0 state.
+    #[test]
+    fn test_p4_and_p5_off_is_legal_and_never_gains_a_trigger_row() {
+        let p = raw(
+            L0Mode::Parallel,
+            L0Mode::Gate,
+            L0Mode::Gate,
+            L0Mode::Off,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
+        p.validate().unwrap();
+        for pr in [P4, P5] {
+            assert_eq!(p.mode_for(pr), L0Mode::Off);
+            assert_eq!(
+                gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT),
+                GatePlan::L0Only
+            );
+            assert!(!gate_plan(&p, pr, &pending(FIRED_AT), FIRED_AT).inserts_a_trigger_row());
+        }
+    }
+
+    /// I21: `only` was never checked at P2/P3 before this build, so a row
+    /// already carrying it must round-trip — `mode_for` still normalises it —
+    /// but a fresh POST of it must now be refused, the same way P4's `gate`
+    /// always was.
+    #[test]
+    fn test_only_is_refused_at_p2_and_p3_on_write_but_still_read_as_parallel() {
+        for field in [1, 2] {
+            let mut p = shipped();
+            if field == 1 {
+                p.mode.p2 = L0Mode::Only;
+            } else {
+                p.mode.p3 = L0Mode::Only;
+            }
+            assert_eq!(
+                p.validate(),
+                Err(L0Error::OnlyWouldSilenceAPage(L0Mode::Only))
+            );
+        }
+        let stored_before_this_build = raw(
+            L0Mode::Parallel,
+            L0Mode::Only,
+            L0Mode::Only,
+            L0Mode::Only,
+            90,
+            true,
+            2,
+            true,
+            false,
+        );
+        assert_eq!(stored_before_this_build.mode_for(P2), L0Mode::Parallel);
+        assert_eq!(stored_before_this_build.mode_for(P3), L0Mode::Parallel);
     }
 
     /// P5 is absent from the stored mode map. It pages nobody, exactly like P4,
@@ -3407,6 +3527,7 @@ mod tests {
             (L0Mode::Parallel, "parallel"),
             (L0Mode::Gate, "gate"),
             (L0Mode::Only, "only"),
+            (L0Mode::Off, "off"),
         ] {
             assert_eq!(serde_json::to_string(&m).unwrap(), format!("\"{want}\""));
         }
