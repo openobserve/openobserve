@@ -45,8 +45,6 @@ use openobserve_api_common::extractors::Headers;
 use openobserve_core::auth::UserEmail;
 #[cfg(feature = "cloud")]
 use openobserve_core::organization::is_org_in_free_trial_period;
-#[cfg(feature = "enterprise")]
-use search::sql::visitor::cipher_key::get_cipher_key_names;
 use search::{
     datafusion::plan::projections::get_result_schema, sql::visitor::pickup_where::pickup_where,
     utils::is_permissable_function_error,
@@ -57,7 +55,7 @@ use tracing::{Instrument, Span};
 use transform as functions;
 use usage_reporting::{http_report_metrics, report_request_usage_stats};
 #[cfg(feature = "enterprise")]
-use utils::{StreamPermissionResourceType, check_stream_permissions};
+use utils::{StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions};
 
 use crate::common::{
     meta::http::HttpResponse as MetaHttpResponse,
@@ -343,62 +341,8 @@ pub async fn search(
     }
 
     #[cfg(feature = "enterprise")]
-    {
-        use common::meta;
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(meta::http::HttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        if !keys_used.is_empty() {
-            log::info!("keys used : {keys_used:?}");
-        }
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use o2_openfga::meta::mapping::OFGA_MODELS;
-
-                use crate::service::{auth::AuthExtractor, users::get_user};
-
-                if !db::user::is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
-
-                    if !openobserve_core::authz::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
-                    }
-                    // Check permissions on key ends
-                }
-            }
-        }
+    if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await {
+        return res;
     }
 
     // run search with cache; `agent_options.mode = partition` instead drives
@@ -1073,6 +1017,12 @@ async fn values_inner(
             .any(|fn_name| sql.contains(&format!("{fn_name}(")));
         query_sql = sql;
     };
+
+    // the caller's WHERE is embedded below, so cipher keys it names need the same check as _search
+    #[cfg(feature = "enterprise")]
+    if let Some(res) = check_cipher_key_permissions(org_id, user_id, &query_sql).await {
+        return res;
+    }
 
     // pick up where clause from sql
     let where_str = match pickup_where(&query_sql) {
@@ -1807,58 +1757,8 @@ pub async fn result_schema(
     }
 
     #[cfg(feature = "enterprise")]
-    {
-        let keys_used = match get_cipher_key_names(&req.query.sql) {
-            Ok(v) => v,
-            Err(e) => {
-                return (
-                    StatusCode::BAD_REQUEST,
-                    Json(MetaHttpResponse::error(StatusCode::BAD_REQUEST, e)),
-                )
-                    .into_response();
-            }
-        };
-        for key in keys_used {
-            // Check permissions on keys
-            {
-                use o2_openfga::meta::mapping::OFGA_MODELS;
-
-                use crate::service::{auth::AuthExtractor, users::get_user};
-
-                if !db::user::is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
-
-                    if !openobserve_core::authz::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
-                    }
-                    // Check permissions on key ends
-                }
-            }
-        }
+    if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await {
+        return res;
     }
 
     let query: proto::cluster_rpc::SearchQuery = req.query.clone().into();

@@ -34,7 +34,7 @@ pub fn get_cipher_key_names(sql: &str) -> Result<Vec<String>, Error> {
     let mut statement = Parser::parse_sql(dialect, sql)
         .map_err(|e| Error::Message(e.to_string()))?
         .pop()
-        .unwrap();
+        .ok_or_else(|| Error::Message("empty sql".to_string()))?;
     let mut visitor = ExtractKeyNamesVisitor::new();
     let _ = statement.visit(&mut visitor);
     if let Some(e) = visitor.error {
@@ -156,6 +156,19 @@ mod tests {
         let mut keys = get_cipher_key_names(sql).unwrap();
         keys.sort();
         assert_eq!(keys, vec!["k1", "k2"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_where_only() {
+        let sql =
+            "SELECT _timestamp FROM t WHERE id = 'x' AND substr(decrypt(col, 'wkey'), 1, 1) = 'S'";
+        let keys = get_cipher_key_names(sql).unwrap();
+        assert_eq!(keys, vec!["wkey"]);
+    }
+
+    #[test]
+    fn test_get_cipher_key_names_empty_sql_returns_error() {
+        assert!(get_cipher_key_names("").is_err());
     }
 
     #[test]
