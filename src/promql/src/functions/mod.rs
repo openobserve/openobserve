@@ -46,6 +46,7 @@ mod predict_linear;
 mod quantile_over_time;
 mod resets;
 mod scalar;
+mod sort;
 mod stddev_over_time;
 mod stdvar_over_time;
 mod sum_over_time;
@@ -63,6 +64,7 @@ pub(crate) use math_operations::*;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
 pub(crate) use scalar::scalar;
+pub(crate) use sort::sort;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
 
