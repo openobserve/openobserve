@@ -543,23 +543,31 @@ async function fetchCheck() {
 
 /** Check env ids → the names rows are stamped with; deleted ids drop out. */
 async function resolveEnvironmentNames(envIds: string[]) {
-  if (!envIds.length) {
-    envNames.value = [];
-    return;
-  }
-  try {
-    const res = await syntheticsService.listEnvironments(orgIdentifier.value);
-    const byId = new Map(
-      ((res?.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]),
-    );
-    envNames.value = envIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
-    if (envNames.value.length >= 2 && envScope.value === ENV_SCOPE_ALL) {
-      await nextTick();
-      runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  envNames.value = [];
+  if (envIds.length) {
+    try {
+      const res = await syntheticsService.listEnvironments(orgIdentifier.value);
+      const byId = new Map(
+        ((res?.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]),
+      );
+      envNames.value = envIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
+    } catch {
+      // No scope control is a degraded render, not an error state.
+      envNames.value = [];
     }
-  } catch {
-    // No scope control is a degraded render, not an error state.
-    envNames.value = [];
   }
+  if (dropStaleEnvScope()) return;
+  if (envNames.value.length >= 2 && envScope.value === ENV_SCOPE_ALL) {
+    await nextTick();
+    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  }
+}
+
+/** A `?env=` the hidden or shorter picker cannot show would empty the page with no way back. */
+function dropStaleEnvScope(): boolean {
+  if (envScope.value === ENV_SCOPE_ALL) return false;
+  if (envNames.value.length >= 2 && envNames.value.includes(envScope.value)) return false;
+  onEnvScopeChange(ENV_SCOPE_ALL);
+  return true;
 }
 </script>

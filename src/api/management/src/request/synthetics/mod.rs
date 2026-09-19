@@ -87,42 +87,50 @@ async fn require_env_access(
 ) -> Result<(), Response> {
     for id in environments {
         let name = env_name(org_id, id).await?;
-        if !can_reach_env(org_id, user_id, &name).await {
-            return Err(MetaHttpResponse::forbidden(format!(
-                "Forbidden: no access to environment '{name}'"
-            )));
+        if !can_use_env(org_id, user_id, &name).await {
+            return Err(env_forbidden(&name));
         }
     }
     Ok(())
 }
 
-/// Reconciles a check's environments on update against what the caller reaches.
+/// An update needs write access to every environment the check runs in, and to each one it leaves.
 #[cfg(feature = "enterprise")]
-async fn reconcile_environments(
+async fn require_update_env_access(
     org_id: &str,
     user_id: &str,
     submitted: &[String],
     stored: &[String],
-) -> Result<Vec<String>, Response> {
-    let added: Vec<String> = submitted
-        .iter()
-        .filter(|id| !stored.contains(id))
-        .cloned()
-        .collect();
-    require_env_access(org_id, user_id, &added).await?;
-
-    let mut out = submitted.to_vec();
+) -> Result<(), Response> {
+    require_env_access(org_id, user_id, submitted).await?;
     for id in stored.iter().filter(|id| !submitted.contains(id)) {
-        let Ok(Some(name)) =
-            openobserve_synthetics::service::get_environment_name(org_id, id).await
-        else {
-            continue;
+        let name = match openobserve_synthetics::service::get_environment_name(org_id, id).await {
+            Ok(Some(name)) => name,
+            // A deleted environment has nothing left to protect.
+            Ok(None) => continue,
+            Err(e) => {
+                tracing::error!("[synthetics] require_update_env_access: {e}");
+                return Err(env_load_failed());
+            }
         };
-        if !can_reach_env(org_id, user_id, &name).await {
-            out.push(id.clone());
+        if !can_use_env(org_id, user_id, &name).await {
+            return Err(env_forbidden(&name));
         }
     }
-    Ok(out)
+    Ok(())
+}
+
+/// The environments a stored check runs in; a failed read refuses rather than checking nothing.
+#[cfg(feature = "enterprise")]
+async fn stored_environments(org_id: &str, id: &str) -> Result<Vec<String>, Response> {
+    match openobserve_synthetics::service::environments_of(org_id, id).await {
+        Ok(Some(environments)) => Ok(environments),
+        Ok(None) => Err(MetaHttpResponse::not_found("check not found")),
+        Err(e) => {
+            tracing::error!("[synthetics] stored_environments: {e}");
+            Err(env_load_failed())
+        }
+    }
 }
 
 #[cfg(feature = "enterprise")]
@@ -139,20 +147,37 @@ async fn env_name(org_id: &str, id: &str) -> Result<String, Response> {
     }
 }
 
+/// Running in an environment hands the check its secrets, so it takes the same PUT that edits them.
 #[cfg(feature = "enterprise")]
-async fn can_reach_env(org_id: &str, user_id: &str, name: &str) -> bool {
+async fn can_use_env(org_id: &str, user_id: &str, name: &str) -> bool {
     check_permissions(
         name,
         org_id,
         user_id,
         "synthetic_environment",
-        "GET",
+        "PUT",
         None,
         false,
         false,
         true,
     )
     .await
+}
+
+#[cfg(feature = "enterprise")]
+fn env_load_failed() -> Response {
+    MetaHttpResponse::error(
+        StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
+        "could not load the check's environments",
+    )
+    .into_response()
+}
+
+#[cfg(feature = "enterprise")]
+fn env_forbidden(name: &str) -> Response {
+    MetaHttpResponse::forbidden(format!(
+        "Forbidden: no write access to environment '{name}'"
+    ))
 }
 
 // ── Runs API ──────────────────────────────────────────────────────────────────
@@ -587,20 +612,16 @@ pub async fn update_synthetic(
     }
 
     #[cfg(feature = "enterprise")]
-    let mut body = body;
-    #[cfg(feature = "enterprise")]
     {
-        let stored = openobserve_synthetics::service::get_synthetic(&org_id, &id)
-            .await
-            .ok()
-            .flatten()
-            .map(|c| c.environments)
-            .unwrap_or_default();
-        match reconcile_environments(&org_id, &user_email.user_id, &body.environments, &stored)
-            .await
-        {
-            Ok(environments) => body.environments = environments,
+        let stored = match stored_environments(&org_id, &id).await {
+            Ok(stored) => stored,
             Err(response) => return response,
+        };
+        if let Err(response) =
+            require_update_env_access(&org_id, &user_email.user_id, &body.environments, &stored)
+                .await
+        {
+            return response;
         }
     }
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
@@ -883,6 +904,16 @@ pub async fn run_synthetic_now(
     .await
     {
         return MetaHttpResponse::forbidden("Forbidden");
+    }
+    #[cfg(feature = "enterprise")]
+    {
+        let stored = match stored_environments(&org_id, &id).await {
+            Ok(stored) => stored,
+            Err(response) => return response,
+        };
+        if let Err(response) = require_env_access(&org_id, &user_email.user_id, &stored).await {
+            return response;
+        }
     }
     match openobserve_synthetics::service::run_synthetic_now(&org_id, &id).await {
         Ok(()) => (StatusCode::ACCEPTED, "").into_response(),

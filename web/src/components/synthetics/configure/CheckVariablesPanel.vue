@@ -276,7 +276,7 @@ const pendingRemoveFallbackScope = computed(() => {
   const row = unionRows.value.find((r) => r.name === pendingRemove.value?.name);
   if (!row) return "";
   const sources = [...row.envs];
-  if (row.global) sources.push("Global");
+  if (row.global) sources.push(t("synthetics.variables.global"));
   return sources.join(", ");
 });
 

@@ -76,7 +76,7 @@ pub fn invalidate_all_cache() {
 /// A failed emit is logged, not propagated: the database write has already
 /// committed, and the cache TTL is the backstop for a dropped event. Failing
 /// the user's save because a cache hint did not send would be the worse trade.
-async fn invalidate_and_publish(org_id: &str, id: &str) {
+pub async fn invalidate_and_publish(org_id: &str, id: &str) {
     invalidate_cache(org_id, id);
     if let Err(e) = crate::coordinator::synthetics::emit_check_put(org_id, id).await {
         log::error!("[synthetics] emit check cache event failed for {org_id}/{id}: {e}");
@@ -374,11 +374,23 @@ pub async fn create<C: TransactionTrait>(
     use_given_id: bool,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
-    let now = config::utils::time::now_micros();
     let id = new_check_id(&check, use_given_id);
+    let result = insert_row(&txn, org_id, &id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let mut am = build_active_model(&check)?;
-    am.id = Set(id);
+/// Inserts a check under `id` without touching the cache; the caller announces it.
+pub async fn insert_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let now = config::utils::time::now_micros();
+    let mut am = build_active_model(check)?;
+    am.id = Set(id.to_owned());
     am.org_id = Set(org_id.to_owned());
     am.folder_id = Set(check.folder_id.clone());
     am.synthetics_type = Set(check_type_to_str(&check.check_type).to_owned());
@@ -387,11 +399,8 @@ pub async fn create<C: TransactionTrait>(
     am.next_run_at = Set(check.start.unwrap_or(0));
     am.owner = Set(check.owner.clone());
 
-    let model = am.insert(&txn).await?.try_into_model()?;
-    let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
-    Ok(result)
+    let model = am.insert(conn).await?.try_into_model()?;
+    Synthetic::try_from(model)
 }
 
 pub async fn update<C: TransactionTrait>(
@@ -401,20 +410,29 @@ pub async fn update<C: TransactionTrait>(
     check: Synthetic,
 ) -> Result<Synthetic, errors::Error> {
     let txn = conn.begin().await?;
+    let result = update_row(&txn, org_id, id, &check).await?;
+    txn.commit().await?;
+    invalidate_and_publish(&result.org_id, &result.id).await;
+    Ok(result)
+}
 
-    let Some(m) = get_model(&txn, org_id, id).await? else {
+/// Updates a check's editable fields without touching the cache; the caller announces it.
+pub async fn update_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    check: &Synthetic,
+) -> Result<Synthetic, errors::Error> {
+    let Some(m) = get_model(conn, org_id, id).await? else {
         return Err(errors::Error::Message(format!("check not found: {id}")));
     };
 
     let mut am: ActiveModel = m.into();
-    update_mutable_fields(&mut am, &check)?;
+    update_mutable_fields(&mut am, check)?;
     am.updated_at = Set(config::utils::time::now_micros());
 
-    let model = am.update(&txn).await?.try_into_model()?;
-    let result = Synthetic::try_from(model)?;
-    txn.commit().await?;
-    invalidate_and_publish(&result.org_id, &result.id).await;
-    Ok(result)
+    let model = am.update(conn).await?.try_into_model()?;
+    Synthetic::try_from(model)
 }
 
 pub async fn put<C: TransactionTrait>(

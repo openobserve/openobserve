@@ -166,7 +166,8 @@ export function buildResolvedGrouped(
   const selected = selectedIds
     .map((id) => environments.find((env) => env.id === id))
     .filter((env): env is SyntheticsEnvironment => Boolean(env));
-  const groups: (SyntheticsEnvironment | null)[] = selectedIds.length ? selected : [null];
+  // An environment the caller cannot read is absent here, and globals still apply to every run.
+  const groups: (SyntheticsEnvironment | null)[] = selected.length ? selected : [null];
 
   const resolved: Record<string, ResolvedVariable[]> = {};
   const names: string[] = [];

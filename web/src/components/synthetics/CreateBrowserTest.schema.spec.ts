@@ -556,6 +556,22 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
     expect(result.success).toBe(true);
   });
 
+  it("should accept a navigate step with a placeholder inside the host, as the server does", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "app-{{ENV}}.example.com/login" }]),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it("should reject a templated navigate step with a non-http scheme", () => {
+    const result = schema.safeParse(
+      form([{ id: "1", action: "navigate", value: "ftp://{{HOST}}/x" }]),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
   it("should reject a navigate step whose placeholder has an invalid name", () => {
     for (const value of ["{{BASE URL}}/web/", "{{}}/web/", "{{BASE_URL}} /web/"]) {
       const result = schema.safeParse(form([{ id: "1", action: "navigate", value }]));

@@ -158,13 +158,13 @@ const filterName = computed<I18nText>(() =>
 
 function sourceLabel(row: InheritedUnionRow): I18nText {
   const sources = [...row.envs];
-  if (row.global) sources.push("Global");
+  if (row.global) sources.push(t("synthetics.variables.global"));
   return raw(sources.join(", "));
 }
 
 function hintsLine(row: InheritedUnionRow): I18nText {
   const hints = row.hints.map((hint) => {
-    const label = hint.source === "global" ? "Global" : hint.source;
+    const label = hint.source === "global" ? t("synthetics.variables.global") : hint.source;
     const value = row.secret
       ? "••••••"
       : hint.example ||

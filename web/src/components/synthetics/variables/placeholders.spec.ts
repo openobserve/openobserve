@@ -14,7 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { placeholderNames, substitutePlaceholders, unboundPlaceholders } from "./placeholders";
+import {
+  isHttpUrlTemplate,
+  placeholderNames,
+  substitutePlaceholders,
+  unboundPlaceholders,
+} from "./placeholders";
 
 describe("placeholderNames", () => {
   it("finds names with and without padding", () => {
@@ -59,5 +64,24 @@ describe("unboundPlaceholders", () => {
 
   it("is empty when every reference is defined", () => {
     expect(unboundPlaceholders("{{A}}", new Set(["A"]))).toEqual([]);
+  });
+});
+
+describe("isHttpUrlTemplate", () => {
+  it("accepts what the server accepts, placeholder anywhere and scheme optional", () => {
+    for (const value of [
+      "{{BASE_URL}}/login",
+      "https://{{TENANT}}.shop.test/login",
+      "app-{{ENV}}.example.com/login",
+      "{{BASE_URL}}",
+    ]) {
+      expect(isHttpUrlTemplate(value), value).toBe(true);
+    }
+  });
+
+  it("refuses whitespace, a broken placeholder and a non-http scheme", () => {
+    for (const value of ["{{BASE_URL}} /login", "{{BASE_URL/login", "{{}}/x", "ftp://{{HOST}}/x"]) {
+      expect(isHttpUrlTemplate(value), value).toBe(false);
+    }
   });
 });

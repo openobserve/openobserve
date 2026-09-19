@@ -560,4 +560,10 @@ describe("substituteVariables", () => {
 
     expect(out.value).toBe("");
   });
+
+  it("never reads a name off the object prototype", () => {
+    const out = substituteVariables(step({ value: "{{constructor}}" }), { USER: "alice" });
+
+    expect(out.value).toBe("{{constructor}}");
+  });
 });

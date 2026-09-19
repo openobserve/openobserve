@@ -485,7 +485,7 @@ use config::meta::{
     self_reporting::usage::UsageData,
     synthetics::{
         MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticType, SyntheticVariable,
-        validate_http_url,
+        validate_http_url_quietly, with_default_scheme,
     },
     synthetics_variables::substitute_placeholders,
 };
@@ -1160,9 +1160,10 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         }
     }
 
-    synthetic.target = substitute_placeholders(&synthetic.target, &env_inject);
-    // The save-time check saw only the template; a variable can still supply `file://`.
-    validate_resolved_target(&synthetic)?;
+    synthetic.target = resolved_target(
+        &synthetic.check_type,
+        &substitute_placeholders(&synthetic.target, &env_inject),
+    )?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1297,13 +1298,15 @@ fn merge_variable_tiers(
     Ok(merged)
 }
 
-/// Fails the job when the substituted target of an HTTP or browser check is not an http(s) URL.
-fn validate_resolved_target(synthetic: &Synthetic) -> anyhow::Result<()> {
-    match synthetic.check_type {
+/// The target the probe gets, normalised and re-checked: a variable can still supply `file://`.
+fn resolved_target(check_type: &SyntheticType, substituted: &str) -> anyhow::Result<String> {
+    match check_type {
         SyntheticType::Http | SyntheticType::Browser => {
-            validate_http_url("target", &synthetic.target).map_err(|e| anyhow::anyhow!(e))
+            let target = with_default_scheme(substituted);
+            validate_http_url_quietly("target", &target).map_err(|e| anyhow::anyhow!(e))?;
+            Ok(target)
         }
-        _ => Ok(()),
+        _ => Ok(substituted.to_string()),
     }
 }
 
@@ -2848,23 +2851,33 @@ mod tests {
 
     #[test]
     fn a_resolved_target_must_still_be_an_http_url() {
-        let check = |check_type, target: &str| Synthetic {
-            check_type,
-            target: target.to_string(),
-            ..Default::default()
-        };
-        assert!(
-            validate_resolved_target(&check(SyntheticType::Http, "file:///etc/passwd")).is_err()
+        assert!(resolved_target(&SyntheticType::Http, "file:///etc/passwd").is_err());
+        assert!(resolved_target(&SyntheticType::Browser, "javascript:alert(1)").is_err());
+        assert_eq!(
+            resolved_target(&SyntheticType::Http, "https://shop.test/login").unwrap(),
+            "https://shop.test/login"
         );
-        assert!(
-            validate_resolved_target(&check(SyntheticType::Browser, "javascript:alert(1)"))
-                .is_err()
+        assert_eq!(
+            resolved_target(&SyntheticType::Tcp, "db.internal:5432").unwrap(),
+            "db.internal:5432"
         );
-        assert!(
-            validate_resolved_target(&check(SyntheticType::Http, "https://shop.test/login"))
-                .is_ok()
+    }
+
+    #[test]
+    fn a_resolved_target_without_a_scheme_gets_https_as_at_save_time() {
+        assert_eq!(
+            resolved_target(&SyntheticType::Http, "shop.test/login").unwrap(),
+            "https://shop.test/login"
         );
-        assert!(validate_resolved_target(&check(SyntheticType::Tcp, "db.internal:5432")).is_ok());
+    }
+
+    #[test]
+    fn a_bad_resolved_target_never_echoes_the_substituted_secret() {
+        let err = resolved_target(&SyntheticType::Http, "ftp://x/?key=hunter2")
+            .unwrap_err()
+            .to_string();
+        assert!(err.starts_with("target: "), "{err}");
+        assert!(!err.contains("hunter2"), "{err}");
     }
 
     #[test]

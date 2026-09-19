@@ -1481,6 +1481,7 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/synthetics/variables/{id}", put(synthetics::update_synthetics_variable).delete(synthetics::delete_synthetics_variable))
             .route("/{org_id}/synthetics/variables/{id}/split", post(synthetics::split_synthetics_variable))
             .route("/{org_id}/synthetics/environments", get(synthetics::list_synthetics_environments).post(synthetics::create_synthetics_environment))
+            .route("/{org_id}/synthetics/environments/_resync", post(synthetics::resync_synthetics_environments))
             .route("/{org_id}/synthetics/environments/{env}", put(synthetics::update_synthetics_environment).delete(synthetics::delete_synthetics_environment))
             .route("/{org_id}/synthetics/environments/{env}/duplicate", post(synthetics::duplicate_synthetics_environment))
             .route("/{org_id}/synthetics/environments/{env}/variables", get(synthetics::list_synthetics_environment_variables).post(synthetics::create_synthetics_environment_variable))

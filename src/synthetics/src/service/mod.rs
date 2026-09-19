@@ -199,11 +199,7 @@ mod tests {
              environment put/delete, batch) and the check update a promote writes through the \
              table layer"
         );
-        // `location_entry` reads the same flag without publishing anything — it
-        // decides whether a location's missing agent rows are evidence or just
-        // this region's blind spot. Counted explicitly so the guard-per-publish
-        // assertion stays exact.
-        const NON_PUBLISH_READS: usize = 2; // and `start_publish_queue`, which starts no worker without it
+        const NON_PUBLISH_READS: usize = 2; // `location_entry` and `super_cluster_enabled`
         assert_eq!(
             guards,
             publishes + NON_PUBLISH_READS,

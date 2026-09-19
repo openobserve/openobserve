@@ -270,6 +270,12 @@ pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
 ) -> Result<bool, errors::Error> {
+    if get(conn, &record.org_id, &record.id)
+        .await?
+        .is_some_and(|stored| stored.updated_at > record.updated_at)
+    {
+        return Ok(false);
+    }
     let rival = Entity::find()
         .filter(Column::OrgId.eq(&record.org_id))
         .filter(Column::Env.eq(&record.env))
@@ -509,6 +515,21 @@ mod tests {
 
         assert!(!apply_upsert(&db, &row("id1", "stale", 5)).await.unwrap());
         assert_eq!(stored(&db).await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_stale_message_that_will_not_apply_never_removes_the_rival() {
+        let db = db().await;
+        let newer = SyntheticsVariableRecord {
+            name: "OTHER".into(),
+            ..row("id1", "newer", 9)
+        };
+        apply_upsert(&db, &newer).await.unwrap();
+        apply_upsert(&db, &row("id2", "rival", 6)).await.unwrap();
+
+        assert!(!apply_upsert(&db, &row("id1", "stale", 7)).await.unwrap());
+        let ids: Vec<String> = stored(&db).await.into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["id1", "id2"]);
     }
 
     #[tokio::test]

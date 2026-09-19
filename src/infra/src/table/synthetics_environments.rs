@@ -104,7 +104,6 @@ pub async fn get_by_id<C: ConnectionTrait>(
 pub async fn get_or_create_global<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
-    now: i64,
 ) -> Result<(SyntheticsEnvironmentRecord, bool), errors::Error> {
     if let Some(found) = get_by_name(conn, org_id, GLOBAL_ENVIRONMENT_NAME).await? {
         return Ok((found, false));
@@ -116,8 +115,9 @@ pub async fn get_or_create_global<C: ConnectionTrait>(
         description: String::new(),
         owner: None,
         is_global: true,
-        created_at: now,
-        updated_at: now,
+        // Zero in every region, so no region's copy ever wins a replication race over another's.
+        created_at: 0,
+        updated_at: 0,
     };
     match Entity::insert(record.to_active_model()).exec(conn).await {
         Ok(_) => Ok((record, true)),
@@ -143,6 +143,8 @@ pub async fn get_by_name<C: ConnectionTrait>(
         .filter(Column::Name.eq(name))
         .one(conn)
         .await?
+        // A case-insensitive collation matches `Prod` to `prod`; grants key on the exact name.
+        .filter(|m| m.name == name)
         .map(SyntheticsEnvironmentRecord::from))
 }
 
@@ -261,14 +263,15 @@ mod tests {
         let db = db().await;
         assert!(list(&db, "acme").await.unwrap().is_empty());
 
-        let (first, created) = get_or_create_global(&db, "acme", 1).await.unwrap();
+        let (first, created) = get_or_create_global(&db, "acme").await.unwrap();
         assert!(created);
         assert!(first.is_global);
         assert_eq!(first.name, "global");
         assert_eq!(first.id, global_environment_id("acme"));
         assert_eq!(first.owner, None);
+        assert_eq!((first.created_at, first.updated_at), (0, 0));
 
-        let (second, created) = get_or_create_global(&db, "acme", 2).await.unwrap();
+        let (second, created) = get_or_create_global(&db, "acme").await.unwrap();
         assert!(!created, "the second call must not insert");
         assert_eq!(second, first);
         assert_eq!(list(&db, "acme").await.unwrap().len(), 1);
@@ -277,8 +280,8 @@ mod tests {
     #[tokio::test]
     async fn each_org_gets_its_own_global_environment() {
         let db = db().await;
-        let (acme, _) = get_or_create_global(&db, "acme", 1).await.unwrap();
-        let (zeta, created) = get_or_create_global(&db, "zeta", 1).await.unwrap();
+        let (acme, _) = get_or_create_global(&db, "acme").await.unwrap();
+        let (zeta, created) = get_or_create_global(&db, "zeta").await.unwrap();
         assert!(created);
         assert_ne!(acme.id, zeta.id);
     }
@@ -286,7 +289,7 @@ mod tests {
     #[tokio::test]
     async fn an_update_never_writes_the_global_flag() {
         let db = db().await;
-        let (global, _) = get_or_create_global(&db, "acme", 1).await.unwrap();
+        let (global, _) = get_or_create_global(&db, "acme").await.unwrap();
         assert!(
             update(&db, "acme", &global.id, "global", "shared defaults", 2)
                 .await

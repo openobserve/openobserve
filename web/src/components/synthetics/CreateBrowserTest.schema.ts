@@ -24,6 +24,7 @@ import { z } from "zod";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
 import { isStorableAction } from "@/utils/synthetics/buildV2Steps";
 import { assertionNeedsExpected } from "@/constants/synthetics";
+import { isHttpUrlTemplate } from "@/components/synthetics/variables/placeholders";
 import type { AssertionKind } from "@/types/synthetics";
 
 /**
@@ -32,8 +33,6 @@ import type { AssertionKind } from "@/types/synthetics";
  * scavenger hunt.
  */
 type Translate = (_key: string, _params?: Record<string, unknown>) => string;
-
-const placeholderLedUrl = /^\{\{[A-Za-z0-9_]+\}\}\S*$/;
 
 /** The locator bundle, as it sits on an editor step. */
 const compositePartSchema = z.object({ value: z.string(), relation: z.string().optional() });
@@ -175,7 +174,7 @@ export const makeBrowserCheckSaveSchema = (t: Translate) =>
         if (
           step.action === "navigate" &&
           !/^https?:\/\/\S+$/i.test(step.value ?? "") &&
-          !placeholderLedUrl.test(step.value ?? "")
+          !((step.value ?? "").includes("{{") && isHttpUrlTemplate(step.value ?? ""))
         ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,

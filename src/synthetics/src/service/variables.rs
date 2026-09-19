@@ -13,9 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashSet;
 #[cfg(any(feature = "enterprise", test))]
-use std::{future::Future, time::Duration};
+use std::time::Duration;
+use std::{
+    collections::{BTreeSet, HashSet},
+    future::Future,
+};
 
 use infra::db::{get_orm_client_ro, get_orm_client_rw};
 use sea_orm::TransactionTrait;
@@ -103,6 +106,93 @@ impl std::fmt::Display for UsageConflict {
 
 impl std::error::Error for UsageConflict {}
 
+/// What `_resync` actually enqueued, and the environments whose batch could not be built.
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ResyncSummary {
+    pub environments: usize,
+    pub variables: usize,
+    pub failed: Vec<String>,
+}
+
+/// A resync asked of a node that has no other region to send to.
+#[derive(Debug)]
+pub struct ResyncUnavailable;
+
+impl std::fmt::Display for ResyncUnavailable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("super cluster is not enabled on this node, so there is nothing to resync")
+    }
+}
+
+impl std::error::Error for ResyncUnavailable {}
+
+/// The org's checks and shared rows, loaded once to answer which checks resolve which row.
+struct UsageScan {
+    checks: Vec<(Synthetic, BTreeSet<String>)>,
+    shared: Vec<SyntheticsVariableRecord>,
+    /// `(name, env)` of every shared row, so a shadow test is one lookup.
+    defined: HashSet<(String, String)>,
+    global_id: String,
+}
+
+impl UsageScan {
+    fn new(
+        checks: Vec<Synthetic>,
+        shared: Vec<SyntheticsVariableRecord>,
+        global_id: String,
+    ) -> Self {
+        let checks = checks
+            .into_iter()
+            .map(|check| {
+                let names = placeholder_names(&check_placeholder_text(&check));
+                (check, names)
+            })
+            .collect();
+        let defined = shared
+            .iter()
+            .map(|v| (v.name.clone(), v.env.clone()))
+            .collect();
+        Self {
+            checks,
+            shared,
+            defined,
+            global_id,
+        }
+    }
+
+    /// Checks that reference the row's name, do not define it, and run where the row applies.
+    fn users(&self, row: &SyntheticsVariableRecord) -> Vec<&Synthetic> {
+        self.checks
+            .iter()
+            .filter(|(check, names)| {
+                names.contains(&row.name)
+                    && !check.variables.iter().any(|v| v.name == row.name)
+                    && self.runs_where_applies(check, row)
+            })
+            .map(|(check, _)| check)
+            .collect()
+    }
+
+    /// A global row applies wherever no environment of the check shadows it with its own row.
+    fn runs_where_applies(&self, check: &Synthetic, row: &SyntheticsVariableRecord) -> bool {
+        if row.env != self.global_id {
+            return check.environments.contains(&row.env);
+        }
+        check.environments.is_empty()
+            || check
+                .environments
+                .iter()
+                .any(|env| !self.defined.contains(&(row.name.clone(), env.clone())))
+    }
+
+    fn user_names(&self, row: &SyntheticsVariableRecord) -> Vec<String> {
+        self.users(row)
+            .into_iter()
+            .map(|c| c.name.clone())
+            .collect()
+    }
+}
+
 /// Resolves an environment by the name the URL and OpenFGA both use.
 pub async fn get_environment(
     org_id: &str,
@@ -126,13 +216,9 @@ pub async fn get_environment_name(org_id: &str, id: &str) -> anyhow::Result<Opti
 /// The org's `global` environment, created on first use by whichever caller needs it.
 pub async fn global_environment(org_id: &str) -> anyhow::Result<SyntheticsEnvironmentRecord> {
     let conn = get_orm_client_rw().await;
-    let (record, created) = synthetics_environments::get_or_create_global(
-        conn,
-        org_id,
-        config::utils::time::now_micros(),
-    )
-    .await
-    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let (record, created) = synthetics_environments::get_or_create_global(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     // Not published: every region mints its own row under the same id.
     if created && ofga_enabled() {
         set_ownership(org_id, &environment_object(&record.name), "", "").await;
@@ -141,26 +227,29 @@ pub async fn global_environment(org_id: &str) -> anyhow::Result<SyntheticsEnviro
 }
 
 /// Every environment in the org with its variables inline, the global one first.
-pub async fn list_environments(org_id: &str) -> anyhow::Result<Vec<SyntheticsEnvironmentView>> {
+pub async fn list_environments<F, Fut>(
+    org_id: &str,
+    readable_checks: F,
+) -> anyhow::Result<Vec<SyntheticsEnvironmentView>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
     global_environment(org_id).await?;
     let conn = get_orm_client_rw().await;
     let mut envs = synthetics_environments::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     envs.sort_by_key(|env| !env.is_global);
-    let variables = synthetics_variables::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let counts = synthetics_checks::count_by_environment(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let usage = placeholder_usage(conn, org_id).await?;
+    let scan = usage_scan(conn, org_id).await?;
+    let rows: Vec<&SyntheticsVariableRecord> = scan.shared.iter().collect();
+    let views = usage_views(org_id, &rows, &scan, readable_checks).await?;
 
     let mut projected: HashMap<&str, Vec<SyntheticsVariableView>> = HashMap::new();
-    for (row, view) in variables
-        .iter()
-        .zip(project_views(org_id, variables.iter()).await?)
-    {
+    for (row, view) in rows.iter().zip(views) {
         projected.entry(row.env.as_str()).or_default().push(view);
     }
 
@@ -168,10 +257,7 @@ pub async fn list_environments(org_id: &str) -> anyhow::Result<Vec<SyntheticsEnv
         .into_iter()
         .map(|env| SyntheticsEnvironmentView {
             checks_count: counts.get(&env.id).copied().unwrap_or(0),
-            variables: with_usage(
-                projected.remove(env.id.as_str()).unwrap_or_default(),
-                &usage,
-            ),
+            variables: projected.remove(env.id.as_str()).unwrap_or_default(),
             id: env.id,
             name: env.name,
             description: env.description,
@@ -207,11 +293,7 @@ pub async fn create_environment(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     publish_environment_put(&record).await;
-
-    if ofga_enabled() {
-        set_ownership(org_id, &environment_object(&record.name), "", "").await;
-    }
-
+    grant_new_environment(org_id, &record.name).await;
     Ok(environment_view(record))
 }
 
@@ -274,11 +356,8 @@ pub async fn duplicate_environment(
     }
     txn.commit().await?;
     synthetics_variables::invalidate_and_publish(org_id).await;
-    publish_batch(org_id, &[&target], &copies, &[]).await?;
-
-    if ofga_enabled() {
-        set_ownership(org_id, &environment_object(&target.name), "", "").await;
-    }
+    publish_batch(org_id, &[&target], &copies, &[]).await;
+    grant_new_environment(org_id, &target.name).await;
     Ok(environment_view(target))
 }
 
@@ -298,8 +377,8 @@ pub async fn update_environment(
         anyhow::bail!(e);
     }
     record.description = req.description;
-    record.updated_at = config::utils::time::now_micros();
-    synthetics_environments::update(
+    record.updated_at = next_updated_at(record.updated_at);
+    let updated = synthetics_environments::update(
         conn,
         org_id,
         &record.id,
@@ -309,6 +388,9 @@ pub async fn update_environment(
     )
     .await
     .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    if !updated {
+        return Ok(None);
+    }
     publish_environment_put(&record).await;
     Ok(Some(environment_view(record)))
 }
@@ -345,7 +427,7 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     if deleted {
         synthetics_variables::invalidate_and_publish(org_id).await;
-        publish_environment_delete(org_id, &record.id).await;
+        publish_environment_delete(&record).await;
         if ofga_enabled() {
             let object = environment_object(&record.name);
             remove_ownership(org_id, &object, "", "").await;
@@ -356,22 +438,43 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
     Ok(deleted)
 }
 
-/// The global environment's variables, which apply in every environment.
-pub async fn list_global_variables(org_id: &str) -> anyhow::Result<Vec<SyntheticsVariableView>> {
+/// The global environment's variables; open to every reader, so they carry no owner.
+pub async fn list_global_variables<F, Fut>(
+    org_id: &str,
+    readable_checks: F,
+) -> anyhow::Result<Vec<SyntheticsVariableView>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
     let conn = get_orm_client_ro().await;
-    let rows = synthetics_variables::list(conn, org_id)
+    let global_id = synthetics_environments::global_environment_id(org_id);
+    let shared = synthetics_variables::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let global_id = synthetics_environments::global_environment_id(org_id);
-    let views = project_views(org_id, rows.iter().filter(|v| v.env == global_id)).await?;
-    Ok(with_usage(views, &placeholder_usage(conn, org_id).await?))
+    if !shared.iter().any(|v| v.env == global_id) {
+        return Ok(Vec::new());
+    }
+    let scan = UsageScan::new(
+        checks_with_secret_slots(conn, org_id).await?,
+        shared,
+        global_id.clone(),
+    );
+    let rows: Vec<&SyntheticsVariableRecord> =
+        scan.shared.iter().filter(|v| v.env == global_id).collect();
+    usage_views(org_id, &rows, &scan, readable_checks).await
 }
 
 /// One environment's variables, or `None` when the environment does not exist.
-pub async fn list_environment_variables(
+pub async fn list_environment_variables<F, Fut>(
     org_id: &str,
     env_name: &str,
-) -> anyhow::Result<Option<Vec<SyntheticsVariableView>>> {
+    readable_checks: F,
+) -> anyhow::Result<Option<Vec<SyntheticsVariableView>>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
     let conn = get_orm_client_ro().await;
     let Some(env) = synthetics_environments::get_by_name(conn, org_id, env_name)
         .await
@@ -379,14 +482,12 @@ pub async fn list_environment_variables(
     else {
         return Ok(None);
     };
-    let rows = synthetics_variables::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let views = project_views(org_id, rows.iter().filter(|v| v.env == env.id)).await?;
-    Ok(Some(with_usage(
-        views,
-        &placeholder_usage(conn, org_id).await?,
-    )))
+    let scan = usage_scan(conn, org_id).await?;
+    let rows: Vec<&SyntheticsVariableRecord> =
+        scan.shared.iter().filter(|v| v.env == env.id).collect();
+    Ok(Some(
+        usage_views(org_id, &rows, &scan, readable_checks).await?,
+    ))
 }
 
 /// Rejects a check that names an environment which does not exist, or the global one.
@@ -446,7 +547,7 @@ pub async fn create_variable(
     synthetics_variables::add(conn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await?;
+    publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await;
     project_view(org_id, &record).await
 }
 
@@ -474,12 +575,8 @@ pub async fn update_variable(
     let name = normalize_variable_name(&req.name);
 
     if name != record.name {
-        if let Some(refusal) = rename_refusal(
-            &record.name,
-            &name,
-            &placeholder_usage(conn, org_id).await?,
-            force,
-        ) {
+        let users = usage_scan(conn, org_id).await?.user_names(&record);
+        if let Some(refusal) = rename_refusal(&record.name, &name, &users, force) {
             return Err(UsageConflict(refusal).into());
         }
         let before = org_variable_state(org_id).await?;
@@ -505,12 +602,16 @@ pub async fn update_variable(
     record.description = req.description;
     record.example = req.example;
     record.tags = req.tags;
-    record.updated_at = config::utils::time::now_micros();
+    record.updated_at = next_updated_at(record.updated_at);
 
-    synthetics_variables::update(conn, &record)
+    // A delete that landed since the read leaves nothing to update, and nothing to publish.
+    if !synthetics_variables::update(conn, &record)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await?;
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    {
+        return Ok(None);
+    }
+    publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await;
     Ok(Some(project_view(org_id, &record).await?))
 }
 
@@ -526,11 +627,11 @@ pub async fn delete_variable(
     let Some(record) = scoped_variable(conn, org_id, &env, id).await? else {
         return Ok(false);
     };
-    if !force
-        && let Some(users) = placeholder_usage(conn, org_id).await?.get(&record.name)
-        && !users.is_empty()
-    {
-        return Err(UsageConflict(usage_refusal(&record.name, users, "delete")).into());
+    if !force {
+        let users = usage_scan(conn, org_id).await?.user_names(&record);
+        if !users.is_empty() {
+            return Err(UsageConflict(usage_refusal(&record.name, &users, "delete")).into());
+        }
     }
     let deleted = synthetics_variables::delete(conn, org_id, id)
         .await
@@ -541,11 +642,16 @@ pub async fn delete_variable(
     Ok(deleted)
 }
 
-/// A check's resolved set, name by name, with the scope each name comes from.
-pub async fn resolved_variables(
+/// A check's resolved set; an environment `readable_envs` withholds contributes no rows.
+pub async fn resolved_variables<F, Fut>(
     org_id: &str,
     check_id: &str,
-) -> anyhow::Result<Option<Vec<ResolvedVariableView>>> {
+    readable_envs: F,
+) -> anyhow::Result<Option<Vec<ResolvedVariableView>>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
     let conn = get_orm_client_ro().await;
     let Some(check) = synthetics_checks::get(conn, org_id, check_id)
         .await
@@ -559,20 +665,36 @@ pub async fn resolved_variables(
     let shared = synthetics_variables::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let first = check
+        .environments
+        .first()
+        .and_then(|id| envs.iter().find(|e| &e.id == id));
+    let readable = match first {
+        Some(env) => readable_envs(vec![env.name.clone()]).await,
+        None => HashSet::new(),
+    };
+    let env_id = first
+        .filter(|env| readable.contains(&env.name))
+        .map(|env| env.id.as_str());
     Ok(Some(resolved_rows(
         &shared,
         &envs,
         &check.variables,
-        check.environments.first().map(String::as_str),
+        env_id,
         &synthetics_environments::global_environment_id(org_id),
     )))
 }
 
-/// Every environment's resolved set, keyed by environment name.
-pub async fn resolved_variables_grouped(
+/// Every readable environment's resolved set, keyed by environment name.
+pub async fn resolved_variables_grouped<F, Fut>(
     org_id: &str,
     check_id: &str,
-) -> anyhow::Result<Option<ResolvedVariablesGrouped>> {
+    readable_envs: F,
+) -> anyhow::Result<Option<ResolvedVariablesGrouped>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
     let conn = get_orm_client_ro().await;
     let Some(check) = synthetics_checks::get(conn, org_id, check_id)
         .await
@@ -588,6 +710,16 @@ pub async fn resolved_variables_grouped(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
     let global_id = synthetics_environments::global_environment_id(org_id);
+    let named: Vec<&SyntheticsEnvironmentRecord> = check
+        .environments
+        .iter()
+        .filter_map(|id| envs.iter().find(|e| &e.id == id))
+        .collect();
+    let readable = if named.is_empty() {
+        HashSet::new()
+    } else {
+        readable_envs(named.iter().map(|env| env.name.clone()).collect()).await
+    };
     let mut grouped = ResolvedVariablesGrouped::default();
     if check.environments.is_empty() {
         grouped.environments.push(String::new());
@@ -596,14 +728,11 @@ pub async fn resolved_variables_grouped(
             resolved_rows(&shared, &envs, &check.variables, None, &global_id),
         );
     }
-    for id in &check.environments {
-        let Some(env) = envs.iter().find(|e| &e.id == id) else {
-            continue;
-        };
+    for env in named.into_iter().filter(|env| readable.contains(&env.name)) {
         grouped.environments.push(env.name.clone());
         grouped.resolved.insert(
             env.name.clone(),
-            resolved_rows(&shared, &envs, &check.variables, Some(id), &global_id),
+            resolved_rows(&shared, &envs, &check.variables, Some(&env.id), &global_id),
         );
     }
     Ok(Some(grouped))
@@ -674,6 +803,190 @@ pub async fn promote_check_variable(
     owner: &str,
 ) -> anyhow::Result<SyntheticsVariableView> {
     let conn = get_orm_client_rw().await;
+    let (record, check) =
+        promote_check_variable_in(conn, org_id, check_id, name, env, owner).await?;
+    synthetics_variables::invalidate_and_publish(org_id).await;
+    synthetics_checks::invalidate_and_publish(org_id, check_id).await;
+    publish_batch(org_id, &[env], std::slice::from_ref(&record), &[]).await;
+    publish_check_update(org_id, check_id, &check).await;
+    project_view(org_id, &record).await
+}
+
+/// Moves an environment's variable into global; `None` when the environment holds no such variable.
+pub async fn promote_to_global(
+    org_id: &str,
+    env: &SyntheticsEnvironmentRecord,
+    id: &str,
+) -> anyhow::Result<Option<SyntheticsVariableView>> {
+    if env.is_global {
+        anyhow::bail!("the variable is already in the '{GLOBAL_ENVIRONMENT_NAME}' environment");
+    }
+    let global = global_environment(org_id).await?;
+    let conn = get_orm_client_rw().await;
+    let Some(mut record) = scoped_variable(conn, org_id, env, id).await? else {
+        return Ok(None);
+    };
+
+    if record.is_secret() {
+        anyhow::bail!(secret_cannot_be_global(&record.name));
+    }
+
+    // Moving to global widens the row from one environment to every check in the org.
+    let before = org_variable_state(org_id).await?;
+    let mut after = before.clone();
+    if let Some(row) = after
+        .shared
+        .iter_mut()
+        .find(|v| v.name == record.name && v.env.as_deref() == Some(env.id.as_str()))
+    {
+        row.env = cap_scope(&global);
+    }
+    if let Some(err) = variable_cap_error(&before, &after) {
+        anyhow::bail!(err);
+    }
+
+    record.updated_at = next_updated_at(record.updated_at);
+    if !synthetics_variables::set_env(conn, org_id, id, &global.id, record.updated_at)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+    {
+        return Ok(None);
+    }
+    record.env = global.id.clone();
+    publish_batch(org_id, &[&global], std::slice::from_ref(&record), &[]).await;
+    Ok(Some(project_view(org_id, &record).await?))
+}
+
+pub async fn split_to_environments(
+    org_id: &str,
+    id: &str,
+    targets: Vec<SplitTarget>,
+    owner: &str,
+) -> anyhow::Result<Vec<SyntheticsVariableView>> {
+    if let Some(err) = split_targets_error(&targets) {
+        anyhow::bail!(err);
+    }
+    let global = global_environment(org_id).await?;
+    let dek = synthetics_dek(org_id).await?;
+    let conn = get_orm_client_rw().await;
+    let (envs, created) =
+        split_to_environments_in(conn, &global, id, &targets, owner, &dek).await?;
+    synthetics_variables::invalidate_and_publish(org_id).await;
+    let envs: Vec<&SyntheticsEnvironmentRecord> = envs.iter().collect();
+    publish_batch(org_id, &envs, &created, &[id.to_string()]).await;
+    project_views(org_id, created.iter()).await
+}
+
+/// The global and job-environment rows the check references, decrypted; an unset one fails the job.
+pub async fn resolve_shared_variables(
+    org_id: &str,
+    env_id: Option<&str>,
+    check: &Synthetic,
+    dek: &[u8],
+) -> anyhow::Result<Vec<(String, String)>> {
+    let conn = get_orm_client_ro().await;
+    resolve_shared_variables_in(conn, org_id, env_id, check, dek).await
+}
+
+/// Whether an org has any shared variable at all.
+pub async fn org_has_shared_variables(org_id: &str) -> bool {
+    let conn = get_orm_client_ro().await;
+    match synthetics_variables::list_cached(conn, org_id).await {
+        Ok(rows) => !rows.is_empty(),
+        Err(e) => {
+            log::error!("[synthetics] shared variable lookup failed for {org_id}: {e}");
+            false
+        }
+    }
+}
+
+/// Publishes every environment and variable of the org again; receivers apply a replay as a no-op.
+pub async fn resync_environments(org_id: &str) -> anyhow::Result<ResyncSummary> {
+    resync_precondition(super_cluster_enabled())?;
+    let conn = get_orm_client_ro().await;
+    let envs = synthetics_environments::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let rows = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let mut summary = ResyncSummary::default();
+    for env in &envs {
+        let puts: Vec<SyntheticsVariableRecord> =
+            rows.iter().filter(|v| v.env == env.id).cloned().collect();
+        if env.is_global && puts.is_empty() {
+            continue;
+        }
+        if !publish_batch(org_id, &[env], &puts, &[]).await {
+            summary.failed.push(env.name.clone());
+            continue;
+        }
+        summary.environments += usize::from(!env.is_global);
+        summary.variables += puts.len();
+    }
+    Ok(summary)
+}
+
+/// Starts the cross-region publish worker on the calling runtime; a no-op without super cluster.
+pub fn start_publish_queue() {
+    #[cfg(feature = "enterprise")]
+    if super_cluster_enabled() {
+        let mut slot = PUBLISH_QUEUE
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if slot.as_ref().is_none_or(|tx| tx.is_closed()) {
+            *slot = Some(start_publish_worker(PUBLISH_BACKOFF));
+        }
+    }
+}
+
+/// The org's checks and shared rows, as the write-time cap gate reads them.
+pub(crate) async fn org_variable_state(org_id: &str) -> anyhow::Result<OrgVariableState> {
+    org_variable_state_in(get_orm_client_ro().await, org_id).await
+}
+
+/// One check reduced to what the cap needs: what it defines and where it runs.
+pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootprint {
+    CheckVariableFootprint {
+        id: id.to_string(),
+        name: check.name.clone(),
+        own_names: check.variables.iter().map(|v| v.name.clone()).collect(),
+        environments: check.environments.clone(),
+    }
+}
+
+async fn org_variable_state_in<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> anyhow::Result<OrgVariableState> {
+    let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let shared = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let global_id = synthetics_environments::global_environment_id(org_id);
+    Ok(OrgVariableState {
+        checks: checks.iter().map(|c| check_footprint(&c.id, c)).collect(),
+        shared: shared
+            .into_iter()
+            .map(|v| SharedVariableScope {
+                name: v.name,
+                env: (v.env != global_id).then_some(v.env),
+            })
+            .collect(),
+    })
+}
+
+/// The promote on `conn`: the shared row appears and the check's own copy goes in one transaction.
+async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    check_id: &str,
+    name: &str,
+    env: &SyntheticsEnvironmentRecord,
+    owner: &str,
+) -> anyhow::Result<(SyntheticsVariableRecord, Synthetic)> {
     let mut check = synthetics_checks::get(conn, org_id, check_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -690,9 +1003,22 @@ pub async fn promote_check_variable(
     if let Some(refusal) = promote_refusal(&source, &normalized, env, &check.environments) {
         anyhow::bail!(refusal);
     }
+    if env.is_global {
+        let shared = synthetics_variables::list(conn, org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        let envs = synthetics_environments::list(conn, org_id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        if let Some(refusal) =
+            shadowing_environment_refusal(&normalized, &check.environments, &shared, &envs)
+        {
+            anyhow::bail!(refusal);
+        }
+    }
 
     // The source check already resolved this name; every other check gains it.
-    let before = org_variable_state(org_id).await?;
+    let before = org_variable_state_in(conn, org_id).await?;
     let mut after = before.clone();
     after.shared.push(SharedVariableScope {
         name: normalized.clone(),
@@ -717,73 +1043,32 @@ pub async fn promote_check_variable(
         created_at: now,
         updated_at: now,
     };
-    synthetics_variables::add(conn, &record)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-
-    publish_batch(org_id, &[env], std::slice::from_ref(&record), &[]).await?;
-
     check.variables.remove(position);
-    synthetics_checks::update(conn, org_id, check_id, check.clone())
+    let txn = conn.begin().await?;
+    synthetics_variables::insert_row(&txn, &record)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    publish_check_update(org_id, check_id, &check).await?;
-    project_view(org_id, &record).await
-}
-
-pub async fn promote_to_global(
-    org_id: &str,
-    env: &SyntheticsEnvironmentRecord,
-    id: &str,
-) -> anyhow::Result<SyntheticsVariableView> {
-    if env.is_global {
-        anyhow::bail!("the variable is already in the '{GLOBAL_ENVIRONMENT_NAME}' environment");
-    }
-    let global = global_environment(org_id).await?;
-    let conn = get_orm_client_rw().await;
-    let mut record = scoped_variable(conn, org_id, env, id)
-        .await?
-        .ok_or_else(|| anyhow::anyhow!("variable not found in environment '{}'", env.name))?;
-
-    if record.is_secret() {
-        anyhow::bail!(secret_cannot_be_global(&record.name));
-    }
-
-    // Moving to global widens the row from one environment to every check in the org.
-    let before = org_variable_state(org_id).await?;
-    let mut after = before.clone();
-    if let Some(row) = after
-        .shared
-        .iter_mut()
-        .find(|v| v.name == record.name && v.env.as_deref() == Some(env.id.as_str()))
-    {
-        row.env = cap_scope(&global);
-    }
-    if let Some(err) = variable_cap_error(&before, &after) {
-        anyhow::bail!(err);
-    }
-
-    record.updated_at = config::utils::time::now_micros();
-    synthetics_variables::set_env(conn, org_id, id, &global.id, record.updated_at)
+    let check = synthetics_checks::update_row(&txn, org_id, check_id, &check)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    record.env = global.id.clone();
-    publish_batch(org_id, &[&global], std::slice::from_ref(&record), &[]).await?;
-    project_view(org_id, &record).await
+    txn.commit().await?;
+    Ok((record, check))
 }
 
-pub async fn split_to_environments(
-    org_id: &str,
+/// The split on `conn`: refused while a check would lose the name, else one transaction.
+async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    global: &SyntheticsEnvironmentRecord,
     id: &str,
-    targets: Vec<SplitTarget>,
+    targets: &[SplitTarget],
     owner: &str,
-) -> anyhow::Result<Vec<SyntheticsVariableView>> {
-    if let Some(err) = split_targets_error(&targets) {
-        anyhow::bail!(err);
-    }
-    let global = global_environment(org_id).await?;
-    let conn = get_orm_client_rw().await;
-    let source = scoped_variable(conn, org_id, &global, id)
+    dek: &[u8],
+) -> anyhow::Result<(
+    Vec<SyntheticsEnvironmentRecord>,
+    Vec<SyntheticsVariableRecord>,
+)> {
+    let org_id = global.org_id.as_str();
+    let source = scoped_variable(conn, org_id, global, id)
         .await?
         .ok_or_else(|| anyhow::anyhow!("global variable not found: {id}"))?;
 
@@ -791,7 +1076,7 @@ pub async fn split_to_environments(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let mut resolved = Vec::with_capacity(targets.len());
-    for target in &targets {
+    for target in targets {
         let env = known
             .iter()
             .find(|e| e.name == target.environment)
@@ -833,7 +1118,6 @@ pub async fn split_to_environments(
         );
     }
 
-    let dek = synthetics_dek(org_id).await?;
     let now = config::utils::time::now_micros();
     let mut created = Vec::with_capacity(resolved.len());
     for (env, value) in &resolved {
@@ -842,7 +1126,7 @@ pub async fn split_to_environments(
             org_id: org_id.to_string(),
             env: env.id.clone(),
             name: source.name.clone(),
-            value: store_value(&dek, value)?,
+            value: store_value(dek, value)?,
             kind: source.kind.clone(),
             description: source.description.clone(),
             example: source.example.clone(),
@@ -863,32 +1147,28 @@ pub async fn split_to_environments(
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     txn.commit().await?;
-    synthetics_variables::invalidate_and_publish(org_id).await;
-    let envs: Vec<&SyntheticsEnvironmentRecord> = resolved.iter().map(|(env, _)| env).collect();
-    publish_batch(org_id, &envs, &created, std::slice::from_ref(&source.id)).await?;
-
-    project_views(org_id, created.iter()).await
+    Ok((resolved.into_iter().map(|(env, _)| env).collect(), created))
 }
 
-/// Global plus the job environment's rows, decrypted; a referenced unset secret fails the job.
-pub async fn resolve_shared_variables(
+async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
+    conn: &C,
     org_id: &str,
     env_id: Option<&str>,
     check: &Synthetic,
     dek: &[u8],
 ) -> anyhow::Result<Vec<(String, String)>> {
-    let conn = get_orm_client_ro().await;
     let rows = synthetics_variables::list_cached(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
     let global_id = synthetics_environments::global_environment_id(org_id);
+    let referenced = placeholder_names(&check_placeholder_text(check));
+    // Only what the check names reaches the probe, which also redacts every value it is sent.
     let applicable = order_for_merge(
         rows.into_iter()
-            .filter(|v| applies_to(v, env_id, &global_id))
+            .filter(|v| referenced.contains(&v.name) && applies_to(v, env_id, &global_id))
             .collect(),
         &global_id,
     );
-    let referenced = placeholder_names(&check_placeholder_text(check));
     if let Some(unset) = first_unset_secret(&applicable, &check.variables, &referenced) {
         let env = synthetics_environments::get_by_id(conn, org_id, &unset.env)
             .await
@@ -909,72 +1189,45 @@ pub async fn resolve_shared_variables(
     Ok(out)
 }
 
-/// Whether an org has any shared variable at all.
-pub async fn org_has_shared_variables(org_id: &str) -> bool {
-    let conn = get_orm_client_ro().await;
-    match synthetics_variables::list_cached(conn, org_id).await {
-        Ok(rows) => !rows.is_empty(),
-        Err(e) => {
-            log::error!("[synthetics] shared variable lookup failed for {org_id}: {e}");
-            false
-        }
-    }
-}
-
-/// Starts the cross-region publish worker on the calling runtime; a no-op without super cluster.
-pub fn start_publish_queue() {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        let mut slot = PUBLISH_QUEUE
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if slot.as_ref().is_none_or(|tx| tx.is_closed()) {
-            *slot = Some(start_publish_worker(PUBLISH_BACKOFF));
-        }
-    }
-}
-
-/// The org's checks and shared rows, as the write-time cap gate reads them.
-pub(crate) async fn org_variable_state(org_id: &str) -> anyhow::Result<OrgVariableState> {
-    let conn = get_orm_client_ro().await;
-    let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+/// The org's checks and shared rows, ready to say which checks resolve a row.
+async fn usage_scan<C: sea_orm::ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+) -> anyhow::Result<UsageScan> {
     let shared = synthetics_variables::list(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let global_id = synthetics_environments::global_environment_id(org_id);
-    Ok(OrgVariableState {
-        checks: checks.iter().map(|c| check_footprint(&c.id, c)).collect(),
-        shared: shared
-            .into_iter()
-            .map(|v| SharedVariableScope {
-                name: v.name,
-                env: (v.env != global_id).then_some(v.env),
-            })
-            .collect(),
-    })
+    Ok(UsageScan::new(
+        checks_with_secret_slots(conn, org_id).await?,
+        shared,
+        synthetics_environments::global_environment_id(org_id),
+    ))
 }
 
-/// One check reduced to what the cap needs: what it defines and where it runs.
-pub(crate) fn check_footprint(id: &str, check: &Synthetic) -> CheckVariableFootprint {
-    CheckVariableFootprint {
-        id: id.to_string(),
-        name: check.name.clone(),
-        own_names: check.variables.iter().map(|v| v.name.clone()).collect(),
-        environments: check.environments.clone(),
-    }
-}
-
-/// Variable name → names of the checks whose definition references `{{NAME}}`.
-async fn placeholder_usage<C: sea_orm::ConnectionTrait>(
-    conn: &C,
+/// Projects `rows` with their usage; `used_by` names only checks `readable_checks` returns.
+async fn usage_views<F, Fut>(
     org_id: &str,
-) -> anyhow::Result<HashMap<String, Vec<String>>> {
-    Ok(usage_index(&checks_with_secret_slots(conn, org_id).await?))
+    rows: &[&SyntheticsVariableRecord],
+    scan: &UsageScan,
+    readable_checks: F,
+) -> anyhow::Result<Vec<SyntheticsVariableView>>
+where
+    F: FnOnce(Vec<String>) -> Fut,
+    Fut: Future<Output = HashSet<String>>,
+{
+    let users: Vec<Vec<&Synthetic>> = rows.iter().map(|row| scan.users(row)).collect();
+    let ids: BTreeSet<String> = users.iter().flatten().map(|c| c.id.clone()).collect();
+    let readable = if ids.is_empty() {
+        HashSet::new()
+    } else {
+        readable_checks(ids.into_iter().collect()).await
+    };
+    let views = project_views(org_id, rows.iter().copied()).await?;
+    Ok(views
+        .into_iter()
+        .zip(rows.iter().zip(users))
+        .map(|(view, (row, users))| stamp_usage(view, row, &users, &readable, &scan.global_id))
+        .collect())
 }
 
 /// The org's checks with secret config slots restored, so a `{{NAME}}` in a header counts.
@@ -1121,7 +1374,8 @@ async fn publish_environment_put(record: &SyntheticsEnvironmentRecord) {
     let _ = record;
 }
 
-async fn publish_environment_delete(org_id: &str, id: &str) {
+/// Carries `created_at`, so a late copy never deletes a namesake created after it.
+async fn publish_environment_delete(record: &SyntheticsEnvironmentRecord) {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -1129,34 +1383,40 @@ async fn publish_environment_delete(org_id: &str, id: &str) {
     {
         use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsVariablesMessage};
         let msg = SyntheticsVariablesMessage::EnvironmentDelete {
-            org_id: org_id.to_string(),
-            id: id.to_string(),
+            org_id: record.org_id.clone(),
+            id: record.id.clone(),
+            created_at: record.created_at,
         };
-        let key = format!("{org_id}/environment/{id}");
+        let key = format!("{}/environment/{}", record.org_id, record.id);
         enqueue_publish(key, move || queue::synthetics_variables(msg.clone()));
     }
     #[cfg(not(feature = "enterprise"))]
-    let _ = (org_id, id);
+    let _ = record;
 }
 
-/// Broadcasts the check a promote just edited.
-async fn publish_check_update(
-    org_id: &str,
-    check_id: &str,
-    check: &Synthetic,
-) -> anyhow::Result<()> {
+/// Broadcasts the check a promote just edited; a failure is logged, since the local write stands.
+async fn publish_check_update(org_id: &str, check_id: &str, check: &Synthetic) {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled
     {
         use o2_enterprise::enterprise::super_cluster::queue::{self, SyntheticsCheckPayload};
-        let slug = folders::get_name_by_pk(&check.folder_id)
-            .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?
-            .unwrap_or_default();
-        let payload = SyntheticsCheckPayload::for_wire(org_id, check, &slug).await?;
         let key = format!("{org_id}/check/{check_id}");
+        let slug = match folders::get_name_by_pk(&check.folder_id).await {
+            Ok(slug) => slug.unwrap_or_default(),
+            Err(e) => {
+                log::error!("[synthetics] publish {key} not sent; folder lookup failed: {e}");
+                return;
+            }
+        };
+        let payload = match SyntheticsCheckPayload::for_wire(org_id, check, &slug).await {
+            Ok(payload) => payload,
+            Err(e) => {
+                log::error!("[synthetics] publish {key} not sent; payload failed: {e}");
+                return;
+            }
+        };
         let (org, id) = (org_id.to_string(), check_id.to_string());
         enqueue_publish(key, move || {
             let (org, id, payload) = (org.clone(), id.clone(), payload.clone());
@@ -1165,16 +1425,15 @@ async fn publish_check_update(
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = (org_id, check_id, check);
-    Ok(())
 }
 
-/// Every variable write ships as one batch with its parent environments, applied atomically.
+/// One batch per write, with its parent environments; `true` once enqueued, a failure is logged.
 async fn publish_batch(
     org_id: &str,
     environments: &[&SyntheticsEnvironmentRecord],
     puts: &[SyntheticsVariableRecord],
     deletes: &[String],
-) -> anyhow::Result<()> {
+) -> bool {
     #[cfg(feature = "enterprise")]
     if o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
@@ -1183,6 +1442,12 @@ async fn publish_batch(
         use o2_enterprise::enterprise::super_cluster::queue::{
             self, SyntheticsVariablesMessage, SyntheticsVariablesOp,
         };
+        let ids: Vec<&str> = puts
+            .iter()
+            .map(|r| r.id.as_str())
+            .chain(deletes.iter().map(String::as_str))
+            .collect();
+        let key = format!("{org_id}/variables/{}", ids.join(","));
         let parents = batch_environments(environments);
         let mut ops = Vec::with_capacity(parents.len() + puts.len() + deletes.len());
         for record in parents {
@@ -1191,9 +1456,16 @@ async fn publish_batch(
             )));
         }
         for record in puts {
-            ops.push(SyntheticsVariablesOp::VariablePut(
-                variable_payload(record).await?,
-            ));
+            match variable_payload(record).await {
+                Ok(payload) => ops.push(SyntheticsVariablesOp::VariablePut(payload)),
+                Err(e) => {
+                    log::error!(
+                        "[synthetics] publish {key} not sent; other regions will not see this \
+                         change: {e}"
+                    );
+                    return false;
+                }
+            }
         }
         for id in deletes {
             ops.push(SyntheticsVariablesOp::VariableDelete(id.clone()));
@@ -1202,17 +1474,12 @@ async fn publish_batch(
             org_id: org_id.to_string(),
             ops,
         };
-        let ids: Vec<&str> = puts
-            .iter()
-            .map(|r| r.id.as_str())
-            .chain(deletes.iter().map(String::as_str))
-            .collect();
-        let key = format!("{org_id}/variables/{}", ids.join(","));
         enqueue_publish(key, move || queue::synthetics_variables(msg.clone()));
+        return true;
     }
     #[cfg(not(feature = "enterprise"))]
     let _ = (org_id, environments, puts, deletes);
-    Ok(())
+    false
 }
 
 /// Sends with backoff and logs the key once every attempt failed; `true` when one got through.
@@ -1324,16 +1591,6 @@ fn batch_environments<'a>(
         .collect()
 }
 
-fn usage_index(checks: &[Synthetic]) -> HashMap<String, Vec<String>> {
-    let mut usage: HashMap<String, Vec<String>> = HashMap::new();
-    for check in checks {
-        for name in placeholder_names(&check_placeholder_text(check)) {
-            usage.entry(name).or_default().push(check.name.clone());
-        }
-    }
-    usage
-}
-
 /// Restores every check's secret slots; one that will not decrypt is scanned as stored.
 fn rehydrate_all(checks: &mut [Synthetic], dek: &[u8]) {
     for check in checks {
@@ -1356,17 +1613,24 @@ pub(crate) fn check_placeholder_text(check: &Synthetic) -> String {
     format!("{} {}", check.target, check.config)
 }
 
-/// Stamps usage counts and check names onto a batch of views.
-fn with_usage(
-    mut views: Vec<SyntheticsVariableView>,
-    usage: &HashMap<String, Vec<String>>,
-) -> Vec<SyntheticsVariableView> {
-    for view in &mut views {
-        let users = usage.get(&view.name).cloned().unwrap_or_default();
-        view.used_by_checks = users.len() as u64;
-        view.used_by = users;
+/// Counts every check using the row, names only readable ones, and hides a global row's owner.
+fn stamp_usage(
+    mut view: SyntheticsVariableView,
+    row: &SyntheticsVariableRecord,
+    users: &[&Synthetic],
+    readable: &HashSet<String>,
+    global_id: &str,
+) -> SyntheticsVariableView {
+    view.used_by_checks = users.len() as u64;
+    view.used_by = users
+        .iter()
+        .filter(|c| readable.contains(&c.id))
+        .map(|c| c.name.clone())
+        .collect();
+    if row.env == global_id {
+        view.owner = None;
     }
-    views
+    view
 }
 
 /// One environment's resolved rows, from already-loaded data.
@@ -1445,19 +1709,11 @@ fn usage_refusal(name: &str, users: &[String], action: &str) -> String {
 }
 
 /// A rename breaks every `{{OLD}}` still in a check, so it takes the delete guard.
-fn rename_refusal(
-    old: &str,
-    new: &str,
-    usage: &HashMap<String, Vec<String>>,
-    force: bool,
-) -> Option<String> {
-    if old == new || force {
+fn rename_refusal(old: &str, new: &str, users: &[String], force: bool) -> Option<String> {
+    if old == new || force || users.is_empty() {
         return None;
     }
-    usage
-        .get(old)
-        .filter(|users| !users.is_empty())
-        .map(|users| usage_refusal(old, users, "rename"))
+    Some(usage_refusal(old, users, "rename"))
 }
 
 /// Why a check variable cannot move to `env`, if it cannot.
@@ -1484,6 +1740,26 @@ fn promote_refusal(
         ));
     }
     None
+}
+
+/// Promoting to global drops the check's value, so a same-name row where it runs would win.
+fn shadowing_environment_refusal(
+    name: &str,
+    check_environments: &[String],
+    shared: &[SyntheticsVariableRecord],
+    envs: &[SyntheticsEnvironmentRecord],
+) -> Option<String> {
+    let id = check_environments
+        .iter()
+        .find(|id| shared.iter().any(|v| v.name == name && &v.env == *id))?;
+    let env = envs
+        .iter()
+        .find(|e| &e.id == id)
+        .map_or(id.as_str(), |e| e.name.as_str());
+    Some(format!(
+        "environment '{env}' defines its own '{name}', which would replace this check's value \
+         there once it moves to global; promote it to '{env}' or rename one of them first"
+    ))
 }
 
 /// A `secure` check variable stays write-only once shared.
@@ -1689,6 +1965,43 @@ fn kind_str(kind: SyntheticsVariableKind) -> &'static str {
     }
 }
 
+/// A resync needs another region to send to.
+fn resync_precondition(super_cluster_enabled: bool) -> Result<(), ResyncUnavailable> {
+    if super_cluster_enabled {
+        Ok(())
+    } else {
+        Err(ResyncUnavailable)
+    }
+}
+
+/// The one flag read here that guards no publish; `start_publish_queue` and `_resync` share it.
+fn super_cluster_enabled() -> bool {
+    #[cfg(feature = "enterprise")]
+    {
+        o2_enterprise::enterprise::common::config::get_config()
+            .super_cluster
+            .enabled
+    }
+    #[cfg(not(feature = "enterprise"))]
+    {
+        false
+    }
+}
+
+/// Never behind the stored stamp, so a region with a slow clock still wins with its own later edit.
+fn next_updated_at(stored: i64) -> i64 {
+    config::utils::time::now_micros().max(stored + 1)
+}
+
+/// A new environment starts from no grants, even ones left behind by a deleted namesake.
+async fn grant_new_environment(org_id: &str, name: &str) {
+    if ofga_enabled() {
+        let object = environment_object(name);
+        remove_object_grants(org_id, &object).await;
+        set_ownership(org_id, &object, "", "").await;
+    }
+}
+
 fn environment_object(name: &str) -> String {
     format!("{}:{}", get_ofga_type("synthetic_environment"), name)
 }
@@ -1818,38 +2131,70 @@ mod tests {
     }
 
     #[test]
-    fn usage_counts_are_stamped_by_name() {
-        let views = vec![
-            SyntheticsVariableView {
-                name: "BASE_URL".into(),
-                ..Default::default()
-            },
-            SyntheticsVariableView {
-                name: "UNUSED".into(),
-                ..Default::default()
-            },
-        ];
-        let usage = HashMap::from([(
-            "BASE_URL".to_string(),
-            vec!["Checkout".to_string(), "Login".to_string()],
-        )]);
+    fn usage_is_counted_in_full_but_names_only_readable_checks() {
+        let row = named_var("g1", "BASE_URL", GLOBAL);
+        let login = Synthetic {
+            id: "c-login".into(),
+            ..synthetic("Login", "{{BASE_URL}}/login", &[], &[])
+        };
+        let checkout = Synthetic {
+            id: "c-checkout".into(),
+            ..synthetic("Checkout", "{{BASE_URL}}/pay", &[], &[])
+        };
+        let users = [&login, &checkout];
+        let readable = HashSet::from(["c-login".to_string()]);
+        let view = SyntheticsVariableView {
+            owner: Some("asha@acme.com".into()),
+            ..Default::default()
+        };
 
-        let stamped = with_usage(views, &usage);
-        assert_eq!(stamped[0].used_by_checks, 2);
-        assert_eq!(stamped[0].used_by, ["Checkout", "Login"]);
-        assert_eq!(stamped[1].used_by_checks, 0);
-        assert!(stamped[1].used_by.is_empty());
+        let stamped = stamp_usage(view.clone(), &row, &users, &readable, GLOBAL);
+        assert_eq!(stamped.used_by_checks, 2);
+        assert_eq!(stamped.used_by, ["Login"]);
+        assert_eq!(
+            stamped.owner, None,
+            "the open global list never shows an owner"
+        );
+
+        let scoped = named_var("s1", "BASE_URL", "e-stg");
+        assert_eq!(
+            stamp_usage(view, &scoped, &users, &readable, GLOBAL)
+                .owner
+                .as_deref(),
+            Some("asha@acme.com")
+        );
     }
 
     #[test]
     fn usage_matching_is_case_sensitive() {
-        let views = vec![SyntheticsVariableView {
-            name: "BASE_URL".into(),
-            ..Default::default()
-        }];
-        let usage = HashMap::from([("base_url".to_string(), vec!["Checkout".to_string()])]);
+        let scan = UsageScan::new(
+            vec![synthetic("Checkout", "{{base_url}}", &[], &[])],
+            vec![named_var("g1", "BASE_URL", GLOBAL)],
+            GLOBAL.to_string(),
+        );
+        assert!(scan.users(&scan.shared[0]).is_empty());
+    }
 
-        assert_eq!(with_usage(views, &usage)[0].used_by_checks, 0);
+    #[test]
+    fn a_row_counts_only_the_checks_that_resolve_it() {
+        let stg_url = named_var("s1", "URL", "e-stg");
+        let global_url = named_var("g1", "URL", GLOBAL);
+        let scan = UsageScan::new(
+            vec![
+                synthetic("Prod only", "{{URL}}", &["e-prod"], &[]),
+                synthetic("Staging", "{{URL}}", &["e-stg"], &[]),
+                synthetic("Both", "{{URL}}", &["e-stg", "e-prod"], &[]),
+                synthetic("Own value", "{{URL}}", &["e-stg"], &["URL"]),
+                synthetic("Unscoped", "{{URL}}", &[], &[]),
+            ],
+            vec![stg_url.clone(), global_url.clone()],
+            GLOBAL.to_string(),
+        );
+        assert_eq!(scan.user_names(&stg_url), ["Staging", "Both"]);
+        assert_eq!(
+            scan.user_names(&global_url),
+            ["Prod only", "Both", "Unscoped"]
+        );
     }
 
     #[test]
@@ -2351,12 +2696,38 @@ mod tests {
 
     #[test]
     fn a_rename_takes_the_same_guard_as_a_delete() {
-        let usage = HashMap::from([("URL".to_string(), vec!["Login".to_string()])]);
-        let err = rename_refusal("URL", "BASE_URL", &usage, false).unwrap();
+        let users = ["Login".to_string()];
+        let err = rename_refusal("URL", "BASE_URL", &users, false).unwrap();
         assert!(err.contains("Login") && err.contains("force=true"), "{err}");
-        assert!(rename_refusal("URL", "BASE_URL", &usage, true).is_none());
-        assert!(rename_refusal("URL", "URL", &usage, false).is_none());
-        assert!(rename_refusal("OTHER", "NEW", &usage, false).is_none());
+        assert!(rename_refusal("URL", "BASE_URL", &users, true).is_none());
+        assert!(rename_refusal("URL", "URL", &users, false).is_none());
+        assert!(rename_refusal("OTHER", "NEW", &[], false).is_none());
+    }
+
+    #[test]
+    fn promoting_to_global_is_refused_where_an_environment_defines_the_name() {
+        let shared = [
+            named_var("s1", "URL", "e-stg"),
+            named_var("g1", "URL", GLOBAL),
+        ];
+        let envs = [env_record("e-stg", "staging"), env_record("e-prod", "prod")];
+        let err = shadowing_environment_refusal(
+            "URL",
+            &["e-prod".into(), "e-stg".into()],
+            &shared,
+            &envs,
+        )
+        .unwrap();
+        assert!(err.contains("'staging'"), "{err}");
+        assert!(shadowing_environment_refusal("URL", &["e-prod".into()], &shared, &envs).is_none());
+        assert!(shadowing_environment_refusal("URL", &[], &shared, &envs).is_none());
+    }
+
+    #[test]
+    fn a_local_write_stamps_past_the_stored_time_even_from_a_slow_clock() {
+        let ahead = config::utils::time::now_micros() + 60_000_000;
+        assert_eq!(next_updated_at(ahead), ahead + 1);
+        assert!(next_updated_at(0) > 1);
     }
 
     #[test]
@@ -2492,11 +2863,14 @@ mod tests {
         );
         let mut checks = vec![header_only];
         assert!(checks.iter_mut().any(has_encrypted_config));
-        assert!(!usage_index(&checks).contains_key("API_TOKEN"));
+        let row = named_var("g1", "API_TOKEN", GLOBAL);
+        let scan = UsageScan::new(checks.clone(), vec![row.clone()], GLOBAL.to_string());
+        assert!(scan.user_names(&row).is_empty());
 
         rehydrate_all(&mut checks, &dek);
 
-        assert_eq!(usage_index(&checks)["API_TOKEN"], ["Orders API"]);
+        let scan = UsageScan::new(checks, vec![row.clone()], GLOBAL.to_string());
+        assert_eq!(scan.user_names(&row), ["Orders API"]);
     }
 
     #[test]
@@ -2515,7 +2889,9 @@ mod tests {
 
         rehydrate_all(&mut checks, &[7u8; 64]);
 
-        assert_eq!(usage_index(&checks)["BASE_URL"], ["Broken"]);
+        let row = named_var("g1", "BASE_URL", GLOBAL);
+        let scan = UsageScan::new(checks, vec![row.clone()], GLOBAL.to_string());
+        assert_eq!(scan.user_names(&row), ["Broken"]);
     }
 
     #[tokio::test]
@@ -2572,5 +2948,270 @@ mod tests {
             copy.id,
             synthetics_environments::environment_id("acme", "prod-eu")
         );
+    }
+
+    /// One connection: separate connections to `sqlite::memory:` are separate databases.
+    async fn variables_db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        let mut checks = backend
+            .build(
+                &schema.create_table_from_entity(infra::table::entity::synthetics_checks::Entity),
+            )
+            .to_string();
+        // The migration defaults the runtime columns to 0; a table built from the entity does not.
+        for col in [
+            "tz_offset",
+            "last_triggered_at",
+            "last_check_status",
+            "consecutive_failures",
+            "last_alert_at",
+            "alerting",
+            "degraded_notified_at",
+        ] {
+            let start = checks.find(&format!("\"{col}\"")).unwrap();
+            let at = start + checks[start..].find("NOT NULL").unwrap() + "NOT NULL".len();
+            checks.insert_str(at, " DEFAULT 0");
+        }
+        db.execute_unprepared(&checks).await.unwrap();
+        for table in [
+            schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
+            schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        db.execute_unprepared("CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)")
+            .await
+            .unwrap();
+        db
+    }
+
+    async fn stored_env(
+        db: &sea_orm::DatabaseConnection,
+        org: &str,
+        name: &str,
+    ) -> SyntheticsEnvironmentRecord {
+        if name == GLOBAL_ENVIRONMENT_NAME {
+            return synthetics_environments::get_or_create_global(db, org)
+                .await
+                .unwrap()
+                .0;
+        }
+        let record = SyntheticsEnvironmentRecord {
+            id: synthetics_environments::environment_id(org, name),
+            org_id: org.into(),
+            name: name.into(),
+            description: String::new(),
+            owner: None,
+            is_global: false,
+            created_at: 1,
+            updated_at: 1,
+        };
+        synthetics_environments::add(db, &record).await.unwrap();
+        record
+    }
+
+    async fn stored_var(
+        db: &sea_orm::DatabaseConnection,
+        env: &SyntheticsEnvironmentRecord,
+        name: &str,
+        kind: &str,
+        value: &str,
+    ) -> SyntheticsVariableRecord {
+        let record = SyntheticsVariableRecord {
+            id: format!("{}-{name}", env.name),
+            org_id: env.org_id.clone(),
+            env: env.id.clone(),
+            name: name.into(),
+            value: value.into(),
+            kind: kind.into(),
+            ..var(&env.id)
+        };
+        synthetics_variables::insert_row(db, &record).await.unwrap();
+        record
+    }
+
+    async fn stored_check(
+        db: &sea_orm::DatabaseConnection,
+        org: &str,
+        id: &str,
+        check: Synthetic,
+    ) -> Synthetic {
+        synthetics_checks::insert_row(db, org, id, &check)
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_job_receives_only_the_shared_rows_its_check_references() {
+        let db = variables_db().await;
+        let org = "f14-resolve";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let staging = stored_env(&db, org, "staging").await;
+        stored_var(&db, &global, "URL", "plain", "https://global.test").await;
+        stored_var(&db, &staging, "URL", "plain", "https://staging.test").await;
+        stored_var(&db, &staging, "SMTP_TOKEN", "secret", "unrelated").await;
+        stored_var(&db, &staging, "PASSWORD", "secret", "").await;
+
+        let check = synthetic("Login", "{{URL}}/login", &[&staging.id], &[]);
+        let sent = resolve_shared_variables_in(&db, org, Some(&staging.id), &check, &[7u8; 64])
+            .await
+            .unwrap();
+        assert_eq!(
+            sent,
+            [
+                ("URL".to_string(), "https://global.test".to_string()),
+                ("URL".to_string(), "https://staging.test".to_string()),
+            ]
+        );
+
+        let check = synthetic("Login", "{{URL}}?p={{PASSWORD}}", &[&staging.id], &[]);
+        let err = resolve_shared_variables_in(&db, org, Some(&staging.id), &check, &[7u8; 64])
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("PASSWORD") && err.contains("staging"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn a_promote_to_global_moves_the_value_and_removes_the_checks_copy() {
+        let db = variables_db().await;
+        let org = "f14-promote";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let staging = stored_env(&db, org, "staging").await;
+        let check = Synthetic {
+            variables: vec![plain_check_var("API_HOST")],
+            ..synthetic("Login", "https://{{API_HOST}}/login", &[&staging.id], &[])
+        };
+        stored_check(&db, org, "c1", check).await;
+
+        let (record, check) =
+            promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
+                .await
+                .unwrap();
+        assert_eq!(record.env, global.id);
+        assert_eq!(record.value, "y");
+        assert!(check.variables.is_empty());
+
+        let shared = synthetics_variables::list(&db, org).await.unwrap();
+        assert_eq!(shared.len(), 1);
+        let reread = synthetics_checks::get(&db, org, "c1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(reread.variables.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_promote_to_global_is_refused_where_the_checks_environment_defines_the_name() {
+        let db = variables_db().await;
+        let org = "f14-promote-shadowed";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let staging = stored_env(&db, org, "staging").await;
+        stored_var(&db, &staging, "API_HOST", "plain", "staging.test").await;
+        let check = Synthetic {
+            variables: vec![plain_check_var("API_HOST")],
+            ..synthetic("Login", "https://{{API_HOST}}/login", &[&staging.id], &[])
+        };
+        stored_check(&db, org, "c1", check).await;
+
+        let err = promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("'staging'"), "{err}");
+        let reread = synthetics_checks::get(&db, org, "c1")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(reread.variables.len(), 1, "the check keeps its own value");
+        assert_eq!(synthetics_variables::list(&db, org).await.unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_split_replaces_the_global_row_with_per_environment_rows() {
+        let db = variables_db().await;
+        let org = "f14-split";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let prod = stored_env(&db, org, "prod").await;
+        let staging = stored_env(&db, org, "staging").await;
+        let source = stored_var(&db, &global, "URL", "plain", "https://global.test").await;
+        stored_check(
+            &db,
+            org,
+            "c1",
+            synthetic("Prod", "{{URL}}/x", &[&prod.id], &[]),
+        )
+        .await;
+        stored_check(
+            &db,
+            org,
+            "c2",
+            synthetic("Both", "{{URL}}/y", &[&prod.id, &staging.id], &[]),
+        )
+        .await;
+        let target = |env: &str, value: &str| SplitTarget {
+            environment: env.into(),
+            value: value.into(),
+        };
+
+        let err = split_to_environments_in(
+            &db,
+            &global,
+            &source.id,
+            &[target("prod", "https://prod.test")],
+            "asha@acme.com",
+            &[7u8; 64],
+        )
+        .await
+        .unwrap_err()
+        .to_string();
+        assert!(err.contains("Both"), "{err}");
+        assert_eq!(synthetics_variables::list(&db, org).await.unwrap().len(), 1);
+
+        let (envs, created) = split_to_environments_in(
+            &db,
+            &global,
+            &source.id,
+            &[
+                target("prod", "https://prod.test"),
+                target("staging", "https://staging.test"),
+            ],
+            "asha@acme.com",
+            &[7u8; 64],
+        )
+        .await
+        .unwrap();
+        assert_eq!(envs.len(), 2);
+        assert_eq!(created.len(), 2);
+        let rows = synthetics_variables::list(&db, org).await.unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|v| v.env != global.id && v.name == "URL"));
+    }
+
+    #[test]
+    fn a_resync_without_super_cluster_reports_it_instead_of_counting() {
+        assert!(resync_precondition(false).is_err());
+        assert!(resync_precondition(true).is_ok());
+    }
+
+    #[test]
+    fn a_global_row_shadowed_in_every_environment_has_no_users() {
+        let global_url = named_var("g1", "URL", GLOBAL);
+        let scan = UsageScan::new(
+            vec![synthetic("Both", "{{URL}}", &["e-stg", "e-prod"], &[])],
+            vec![
+                global_url.clone(),
+                named_var("s1", "URL", "e-stg"),
+                named_var("p1", "URL", "e-prod"),
+            ],
+            GLOBAL.to_string(),
+        );
+        assert!(scan.users(&global_url).is_empty());
     }
 }

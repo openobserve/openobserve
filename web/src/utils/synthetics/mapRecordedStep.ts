@@ -15,6 +15,7 @@
 
 import type { BrowserStep, StepAction, WireStep } from "@/types/synthetics";
 import { getUUIDv7 } from "../uuid";
+import { substitutePlaceholders } from "@/components/synthetics/variables/placeholders";
 
 // Maps the extension's Playwright-flavoured action names onto the UI's StepAction.
 // `setInputFiles` has no dedicated UI action and is surfaced as a `type` step.
@@ -268,11 +269,8 @@ export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
  * variable references (value, url, text, key, selector, name).
  */
 export function substituteVariables(step: WireStep, vars: Record<string, string>): WireStep {
-  const re = /\{\{\s*(\w+)\s*\}\}/g;
-  const sub = (s: string | undefined): string | undefined => {
-    if (s === undefined || s === null) return s;
-    return s.replace(re, (match: string, k: string) => vars[k] ?? match);
-  };
+  const sub = (s: string | undefined): string | undefined =>
+    s === undefined || s === null ? s : substitutePlaceholders(s, vars);
   return {
     ...step,
     url: sub(step.url),

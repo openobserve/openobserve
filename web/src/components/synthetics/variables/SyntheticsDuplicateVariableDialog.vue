@@ -27,16 +27,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("synthetics.duplicateVariable.body", { name: source?.name ?? "" }) }}
       </p>
 
-      <div class="flex flex-col gap-1">
-        <label class="text-sm font-medium" for="synthetics-duplicate-variable-name">{{
-          t("synthetics.duplicateVariable.nameLabel")
-        }}</label>
-        <OInput
-          id="synthetics-duplicate-variable-name"
-          v-model="name"
-          data-test="synthetics-duplicate-variable-name-input"
-        />
-      </div>
+      <OInput
+        v-model="name"
+        :label="t('synthetics.duplicateVariable.nameLabel')"
+        data-test="synthetics-duplicate-variable-name-input"
+      />
     </div>
 
     <template #footer>
@@ -67,6 +62,7 @@ import syntheticsService from "@/services/synthetics";
 import type { SyntheticsVariablePayload } from "@/services/synthetics";
 import type { SyntheticsVariable } from "@/types/synthetics";
 import { duplicateVariableNameFor } from "./scope";
+import { serverMessage } from "./serverMessage";
 
 const props = defineProps<{
   open: boolean;
@@ -108,10 +104,10 @@ async function submit() {
     emit("done");
     emit("update:open", false);
     toast({ variant: "success", message: t("synthetics.duplicateVariable.done") });
-  } catch (error: any) {
+  } catch (error) {
     toast({
       variant: "error",
-      message: error?.response?.data?.message || t("synthetics.duplicateVariable.failed"),
+      message: serverMessage(error) ?? t("synthetics.duplicateVariable.failed"),
     });
   } finally {
     saving.value = false;

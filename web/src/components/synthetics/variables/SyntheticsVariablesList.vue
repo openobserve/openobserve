@@ -232,6 +232,7 @@ import SyntheticsSplitVariableDialog from "./SyntheticsSplitVariableDialog.vue";
 import SyntheticsDuplicateVariableDialog from "./SyntheticsDuplicateVariableDialog.vue";
 import { filterVariables, relativeTime } from "./usage";
 import { crossTierShadow, duplicatePrefill } from "./scope";
+import { serverMessage } from "./serverMessage";
 
 export default defineComponent({
   name: "SyntheticsVariablesList",
@@ -387,10 +388,10 @@ export default defineComponent({
             ? t("synthetics.promote.doneShadowed", { envs: stillOverriding.join(", ") })
             : t("synthetics.promote.done"),
         });
-      } catch (error: any) {
+      } catch (error) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || t("synthetics.promote.failed"),
+          message: serverMessage(error) ?? t("synthetics.promote.failed"),
         });
       }
     }
@@ -446,10 +447,10 @@ export default defineComponent({
           : syntheticsService.deleteGlobalVariable(org, row.id, force));
         emit("refresh");
         toast({ variant: "success", message: t("synthetics.variables.deleted") });
-      } catch (error: any) {
+      } catch (error) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || t("synthetics.variables.deleteFailed"),
+          message: serverMessage(error) ?? t("synthetics.variables.deleteFailed"),
         });
       }
     }

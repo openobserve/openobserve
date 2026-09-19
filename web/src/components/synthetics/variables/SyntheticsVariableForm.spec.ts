@@ -40,6 +40,7 @@ import { nextTick } from "vue";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 function mountForm(props: Record<string, unknown> = {}) {
   return shallowMount(SyntheticsVariableForm, {
@@ -149,6 +150,17 @@ describe("SyntheticsVariableForm — kind is fixed at creation", () => {
     expect(select.props("disabled")).toBe(true);
     const values = (select.props("options") as { value: string }[]).map((o) => o.value);
     expect(values).toEqual(["plain"]);
+  });
+
+  it("warns that a global value reaches production, and only on the global tab", () => {
+    const warnings = () =>
+      wrapper.findAllComponents(OBanner).filter((b) => b.props("variant") === "warning");
+    wrapper = mountForm({ environment: null });
+    expect(warnings()).toHaveLength(1);
+    wrapper.unmount();
+
+    wrapper = mountForm({ environment: "staging" });
+    expect(warnings()).toHaveLength(0);
   });
 });
 

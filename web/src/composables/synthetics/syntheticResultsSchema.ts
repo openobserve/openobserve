@@ -2252,7 +2252,8 @@ export function mapHistogramSplit(
       prevTotal + total > 0
         ? (num(prev.avg_duration) * prevTotal + num(hit.avg_duration) * total) / (prevTotal + total)
         : 0;
-    prev.p95_duration = 0;
+    // Percentiles do not add; the slowest part's p95 bounds the blend from above.
+    prev.p95_duration = Math.max(num(prev.p95_duration), num(hit.p95_duration));
     for (const k of [
       "total_runs",
       "passed_runs",

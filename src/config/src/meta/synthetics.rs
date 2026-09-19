@@ -1372,9 +1372,38 @@ const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
 
 /// Validates a URL that may be templated.
 pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, true)
+}
+
+/// The same rule as [`validate_http_url`], with errors that never quote the value.
+pub fn validate_http_url_quietly(field: &str, value: &str) -> Result<(), String> {
+    check_http_url(field, value, false)
+}
+
+/// A templated or resolved URL with no scheme is read as https, at save time and at run time.
+pub fn with_default_scheme(value: &str) -> String {
+    if value.contains("://") {
+        value.to_string()
+    } else {
+        format!("https://{value}")
+    }
+}
+
+/// `echo` decides whether an error quotes the value; a resolved URL may hold a secret.
+fn check_http_url(field: &str, value: &str, echo: bool) -> Result<(), String> {
+    let quoted = |sep: &str| {
+        if echo {
+            format!("{sep}'{value}'")
+        } else {
+            String::new()
+        }
+    };
     if value.contains("{{") {
         if value.chars().any(char::is_whitespace) {
-            return Err(format!("{field}: must not contain whitespace: '{value}'"));
+            return Err(format!(
+                "{field}: must not contain whitespace{}",
+                quoted(": ")
+            ));
         }
         let tokens: HashMap<String, String> = placeholder_names(value)
             .into_iter()
@@ -1382,22 +1411,22 @@ pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
             .collect();
         let probe = substitute_placeholders(value, &tokens);
         if probe.contains("{{") {
-            return Err(format!("{field}: unclosed or invalid '{{{{' in '{value}'"));
+            return Err(format!(
+                "{field}: unclosed or invalid '{{{{'{}",
+                quoted(" in ")
+            ));
         }
-        let candidate = if probe.contains("://") {
-            probe
-        } else {
-            format!("https://{probe}")
-        };
-        return validate_http_url(field, &candidate);
+        return check_http_url(field, &with_default_scheme(&probe), echo);
     }
     let parsed =
-        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL '{value}': {e}"))?;
+        url::Url::parse(value).map_err(|e| format!("{field}: invalid URL{}: {e}", quoted(" ")))?;
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
-        return Err(format!(
-            "{field}: URL scheme must be http or https, got '{}'",
-            parsed.scheme()
-        ));
+        let got = if echo {
+            format!(", got '{}'", parsed.scheme())
+        } else {
+            String::new()
+        };
+        return Err(format!("{field}: URL scheme must be http or https{got}"));
     }
     if parsed.host_str().is_none_or(str::is_empty) {
         return Err(format!("{field}: URL has no host"));
@@ -2818,6 +2847,33 @@ mod tests {
 
         s.target = "not-a-url".to_string();
         assert!(s.validate(&locs, &brs, &devs, true).is_err());
+    }
+
+    #[test]
+    fn a_quiet_url_error_names_the_field_and_never_the_value() {
+        for bad in [
+            "file:///etc/hunter2",
+            "https://hunter2 x",
+            "hunter2",
+            "https://",
+            "{{A}} hunter2",
+            "{{A/hunter2",
+        ] {
+            let quiet = validate_http_url_quietly("target", bad).unwrap_err();
+            assert!(quiet.starts_with("target: "), "{quiet}");
+            assert!(!quiet.contains("hunter2"), "{quiet}");
+            assert!(validate_http_url("target", bad).is_err(), "{bad}");
+        }
+        assert!(validate_http_url_quietly("target", "https://shop.test/login").is_ok());
+    }
+
+    #[test]
+    fn a_url_without_a_scheme_is_read_as_https() {
+        assert_eq!(
+            with_default_scheme("shop.test/login"),
+            "https://shop.test/login"
+        );
+        assert_eq!(with_default_scheme("http://shop.test"), "http://shop.test");
     }
 
     #[test]

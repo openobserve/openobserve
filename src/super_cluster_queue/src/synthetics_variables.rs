@@ -54,8 +54,12 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
         SyntheticsVariablesMessage::EnvironmentPut { payload, .. } => {
             synthetics_environments::apply_upsert(conn, &environment_record(payload)).await?;
         }
-        SyntheticsVariablesMessage::EnvironmentDelete { org_id, id } => {
-            synthetics_environments::delete(conn, &org_id, &id).await?;
+        SyntheticsVariablesMessage::EnvironmentDelete {
+            org_id,
+            id,
+            created_at,
+        } => {
+            delete_environment(conn, &org_id, &id, created_at).await?;
         }
         SyntheticsVariablesMessage::VariablePut { org_id, payload } => {
             let record = variable_record(&org_id, payload).await?;
@@ -85,12 +89,39 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
     Ok(())
 }
 
+/// Deletes unless the stored row is newer than the message; `created_at` 0 is an old sender.
+async fn delete_environment<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    id: &str,
+    created_at: i64,
+) -> Result<()> {
+    if created_at > 0
+        && synthetics_environments::get_by_id(conn, org_id, id)
+            .await?
+            .is_some_and(|stored| stored.created_at > created_at)
+    {
+        log::info!(
+            "[SUPER_CLUSTER:DB] synthetics environment {id} was created again after this delete; kept"
+        );
+        return Ok(());
+    }
+    synthetics_environments::delete(conn, org_id, id).await?;
+    Ok(())
+}
+
 /// Applies writes in one transaction; a variable that loses to a newer row is skipped, not retried.
 async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
     writes: &[Write],
 ) -> Result<()> {
+    // Outside the transaction: on Postgres a lost insert race would abort the whole batch.
+    for write in writes {
+        if let Write::Variable(record) = write {
+            ensure_global_parent(conn, record).await?;
+        }
+    }
     let txn = conn.begin().await?;
     for write in writes {
         match write {
@@ -98,7 +129,6 @@ async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
                 synthetics_environments::apply_upsert(&txn, record).await?;
             }
             Write::Variable(record) => {
-                ensure_global_parent(&txn, record).await?;
                 synthetics_variables::apply_upsert(&txn, record).await?;
             }
             Write::Delete(id) => {
@@ -116,12 +146,7 @@ async fn ensure_global_parent<C: ConnectionTrait>(
     record: &SyntheticsVariableRecord,
 ) -> Result<()> {
     if record.env == synthetics_environments::global_environment_id(&record.org_id) {
-        synthetics_environments::get_or_create_global(
-            conn,
-            &record.org_id,
-            config::utils::time::now_micros(),
-        )
-        .await?;
+        synthetics_environments::get_or_create_global(conn, &record.org_id).await?;
     }
     Ok(())
 }
@@ -330,6 +355,82 @@ mod tests {
         assert_eq!(envs.len(), 1);
         assert!(envs[0].is_global);
         assert_eq!(envs[0].id, "global_org1");
+    }
+
+    async fn environment_db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, Database, Schema};
+
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        for table in [
+            schema.create_table_from_entity(infra::table::entity::synthetics_environments::Entity),
+            schema.create_table_from_entity(infra::table::entity::synthetics_variables::Entity),
+        ] {
+            db.execute(backend.build(&table)).await.unwrap();
+        }
+        db
+    }
+
+    fn staging(created_at: i64) -> SyntheticsEnvironmentRecord {
+        SyntheticsEnvironmentRecord {
+            id: "org1/staging".to_string(),
+            org_id: "org1".to_string(),
+            name: "staging".to_string(),
+            description: String::new(),
+            owner: None,
+            is_global: false,
+            created_at,
+            updated_at: created_at,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_late_delete_never_removes_an_environment_created_again_after_it() {
+        let db = environment_db().await;
+        synthetics_environments::add(&db, &staging(10))
+            .await
+            .unwrap();
+
+        delete_environment(&db, "org1", "org1/staging", 5)
+            .await
+            .unwrap();
+        assert!(
+            synthetics_environments::get_by_id(&db, "org1", "org1/staging")
+                .await
+                .unwrap()
+                .is_some(),
+            "the stored row is newer than the delete"
+        );
+
+        delete_environment(&db, "org1", "org1/staging", 10)
+            .await
+            .unwrap();
+        assert!(
+            synthetics_environments::get_by_id(&db, "org1", "org1/staging")
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_delete_from_an_older_sender_still_deletes() {
+        let db = environment_db().await;
+        synthetics_environments::add(&db, &staging(10))
+            .await
+            .unwrap();
+        delete_environment(&db, "org1", "org1/staging", 0)
+            .await
+            .unwrap();
+        assert!(
+            synthetics_environments::get_by_id(&db, "org1", "org1/staging")
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

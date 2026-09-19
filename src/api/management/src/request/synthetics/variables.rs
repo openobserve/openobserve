@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
+
 use axum::{
     Json,
     extract::{Path, Query},
@@ -30,7 +32,9 @@ use config::meta::synthetics_variables::{
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::UserEmail;
-use openobserve_synthetics::service::{SyntheticsEnvironmentRecord, UsageConflict};
+use openobserve_synthetics::service::{
+    ResyncUnavailable, SyntheticsEnvironmentRecord, UsageConflict,
+};
 
 /// Confirmation that the caller has seen the deletion guard's list.
 #[derive(Debug, Default, serde::Deserialize)]
@@ -49,6 +53,33 @@ pub struct ResolvedQuery {
 #[cfg(feature = "enterprise")]
 const ENVIRONMENT_RESOURCE: &str = "synthetic_environment";
 
+/// Most permission lookups one request keeps in flight.
+#[cfg(feature = "enterprise")]
+const PERMISSION_CONCURRENCY: usize = 16;
+#[cfg(feature = "enterprise")]
+const ENVIRONMENT_GET: GetCheck = GetCheck {
+    resource: ENVIRONMENT_RESOURCE,
+    use_self_context: false,
+    use_self_parent: true,
+};
+#[cfg(feature = "enterprise")]
+const CHECK_GET: GetCheck = GetCheck {
+    resource: "synthetics",
+    use_self_context: true,
+    use_self_parent: false,
+};
+
+/// The service's batch question "which of these ids may the caller GET?".
+type Permitted = std::pin::Pin<Box<dyn std::future::Future<Output = HashSet<String>> + Send>>;
+
+/// A resource and the flags its per-object GET is resolved with.
+#[cfg(feature = "enterprise")]
+struct GetCheck {
+    resource: &'static str,
+    use_self_context: bool,
+    use_self_parent: bool,
+}
+
 #[utoipa::path(
     get,
     path = "/{org_id}/synthetics/variables",
@@ -63,8 +94,15 @@ const ENVIRONMENT_RESOURCE: &str = "synthetic_environment";
         (status = 500, description = "Error",   content_type = "application/json", body = Object),
     ),
 )]
-pub async fn list_synthetics_variables(Path(org_id): Path<String>) -> Response {
-    match openobserve_synthetics::service::list_global_variables(&org_id).await {
+pub async fn list_synthetics_variables(
+    Path(org_id): Path<String>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
+) -> Response {
+    #[cfg(feature = "enterprise")]
+    let readable_checks = permitted(&org_id, &user_email.user_id, &CHECK_GET);
+    #[cfg(not(feature = "enterprise"))]
+    let readable_checks = permitted_all();
+    match openobserve_synthetics::service::list_global_variables(&org_id, readable_checks).await {
         Ok(vars) => MetaHttpResponse::json(vars),
         Err(e) => variables_error("list_global_variables", e),
     }
@@ -181,37 +219,25 @@ pub async fn list_synthetics_environments(
     Path(org_id): Path<String>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    let environments = match openobserve_synthetics::service::list_environments(&org_id).await {
-        Ok(envs) => envs,
-        Err(e) => return variables_error("list_environments", e),
-    };
+    #[cfg(feature = "enterprise")]
+    let readable_checks = permitted(&org_id, &user_email.user_id, &CHECK_GET);
+    #[cfg(not(feature = "enterprise"))]
+    let readable_checks = permitted_all();
+    let environments =
+        match openobserve_synthetics::service::list_environments(&org_id, readable_checks).await {
+            Ok(envs) => envs,
+            Err(e) => return variables_error("list_environments", e),
+        };
 
     // Per environment: `list_objects_for_user` is None unless list-only-permitted is on.
     #[cfg(feature = "enterprise")]
     let environments = {
-        let checks = environments
+        let names = environments
             .iter()
             .filter(|env| !env.is_global)
-            .map(|env| async {
-                openobserve_core::auth::check_permissions(
-                    &env.name,
-                    &org_id,
-                    &user_email.user_id,
-                    ENVIRONMENT_RESOURCE,
-                    "GET",
-                    None,
-                    false,
-                    false,
-                    true,
-                )
-                .await
-                .then(|| env.name.clone())
-            });
-        let readable: std::collections::HashSet<String> = futures::future::join_all(checks)
-            .await
-            .into_iter()
-            .flatten()
+            .map(|env| env.name.clone())
             .collect();
+        let readable = gettable(&org_id, &user_email.user_id, &ENVIRONMENT_GET, names).await;
         readable_environments(environments, &readable)
     };
 
@@ -326,8 +352,19 @@ pub async fn delete_synthetics_environment(
 )]
 pub async fn list_synthetics_environment_variables(
     Path((org_id, env)): Path<(String, String)>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    match openobserve_synthetics::service::list_environment_variables(&org_id, &env).await {
+    #[cfg(feature = "enterprise")]
+    let readable_checks = permitted(&org_id, &user_email.user_id, &CHECK_GET);
+    #[cfg(not(feature = "enterprise"))]
+    let readable_checks = permitted_all();
+    match openobserve_synthetics::service::list_environment_variables(
+        &org_id,
+        &env,
+        readable_checks,
+    )
+    .await
+    {
         Ok(Some(vars)) => MetaHttpResponse::json(vars),
         Ok(None) => MetaHttpResponse::not_found("environment not found"),
         Err(e) => variables_error("list_environment_variables", e),
@@ -467,12 +504,60 @@ pub async fn delete_synthetics_environment_variable(
 #[cfg(any(feature = "enterprise", test))]
 fn readable_environments(
     environments: Vec<SyntheticsEnvironmentView>,
-    readable: &std::collections::HashSet<String>,
+    readable: &HashSet<String>,
 ) -> Vec<SyntheticsEnvironmentView> {
     environments
         .into_iter()
         .filter(|env| env.is_global || readable.contains(&env.name))
         .collect()
+}
+
+/// The ids the caller may GET, asked at most `PERMISSION_CONCURRENCY` at a time.
+#[cfg(feature = "enterprise")]
+async fn gettable(
+    org_id: &str,
+    user_id: &str,
+    target: &GetCheck,
+    ids: Vec<String>,
+) -> HashSet<String> {
+    use futures::StreamExt;
+    futures::stream::iter(ids)
+        .map(|id| async move {
+            openobserve_core::auth::check_permissions(
+                &id,
+                org_id,
+                user_id,
+                target.resource,
+                "GET",
+                None,
+                false,
+                target.use_self_context,
+                target.use_self_parent,
+            )
+            .await
+            .then_some(id)
+        })
+        .buffer_unordered(PERMISSION_CONCURRENCY)
+        .filter_map(|id| async move { id })
+        .collect()
+        .await
+}
+
+/// [`gettable`] bound to the caller, in the shape the service's listings take.
+#[cfg(feature = "enterprise")]
+fn permitted(
+    org_id: &str,
+    user_id: &str,
+    target: &'static GetCheck,
+) -> impl FnOnce(Vec<String>) -> Permitted + use<> {
+    let (org_id, user_id) = (org_id.to_string(), user_id.to_string());
+    move |ids| Box::pin(async move { gettable(&org_id, &user_id, target, ids).await })
+}
+
+/// OSS has no per-object RBAC, so every id is readable.
+#[cfg(not(feature = "enterprise"))]
+fn permitted_all() -> impl FnOnce(Vec<String>) -> Permitted {
+    |ids| Box::pin(async move { ids.into_iter().collect() })
 }
 
 /// Turns the URL's environment name into the row the service works against.
@@ -524,15 +609,30 @@ fn variables_error(operation: &str, error: anyhow::Error) -> Response {
 pub async fn get_synthetic_resolved_variables(
     Path((org_id, id)): Path<(String, String)>,
     Query(q): Query<ResolvedQuery>,
+    #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
+    #[cfg(feature = "enterprise")]
+    let readable_envs = permitted(&org_id, &user_email.user_id, &ENVIRONMENT_GET);
+    #[cfg(not(feature = "enterprise"))]
+    let readable_envs = permitted_all();
     match q.envs.as_deref() {
-        None => match openobserve_synthetics::service::resolved_variables(&org_id, &id).await {
-            Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
-            Ok(None) => MetaHttpResponse::not_found("check not found"),
-            Err(e) => variables_error("resolved_variables", e),
-        },
+        None => {
+            match openobserve_synthetics::service::resolved_variables(&org_id, &id, readable_envs)
+                .await
+            {
+                Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
+                Ok(None) => MetaHttpResponse::not_found("check not found"),
+                Err(e) => variables_error("resolved_variables", e),
+            }
+        }
         Some("all") => {
-            match openobserve_synthetics::service::resolved_variables_grouped(&org_id, &id).await {
+            match openobserve_synthetics::service::resolved_variables_grouped(
+                &org_id,
+                &id,
+                readable_envs,
+            )
+            .await
+            {
                 Ok(Some(grouped)) => MetaHttpResponse::json(grouped),
                 Ok(None) => MetaHttpResponse::not_found("check not found"),
                 Err(e) => variables_error("resolved_variables_grouped", e),
@@ -644,7 +744,8 @@ pub async fn promote_environment_variable(
     }
 
     match openobserve_synthetics::service::promote_to_global(&org_id, &record, &id).await {
-        Ok(view) => MetaHttpResponse::json(view),
+        Ok(Some(view)) => MetaHttpResponse::json(view),
+        Ok(None) => MetaHttpResponse::not_found("variable not found"),
         Err(e) => MetaHttpResponse::bad_request(e),
     }
 }
@@ -877,6 +978,37 @@ pub async fn duplicate_synthetics_environment(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/{org_id}/synthetics/environments/_resync",
+    context_path = "/api",
+    tag = "Synthetics",
+    operation_id = "ResyncSyntheticsEnvironments",
+    summary = "Publish every environment and variable of the org to the other regions again",
+    security(("Authorization" = [])),
+    params(("org_id" = String, Path, description = "Organization name")),
+    responses(
+        (status = 200, description = "Counts of what was enqueued, and environments whose batch failed", content_type = "application/json", body = Object),
+        (status = 400, description = "Super cluster is not enabled", content_type = "application/json", body = Object),
+        (status = 500, description = "Error", content_type = "application/json", body = Object),
+    ),
+)]
+pub async fn resync_synthetics_environments(Path(org_id): Path<String>) -> Response {
+    match openobserve_synthetics::service::resync_environments(&org_id).await {
+        Ok(summary) => MetaHttpResponse::json(summary),
+        Err(e) => resync_error(e),
+    }
+}
+
+/// 400 when this node has no other region to send to; any other failure is a 500.
+fn resync_error(error: anyhow::Error) -> Response {
+    if error.downcast_ref::<ResyncUnavailable>().is_some() {
+        MetaHttpResponse::bad_request(error)
+    } else {
+        variables_error("resync_environments", error)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -898,13 +1030,25 @@ mod tests {
     }
 
     #[test]
+    fn a_resync_without_super_cluster_is_a_bad_request() {
+        assert_eq!(
+            resync_error(ResyncUnavailable.into()).status(),
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            resync_error(anyhow::anyhow!("db down")).status(),
+            StatusCode::INTERNAL_SERVER_ERROR
+        );
+    }
+
+    #[test]
     fn an_environment_the_caller_cannot_get_is_dropped_but_global_stays() {
         let envs = vec![
             env("global", true),
             env("staging", false),
             env("production", false),
         ];
-        let readable = std::collections::HashSet::from(["staging".to_string()]);
+        let readable = HashSet::from(["staging".to_string()]);
         let names: Vec<String> = readable_environments(envs, &readable)
             .into_iter()
             .map(|e| e.name)

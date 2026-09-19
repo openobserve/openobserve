@@ -71,6 +71,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import { makeSyntheticsEnvironmentFormSchema } from "./SyntheticsVariableForm.schema";
+import { serverMessage } from "./serverMessage";
 
 export default defineComponent({
   name: "SyntheticsEnvironmentForm",
@@ -114,10 +115,10 @@ export default defineComponent({
             ? t("synthetics.environments.updated")
             : t("synthetics.environments.created"),
         });
-      } catch (error: any) {
+      } catch (error) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || t("synthetics.environments.saveFailed"),
+          message: serverMessage(error) ?? t("synthetics.environments.saveFailed"),
         });
       }
     }

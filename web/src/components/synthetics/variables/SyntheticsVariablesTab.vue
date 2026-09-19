@@ -75,6 +75,7 @@ import SyntheticsEnvironmentForm from "./SyntheticsEnvironmentForm.vue";
 import SyntheticsDuplicateEnvironmentDialog from "./SyntheticsDuplicateEnvironmentDialog.vue";
 import { namedEnvironments, resolveScope } from "./scope";
 import { environmentDeleteBlock } from "./usage";
+import { serverMessage } from "./serverMessage";
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -116,10 +117,10 @@ async function refresh() {
     ]);
     environments.value = envRes.data ?? [];
     globals.value = globalRes.data ?? [];
-  } catch (error: any) {
+  } catch (error) {
     toast({
       variant: "error",
-      message: error?.response?.data?.message || t("synthetics.variables.loadFailed"),
+      message: serverMessage(error) ?? t("synthetics.variables.loadFailed"),
     });
   } finally {
     loading.value = false;
@@ -165,10 +166,10 @@ async function removeEnvironment(environment: SyntheticsEnvironment) {
     if (selectedScope.value === environment.name) selectedScope.value = "";
     await refresh();
     toast({ variant: "success", message: t("synthetics.environments.deleted") });
-  } catch (error: any) {
+  } catch (error) {
     toast({
       variant: "error",
-      message: error?.response?.data?.message || t("synthetics.environments.deleteFailed"),
+      message: serverMessage(error) ?? t("synthetics.environments.deleteFailed"),
     });
   }
 }

@@ -41,6 +41,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : t("synthetics.variables.scopeGlobal")
         }}
       </OBanner>
+      <OBanner v-if="!environment" variant="warning" data-test="synthetics-variable-global-warning">
+        {{ t("synthetics.variables.globalReachesProduction") }}
+      </OBanner>
 
       <OFormInput
         name="name"

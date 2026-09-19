@@ -146,6 +146,15 @@ pub async fn folder_of(org_id: &str, id: &str) -> anyhow::Result<Option<String>>
     ))
 }
 
+/// The environment ids a check runs in, read without decrypting its secrets; `None` when absent.
+pub async fn environments_of(org_id: &str, id: &str) -> anyhow::Result<Option<Vec<String>>> {
+    let conn = get_orm_client_ro().await;
+    Ok(synthetics_checks::get(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map(|check| check.environments))
+}
+
 /// Updates a synthetic. Recomputes `next_run_at` if the frequency changed so the
 /// scheduler fires on the correct schedule without waiting for the old window.
 pub async fn update_synthetic(

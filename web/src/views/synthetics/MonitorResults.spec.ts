@@ -294,6 +294,30 @@ describe("MonitorResults", () => {
       expect(runs.props("environments")).toEqual(["cloud", "ap1"]);
     });
 
+    it("should drop a ?env= the check no longer runs in instead of filtering to nothing", async () => {
+      routeQuery = { name: "Test Monitor", status: "healthy", env: "deleted-env" };
+      mockSyntheticsServiceGet.mockResolvedValueOnce({
+        data: {
+          name: "Test Monitor",
+          status: "healthy",
+          last_triggered_at: 0,
+          environments: ["e1", "e2"],
+        },
+      });
+      mockListEnvironments.mockResolvedValueOnce({
+        data: [
+          { id: "e1", name: "cloud" },
+          { id: "e2", name: "ap1" },
+        ],
+      });
+      wrapper = makeWrapper();
+      await flushPromises();
+      const runs = wrapper.findComponent('[data-test="monitor-runs"]') as any;
+      expect(runs.props("environmentScope")).toBe("");
+      const lastQuery = mockRouterReplace.mock.calls.at(-1)?.[0]?.query ?? {};
+      expect(lastQuery.env).toBeUndefined();
+    });
+
     it("should render MonitorRuns child component", async () => {
       wrapper = makeWrapper();
       await flushPromises();

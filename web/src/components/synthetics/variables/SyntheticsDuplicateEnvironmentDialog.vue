@@ -35,16 +35,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         }}
       </p>
 
-      <div class="flex flex-col gap-1">
-        <label class="text-sm font-medium" for="synthetics-duplicate-name">{{
-          t("synthetics.duplicate.nameLabel")
-        }}</label>
-        <OInput
-          id="synthetics-duplicate-name"
-          v-model="name"
-          data-test="synthetics-duplicate-name-input"
-        />
-      </div>
+      <OInput
+        v-model="name"
+        :label="t('synthetics.duplicate.nameLabel')"
+        data-test="synthetics-duplicate-name-input"
+      />
     </div>
 
     <template #footer>
@@ -74,6 +69,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment } from "@/types/synthetics";
 import { duplicateNameFor, duplicateSummary } from "./scope";
+import { serverMessage } from "./serverMessage";
 
 const props = defineProps<{ open: boolean; source: SyntheticsEnvironment | null }>();
 const emit = defineEmits<{ "update:open": [value: boolean]; done: [name: string] }>();
@@ -102,10 +98,10 @@ async function submit() {
     emit("done", name.value.trim());
     emit("update:open", false);
     toast({ variant: "success", message: t("synthetics.duplicate.done") });
-  } catch (error: any) {
+  } catch (error) {
     toast({
       variant: "error",
-      message: error?.response?.data?.message || t("synthetics.duplicate.failed"),
+      message: serverMessage(error) ?? t("synthetics.duplicate.failed"),
     });
   } finally {
     saving.value = false;

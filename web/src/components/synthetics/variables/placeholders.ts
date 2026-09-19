@@ -29,6 +29,20 @@ export function substitutePlaceholders(text: string, values: Record<string, stri
   );
 }
 
+/** The server's `validate_http_url` for a templated URL: names stand in for a token, no scheme reads as https. */
+export function isHttpUrlTemplate(value: string): boolean {
+  if (/\s/.test(value)) return false;
+  const tokens = Object.fromEntries(placeholderNames(value).map((name) => [name, "placeholder"]));
+  const probe = substitutePlaceholders(value, tokens);
+  if (probe.includes("{{")) return false;
+  try {
+    const url = new URL(probe.includes("://") ? probe : `https://${probe}`);
+    return (url.protocol === "http:" || url.protocol === "https:") && url.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
 /** Names `text` references that none of `known` defines, each once in order of appearance. */
 export function unboundPlaceholders(text: string, known: ReadonlySet<string>): string[] {
   return [...new Set(placeholderNames(text))].filter((name) => !known.has(name));

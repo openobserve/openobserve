@@ -400,11 +400,11 @@ describe("mapHistogramSplit", () => {
     expect(cloudBucket.avgMs).toBe(100);
   });
 
-  it("should blend counts by sum and averages by weight, leaving p95 unrendered", () => {
+  it("should blend counts by sum, averages by weight, and p95 as the slowest part's", () => {
     const { blended } = mapHistogramSplit(
       [
-        row("cloud", { total_runs: 3, avg_duration: 100 }),
-        row("ap1", { total_runs: 1, avg_duration: 500 }),
+        row("cloud", { total_runs: 3, avg_duration: 100, p95_duration: 150 }),
+        row("ap1", { total_runs: 1, avg_duration: 500, p95_duration: 700 }),
       ],
       start,
       end,
@@ -412,7 +412,7 @@ describe("mapHistogramSplit", () => {
     const bucket = blended.find((b) => b.tsMs === start / 1000)!;
     expect(bucket.failedRuns).toBe(2);
     expect(bucket.avgMs).toBe(200); // (100*3 + 500*1) / 4
-    expect(bucket.p95Ms).toBe(0);
+    expect(bucket.p95Ms).toBe(700);
   });
 
   it("should fold unattributed rows into the blended series only", () => {

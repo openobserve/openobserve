@@ -25,16 +25,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex flex-col gap-3">
       <p class="text-text-secondary text-sm">{{ t("synthetics.replaySecrets.description") }}</p>
 
-      <div v-for="name in names" :key="name" class="flex flex-col gap-1">
-        <label class="font-mono text-sm" :for="`replay-secret-${name}`">{{ name }}</label>
-        <OInput
-          :id="`replay-secret-${name}`"
-          v-model="values[name]"
-          type="password"
-          :placeholder="t('synthetics.replaySecrets.valuePlaceholder')"
-          :data-test="`synthetics-replay-secret-${name}`"
-        />
-      </div>
+      <OInput
+        v-for="name in names"
+        :key="name"
+        v-model="values[name]"
+        :label="raw(name)"
+        type="password"
+        :placeholder="t('synthetics.replaySecrets.valuePlaceholder')"
+        :data-test="`synthetics-replay-secret-${name}`"
+      />
 
       <OCheckbox v-model="remember" data-test="synthetics-replay-secret-remember">
         {{ t("synthetics.replaySecrets.remember") }}
@@ -59,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";

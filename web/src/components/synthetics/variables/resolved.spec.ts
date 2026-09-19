@@ -276,8 +276,13 @@ describe("buildResolvedGrouped", () => {
 
   it("skips an id that resolves to nothing, as the server does", () => {
     // A deleted environment, or one this user cannot read.
+    const grouped = buildResolvedGrouped([staging], globals, ["env-gone", "env-staging"], []);
+    expect(grouped.environments).toEqual(["staging"]);
+  });
+
+  it("keeps the globals when none of the check's environments is readable", () => {
     const grouped = buildResolvedGrouped([staging], globals, ["env-gone"], []);
-    expect(grouped.environments).toEqual([]);
-    expect(grouped.resolved).toEqual({});
+    expect(grouped.environments).toEqual([""]);
+    expect(grouped.resolved[""].map((r) => r.name)).toEqual(["BASE_URL", "ORG"]);
   });
 });

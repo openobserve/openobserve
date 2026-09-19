@@ -307,6 +307,7 @@ use crate::{
         synthetics::update_synthetics_environment_variable,
         synthetics::delete_synthetics_environment_variable,
         synthetics::duplicate_synthetics_environment,
+        synthetics::resync_synthetics_environments,
         synthetics::get_synthetic_resolved_variables,
         synthetics::promote_synthetic_variable,
         synthetics::promote_environment_variable,

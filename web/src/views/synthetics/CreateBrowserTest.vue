@@ -922,6 +922,8 @@ const {
 onMounted(fetchSharedVariables);
 
 function onVariablePromoted(name: string) {
+  // The promoted row is now shared, so replay and the unbound warning need the fresh lists.
+  void fetchSharedVariables();
   if (!savedCheck.value) return;
   savedCheck.value = {
     ...savedCheck.value,
@@ -968,8 +970,8 @@ const replaySecretScope = computed<ReplaySecretScope>(() => ({
 const pendingReplaySteps = ref<WireStep[] | null>(null);
 const replaySecretNames = ref<string[]>([]);
 const replaySecretPromptOpen = ref(false);
-/** Values the server supplied, merged back in when the prompt closes. */
-const autoFilledSecrets = ref<Record<string, string>>({});
+/** Values already in hand, remembered or server-supplied, merged back in when the prompt closes. */
+const heldSecrets = ref<Record<string, string>>({});
 
 function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
@@ -991,7 +993,8 @@ async function resumeReplayWithSecrets(
 ) {
   let filled: Record<string, string> = {};
   const checkId = check.value.id;
-  if (checkId) {
+  // The server fills from the saved check's first environment, so an unsaved switch must not mix in its secrets.
+  if (checkId && savedCheck.value?.environments?.[0] === replayEnvironmentId.value) {
     try {
       const org = store.state.selectedOrganization.identifier;
       const res = await syntheticsService.replaySecrets(org, checkId);
@@ -1008,7 +1011,7 @@ async function resumeReplayWithSecrets(
     return;
   }
   pendingReplaySteps.value = steps;
-  autoFilledSecrets.value = filled;
+  heldSecrets.value = { ...known, ...filled };
   replaySecretNames.value = stillMissing;
   replaySecretPromptOpen.value = true;
 }
@@ -1017,9 +1020,8 @@ function onReplaySecretsSupplied(supplied: Record<string, string>) {
   const steps = pendingReplaySteps.value;
   pendingReplaySteps.value = null;
   if (!steps) return;
-  const { known } = partitionReplaySecrets(replaySecretScope.value, replaySecretNames.value);
-  startReplay(steps, { ...known, ...autoFilledSecrets.value, ...supplied });
-  autoFilledSecrets.value = {};
+  startReplay(steps, { ...heldSecrets.value, ...supplied });
+  heldSecrets.value = {};
 }
 
 function startReplay(steps: WireStep[], secrets: Record<string, string>) {

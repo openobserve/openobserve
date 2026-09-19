@@ -13500,6 +13500,7 @@
       "examplePlaceholder": "https://shop.example.com",
       "global": "Global",
       "globalSubtitle": "Applies in every environment.",
+      "globalReachesProduction": "Global values apply in every environment, including production. A change here reaches every check that uses this name without its own value.",
       "kind": "Kind",
       "kindPlain": "Plain",
       "kindSecret": "Secret",

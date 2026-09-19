@@ -784,9 +784,7 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<RunLocationOutcomes, errors::Error> {
-    const STATUS_PASSED: i32 = 3;
-
-    let mut rows = Entity::find()
+    let rows = Entity::find()
         .select_only()
         .column(Column::Location)
         .column(Column::Status)
@@ -794,30 +792,7 @@ pub async fn run_location_outcomes<C: ConnectionTrait>(
         .into_tuple::<(String, i32)>()
         .all(conn)
         .await?;
-
-    // Worst first: Error(6) > Warning(5) > Failed(4). A reader scanning the first
-    // line of a message should see the most severe location, not the
-    // alphabetically first. Passing rows sort last and are split out below.
-    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-
-    let mut out = RunLocationOutcomes::default();
-    for (loc, status) in rows {
-        // A location runs once per run, but dedupe anyway: a requeued job can
-        // leave two rows for one location, and naming it twice in a message
-        // reads as two separate outages.
-        let bucket = if status == STATUS_PASSED {
-            &mut out.passing
-        } else {
-            &mut out.failing
-        };
-        if !bucket.contains(&loc) {
-            bucket.push(loc);
-        }
-    }
-    // Failing is severity-ordered; passing has no severity, so alphabetical is
-    // the only stable order a reader can predict.
-    out.passing.sort();
-    Ok(out)
+    Ok(split_by_outcome(rows))
 }
 
 /// Environments of a run that did not pass, worst first.
@@ -825,9 +800,7 @@ pub async fn failing_environments<C: ConnectionTrait>(
     conn: &C,
     run_id: &str,
 ) -> Result<Vec<String>, errors::Error> {
-    const STATUS_PASSED: i32 = 3;
-
-    let mut rows = Entity::find()
+    let rows = Entity::find()
         .select_only()
         .column(Column::Env)
         .column(Column::Status)
@@ -835,17 +808,11 @@ pub async fn failing_environments<C: ConnectionTrait>(
         .into_tuple::<(Option<String>, i32)>()
         .all(conn)
         .await?;
-
-    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
-
-    let mut failing = Vec::new();
-    for (env, status) in rows {
-        let Some(env) = env else { continue };
-        if status != STATUS_PASSED && !failing.contains(&env) {
-            failing.push(env);
-        }
-    }
-    Ok(failing)
+    let named = rows
+        .into_iter()
+        .filter_map(|(env, status)| env.map(|env| (env, status)))
+        .collect();
+    Ok(split_by_outcome(named).failing)
 }
 
 /// One location+pool's share of the pending queue.
@@ -933,6 +900,29 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
         ))
         .await?;
     Ok(res.rows_affected())
+}
+
+/// Splits `(key, status)` rows into failing, worst first, and passing, each key once.
+fn split_by_outcome(mut rows: Vec<(String, i32)>) -> RunLocationOutcomes {
+    const STATUS_PASSED: i32 = 3;
+
+    // Error(6) > Warning(5) > Failed(4): a message's first line names the most severe.
+    rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    let mut out = RunLocationOutcomes::default();
+    for (key, status) in rows {
+        // A requeued job can leave two rows for one key, and naming it twice reads as two outages.
+        let bucket = if status == STATUS_PASSED {
+            &mut out.passing
+        } else {
+            &mut out.failing
+        };
+        if !bucket.contains(&key) {
+            bucket.push(key);
+        }
+    }
+    out.passing.sort();
+    out
 }
 
 #[cfg(test)]
@@ -1353,5 +1343,18 @@ mod tests {
             dead_letter_reason(1, MAX - 1, MAX),
             DeadLetterReason::Expired
         );
+    }
+
+    #[test]
+    fn outcomes_put_the_worst_failure_first_and_name_each_key_once() {
+        let out = split_by_outcome(vec![
+            ("eu".to_string(), 4),
+            ("us".to_string(), 6),
+            ("eu".to_string(), 4),
+            ("ap".to_string(), 3),
+            ("ca".to_string(), 3),
+        ]);
+        assert_eq!(out.failing, ["us", "eu"]);
+        assert_eq!(out.passing, ["ap", "ca"]);
     }
 }
