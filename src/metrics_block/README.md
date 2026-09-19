@@ -36,7 +36,7 @@ maps to:
 
 `files/{org}/midx/{stream}/{yyyy}/{mm}/{dd}/{hh}/indexed-v1-{id}.midx`
 
-The object contains contiguous compressed sample payloads, compact column metadata, and a fixed 64-byte footer. There is no second production sample object and no conversion command or experimental-format compatibility layer. Legacy Arrow IPC `.midx` is recognized separately by the metrics-index reader.
+The object contains contiguous compressed sample payloads, compact column metadata, and a fixed 64-byte footer. There is no second production sample object and no conversion command or experimental-format compatibility layer. Legacy Arrow IPC `.midx` is recognized separately by the metrics-index reader. Successfully decoded legacy metadata warms the configured byte cache within its size/age policy, so repeated queries do not refetch it; new-container bodies are excluded from this warming path. Legacy cache publication uses at most `min(cpu_num, 8)` owned writes; admitted writes finish even if the requesting query is cancelled, while busy admission skips optional warming.
 
 | Footer bytes | Encoding |
 | --- | --- |
@@ -59,7 +59,7 @@ Each sample payload is a Zstd frame containing an initial little-endian i64 time
 - Encoded metadata and declared decompressed metadata are capped at 128 MiB; the JSON header is capped at 1 MiB. Projected label expansion has a separate 128 MiB cap.
 - Writer directory/label admission is capped at a conservative 256 MiB estimate. Parent bytes, encoded output, and bounded codec scratch are separate allocations.
 - Sample readers bound each compressed block by Zstd's compression bound for `rows * 16`, verify checksums, and reuse bounded decoder scratch. Metadata and sample Zstd windows are capped.
-- Remote reads coalesce ordered selected payload ranges within explicit byte/span limits. Query cancellation drops owned preparation/read tasks and query-owned buffers.
+- Remote reads coalesce ordered selected payload ranges within explicit byte/span limits. Metadata I/O and decoding use a shared admission limit of `min(cpu_num, 32)` and execute blocking reads/decoding on blocking workers. Cancellation aborts queued work and discards abandoned results; already-running blocking work keeps its permit until it exits and cannot publish a parsed-index cache entry after its awaiting caller is dropped. Query cancellation drops owned preparation/read tasks and query-owned buffers.
 - On 64-bit Unix, only the positive native-local storage capability can provide a mapped file. Size and footer bind cached metadata to the opened inode. Local storage publishes new staging inodes atomically and retires objects by unlinking; external in-place modification or truncation of published objects violates the storage contract. Memory-map admission failure uses the range reader.
 - Compaction uploads Parquet and its complete index before publishing the replacement file-list entries. The same existing `.midx` retention/deletion path removes either generation. No live object is migrated in place.
 
