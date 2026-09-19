@@ -144,12 +144,7 @@ async fn run() -> Result<(), anyhow::Error> {
         bytes_to_human_readable(cfg.memory_cache.datafusion_max_size as f64),
     );
 
-    // install ring as the default crypto provider if TLS is enabled
-    if cfg.http.tls_enabled || cfg.grpc.tls_enabled {
-        rustls::crypto::ring::default_provider()
-            .install_default()
-            .expect("Failed to install rustls crypto provider");
-    }
+    install_crypto_provider();
 
     // init backend jobs
     let (job_init_tx, job_init_rx) = oneshot::channel();
@@ -490,6 +485,15 @@ fn check_ratelimit_config(cfg: &Config, o2cfg: &O2Config) -> Result<(), anyhow::
     Ok(())
 }
 
+fn install_crypto_provider() {
+    // SMTP STARTTLS also needs rustls, so install even with server TLS off.
+    if rustls::crypto::CryptoProvider::get_default().is_none() {
+        rustls::crypto::ring::default_provider()
+            .install_default()
+            .expect("Failed to install rustls crypto provider");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -627,5 +631,12 @@ mod tests {
 
         assert!(result.contains("SIG"));
         assert!(result.contains("received"));
+    }
+
+    #[test]
+    fn installing_the_crypto_provider_leaves_one_installed() {
+        install_crypto_provider();
+        install_crypto_provider();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
     }
 }
