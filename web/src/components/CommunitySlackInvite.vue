@@ -15,11 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import config from "@/aws-exports";
 import { addCommasToNumber } from "@/utils/zincutils";
+import segment from "@/services/segment_analytics";
+import {
+  connectDataPopupSettled,
+  connectDataPromptSessionKey,
+  getCommunitySlackUrl,
+  markSlackInviteResolved,
+  shouldShowStandaloneSlackInvite,
+} from "@/utils/slackCommunityInvite";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -28,59 +36,55 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
 const { t } = useI18nTyped();
 const store = useStore();
 
-// ── One-time first-login invite (self-contained) ───────────────────────────
-// Shown once on a Cloud user's first login, then never again for that user.
-// Cloud-only — never shown on self-hosted Enterprise or open source.
-// All trigger/persistence state lives here so the host layout stays clean.
+// Day-2 follow-up for a user who didn't act on ConnectDataSourcePopup's embedded offer — clock is shared via utils/slackCommunityInvite.ts.
 const isOpen = ref(false);
 
-// Per-user "seen" record + a pending flag that survives reloads until the user
-// actually dismisses the invite (so it still appears if they leave mid-onboarding).
-const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
-const PENDING_KEY = "communitySlackInvitePending";
+const userEmail = store.state.userInfo?.email ?? "anonymous";
 
-// Community Slack URL — enterprise can override it via backend config.
-const slackUrl = computed(() => {
-  if (config.isEnterprise == "true" && store.state.zoConfig?.custom_slack_url) {
-    return store.state.zoConfig.custom_slack_url;
-  }
-  return "https://short.openobserve.ai/community";
-});
+const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
-const maybeShow = () => {
-  if (localStorage.getItem(PENDING_KEY) === "true" && localStorage.getItem(seenKey) !== "true") {
-    isOpen.value = true;
+const track = (event: string, properties: Record<string, any> = {}) => {
+  try {
+    // org_id alone is enough to correlate events without transmitting the user's raw email as PII.
+    segment.track(event, {
+      org_id: store.state.selectedOrganization?.identifier,
+      source: "standalone_day2",
+      ...properties,
+    });
+  } catch {
+    // Telemetry must never break the page.
   }
 };
 
-// GetStarted (full-screen onboarding) dispatches this when it completes; for
-// brand-new users we wait for it so two dialogs never stack.
-const onOnboardingComplete = () => maybeShow();
+const maybeShowStandaloneInvite = () => {
+  // ConnectDataSourcePopup gets first refusal on this session — if it claimed the
+  // session (shown, or about to be), the two popups must not stack.
+  if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
+  if (shouldShowStandaloneSlackInvite(userEmail)) {
+    isOpen.value = true;
+    track("community_slack_prompt_shown");
+  }
+};
 
 onMounted(() => {
   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
-  // captured, listened for, or shown there.
+  // captured or shown there.
   if (config.isCloud !== "true") return;
 
-  // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
-  // Capture it into a pending flag before GetStarted clears it.
-  const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
+  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
+  // first-login session — the day-2 clock only starts once that session ends.
+  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
 
-  if (isFirstLogin && localStorage.getItem(seenKey) !== "true") {
-    localStorage.setItem(PENDING_KEY, "true");
+  if (connectDataPopupSettled.value) {
+    maybeShowStandaloneInvite();
+    return;
   }
-
-  if (isFirstLogin) {
-    // GetStarted is taking over the screen — show the invite once it finishes.
-    window.addEventListener("o2:onboarding-complete", onOnboardingComplete);
-  } else {
-    // Returning session with the invite still pending — show it now.
-    maybeShow();
-  }
-});
-
-onBeforeUnmount(() => {
-  window.removeEventListener("o2:onboarding-complete", onOnboardingComplete);
+  // ConnectDataSourcePopup is still deciding whether it opens this session — wait for it.
+  const stopWaiting = watch(connectDataPopupSettled, (settled) => {
+    if (!settled) return;
+    stopWaiting();
+    maybeShowStandaloneInvite();
+  });
 });
 
 // Real member count, sourced from the backend `/config` response
@@ -118,12 +122,12 @@ const avatarBgClasses = [
   "bg-avatar-tint-4",
 ];
 
-// Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
-// closes the dialog and marks it seen so it never shows again for this user.
+// × / overlay / Escape / Maybe later: closes the dialog only. Only joinSlack()
+// resolves the invite for good — "Maybe later" means the day-2 popup can show
+// again on a later session.
 const dismiss = () => {
+  track("community_slack_prompt_dismissed");
   isOpen.value = false;
-  localStorage.setItem(seenKey, "true");
-  localStorage.removeItem(PENDING_KEY);
 };
 
 const handleOpenChange = (open: boolean) => {
@@ -132,7 +136,9 @@ const handleOpenChange = (open: boolean) => {
 
 const joinSlack = () => {
   window.open(slackUrl.value, "_blank", "noopener");
-  dismiss();
+  markSlackInviteResolved(userEmail);
+  track("community_slack_prompt_joined");
+  isOpen.value = false;
 };
 </script>
 

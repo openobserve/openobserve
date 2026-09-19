@@ -3388,6 +3388,12 @@
     "joinSlack": "Slack に参加しよう",
     "maybeLater": "たぶん後で"
   },
+  "connectDataSourcePopup": {
+    "title": "始めるには、まず最初のデータソースを接続しましょう。",
+    "description": "お見せしたいことがたくさんありますが、まずデータを接続する必要があります。ほとんどのチームは約1分で最初のログを確認できます。",
+    "connectButton": "データソースを接続",
+    "slackLink": "Slackコミュニティにもご参加ください"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "一時停止した場所から続行",
     "startFromNow": "今から開始します。",
