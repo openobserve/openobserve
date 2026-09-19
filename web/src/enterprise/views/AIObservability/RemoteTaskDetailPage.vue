@@ -61,7 +61,7 @@
         icon-left="refresh"
         :loading="loading"
         data-test="ai-remote-task-detail-refresh-btn"
-        @click="refresh"
+        @click="refresh(true)"
       >
         <OTooltip side="bottom" :content="t('common.refresh')" />
       </OButton>
@@ -379,6 +379,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import useSmartBack from "@/composables/useSmartBack";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -393,10 +394,14 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { discardRemoteTaskDraftMutation } from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import RemoteTaskSigningPanel from "@/enterprise/components/AIObservability/RemoteTaskSigningPanel.vue";
 import RemoteTaskTestRunPanel from "@/enterprise/components/AIObservability/RemoteTaskTestRunPanel.vue";
 import RemoteTaskDetailSection from "@/enterprise/components/AIObservability/RemoteTaskDetailSection.vue";
-import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
+import { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentDetailRoute } from "./experimentRoutes";
 import {
   DEFAULT_REQUEST_TEMPLATE,
@@ -533,10 +538,18 @@ function openExperiment(row: { id: string }) {
 }
 
 /** Best-effort: an unreachable experiments list must not blank the task page. */
-async function loadUsedBy(name: string) {
+async function loadUsedBy(name: string, force = false) {
   loadingUsedBy.value = true;
   try {
-    const experiments: LlmExperiment[] = await llmExperimentsService.list(orgId.value);
+    const options = experimentsListQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const experiments: LlmExperiment[] = await queryClient.fetchQuery(options);
     usedBy.value = experiments
       .filter(
         (experiment) =>
@@ -603,9 +616,8 @@ const versionColumns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
-function goBack() {
-  void router.push(aiRemoteTasksRoute(orgId.value));
-}
+// Real browser back when there's history to pop.
+const { goBack } = useSmartBack(() => aiRemoteTasksRoute(orgId.value));
 
 function openEdit() {
   if (!canEdit.value) return;
@@ -622,7 +634,8 @@ async function copyRef() {
   }
 }
 
-async function refresh() {
+// `force` is for the Refresh button: experiments made elsewhere never expire this tab's cached list.
+async function refresh(force = false) {
   if (!orgId.value || !entityId.value) return;
   loading.value = true;
   try {
@@ -632,7 +645,7 @@ async function refresh() {
     ]);
     task.value = head;
     versions.value = allVersions;
-    void loadUsedBy(head.name);
+    void loadUsedBy(head.name, force);
   } catch (error: any) {
     toast({
       variant: "error",
@@ -644,6 +657,9 @@ async function refresh() {
   }
 }
 
+// `refresh` only re-reads this page; the tasks list still shows the draft badge.
+const discardDraftWrite = useMutation(() => discardRemoteTaskDraftMutation(orgId.value));
+
 async function discardDraft() {
   const ok = await confirm({
     title: t("aiObservability.remoteTasks.detail.discardDraftTitle"),
@@ -653,7 +669,7 @@ async function discardDraft() {
   });
   if (!ok) return;
   try {
-    await remoteTasksService.discardDraft(orgId.value, entityId.value);
+    await discardDraftWrite.mutateAsync(entityId.value);
     toast({
       variant: "success",
       message: t("aiObservability.remoteTasks.detail.discardDraftSuccess"),

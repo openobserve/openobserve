@@ -342,7 +342,7 @@ test.describe("VRL visualization support testcases", () => {
     await pm.logsVisualise.logsApplyQueryAndWait();
 
     await pm.logsVisualise.openVisualiseTabWithVrl();
-    await pm.logsVisualise.runQueryAndWaitForCompletion();
+    await pm.logsVisualise.runQueryAndWaitForCompletion({ expectTable: true });
     await pm.logsVisualise.verifyChartRenders(page);
 
     // Verify table is displayed

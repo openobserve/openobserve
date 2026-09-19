@@ -849,7 +849,7 @@ pub async fn build_search_request_per_field(
 
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
     let fields = req
         .fields
         .iter()
@@ -950,6 +950,8 @@ pub async fn build_search_request_per_field(
     };
 
     let size = req.query.size;
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
+    let keyword = keyword.replace('\'', "''");
     let mut requests = Vec::new();
     for field in fields {
         let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
@@ -1048,9 +1050,10 @@ async fn values_inner(
         query_sql = sql;
     }
 
+    // Escape single quotes so the keyword can't break out of the SQL string literal.
     let keyword = match query.get("keyword") {
         None => "".to_string(),
-        Some(v) => v.trim().to_string(),
+        Some(v) => v.trim().replace('\'', "''"),
     };
     let no_count = match query.get("no_count") {
         None => false,
@@ -1161,7 +1164,7 @@ async fn values_inner(
     // skip fields which aren't part of the schema
     let schema = infra::schema::get(org_id, stream_name, stream_type)
         .await
-        .unwrap_or(Schema::empty());
+        .unwrap_or_else(|_| Schema::empty());
 
     let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {

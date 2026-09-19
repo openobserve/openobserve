@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="close"
               :title="t('common.remove')"
               :data-test="`dashboard-addpanel-config-delete-column-${idx}`"
-              class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+              class="absolute! top-1/2 right-1 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100"
               @click.stop="removeColumn(idx)"
             />
           </div>

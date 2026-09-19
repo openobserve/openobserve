@@ -41,7 +41,10 @@ vi.mock("vue-i18n", () => ({
   })),
 }));
 
-vi.mock("vuex", () => ({
+// Partial: the overlaid synthetics service loads `@/stores`, which needs the real
+// `createStore` — a wholesale vuex mock leaves it undefined at import time.
+vi.mock("vuex", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("vuex")>()),
   useStore: () => ({
     state: {
       timezone: "UTC",
@@ -164,18 +167,21 @@ vi.mock("@/composables/useSyntheticResults", () => ({
 const mockGetSynthetics = vi.fn().mockResolvedValue({ data: { type: "browser" } });
 const mockGetLocations = vi.fn().mockResolvedValue({ data: { locations: [] } });
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    get: (...args: any[]) => mockGetSynthetics(...args),
-    getLocations: (...args: any[]) => mockGetLocations(...args),
-    presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
-    artifactUrl: vi.fn(() => ""),
-    // useSyntheticEvidence asks this before fetching, to decide whether the URL
-    // is our cookie-authed proxy or a presigned object URL. Omitting it threw
-    // inside the load path, so no fetch was ever issued.
-    isProxyArtifactUrl: vi.fn(() => false),
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get: (...args: any[]) => mockGetSynthetics(...args),
+      getLocations: (...args: any[]) => mockGetLocations(...args),
+      presignArtifacts: vi.fn().mockResolvedValue({ data: { urls: [] } }),
+      artifactUrl: vi.fn(() => ""),
+      // useSyntheticEvidence asks this before fetching, to decide whether the URL
+      // is our cookie-authed proxy or a presigned object URL. Omitting it threw
+      // inside the load path, so no fetch was ever issued.
+      isProxyArtifactUrl: vi.fn(() => false),
+    },
+  });
+});
 
 const stubs = {
   OCard: {
@@ -510,5 +516,71 @@ describe("RunDetail — per-step page activity", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(w.find('[data-test="synthetics-step-page-activity"]').exists()).toBe(false);
     w.unmount();
+  });
+});
+
+describe("RunDetail — id-less error override (quota / reaper rows)", () => {
+  let w: VueWrapper;
+
+  const overrideError = {
+    errorSource: "quota",
+    message: "the organization's included synthetics steps are exhausted, so this run was skipped",
+    timestamp: 1_700_000_000_000,
+    location: "aws-us-east-1",
+    browser: "chromium",
+    device: "desktop",
+  };
+
+  afterEach(() => {
+    w?.unmount();
+    vi.clearAllMocks();
+    mockLoading.value = false;
+  });
+
+  it("renders the error banner from the row and issues NO per-execution query", async () => {
+    mockRunDetailRef.value = null; // nothing fetched — the row has no ids
+    mockFetchRun.mockClear();
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
+    expect(mockFetchRun).not.toHaveBeenCalled();
+  });
+
+  it("shows the quota source label and its FE explanation", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "browser", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuota",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').text()).toBe(
+      "synthetics.runDetail.errorSourceQuotaDesc",
+    );
+  });
+
+  it("shows a source label but no explanation for a non-quota source", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({
+      drawerMode: true,
+      overrideMonitorType: "browser",
+      overrideError: { ...overrideError, errorSource: "dispatch" },
+    });
+    await flushPromises();
+
+    expect(w.find('[data-test="synthetics-run-detail-error-source"]').text()).toBe(
+      "synthetics.runDetail.errorSourceDispatch",
+    );
+    expect(w.find('[data-test="synthetics-run-detail-error-desc"]').exists()).toBe(false);
+  });
+
+  it("renders the error view even for a protocol monitor type (skips ProtocolRunSummary)", async () => {
+    mockRunDetailRef.value = null;
+    w = mountComponent({ drawerMode: true, overrideMonitorType: "http", overrideError });
+    await flushPromises();
+
+    expect(w.find('[data-test="protocol-run-summary-stub"]').exists()).toBe(false);
+    expect(w.find('[data-test="synthetics-run-detail-steps-error-banner"]').exists()).toBe(true);
   });
 });

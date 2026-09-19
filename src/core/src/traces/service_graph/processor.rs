@@ -20,22 +20,20 @@
 
 #[cfg(feature = "enterprise")]
 use {
+    super::{discover_trace_streams, run_graph_search},
     config::{cluster::LOCAL_NODE, meta::stream::StreamType, utils::time::now_micros},
     infra::cluster::get_node_by_uuid,
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
 };
 
-#[cfg(feature = "enterprise")]
-#[derive(serde::Deserialize)]
-struct RecentIngestedTraceStream {
-    org_id: String,
-    stream_name: String,
-}
-
 /// Main entry point for service graph processing
 /// Called by compactor job
 #[cfg(feature = "enterprise")]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
+    if crate::db::service_graph::is_v1_stopped().await {
+        log::info!("[ServiceGraph] v1 stopped: service-graph edges are no longer computed");
+        return Ok(());
+    }
     // get last offset
     let (mut last_updated_at, node) = crate::db::service_graph::get_offset().await;
     // other node is processing
@@ -64,33 +62,8 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
 
     log::info!("[ServiceGraph] Processing traces from {last_updated_at} to {next_updated_at}");
 
-    // Query usage stream to find which streams have recent ingestion activity
-    let sql = r#"SELECT org_id, stream_name
-        FROM "usage"
-        WHERE event = 'Ingestion' AND stream_type = 'traces'
-        GROUP BY org_id, stream_name"#
-        .to_string();
-
-    let usage_results = match crate::self_reporting::search::get_usage(
-        sql,
-        last_updated_at,
-        next_updated_at,
-        false,
-    )
-    .await
-    {
-        Ok(v) => v
-            .into_iter()
-            .filter_map(
-                |v| match serde_json::from_value::<RecentIngestedTraceStream>(v) {
-                    Ok(usage) => Some(usage),
-                    Err(e) => {
-                        log::warn!("[ServiceGraph] Failed to deserialize usage row: {e}");
-                        None
-                    }
-                },
-            )
-            .collect::<Vec<_>>(),
+    let discovered = match discover_trace_streams(last_updated_at, next_updated_at).await {
+        Ok(streams) => streams,
         Err(e) => {
             log::error!(
                 "[ServiceGraph] Failed to get last ingestion from usage stream, skipping service graph: {e}"
@@ -98,91 +71,17 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
             return Ok(());
         }
     };
-
-    log::info!(
-        "[ServiceGraph] Found {} active trace streams in usage data",
-        usage_results.len()
-    );
-
-    // Discovery = usage-active streams UNION every trace stream in the schema cache.
-    //
-    // Usage-windowed discovery alone is not enough: it only surfaces streams that
-    // logged an `Ingestion` event *inside this window*. A stream whose producer
-    // paused, or ingests in bursts sparser than the window, silently drops out and
-    // stops getting a service graph / agent-signals rollup — even though it still
-    // holds queryable spans. (This is exactly how the agent-behavior streams went
-    // dark: they fell out of recent `usage` and were never re-processed.) The old
-    // code only fell back to the schema cache when usage was *entirely* empty, so
-    // on any busy instance an individually-stale stream was invisible forever.
-    //
-    // Unioning fixes that: every known trace stream is processed each window. This
-    // is the same total set the empty-usage fallback already processed, so it does
-    // not widen the worst case. Per-stream work self-bounds — an idle window's SQL
-    // returns no rows (no service-graph edges, no agent signals), so re-visiting a
-    // quiet stream is cheap. Dedup by (org_id, stream_name) so a stream present in
-    // both sources is processed once.
-    let mut discovered = usage_results;
-    let mut seen: std::collections::HashSet<(String, String)> = discovered
-        .iter()
-        .map(|s| (s.org_id.clone(), s.stream_name.clone()))
-        .collect();
-    match crate::organization::list_all_orgs(None).await {
-        Ok(orgs) => {
-            // one pass over the schema cache instead of a full scan per org
-            let mut grouped = crate::db::schema::list_all_streams_grouped().await;
-            for org in orgs {
-                let Some(streams) = grouped
-                    .get_mut(&org.identifier)
-                    .and_then(|types| types.remove(&StreamType::Traces))
-                else {
-                    continue;
-                };
-                for stream_name in streams {
-                    if seen.insert((org.identifier.clone(), stream_name.clone())) {
-                        discovered.push(RecentIngestedTraceStream {
-                            org_id: org.identifier.clone(),
-                            stream_name,
-                        });
-                    }
-                }
-            }
-        }
-        // Non-fatal: fall back to whatever usage discovered. A busy instance still
-        // gets its active streams; only the stale-but-active ones are missed.
-        Err(e) => log::warn!(
-            "[ServiceGraph] org list failed; processing usage-discovered streams only: {e}"
-        ),
-    }
     log::info!(
         "[ServiceGraph] Processing {} trace streams (usage ∪ schema cache)",
         discovered.len()
     );
 
-    for RecentIngestedTraceStream {
-        org_id,
-        stream_name,
-    } in discovered
-    {
+    for (org_id, stream_name) in discovered {
         log::info!("[ServiceGraph] Processing stream {org_id}/{stream_name}");
-
         if let Err(e) =
             process_stream(&org_id, &stream_name, last_updated_at, next_updated_at).await
         {
             log::error!("[ServiceGraph] Failed to process stream {org_id}/{stream_name}: {e}");
-            continue; // Don't fail entire job if one stream fails
-        }
-
-        // Agent-signals rollup: co-located, same window, same node. Self-guards on config.
-        if let Err(e) = crate::traces::agent_signals::process_agent_signals_stream(
-            &org_id,
-            &stream_name,
-            last_updated_at,
-            next_updated_at,
-        )
-        .await
-        {
-            log::error!("[AgentSignals] Failed for stream {org_id}/{stream_name}: {e}");
-            // Non-fatal: agent signals must never break the service graph.
         }
     }
 
@@ -745,53 +644,6 @@ async fn process_stream(
     Ok(())
 }
 
-/// Run a pre-aggregated service-graph edge query against a trace stream and return
-/// the raw result hits. Shared by the instrumented self-join query and the
-/// inferred-dependency query.
-#[cfg(feature = "enterprise")]
-pub(crate) async fn run_graph_search(
-    org_id: &str,
-    sql: String,
-    start_time: i64,
-    end_time: i64,
-) -> Result<Vec<serde_json::Value>, anyhow::Error> {
-    let req = config::meta::search::Request {
-        query: config::meta::search::Query {
-            sql,
-            from: 0,
-            size: 100000,
-            start_time,
-            end_time,
-            quick_mode: false,
-            query_type: "".to_string(),
-            track_total_hits: false,
-            uses_zo_fn: false,
-            query_fn: None,
-            skip_wal: false,
-            histogram_interval: 0,
-            streaming_id: None,
-            streaming_output: false,
-            sampling_config: None,
-            sampling_ratio: None,
-            timezone: None,
-        },
-        encoding: config::meta::search::RequestEncoding::Empty,
-        regions: vec![],
-        clusters: vec![],
-        timeout: 300, // 5 minute timeout for large queries
-        search_type: None,
-        search_event_context: None,
-        use_cache: false,
-        clear_cache: false,
-        local_mode: Some(false),
-        agent_options: None,
-    };
-
-    let trace_id = config::ider::generate();
-    let resp = crate::search::search(&trace_id, org_id, StreamType::Traces, None, &req).await?;
-    Ok(resp.hits)
-}
-
 // Stub implementation for non-enterprise builds
 #[cfg(not(feature = "enterprise"))]
 pub async fn process_service_graph() -> Result<(), anyhow::Error> {
@@ -800,23 +652,6 @@ pub async fn process_service_graph() -> Result<(), anyhow::Error> {
 
 #[cfg(all(test, feature = "enterprise"))]
 mod test {
-
-    #[test]
-    fn test_usage_deser() {
-        let value = serde_json::json!({
-            "org_id": "random",
-            "stream_name": "random-stream"
-        });
-
-        let result = serde_json::from_value::<super::RecentIngestedTraceStream>(value);
-
-        assert!(
-            result.is_ok_and(|data| {
-                data.org_id == "random" && data.stream_name == "random-stream"
-            })
-        );
-    }
-
     // Multi-level agent inheritance: a tool/LLM span's owning agent may be more
     // than one parent up (real Google ADK: generate_content(agent)→chat→tool),
     // so the `from` COALESCE must walk child → p1 → … → pN → service, and the

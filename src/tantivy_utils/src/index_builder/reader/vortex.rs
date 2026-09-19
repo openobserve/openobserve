@@ -24,7 +24,7 @@ use futures::StreamExt;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
-    arrow::ToArrowType,
+    arrow::ArrowSessionExt,
     expr::{root, select},
     file::{OpenOptionsSessionExt, VortexFile},
     io::{
@@ -47,7 +47,7 @@ pub(super) async fn scan_vortex_async(
     let vxf = session.open_options().open_buffer(data)?;
     let scan = open_projected_scan(&vxf, projection)?;
 
-    let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
+    let stream_schema: Arc<Schema> = Arc::new(session.arrow().to_arrow_schema(&scan.dtype()?)?);
     let data_type = DataType::Struct(stream_schema.fields().clone());
 
     let stream = scan.into_array_stream()?.then(move |result| {
@@ -76,7 +76,7 @@ pub(super) fn scan_vortex_row_range(
     let vxf = session.open_options().open_buffer(data)?;
     let scan = open_projected_scan(&vxf, projection)?.with_row_range(row_range);
 
-    let stream_schema: Arc<Schema> = Arc::new(scan.dtype()?.to_arrow_schema()?);
+    let stream_schema: Arc<Schema> = Arc::new(session.arrow().to_arrow_schema(&scan.dtype()?)?);
     let data_type = DataType::Struct(stream_schema.fields().clone());
 
     let iter: Box<dyn Iterator<Item = Result<RecordBatch, ArrowError>> + 'static> = Box::new(
@@ -110,7 +110,7 @@ fn open_projected_scan(
     vxf: &VortexFile,
     projection: Option<&[String]>,
 ) -> Result<ScanBuilder<ArrayRef>, anyhow::Error> {
-    let full_schema = vxf.dtype().to_arrow_schema()?;
+    let full_schema = vxf.session().arrow().to_arrow_schema(vxf.dtype())?;
     let mut scan = vxf.scan()?;
     if let Some(cols) = projection {
         let kept: Vec<&str> = cols
@@ -119,7 +119,7 @@ fn open_projected_scan(
             .map(String::as_str)
             .collect();
         if !kept.is_empty() {
-            scan = scan.with_projection(select(kept, root()));
+            scan = scan.with_projection(select(kept, root()).bind(vxf.dtype())?);
         }
     }
     Ok(scan)

@@ -15,7 +15,7 @@ const SRC_DIR = join(__dirname, "..", "src");
 const EXTS = new Set([".css", ".vue", ".ts"]);
 
 // Library-injected custom properties that are never statically `--x: value;`
-// defined in our source (Reka UI, Tailwind internals, vue-flow).
+// defined in our source (Reka UI, Tailwind internals, vue-flow, GridStack).
 // These resolve at runtime, so a static "undefined" report on them would be a
 // false positive — hence the prefix allowlist.
 //
@@ -24,7 +24,7 @@ const EXTS = new Set([".css", ".vue", ".ts"]);
 // runtime via Vue `:style` (OTable tree indents, row status, row height) must be
 // renamed off the `--o2-` namespace. If you find a `--o2-*` here, delete it and
 // fix the usage — never re-exempt it.
-const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/];
+const ALLOW_PREFIXES = [/^--reka-/, /^--tw-/, /^--vf-/, /^--gs-/];
 const ALLOW_EXACT = new Set([
   // Non-o2 custom properties set per-element at runtime via Vue `:style`
   // bindings — dynamic values with no static `--x:` definition.

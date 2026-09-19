@@ -31,7 +31,7 @@ pub struct StreamInfo {
     /// Stream name
     pub stream_name: String,
 
-    /// Stream type (logs, metrics, traces)
+    /// Stream type (logs, metrics, traces, profiles)
     ///
     /// This field explicitly identifies the stream type, enabling UIs to:
     /// 1. Query the correct API endpoint (logs/_search vs metrics/_search)
@@ -146,9 +146,19 @@ pub struct CorrelationResponse {
     /// which stream the correlation started from (F27).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_stream: Option<String>,
-    /// Echo of the request's source stream type (logs/traces/metrics) (F27).
+    /// Echo of the request's source stream type (logs/traces/metrics/profiles) (F27).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_type: Option<String>,
+    /// Whether `service_name` is the name of the stream this service was
+    /// discovered in rather than anything about the service.
+    ///
+    /// Discovery falls back to the stream name when a record carries neither a
+    /// `service` dimension nor any tracked one, so `node_cpu_seconds` is a
+    /// perfectly ordinary entry in the registry. That is fine for a list of
+    /// streams and wrong for anything that acts on it: on-call routing would be
+    /// routing on a table name. Consumers that need a real service check this.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub service_name_from_stream: bool,
 }
 
 impl CorrelationResponse {
@@ -180,6 +190,13 @@ impl CorrelationResponse {
             all.push(s);
         }
 
+        // Add profiles with explicit type
+        for stream in &self.related_streams.profiles {
+            let mut s = stream.clone();
+            s.stream_type = StreamType::Profiles;
+            all.push(s);
+        }
+
         self.all_streams = all;
     }
 
@@ -199,6 +216,7 @@ impl CorrelationResponse {
             matched_set_id: None,
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         response.build_all_streams();
         response
@@ -211,6 +229,7 @@ pub struct RelatedStreams {
     pub logs: Vec<StreamInfo>,
     pub traces: Vec<StreamInfo>,
     pub metrics: Vec<StreamInfo>,
+    pub profiles: Vec<StreamInfo>,
 }
 
 /// Dimension analytics summary for an organization
@@ -416,6 +435,10 @@ pub struct ServiceStreams {
     /// Metric stream names
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub metrics: Vec<String>,
+
+    /// Profile stream names
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub profiles: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
@@ -551,6 +574,7 @@ mod tests {
                 logs: vec![logs_stream],
                 traces: vec![traces_stream],
                 metrics: vec![metrics_stream],
+                profiles: vec![],
             },
         );
 
@@ -774,11 +798,13 @@ mod tests {
                 logs: vec![],
                 traces: vec![],
                 metrics: vec![],
+                profiles: vec![],
             },
             all_streams: vec![],
             matched_set_id: None,
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -796,11 +822,13 @@ mod tests {
                 logs: vec![],
                 traces: vec![],
                 metrics: vec![],
+                profiles: vec![],
             },
             all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
             matched_set_id: Some("set1".to_string()),
             source_stream: None,
             source_type: None,
+            service_name_from_stream: false,
         };
         let json = serde_json::to_value(&r).unwrap();
         let obj = json.as_object().unwrap();
@@ -826,6 +854,7 @@ mod tests {
         assert!(!obj.contains_key("logs"));
         assert!(!obj.contains_key("traces"));
         assert!(!obj.contains_key("metrics"));
+        assert!(!obj.contains_key("profiles"));
     }
 
     #[test]
@@ -834,11 +863,13 @@ mod tests {
             logs: vec!["l".to_string()],
             traces: vec!["t".to_string()],
             metrics: vec!["m".to_string()],
+            profiles: vec!["p".to_string()],
         };
         let json = serde_json::to_value(&s).unwrap();
         let obj = json.as_object().unwrap();
         assert!(obj.contains_key("logs"));
         assert!(obj.contains_key("traces"));
         assert!(obj.contains_key("metrics"));
+        assert!(obj.contains_key("profiles"));
     }
 }

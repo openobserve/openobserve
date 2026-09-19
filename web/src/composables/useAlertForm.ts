@@ -31,6 +31,12 @@ import { cloneDeep, debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
 import searchService from "@/services/search";
 import anomalyDetectionService from "@/services/anomaly_detection";
+import {
+  saveAnomalyConfigMutation,
+  triggerAnomalyTrainingMutation,
+} from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import segment from "@/services/segment_analytics";
 import { useReo } from "@/services/reodotdev_analytics";
 
@@ -100,6 +106,7 @@ import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
 import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
+import { anomalyBudgetPerDay } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
 
 // ─── Default Values ─────────────────────────────────────────────────────────
 
@@ -182,6 +189,9 @@ export const defaultAlertValue: any = () => {
     // serialize unchanged.
     priority: null,
     tags: [],
+    // Empty means "route from the identity dimensions"; the payload layer
+    // drops the key so alerts that never set a team serialize unchanged.
+    oncall_team: "",
   };
 };
 
@@ -204,6 +214,8 @@ export const defaultAnomalyConfig = () => ({
   training_window_days: 14,
   retrain_interval_days: 7,
   threshold: 97,
+  // Set only when the backend stored a budget; undefined/null = percentile mode.
+  alert_budget_per_day: undefined as number | undefined,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -417,6 +429,17 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   const anomalyRetraining = ref(false);
   const anomalySaving = ref(false);
 
+  const anomalyOrgId = useOrgId();
+  const saveAnomalyConfig = useMutation(() =>
+    saveAnomalyConfigMutation(
+      anomalyOrgId.value,
+      () => router.currentRoute.value.params.anomaly_id as string | undefined,
+    ),
+  );
+  const triggerAnomalyTraining = useMutation(() =>
+    triggerAnomalyTrainingMutation(anomalyOrgId.value),
+  );
+
   const anomalyStatusVariant = computed<BadgeVariant>(() => {
     switch (anomalyConfig.value.status) {
       case "active":
@@ -441,10 +464,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     if (!anomalyId) return;
     anomalyRetraining.value = true;
     try {
-      await anomalyDetectionService.triggerTraining(
-        store.state.selectedOrganization.identifier,
-        anomalyId,
-      );
+      await triggerAnomalyTraining.mutateAsync(anomalyId);
       toast({
         variant: "success",
         message: t("alerts.messages.trainingTriggered"),
@@ -1886,6 +1906,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     }
 
     try {
+      const budgetPerDay = anomalyBudgetPerDay(c);
       const payload: any = {
         alert_type: "anomaly_detection",
         name: c.name,
@@ -1918,29 +1939,25 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_window_seconds: anomalyDetectionWindowSeconds.value,
           training_window_days: c.training_window_days,
           retrain_interval_days: c.retrain_interval_days,
-          threshold: c.threshold,
+          // Mutually exclusive on the wire; in budget mode `threshold` is controller-derived, never sent.
+          ...(budgetPerDay !== null
+            ? { alert_budget_per_day: budgetPerDay }
+            : { threshold: c.threshold }),
           alert_enabled: c.alert_enabled,
         },
       };
 
       const routeAnomalyId = router.currentRoute.value.params.anomaly_id as string | undefined;
-      if (routeAnomalyId) {
-        await anomalyDetectionService.update(orgId, routeAnomalyId, payload);
-        toast({
-          variant: "success",
-          message: t("alerts.messages.anomalyConfigUpdated"),
-        });
-      } else {
-        await anomalyDetectionService.create(
-          orgId,
-          payload,
-          (activeFolderId.value as string) || "default",
-        );
-        toast({
-          variant: "success",
-          message: t("alerts.anomalyCreated"),
-        });
-      }
+      await saveAnomalyConfig.mutateAsync({
+        payload,
+        folderId: (activeFolderId.value as string) || "default",
+      });
+      toast({
+        variant: "success",
+        message: routeAnomalyId
+          ? t("alerts.messages.anomalyConfigUpdated")
+          : t("alerts.anomalyCreated"),
+      });
 
       emit("update:list", (activeFolderId.value as string) || "default");
     } catch (err: any) {
@@ -2073,6 +2090,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   let callAlert: Promise<{ data: any }>;
 
+  // Advisories that ride along with a 200 — an alert that can only ever page
+  // the catch-all team, or one whose groups span teams. Shown beside the
+  // success toast and never in place of it: the save did happen, and an
+  // operator who meant it is entitled to keep it.
+  const showSaveWarnings = (res: { data?: { warnings?: string[] } }) => {
+    for (const message of res?.data?.warnings ?? []) {
+      toast({ variant: "warning", message: raw(message), timeout: 10000 });
+    }
+  };
+
   // Post-schema scheduled/realtime save. Runs ONLY after the composed schema
   // passes (via handleSubmit); preserves the imperative gates + the payload
   // assembly byte-for-byte (Rule ④ payload parity). The payload is built from
@@ -2204,7 +2231,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // isSubmitting) spans the whole request — otherwise the Save button
       // re-enables in the same tick and repeat clicks fire duplicate saves.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2213,6 +2240,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertUpdated"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();
@@ -2241,7 +2269,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
       // Same as the update branch: returned below so isSubmitting spans the request.
       const request = callAlert
-        .then((_res: { data: any }) => {
+        .then((res: { data: any }) => {
           resetForm(defaultAlertValue());
           emit("update:list", activeFolderId.value);
           addAlertForm.value?.resetValidation();
@@ -2250,6 +2278,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
             variant: "success",
             message: t("alerts.messages.alertSaved"),
           });
+          showSaveWarnings(res);
         })
         .catch((err: any) => {
           dismiss();
@@ -2847,7 +2876,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
           detection_function: parsedFn,
           detection_function_field: parsedField,
           threshold: data.threshold ?? data.percentile ?? 97,
-          filters: data.filters ?? [],
+          filters: Array.isArray(data.filters) ? data.filters : [],
           histogram_interval_value: histInterval.value,
           histogram_interval_unit: histInterval.unit,
           schedule_interval_value: sched.value,

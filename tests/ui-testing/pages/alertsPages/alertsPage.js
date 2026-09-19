@@ -188,6 +188,15 @@ export class AlertsPage {
             cloneStreamName: '[data-test="to-be-clone-stream-name"]',
             cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
             cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
+            // Not `cloneDialog`: _exposeLocators() copies every key onto the page
+            // object, so a locator sharing a method's name silently replaces it.
+            cloneFormDialog: '[data-test="alert-list-form-dialog"]',
+            cloneAlertNameField: '[data-test="to-be-clone-alert-name-field"]',
+            cloneStreamTypeOption: '[data-test="to-be-clone-stream-type-option"][data-test-value="{streamType}"]',
+            cloneFolderPicker: '[data-test="alert-list-form-dialog"] [data-test="alerts-index-dropdown-stream_type"]',
+            cloneFolderOption: '[data-test="alerts-index-dropdown-stream_type-option"][data-test-value="{folderId}"]',
+            selectTrigger: '[data-test$="-trigger"]',
+            toastMessage: '[data-test="o-toast-message"]',
             pauseStartAlert: '[data-test="alert-list-{alertName}-pause-start-alert"]',
 
             // Alert management locators
@@ -808,8 +817,44 @@ export class AlertsPage {
         return this.management.updateAlert(alertName);
     }
 
-    async cloneAlert(alertName, streamType, streamName) {
-        return this.management.cloneAlert(alertName, streamType, streamName);
+    async cloneAlert(alertName, streamType, streamName, options = {}) {
+        return this.management.cloneAlert(alertName, streamType, streamName, options);
+    }
+
+    cloneDialog() {
+        return this.management.cloneDialog();
+    }
+
+    async openCloneDialog(alertName) {
+        return this.management.openCloneDialog(alertName);
+    }
+
+    cloneSaveButton() {
+        return this.management.cloneSaveButton();
+    }
+
+    async fillCloneName(name) {
+        return this.management.fillCloneName(name);
+    }
+
+    async submitCloneDialog() {
+        return this.management.submitCloneDialog();
+    }
+
+    async cancelCloneDialog() {
+        return this.management.cancelCloneDialog();
+    }
+
+    async selectCloneStreamType(streamType) {
+        return this.management.selectCloneStreamType(streamType);
+    }
+
+    rowEnableToggle(alertName) {
+        return this.management.rowEnableToggle(alertName);
+    }
+
+    toastWithText(text) {
+        return this.management.toastWithText(text);
     }
 
     async pauseAlert(alertName) {
@@ -2891,7 +2936,10 @@ export class AlertsPage {
         // The folder-list refetch after navigation lags under CI load, so reload + retry once
         // (mirrors verifyAlertCreated) rather than failing on a single slow fetch.
         const firstRow = this.page.locator('[data-test^="o2-table-row-"]').first();
-        if (!(await firstRow.isVisible({ timeout: 15000 }).catch(() => false))) {
+        // waitFor, NOT isVisible({timeout}) — locator.isVisible() IGNORES its timeout and answers in ~14ms, so the wait above was really "probe once, then always reload", leaving the row one post-reload window that times out under shard contention.
+        const rowAppeared = (timeout) =>
+            firstRow.waitFor({ state: 'visible', timeout }).then(() => true).catch(() => false);
+        if (!(await rowAppeared(15000))) {
             await this.page.reload({ waitUntil: 'domcontentloaded' }).catch(() => {});
             await headerCheckbox.waitFor({ state: 'visible', timeout: 10000 });
             // The reload just put us back on the default folder. Without re-selecting, the rows
@@ -2900,7 +2948,7 @@ export class AlertsPage {
             if (this.lastNavigatedFolder && this.lastNavigatedFolder !== 'default') {
                 await this.navigateToFolder(this.lastNavigatedFolder);
             }
-            await firstRow.waitFor({ state: 'visible', timeout: 15000 });
+            await firstRow.waitFor({ state: 'visible', timeout: 30000 });
         }
         await headerCheckbox.click();
         testLogger.info('Clicked select all checkbox for export');
@@ -3189,6 +3237,16 @@ export class AlertsPage {
     }
 
     /**
+     * Current alert name, read from the value element — OFormInlineEdit only mounts an <input> while editing.
+     * @returns {Promise<string>}
+     */
+    async getAlertNameValue() {
+        const valueEl = this.page.locator('[data-test="add-alert-name-input-value"]').first();
+        await valueEl.waitFor({ state: 'visible', timeout: 30000 });
+        return ((await valueEl.textContent()) ?? '').trim();
+    }
+
+    /**
      * Select stream type from dropdown
      * OSelect popover pattern: open trigger, wait for popover, click option keyed by data-test-value (§4)
      */
@@ -3294,6 +3352,49 @@ export class AlertsPage {
         await expect(streamOption).toBeVisible({ timeout: 10000 });
         await streamOption.click();
         testLogger.info('Selected stream by name', { stream: streamName });
+    }
+
+    // No first-available fallback on purpose: silently picking another stream is a false green.
+    /**
+     * Select a stream by its exact option value, filtering the virtualised list first.
+     * @param {string} streamName
+     */
+    async selectStreamByValue(streamName) {
+        const trigger = this.page.locator(`${this.locators.streamNameDropdown} button[name="stream_name"]`).first();
+        const popover = this.page.locator(this.locators.streamNamePopover);
+        const search = this.page.locator('[data-test="add-alert-stream-name-select-dropdown-search"]');
+        const option = this.page.locator(
+            `${this.locators.streamNameOption}[data-test-value="${streamName}"]`,
+        );
+
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            await trigger.waitFor({ state: 'visible', timeout: 15000 });
+            await trigger.click();
+            await popover.waitFor({ state: 'visible', timeout: 10000 }).catch(() => {});
+
+            if (await search.count() > 0) {
+                await search.fill('');
+                await search.fill(streamName);
+            } else {
+                await this.page.keyboard.type(streamName, { delay: 30 });
+            }
+            // The option list is virtualised, so only the filtered rows ever reach the DOM.
+            const appeared = await option
+                .first()
+                .waitFor({ state: 'visible', timeout: 8000 })
+                .then(() => true)
+                .catch(() => false);
+            if (appeared) {
+                await option.first().click();
+                await popover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+                testLogger.info('Selected stream by value', { streamName, attempt });
+                return;
+            }
+            testLogger.warn('Stream option not rendered, retrying', { streamName, attempt });
+            await this.page.keyboard.press('Escape').catch(() => {});
+            await this.page.waitForTimeout(1000);
+        }
+        throw new Error(`selectStreamByValue: "${streamName}" never appeared in the alert stream dropdown`);
     }
 
     /**
@@ -4413,6 +4514,27 @@ export class AlertsPage {
         // <button type="button"> inside the "Alert if" row (the first is the
         // aggregation function selector).
         return this.page.locator('[data-test="alert-if-row-logs"] button[type="button"]').nth(1);
+    }
+
+    /**
+     * Value selected in the measure ("of <field>") column select; empty means the placeholder is showing.
+     * @returns {Promise<string>}
+     */
+    async getMeasureColumnSelectedValue() {
+        const trigger = this.page
+            .locator('button[name="query_condition.aggregation.having.column"]:visible')
+            .first();
+        await trigger.waitFor({ state: 'visible', timeout: 15000 });
+        // The stream's field list arrives from its own request and the default is applied
+        // after it lands, so a single read can catch the pre-populated empty state.
+        let previous = null;
+        for (let attempt = 0; attempt < 20; attempt++) {
+            const current = (await trigger.getAttribute('data-test-selected-value')) ?? '';
+            if (current !== '' && current === previous) return current;
+            previous = current;
+            await this.page.waitForTimeout(500);
+        }
+        return previous ?? '';
     }
 
     /**

@@ -32,12 +32,13 @@
           v-else
           :org-id="orgId"
           :loading="loading"
+          :last-updated-at="lastUpdatedAt"
           :experiments="experiments"
           :datasets="datasets"
-          :details="experimentDetails"
           @new="openCreate"
-          @refresh="refresh"
+          @refresh="refresh(true)"
           @select="openExperiment"
+          @baseline-changed="onBaselineChanged"
           sync-url
         />
       </section>
@@ -56,11 +57,10 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ExperimentBrowser from "@/enterprise/components/AIObservability/ExperimentBrowser.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import llmDatasetsService, { type LlmDataset } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
-import { fetchExperimentDetails } from "./experimentDiscovery";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
+import { experimentsListQuery } from "@/services/llm-experiments.queries";
+import { experimentKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { aiExperimentCreateRoute, aiExperimentDetailRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIExperimentsPage" });
@@ -71,20 +71,32 @@ const route = useRoute();
 const router = useRouter();
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const experiments = ref<LlmExperiment[]>([]);
-const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
-async function refresh() {
+const lastUpdatedAt = ref<number | null>(null);
+
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
+// `force` reaches the server: the mount may serve the cached list, but Refresh and post-write reloads must not.
+async function refresh(force = false) {
   if (!orgId.value) return;
   loading.value = true;
   try {
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: experimentKeys.all(orgId.value) });
+    }
+    const opts = experimentsListQuery(orgId.value);
     [experiments.value, datasets.value] = await Promise.all([
-      llmExperimentsService.list(orgId.value),
+      queryClient.fetchQuery(opts),
       llmDatasetsService.list(orgId.value),
     ]);
-    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
-      llmExperimentsService.get(orgId.value, experimentId),
-    );
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
     // Surface the server's message; a bare catch here hid a stale ?selected=
     // 404 behind "failed to load experiments" while the list rendered fine.

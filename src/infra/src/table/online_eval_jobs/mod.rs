@@ -17,10 +17,7 @@ use std::collections::BTreeMap;
 
 use config::meta::{
     pipeline::components::ScorerRef,
-    self_reporting::{
-        evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM,
-        usage::is_reserved_internal_stream,
-    },
+    self_reporting::{evaluator::EVALUATOR_STREAM, llm_scores::LLM_SCORES_STREAM},
 };
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, Order, QueryFilter, QueryOrder, Schema, Set,
@@ -49,7 +46,6 @@ pub fn is_reserved_eval_source_stream(stream: &str) -> bool {
     let stream = stream.trim().to_ascii_lowercase();
     stream == EVALUATOR_STREAM
         || stream == LLM_SCORES_STREAM
-        || is_reserved_internal_stream(&stream)
         || matches!(
             stream.as_str(),
             "eval.task.span"
@@ -970,7 +966,7 @@ mod tests {
 
     #[test]
     fn test_internal_streams_cannot_be_eval_sources() {
-        for stream in ["_evaluator", "_LLM_SCORES", "usage", "eval.task.trace"] {
+        for stream in ["_evaluator", "_LLM_SCORES", "eval.task.trace"] {
             let mut model = make_model();
             model.stream = stream.to_string();
             let job = OnlineEvalJob::from(model);

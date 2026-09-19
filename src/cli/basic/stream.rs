@@ -14,7 +14,10 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use chrono::{DateTime, Utc};
-use config::{meta::stream::StreamType, utils::json};
+use config::{
+    meta::stream::{StreamStats, StreamType},
+    utils::json,
+};
 use db;
 use infra::schema::unwrap_stream_settings;
 
@@ -38,16 +41,11 @@ pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(
         }
         all
     } else {
-        let parts = stream.splitn(3, '/').collect::<Vec<&str>>();
-        if parts.len() != 3 {
-            return Err(anyhow::anyhow!(
-                "invalid stream [{stream}], expected format: org/stream_type/stream_name"
-            ));
-        }
+        let [org_id, stream_type, stream_name] = split_stream_key(stream)?;
         vec![(
-            parts[0].to_string(),
-            StreamType::from(parts[1]),
-            parts[2].to_string(),
+            org_id.to_string(),
+            StreamType::from(stream_type),
+            stream_name.to_string(),
         )]
     };
 
@@ -83,6 +81,42 @@ pub async fn reset_index_updated_at(stream: &str, time: Option<i64>) -> Result<(
     Ok(())
 }
 
+/// Recompute a stream's `stream_stats` rows from `file_list`; never touches the compactor offset.
+pub async fn reset_stream_stats(stream: &str) -> Result<(), anyhow::Error> {
+    let (org_id, stream_type, stream_name) = parse_stream_stats_key(stream)?;
+    if !infra::schema::exists(org_id, stream_type, stream_name).await {
+        return Err(anyhow::anyhow!(
+            "stream not found: {org_id}/{stream_type}/{stream_name}"
+        ));
+    }
+
+    // Summarise what was written; a read-back would go through CLIENT_RO and can lag the primary
+    let mut stats = StreamStats::default();
+    for (date_range, is_recent) in compaction::stats::stats_date_ranges() {
+        let range_stats = compaction::stats::update_stats_from_file_list_for_stream(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range,
+            is_recent,
+        )
+        .await?;
+        stats.merge(&range_stats);
+    }
+    println!(
+        "reset stream stats for {org_id}/{stream_type}/{stream_name}: file_num={}, doc_num={}, storage_size={}, compressed_size={}, index_size={}, doc_time_min={}, doc_time_max={}",
+        stats.file_num,
+        stats.doc_num,
+        stats.storage_size,
+        stats.compressed_size,
+        stats.index_size,
+        stats.doc_time_min,
+        stats.doc_time_max
+    );
+
+    Ok(())
+}
+
 /// Resolve a stream's earliest data date from file_list and convert it to a
 /// microseconds timestamp. Returns `None` when the stream has no data.
 async fn min_date_micros(
@@ -99,4 +133,97 @@ async fn min_date_micros(
         .with_timezone(&Utc)
         .timestamp_micros();
     Ok(Some(ts))
+}
+
+fn split_stream_key(stream: &str) -> Result<[&str; 3], anyhow::Error> {
+    let parts = stream.splitn(3, '/').collect::<Vec<&str>>();
+    if parts.len() != 3 {
+        return Err(anyhow::anyhow!(
+            "invalid stream [{stream}], expected format: org/stream_type/stream_name"
+        ));
+    }
+    Ok([parts[0], parts[1], parts[2]])
+}
+
+fn parse_stream_stats_key(stream: &str) -> Result<(&str, StreamType, &str), anyhow::Error> {
+    let parts = split_stream_key(stream)?;
+    if parts.iter().any(|p| p.is_empty()) {
+        return Err(anyhow::anyhow!(
+            "invalid stream [{stream}], expected format: org/stream_type/stream_name"
+        ));
+    }
+    let [org_id, type_name, stream_name] = parts;
+    let stream_type = StreamType::from(type_name);
+    // `From<&str>` maps unknown names to the default type, so the fallback has to be detected here
+    if stream_type == StreamType::default()
+        && !type_name.eq_ignore_ascii_case(StreamType::default().as_str())
+    {
+        return Err(anyhow::anyhow!(
+            "unknown stream_type [{type_name}] in stream [{stream}]"
+        ));
+    }
+    if matches!(stream_type, StreamType::Index | StreamType::Filelist) {
+        return Err(anyhow::anyhow!(
+            "stream_type [{stream_type}] has no stream stats"
+        ));
+    }
+    Ok((org_id, stream_type, stream_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_stream_stats_key_valid() {
+        let (org_id, stream_type, stream_name) =
+            parse_stream_stats_key("default/logs/app").unwrap();
+        assert_eq!(org_id, "default");
+        assert_eq!(stream_type, StreamType::Logs);
+        assert_eq!(stream_name, "app");
+    }
+
+    #[test]
+    fn test_parse_stream_stats_key_maps_known_types() {
+        for (name, expected) in [
+            ("logs", StreamType::Logs),
+            ("metrics", StreamType::Metrics),
+            ("traces", StreamType::Traces),
+        ] {
+            let key = format!("org/{name}/s1");
+            let (_, stream_type, _) = parse_stream_stats_key(&key).unwrap();
+            assert_eq!(stream_type, expected, "{key}");
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_stats_key_rejects_two_parts() {
+        let err = parse_stream_stats_key("org/logs").unwrap_err().to_string();
+        assert!(err.contains("expected format"), "{err}");
+    }
+
+    #[test]
+    fn test_parse_stream_stats_key_rejects_empty_segment() {
+        for key in ["/logs/s1", "org//s1", "org/logs/"] {
+            let err = parse_stream_stats_key(key).unwrap_err().to_string();
+            assert!(err.contains("expected format"), "{key}: {err}");
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_stats_key_rejects_unknown_type() {
+        let err = parse_stream_stats_key("org/bogus/s1")
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("unknown stream_type [bogus]"), "{err}");
+    }
+
+    #[test]
+    fn test_parse_stream_stats_key_rejects_index_and_file_list() {
+        for name in ["index", "file_list"] {
+            let key = format!("org/{name}/s1");
+            let err = parse_stream_stats_key(&key).unwrap_err().to_string();
+            assert!(err.contains("has no stream stats"), "{key}: {err}");
+        }
+    }
 }

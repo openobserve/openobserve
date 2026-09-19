@@ -62,6 +62,10 @@ pub enum MetricsFileLayout {
     /// incremental compactor merges of the still-open hour
     /// (`hash-sorted-v1-{id}.parquet` or `.vortex`).
     HashSorted,
+    /// One file ordered by `(__hash__ ASC, _timestamp ASC)` that an open-hour compactor
+    /// round merged from pending ingester files; later rounds leave it alone and the
+    /// hour-end merge takes it once more (`hash-merged-v1-{id}.parquet` or `.vortex`).
+    HashMerged,
     /// Size-bounded file ordered by `(__hash__ ASC, _timestamp ASC)` with a
     /// `.midx` metrics index (see [`MetricsFileLayout::metrics_index_path`]);
     /// written by the compactor's hour-end merge
@@ -71,6 +75,7 @@ pub enum MetricsFileLayout {
 
 impl MetricsFileLayout {
     const HASH_SORTED_PREFIX: &'static str = "hash-sorted-v1-";
+    const HASH_MERGED_PREFIX: &'static str = "hash-merged-v1-";
     const INDEXED_PREFIX: &'static str = "indexed-v1-";
     const METRICS_INDEX_DIR: &'static str = "midx";
     const METRICS_INDEX_EXT: &'static str = ".midx";
@@ -80,6 +85,7 @@ impl MetricsFileLayout {
         let file_name = path.rsplit('/').next().unwrap_or(path);
         for (prefix, layout) in [
             (Self::HASH_SORTED_PREFIX, Self::HashSorted),
+            (Self::HASH_MERGED_PREFIX, Self::HashMerged),
             (Self::INDEXED_PREFIX, Self::Indexed),
         ] {
             if let Some(id) = file_name.strip_prefix(prefix)
@@ -106,6 +112,7 @@ impl MetricsFileLayout {
     fn prefix(self) -> &'static str {
         match self {
             Self::HashSorted => Self::HASH_SORTED_PREFIX,
+            Self::HashMerged => Self::HASH_MERGED_PREFIX,
             Self::Indexed => Self::INDEXED_PREFIX,
         }
     }
@@ -177,6 +184,19 @@ mod metrics_file_layout_tests {
         assert_eq!(
             MetricsFileLayout::of("hash-sorted-v1-7099.vortex"),
             Some(MetricsFileLayout::HashSorted)
+        );
+        assert_eq!(
+            MetricsFileLayout::of("hash-merged-v1-77.parquet"),
+            Some(MetricsFileLayout::HashMerged)
+        );
+        assert!(MetricsFileLayout::is_hash_ordered(
+            "hash-merged-v1-77.vortex"
+        ));
+        assert_eq!(
+            MetricsFileLayout::metrics_index_path(
+                "files/o/metrics/s/2026/08/18/10/hash-merged-v1-77.parquet"
+            ),
+            None
         );
         assert_eq!(
             MetricsFileLayout::of("indexed-v1-456.vortex"),

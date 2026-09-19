@@ -165,7 +165,7 @@ async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
             rule_id: Set(rule.rule_id.unwrap()),
             rule_type: Set(rule
                 .rule_type
-                .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                .unwrap_or_else(|| RatelimitRuleType::Exact.to_string())),
             user_role: Set(rule.user_role.unwrap_or_default()),
             user_id: Set(rule.user_id.unwrap_or_default()),
             api_group_name: Set(rule.api_group_name.unwrap_or_default()),
@@ -245,7 +245,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                 active_model.rule_id = Set(existing.rule_id.clone());
                 active_model.rule_type = Set(rule
                     .rule_type
-                    .unwrap_or(RatelimitRuleType::Exact.to_string()));
+                    .unwrap_or_else(|| RatelimitRuleType::Exact.to_string()));
                 active_model.user_role = Set(rule.user_role.unwrap_or_default());
                 active_model.user_id = Set(rule.user_id.unwrap_or_default());
                 active_model.api_group_name = Set(rule.api_group_name.unwrap_or_default());
@@ -278,7 +278,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
                         rule_id: Set(rule.rule_id.unwrap()),
                         rule_type: Set(rule
                             .rule_type
-                            .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                            .unwrap_or_else(|| RatelimitRuleType::Exact.to_string())),
                         user_role: Set(rule.user_role.unwrap_or_default()),
                         user_id: Set(rule.user_id.unwrap_or_default()),
                         api_group_name: Set(rule.api_group_name.unwrap_or_default()),
@@ -322,7 +322,7 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
                 rule_id: Set(rule.rule_id.unwrap()),
                 rule_type: Set(rule
                     .rule_type
-                    .unwrap_or(RatelimitRuleType::Exact.to_string())),
+                    .unwrap_or_else(|| RatelimitRuleType::Exact.to_string())),
                 user_role: Set(rule.user_role.unwrap_or("".to_string())),
                 user_id: Set(rule.user_id.unwrap_or_default()),
                 api_group_name: Set(rule.api_group_name.unwrap_or_default()),
@@ -372,7 +372,7 @@ async fn update_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
                     Column::RuleType,
                     Expr::value(
                         rule.rule_type
-                            .unwrap_or(RatelimitRuleType::Exact.to_string()),
+                            .unwrap_or_else(|| RatelimitRuleType::Exact.to_string()),
                     ),
                 )
                 .col_expr(Column::Threshold, Expr::value(rule.threshold))
@@ -460,7 +460,7 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
                 Column::RuleType,
                 Expr::value(
                     rule.rule_type
-                        .unwrap_or(RatelimitRuleType::Exact.to_string()),
+                        .unwrap_or_else(|| RatelimitRuleType::Exact.to_string()),
                 ),
             )
             .col_expr(Column::Threshold, Expr::value(rule.threshold))

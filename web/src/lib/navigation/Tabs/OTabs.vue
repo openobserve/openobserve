@@ -30,6 +30,7 @@ const props = withDefaults(defineProps<OTabsProps>(), {
   dense: false,
   bordered: false,
   reorderable: false,
+  collapseLabels: false,
 });
 
 const emit = defineEmits<OTabsEmits>();
@@ -181,6 +182,7 @@ const context = computed<TabsContext>(() => ({
   draggingName: draggingName.value,
   dropTargetName: dropTargetName.value,
   dropBefore: dropBefore.value,
+  collapseLabels: props.collapseLabels,
 }));
 
 provide(TABS_CONTEXT_KEY, context);

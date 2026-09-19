@@ -23,7 +23,7 @@ use config::{
     meta::{
         cluster::{Node, RoleGroup},
         promql::value::*,
-        search::ScanStats,
+        search::{ScanStats, SearchEventType},
         self_reporting::usage::{RequestStats, UsageType},
         stream::StreamType,
     },
@@ -479,9 +479,8 @@ async fn search_in_cluster(
         series_data.push(series);
     });
 
-    // with cache maybe we only get the last point from original data, then the result_type will
-    // return as vector, but if the query is range query, the result_type should be matrix
-    if result_type == "vector" && original_start != end {
+    // a worker left with a lone point answers as an instant query, the range is still a matrix
+    if (result_type == "vector" || result_type == "scalar") && original_start != end {
         result_type = "matrix".to_string();
     }
 
@@ -515,6 +514,8 @@ async fn search_in_cluster(
         min_ts: Some(start),
         max_ts: Some(end),
         trace_id: Some(trace_id.to_string()),
+        search_event_context: req.search_event_context.map(Into::into),
+        search_type: SearchEventType::try_from(req.search_event_type.as_str()).ok(),
         ..Default::default()
     };
 
@@ -565,7 +566,7 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
         let entry = merged_data
             .entry(signature(&labels))
             .or_insert_with(HashMap::new);
-        ser.samples.iter().for_each(|v| {
+        ser.samples.iter().chain(ser.sample.iter()).for_each(|v| {
             entry.insert(v.time, v.value);
         });
         merged_metrics.insert(signature(&labels), labels);
@@ -747,6 +748,50 @@ fn should_truncate_series(series_count: usize, max_limit: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_merge_matrix_preserves_instant_worker_sample_with_cached_prefix() {
+        let latest = Sample::new(3_000_000, 3.0);
+        let labels = vec![Arc::new(Label::new("job", "test"))];
+        for (worker_value, expected_labels) in [
+            (Value::Sample(latest), Labels::default()),
+            (
+                Value::Vector(vec![InstantValue {
+                    labels: labels.clone(),
+                    sample: latest,
+                }]),
+                labels,
+            ),
+        ] {
+            let mut response = cluster_rpc::MetricsQueryResponse::default();
+            grpc::add_value(&mut response, worker_value);
+            grpc::add_value(
+                &mut response,
+                Value::Matrix(vec![RangeValue::new(
+                    expected_labels.clone(),
+                    vec![Sample::new(1_000_000, 1.0), Sample::new(2_000_000, 2.0)],
+                )]),
+            );
+
+            let value = merge_matrix_query(&response.series, "test_instant_worker_merge")
+                .await
+                .unwrap();
+            let Value::Matrix(matrix) = value else {
+                panic!("expected matrix result");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels, expected_labels);
+            let samples: Vec<_> = matrix[0]
+                .samples
+                .iter()
+                .map(|sample| (sample.timestamp, sample.value))
+                .collect();
+            assert_eq!(
+                samples,
+                vec![(1_000_000, 1.0), (2_000_000, 2.0), (3_000_000, 3.0)]
+            );
+        }
+    }
 
     #[test]
     fn test_should_truncate_series_within_limit() {

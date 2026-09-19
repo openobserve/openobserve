@@ -85,12 +85,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3">
+    <div
+      class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3 max-lg:flex-col max-lg:overflow-y-auto"
+    >
       <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
            opens its NDV (read-only here) with the step's Input · Config · Output — the
            SAME panel the editor uses, so results read identically in both places. -->
       <div
-        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden dark:bg-transparent"
+        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden max-lg:h-64 max-lg:flex-none dark:bg-transparent"
       >
         <WorkflowCanvas />
       </div>
@@ -119,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-if="!panelCollapsed"
         data-test="workflow-runs-panel"
-        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border"
+        class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border max-lg:h-96 max-lg:w-full max-lg:max-w-full"
       >
         <WorkflowRunsPanel
           ref="runsPanelRef"
@@ -167,7 +169,8 @@ import useWorkflowCanvas, {
   isRetryableRun,
   retryWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import workflowService from "@/services/workflows";
+import { workflowsQuery } from "@/services/workflows.queries";
+import { queryClient } from "@/composables/query/queryClient";
 
 const { t } = useI18nTyped();
 
@@ -177,6 +180,14 @@ const router = useRouter();
 const store = useStore();
 
 const orgId = computed(() => store.state.selectedOrganization.identifier as string);
+// Carried on to the list and the editor: this view is a dead end for the folder
+// otherwise, and the return trip would land on `default`.
+const activeFolderId = computed(
+  () =>
+    (router.currentRoute.value.query.folder as string) ||
+    workflowObj.currentSelectedWorkflow?.folder_id ||
+    "default",
+);
 const workflowId = computed(() => (router.currentRoute.value.query.id as string) || "");
 const workflowName = computed(() => workflowObj.currentSelectedWorkflow?.name || "");
 const selectedRunId = ref<string>("");
@@ -213,7 +224,10 @@ const togglePanel = () => {
 };
 
 const goBack = () => {
-  router.push({ name: "workflows", query: { org_identifier: orgId.value } });
+  router.push({
+    name: "workflows",
+    query: { org_identifier: orgId.value, folder: activeFolderId.value },
+  });
 };
 
 // Dry-run the current graph without leaving to the editor. Deselect the historical
@@ -246,6 +260,7 @@ const onEditWorkflow = () => {
       id: workflowId.value,
       name: workflowName.value,
       org_identifier: orgId.value,
+      folder: activeFolderId.value,
     },
   });
 };
@@ -262,6 +277,7 @@ const onDebugInEditor = () => {
       name: workflowName.value,
       org_identifier: orgId.value,
       run_id: selectedRunId.value,
+      folder: activeFolderId.value,
     },
   });
 };
@@ -296,8 +312,8 @@ const onRetryRun = async () => {
 // only re-fetch when the shared state doesn't already hold this workflow.
 const loadWorkflow = async (id: string) => {
   try {
-    const res = await workflowService.listWorkflows(orgId.value);
-    const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    // The same default-folder read as the alert form's workflow picker, so it shares that cached list.
+    const list = await queryClient.fetchQuery(workflowsQuery(orgId.value));
     const wf = list.find((w: any) => w.id === id);
     if (!wf) {
       toast({ message: t("workflow.loadError"), variant: "error" });

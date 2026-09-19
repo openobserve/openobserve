@@ -30,67 +30,8 @@ pub const TRIGGERS_STREAM: &str = "triggers";
 pub const ERROR_STREAM: &str = "errors";
 pub const DATA_RETENTION_USAGE_STREAM: &str = "data_retention_usage";
 
-/// The reserved self-reporting stream names. These are written only by internal
-/// self-reporting jobs (usage/stats/triggers/errors/data-retention). Users must
-/// not be able to create, ingest into, or delete them — doing so would corrupt
-/// billing/usage accounting.
-pub const RESERVED_SELF_REPORTING_STREAMS: [&str; 5] = [
-    USAGE_STREAM,
-    STATS_STREAM,
-    TRIGGERS_STREAM,
-    ERROR_STREAM,
-    DATA_RETENTION_USAGE_STREAM,
-];
-
-/// Returns true if `stream_name` is a reserved self-reporting stream that users
-/// are not allowed to create, ingest into, or delete. Internal self-reporting
-/// writes bypass this via the `IngestionRequest::Usage` channel.
-pub fn is_reserved_self_reporting_stream(stream_name: &str) -> bool {
-    RESERVED_SELF_REPORTING_STREAMS.contains(&stream_name)
-}
-
-/// Every reserved internal stream, self-reporting or otherwise.
-///
-/// `slo_slices` is not self-reporting — it is measurement data for Feature 5 —
-/// but it needs the identical protection, and for the identical reason: a user
-/// write into it would corrupt the numbers an SLO reports. It is listed
-/// separately rather than folded into [`RESERVED_SELF_REPORTING_STREAMS`] so
-/// that array keeps meaning what its name says.
-pub const RESERVED_INTERNAL_STREAMS: [&str; 6] = [
-    USAGE_STREAM,
-    STATS_STREAM,
-    TRIGGERS_STREAM,
-    ERROR_STREAM,
-    DATA_RETENTION_USAGE_STREAM,
-    crate::meta::slo::stream::SLO_SLICES_STREAM,
-];
-
-/// Returns true if `stream_name` is reserved for internal writes of any kind.
-///
-/// This is the predicate the create/delete/ingest guards should use. Internal
-/// writers bypass it the same way self-reporting does — via the
-/// `IngestionRequest::Usage` channel, for which `should_report_usage()` is
-/// false.
-pub fn is_reserved_internal_stream(stream_name: &str) -> bool {
-    RESERVED_INTERNAL_STREAMS.contains(&stream_name)
-}
-
-/// Returns true if `stream_name` is an internal rollup stream written only by
-/// OpenObserve's own aggregation jobs — the `_o2_` family (`_o2_service_graph`,
-/// `_o2_db_stats`, future `_o2_dep_stats` siblings) plus the pre-prefix-era
-/// `_agent_signals`. User ingestion into these would poison what the topology,
-/// agent-signals, and Database Monitoring APIs serve, so user-initiated writes
-/// are rejected in ALL editions; the platform's own writers are exempt (they
-/// arrive through the internal gRPC channel as a `SystemJob` user and/or with
-/// `is_derived` set — see the guard in `openobserve_core::logs::ingest`).
-///
-/// Mechanism decision (design §5.3): this is deliberately a PREFIX guard, not
-/// an extension of the named [`RESERVED_INTERNAL_STREAMS`] list. The `_o2_`
-/// family grows with every new rollup job, and a forgotten list entry would
-/// silently reopen the tamper hole; the named list keeps meaning what its name
-/// says (self-reporting + SLO streams, cloud-gated) while this predicate owns
-/// the rollup-stream namespace, un-gated. The two are documented here so they
-/// don't read as half-overlapping accidents.
+/// The `_o2_` rollup streams and `_agent_signals` are written only by internal jobs, so user writes
+/// are rejected.
 pub fn is_internal_rollup_stream(stream_name: &str) -> bool {
     stream_name.starts_with("_o2_") || stream_name == "_agent_signals"
 }
@@ -348,6 +289,13 @@ pub struct TriggerData {
     /// fetch hit its cap, §7.5) — history renders "≥ N". Absent = exact.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value_is_lower_bound: Option<bool>,
+    /// Which failure produced this row. The three synthetics failure paths share
+    /// one stream and one `status`, so only this separates them for an alert rule.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synthetics_error_source: Option<String>,
+    /// The venue the failed synthetics slot was scheduled for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub synthetics_location: Option<String>,
 }
 
 impl Default for TriggerData {
@@ -385,6 +333,8 @@ impl Default for TriggerData {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         }
     }
 }
@@ -433,6 +383,8 @@ impl TriggerData {
             level: Some(0),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
+            synthetics_error_source: Some(String::new()),
+            synthetics_location: Some(String::new()),
         }
     }
 
@@ -659,12 +611,6 @@ pub enum UsageEvent {
     /// Separate from the browser event because only `event` is part of
     /// [`GroupKey`]: a shared event with a type field would be first-row-wins.
     SyntheticsProtocolSteps,
-    /// Browser-check steps executed against the free pool. `size` carries the
-    /// same executed-step count as `SyntheticsBrowserSteps`; never billed.
-    SyntheticsFreeBrowserSteps,
-    /// Protocol-check steps executed against the free pool. `size` carries the
-    /// same executed-step count as `SyntheticsProtocolSteps`; never billed.
-    SyntheticsFreeProtocolSteps,
     /// Steps the journey DEFINES (`configured × combos`). `size` carries that
     /// product. Reported, never billed — the leading `_` is the non-billable
     /// marker, matching `MeteringEventName::_AiChat` and friends. Separate event
@@ -701,8 +647,6 @@ impl std::fmt::Display for UsageEvent {
             UsageEvent::AiFreeCredits => write!(f, "AiFreeCredits"),
             UsageEvent::SyntheticsBrowserSteps => write!(f, "SyntheticsBrowserSteps"),
             UsageEvent::SyntheticsProtocolSteps => write!(f, "SyntheticsProtocolSteps"),
-            UsageEvent::SyntheticsFreeBrowserSteps => write!(f, "SyntheticsFreeBrowserSteps"),
-            UsageEvent::SyntheticsFreeProtocolSteps => write!(f, "SyntheticsFreeProtocolSteps"),
             UsageEvent::_SyntheticsStepsDefined => write!(f, "_SyntheticsStepsDefined"),
             UsageEvent::_SyntheticsBrowserMs => write!(f, "_SyntheticsBrowserMs"),
             UsageEvent::Other => write!(f, "Other"),
@@ -1491,37 +1435,6 @@ mod run_outcome_tests {
 }
 
 #[cfg(test)]
-mod reserved_stream_tests {
-    use super::*;
-
-    #[test]
-    fn slo_slices_is_reserved() {
-        // Not self-reporting, but it needs the identical protection: a user
-        // write into it would corrupt the numbers an SLO reports.
-        assert!(is_reserved_internal_stream(
-            crate::meta::slo::stream::SLO_SLICES_STREAM
-        ));
-        assert!(!is_reserved_self_reporting_stream(
-            crate::meta::slo::stream::SLO_SLICES_STREAM
-        ));
-    }
-
-    #[test]
-    fn every_self_reporting_stream_is_also_an_internal_stream() {
-        for s in RESERVED_SELF_REPORTING_STREAMS {
-            assert!(is_reserved_internal_stream(s), "{s} lost its protection");
-        }
-    }
-
-    #[test]
-    fn an_ordinary_stream_name_is_not_reserved() {
-        for s in ["logs", "default", "slo", "slices", "slo_slice"] {
-            assert!(!is_reserved_internal_stream(s), "{s} wrongly reserved");
-        }
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
     use crate::meta::{
@@ -1536,25 +1449,6 @@ mod tests {
         assert_eq!(format!("{}", UsageEvent::Search), "Search");
         assert_eq!(format!("{}", UsageEvent::Functions), "Functions");
         assert_eq!(format!("{}", UsageEvent::Other), "Other");
-    }
-
-    #[test]
-    fn test_is_reserved_self_reporting_stream() {
-        // All self-reporting streams are reserved.
-        assert!(is_reserved_self_reporting_stream(USAGE_STREAM));
-        assert!(is_reserved_self_reporting_stream(STATS_STREAM));
-        assert!(is_reserved_self_reporting_stream(TRIGGERS_STREAM));
-        assert!(is_reserved_self_reporting_stream(ERROR_STREAM));
-        assert!(is_reserved_self_reporting_stream(
-            DATA_RETENTION_USAGE_STREAM
-        ));
-        assert!(is_reserved_self_reporting_stream("usage"));
-
-        // Ordinary user streams are not.
-        assert!(!is_reserved_self_reporting_stream("my_logs"));
-        assert!(!is_reserved_self_reporting_stream("usage_production"));
-        assert!(!is_reserved_self_reporting_stream("_usage"));
-        assert!(!is_reserved_self_reporting_stream(""));
     }
 
     #[test]
@@ -1763,6 +1657,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2470,14 +2366,6 @@ mod tests {
             "SyntheticsProtocolSteps"
         );
         assert_eq!(
-            UsageEvent::SyntheticsFreeBrowserSteps.to_string(),
-            "SyntheticsFreeBrowserSteps"
-        );
-        assert_eq!(
-            UsageEvent::SyntheticsFreeProtocolSteps.to_string(),
-            "SyntheticsFreeProtocolSteps"
-        );
-        assert_eq!(
             UsageEvent::_SyntheticsStepsDefined.to_string(),
             "_SyntheticsStepsDefined"
         );
@@ -2497,14 +2385,6 @@ mod tests {
             (
                 UsageEvent::SyntheticsProtocolSteps,
                 "\"SyntheticsProtocolSteps\"",
-            ),
-            (
-                UsageEvent::SyntheticsFreeBrowserSteps,
-                "\"SyntheticsFreeBrowserSteps\"",
-            ),
-            (
-                UsageEvent::SyntheticsFreeProtocolSteps,
-                "\"SyntheticsFreeProtocolSteps\"",
             ),
             (
                 UsageEvent::_SyntheticsStepsDefined,
@@ -2535,8 +2415,6 @@ mod tests {
             UsageEvent::AiFreeCredits,
             UsageEvent::SyntheticsBrowserSteps,
             UsageEvent::SyntheticsProtocolSteps,
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
             UsageEvent::Other,
@@ -2554,10 +2432,23 @@ mod tests {
         }
     }
 
+    /// Nothing decides free from billable now, so an old row naming one must land on `Other`.
+    #[test]
+    fn usage_event_has_no_free_synthetics_variants() {
+        for wire in ["SyntheticsFreeBrowserSteps", "SyntheticsFreeProtocolSteps"] {
+            let decoded: UsageEvent = serde_json::from_str(&format!("\"{wire}\""))
+                .unwrap_or_else(|e| panic!("a row written before this deploy must decode: {e}"));
+            assert_eq!(
+                decoded,
+                UsageEvent::Other,
+                "`{wire}` must read back as the non-billable Other"
+            );
+            assert_eq!(decoded.to_string(), "Other");
+        }
+    }
+
     /// o2-enterprise (`MeteringEventName::is_billable`) keys off the naming
-    /// convention this side owns: a leading `_` marks reported-but-never-billed,
-    /// `Free` marks free-pool consumption. Exactly two synthetics events — the
-    /// browser and protocol billable pair — carry neither.
+    /// convention this side owns: a leading `_` marks reported-but-never-billed.
     #[test]
     fn test_synthetics_event_naming_convention_marks_non_billable() {
         for event in [
@@ -2569,22 +2460,16 @@ mod tests {
                 !billable.starts_with('_'),
                 "billable `{billable}` must not carry the `_` non-billable marker"
             );
-            assert!(
-                !billable.contains("Free"),
-                "billable `{billable}` must not carry the `Free` marker"
-            );
         }
 
         for event in [
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ] {
             let name = event.to_string();
             assert!(
-                name.starts_with('_') || name.contains("Free"),
-                "non-billable `{name}` must carry the `_` or `Free` marker"
+                name.starts_with('_'),
+                "non-billable `{name}` must carry the `_` marker"
             );
         }
     }
@@ -2610,8 +2495,6 @@ mod tests {
         let keys: HashSet<GroupKey> = [
             UsageEvent::SyntheticsBrowserSteps,
             UsageEvent::SyntheticsProtocolSteps,
-            UsageEvent::SyntheticsFreeBrowserSteps,
-            UsageEvent::SyntheticsFreeProtocolSteps,
             UsageEvent::_SyntheticsStepsDefined,
             UsageEvent::_SyntheticsBrowserMs,
         ]
@@ -2621,7 +2504,7 @@ mod tests {
 
         assert_eq!(
             keys.len(),
-            6,
+            4,
             "each synthetics event must aggregate into its own bucket"
         );
         // Same event => one bucket. (`GroupKey` has no `Debug`, so `assert!`
@@ -2686,6 +2569,48 @@ mod tests {
             .collect::<Result<Vec<_>, _>>()
             .expect("one unknown row must not abort the cycle for every other org");
         assert_eq!(collected.len(), 4);
+    }
+
+    /// Every `TriggerData` writer shares one inferred schema, so an unset field must stay ABSENT.
+    #[test]
+    fn trigger_data_synthetics_fields_round_trip_and_omit_when_none() {
+        let bare = TriggerData::default();
+        assert_eq!(bare.synthetics_error_source, None);
+        assert_eq!(bare.synthetics_location, None);
+
+        let json = serde_json::to_value(&bare).expect("TriggerData must serialize");
+        assert!(json.get("synthetics_error_source").is_none());
+        assert!(json.get("synthetics_location").is_none());
+
+        let tagged = TriggerData {
+            synthetics_error_source: Some("quota".to_string()),
+            synthetics_location: Some("aws-us-east-1".to_string()),
+            ..TriggerData::default()
+        };
+        let json = serde_json::to_value(&tagged).expect("TriggerData must serialize");
+        assert_eq!(json["synthetics_error_source"], "quota");
+        assert_eq!(json["synthetics_location"], "aws-us-east-1");
+
+        let back: TriggerData =
+            serde_json::from_value(json).expect("a tagged row must read back unchanged");
+        assert_eq!(back, tagged);
+
+        let untagged: TriggerData = serde_json::from_value(
+            serde_json::to_value(&bare).expect("TriggerData must serialize"),
+        )
+        .expect("a row written before these fields existed must still deserialize");
+        assert_eq!(untagged.synthetics_error_source, None);
+        assert_eq!(untagged.synthetics_location, None);
+
+        let names = TriggerData::get_field_names();
+        for field in ["synthetics_error_source", "synthetics_location"] {
+            assert!(
+                names.contains(&field.to_string()),
+                "`skip_serializing_if` keeps `{field}` out of the reflection sample unless \
+                 `init_for_reflection` sets it, and a `triggers` schema without the column is a \
+                 column the quota alert rule can never fire on"
+            );
+        }
     }
 }
 

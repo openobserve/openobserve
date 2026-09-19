@@ -469,8 +469,8 @@ describe("ROUTE_TAB_MAPS", () => {
       expect(Object.keys(ROUTE_TAB_MAPS.ingestMetrics)).toHaveLength(7);
     });
 
-    it("ingestLogs has 9 entries", () => {
-      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(9);
+    it("ingestLogs has 10 entries", () => {
+      expect(Object.keys(ROUTE_TAB_MAPS.ingestLogs)).toHaveLength(10);
     });
 
     it("billings has 4 entries", () => {

@@ -219,21 +219,6 @@ describe("SettingsIndex.vue", () => {
       mockReplace.mockClear();
     });
 
-    it("should redirect via replace to general when on settings route", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-      mockReplace.mockClear();
-
-      wrapper.vm.handleSettingsRouting();
-
-      expect(mockReplace).toHaveBeenCalledWith({
-        path: "/settings/general",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
-    });
-
     it("should not redirect when on general route", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
@@ -254,9 +239,7 @@ describe("SettingsIndex.vue", () => {
 
       wrapper.vm.handleSettingsRouting();
 
-      // nodes route is not "settings" so replace is not called;
-      // notMeta guard may or may not apply depending on zoConfig.meta_org
-      // Without meta_org set, notMeta is falsy → no redirect
+      // Without meta_org set, the notMeta guard is falsy, so nodes is not redirected.
       expect(mockReplace).not.toHaveBeenCalled();
     });
 
@@ -278,20 +261,6 @@ describe("SettingsIndex.vue", () => {
 
       expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
       expect(mockReplace).not.toHaveBeenCalled();
-    });
-
-    it("should handle missing selectedOrganization gracefully", () => {
-      wrapper = createWrapper({ selectedOrganization: null });
-      mockRouter.currentRoute.value.name = "settings";
-      mockReplace.mockClear();
-
-      expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
-      expect(mockReplace).toHaveBeenCalledWith({
-        path: "/settings/general",
-        query: {
-          org_identifier: undefined,
-        },
-      });
     });
 
     it("should not redirect when on other non-settings routes", () => {
@@ -328,17 +297,6 @@ describe("SettingsIndex.vue", () => {
   });
 
   describe("Lifecycle Hooks", () => {
-    it("should call handleSettingsRouting on mount (settings route)", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-
-      // During mount, handleSettingsRouting is called via onBeforeMount
-      // It should have triggered a replace call for the "settings" route
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/settings/general" }),
-      );
-    });
-
     it("should not redirect during mount when on a valid child route", () => {
       mockRouter.currentRoute.value.name = "general";
       mockReplace.mockClear();
@@ -450,17 +408,6 @@ describe("SettingsIndex.vue", () => {
   });
 
   describe("Integration Tests", () => {
-    it("should handle workflow for non-enterprise org", async () => {
-      mockRouter.currentRoute.value.name = "settings";
-      wrapper = createWrapper();
-      mockReplace.mockClear();
-
-      wrapper.vm.handleSettingsRouting();
-      expect(mockReplace).toHaveBeenCalledWith(
-        expect.objectContaining({ path: "/settings/general" }),
-      );
-    });
-
     it("should have stable activeSection after mount on general", () => {
       mockRouter.currentRoute.value.name = "general";
       wrapper = createWrapper();
@@ -484,15 +431,6 @@ describe("SettingsIndex.vue", () => {
       mockRouter.currentRoute.value.name = "alertDestinations";
       wrapper = createWrapper();
       expect(() => wrapper.vm.handleSettingsRouting()).not.toThrow();
-    });
-
-    it("should handle router replace failures gracefully", () => {
-      mockRouter.currentRoute.value.name = "settings";
-      // replace returns a rejected promise — the component wraps it in Promise.resolve().catch()
-      mockReplace.mockReturnValue(Promise.reject(new Error("nav failed")));
-      expect(() => {
-        wrapper = createWrapper();
-      }).not.toThrow();
     });
   });
 

@@ -21,7 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          Settings shell; this component renders only the form content. -->
     <!-- platform settings section. The page gutter is owned by the Settings
          shell's ConstrainedPage; this block adds none of its own. -->
-    <div>
+    <div v-if="!trialExpired">
       <GroupHeader :title="t('settings.platformSettings')" :showIcon="false" />
       <div class="flex w-full flex-col">
         <OForm
@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <!-- scape interval section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.scrapintervalLabel") }}
@@ -51,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Max Series Per Query section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.maxSeriesPerQueryLabel") }}
@@ -78,12 +78,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Manage Theme section -->
           <div
-            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+            class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
           >
             <span class="individual-setting-title text-sm leading-5 font-medium">
               {{ t("settings.manageTheme") }}
             </span>
-            <div class="-ms-15 flex items-center gap-2">
+            <div class="-ms-15 flex items-center gap-2 max-lg:ms-0 max-lg:flex-wrap">
               <!-- Light Mode Theme -->
               <div
                 class="group/chip bg-surface-subtle border-border-default hover:bg-surface-subtle-hover hover:border-accent inline-flex cursor-pointer items-center gap-2 rounded-full border py-1.5 ps-1.5 pe-3 transition-all duration-200 hover:-translate-y-px hover:shadow-md"
@@ -98,7 +98,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
@@ -124,7 +124,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <OIcon
                     name="palette"
                     size="xs"
-                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90"
+                    class="opacity-0 filter-[drop-shadow(0_1px_1px_color-mix(in_srgb,var(--color-black)_30%,transparent))] transition-opacity duration-200 group-hover/chip:opacity-90 max-md:opacity-90"
                   />
                   <!-- eslint-enable local/no-hardcoded-px -->
                 </div>
@@ -174,6 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       id="enterpriseFeature"
       v-if="
+        !trialExpired &&
         config.isEnterprise == 'true' &&
         store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier
       "
@@ -183,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div>
         <div
-          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item no-border-bottom border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("settings.customLogoText") }}
@@ -240,7 +241,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <!-- Light Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.lightMode") }})
@@ -309,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dark Mode Logo -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <div class="individual-setting-title mb-5 w-full pt-2 text-sm leading-5 font-medium">
             {{ t("settings.customLogoTitle") }} ({{ t("settings.darkMode") }})
@@ -379,7 +380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Authoring banners needs far more room than a settings row, so the
              row is just the entry point into a drawer. -->
         <div
-          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4"
+          class="settings-grid-item border-card-glass-border grid grid-cols-3 items-center gap-4 border-b py-4 max-lg:grid-cols-1 max-lg:gap-2"
         >
           <span class="individual-setting-title text-sm leading-5 font-medium">
             {{ t("announcements.settings.label") }}
@@ -582,6 +583,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-ignore
+import { configFullQuery, updateCustomLogoTextMutation } from "@/services/config.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery, updateOrgSettingsMutation } from "@/services/organizations.queries";
 import {
   computed,
   defineComponent,
@@ -599,11 +604,10 @@ import organizations from "@/services/organizations";
 import usersService from "@/services/users";
 import settingsService from "@/services/settings";
 import config from "@/aws-exports";
-import configService from "@/services/config";
 import DOMPurify from "dompurify";
 import GroupHeader from "../common/GroupHeader.vue";
 import { applyThemeColors, switchThemeMode } from "@/utils/theme";
-import { useLocalOrganization } from "@/utils/zincutils";
+import { isTrialExpired, useLocalOrganization } from "@/utils/zincutils";
 import { formatSizeFromMB } from "@/utils/formatters";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -665,6 +669,16 @@ export default defineComponent({
     }));
 
     const loadingState = ref(false);
+
+    // Branding is instance-wide, so with no org selected it is written against the default-type org.
+    const brandingOrg = () =>
+      store.state.selectedOrganization?.identifier ||
+      store.state.organizations?.find((o: any) => o.type == "default")?.identifier ||
+      "default";
+    const updateCustomLogoText = useMutation(() => updateCustomLogoTextMutation(brandingOrg()));
+    const updateOrgSettings = useMutation(() =>
+      updateOrgSettingsMutation(store.state?.selectedOrganization?.identifier),
+    );
     const customText = ref("");
     const editingText = ref(false);
     const showAnnouncementBanners = ref(false);
@@ -769,6 +783,10 @@ export default defineComponent({
       () => deleteConfirmInput.value.trim() === deleteOrgName.value,
     );
 
+    const trialExpired = computed(() =>
+      isTrialExpired(store.state?.organizationData?.organizationSettings?.free_trial_expiry),
+    );
+
     // Only cloud builds expose self-service org deletion. Backend enforces the
     // real per-org RBAC check; this only governs visibility.
     const canDeleteOrg = computed(() => {
@@ -851,11 +869,11 @@ export default defineComponent({
       if (!orgId || orgScope.value || orgScopeLoading.value) return;
       orgScopeLoading.value = true;
       try {
-        const res = await organizations.get_organization_summary(orgId);
+        const data: any = await queryClient.fetchQuery(orgSummaryQuery(orgId));
         orgScope.value = t("settings.deleteOrganizationScope", {
-          dashboards: res.data?.total_dashboards ?? 0,
-          streams: res.data?.streams?.num_streams ?? 0,
-          size: formatSizeFromMB(String(res.data?.streams?.total_storage_size ?? 0)),
+          dashboards: data?.total_dashboards ?? 0,
+          streams: data?.streams?.num_streams ?? 0,
+          size: formatSizeFromMB(String(data?.streams?.total_storage_size ?? 0)),
         });
       } catch {
         // Contextual only — the delete flow stays usable without the counts.
@@ -946,22 +964,24 @@ export default defineComponent({
           ? null
           : Number(maxSeriesRaw);
 
+      // Only the fields this form owns: the backend applies what is present, and Vuex may hold values another admin changed since.
+      const owned = {
+        scrape_interval: Number(value.scrape_interval),
+        max_series_per_query: maxSeriesNum,
+        light_mode_theme_color: customLightColor.value,
+        dark_mode_theme_color: customDarkColor.value,
+      };
+
       try {
         //set organizations settings in store
         //scrape interval will be in number
         store.dispatch("setOrganizationSettings", {
           ...store.state?.organizationData?.organizationSettings,
-          scrape_interval: Number(value.scrape_interval),
-          max_series_per_query: maxSeriesNum,
-          light_mode_theme_color: customLightColor.value,
-          dark_mode_theme_color: customDarkColor.value,
+          ...owned,
         });
 
         //update settings in backend
-        await organizations.post_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-          store.state?.organizationData?.organizationSettings,
-        );
+        await updateOrgSettings.mutateAsync(owned);
 
         // Apply the current mode's theme
         const currentMode = isDark.value ? "dark" : "light";
@@ -1017,11 +1037,21 @@ export default defineComponent({
                 }),
               });
 
-              await configService
-                .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
-                .then((res: any) => {
-                  store.dispatch("setConfig", res.data);
-                });
+              // Forced: the logo just changed, so the cached config is the one
+              // thing that must not answer here.
+              await queryClient.invalidateQueries({
+                queryKey: configFullQuery(
+                  store.state.selectedOrganization?.identifier || orgIdentifier,
+                ).queryKey,
+                exact: true,
+                refetchType: "none",
+              });
+              store.dispatch(
+                "setConfig",
+                await queryClient.fetchQuery(
+                  configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                ),
+              );
 
               // Clear the appropriate file ref
               if (mode === "dark") {
@@ -1078,11 +1108,24 @@ export default defineComponent({
               }),
             });
 
-            await configService
-              .get_config_full(store.state.selectedOrganization?.identifier || orgIdentifier)
-              .then((res: any) => {
-                store.dispatch("setConfig", res.data);
-              });
+            // Forced: the logo just changed, so the cached config is the one
+            // thing that must not answer here.
+            store.dispatch(
+              "setConfig",
+              await queryClient
+                .invalidateQueries({
+                  queryKey: configFullQuery(
+                    store.state.selectedOrganization?.identifier || orgIdentifier,
+                  ).queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() =>
+                  queryClient.fetchQuery(
+                    configFullQuery(store.state.selectedOrganization?.identifier || orgIdentifier),
+                  ),
+                ),
+            );
           } else {
             toast({
               variant: "error",
@@ -1240,13 +1283,6 @@ export default defineComponent({
 
     const updateCustomText = () => {
       loadingState.value = true;
-      let orgIdentifier = "default";
-      for (let item of store.state.organizations) {
-        if (item.type == "default") {
-          orgIdentifier = item.identifier;
-        }
-      }
-
       customText.value = sanitizeInput(customText.value);
       if (customText.value.length > 100) {
         toast({
@@ -1257,12 +1293,9 @@ export default defineComponent({
         return;
       }
 
-      settingsService
-        .updateCustomText(
-          store.state.selectedOrganization?.identifier || orgIdentifier,
-          "custom_logo_text",
-          customText.value,
-        )
+      // Returned so a caller can await the write.
+      return updateCustomLogoText
+        .mutateAsync(customText.value)
         .then(async (res: any) => {
           if (res.status == 200) {
             toast({
@@ -1385,6 +1418,7 @@ export default defineComponent({
       updateCustomColor,
       resetThemeColors,
       currentPickerMode,
+      trialExpired,
       // Delete organization (Danger Zone)
       canDeleteOrg,
       confirmDeleteOrg,

@@ -8,14 +8,18 @@ vi.mock("@/aws-exports", () => ({
   default: { isCloud: "false", isEnterprise: "true" },
 }));
 
-vi.mock("@/services/iam", () => ({
-  getRoles: vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] })),
-  deleteRole: vi.fn(async () => ({})),
-  bulkDeleteRoles: vi.fn(async () => ({
-    data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
-  })),
-  getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getRoles = vi.fn(async () => ({ data: ["Admin", "Viewer", "Editor"] }));
+  return overlayServiceMock(await importOriginal(), {
+    getRoles,
+    deleteRole: vi.fn(async () => ({})),
+    bulkDeleteRoles: vi.fn(async () => ({
+      data: { successful: ["Admin", "Viewer"], unsuccessful: [] },
+    })),
+    getRoleUsers: vi.fn(async () => ({ data: ["user1@o2.ai", "user2@o2.ai"] })),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),
@@ -206,6 +210,38 @@ describe("AppRoles - onRoleAdded", () => {
         query: expect.objectContaining({ preset: "readonly" }),
       }),
     );
+  });
+
+  it("forwards the dbm preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "DBM", startFrom: "dbm" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        query: expect.objectContaining({ preset: "dbm" }),
+      }),
+    );
+  });
+
+  it("forwards the k8s preset in the query", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "K8s", startFrom: "k8s" });
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "editRole",
+        params: { role_name: "K8s" },
+        query: expect.objectContaining({ tab: "permissions", preset: "k8s" }),
+      }),
+    );
+  });
+
+  it("does not set a preset when startFrom is omitted", async () => {
+    const wrapper = await mountAppRoles();
+    const spy = vi.spyOn(router, "push");
+    (wrapper.vm as any).onRoleAdded({ role_name: "NoPreset" });
+    const call = spy.mock.calls[0][0] as any;
+    expect(call.query.preset).toBeUndefined();
   });
 
   it("does not set a preset for the custom start option", async () => {

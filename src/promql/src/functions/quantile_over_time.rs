@@ -18,7 +18,7 @@ use std::time::Duration;
 use config::meta::promql::value::{EvalContext, Sample, Value};
 use datafusion::error::Result;
 
-use crate::{common::quantile, functions::RangeFunc};
+use crate::{common::quantile_in_place, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#quantile_over_time
 pub(crate) fn quantile_over_time(
@@ -45,8 +45,8 @@ impl RangeFunc for QuantileOverTimeFunc {
     }
 
     fn exec(&self, samples: &[Sample], _eval_ts: i64, _range: &Duration) -> Option<f64> {
-        let input: Vec<f64> = samples.iter().map(|x| x.value).collect();
-        quantile(&input, self.phi_quantile)
+        let mut input: Vec<f64> = samples.iter().map(|x| x.value).collect();
+        quantile_in_place(&mut input, self.phi_quantile)
     }
 }
 

@@ -13,24 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { configQuery } from "@/services/config.queries";
 import { createApp } from "vue";
+import { VueQueryPlugin } from "@tanstack/vue-query";
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n, { getLocale, loadLocaleMessages } from "./locales";
+import i18n, { applyDocumentLocale, getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+import "./styles/rtl.css";
 // Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
 // applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
 // here instead of re-@imported inside each consumer's <style> block.
 import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
-import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
 import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { queryClient, setMutationNotifier } from "./composables/query/queryClient";
+import { shouldPropagateTracing } from "./utils/rum/tracingOrigin";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { bootstrapTheme } from "@/utils/themeManager";
 import { raw } from "@/types/i18n";
@@ -39,6 +43,9 @@ import { raw } from "@/types/i18n";
 // paint already uses the correct colors (no flash of the base stylesheet theme).
 bootstrapTheme();
 
+const activeLocale = getLocale();
+applyDocumentLocale(activeLocale);
+
 const app = createApp(App);
 const router = createRouter(store);
 
@@ -46,6 +53,12 @@ app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
+
+app.use(VueQueryPlugin, { queryClient });
+
+// Mutation success/error feedback. Injected rather than imported by the query
+// client so that module stays free of UI and i18n at runtime.
+setMutationNotifier((variant, message) => toast({ variant, message }));
 
 // Initialize default context provider globally
 const defaultProvider = createDefaultContextProvider(router, store);
@@ -80,7 +93,12 @@ interface ConfigResponse {
 }
 
 const getConfig = async () => {
-  await configService.get_config().then((res: ConfigResponse) => {
+  // Seeds the shared bootstrap `/config` query — Login and the version checker
+  // read the same cached entry instead of each issuing their own request. The
+  // authenticated full config is a separate entry (`configFullQuery`), fetched
+  // per org once the user is signed in.
+  await queryClient.fetchQuery(configQuery()).then((data: ConfigResponse["data"]) => {
+    const res: ConfigResponse = { data };
     if (!res.data) return;
 
     // Never clobber the authenticated full config with the bootstrap subset if
@@ -122,12 +140,17 @@ const getConfig = async () => {
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",
-        allowedTracingUrls: [
-          {
-            match: store.state.API_ENDPOINT + "/api",
-            propagatorTypes: ["openobserve", "tracecontext"],
-          },
-        ],
+        // Same-origin only: cross-origin (dev against a remote cluster) the
+        // injected headers fail the CORS preflight and kill every API call.
+        // See shouldPropagateTracing.
+        allowedTracingUrls: shouldPropagateTracing(store.state.API_ENDPOINT, window.location.origin)
+          ? [
+              {
+                match: store.state.API_ENDPOINT + "/api",
+                propagatorTypes: ["openobserve", "tracecontext"],
+              },
+            ]
+          : [],
         beforeSend: (event) => {
           // Filter out specific errors before sending to RUM
           if (event.type === "error") {
@@ -282,7 +305,7 @@ router.onError(async (error) => {
 
 // Ensure the active locale's messages are loaded (en-us is bundled; any other
 // language is fetched as a code-split chunk) before the first render.
-loadLocaleMessages(getLocale())
+loadLocaleMessages(activeLocale)
   // On a locale-chunk load failure, fall back to the bundled en-us messages
   // (no console noise). The app must mount regardless.
   .catch(() => {})

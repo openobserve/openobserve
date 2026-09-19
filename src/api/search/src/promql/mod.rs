@@ -195,8 +195,18 @@ async fn query(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
@@ -263,6 +273,7 @@ async fn query(
         search_type: None,
         regions: vec![],
         clusters: vec![],
+        search_event_context: Some(req.search_event_context),
     };
 
     search(&trace_id, org_id, req, user_email, timeout).await
@@ -484,8 +495,18 @@ async fn query_range(
                     .into_response();
             }
         };
-        let mut visitor = promql::promql::name_visitor::MetricNameVisitor::default();
-        promql_parser::util::walk_expr(&mut visitor, &ast).unwrap();
+        let mut visitor = promql::ast::name_visitor::MetricNameVisitor::default();
+        if let Err(e) = promql_parser::util::walk_expr(&mut visitor, &ast) {
+            log::error!("[trace_id: {trace_id}] promql metric name error: {e}");
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(config::meta::promql::ApiFuncResponse::<()>::err_bad_data(
+                    e.to_string(),
+                    Some(trace_id),
+                )),
+            )
+                .into_response();
+        }
 
         if !db::user::is_root_user(user_email) {
             let stream_type_str = StreamType::Metrics.as_str();
@@ -593,6 +614,7 @@ async fn query_range(
         search_type: req.search_type,
         regions: req.regions,
         clusters: req.clusters,
+        search_event_context: Some(req.search_event_context),
     };
     if let Some(use_streaming) = req.use_streaming
         && use_streaming

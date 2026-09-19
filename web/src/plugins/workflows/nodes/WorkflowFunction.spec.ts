@@ -30,7 +30,10 @@ vi.mock("@/utils/zincutils", () => ({
   getImageURL: (p: string) => p,
   getUUID: () => "uuid",
 }));
-vi.mock("@/services/workflows", () => ({ default: {} }));
+vi.mock("@/services/workflows", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
 
 const pickerSubmit = vi.fn();
 vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
@@ -58,7 +61,6 @@ vi.mock("@/components/flow/forms/FunctionPicker.vue", () => ({
 
 import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
 import { buildTestSample } from "@/plugins/workflows/testSample";
-import { buildIncidentSample } from "@/plugins/workflows/incidentSample";
 import WorkflowFunction from "./WorkflowFunction.vue";
 
 // The "Events" sample comes from the CURRENT trigger's kind, so seed a trigger

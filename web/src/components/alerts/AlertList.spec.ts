@@ -25,31 +25,44 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock services before importing component (follow reference style)
-vi.mock("@/services/alerts", () => ({
-  default: {
-    listByFolderId: vi.fn(),
-    get_by_alert_id: vi.fn(),
-    toggle_state_by_alert_id: vi.fn(),
-    delete_by_alert_id: vi.fn(),
-    create_by_alert_id: vi.fn(),
-    getHistory: vi.fn(),
-    export_by_id: vi.fn(),
-    retrain_by_id: vi.fn(),
-    bulkDelete: vi.fn(),
-    bulkToggleState: vi.fn(),
-    getCompositeReferences: vi.fn(),
-  },
+vi.mock("@/services/oncall", () => ({
+  default: { listTeams: vi.fn().mockResolvedValue({ data: [{ id: "t1", name: "Payments" }] }) },
 }));
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    list: vi.fn(),
-  },
-}));
+
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      listByFolderId: vi.fn(),
+      get_by_alert_id: vi.fn(),
+      toggle_state_by_alert_id: vi.fn(),
+      delete_by_alert_id: vi.fn(),
+      create_by_alert_id: vi.fn(),
+      getHistory: vi.fn(),
+      export_by_id: vi.fn(),
+      retrain_by_id: vi.fn(),
+      bulkDelete: vi.fn(),
+      bulkToggleState: vi.fn(),
+      getCompositeReferences: vi.fn(),
+    },
+  });
+});
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+    },
+  });
+});
 
 import AlertList from "@/components/alerts/AlertList.vue";
 import config from "@/aws-exports";
@@ -500,6 +513,20 @@ describe("AlertList - data fetching and columns", () => {
     expect(wrapper.vm.filteredResults.length).toBe(alertsDB.length);
   });
 
+  // A destination made in the form's new tab never expires this tab's cache, so only a forced read shows it.
+  it("re-reads destinations from the server when the form asks for a refresh", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    await flushPromises();
+    const afterMount = destinationsSvc.list.mock.calls.length;
+    expect(afterMount).toBeGreaterThan(0);
+
+    await wrapper.vm.refreshDestination();
+    await flushPromises();
+
+    expect(destinationsSvc.list).toHaveBeenCalledTimes(afterMount + 1);
+  });
+
   // period, state, level, last_trained_at are intentionally absent (config
   // detail, or duplicate a neighbouring column); frequency remains — it is
   // the list's only visible cadence signal for non-realtime alerts.
@@ -864,6 +891,49 @@ describe("AlertList - router query behaviors", () => {
     expect(wrapper.vm.showAddAlertDialog).toBe(true);
     expect(pushSpy).toHaveBeenCalled();
   });
+
+  it("hideForm drops the editor's own params but keeps the rest of the query (e.g. page)", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    wrapper.vm.router.currentRoute.value.query = {
+      action: "update",
+      alert_id: "a1",
+      name: "Alert 1",
+      page: "3",
+    };
+    const spy = vi.spyOn(router, "push");
+    await wrapper.vm.hideForm();
+
+    const pushedQuery = spy.mock.calls[0][0].query;
+    expect(pushedQuery.page).toBe("3");
+    expect(pushedQuery.action).toBeUndefined();
+    expect(pushedQuery.alert_id).toBeUndefined();
+  });
+});
+
+describe("AlertList - pagination restoration", () => {
+  it("restores the page saved before navigating away, surviving the initial async load", async () => {
+    // Drive the real fetch path (cache-miss -> getAlertsFn) rather than waitData()'s
+    // post-mount override, which double-assigns filteredResults and would trigger a
+    // second, spurious autoResetPageIndex after the legitimate one has already settled.
+    (store.state as any).organizationData.allAlertsListByFolderId = {};
+    alertsDB = Array.from({ length: 15 }, (_, i) => makeAlert(i + 1));
+    (store.state as any).alertListFilters = {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+      perPage: 5,
+      currentPage: 3,
+    };
+    const wrapper: any = await mountAlertList();
+    await flushPromises();
+    await wrapper.vm.$nextTick();
+    // The reassert is scheduled via setTimeout(0) to run after TanStack's own deferred auto-reset — see AlertList.vue's watch(loading, ...).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.vm.oTableRef.table.getState().pagination.pageIndex).toBe(2);
+  });
 });
 
 // 6. Search behaviors and debounce
@@ -1038,14 +1108,19 @@ describe("AlertList - micro validations", () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("importAlert sets dialog and pushes route", async () => {
+  it("importAlert sets dialog and pushes route, preserving the rest of the query", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
+    wrapper.vm.router.currentRoute.value.query = {
+      ...wrapper.vm.router.currentRoute.value.query,
+      page: "3",
+    };
     const spy = vi.spyOn(router, "push");
     wrapper.vm.importAlert();
     await flushPromises();
     expect(wrapper.vm.showImportAlertDialog).toBe(true);
     expect(spy).toHaveBeenCalled();
+    expect(spy.mock.calls[0][0].query.page).toBe("3");
   });
 
   it("updateFolderIdToBeCloned updates state", async () => {
@@ -1276,11 +1351,15 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.props("size")).toBe("sm");
   });
 
-  it("clone dialog ODialog binds title, button labels, and primaryDisabled to isSubmitting", async () => {
+  it("clone dialog ODialog binds title, labels, and primaryDisabled to isSubmitting and a present name", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.showForm = true;
     wrapper.vm.isSubmitting = false;
+    // duplicateAlert() seeds this from the source row, so the dialog is never
+    // open with a blank name in the UI. Setting showForm alone reaches a state
+    // the user cannot.
+    wrapper.vm.toBeCloneAlertName = "orders_latency_clone";
     await wrapper.vm.$nextTick();
 
     const cloneDialog = wrapper.findComponent({ name: "ODialog" });
@@ -1290,6 +1369,14 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(false);
 
     wrapper.vm.isSubmitting = true;
+    await wrapper.vm.$nextTick();
+    expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+
+    // #14627: a whitespace-only name is refused too. Neither clone endpoint
+    // rejects a blank name, and the resulting row cannot be searched, toggled
+    // or deleted by name — so Save has to be the gate.
+    wrapper.vm.isSubmitting = false;
+    wrapper.vm.toBeCloneAlertName = "   ";
     await wrapper.vm.$nextTick();
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
   });
@@ -1616,4 +1703,43 @@ describe("AlertList - ODialog/ODrawer migration", () => {
       expect(row.groups_observed).toBeUndefined();
     });
   }, 15000);
+});
+
+/// The payoff of ownership routing is being able to see, from the alerts list,
+/// which team each rule pages. Only an alert that NAMES a team can be answered
+/// here — see the column comment in AlertList.vue.
+describe("AlertList - on-call owner column", () => {
+  afterEach(() => {
+    delete (store.state as any).zoConfig.oncall_enabled;
+  });
+
+  it("is absent on a build with on-call switched off", async () => {
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.vm.columns.map((c: any) => c.id)).not.toContain("oncall_team");
+  });
+
+  it("appears once on-call is enabled", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.vm.columns.map((c: any) => c.id)).toContain("oncall_team");
+  });
+
+  // The alert stores an id; a woken engineer needs the name.
+  it("renders the team's name rather than its id", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(String(wrapper.vm.oncallTeamName("t1"))).toBe("Payments");
+  });
+
+  /// An unreadable team list must not blank the cell: an opaque id still says
+  /// "this alert names a team", which an empty cell would deny.
+  it("falls back to the id when the team is unknown", async () => {
+    (store.state as any).zoConfig.oncall_enabled = true;
+    const wrapper: any = await mountAlertList();
+    await waitData(wrapper);
+    expect(String(wrapper.vm.oncallTeamName("t_gone"))).toBe("t_gone");
+  });
 });

@@ -156,6 +156,8 @@ impl Stream for MonitorStream {
                 None
             }
             Some(Err(e)) => {
+                // A failed partition must never complete or publish a partial cache entry.
+                self.done = true;
                 log::error!("[streaming_id: {}] Error in MonitorStream: {e}", self.id);
                 Some(Err(e))
             }
@@ -244,5 +246,53 @@ mod tests {
         assert_eq!(monitor_stream.id, "test_monitor");
         assert_eq!(monitor_stream.start_time, 1000);
         assert_eq!(monitor_stream.end_time, 2000);
+    }
+
+    #[tokio::test]
+    async fn test_failed_partition_does_not_complete_cache() {
+        use datafusion::{
+            error::DataFusionError,
+            physical_plan::{
+                aggregates::{AggregateMode, PhysicalGroupBy},
+                empty::EmptyExec,
+                stream::RecordBatchStreamAdapter,
+            },
+        };
+
+        let schema = Arc::new(Schema::empty());
+        let aggregate = Arc::new(
+            AggregateExec::try_new(
+                AggregateMode::Partial,
+                PhysicalGroupBy::new_single(vec![]),
+                vec![],
+                vec![],
+                Arc::new(EmptyExec::new(schema.clone())),
+                schema.clone(),
+            )
+            .unwrap(),
+        );
+        let cache = Arc::new(Mutex::new(CacheBuf {
+            total_partition_num: 1,
+            cached_partition_num: 0,
+            cached_buf: CacheStream::new(false, 1, aggregate),
+        }));
+        let input = Box::pin(RecordBatchStreamAdapter::new(
+            schema.clone(),
+            futures::stream::iter([Err(DataFusionError::Execution(
+                "failed input partition".to_string(),
+            ))]),
+        ));
+        let mut stream = MonitorStream::new(
+            "failed-partition".to_string(),
+            0,
+            1,
+            schema,
+            cache.clone(),
+            input,
+            false,
+        );
+        assert!(stream.next().await.unwrap().is_err());
+        assert!(stream.next().await.is_none());
+        assert_eq!(cache.lock().cached_partition_num, 0);
     }
 }

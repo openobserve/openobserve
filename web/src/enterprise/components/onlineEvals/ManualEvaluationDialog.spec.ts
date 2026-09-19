@@ -8,14 +8,17 @@ import ManualEvaluationDialog from "./ManualEvaluationDialog.vue";
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
-vi.mock("@/services/online-evals.service", () => ({
-  default: {
-    jobs: {
-      list: vi.fn(),
-      manualEval: vi.fn(),
+vi.mock("@/services/online-evals.service", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      jobs: {
+        list: vi.fn(),
+        manualEval: vi.fn(),
+      },
     },
-  },
-}));
+  });
+});
 
 const matchingTraceJob: EvalJob = {
   id: "trace-job",

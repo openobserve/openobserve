@@ -74,7 +74,7 @@ test.describe("Streams Regression Bugs", () => {
   // Bug #7468: Multi-stream selection should display ellipsis with tooltip
   // https://github.com/openobserve/openobserve/issues/7468
   test('should display ellipsis with tooltip when multiple streams selected', {
-    tag: ['@bug7468', '@P1', '@regression', '@streamsRegression', '@logs']
+    tag: ['@bug-7468', '@P1', '@regression', '@streamsRegression', '@logs']
   }, async ({ page }) => {
     testLogger.info('Test: Verify ellipsis and tooltip for multiple stream selection with long names (Bug #7468)');
 
@@ -223,7 +223,7 @@ test.describe("Streams Regression Bugs", () => {
   // https://github.com/openobserve/openobserve/issues/9354
   // ==========================================================================
   test("should access stream settings with FTS configuration", {
-    tag: ['@bug9354', '@P1', '@fts', '@regression', '@streamsRegression', '@logs']
+    tag: ['@bug-9354', '@P1', '@fts', '@regression', '@streamsRegression', '@logs']
   }, async ({ page }) => {
     testLogger.info('Test: Verify FTS fields access (Bug #9354)');
 

@@ -85,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-latitude-item-${latitudeLabel}-menu`"
             >
               <div
@@ -97,7 +97,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.latitude.isDerived
                       ? 'auto'
-                      : '48.1875rem',
+                      : 'min(48.1875rem, calc(100vw - 1.5rem))',
                 }"
               >
                 <DynamicFunctionPopUp
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-longitude-item-${longitudeLabel}-menu`"
             >
               <div
@@ -218,7 +218,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.longitude.isDerived
                       ? 'auto'
-                      : '48.1875rem',
+                      : 'min(48.1875rem, calc(100vw - 1.5rem))',
                 }"
               >
                 <DynamicFunctionPopUp
@@ -327,7 +327,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OButton>
             </template>
             <div
-              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[48.1875rem]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md"
+              class="field-function-menu-popup dashboard-geo-maps-query-builder-dropdown w-[min(48.1875rem,calc(100vw-1.5rem))]! translate-y-2 overflow-hidden rounded-none p-0 shadow-md max-lg:max-h-[var(--reka-popper-available-height,75vh)] max-lg:overflow-y-auto"
               :data-test="`dashboard-weight-item-${weightLabel}-menu`"
             >
               <div
@@ -339,7 +339,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
                       .fields.weight.isDerived
                       ? 'auto'
-                      : '48.1875rem',
+                      : 'min(48.1875rem, calc(100vw - 1.5rem))',
                 }"
               >
                 <DynamicFunctionPopUp
@@ -395,7 +395,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, reactive, watch, computed } from "vue";
+import { defineComponent, ref, reactive, watch, computed, inject } from "vue";
 import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
@@ -405,7 +405,6 @@ import { useI18nTyped, raw } from "@/types/i18n";
 import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import useDragHandle from "@/composables/useDragHandle";
 import { getImageURL } from "../../../utils/zincutils";
-import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import DashboardFiltersOption from "@/views/Dashboards/addPanel/DashboardFiltersOption.vue";
 import DynamicFunctionPopUp from "@/components/dashboards/addPanel/dynamicFunction/DynamicFunctionPopUp.vue";
