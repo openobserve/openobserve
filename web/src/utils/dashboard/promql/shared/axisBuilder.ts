@@ -16,6 +16,7 @@
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
 import { getGridLineStyle } from "../../colorPalette";
 import { chartColor } from "@/utils/chartTheme";
+import { escapeHtml } from "@/utils/html";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -69,7 +70,7 @@ export function buildTooltip(
 
       // Add axis label (timestamp for time-series)
       if (params[0]?.axisValue) {
-        tooltipItems.push(params[0].axisValue);
+        tooltipItems.push(escapeHtml(params[0].axisValue));
       }
 
       // Sort by value and hoist the hovered series, matching SQL tooltips
@@ -91,7 +92,7 @@ export function buildTooltip(
           // Apply unit formatting
           const formattedValue = formatUnitValue(getUnitValue(value, unit, unitCustom, decimals));
 
-          const row = `${marker} ${param.seriesName}: ${formattedValue}`;
+          const row = `${marker} ${escapeHtml(param.seriesName)}: ${escapeHtml(formattedValue)}`;
           tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
         }
       });
