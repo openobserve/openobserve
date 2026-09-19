@@ -130,7 +130,13 @@ pub async fn search(
         };
         index_files.insert(
             file.key.clone(),
-            (file.account.clone(), sidecar_path, cache_key, expected_rows),
+            (
+                file.account.clone(),
+                sidecar_path,
+                cache_key,
+                expected_rows,
+                file.meta.max_ts,
+            ),
         );
     }
     if index_files.is_empty() {
@@ -145,7 +151,9 @@ pub async fn search(
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
+        for (data_path, (account, sidecar_path, cache_key, expected_rows, max_timestamp)) in
+            index_files
+        {
             metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
                 .with_label_values::<&str>(&[])
                 .inc();
@@ -156,13 +164,27 @@ pub async fn search(
                 // only complete selections are cached, so a hit implies exactness
                 evaluated.push((data_path, ranges, true, row_group_size));
             } else {
-                misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
+                misses.push((
+                    data_path,
+                    account,
+                    sidecar_path,
+                    cache_key,
+                    expected_rows,
+                    max_timestamp,
+                ));
             }
         }
     } else {
         misses.extend(index_files.into_iter().map(
-            |(data_path, (account, sidecar_path, cache_key, expected_rows))| {
-                (data_path, account, sidecar_path, cache_key, expected_rows)
+            |(data_path, (account, sidecar_path, cache_key, expected_rows, max_timestamp))| {
+                (
+                    data_path,
+                    account,
+                    sidecar_path,
+                    cache_key,
+                    expected_rows,
+                    max_timestamp,
+                )
             },
         ));
     }
@@ -170,7 +192,7 @@ pub async fn search(
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
     let matchers = Arc::new(matchers.clone());
     let mut evaluations = stream::iter(misses.into_iter().map(
-        |(data_path, account, sidecar_path, cache_key, expected_rows)| {
+        |(data_path, account, sidecar_path, cache_key, expected_rows, max_timestamp)| {
             let labels = Arc::clone(&matcher_labels);
             let matchers = Arc::clone(&matchers);
             let block_files = Arc::clone(&block_files);
@@ -184,11 +206,11 @@ pub async fn search(
                             Ok(data) => data,
                             Err(error) => {
                                 log::debug!("[trace_id {trace_id}] block index unavailable for {data_path}, trying legacy metrics index: {error}");
-                                load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels)).await?
+                                load_metrics_index_file(&account, &sidecar_path, max_timestamp, Arc::clone(&labels)).await?
                             }
                         }
                     } else {
-                        load_metrics_index_file(&account, &sidecar_path, Arc::clone(&labels))
+                        load_metrics_index_file(&account, &sidecar_path, max_timestamp, Arc::clone(&labels))
                             .await?
                     };
                     tokio::task::spawn_blocking(move || {

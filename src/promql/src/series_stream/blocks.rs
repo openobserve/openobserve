@@ -29,7 +29,10 @@ use futures::{StreamExt, stream};
 use hashbrown::{HashMap, HashSet};
 use hashlink::LruCache;
 use metrics_block::{BlockDecoder, DecodedBlockRef, Index, ParentIdentity};
-use tokio::task::JoinSet;
+use tokio::{
+    sync::{OwnedSemaphorePermit, Semaphore},
+    task::{JoinHandle, JoinSet},
+};
 
 use super::{SeriesStream, block_ranges::plan_coalesced_ranges, plan::LabelColumns};
 use crate::series_loader::label_interner::LabelInterner;
@@ -39,8 +42,41 @@ const PREFETCH_BLOCKS: usize = 128;
 const PREFETCH_BYTES: usize = 4 * 1024 * 1024;
 const COALESCE_MAX_GAP: u64 = 16 * 1024;
 const COALESCE_MAX_SPAN: u64 = 1024 * 1024;
+static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
+    Arc::new(Semaphore::new(
+        config::get_config().limit.cpu_num.clamp(1, 32),
+    ))
+});
 static INDEX_CACHE: LazyLock<Mutex<IndexCache>> =
     LazyLock::new(|| Mutex::new(IndexCache::default()));
+
+struct BlockingMetadata<T> {
+    handle: JoinHandle<Result<T>>,
+}
+
+impl<T: Send + 'static> BlockingMetadata<T> {
+    async fn run(
+        permit: OwnedSemaphorePermit,
+        work: impl FnOnce() -> Result<T> + Send + 'static,
+    ) -> Result<T> {
+        let mut task = Self {
+            handle: tokio::task::spawn_blocking(move || {
+                let _permit = permit;
+                work()
+            }),
+        };
+        (&mut task.handle)
+            .await
+            .context("metrics metadata worker failed")?
+    }
+}
+
+impl<T> Drop for BlockingMetadata<T> {
+    fn drop(&mut self) {
+        // Running blocking work retains its permit; queued work can still be aborted.
+        self.handle.abort();
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct CacheKey {
@@ -522,7 +558,9 @@ struct ValidatedPartition {
 
 pub async fn load_metrics_block_index(file: &FileKey, labels: &[String]) -> Result<Arc<Index>> {
     Ok(Arc::clone(
-        &load_index_inner(file, labels, false).await?.index,
+        &load_index_inner(file, labels, false, Arc::clone(&METADATA_WORKERS))
+            .await?
+            .index,
     ))
 }
 
@@ -848,13 +886,14 @@ fn load_opened_local_index_with(
 }
 
 async fn load_index(file: &FileKey, labels: &[String]) -> Result<Arc<LoadedFile>> {
-    load_index_inner(file, labels, true).await
+    load_index_inner(file, labels, true, Arc::clone(&METADATA_WORKERS)).await
 }
 
 async fn load_index_inner(
     file: &FileKey,
     labels: &[String],
     map_samples: bool,
+    workers: Arc<Semaphore>,
 ) -> Result<Arc<LoadedFile>> {
     ensure!(
         file.key.ends_with(".parquet"),
@@ -885,26 +924,41 @@ async fn load_index_inner(
         cache.trim(limit);
         if limit > 0 { cache.get(&key) } else { None }
     };
+    let permit = workers
+        .acquire_owned()
+        .await
+        .context("metrics metadata admission closed")?;
     #[cfg(all(unix, target_pointer_width = "64"))]
     if let Some(local) = infra::storage::try_open_local_file(&file.account, &sidecar).await? {
         let cache_hit = cached.is_some();
-        let (entry, mapping) =
-            match load_opened_local_index_with(local, cached, &parent, labels, |file, len, end| {
-                if map_samples {
-                    map_local_index(file, len, end)
-                } else {
-                    Err(std::io::Error::other("metadata-only read"))
-                }
-            }) {
-                Ok(value) => value,
-                Err(error) => {
-                    INDEX_CACHE
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .remove(&key);
-                    return Err(error);
-                }
-            };
+        let load_parent = parent.clone();
+        let load_labels = labels.to_vec();
+        let (entry, mapping) = match BlockingMetadata::run(permit, move || {
+            load_opened_local_index_with(
+                local,
+                cached,
+                &load_parent,
+                &load_labels,
+                |file, len, end| {
+                    if map_samples {
+                        map_local_index(file, len, end)
+                    } else {
+                        Err(std::io::Error::other("metadata-only read"))
+                    }
+                },
+            )
+        })
+        .await
+        {
+            Ok(value) => value,
+            Err(error) => {
+                INDEX_CACHE
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&key);
+                return Err(error);
+            }
+        };
         if limit > 0 && !cache_hit {
             INDEX_CACHE
                 .lock()
@@ -944,11 +998,18 @@ async fn load_index_inner(
     let metadata =
         infra::cache::storage::get_range(&file.account, &location, footer.metadata_range.clone())
             .await?;
-    let index = Arc::new(metrics_block::decode_index(
-        metadata, &footer, &parent, labels,
-    )?);
-    validate_projected_labels(&index, labels)?;
-    let entry = Arc::new(CachedIndex { index, binding });
+    let load_labels = labels.to_vec();
+    let entry = BlockingMetadata::run(permit, move || {
+        let index = Arc::new(metrics_block::decode_index(
+            metadata,
+            &footer,
+            &parent,
+            &load_labels,
+        )?);
+        validate_projected_labels(&index, &load_labels)?;
+        Ok(Arc::new(CachedIndex { index, binding }))
+    })
+    .await?;
     if limit > 0 {
         INDEX_CACHE
             .lock()
@@ -1333,6 +1394,81 @@ mod tests {
                     .collect(),
             }
         }
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn metadata_admission_bounds_remote_io_and_cancels_waiters() {
+        let data = file(&[(1, 10, 1.0, Some("x"))]);
+        let fixture = Fixture::with_gates(std::slice::from_ref(&data), false, true).await;
+        let key = fixture.scan([data.0]).files.remove(0);
+        let workers = Arc::new(Semaphore::new(1));
+        let first_file = key.clone();
+        let first_workers = Arc::clone(&workers);
+        let first =
+            tokio::spawn(
+                async move { load_index_inner(&first_file, &[], false, first_workers).await },
+            );
+        fixture.entered.notified().await;
+        let second_file = key.clone();
+        let second_workers = Arc::clone(&workers);
+        let second = tokio::spawn(async move {
+            load_index_inner(&second_file, &[], false, second_workers).await
+        });
+        tokio::task::yield_now().await;
+        assert_eq!(fixture.active.load(Ordering::SeqCst), 1);
+        assert_eq!(workers.available_permits(), 0);
+        second.abort();
+        assert!(matches!(second.await, Err(error) if error.is_cancelled()));
+        assert_eq!(fixture.active.load(Ordering::SeqCst), 1);
+        first.abort();
+        assert!(matches!(first.await, Err(error) if error.is_cancelled()));
+        assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
+        assert_eq!(workers.available_permits(), 1);
+        assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
+        let cache_key = CacheKey {
+            account: key.account.clone(),
+            parent: ParentIdentity {
+                object_key: key.key.clone(),
+                rows: key.meta.records as u64,
+                compressed_size: key.meta.compressed_size as u64,
+            },
+            labels: vec![],
+        };
+        assert!(
+            INDEX_CACHE
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .get(&cache_key)
+                .is_none()
+        );
+        workers.close();
+        assert!(load_index_inner(&key, &[], false, workers).await.is_err());
+        assert_eq!(fixture.active.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn blocking_metadata_failure_releases_admission_and_keeps_runtime_responsive() {
+        let workers = Arc::new(Semaphore::new(1));
+        let runtime_thread = std::thread::current().id();
+        let result = BlockingMetadata::<()>::run(
+            Arc::clone(&workers).acquire_owned().await.unwrap(),
+            move || {
+                assert_ne!(std::thread::current().id(), runtime_thread);
+                panic!("injected metadata worker panic");
+            },
+        )
+        .await;
+        assert!(result.is_err());
+        assert_eq!(workers.available_permits(), 1);
+        assert_eq!(
+            BlockingMetadata::run(Arc::clone(&workers).acquire_owned().await.unwrap(), || Ok(
+                7
+            ))
+            .await
+            .unwrap(),
+            7
+        );
+        assert_eq!(workers.available_permits(), 1);
     }
 
     fn schema() -> Arc<Schema> {
@@ -2213,6 +2349,16 @@ mod tests {
 
         use super::*;
 
+        struct DropSignal(Option<tokio::sync::oneshot::Sender<()>>);
+
+        impl Drop for DropSignal {
+            fn drop(&mut self) {
+                if let Some(sender) = self.0.take() {
+                    let _ = sender.send(());
+                }
+            }
+        }
+
         struct DiskFixture {
             _directory: tempfile::TempDir,
             path: PathBuf,
@@ -2265,6 +2411,79 @@ mod tests {
                 std::fs::write(&staging, bytes).unwrap();
                 std::fs::rename(staging, &self.path).unwrap();
             }
+        }
+
+        #[tokio::test(flavor = "current_thread")]
+        async fn cancelled_blocking_native_metadata_keeps_its_permit_and_drops_results() {
+            let disk = DiskFixture::new(&file(&[(1, 10, 1.0, Some("x")), (1, 20, 2.0, Some("x"))]));
+            let local = disk.open();
+            let parent = disk.parent();
+            let cache_key = CacheKey {
+                account: config::ider::uuid(),
+                parent: parent.clone(),
+                labels: vec!["group".into()],
+            };
+            let publish_key = cache_key.clone();
+            let workers = Arc::new(Semaphore::new(1));
+            let permit = Arc::clone(&workers).acquire_owned().await.unwrap();
+            let runtime_thread = std::thread::current().id();
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let (release_tx, release_rx) = std::sync::mpsc::channel();
+            let (mapping_tx, mapping_rx) = tokio::sync::oneshot::channel();
+            let (dropped_tx, dropped_rx) = tokio::sync::oneshot::channel();
+            let published = Arc::new(AtomicUsize::new(0));
+            let published_task = Arc::clone(&published);
+            let caller = tokio::spawn(async move {
+                let (entry, mapping, _dropped) = BlockingMetadata::run(permit, move || {
+                    assert_ne!(std::thread::current().id(), runtime_thread);
+                    let dropped = DropSignal(Some(dropped_tx));
+                    let _ = started_tx.send(());
+                    let _ = release_rx.recv();
+                    let (entry, mapping) =
+                        load_opened_local_index(local, None, &parent, &["group".into()])?;
+                    let _ = mapping_tx.send(Arc::downgrade(mapping.as_ref().unwrap()));
+                    Ok((entry, mapping, dropped))
+                })
+                .await?;
+                published_task.fetch_add(1, Ordering::SeqCst);
+                INDEX_CACHE
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .insert(publish_key, entry, 1024 * 1024);
+                drop(mapping);
+                Ok::<(), anyhow::Error>(())
+            });
+            started_rx.await.unwrap();
+            tokio::task::yield_now().await;
+            caller.abort();
+            assert!(caller.await.unwrap_err().is_cancelled());
+            assert_eq!(workers.available_permits(), 0);
+            assert!(Arc::clone(&workers).try_acquire_owned().is_err());
+            assert!(
+                INDEX_CACHE
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(&cache_key)
+                    .is_none()
+            );
+            release_tx.send(()).unwrap();
+            let mapping = mapping_rx.await.unwrap();
+            tokio::time::timeout(std::time::Duration::from_secs(5), dropped_rx)
+                .await
+                .unwrap()
+                .unwrap();
+            let released_permit = Arc::clone(&workers).acquire_owned().await.unwrap();
+            assert!(mapping.upgrade().is_none());
+            assert_eq!(published.load(Ordering::SeqCst), 0);
+            assert!(
+                INDEX_CACHE
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .get(&cache_key)
+                    .is_none()
+            );
+            drop(released_permit);
+            assert_eq!(workers.available_permits(), 1);
         }
 
         fn map_prepared(

@@ -6884,6 +6884,7 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "arrow-schema",
+ "async-trait",
  "bytes",
  "config",
  "datafusion",
@@ -6892,10 +6893,12 @@ dependencies = [
  "infra",
  "log",
  "metrics_block",
+ "object_store",
  "parquet",
  "promql",
  "promql-parser",
  "regex",
+ "tempfile",
  "tokio",
 ]
 

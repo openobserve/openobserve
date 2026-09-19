@@ -21,5 +21,8 @@ promql-parser.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+async-trait.workspace = true
+object_store.workspace = true
+tempfile.workspace = true
 parquet.workspace = true
 regex.workspace = true

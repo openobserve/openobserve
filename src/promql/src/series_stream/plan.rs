@@ -99,8 +99,6 @@ impl LabelColumns {
     }
 }
 
-/// One hash-sorted stream per partition over the selector's hash-sorted table, projected to the
-/// sample columns plus the label columns; `None` when the layout cannot stream in order.
 struct PlannedPartition {
     plan: Arc<dyn ExecutionPlan>,
     task_ctx: Arc<TaskContext>,
@@ -197,8 +195,6 @@ pub(crate) async fn execute_partitioned(
     ))
 }
 
-/// Every partition's ordered input streams; `None` (logged) means a partition's plan cannot stream
-/// in order.
 /// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
 pub(crate) fn group_label_columns(
     modifier: &Option<LabelModifier>,

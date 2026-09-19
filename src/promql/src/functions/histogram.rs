@@ -255,7 +255,6 @@ mod tests {
             let start = std::time::Instant::now();
             let trace_id = &eval_ctx.trace_id;
 
-            // Handle input data - convert to matrix format if needed
             let in_matrix = match data {
                 Value::Matrix(m) => m,
                 Value::None => {
@@ -268,7 +267,6 @@ mod tests {
                 }
             };
 
-            // Always use range query path - compute all timestamps at once
             let timestamps = eval_ctx.timestamps();
             log::info!(
                 "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} series and {} time points",
@@ -279,7 +277,6 @@ mod tests {
             let mut metrics_by_sig: HashMap<u64, Vec<(f64, RangeValue)>> = HashMap::default();
 
             for rv in in_matrix {
-                // Verify this metric has a bucket label
                 let Ok(upper_bound) = rv.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
                     continue;
                 };
@@ -297,7 +294,6 @@ mod tests {
 
             for (_sig, mut bucket_series) in metrics_by_sig {
                 bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
-                // Get the labels (without bucket label) from the first series
                 let base_labels = bucket_series[0]
                     .1
                     .labels
@@ -311,11 +307,9 @@ mod tests {
                 let mut samples = Vec::with_capacity(timestamps.len());
                 let mut cursors = vec![0usize; bucket_series.len()];
 
-                // For each timestamp, compute histogram_quantile
                 for &eval_ts in &timestamps {
                     let mut buckets = Vec::with_capacity(bucket_series.len());
 
-                    // Collect bucket values at this timestamp
                     for ((upper_bound, bucket_rv), cursor) in
                         bucket_series.iter().zip(cursors.iter_mut())
                     {
@@ -368,7 +362,6 @@ mod tests {
             if phi > 1.0 {
                 return f64::INFINITY;
             }
-            // The caller guarantees that `buckets` is non-empty.
             let highest_bucket = &buckets[buckets.len() - 1];
             if !(highest_bucket.upper_bound.is_infinite()
                 && highest_bucket.upper_bound.is_sign_positive())
