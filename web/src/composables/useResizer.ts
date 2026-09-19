@@ -6,8 +6,6 @@ import { throttle } from "lodash-es";
 interface UseResizerOptions {
   direction: "horizontal" | "vertical";
   initialValue: number;
-  /** A getter keeps a limit live — a number is frozen at setup, which is wrong
-   *  for callers whose limits change after mount (OSplitter's do). */
   minValue?: number | (() => number);
   maxValue?: number | (() => number);
   unit: "px" | "%";

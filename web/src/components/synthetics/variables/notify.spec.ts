@@ -23,12 +23,6 @@ const sources = readdirSync(DIR)
   .map((f) => ({ file: f, text: readFileSync(join(DIR, f), "utf-8") }));
 
 describe("notification API", () => {
-  // `toast` is a plain function — `function toast(options: ToastOptions)`. It
-  // has no .success/.error members, so `toast.success(...)` is a TypeError at
-  // runtime, not a compile error. That shipped: every notification in this
-  // directory was silently dead, and because the throw landed mid-handler it
-  // also skipped the `emit("update:list")` on the next line — so a save that
-  // had already succeeded on the server looked like it did nothing at all.
   it("never calls toast as if it had .success or .error members", () => {
     const offenders = sources
       .filter(({ text }) => /toast\s*\.\s*(success|error|warning|info)\s*\(/.test(text))
@@ -50,9 +44,6 @@ describe("notification API", () => {
 });
 
 describe("side-effect ordering", () => {
-  // The refresh and the close are what the user is waiting on; a toast is
-  // cosmetic. Ordering the cosmetic call first is what turned one broken API
-  // call into "saving does not refresh the list".
   it("emits the refresh before showing the success toast", () => {
     for (const { file, text } of sources) {
       const success = text.indexOf('variant: "success"');

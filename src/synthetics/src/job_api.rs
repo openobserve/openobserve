@@ -484,7 +484,8 @@ use std::collections::HashMap;
 use config::meta::{
     self_reporting::usage::UsageData,
     synthetics::{
-        MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticVariable, for_each_string_at_path,
+        MAX_VARIABLES, Synthetic, SyntheticAuth, SyntheticType, SyntheticVariable,
+        validate_http_url,
     },
     synthetics_variables::substitute_placeholders,
 };
@@ -1093,36 +1094,31 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         .ok_or_else(|| anyhow::anyhow!("check not found: {}", check.synthetics_id))?;
 
     // Decrypt credentials and variables; build env_inject for the probe.
-    // Extracted config secrets live in config_secrets; legacy rows may still
-    // carry AESenc: values in-place inside config.
-    let mut has_encrypted_config = !synthetic.config_secrets.is_empty();
-    for path in synthetic.check_type.secret_config_paths() {
-        let _ = for_each_string_at_path(&mut synthetic.config, path, &mut |s: &mut String| {
-            if s.starts_with("AESenc:") {
-                has_encrypted_config = true;
-            }
-            Ok::<(), ()>(())
-        });
-    }
-    // The environment this job was fanned out for. Read from the JOB, not the
-    // check: with fan-out a check produces jobs for several environments at
-    // once, so the check no longer knows which one this job is.
+    let has_encrypted_config = crate::service::has_encrypted_config(&mut synthetic);
     let env_id = check.env.clone();
-    // Widened past the check's own fields: a check whose variables all live in the shared tier has
-    // an empty `variables` vec, and computing `needs_dek` without this skipped the whole decrypt
-    // block, so it resolved nothing at all and the probe typed empty strings into every field.
     let has_shared_variables = crate::service::org_has_shared_variables(&check.org_id).await;
     let mut env_inject = HashMap::new();
 
     if needs_dek(&synthetic, has_encrypted_config, has_shared_variables) {
         let dek = crate::service::synthetics_dek(&check.org_id).await?;
 
+        // Before the shared tier: a `{{NAME}}` in a header only exists once its slot is restored.
+        if has_encrypted_config {
+            crate::service::rehydrate_config_secrets(&mut synthetic, &dek)?;
+        }
+
         if let Some(ref auth) = synthetic.auth {
             env_inject.extend(build_env_map(auth, &dek)?);
         }
 
         let shared = if has_shared_variables {
-            crate::service::resolve_shared_variables(&check.org_id, env_id.as_deref(), &dek).await?
+            crate::service::resolve_shared_variables(
+                &check.org_id,
+                env_id.as_deref(),
+                &synthetic,
+                &dek,
+            )
+            .await?
         } else {
             Vec::new()
         };
@@ -1162,31 +1158,11 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
                     .map_err(|e| anyhow::anyhow!("cookies serialize failed: {e}"))?,
             );
         }
-
-        // Rehydrate config-embedded secrets (SSH password, headers, browser
-        // recorded secrets) — the probe reads them from `config` verbatim.
-        if has_encrypted_config {
-            for (pointer, encrypted) in std::mem::take(&mut synthetic.config_secrets) {
-                if let Some(slot) = synthetic.config.pointer_mut(&pointer) {
-                    *slot = serde_json::Value::String(crate::service::decrypt_secret(
-                        &dek, &encrypted,
-                    )?);
-                }
-            }
-            // Legacy rows: AESenc: values still stored in-place inside config.
-            for path in synthetic.check_type.secret_config_paths() {
-                for_each_string_at_path(&mut synthetic.config, path, &mut |s: &mut String| {
-                    if s.starts_with("AESenc:") {
-                        *s = crate::service::decrypt_secret(&dek, s)?;
-                    }
-                    Ok::<(), anyhow::Error>(())
-                })?;
-            }
-        }
     }
 
-    // Resolve a templated target before it leaves the control plane.
     synthetic.target = substitute_placeholders(&synthetic.target, &env_inject);
+    // The save-time check saw only the template; a variable can still supply `file://`.
+    validate_resolved_target(&synthetic)?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1233,8 +1209,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
-    // Stamped per JOB, not in the enqueue-time metadata blob: that blob is built
-    // once per run while fan-out gives every job its own environment.
     if let Some(env_id) = check.env.as_deref() {
         metadata["environment"] =
             serde_json::json!(environment_display_name(&check.org_id, env_id).await);
@@ -1286,14 +1260,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     })
 }
 
-/// AES-decrypt credentials from `auth` and return as env var map.
-/// Whether resolving this check needs the org DEK at all.
-///
-/// The shared tier is the fourth input and the one that used to be missing:
-/// this read only the check's own fields, so a check whose variables all live in
-/// the shared tier computed `false`, skipped the entire decrypt block, and
-/// resolved nothing — the probe then typed empty strings into every field the
-/// journey filled. Failing silently is what made it worth extracting.
 fn needs_dek(
     synthetic: &Synthetic,
     has_encrypted_config: bool,
@@ -1314,8 +1280,6 @@ fn merge_variable_tiers(
     synthetics_id: &str,
 ) -> anyhow::Result<HashMap<String, String>> {
     let mut merged: HashMap<String, String> = shared.into_iter().collect();
-    // All values are AESenc: at rest regardless of the `secure` flag, which is a
-    // display hint and has never had a storage effect.
     for var in check_variables {
         let value = if var.value.starts_with("AESenc:") {
             crate::service::decrypt_secret(dek, &var.value)?
@@ -1333,6 +1297,17 @@ fn merge_variable_tiers(
     Ok(merged)
 }
 
+/// Fails the job when the substituted target of an HTTP or browser check is not an http(s) URL.
+fn validate_resolved_target(synthetic: &Synthetic) -> anyhow::Result<()> {
+    match synthetic.check_type {
+        SyntheticType::Http | SyntheticType::Browser => {
+            validate_http_url("target", &synthetic.target).map_err(|e| anyhow::anyhow!(e))
+        }
+        _ => Ok(()),
+    }
+}
+
+/// AES-decrypt credentials from `auth` and return as env var map.
 fn build_env_map(auth: &SyntheticAuth, dek: &[u8]) -> anyhow::Result<HashMap<String, String>> {
     let mut map = HashMap::new();
     match auth {
@@ -1618,9 +1593,6 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     };
     let (failing_locations, passing_locations) = (outcomes.failing, outcomes.passing);
 
-    // Which environments broke, resolved to names. Empty for a check that
-    // targets none — every check that pre-dates fan-out — so the message shape
-    // is unchanged for them.
     let failing_environments = if run_complete && !matches!(alert, AlertDecision::Silent) {
         environment_names(&check.org_id, &check.run_id).await
     } else {
@@ -1653,8 +1625,6 @@ pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse
     })
 }
 
-/// The environment name a result row is stamped with — the id when the lookup
-/// fails, the same degradation `environment_names` chose.
 pub(crate) async fn environment_display_name(org_id: &str, env_id: &str) -> String {
     let conn = get_orm_client_rw().await;
     match infra::table::synthetics_environments::get_by_id(conn, org_id, env_id).await {
@@ -2800,8 +2770,6 @@ mod tests {
 
     #[test]
     fn a_check_with_only_shared_variables_still_needs_the_dek() {
-        // The regression this whole extraction exists for. Before the shared
-        // tier was an input, this check computed `false` and resolved nothing.
         let synthetic = Synthetic::default();
         assert!(!needs_dek(&synthetic, false, false));
         assert!(needs_dek(&synthetic, false, true));
@@ -2847,8 +2815,6 @@ mod tests {
         let shared = vec![("PASSWORD".to_string(), "hunter2".to_string())];
         let merged = merge_variable_tiers(shared, &[], &dek(), "check-1").unwrap();
 
-        // Asserting the value is present, not merely that the call succeeded —
-        // the failure this guards against returned Ok with an empty map.
         assert_eq!(merged.get("PASSWORD").unwrap(), "hunter2");
     }
 
@@ -2878,5 +2844,54 @@ mod tests {
         .unwrap();
         assert_eq!(merged.len(), MAX_VARIABLES);
         assert_eq!(merged.get("SHARED_0").unwrap(), "override");
+    }
+
+    #[test]
+    fn a_resolved_target_must_still_be_an_http_url() {
+        let check = |check_type, target: &str| Synthetic {
+            check_type,
+            target: target.to_string(),
+            ..Default::default()
+        };
+        assert!(
+            validate_resolved_target(&check(SyntheticType::Http, "file:///etc/passwd")).is_err()
+        );
+        assert!(
+            validate_resolved_target(&check(SyntheticType::Browser, "javascript:alert(1)"))
+                .is_err()
+        );
+        assert!(
+            validate_resolved_target(&check(SyntheticType::Http, "https://shop.test/login"))
+                .is_ok()
+        );
+        assert!(validate_resolved_target(&check(SyntheticType::Tcp, "db.internal:5432")).is_ok());
+    }
+
+    #[test]
+    fn a_secret_referenced_only_from_a_header_is_visible_once_rehydrated() {
+        let mut synthetic = Synthetic {
+            check_type: SyntheticType::Http,
+            target: "https://shop.test".to_string(),
+            config: serde_json::json!({
+                "method": "GET",
+                "headers": [{ "key": "Authorization", "value": "" }]
+            }),
+            ..Default::default()
+        };
+        synthetic.config_secrets.insert(
+            "/headers/0/value".to_string(),
+            encrypt_secret(&dek(), "Bearer {{API_TOKEN}}").unwrap(),
+        );
+        let referenced = |s: &Synthetic| {
+            config::meta::synthetics_variables::placeholder_names(
+                &crate::service::check_placeholder_text(s),
+            )
+        };
+        assert!(!referenced(&synthetic).contains("API_TOKEN"));
+
+        crate::service::rehydrate_config_secrets(&mut synthetic, &dek()).unwrap();
+
+        assert!(referenced(&synthetic).contains("API_TOKEN"));
+        assert!(synthetic.config_secrets.is_empty());
     }
 }

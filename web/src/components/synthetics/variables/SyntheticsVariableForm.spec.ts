@@ -36,8 +36,10 @@ vi.mock("@/services/synthetics", () => ({
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
+import { nextTick } from "vue";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 
 function mountForm(props: Record<string, unknown> = {}) {
   return shallowMount(SyntheticsVariableForm, {
@@ -45,7 +47,6 @@ function mountForm(props: Record<string, unknown> = {}) {
     global: {
       plugins: [i18n],
       provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
-      // The fields live inside two nested slots, which shallowMount drops.
       stubs: {
         ODrawer: { template: "<div><slot /></div>" },
         OForm: { template: "<form><slot /></form>" },
@@ -98,7 +99,7 @@ describe("SyntheticsVariableForm — cross-tier shadow confirms", () => {
     wrapper = mountForm({
       environment: "staging",
       isEdit: true,
-      data: { id: "v1", name: "URL", kind: "plain", has_value: true },
+      data: { id: "v1", name: "URL", kind: "plain", value: "https://a.test", has_value: true },
       otherTierNames: { URL: [] },
     });
     await (wrapper.vm as any).save({ name: "URL", kind: "plain", value: "" });
@@ -126,7 +127,6 @@ describe("SyntheticsVariableForm — kind is fixed at creation", () => {
   });
 
   it("disables the Kind select when editing an existing variable", () => {
-    // Both kinds hold the same ciphertext, so kind alone hides the value.
     wrapper = mountForm({
       environment: "staging",
       isEdit: true,
@@ -149,5 +149,80 @@ describe("SyntheticsVariableForm — kind is fixed at creation", () => {
     expect(select.props("disabled")).toBe(true);
     const values = (select.props("options") as { value: string }[]).map((o) => o.value);
     expect(values).toEqual(["plain"]);
+  });
+});
+
+describe("SyntheticsVariableForm — value field", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const valueInput = () =>
+    wrapper.findAllComponents(OFormInput).find((input) => input.props("name") === "value");
+  const defaults = () => (wrapper.vm as unknown as { defaults: { value: string } }).defaults;
+
+  it("prefills a plain variable's current value on edit", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "URL", kind: "plain", value: "https://a.test", has_value: true },
+    });
+
+    expect(defaults().value).toBe("https://a.test");
+    expect(valueInput()?.props("type")).toBe("text");
+  });
+
+  it("never prefills a secret", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "TOKEN", kind: "secret", has_value: false },
+    });
+
+    expect(defaults().value).toBe("");
+  });
+
+  it("masks the value once a new variable is switched to secret", async () => {
+    wrapper = mountForm({ environment: "staging" });
+    expect(valueInput()?.props("type")).toBe("text");
+
+    wrapper.findComponent(OFormSelect).vm.$emit("update:model-value", "secret");
+    await nextTick();
+
+    expect(valueInput()?.props("type")).toBe("password");
+  });
+});
+
+describe("SyntheticsVariableForm — saving an edit", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("sends an emptied plain value rather than keeping the stored one", async () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "URL", kind: "plain", value: "https://a.test", has_value: true },
+    });
+    await (wrapper.vm as any).save({ name: "URL", kind: "plain", value: "" });
+
+    expect(updateEnvVar).toHaveBeenCalledTimes(1);
+    expect(updateEnvVar.mock.calls[0][3]).toMatchObject({ value: "" });
+  });
+
+  it("omits a blank secret value so the stored one is kept", async () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "TOKEN", kind: "secret", has_value: true },
+    });
+    await (wrapper.vm as any).save({ name: "TOKEN", kind: "secret", value: "" });
+
+    expect(updateEnvVar.mock.calls[0][3]).not.toHaveProperty("value");
   });
 });

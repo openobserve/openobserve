@@ -556,8 +556,6 @@ describe("makeBrowserCheckSaveSchema field-level step rules", () => {
     expect(result.success).toBe(true);
   });
 
-  // Only the backend's variable-name grammar unlocks the exemption — anything
-  // else in the braces is still an invalid URL, not a resolvable placeholder.
   it("should reject a navigate step whose placeholder has an invalid name", () => {
     for (const value of ["{{BASE URL}}/web/", "{{}}/web/", "{{BASE_URL}} /web/"]) {
       const result = schema.safeParse(form([{ id: "1", action: "navigate", value }]));

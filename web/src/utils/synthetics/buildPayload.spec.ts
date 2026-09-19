@@ -88,8 +88,6 @@ describe("buildCreateBrowserTestPayload", () => {
 });
 
 describe("environments round-trip", () => {
-  // CheckEnvironments edits this list; if either direction drops the field,
-  // a save silently unpins the check from its environments.
   it("carries environments through the browser payload", () => {
     const payload = buildCreateBrowserTestPayload(check({ environments: ["env-1"] }));
 

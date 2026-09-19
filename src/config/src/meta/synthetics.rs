@@ -13,9 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::collections::HashMap;
+
 use chrono::FixedOffset;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
+use super::synthetics_variables::{placeholder_names, substitute_placeholders};
 
 // ── Frequency ─────────────────────────────────────────────────────────────────
 
@@ -1350,9 +1354,6 @@ pub const DEFAULT_TEST_ID_ATTR: &str = "data-test";
 const MAX_TEST_ID_ATTR_LEN: usize = 64;
 const MAX_SETTLE_RESPONSES: usize = 5;
 const MAX_TAGS: usize = 20;
-/// Variables one check may end up with. Applies to the **resolved** set — the
-/// shared tier merged with the check's own — because that is what the probe
-/// receives and what an author has to reason about.
 pub const MAX_VARIABLES: usize = 50;
 
 /// Environments one check may fan out over.
@@ -1370,25 +1371,19 @@ const MIN_BROWSER_INTERVAL_SECS: i64 = 60;
 const TEMPLATE_PROBE_TOKEN: &str = "placeholder";
 
 /// Validates a URL that may be templated.
-fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
+pub fn validate_http_url(field: &str, value: &str) -> Result<(), String> {
     if value.contains("{{") {
         if value.chars().any(char::is_whitespace) {
             return Err(format!("{field}: must not contain whitespace: '{value}'"));
         }
-        let mut probe = String::new();
-        let mut rest = value;
-        while let Some(open) = rest.find("{{") {
-            probe.push_str(&rest[..open]);
-            let after = &rest[open + 2..];
-            let Some(close) = after.find("}}") else {
-                return Err(format!("{field}: unclosed '{{{{' in '{value}'"));
-            };
-            probe.push_str(TEMPLATE_PROBE_TOKEN);
-            rest = &after[close + 2..];
+        let tokens: HashMap<String, String> = placeholder_names(value)
+            .into_iter()
+            .map(|name| (name, TEMPLATE_PROBE_TOKEN.to_string()))
+            .collect();
+        let probe = substitute_placeholders(value, &tokens);
+        if probe.contains("{{") {
+            return Err(format!("{field}: unclosed or invalid '{{{{' in '{value}'"));
         }
-        probe.push_str(rest);
-        // A target starting with a placeholder has no scheme to parse until the placeholder
-        // supplies one, so assume the one it must resolve to.
         let candidate = if probe.contains("://") {
             probe
         } else {
@@ -1671,8 +1666,6 @@ impl Synthetic {
                     v.name
                 ));
             }
-            // `resolve` injects the probe's own credentials under this prefix, so a
-            // check variable claiming one would overwrite its own auth.
             if v.name
                 .starts_with(crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX)
             {
@@ -1698,9 +1691,6 @@ impl Synthetic {
             if env.trim().is_empty() {
                 return Err("environments: empty environment id not allowed".to_string());
             }
-            // A duplicate would enqueue the same job twice per tick, and the
-            // dedup key would swallow the second — so it is rejected rather
-            // than silently collapsed.
             if !seen_envs.insert(env.as_str()) {
                 return Err(format!("environments: duplicate environment '{env}'"));
             }
@@ -2766,8 +2756,6 @@ mod tests {
 
     #[test]
     fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
-        // The shared tier has always refused it; an inline variable of the same
-        // name silently overwrote the check's own auth at resolve time.
         let (locs, brs, devs) = allowed();
         let mut s = valid_tcp_synthetic();
         s.variables = vec![SyntheticVariable {
@@ -2787,8 +2775,6 @@ mod tests {
         s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET", "timeout_ms": 10000 });
 
-        // The whole point of phase 4: this used to be rejected outright,
-        // because url::Url::parse demands a host it cannot see yet.
         for target in [
             "{{BASE_URL}}/login",
             "https://{{TENANT}}.shop.test/login",
@@ -2838,8 +2824,6 @@ mod tests {
     fn a_check_may_fan_out_over_several_environments() {
         let (locs, brs, devs) = allowed();
 
-        // No environment is the shape every check that pre-dates this feature
-        // has, so it must stay valid with nothing to migrate.
         let mut s = valid_tcp_synthetic();
         s.environments = vec![];
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
@@ -2863,8 +2847,6 @@ mod tests {
 
     #[test]
     fn a_duplicate_environment_is_rejected_not_collapsed() {
-        // The dedup key would swallow the second job silently, so the check
-        // would look like it fanned out and not have.
         let (locs, brs, devs) = allowed();
         let mut s = valid_tcp_synthetic();
         s.environments = vec!["env-1".to_string(), "env-1".to_string()];
@@ -2875,9 +2857,6 @@ mod tests {
 
     #[test]
     fn environments_survive_the_settings_round_trip() {
-        // `environments` rides in the settings JSON blob rather than a column of
-        // its own, which is what makes this a migration-free change. A row
-        // written before the field existed must still deserialize.
         let legacy: SyntheticSettings =
             serde_json::from_value(serde_json::json!({ "retries": 2 })).unwrap();
         assert!(legacy.environments.is_empty());

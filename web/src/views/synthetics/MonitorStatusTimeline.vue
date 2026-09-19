@@ -56,7 +56,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <OIcon name="chevron-left" size="xs" />
         </OButton>
-        <!-- One label per lane; row heights mirror the cells beside them. -->
         <div
           v-if="isLaned"
           class="flex shrink-0 flex-col gap-0.5"
@@ -141,12 +140,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ group.location }}
                         </span>
                       </div>
-                      <!--
-                      Per-execution detail rows: only rendered for browser monitors
-                      where each execution carries a browser engine + device.
-                      Non-browser monitors only have locations — the group header
-                      above (dot + location name) is the full summary.
-                    -->
                       <template v-if="isBrowser">
                         <div
                           v-for="(exec, eIdx) in group.executions"
@@ -250,8 +243,6 @@ interface TimelineSegment {
 
 interface TimelineLane {
   label: string;
-  /** Aligned with `segments` by index; null = this run never touched the lane's
-   *  environment, rendered as an empty slot so columns stay comparable. */
   segments: (TimelineSegment | null)[];
 }
 

@@ -36,6 +36,7 @@ vi.mock("@/services/synthetics", () => ({
 }));
 
 import CheckVariablesPanel from "./CheckVariablesPanel.vue";
+import PromoteCheckVariableDialog from "@/components/synthetics/variables/PromoteCheckVariableDialog.vue";
 
 // ── Stubs ───────────────────────────────────────────────────────────────────
 
@@ -555,6 +556,7 @@ describe("CheckVariablesPanel", () => {
         example: "",
         tags: [],
         value: "acme",
+        has_value: true,
         used_by_checks: 0,
         created_at: 0,
         updated_at: 0,
@@ -601,9 +603,6 @@ describe("CheckVariablesPanel", () => {
       expect(listGlobalVariablesMock).toHaveBeenCalledTimes(1);
     });
 
-    /// The regression: the panel used to key its only fetch on the check id, so
-    /// ticking an environment changed nothing, and an unsaved check had no id to
-    /// resolve against at all.
     it("re-resolves when an environment is ticked, with no further request", async () => {
       mockShared(environments(), [sharedVar()]);
       wrapper = mountPanel({ check: checkWith([varToken], [], []) });
@@ -680,5 +679,68 @@ describe("CheckVariablesPanel", () => {
         "Steps using BASE_URL will now get the staging value.",
       );
     });
+  });
+});
+
+describe("CheckVariablesPanel — promote", () => {
+  let wrapper: VueWrapper;
+  const saved = checkWith([varBaseUrl, varToken]);
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  it("offers no promote for an unsaved check", () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl]) });
+
+    expect(wrapper.find(sel("-promote-0-btn")).exists()).toBe(false);
+  });
+
+  it("offers promote only for rows unchanged since the last save", () => {
+    const edited = { ...varBaseUrl, value: "https://edited.test" };
+    const added = { id: "var-c", name: "NEW", value: "x", secure: false, example: "" };
+    wrapper = mountPanel({
+      check: checkWith([edited, varToken, added]),
+      checkId: "check-1",
+      saved,
+    });
+
+    expect(wrapper.find(sel("-promote-0-btn")).exists()).toBe(false);
+    expect(wrapper.find(sel("-promote-1-btn")).exists()).toBe(true);
+    expect(wrapper.find(sel("-promote-2-btn")).exists()).toBe(false);
+  });
+
+  it("opens the promote dialog for the chosen variable", async () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]), checkId: "check-1", saved });
+
+    await wrapper.find(sel("-promote-1-btn")).trigger("click");
+
+    const dialog = wrapper.findComponent(PromoteCheckVariableDialog);
+    expect(dialog.props("open")).toBe(true);
+    expect(dialog.props("name")).toBe("TOKEN");
+    expect(dialog.props("secure")).toBe(true);
+    expect(dialog.props("checkId")).toBe("check-1");
+  });
+
+  it("drops the promoted variable from the check and reports it", async () => {
+    wrapper = mountPanel({ check: checkWith([varBaseUrl, varToken]), checkId: "check-1", saved });
+
+    wrapper.findComponent(PromoteCheckVariableDialog).vm.$emit("done", "BASE_URL");
+    await nextTick();
+
+    expect(lastEmitted(wrapper).variables?.map((v) => v.name)).toEqual(["TOKEN"]);
+    expect(wrapper.emitted("promoted")?.[0]).toEqual(["BASE_URL"]);
+  });
+
+  it("keeps a row edited while the dialog was open", async () => {
+    const edited = { ...varBaseUrl, value: "https://edited.test" };
+    wrapper = mountPanel({ check: checkWith([edited, varToken]), checkId: "check-1", saved });
+
+    wrapper.findComponent(PromoteCheckVariableDialog).vm.$emit("done", "BASE_URL");
+    await nextTick();
+
+    expect(wrapper.emitted("update:check")).toBeUndefined();
+    expect(wrapper.emitted("promoted")?.[0]).toEqual(["BASE_URL"]);
   });
 });

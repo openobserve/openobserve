@@ -15,12 +15,6 @@
 
 import type { SyntheticsVariable } from "@/types/synthetics";
 
-/**
- * Relative time from a microsecond timestamp.
- *
- * Microseconds, not milliseconds: every synthetics timestamp on the wire is
- * `now_micros()`. Treating one as milliseconds dates a row to 1970.
- */
 export function relativeTime(micros: number, now: number = Date.now()): string {
   if (!micros) return "—";
   const seconds = Math.max(0, Math.floor((now - micros / 1000) / 1000));
@@ -36,14 +30,6 @@ export function relativeTime(micros: number, now: number = Date.now()): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
-/**
- * Does the environment refuse deletion outright, rather than on confirmation?
- *
- * A secret's value is write-only, so deleting one is unrecoverable by anyone -
- * there is no copy to restore from and nobody who can read it back. Checks are
- * the other hard block: the check would keep naming an environment that no
- * longer exists. Plain variables only need confirmation.
- */
 export function environmentDeleteBlock(
   variables: SyntheticsVariable[],
   checksCount: number,

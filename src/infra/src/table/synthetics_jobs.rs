@@ -75,8 +75,6 @@ pub struct LeasedRow {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
-    /// Environment this job runs against; None for an unscoped check. `resolve`
-    /// filters the shared variable tier by it.
     pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,
@@ -838,15 +836,11 @@ pub async fn failing_environments<C: ConnectionTrait>(
         .all(conn)
         .await?;
 
-    // Worst first, matching `run_location_outcomes`: a reader scanning the
-    // first line should see the most severe environment.
     rows.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 
     let mut failing = Vec::new();
     for (env, status) in rows {
         let Some(env) = env else { continue };
-        // One environment can fail in several locations; naming it once per
-        // location would read as several separate outages.
         if status != STATUS_PASSED && !failing.contains(&env) {
             failing.push(env);
         }
@@ -945,8 +939,6 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
 mod tests {
     use super::*;
 
-    /// The COALESCE must survive review. Without it an unscoped job — which is
-    /// every job today — stops being deduplicated at all.
     #[test]
     fn the_dedup_key_coalesces_a_null_environment() {
         for backend in [DatabaseBackend::Postgres, DatabaseBackend::Sqlite] {
@@ -983,8 +975,6 @@ mod tests {
         assert_eq!(p.run_id, "3Fzn001XXXXXXXXXXXXXXXX");
         assert!(p.browser_devices.is_some());
         assert_eq!(p.steps_configured, 14);
-        // Part of the dedup key: without it two environments at one tick
-        // collapse into a single job.
         assert_eq!(p.env, Some("env-prod"));
     }
 
@@ -1018,13 +1008,6 @@ mod tests {
     /// A real sqlite: `get_by_id` names its columns in a raw SELECT, so a column
     /// forgotten there is a runtime "column not found" no mock reproduces. One
     /// connection — separate connections to `sqlite::memory:` are separate DBs.
-    ///
-    /// The dedup index comes from the migration rather than being copied here,
-    /// because copying it is what let this fixture fall a schema change behind
-    /// `enqueue`'s `ON CONFLICT` target. Running the migrator outright would be
-    /// better still, but it cannot: migrations from `m20241115` onwards read
-    /// the `meta` table, which `db::sqlite`'s bootstrap creates outside the
-    /// migrator.
     async fn jobs_db() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, Database, Schema};
 
@@ -1062,9 +1045,6 @@ mod tests {
         }
     }
 
-    /// Fan-out, end to end: without `env` in the conflict target every
-    /// environment after the first is swallowed by `DO NOTHING` and the check
-    /// silently runs against one environment.
     #[tokio::test]
     async fn one_tick_against_two_environments_enqueues_two_jobs() {
         let db = jobs_db().await;

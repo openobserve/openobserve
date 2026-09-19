@@ -517,9 +517,6 @@ const { confirm } = useConfirmDialog();
 const { isMobile, lgUp } = useBreakpoint();
 
 // ── API types ──────────────────────────────────────────────────────────
-// Variables is unconditional: unlike Private Locations it is not
-// feature-flagged, and a check can reference a shared variable on any
-// deployment. Environments live inside it, on the scope rail.
 type SyntheticsSection = "checks" | "private" | "status-pages" | "variables";
 
 interface ApiMonitorFrequency {

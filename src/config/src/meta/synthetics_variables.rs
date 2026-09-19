@@ -13,13 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Org-level synthetics variables and the environments that scope them.
-//!
-//! Two tiers resolve into the probe's flat `env_inject` map: these shared
-//! variables first, then the check's own inline `SyntheticVariable`, so the
-//! narrower tier wins name by name. An environment is a filter and an access
-//! boundary, never a third tier.
-
 use std::collections::{BTreeSet, HashMap};
 
 use serde::{Deserialize, Serialize};
@@ -27,17 +20,10 @@ use utoipa::ToSchema;
 
 use super::synthetics::MAX_VARIABLES;
 
-/// Longest accepted variable name. A name past this is a paste accident, not a
-/// binding anything types.
 pub const MAX_VARIABLE_NAME_LEN: usize = 128;
 
-/// Longest accepted environment name. Names become OpenFGA object ids, so this
-/// also bounds the object id.
 pub const MAX_ENVIRONMENT_NAME_LEN: usize = 64;
 
-/// Names the probe reserves for credentials it injects itself (`_AUTH_COOKIES`
-/// and the `build_env_map` keys). A shared variable claiming one would
-/// overwrite the check's own auth at resolve time.
 pub const RESERVED_VARIABLE_PREFIX: &str = "_AUTH_";
 
 /// Reserved case-insensitively, because the name is also its OpenFGA object id.
@@ -53,15 +39,11 @@ pub enum SyntheticsVariableKind {
     Secret,
 }
 
-/// Create/update body for a shared variable.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SyntheticsVariableRequest {
     pub name: String,
     #[serde(default)]
     pub value: Option<String>,
-    /// Optional so an update that never mentions `kind` is not read as an
-    /// attempt to change it — the field defaults to `Plain`, and a client
-    /// editing a secret's description sends no kind at all.
     #[serde(default)]
     pub kind: Option<SyntheticsVariableKind>,
     #[serde(default)]
@@ -78,17 +60,18 @@ pub struct SyntheticsVariableRequest {
 pub enum VariableValueView {
     Plain {
         value: String,
-    },
-    /// Write-only: presence is all a client ever learns.
-    Secret {
+        #[serde(default)]
         has_value: bool,
     },
+    /// Write-only: presence is all a client ever learns.
+    Secret { has_value: bool },
 }
 
 impl Default for VariableValueView {
     fn default() -> Self {
         Self::Plain {
             value: String::new(),
+            has_value: false,
         }
     }
 }
@@ -106,6 +89,9 @@ pub struct SyntheticsVariableView {
     /// Checks whose definition references `{{NAME}}`.
     #[serde(default)]
     pub used_by_checks: u64,
+    /// Names of those checks, so a destructive action can list them before it is confirmed.
+    #[serde(default)]
+    pub used_by: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner: Option<String>,
     pub created_at: i64,
@@ -119,8 +105,6 @@ pub struct ResolvedVariableView {
     pub kind: SyntheticsVariableKind,
     /// `global`, an environment name, or `check`.
     pub scope: String,
-    /// A shared variable this check redefines. The shared row still exists; the
-    /// check's value is what resolves.
     pub overridden: bool,
     pub example: String,
     pub description: String,
@@ -143,20 +127,17 @@ pub struct PromoteVariableRequest {
     pub environment: Option<String>,
 }
 
-/// One destination of a global → per-environment split.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 pub struct SplitTarget {
     pub environment: String,
     pub value: String,
 }
 
-/// Splitting a global variable into per-environment rows.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SplitVariableRequest {
     pub targets: Vec<SplitTarget>,
 }
 
-/// Create/update body for an environment.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema)]
 pub struct SyntheticsEnvironmentRequest {
     pub name: String,
@@ -164,7 +145,6 @@ pub struct SyntheticsEnvironmentRequest {
     pub description: String,
 }
 
-/// One environment with its variables inline.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 pub struct SyntheticsEnvironmentView {
     pub id: String,
@@ -175,8 +155,6 @@ pub struct SyntheticsEnvironmentView {
     pub is_global: bool,
     pub created_at: i64,
     pub updated_at: i64,
-    /// Checks pinned to this environment. Not derivable from this response, so
-    /// it is counted server-side; `variables.len()` is, so it is not sent.
     pub checks_count: u64,
     pub variables: Vec<SyntheticsVariableView>,
 }
@@ -201,7 +179,6 @@ pub struct CheckVariableFootprint {
     pub environments: Vec<String>,
 }
 
-/// The org's checks and shared rows together.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct OrgVariableState {
     pub checks: Vec<CheckVariableFootprint>,
@@ -231,8 +208,6 @@ pub fn placeholder_names(text: &str) -> BTreeSet<String> {
             found.insert(text[name_start..name_end].to_string());
             i = j + 2;
         } else {
-            // Not a placeholder — resume just past the braces so `{{{{X}}` is
-            // still seen, rather than skipping the whole run.
             i = start;
         }
     }
@@ -307,7 +282,6 @@ pub fn validate_variable_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Validates an environment name.
 pub fn validate_environment_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("name: must not be empty".to_string());
@@ -391,7 +365,6 @@ pub fn validate_variable_request(
     Ok(())
 }
 
-/// Validates an environment create/update body.
 pub fn validate_environment_request(req: &SyntheticsEnvironmentRequest) -> Result<(), String> {
     validate_environment_name(req.name.trim())?;
     validate_environment_description(&req.description)
@@ -475,8 +448,6 @@ mod tests {
 
     #[test]
     fn names_are_stored_upper_cased() {
-        // An API client can POST `base_url` directly, so upper-casing in the
-        // form is a convenience and this is the enforcement.
         assert_eq!(normalize_variable_name("  base_url "), "BASE_URL");
         assert_eq!(normalize_variable_name("BASE_URL"), "BASE_URL");
     }
@@ -492,8 +463,6 @@ mod tests {
 
     #[test]
     fn the_probes_own_credential_prefix_is_reserved() {
-        // `_AUTH_COOKIES` and the build_env_map keys are injected by resolve
-        // itself; a shared variable claiming one would overwrite the check's auth.
         assert!(validate_variable_name("_AUTH_COOKIES").is_err());
         assert!(validate_variable_name("_AUTHENTIC").is_ok());
     }
@@ -591,8 +560,6 @@ mod tests {
         OrgVariableState { checks, shared }
     }
 
-    /// Straddles the boundary in one test, because comparing a state with itself is `None` for
-    /// any implementation and proves nothing.
     #[test]
     fn a_check_lands_exactly_on_the_limit_without_being_rejected() {
         let checks = || vec![footprint("Login", &[], &[])];
@@ -628,8 +595,6 @@ mod tests {
         assert!(err.contains(&MAX_VARIABLES.to_string()), "{err}");
     }
 
-    /// The failure the resolve-time error catches today: one global is added and the check that
-    /// already defines a lot of its own tips over.
     #[test]
     fn a_checks_own_variables_count_towards_the_limit() {
         let own: Vec<String> = (0..MAX_VARIABLES - 1).map(|i| format!("C{i}")).collect();
@@ -661,8 +626,6 @@ mod tests {
         );
     }
 
-    /// The cap is per check *and* environment: a scoped variable only tips over the
-    /// environments that actually resolve it.
     #[test]
     fn every_environment_a_check_targets_is_measured() {
         let checks = || vec![footprint("Login", &[], &["e-prod", "e-stg"])];
@@ -687,8 +650,6 @@ mod tests {
         assert_eq!(variable_cap_error(&before, &state(checks(), rows)), None);
     }
 
-    /// The same gate has to run when the check moves, not just when a variable does — pointing
-    /// a check at an environment resolves that environment's rows for the first time.
     #[test]
     fn a_check_that_takes_on_an_overflowing_environment_is_refused() {
         let mut shared = globals(MAX_VARIABLES);
@@ -701,8 +662,6 @@ mod tests {
         assert!(err.contains("Login"), "{err}");
     }
 
-    /// One unscoped variable merges into every check in the org, so the blast radius is the
-    /// point: naming one check would hide the rest.
     #[test]
     fn the_error_names_every_check_the_write_would_break() {
         let checks = || {
@@ -723,8 +682,6 @@ mod tests {
         }
     }
 
-    /// Upgrading into an over-limit state must not lock the org out of the only writes that fix
-    /// it.
     #[test]
     fn an_org_already_over_the_limit_can_still_edit_and_delete_its_way_back() {
         let checks = || vec![footprint("Login", &[], &[])];
@@ -746,9 +703,6 @@ mod tests {
         );
     }
 
-    /// Footprints are keyed by id: keyed by name, the second check would overwrite the first
-    /// and one of them would go unmeasured. Same name AND same environment, so the two differ
-    /// only by id: keyed by name the second would overwrite the first and go unmeasured.
     #[test]
     fn two_checks_sharing_a_name_are_measured_separately() {
         let checks = || {
@@ -777,9 +731,6 @@ mod tests {
         assert!(err.contains("1 check(s)"), "{err}");
     }
 
-    /// Narrowing is how an org that upgraded into an over-limit state digs out. Comparing per
-    /// (check, environment) refuses it, because the new pair has no predecessor to be measured
-    /// against.
     #[test]
     fn a_check_may_drop_an_environment_even_while_it_is_over_the_limit() {
         let mut shared = globals(MAX_VARIABLES + 5);
@@ -810,9 +761,6 @@ mod tests {
         );
     }
 
-    /// A check's worst environment must not shield the others. Once one
-    /// environment is over the cap, taking the per-check maximum makes every
-    /// other environment of that check free to climb up to it unnoticed.
     #[test]
     fn a_second_environment_cannot_cross_the_cap_behind_a_worse_one() {
         let checks = || vec![footprint("Login", &[], &["e-a", "e-b"])];
@@ -865,8 +813,6 @@ mod tests {
         );
     }
 
-    /// Both kinds store the same encrypted value, so `kind` is the entire difference between a
-    /// write-only secret and one anyone with GET reads.
     #[test]
     fn a_stored_secret_cannot_be_demoted_to_a_plain_variable() {
         let req = SyntheticsVariableRequest {
@@ -881,8 +827,6 @@ mod tests {
         assert!(err.starts_with("kind:"), "{err}");
     }
 
-    /// `kind` defaults to Plain, so reading an omitted field as a demotion would 400 every
-    /// client that edits a secret's description.
     #[test]
     fn an_update_that_never_mentions_kind_leaves_a_secret_alone() {
         let req = SyntheticsVariableRequest {
@@ -912,8 +856,6 @@ mod tests {
         );
     }
 
-    /// Immutable in both directions: the value was readable while it was plain, so calling it a
-    /// secret afterwards claims a guarantee that never held.
     #[test]
     fn a_stored_plain_variable_cannot_be_turned_into_a_secret() {
         let req = SyntheticsVariableRequest {
@@ -942,8 +884,6 @@ mod tests {
         );
     }
 
-    /// No stored kind means there is nothing to change, so the only rule that applies is the
-    /// one that keeps a secret out of the global environment.
     #[test]
     fn a_create_may_pick_either_kind() {
         for kind in [
@@ -971,9 +911,6 @@ mod tests {
 
     #[test]
     fn placeholder_case_is_preserved() {
-        // Substitution is an exact key lookup on both sides, so `{{base_url}}`
-        // genuinely does not resolve a variable stored as `BASE_URL`. Folding
-        // case here would report a binding that does not exist.
         let found = placeholder_names("{{base_url}}");
         assert!(found.contains("base_url"));
         assert!(!found.contains("BASE_URL"));
@@ -990,15 +927,11 @@ mod tests {
 
     #[test]
     fn a_placeholder_after_a_malformed_one_is_still_found() {
-        // The scan resumes just past the braces rather than past the whole run,
-        // so one bad match cannot swallow the next good one.
         assert!(placeholder_names("{{ {{GOOD}}").contains("GOOD"));
     }
 
     #[test]
     fn substitution_leaves_an_unbound_name_verbatim() {
-        // Same choice as the probe and the editor, for the same reason: a check
-        // may legitimately put those characters in a URL.
         let values = HashMap::from([("BASE_URL".to_string(), "https://shop.test".to_string())]);
         assert_eq!(
             substitute_placeholders("{{BASE_URL}}/login", &values),
@@ -1034,8 +967,6 @@ mod tests {
 
     #[test]
     fn a_secret_view_has_no_value_field() {
-        // The guarantee this module rests on: serialising a secret cannot emit
-        // a value, because the variant has no value to forget to redact.
         let view = SyntheticsVariableView {
             name: "TOKEN".into(),
             value: VariableValueView::Secret { has_value: true },
@@ -1049,18 +980,17 @@ mod tests {
 
     #[test]
     fn a_plain_view_carries_its_value() {
-        // §6 is about secrets. A BASE_URL you cannot read is one you cannot
-        // verify, and hiding it protects nothing.
         let view = SyntheticsVariableView {
             name: "BASE_URL".into(),
             value: VariableValueView::Plain {
                 value: "https://shop.test".into(),
+                has_value: true,
             },
             ..Default::default()
         };
         let json = serde_json::to_string(&view).unwrap();
         assert!(json.contains("\"kind\":\"plain\""), "{json}");
         assert!(json.contains("https://shop.test"), "{json}");
-        assert!(!json.contains("has_value"), "{json}");
+        assert!(json.contains("\"has_value\":true"), "{json}");
     }
 }

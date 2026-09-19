@@ -58,10 +58,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isEdit || !environment"
         :hint="!environment ? t('synthetics.variables.secretNeedsEnvironment') : undefined"
         data-test="synthetics-variable-kind-select"
+        @update:model-value="onKindChange"
       />
 
-      <!-- A stored secret is never sent back, so the form shows presence and a
-           Replace affordance rather than a populated field. -->
       <div v-if="isEdit && data?.kind === 'secret' && data?.has_value && !replacing">
         <p class="text-muted-foreground text-sm" data-test="synthetics-variable-value-set">
           {{ t("synthetics.variables.valueSet", { when: updatedRelative }) }}
@@ -119,6 +118,7 @@ import type { SyntheticsVariablePayload } from "@/services/synthetics";
 import type { SyntheticsVariable } from "@/types/synthetics";
 import { makeSyntheticsVariableFormSchema } from "./SyntheticsVariableForm.schema";
 import { relativeTime } from "./usage";
+import { serverMessage } from "./serverMessage";
 
 export default defineComponent({
   name: "SyntheticsVariableForm",
@@ -138,8 +138,6 @@ export default defineComponent({
     data: { type: Object as PropType<SyntheticsVariable | null>, default: null },
     /** Environment NAME, or null for the unscoped tier. Fixed, never chosen here. */
     environment: { type: String as PropType<string | null>, default: null },
-    /** Normalized names defined in the OTHER tier → env names involved.
-     *  Creating one of these is a shadow, which must be a deliberate act. */
     otherTierNames: {
       type: Object as PropType<Record<string, string[]>>,
       default: () => ({}),
@@ -170,7 +168,7 @@ export default defineComponent({
     const defaults = computed(() => ({
       name: props.data?.name ?? "",
       kind: props.data?.kind ?? "plain",
-      value: "",
+      value: props.data?.kind === "plain" ? (props.data.value ?? "") : "",
       example: props.data?.example ?? "",
       description: props.data?.description ?? "",
     }));
@@ -187,6 +185,10 @@ export default defineComponent({
       },
     );
 
+    function onKindChange(kind: unknown) {
+      kindValue.value = kind === "secret" ? "secret" : "plain";
+    }
+
     function handleClose() {
       emit("update:open", false);
       emit("close");
@@ -196,8 +198,6 @@ export default defineComponent({
     async function acknowledgeShadow(name: string): Promise<boolean> {
       const envs = props.otherTierNames[name];
       if (envs === undefined) return true;
-      // Editing without renaming re-saves an acknowledged state — only a new
-      // name (create or rename) creates a shadow.
       const original = (props.data?.name ?? "").trim().toUpperCase();
       if (props.isEdit && name === original) return true;
       return confirm(
@@ -231,10 +231,11 @@ export default defineComponent({
         example: String(values.example ?? ""),
         description: String(values.description ?? ""),
       };
-      // Omitting `value` means "keep the stored one" — the only way to edit a
-      // write-only secret's metadata without knowing its value.
       const typed = String(values.value ?? "");
-      if (typed.length > 0 || !hasStoredValue.value) payload.value = typed;
+      // Only a secret's value is unknown to the form, so only a secret may omit it to keep it.
+      if (payload.kind === "plain" || typed.length > 0 || !hasStoredValue.value) {
+        payload.value = typed;
+      }
 
       try {
         const id = props.data?.id ?? "";
@@ -247,8 +248,6 @@ export default defineComponent({
             ? syntheticsService.updateGlobalVariable(org, id, payload)
             : syntheticsService.createGlobalVariable(org, payload));
         }
-        // Emit and close BEFORE the toast: these are the effects the user is
-        // waiting on, and nothing cosmetic should be able to prevent them.
         emit("update:list");
         handleClose();
         toast({
@@ -257,12 +256,10 @@ export default defineComponent({
             ? t("synthetics.variables.updated")
             : t("synthetics.variables.created"),
         });
-      } catch (error: any) {
-        // The server's message names the conflict or the constraint, and is
-        // written to be shown verbatim.
+      } catch (error: unknown) {
         toast({
           variant: "error",
-          message: error?.response?.data?.message || t("synthetics.variables.saveFailed"),
+          message: serverMessage(error) ?? t("synthetics.variables.saveFailed"),
         });
       }
     }
@@ -276,6 +273,7 @@ export default defineComponent({
       replacing,
       updatedRelative,
       handleClose,
+      onKindChange,
       save,
     };
   },

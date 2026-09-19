@@ -23,8 +23,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="synthetics-duplicate-dialog"
   >
     <div class="flex flex-col gap-3">
-      <!-- Secrets arrive named but unset. Saying so before the click is the
-           difference between a choice and a surprise when a check fails. -->
       <p class="text-text-secondary text-sm" data-test="synthetics-duplicate-summary">
         {{
           summary.secrets > 0

@@ -37,9 +37,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
     <template #actions>
-      <!-- Page-level scope, peer of the time range: it changes what every
-           widget below means, which is why it does not live in the table's
-           filter bar. Hidden below two environments by design. -->
       <OSelect
         v-if="envNames.length >= 2"
         :model-value="envScope"
@@ -224,8 +221,6 @@ const resolvedCheckType = computed(() => (checkTypeReady.value ? checkType.value
 const DEFAULT_RELATIVE = "15m";
 
 const monitorId = computed(() => String(route.params.id ?? ""));
-// The check GET is authoritative; `?name=` only bridges the pre-fetch render,
-// so a renamed check never shows a stale deep-linked name.
 const checkName = ref("");
 const monitorName = computed(
   () => checkName.value || String(route.query.name ?? "") || t("synthetics.results.title"),
@@ -558,8 +553,6 @@ async function resolveEnvironmentNames(envIds: string[]) {
       ((res?.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]),
     );
     envNames.value = envIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
-    // The first fetch raced this lookup and ran env-blind; now that the check
-    // is known to be multi-env, re-query so All mode gets its per-env series.
     if (envNames.value.length >= 2 && envScope.value === ENV_SCOPE_ALL) {
       await nextTick();
       runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);

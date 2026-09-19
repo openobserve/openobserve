@@ -11,9 +11,6 @@ pub struct Model {
     pub synthetics_name: String,
     pub org_id: String,
     pub location: String,
-    /// `synthetics_environments.id` this job was fanned out for, or None for an
-    /// unscoped check. Part of the dedup key, so it is what distinguishes two
-    /// jobs that differ only by environment at the same tick.
     pub env: Option<String>,
     pub pool: String,
     pub scheduled_ts: i64,

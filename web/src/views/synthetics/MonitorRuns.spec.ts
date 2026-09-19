@@ -409,8 +409,6 @@ describe("MonitorRuns", () => {
     });
   });
 
-  // "Don't show env machinery on single-env or unscoped checks" — every env
-  // surface keys off the check having at least two environments.
   describe("environment awareness", () => {
     it("should render the env breakdown card only from two environments up", () => {
       wrapper = mountRuns({
@@ -436,7 +434,6 @@ describe("MonitorRuns", () => {
       });
       const withEnv = (wrapper.vm as any).runColumns.map((c: { id: string }) => c.id);
       expect(withEnv).toContain("environment");
-      // Right where the review's mock puts it: directly after status.
       expect(withEnv[1]).toBe("environment");
       wrapper.unmount();
       wrapper = mountRuns();

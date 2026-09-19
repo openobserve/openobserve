@@ -19,11 +19,6 @@ import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/syntheti
 export type CrossTierShadow =
   { kind: "overrides-global" } | { kind: "overridden-in"; envs: string[] } | null;
 
-/**
- * How `name` in the given scope relates to the other tier — an env row that
- * overrides a global, or a global that env rows shadow. Null when the name
- * lives in one tier only.
- */
 export function crossTierShadow(
   name: string,
   environment: string | null,
@@ -70,14 +65,6 @@ export function canDeleteEnvironment(environment: SyntheticsEnvironment): boolea
   return !environment.is_global;
 }
 
-/**
- * Resolve the selected scope against the loaded data.
- *
- * Falls back to Global when the selection names an environment that is no
- * longer there - deleted in another tab, or filtered out by permission on a
- * refetch. Rendering an empty pane for a scope that does not exist would look
- * like an environment with no variables.
- */
 export function resolveScope(
   selected: string,
   environments: SyntheticsEnvironment[],
@@ -90,45 +77,18 @@ export function resolveScope(
   return { environment: globalEnvironment(environments), variables: globals, isGlobal: true };
 }
 
-/**
- * The default name offered when duplicating.
- *
- * `_copy` rather than a counter: the user is expected to replace it, and a
- * name that reads as a placeholder invites that more than `dev2` does.
- */
 export function duplicateNameFor(source: string): string {
   return `${source}_copy`;
 }
 
-/**
- * The default name offered when duplicating a variable.
- *
- * Upper-cased suffix, unlike [`duplicateNameFor`]: the server normalizes every
- * variable name to upper case, so offering `_copy` would show the user a name
- * they never get. Environment names are not normalized, hence the two helpers.
- */
 export function duplicateVariableNameFor(source: string): string {
   return `${source}_COPY`;
 }
 
-/**
- * The prefill handed to the create form when duplicating a secret.
- *
- * Everything but the value, which no client ever holds. `has_value` is cleared
- * so the form cannot offer the Replace affordance for a value that is not
- * being carried over — the copy has to be given one by someone who knows it.
- */
 export function duplicatePrefill(source: SyntheticsVariable): SyntheticsVariable {
   return { ...source, name: duplicateVariableNameFor(source.name), has_value: false };
 }
 
-/**
- * What the duplicate dialog promises, given what the source holds.
- *
- * The secret count is called out separately because those arrive unset. Saying
- * so before the click is the difference between a deliberate choice and a
- * surprise the first time a check fails.
- */
 export function duplicateSummary(variables: SyntheticsVariable[]): {
   total: number;
   secrets: number;

@@ -78,8 +78,6 @@ pub struct MoveSyntheticsRequestBody {
     pub dst_folder_id: String,
 }
 
-// ── Environment access for checks ─────────────────────────────────────────────
-
 /// Refuses a check that pins itself to an environment the caller cannot use.
 #[cfg(feature = "enterprise")]
 async fn require_env_access(
@@ -115,8 +113,6 @@ async fn reconcile_environments(
 
     let mut out = submitted.to_vec();
     for id in stored.iter().filter(|id| !submitted.contains(id)) {
-        // A stored id that no longer resolves is a deleted environment, not a
-        // permission failure — leave it dropped rather than 400 the update.
         let Ok(Some(name)) =
             openobserve_synthetics::service::get_environment_name(org_id, id).await
         else {
@@ -129,8 +125,6 @@ async fn reconcile_environments(
     Ok(out)
 }
 
-/// Grants name the environment, not its primary key, so an id on a check has to
-/// be resolved back to a name before it can be checked.
 #[cfg(feature = "enterprise")]
 async fn env_name(org_id: &str, id: &str) -> Result<String, Response> {
     match openobserve_synthetics::service::get_environment_name(org_id, id).await {
@@ -592,8 +586,6 @@ pub async fn update_synthetic(
         }
     }
 
-    // An unloadable check leaves stored empty, so every id is an addition and the
-    // update below reports the missing check rather than this doing it twice.
     #[cfg(feature = "enterprise")]
     let mut body = body;
     #[cfg(feature = "enterprise")]

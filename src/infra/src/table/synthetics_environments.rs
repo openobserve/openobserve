@@ -13,15 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Synthetics environment storage.
-//!
-//! An environment is an entity rather than a free-form label because it gates
-//! credentials: its `name` is the OpenFGA object id that decides who may rotate
-//! the secrets scoped to it.
-
 use config::meta::synthetics_variables::GLOBAL_ENVIRONMENT_NAME;
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Set, SqlErr,
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr,
     TransactionTrait,
 };
 
@@ -75,8 +69,11 @@ pub fn global_environment_id(org_id: &str) -> String {
     format!("{GLOBAL_ENVIRONMENT_NAME}_{org_id}")
 }
 
-/// Inserts an environment. A duplicate `(org_id, name)` is reported by name,
-/// because that is the identifier the caller used and the one shown in the UI.
+/// Deterministic per `(org, name)`; `/` fits neither an org id (a URL segment) nor a name.
+pub fn environment_id(org_id: &str, name: &str) -> String {
+    format!("{org_id}/{name}")
+}
+
 pub async fn add<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsEnvironmentRecord,
@@ -163,8 +160,6 @@ pub async fn list<C: ConnectionTrait>(
         .collect())
 }
 
-/// Updates name and description. `owner` and `created_at` are set once at
-/// create and never rewritten, so an edit cannot reassign authorship.
 pub async fn update<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -194,20 +189,30 @@ pub async fn update<C: ConnectionTrait>(
     }
 }
 
-/// Writes a row exactly as another region has it, creating or replacing by id.
+/// Writes a row as another region has it, unless the stored copy is newer.
 pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsEnvironmentRecord,
-) -> Result<(), errors::Error> {
-    Entity::insert(record.to_active_model())
-        .on_conflict(
-            sea_orm::sea_query::OnConflict::column(Column::Id)
-                .update_columns(<Entity as EntityTrait>::Column::iter())
-                .to_owned(),
-        )
+) -> Result<bool, errors::Error> {
+    let updated = Entity::update_many()
+        .set(record.to_active_model())
+        .filter(Column::OrgId.eq(&record.org_id))
+        .filter(Column::Id.eq(&record.id))
+        .filter(Column::UpdatedAt.lte(record.updated_at))
         .exec(conn)
         .await?;
-    Ok(())
+    if updated.rows_affected > 0 {
+        return Ok(true);
+    }
+    let inserted = Entity::insert(record.to_active_model())
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(inserted > 0)
 }
 
 /// Deletes an environment and the variables scoped to it, in one transaction.
@@ -290,5 +295,58 @@ mod tests {
         let stored = get_by_id(&db, "acme", &global.id).await.unwrap().unwrap();
         assert!(stored.is_global);
         assert_eq!(stored.description, "shared defaults");
+    }
+
+    fn env(id: &str, description: &str, updated_at: i64) -> SyntheticsEnvironmentRecord {
+        SyntheticsEnvironmentRecord {
+            id: id.to_string(),
+            org_id: "acme".to_string(),
+            name: "staging".to_string(),
+            description: description.to_string(),
+            owner: None,
+            is_global: false,
+            created_at: 1,
+            updated_at,
+        }
+    }
+
+    #[tokio::test]
+    async fn an_older_replicated_environment_never_overwrites_a_newer_one() {
+        let db = db().await;
+        assert!(
+            apply_upsert(&db, &env("acme/staging", "new", 5))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !apply_upsert(&db, &env("acme/staging", "old", 3))
+                .await
+                .unwrap()
+        );
+        assert!(
+            apply_upsert(&db, &env("acme/staging", "same", 5))
+                .await
+                .unwrap()
+        );
+        let stored = get_by_id(&db, "acme", "acme/staging")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(stored.description, "same");
+    }
+
+    #[test]
+    fn environment_ids_are_deterministic_and_never_collide() {
+        assert_eq!(
+            environment_id("acme", "prod"),
+            environment_id("acme", "prod")
+        );
+        assert_ne!(environment_id("a_b", "c"), environment_id("a", "b_c"));
+        assert_ne!(
+            environment_id("acme", "prod"),
+            environment_id("acme2", "prod")
+        );
+        assert_ne!(environment_id("acme", "x"), global_environment_id("acme"));
+        assert!(!global_environment_id("acme").contains('/'));
     }
 }

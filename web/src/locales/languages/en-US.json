@@ -13602,6 +13602,18 @@
       "secretBlocked": "Secrets can't be moved across environments",
       "toGlobal": "Make global"
     },
+    "promoteCheck": {
+      "action": "Share {name}",
+      "confirm": "Move",
+      "description": "Moves this variable out of the check into a shared environment, where other checks can use it too.",
+      "destination": "Destination",
+      "done": "Variable moved",
+      "failed": "Could not move the variable",
+      "global": "Global",
+      "secretHint": "This value is marked secure, so it becomes a secret and cannot go to global.",
+      "title": "Share {name}",
+      "tooltip": "Move to a shared environment"
+    },
     "split": {
       "action": "Scope to environments",
       "alreadyOwn": "Already has its own value — kept as is.",
@@ -13612,7 +13624,9 @@
       "failed": "Could not scope the variable",
       "title": "Scope {name} to environments",
       "unselectedWarning": "Not selected: {envs}. Checks running against them will stop resolving this variable.",
-      "valuePlaceholder": "Value for this environment"
+      "valuePlaceholder": "Value for this environment",
+      "usedBy": "Used by {n} checks: {names}",
+      "usedByHint": "The split is refused while any of these checks would lose the value: a check with no environments, or one that runs in an environment not given a value here."
     },
     "replaySecrets": {
       "confirm": "Replay",
@@ -14042,7 +14056,8 @@
       "timeoutLabel": "Timeout (ms)",
       "valueFallback": "Value",
       "showSetupSteps": "Show setup steps",
-      "waitingForActions": "Waiting for actions in the browser…"
+      "waitingForActions": "Waiting for actions in the browser…",
+      "unboundVariables": "{names} is not defined in this check, its environments or global, so it is typed as written. | {names} are not defined in this check, its environments or global, so they are typed as written."
     },
     "labels": {
       "copyOf": "Copy of {name}",

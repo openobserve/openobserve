@@ -13,14 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Create `synthetics_environments` and `synthetics_variables` — the org-level
-//! variable store, and the environments that scope it.
-//!
-//! Both tables are new, so both constraints are created with the table and
-//! validated. Environments ship in the same migration as variables precisely so
-//! that a secret can never pre-date the environment the CHECK requires it to
-//! carry.
-
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 use sea_orm_migration::prelude::*;
 

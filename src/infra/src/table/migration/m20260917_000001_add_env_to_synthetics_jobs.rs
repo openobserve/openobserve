@@ -13,34 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Give a job the environment it was fanned out for, and widen the dedup key
-//! to match.
-//!
-//! The column alone would not be enough. `enqueue` relies on
-//! `ON CONFLICT (synthetics_id, location, scheduled_ts) DO NOTHING` to stop
-//! double-scheduling, and a check running against two environments produces
-//! jobs that differ in nothing else at the same tick — so every environment
-//! after the first was silently discarded by the conflict clause. Fan-out is
-//! only real once this key includes `env`.
-//!
-//! **Rolling upgrades take a bounded enqueue gap, deliberately.** A node on the
-//! old release targets the three-column key, and once this migration drops it
-//! that node's inserts fail until it is replaced — no jobs are queued by it for
-//! the length of the rollout. The alternative is splitting the swap across two
-//! releases, and the price of that is a release where fan-out is merged but
-//! still silently drops every environment after the first, which is the bug
-//! this migration exists to fix. `m20241217_154900_alter_folders_table_idx` is
-//! the precedent: it swaps a unique index in one release too. Nodes on the new
-//! release enqueue normally throughout, and the scheduler re-queues on its next
-//! tick, so the gap costs monitoring coverage rather than data.
-//!
-//! MySQL is not a supported meta store — `MetaStore` is `Sqlite | Nats |
-//! PostgreSQL`, and sea-orm is compiled with `sqlx-postgres` and `sqlx-sqlite`
-//! only — so no MySQL arm here is reachable. The index statements are still
-//! written to emit valid MySQL, but the arm in `dedup_index_sql` indexes bare
-//! `env` and so would not dedup unscoped jobs, and `enqueue`'s `ON CONFLICT` is
-//! Postgres syntax MySQL cannot parse at all. Supporting MySQL is separate work.
-
 use sea_orm::{ConnectionTrait, Statement};
 use sea_orm_migration::prelude::*;
 
@@ -73,9 +45,6 @@ impl MigrationTrait for Migration {
         Ok(())
     }
 
-    /// One-way in practice: the recreated three-column key is unique, and the jobs table keeps
-    /// completed rows, so the first `CREATE UNIQUE INDEX` fails as soon as any check has run
-    /// against two environments.
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.create_index(create_old_dedup_uq()).await?;
         manager.drop_index(drop_dedup_idx(DEDUP_UQ)).await?;
@@ -98,8 +67,6 @@ fn drop_dedup_idx(name: &str) -> IndexDropStatement {
         .to_owned()
 }
 
-/// The three-column key exactly as `m20260707_000003_create_synthetics_jobs`
-/// created it, for `down()` to put back.
 fn create_old_dedup_uq() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
@@ -125,8 +92,6 @@ enum SyntheticsJobs {
 mod tests {
     use super::*;
 
-    /// MySQL has no `DROP INDEX IF EXISTS` and requires the table, so the raw
-    /// statement this replaced could not run there at all.
     #[test]
     fn the_mysql_index_drop_names_its_table_and_omits_if_exists() {
         let sql = drop_dedup_idx(OLD_DEDUP_UQ).to_string(MysqlQueryBuilder);
@@ -149,8 +114,6 @@ mod tests {
         );
     }
 
-    /// `down()` has to put back exactly what `m20260707_000003` created, or a
-    /// rolled-back database keeps a key that dedupes something else.
     #[test]
     fn down_recreates_the_key_the_jobs_migration_created() {
         assert_eq!(

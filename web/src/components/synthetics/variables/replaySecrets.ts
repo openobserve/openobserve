@@ -13,22 +13,18 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { WireStep } from "@/types/synthetics";
+import type { SyntheticsEnvironment, SyntheticsVariable, WireStep } from "@/types/synthetics";
 import type { ResolvedVariable } from "./resolved";
-import { placeholderNames } from "./placeholders";
+import { placeholderNames, substitutePlaceholders } from "./placeholders";
 import { effectiveVariables } from "./resolved";
 
-/**
- * Shared secrets the steps about to replay actually reference.
- *
- * Replay substitutes in the browser, so any value it can use is a value the
- * page can read - which is the same property as "write-only", with the sign
- * flipped. A shared secret therefore has no value on the client, and the only
- * honest options are to prompt or to let it type as literal text.
- *
- * Only the names the steps reference are asked for. Prompting for every secret
- * in the environment would make replay a bulk credential-collection screen.
- */
+/** Which org, check and environment a remembered value was typed for. */
+export interface ReplaySecretScope {
+  org: string;
+  checkId: string;
+  environment: string;
+}
+
 export function secretsNeededForReplay(steps: WireStep[], resolved: ResolvedVariable[]): string[] {
   const secrets = new Set(
     effectiveVariables(resolved)
@@ -46,29 +42,28 @@ export function secretsNeededForReplay(steps: WireStep[], resolved: ResolvedVari
   return [...needed].sort();
 }
 
-/**
- * Values the author supplied for this browser session.
- *
- * In memory, deliberately. `sessionStorage` would survive a reload and remain
- * readable by any script on the origin; other tools' "remember locally" is a
- * file on a developer's machine, ours would be a browser origin that XSS can
- * reach. A module-level map dies with the tab and never serialises.
- */
 const sessionSecrets = new Map<string, string>();
 
-export function rememberReplaySecret(name: string, value: string): void {
-  sessionSecrets.set(name, value);
+function sessionKey(scope: ReplaySecretScope, name: string): string {
+  return JSON.stringify([scope.org, scope.checkId, scope.environment, name]);
 }
 
-/** Which of `names` already have a value, and which still have to be asked for. */
-export function partitionReplaySecrets(names: string[]): {
+export function rememberReplaySecret(scope: ReplaySecretScope, name: string, value: string): void {
+  sessionSecrets.set(sessionKey(scope, name), value);
+}
+
+/** Which of `names` already have a value in `scope`, and which still have to be asked for. */
+export function partitionReplaySecrets(
+  scope: ReplaySecretScope,
+  names: string[],
+): {
   known: Record<string, string>;
   missing: string[];
 } {
   const known: Record<string, string> = {};
   const missing: string[] = [];
   for (const name of names) {
-    const value = sessionSecrets.get(name);
+    const value = sessionSecrets.get(sessionKey(scope, name));
     if (value === undefined) missing.push(name);
     else known[name] = value;
   }
@@ -80,14 +75,24 @@ export function forgetReplaySecrets(): void {
   sessionSecrets.clear();
 }
 
-/**
- * Merges supplied secrets into the check's own variables for one replay.
- *
- * The check's own values win: they are what the check would actually run with,
- * and a supplied secret is only standing in for a value the client cannot see.
- * Anything still unsupplied is simply absent, so it types as literal text and
- * the failure names itself on the page.
- */
+/** Plain shared values for one environment, its rows over the global ones; a secret hides a plain global. */
+export function sharedPlainValues(
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+  environmentId: string | undefined,
+): Record<string, string> {
+  const values: Record<string, string> = {};
+  const apply = (rows: SyntheticsVariable[]) => {
+    for (const row of rows) {
+      if (row.kind === "plain" && row.value !== undefined) values[row.name] = row.value;
+      else delete values[row.name];
+    }
+  };
+  apply(globals);
+  apply(environments.find((env) => env.id === environmentId && !env.is_global)?.variables ?? []);
+  return values;
+}
+
 export function mergeReplayVariables(
   checkVariables: { name: string; value: string }[],
   supplied: Record<string, string>,
@@ -97,4 +102,16 @@ export function mergeReplayVariables(
     .filter(([name]) => !own.has(name))
     .map(([name, value]) => ({ name, value }));
   return [...checkVariables, ...extra];
+}
+
+/** What replay runs with: check values over supplied secrets over shared plain values, url resolved. */
+export function replayInputs(
+  url: string,
+  checkVariables: { name: string; value: string }[],
+  sharedPlain: Record<string, string>,
+  secrets: Record<string, string>,
+): { url: string; variables: { name: string; value: string }[] } {
+  const variables = mergeReplayVariables(checkVariables, { ...sharedPlain, ...secrets });
+  const values = Object.fromEntries(variables.map((v) => [v.name, v.value]));
+  return { url: substitutePlaceholders(url, values), variables };
 }

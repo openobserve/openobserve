@@ -79,9 +79,6 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
-// MonitorRuns is stubbed at mount, but its MODULE still loads with the page,
-// and the real composable's import chain reaches @/stores, which cannot
-// initialise under vitest. Same mock MonitorRuns.spec uses, for the same reason.
 vi.mock("@/composables/useSyntheticResults", () => ({
   default: () => ({}),
 }));
@@ -455,8 +452,6 @@ describe("MonitorResults", () => {
 
     it("should handle missing name gracefully with default title", async () => {
       routeQuery = {};
-      // No deep-linked name AND no fetched check — only then is the generic
-      // title the right render; a successful fetch always names the page.
       mockSyntheticsServiceGet.mockRejectedValueOnce(new Error("network"));
       wrapper = makeWrapper();
       await flushPromises();

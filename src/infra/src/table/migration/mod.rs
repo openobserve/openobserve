@@ -552,9 +552,6 @@ mod tests {
         );
     }
 
-    /// Registration order, asserted relatively so appending a migration does
-    /// not break it — an absolute "this one is last" assertion has now been
-    /// invalidated twice by the next person to add a migration.
     #[test]
     fn each_migration_is_registered_once_and_after_the_schema_it_builds_on() {
         let names: Vec<String> = Migrator::migrations()
@@ -578,8 +575,6 @@ mod tests {
         // Registration alone is what makes a migration run at all.
         position("m20260812_000001_create_composite_alerts");
 
-        // Each pair is a migration and the one whose schema it alters, or a
-        // pair whose relative order a test elsewhere already relied on.
         for (earlier, later) in [
             (
                 "m20260707_000003_create_synthetics_jobs",

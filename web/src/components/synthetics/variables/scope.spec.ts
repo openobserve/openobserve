@@ -37,6 +37,7 @@ function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
     description: "",
     example: "",
     tags: [],
+    has_value: true,
     used_by_checks: 0,
     created_at: 0,
     updated_at: 0,
@@ -115,8 +116,6 @@ describe("resolveScope", () => {
   });
 
   it("falls back to global when the selection no longer exists", () => {
-    // Deleted in another tab, or filtered out by permission on a refetch.
-    // Rendering an empty pane would look like an environment with no variables.
     const scope = resolveScope("deleted", envs, globals);
 
     expect(scope.isGlobal).toBe(true);
@@ -186,8 +185,6 @@ describe("duplicatePrefill", () => {
 
 describe("duplicateSummary", () => {
   it("counts secrets separately, because those arrive unset", () => {
-    // Saying so before the click is the difference between a deliberate choice
-    // and a surprise the first time a check fails.
     const summary = duplicateSummary([
       variable({ id: "1" }),
       variable({ id: "2", kind: "secret" }),

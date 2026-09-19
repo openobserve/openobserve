@@ -12,26 +12,16 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
-//
-// Validation for the shared-variable drawer. Mirrors the server's rules so a
-// name is rejected while typing rather than after a round trip; the server
-// remains the enforcement, since an API client can post directly.
 
 import { z } from "zod";
 
 /** Same grammar the server validates, and the same reserved prefix. */
 export const VARIABLE_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-/**
- * Names the probe injects for the check's own credentials. A shared variable
- * claiming one would overwrite auth at resolve time, so the server rejects it.
- */
 export const RESERVED_VARIABLE_PREFIX = "_AUTH_";
 
 export const makeSyntheticsVariableFormSchema = (
   t: (_key: string) => string,
-  // A saved variable already has a value, so an edit may leave it untouched -
-  // which is the only way to change a write-only secret's metadata.
   hasStoredValue: boolean,
 ) =>
   z

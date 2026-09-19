@@ -51,12 +51,6 @@ fetchEnvironments();
 const selected = computed(() => props.check.environments ?? []);
 const atCap = computed(() => selected.value.length >= MAX_CHECK_ENVIRONMENTS);
 
-/**
- * Stored ids the list does not return — environments this caller cannot read.
- * Shown checked and locked, never hidden: a hidden entry gets dropped from a
- * round-tripped form, silently ending monitoring there. The server re-attaches
- * them on save either way; the lock just makes the truth visible.
- */
 const lockedIds = computed(() =>
   selected.value.filter((id) => !allEnvironments.value.some((env) => env.id === id)),
 );

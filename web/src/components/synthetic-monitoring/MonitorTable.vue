@@ -287,7 +287,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip side="bottom" :content="t('synthetics.table.duplicate')" />
         </OButton>
 
-        <!-- Move -->
         <OButton
           variant="ghost"
           size="icon-sm"

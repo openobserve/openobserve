@@ -34,9 +34,6 @@ function variable(over: Partial<SyntheticsVariable> = {}): SyntheticsVariable {
 }
 
 describe("relativeTime", () => {
-  // Every synthetics timestamp on the wire is now_micros(). Reading one as
-  // milliseconds dates the row to 1970, which is how "updated 56 years ago"
-  // ends up next to a variable someone saved a minute earlier.
   const now = 1_700_000_000_000;
   const micros = (msAgo: number) => (now - msAgo) * 1000;
 

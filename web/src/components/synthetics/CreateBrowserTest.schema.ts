@@ -33,8 +33,6 @@ import type { AssertionKind } from "@/types/synthetics";
  */
 type Translate = (_key: string, _params?: Record<string, unknown>) => string;
 
-// A placeholder-led navigate URL carries no literal scheme — the resolved
-// variable supplies it, so the scheme check has to wait until run time.
 const placeholderLedUrl = /^\{\{[A-Za-z0-9_]+\}\}\S*$/;
 
 /** The locator bundle, as it sits on an editor step. */

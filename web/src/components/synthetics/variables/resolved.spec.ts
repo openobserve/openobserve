@@ -16,14 +16,11 @@
 import { describe, expect, it } from "vitest";
 import type { ResolvedVariable } from "./resolved";
 import {
-  applyPlaceholder,
   buildResolvedGrouped,
   coverageGaps,
   effectiveVariables,
   inheritedUnion,
   inheritedVariables,
-  placeholderAtCursor,
-  suggestPlaceholders,
 } from "./resolved";
 
 function v(over: Partial<ResolvedVariable> = {}): ResolvedVariable {
@@ -59,76 +56,6 @@ describe("effectiveVariables", () => {
     expect(effective.find((r) => r.name === "BASE_URL")?.scope).toBe("check");
     // Overriding one name still inherits every other.
     expect(effective.find((r) => r.name === "API_TOKEN")?.scope).toBe("prod");
-  });
-});
-
-describe("placeholderAtCursor", () => {
-  it("finds an open placeholder and what has been typed into it", () => {
-    expect(placeholderAtCursor("go to {{BA", 10)).toEqual({ start: 6, query: "BA" });
-  });
-
-  it("offers everything immediately after the braces", () => {
-    expect(placeholderAtCursor("{{", 2)).toEqual({ start: 0, query: "" });
-  });
-
-  it("is silent once the placeholder is closed", () => {
-    expect(placeholderAtCursor("{{NAME}}", 8)).toBeNull();
-  });
-
-  it("is silent when the braces belong to earlier text", () => {
-    expect(placeholderAtCursor("{{A}} and then some words", 25)).toBeNull();
-    expect(placeholderAtCursor("{{A B", 5)).toBeNull();
-  });
-
-  it("is silent with no braces at all", () => {
-    expect(placeholderAtCursor("plain text", 5)).toBeNull();
-  });
-});
-
-describe("suggestPlaceholders", () => {
-  const rows = [v({ name: "BASE_URL" }), v({ name: "DB_BACKUP" }), v({ name: "API_TOKEN" })];
-
-  it("ranks prefix matches above substring matches", () => {
-    // Someone typing BA wants BASE_URL, not DB_BACKUP.
-    expect(suggestPlaceholders(rows, "BA").map((r) => r.name)).toEqual(["BASE_URL", "DB_BACKUP"]);
-  });
-
-  it("matches case-insensitively", () => {
-    expect(suggestPlaceholders(rows, "base").map((r) => r.name)).toEqual(["BASE_URL"]);
-  });
-
-  it("offers everything for an empty query", () => {
-    expect(suggestPlaceholders(rows, "")).toHaveLength(3);
-  });
-
-  it("never offers a shadowed shared row", () => {
-    const shadowed = [
-      v({ name: "BASE_URL", scope: "global" }),
-      v({ name: "BASE_URL", scope: "check" }),
-    ];
-    expect(suggestPlaceholders(shadowed, "BASE")).toHaveLength(1);
-  });
-});
-
-describe("applyPlaceholder", () => {
-  it("completes the placeholder and leaves the cursor past it", () => {
-    const context = placeholderAtCursor("go to {{BA", 10)!;
-    const result = applyPlaceholder("go to {{BA", 10, context, "BASE_URL");
-
-    expect(result.text).toBe("go to {{BASE_URL}}");
-    expect(result.cursor).toBe(result.text.length);
-  });
-
-  it("inserts the stored name, not what was typed", () => {
-    // Substitution is an exact key lookup, so inserting the typed case would
-    // produce a placeholder that never resolves.
-    const context = placeholderAtCursor("{{base", 6)!;
-    expect(applyPlaceholder("{{base", 6, context, "BASE_URL").text).toBe("{{BASE_URL}}");
-  });
-
-  it("keeps text that follows the cursor", () => {
-    const context = placeholderAtCursor("{{BA", 4)!;
-    expect(applyPlaceholder("{{BA/login", 4, context, "BASE_URL").text).toBe("{{BASE_URL}}/login");
   });
 });
 
@@ -269,6 +196,7 @@ describe("buildResolvedGrouped", () => {
       example: "",
       tags: [],
       value: "acme",
+      has_value: true,
       used_by_checks: 0,
       created_at: 0,
       updated_at: 0,
@@ -337,13 +265,12 @@ describe("buildResolvedGrouped", () => {
     ]);
   });
 
-  it("reads presence from the shape each kind uses on the wire", () => {
+  it("reads presence from the has_value the server sends for both kinds", () => {
     const grouped = buildResolvedGrouped([prod], [], ["env-prod"], []);
     const secret = grouped.resolved.prod[0];
     expect(secret.kind).toBe("secret");
-    // A secret carries has_value and no value; a plain one carries the value.
     expect(secret.has_value).toBe(true);
-    const empty = buildResolvedGrouped([], [shared({ value: "" })], [], []);
+    const empty = buildResolvedGrouped([], [shared({ value: "", has_value: false })], [], []);
     expect(empty.resolved[""][0].has_value).toBe(false);
   });
 

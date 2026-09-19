@@ -14,11 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { placeholderNames } from "./placeholders";
+import { placeholderNames, substitutePlaceholders, unboundPlaceholders } from "./placeholders";
 
-// The mirror of the server's placeholder_names. If the two disagree, the
-// editor's unbound warning names something the server counts as used, or stays
-// quiet about something that will type as literal text at run time.
 describe("placeholderNames", () => {
   it("finds names with and without padding", () => {
     expect(placeholderNames("{{A}} {{ B }}")).toEqual(["A", "B"]);
@@ -35,8 +32,32 @@ describe("placeholderNames", () => {
   });
 
   it("reports a repeated name once per occurrence", () => {
-    // The caller dedupes; reporting occurrences keeps this a parser rather
-    // than a policy.
     expect(placeholderNames("{{A}} and {{A}}")).toEqual(["A", "A"]);
+  });
+});
+
+describe("substitutePlaceholders", () => {
+  it("fills bound names and leaves unbound ones verbatim", () => {
+    expect(substitutePlaceholders("{{ BASE }}/x/{{MISSING}}", { BASE: "https://a.test" })).toBe(
+      "https://a.test/x/{{MISSING}}",
+    );
+  });
+
+  it("does not resolve names from the object prototype", () => {
+    expect(substitutePlaceholders("{{constructor}}", {})).toBe("{{constructor}}");
+  });
+});
+
+describe("unboundPlaceholders", () => {
+  it("names each unbound reference once", () => {
+    const known = new Set(["BASE_URL"]);
+    expect(unboundPlaceholders("{{BASE_URL}} {{USER}} {{USER}} {{base_url}}", known)).toEqual([
+      "USER",
+      "base_url",
+    ]);
+  });
+
+  it("is empty when every reference is defined", () => {
+    expect(unboundPlaceholders("{{A}}", new Set(["A"]))).toEqual([]);
   });
 });

@@ -13,12 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Org-level synthetics variable storage.
-//!
-//! Rows here are the shared tier. The check's own inline variables are stored on
-//! the check and merged over these at resolve time, so nothing in this module
-//! knows about precedence.
-
 use std::{
     sync::LazyLock,
     time::{Duration, Instant},
@@ -28,9 +22,7 @@ use config::{
     RwHashMap,
     meta::synthetics_variables::{SyntheticsVariableView, VariableValueView},
 };
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, Iterable, QueryFilter, QueryOrder, Set, SqlErr,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set, SqlErr};
 
 use super::entity::synthetics_variables::{ActiveModel, Column, Entity, Model};
 use crate::errors::{self, DbError, Error};
@@ -46,8 +38,6 @@ static VARIABLE_CACHE: LazyLock<RwHashMap<String, (Vec<SyntheticsVariableRecord>
 
 const VARIABLE_CACHE_TTL: Duration = Duration::from_secs(15);
 
-/// One shared variable as stored. `value` is ciphertext; decryption happens in
-/// the synthetics service, which owns the org DEK.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SyntheticsVariableRecord {
     pub id: String,
@@ -88,6 +78,23 @@ impl SyntheticsVariableRecord {
         self.kind == KIND_SECRET
     }
 
+    fn to_active_model(&self) -> Result<ActiveModel, errors::Error> {
+        Ok(ActiveModel {
+            id: Set(self.id.clone()),
+            org_id: Set(self.org_id.clone()),
+            env: Set(self.env.clone()),
+            name: Set(self.name.clone()),
+            value: Set(self.value.clone()),
+            kind: Set(self.kind.clone()),
+            description: Set(self.description.clone()),
+            example: Set(self.example.clone()),
+            tags: Set(serde_json::to_value(&self.tags)?),
+            owner: Set(self.owner.clone()),
+            created_at: Set(self.created_at),
+            updated_at: Set(self.updated_at),
+        })
+    }
+
     /// The read projection, given the plaintext for a plain variable.
     pub fn to_view(&self, plain_value: Option<String>) -> SyntheticsVariableView {
         SyntheticsVariableView {
@@ -100,14 +107,14 @@ impl SyntheticsVariableRecord {
             } else {
                 VariableValueView::Plain {
                     value: plain_value.unwrap_or_default(),
+                    has_value: !self.value.is_empty(),
                 }
             },
             description: self.description.clone(),
             example: self.example.clone(),
             tags: self.tags.clone(),
-            // Stamped by the service, which is the only layer that can see
-            // checks. Zero here means "not counted yet", never "unused".
             used_by_checks: 0,
+            used_by: Vec::new(),
             owner: self.owner.clone(),
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -115,8 +122,6 @@ impl SyntheticsVariableRecord {
     }
 }
 
-/// Drops one org's variables from the cache. Called by the coordinator watcher,
-/// which must not re-publish or the event would echo forever.
 pub fn invalidate_cache(org_id: &str) {
     VARIABLE_CACHE.remove(org_id);
 }
@@ -163,9 +168,6 @@ pub async fn get<C: ConnectionTrait>(
         .map(SyntheticsVariableRecord::from))
 }
 
-/// Inserts a variable and invalidates the org's cache.
-///
-/// Not for use inside a transaction — see [`insert_row`].
 pub async fn add<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
@@ -180,21 +182,7 @@ pub async fn insert_row<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
 ) -> Result<(), errors::Error> {
-    let model = ActiveModel {
-        id: Set(record.id.clone()),
-        org_id: Set(record.org_id.clone()),
-        env: Set(record.env.clone()),
-        name: Set(record.name.clone()),
-        value: Set(record.value.clone()),
-        kind: Set(record.kind.clone()),
-        description: Set(record.description.clone()),
-        example: Set(record.example.clone()),
-        tags: Set(serde_json::to_value(&record.tags)?),
-        owner: Set(record.owner.clone()),
-        created_at: Set(record.created_at),
-        updated_at: Set(record.updated_at),
-    };
-    match Entity::insert(model).exec(conn).await {
+    match Entity::insert(record.to_active_model()?).exec(conn).await {
         Ok(_) => Ok(()),
         Err(e) => match e.sql_err() {
             Some(SqlErr::UniqueConstraintViolation(_)) => Err(duplicate_name(&record.name)),
@@ -203,7 +191,6 @@ pub async fn insert_row<C: ConnectionTrait>(
     }
 }
 
-/// Overwrites the mutable fields of one variable.
 pub async fn update<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
@@ -236,7 +223,6 @@ pub async fn update<C: ConnectionTrait>(
     }
 }
 
-/// Moves one variable to a different scope.
 pub async fn set_env<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -279,40 +265,55 @@ pub async fn delete<C: ConnectionTrait>(
     Ok(removed)
 }
 
-/// Writes a row exactly as another region has it, creating or replacing by id.
+/// Writes a row as another region has it; `false` when a newer or winning row is kept instead.
 pub async fn apply_upsert<C: ConnectionTrait>(
     conn: &C,
     record: &SyntheticsVariableRecord,
-) -> Result<(), errors::Error> {
-    let model = ActiveModel {
-        id: Set(record.id.clone()),
-        org_id: Set(record.org_id.clone()),
-        env: Set(record.env.clone()),
-        name: Set(record.name.clone()),
-        value: Set(record.value.clone()),
-        kind: Set(record.kind.clone()),
-        description: Set(record.description.clone()),
-        example: Set(record.example.clone()),
-        tags: Set(serde_json::to_value(&record.tags)?),
-        owner: Set(record.owner.clone()),
-        created_at: Set(record.created_at),
-        updated_at: Set(record.updated_at),
-    };
-    // Last write wins by primary key: the queue redelivers, so an apply has to
-    // be safe to run twice.
-    Entity::insert(model)
-        .on_conflict(
-            sea_orm::sea_query::OnConflict::column(Column::Id)
-                .update_columns(<Entity as EntityTrait>::Column::iter())
-                .to_owned(),
-        )
+) -> Result<bool, errors::Error> {
+    let rival = Entity::find()
+        .filter(Column::OrgId.eq(&record.org_id))
+        .filter(Column::Env.eq(&record.env))
+        .filter(Column::Name.eq(&record.name))
+        .filter(Column::Id.ne(&record.id))
+        .one(conn)
+        .await?
+        .map(SyntheticsVariableRecord::from);
+    if let Some(rival) = rival {
+        if !incoming_wins(record, &rival) {
+            // The loser is the same id in every region, so its local copy goes too unless newer.
+            Entity::delete_many()
+                .filter(Column::OrgId.eq(&record.org_id))
+                .filter(Column::Id.eq(&record.id))
+                .filter(Column::UpdatedAt.lte(record.updated_at))
+                .exec(conn)
+                .await?;
+            return Ok(false);
+        }
+        delete_row(conn, &rival.org_id, &rival.id).await?;
+    }
+    let model = record.to_active_model()?;
+    let updated = Entity::update_many()
+        .set(model.clone())
+        .filter(Column::OrgId.eq(&record.org_id))
+        .filter(Column::Id.eq(&record.id))
+        .filter(Column::UpdatedAt.lte(record.updated_at))
         .exec(conn)
         .await?;
-    Ok(())
+    if updated.rows_affected > 0 {
+        return Ok(true);
+    }
+    // A stored row that is newer makes this a no-op rather than an overwrite.
+    let inserted = Entity::insert(model)
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::column(Column::Id)
+                .do_nothing()
+                .to_owned(),
+        )
+        .exec_without_returning(conn)
+        .await?;
+    Ok(inserted > 0)
 }
 
-/// Deletes a variable without touching the cache. The transactional twin of
-/// [`insert_row`], and for the same reason.
 pub async fn delete_row<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -326,9 +327,6 @@ pub async fn delete_row<C: ConnectionTrait>(
     Ok(res.rows_affected > 0)
 }
 
-/// Removes every variable scoped to one environment. Called inside the
-/// environment delete transaction, so it publishes nothing itself — the caller
-/// does, once, after the commit.
 pub async fn delete_by_env<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -348,6 +346,12 @@ pub async fn invalidate_and_publish(org_id: &str) {
     if let Err(e) = crate::coordinator::synthetics::emit_variables_changed(org_id).await {
         log::error!("[synthetics] emit variable cache event failed for {org_id}: {e}");
     }
+}
+
+/// Two ids for one `(org, env, name)`: newer `updated_at` wins, then the lower id, in every region.
+fn incoming_wins(incoming: &SyntheticsVariableRecord, stored: &SyntheticsVariableRecord) -> bool {
+    (incoming.updated_at, std::cmp::Reverse(&incoming.id))
+        > (stored.updated_at, std::cmp::Reverse(&stored.id))
 }
 
 /// Written to be shown: `DbError` would prefix it with its own type names.
@@ -402,7 +406,8 @@ mod tests {
                 .to_view(Some("https://shop.test".into()))
                 .value,
             VariableValueView::Plain {
-                value: "https://shop.test".into()
+                value: "https://shop.test".into(),
+                has_value: true
             }
         );
     }
@@ -413,7 +418,118 @@ mod tests {
         assert_eq!(
             record(KIND_PLAIN, "AESenc:corrupt").to_view(None).value,
             VariableValueView::Plain {
-                value: String::new()
+                value: String::new(),
+                has_value: true
+            }
+        );
+    }
+
+    /// One connection: separate connections to `sqlite::memory:` are separate databases.
+    async fn db() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectOptions, Database, Schema};
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        db.execute(backend.build(&Schema::new(backend).create_table_from_entity(Entity)))
+            .await
+            .unwrap();
+        db.execute_unprepared("CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)")
+            .await
+            .unwrap();
+        db
+    }
+
+    fn row(id: &str, value: &str, updated_at: i64) -> SyntheticsVariableRecord {
+        SyntheticsVariableRecord {
+            id: id.into(),
+            value: value.into(),
+            updated_at,
+            ..record(KIND_PLAIN, "")
+        }
+    }
+
+    async fn stored(db: &sea_orm::DatabaseConnection) -> Vec<SyntheticsVariableRecord> {
+        list(db, "acme").await.unwrap()
+    }
+
+    #[tokio::test]
+    async fn an_older_replicated_row_never_overwrites_a_newer_one() {
+        let db = db().await;
+        assert!(apply_upsert(&db, &row("id1", "new", 5)).await.unwrap());
+        assert!(!apply_upsert(&db, &row("id1", "old", 3)).await.unwrap());
+        assert_eq!(stored(&db).await[0].value, "new");
+        assert!(apply_upsert(&db, &row("id1", "newer", 6)).await.unwrap());
+        assert_eq!(stored(&db).await[0].value, "newer");
+    }
+
+    #[tokio::test]
+    async fn the_same_name_under_two_ids_keeps_the_newer_row_in_every_region() {
+        let db = db().await;
+        apply_upsert(&db, &row("id-b", "b", 5)).await.unwrap();
+        assert!(!apply_upsert(&db, &row("id-a", "a", 4)).await.unwrap());
+        assert_eq!(stored(&db).await.len(), 1);
+        assert_eq!(stored(&db).await[0].id, "id-b");
+
+        assert!(apply_upsert(&db, &row("id-c", "c", 9)).await.unwrap());
+        let rows = stored(&db).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "id-c");
+    }
+
+    #[tokio::test]
+    async fn a_rename_that_loses_to_a_newer_create_removes_the_renamed_row() {
+        let db = db().await;
+        apply_upsert(
+            &db,
+            &SyntheticsVariableRecord {
+                name: "URL".into(),
+                ..row("id1", "old", 1)
+            },
+        )
+        .await
+        .unwrap();
+        apply_upsert(&db, &row("id2", "created", 6)).await.unwrap();
+
+        assert!(!apply_upsert(&db, &row("id1", "renamed", 5)).await.unwrap());
+        let rows = stored(&db).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "id2");
+    }
+
+    #[tokio::test]
+    async fn a_losing_message_never_removes_a_newer_local_copy_of_its_id() {
+        let db = db().await;
+        let newer = SyntheticsVariableRecord {
+            name: "OTHER".into(),
+            ..row("id1", "newer", 9)
+        };
+        apply_upsert(&db, &newer).await.unwrap();
+        apply_upsert(&db, &row("id2", "created", 6)).await.unwrap();
+
+        assert!(!apply_upsert(&db, &row("id1", "stale", 5)).await.unwrap());
+        assert_eq!(stored(&db).await.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_tie_on_updated_at_goes_to_the_lower_id() {
+        let db = db().await;
+        apply_upsert(&db, &row("id-b", "b", 5)).await.unwrap();
+        assert!(apply_upsert(&db, &row("id-a", "a", 5)).await.unwrap());
+        assert!(!apply_upsert(&db, &row("id-b", "b", 5)).await.unwrap());
+        let rows = stored(&db).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].id, "id-a");
+    }
+
+    #[test]
+    fn a_plain_view_reports_whether_a_value_is_stored() {
+        let view = record(KIND_PLAIN, "AESenc:abc").to_view(Some("x".into()));
+        assert_eq!(
+            view.value,
+            VariableValueView::Plain {
+                value: "x".into(),
+                has_value: true
             }
         );
     }

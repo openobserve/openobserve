@@ -163,8 +163,6 @@ describe("syntheticResultsSchema query builders", () => {
   });
 
   it("should scope every overview query to an environment only when one is given", () => {
-    // The caller gates on the stream schema having the column; the builders
-    // just honour the argument.
     expect(buildRunsSql("mon-1", 50, null, "ap1")).toContain("AND environment = 'ap1'");
     expect(buildRunsSql("mon-1", 50, null)).not.toContain("environment =");
     expect(buildHistogramSql("mon-1", "1 hour", false, false, "ap1")).toContain(
@@ -414,8 +412,6 @@ describe("mapHistogramSplit", () => {
     const bucket = blended.find((b) => b.tsMs === start / 1000)!;
     expect(bucket.failedRuns).toBe(2);
     expect(bucket.avgMs).toBe(200); // (100*3 + 500*1) / 4
-    // Percentiles do not recombine; nothing renders the blended per-bucket p95
-    // in split mode, so 0 is honest rather than invented.
     expect(bucket.p95Ms).toBe(0);
   });
 

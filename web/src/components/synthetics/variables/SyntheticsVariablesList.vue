@@ -13,10 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-One list serves both scopes: the Variables tab under a Global heading, and an
-environment's detail page filtered to that environment. The surrounding page
-already says which scope you are in, so there is no Environment column.
 -->
 
 <template>
@@ -40,19 +36,11 @@ already says which scope you are in, so there is no Environment column.
       :loading="loading"
     >
       <template #toolbar>
-        <!-- Fixed width, not a max: sized to content this block would change
-             width with the environment name, and the flex-1 search beside it
-             would resize on every scope change. -->
         <OTooltip side="bottom" :content="raw(`${scopeLabel} — ${scopeSummary}`)">
           <div class="flex w-80 shrink-0 items-center gap-2" data-test="synthetics-scope-summary">
-            <!-- The name absorbs the overflow and the count is pinned: sharing
-                 one truncating flow would drop the count first, and it is the
-                 half not shown anywhere else on the page. -->
             <span class="text-text-heading min-w-0 truncate text-sm font-semibold">{{
               scopeLabel
             }}</span>
-            <!-- Global has no count to badge — its summary is the line that
-                 explains the tier, which is prose, not a metric. -->
             <OBadge v-if="environment" variant="default" size="sm" class="shrink-0">{{
               scopeSummary
             }}</OBadge>
@@ -99,8 +87,6 @@ already says which scope you are in, so there is no Environment column.
         </OBadge>
       </template>
 
-      <!-- A secret has no value to show: the server never sends one. The dots
-           carry presence on their own, so only their absence needs a word. -->
       <template #cell-value="{ row }">
         <span
           v-if="row.kind === 'secret'"
@@ -119,8 +105,6 @@ already says which scope you are in, so there is no Environment column.
         >
       </template>
 
-      <!-- Load-bearing: answers "what breaks if I change this?" and is the
-           safety check before a delete. -->
       <template #cell-used_by_checks="{ row }">
         <span data-test="synthetics-variable-usage">
           {{ t("synthetics.variables.usedByChecks", { n: row.used_by_checks }) }}
@@ -148,9 +132,6 @@ already says which scope you are in, so there is no Environment column.
         >
           <OTooltip side="bottom" :content="t('synthetics.duplicate.action')" />
         </OButton>
-        <!-- Wrapper mode around a span, not a tooltip inside the button: a
-             disabled button dispatches no mouse events, so the reason would
-             never appear on the row that needs it. -->
         <OTooltip
           v-if="environment"
           side="bottom"
@@ -285,9 +266,6 @@ export default defineComponent({
     const { confirm } = useConfirmDialog();
     const filterQuery = ref("");
 
-    // Names in the OTHER tier -> env names involved, for the form's shadow
-    // confirm: on an env scope the globals it could override; on the global
-    // scope the env-defined names that would keep their own values.
     const otherTierNames = computed<Record<string, string[]>>(() => {
       const map: Record<string, string[]> = {};
       if (props.environment) {
@@ -383,9 +361,6 @@ export default defineComponent({
     }
 
     function openDuplicate(row: SyntheticsVariable) {
-      // A secret's value cannot be copied, so a secret is not duplicated — it is
-      // created. The drawer carries every other field and asks for the one thing
-      // only a human can supply, rather than handing back a named empty box.
       if (row.kind === "secret") {
         drawer.value = { show: true, isEdit: false, data: duplicatePrefill(row) };
         return;
@@ -399,8 +374,6 @@ export default defineComponent({
       try {
         await syntheticsService.promoteEnvironmentVariable(org, props.environment, row.id);
         emit("refresh");
-        // Other envs' rows now shadow the promoted value — say so, or the
-        // author expects it to apply everywhere.
         const stillOverriding = props.environments
           .filter(
             (env) =>
@@ -415,8 +388,6 @@ export default defineComponent({
             : t("synthetics.promote.done"),
         });
       } catch (error: any) {
-        // The server names the conflicting environments, or explains why a
-        // secret cannot leave one — both are written to be shown verbatim.
         toast({
           variant: "error",
           message: error?.response?.data?.message || t("synthetics.promote.failed"),
@@ -469,8 +440,6 @@ export default defineComponent({
 
       const org = store.state.selectedOrganization.identifier;
       try {
-        // The dialog above IS the confirmation the server's guard asks for, so
-        // force is set once the user has seen what they are breaking.
         const force = row.used_by_checks > 0;
         await (props.environment
           ? syntheticsService.deleteEnvironmentVariable(org, props.environment, row.id, force)
@@ -485,8 +454,6 @@ export default defineComponent({
       }
     }
 
-    // Exposed so the scope header's "Add Variable" opens this drawer rather
-    // than the list growing a second, duplicate one.
     expose({ openCreate });
 
     return {

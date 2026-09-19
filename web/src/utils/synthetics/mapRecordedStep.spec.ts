@@ -543,9 +543,6 @@ describe("substituteVariables", () => {
   });
 
   it("leaves an unbound placeholder verbatim", () => {
-    // `{{...}}` is not necessarily a variable reference - a check may legitimately
-    // type those characters, and nothing here can tell that from a typo. The
-    // probe's substituteSecretsV2 makes the same choice.
     const out = substituteVariables(step({ value: "{{TYPO}}" }), { USER: "alice" });
 
     expect(out.value).toBe("{{TYPO}}");

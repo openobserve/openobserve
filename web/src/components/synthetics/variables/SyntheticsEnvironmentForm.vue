@@ -36,8 +36,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @submit="save"
       class="flex flex-col gap-4"
     >
-      <!-- The name is the OpenFGA object id every grant is written against, so
-           renaming would orphan them. The server refuses; say so before trying. -->
       <OBanner v-if="isEdit" variant="info" data-test="synthetics-environment-rename-note">
         {{ t("synthetics.environments.renameBlocked") }}
       </OBanner>
@@ -108,9 +106,6 @@ export default defineComponent({
         await (props.isEdit
           ? syntheticsService.updateEnvironment(org, props.data?.name ?? "", body)
           : syntheticsService.createEnvironment(org, body));
-        // Emit and close BEFORE the toast, for the same reason as the variable
-        // form: nothing cosmetic should sit between a completed save and the
-        // refresh that makes it visible.
         emit("update:list");
         handleClose();
         toast({

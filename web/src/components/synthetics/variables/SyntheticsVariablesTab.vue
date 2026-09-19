@@ -13,10 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-One tab for every scope. The rail selects; the pane shows that scope's
-variables. Both scopes load in one pass, so switching between staging and
-production - the most frequent movement here - costs no network call.
 -->
 
 <template>
@@ -87,9 +83,6 @@ const { confirm } = useConfirmDialog();
 const environments = ref<SyntheticsEnvironment[]>([]);
 const globals = ref<SyntheticsVariable[]>([]);
 const loading = ref(false);
-// Held by NAME, not object: a refetch replaces every row, and an object-held
-// reference would keep rendering the pre-refresh variable list.
-// Empty until the user picks one, which resolves to the global environment.
 const selectedScope = ref<string>("");
 const environmentDrawer = ref({
   show: false,
@@ -97,8 +90,6 @@ const environmentDrawer = ref({
   data: null as SyntheticsEnvironment | null,
 });
 const duplicateDialogOpen = ref(false);
-// Held separately from the selection: the row menu acts on its own row, which
-// is not necessarily the scope the pane is showing.
 const duplicateSource = ref<SyntheticsEnvironment | null>(null);
 const listRef = ref<InstanceType<typeof SyntheticsVariablesList> | null>(null);
 
@@ -119,8 +110,6 @@ async function refresh() {
   loading.value = true;
   try {
     const org = store.state.selectedOrganization.identifier;
-    // Both scopes in one pass: the environments list already carries each
-    // environment's variables inline, so selecting a scope is a local filter.
     const [envRes, globalRes] = await Promise.all([
       syntheticsService.listEnvironments(org),
       syntheticsService.listGlobalVariables(org),
@@ -141,8 +130,6 @@ function openCreateEnvironment() {
   environmentDrawer.value = { show: true, isEdit: false, data: null };
 }
 
-// The page header owns the primary action for every tab; adding an environment
-// is the rail's own affordance, the way adding a folder is.
 defineExpose({ addVariable });
 
 function openEditEnvironment(environment: SyntheticsEnvironment) {
@@ -173,8 +160,6 @@ async function removeEnvironment(environment: SyntheticsEnvironment) {
 
   try {
     const org = store.state.selectedOrganization.identifier;
-    // The dialog above IS the confirmation the server's guard asks for, so
-    // force is set once the user has seen the variables going with it.
     await syntheticsService.deleteEnvironment(org, environment.name, count > 0);
     // Only the selection needs moving, and only when it was the one deleted.
     if (selectedScope.value === environment.name) selectedScope.value = "";

@@ -13,8 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-The scope selector. Global is the org's reserved environment, pinned first.
 -->
 
 <template>
@@ -68,8 +66,6 @@ The scope selector. Global is the org's reserved environment, pinned first.
               labelFor(env)
             }}</span>
 
-            <!-- The count yields to the menu rather than sitting beside it, so
-                 the row does not reflow when the pointer enters it. -->
             <span
               class="text-text-secondary shrink-0 tabular-nums group-hover/row:hidden group-has-[[data-state=open]]/row:hidden"
               >{{ env.is_global ? globalCount : env.variables.length }}</span
@@ -107,9 +103,6 @@ The scope selector. Global is the org's reserved environment, pinned first.
 
                 <ODropdownSeparator v-if="canDeleteEnvironment(env)" />
 
-                <!-- Checks and secrets are blocks the server refuses even with
-                     force, so the item carries the reason instead of a tooltip:
-                     a disabled item dispatches no hover to open one. -->
                 <ODropdownItem
                   v-if="canDeleteEnvironment(env)"
                   variant="destructive"
@@ -166,9 +159,6 @@ defineEmits<{
 const { t } = useI18nTyped();
 const searchQuery = ref("");
 
-// Filtering stays local: the rail makes no request, so a search must not cost
-// one either. The selection is held by the parent and survives being filtered
-// out, which is what keeps the pane rendering while the rail is narrowed.
 const needle = computed(() => searchQuery.value.trim().toLowerCase());
 const filteredEnvironments = computed(() =>
   railOrder(props.environments).filter(

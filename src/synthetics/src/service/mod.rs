@@ -41,8 +41,6 @@ use config::meta::{
         variable_cap_error,
     },
 };
-// Re-exported so handlers can name what `get_environment` returns without
-// depending on the infra crate's module layout.
 pub use infra::table::synthetics_environments::SyntheticsEnvironmentRecord;
 use infra::table::{
     cipher, folders, synthetics_agents, synthetics_checks, synthetics_environments,
@@ -58,7 +56,8 @@ use infra::table::{
 // compile-time `false` in OSS, so nothing downstream of it is ever reached.
 #[cfg(feature = "enterprise")]
 pub(crate) use o2_openfga::authorizer::authz::{
-    get_ofga_type, remove_ownership, remove_parent_relation, set_ownership, set_parent_relation,
+    get_ofga_type, remove_object_grants, remove_ownership, remove_parent_relation, set_ownership,
+    set_parent_relation,
 };
 use serde::{Deserialize, Serialize};
 
@@ -84,6 +83,9 @@ pub(crate) async fn set_ownership(_org: &str, _obj: &str, _parent: &str, _parent
 
 #[cfg(not(feature = "enterprise"))]
 pub(crate) async fn remove_ownership(_org: &str, _obj: &str, _parent: &str, _parent_type: &str) {}
+
+#[cfg(not(feature = "enterprise"))]
+pub(crate) async fn remove_object_grants(_org: &str, _object: &str) {}
 
 #[cfg(not(feature = "enterprise"))]
 pub(crate) async fn set_parent_relation(_id: &str, _ty: &str, _parent: &str, _parent_ty: &str) {}
@@ -190,10 +192,10 @@ mod tests {
         let guards = source.matches(&guard).count();
 
         assert_eq!(
-            publishes, 18,
+            publishes, 17,
             "expected 6 check publishes (create/update/delete/set_enabled/bulk-delete/move), 3 \
              location publishes (create/update/delete), 3 probe-token publishes \
-             (create/rotate/set_enabled), 5 shared-variable publishes (variable put/delete, \
+             (create/rotate/set_enabled), 4 shared-variable publishes (variable delete, \
              environment put/delete, batch) and the check update a promote writes through the \
              table layer"
         );
@@ -201,7 +203,7 @@ mod tests {
         // decides whether a location's missing agent rows are evidence or just
         // this region's blind spot. Counted explicitly so the guard-per-publish
         // assertion stays exact.
-        const NON_PUBLISH_READS: usize = 1;
+        const NON_PUBLISH_READS: usize = 2; // and `start_publish_queue`, which starts no worker without it
         assert_eq!(
             guards,
             publishes + NON_PUBLISH_READS,

@@ -407,8 +407,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <template v-else>
                 <div class="px-page-edge">
                   <div :class="['grid gap-2', breakdownGridClass]">
-                    <!-- First in the row: the most decision-relevant of the four
-                         dimensions — nobody deploys a fix to "Chromium". -->
                     <div
                       v-if="envAware"
                       class="card-container rounded-default bg-surface-base border-border-default flex flex-col overflow-hidden border"
@@ -1249,7 +1247,6 @@ const props = withDefaults(defineProps<Props>(), {
   environmentScope: "",
 });
 
-/** "Don't show env machinery on single-env or unscoped checks." */
 const envAware = computed(() => (props.environments?.length ?? 0) >= 2);
 
 /** Whether flakiness is observable at all for this check. */
@@ -1807,12 +1804,6 @@ function segmentsFor(runs: MockRun[]): TimelineSegment[] {
 
 const timelineSegments = computed<TimelineSegment[]>(() => segmentsFor(allRuns.value));
 
-/**
- * One strip per environment, columns aligned by run so divergence reads at a
- * glance — the blast-radius view. Renders only when every run in the window is
- * attributed; a partial window (pre-stamp history) falls back to the single
- * strip rather than mislabeling unattributed executions.
- */
 const timelineLanes = computed<{ label: string; segments: (TimelineSegment | null)[] }[] | null>(
   () => {
     if (!envAware.value || props.environmentScope) return null;
@@ -2523,8 +2514,6 @@ function cssVar(name: string, fallback: string): string {
   return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
 }
 
-// Identity palette for per-env series — deliberately not the status ramp:
-// an environment is who ran, not how it went.
 const ENV_SERIES_TOKENS = [
   "--color-primary-600",
   "--color-purple-500",

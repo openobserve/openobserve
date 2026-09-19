@@ -13,11 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-A split, not a move: one global row becomes N per-environment rows, each with
-its own value. Values are collected here rather than filled in afterwards -
-otherwise the author splits into three environments and then visits three pages
-to fill three values, with checks unresolved in between.
 -->
 
 <template>
@@ -30,6 +25,13 @@ to fill three values, with checks unresolved in between.
     <div class="flex flex-col gap-3">
       <p class="text-text-secondary text-sm">{{ t("synthetics.split.description") }}</p>
       <p class="text-text-muted text-xs">{{ t("synthetics.split.overrideHint") }}</p>
+
+      <OBanner v-if="usedBy.length" variant="info" data-test="synthetics-split-used-by">
+        <p class="m-0">
+          {{ t("synthetics.split.usedBy", { n: usedBy.length, names: usedBy.join(", ") }) }}
+        </p>
+        <p class="m-0 text-xs">{{ t("synthetics.split.usedByHint") }}</p>
+      </OBanner>
 
       <div
         v-for="row in rows"
@@ -60,8 +62,6 @@ to fill three values, with checks unresolved in between.
         />
       </div>
 
-      <!-- Every environment starts selected, so nothing breaks unless the
-           author deliberately unticks one — and then it says what breaks. -->
       <OBanner v-if="unselected.length" variant="warning" data-test="synthetics-split-warning">
         {{ t("synthetics.split.unselectedWarning", { envs: unselected.join(", ") }) }}
       </OBanner>
@@ -74,7 +74,7 @@ to fill three values, with checks unresolved in between.
       <OButton
         variant="primary"
         size="sm"
-        :disabled="!selected.length"
+        :disabled="!canConfirm"
         data-test="synthetics-split-confirm-btn"
         @click="submit"
         >{{ t("synthetics.split.confirm") }}</OButton
@@ -95,6 +95,7 @@ import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
+import { serverMessage } from "./serverMessage";
 
 const props = defineProps<{
   open: boolean;
@@ -113,18 +114,24 @@ const selected = computed(() => rows.value.filter((r) => r.selected));
 const unselected = computed(() =>
   rows.value.filter((r) => !r.selected && !r.alreadyOwn).map((r) => r.environment),
 );
+// The global row is deleted by the split, so an empty value would be the only copy left.
+const canConfirm = computed(
+  () => selected.value.length > 0 && selected.value.every((r) => r.value.length > 0),
+);
+const usedBy = computed(() => props.variable?.used_by ?? []);
 
 watch(
   () => props.open,
   (isOpen) => {
     if (!isOpen) return;
-    // Selected by default: the destructive outcome is an environment being
-    // left out, not one being included.
     rows.value = props.environments.map((e) => {
-      // An env that already defines the name keeps its value — the server
-      // skips it too, so offering an input would collect a value it discards.
       const alreadyOwn = (e.variables ?? []).some((v) => v.name === props.variable?.name);
-      return { environment: e.name, value: "", selected: !alreadyOwn, alreadyOwn };
+      return {
+        environment: e.name,
+        value: props.variable?.value ?? "",
+        selected: !alreadyOwn,
+        alreadyOwn,
+      };
     });
   },
 );
@@ -141,10 +148,10 @@ async function submit() {
     emit("done");
     emit("update:open", false);
     toast({ variant: "success", message: t("synthetics.split.done") });
-  } catch (error: any) {
+  } catch (error: unknown) {
     toast({
       variant: "error",
-      message: error?.response?.data?.message || t("synthetics.split.failed"),
+      message: serverMessage(error) ?? t("synthetics.split.failed"),
     });
   }
 }

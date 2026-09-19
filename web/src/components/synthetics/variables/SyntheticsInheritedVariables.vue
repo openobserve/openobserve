@@ -13,10 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-The Shared group of the 4b names-only panel: the union of every selected
-environment plus globals, one row per distinct name, filterable by source.
-Purely presentational — the panel owns the grouped fetch.
 -->
 
 <template>
@@ -67,8 +63,6 @@ Purely presentational — the panel owns the grouped fetch.
         class="flex items-center gap-2 text-sm"
         data-test="synthetics-inherited-variable"
       >
-        <!-- Same scope vocabulary as the Environments & Variables rail:
-             public = Global, layers = an environment. -->
         <OIcon
           :name="row.global && !row.envs.length ? 'public' : 'layers'"
           size="sm"
@@ -77,8 +71,6 @@ Purely presentational — the panel owns the grouped fetch.
           :aria-label="sourceLabel(row)"
           data-test="synthetics-inherited-scope-icon"
         />
-        <!-- The strike is the whole visible signal for a shadowed name; the
-             relation and the per-source value hints live on the tooltip. -->
         <span
           class="min-w-0 truncate font-mono"
           :class="row.overridden ? 'text-text-muted line-through' : 'text-text-secondary'"
@@ -93,10 +85,7 @@ Purely presentational — the panel owns the grouped fetch.
             </template>
           </OTooltip></span
         >
-        <!-- shrink-0 wrappers: on overflow the NAME ellipsizes, never these. -->
         <span v-if="gapText(row)" class="flex shrink-0">
-          <!-- Fires only on non-uniformity; the env names live in the tooltip
-               and on aria-label, so hover is not the only path to them. -->
           <OTooltip :content="gapText(row)" side="top">
             <OIcon
               name="warning"
@@ -173,11 +162,6 @@ function sourceLabel(row: InheritedUnionRow): I18nText {
   return raw(sources.join(", "));
 }
 
-/**
- * Per-source value hints, the closest the metadata-only API allows to a value
- * on hover: the declared `example` when one exists, else whether a value is
- * set. Secrets never show more than that by design.
- */
 function hintsLine(row: InheritedUnionRow): I18nText {
   const hints = row.hints.map((hint) => {
     const label = hint.source === "global" ? "Global" : hint.source;

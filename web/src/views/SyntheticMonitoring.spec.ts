@@ -369,8 +369,6 @@ describe("SyntheticMonitoring", () => {
       const tabsWrapper = wrapper.find('[data-test="synthetic-monitoring-header-tabs"]');
       expect(tabsWrapper.exists()).toBe(true);
 
-      // Variables is one tab covering every scope; environments live on its
-      // own rail rather than in a tab of their own.
       const tabElements = wrapper.findAll('[data-test="synthetic-monitoring-header-tab"]');
       expect(tabElements).toHaveLength(4);
     });

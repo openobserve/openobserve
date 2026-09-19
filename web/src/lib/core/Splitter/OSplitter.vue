@@ -95,9 +95,6 @@ const maxValue = computed(() => props.limits?.[1] || (props.unit === "%" ? 100 :
 const { value: currentValue, onMouseDown } = useResizer({
   direction: !props.horizontal ? "horizontal" : "vertical",
   initialValue: props.modelValue,
-  // Getters, not snapshots: the Journey page mounts this with the panel
-  // collapsed ([100,100]) and widens the limits when it opens — a frozen
-  // clamp would snap the first drag to 100 and hide the panel.
   minValue: () => minValue.value,
   maxValue: () => maxValue.value,
   unit: props.unit,

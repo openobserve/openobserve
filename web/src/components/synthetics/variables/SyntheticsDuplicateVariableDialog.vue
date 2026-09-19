@@ -13,13 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-The copy lands in the scope it was made from. Offering a scope picker here
-would duplicate what Make global and Scope to environments already do, and
-those carry guards this dialog does not.
-
-Plain variables only: a secret's value cannot be copied, so the list routes
-that row to the create form instead.
 -->
 
 <template>

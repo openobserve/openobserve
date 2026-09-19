@@ -16,14 +16,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
-import { useStore } from "vuex";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import type {
-  BrowserCheck,
-  BrowserStep,
-  SyntheticsEnvironment,
-  SyntheticsVariable,
-} from "@/types/synthetics";
+import type { BrowserCheck, BrowserStep } from "@/types/synthetics";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -33,8 +27,9 @@ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import { getUUID } from "@/utils/uuid";
-import syntheticsService from "@/services/synthetics";
 import SyntheticsInheritedVariables from "@/components/synthetics/variables/SyntheticsInheritedVariables.vue";
+import PromoteCheckVariableDialog from "@/components/synthetics/variables/PromoteCheckVariableDialog.vue";
+import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
 import {
   RESOLVED_VARIABLE_CAP,
   buildResolvedGrouped,
@@ -44,8 +39,13 @@ import {
 
 type CheckVariable = NonNullable<BrowserCheck["variables"]>[number];
 
-const props = defineProps<{ check: BrowserCheck }>();
-const emit = defineEmits<{ "update:check": [value: BrowserCheck] }>();
+const props = defineProps<{
+  check: BrowserCheck;
+  checkId?: string;
+  /** The check as last loaded or saved; promote acts on the stored copy. */
+  saved?: BrowserCheck | null;
+}>();
+const emit = defineEmits<{ "update:check": [value: BrowserCheck]; promoted: [name: string] }>();
 
 const { t } = useI18nTyped();
 
@@ -71,28 +71,11 @@ const usageCounts = computed(() => variables.value.map((v) => usageCount(v.name)
 
 // ── Resolution — the union of every selected environment plus globals ──────
 
-const store = useStore();
-const sharedEnvironments = ref<SyntheticsEnvironment[]>([]);
-const sharedGlobals = ref<SyntheticsVariable[]>([]);
-
-/** Both shared tiers, as metadata. Fetched once: the merge below is local, so
- *  ticking an environment costs no request and works before the first save. */
-async function fetchShared() {
-  try {
-    const org = store.state.selectedOrganization.identifier;
-    const [environments, globals] = await Promise.all([
-      syntheticsService.listEnvironments(org),
-      syntheticsService.listGlobalVariables(org),
-    ]);
-    sharedEnvironments.value = environments.data ?? [];
-    sharedGlobals.value = globals.data ?? [];
-  } catch {
-    // A failure here costs the author a hint, not their work — the panel and
-    // the save path both stand on their own, so it stays silent.
-    sharedEnvironments.value = [];
-    sharedGlobals.value = [];
-  }
-}
+const {
+  environments: sharedEnvironments,
+  globals: sharedGlobals,
+  refresh: fetchShared,
+} = useSharedVariables();
 
 onMounted(fetchShared);
 
@@ -115,7 +98,6 @@ const environmentNames = computed(() => grouped.value.environments.filter((env) 
 /** Distinct resolved names across local and inherited — a shadowed name counts once. */
 const headerCount = computed(() => new Set([...localNames.value, ...unionNames.value]).size);
 
-/** Value on hover, per the 4b brief — masked when the author marked it secure. */
 function localValueTooltip(variable: CheckVariable): I18nText {
   if (variable.secure) return raw(`${variable.name}: ••••••`);
   if (!variable.value) {
@@ -301,6 +283,44 @@ const pendingRemoveFallbackScope = computed(() => {
 onBeforeUnmount(() => {
   if (undoTimer) clearTimeout(undoTimer);
 });
+
+const promoting = ref<CheckVariable | null>(null);
+const promoteDialogOpen = computed({
+  get: () => promoting.value !== null,
+  set: (open: boolean) => {
+    if (!open) promoting.value = null;
+  },
+});
+
+/** Unchanged since the last save, so the server's copy is the one the editor shows. */
+function isSaved(variable: CheckVariable): boolean {
+  return (props.saved?.variables ?? []).some(
+    (s) =>
+      s.name === variable.name && s.value === variable.value && !!s.secure === !!variable.secure,
+  );
+}
+
+const savedEnvironmentNames = computed(() =>
+  (props.saved?.environments ?? [])
+    .map((id) => sharedEnvironments.value.find((env) => env.id === id)?.name)
+    .filter((name): name is string => Boolean(name)),
+);
+
+function onPromoted(name: string) {
+  const index = variables.value.findIndex((v) => v.name === name);
+  const row = variables.value[index];
+  const unchanged = !!row && isSaved(row);
+  emit("promoted", name);
+  // An edit made while the dialog was open is new local state, not what the server moved.
+  if (unchanged) {
+    if (editingIndex.value === index) closeForm();
+    emit("update:check", {
+      ...props.check,
+      variables: variables.value.filter((_, i) => i !== index),
+    });
+  }
+  void fetchShared();
+}
 </script>
 
 <template>
@@ -352,7 +372,6 @@ onBeforeUnmount(() => {
         </OButton>
       </div>
 
-      <!-- Panel-wide empty state; Local's + is the add affordance otherwise -->
       <OEmptyState
         v-if="variables.length === 0 && !adding && !unionRows.length"
         size="block"
@@ -365,7 +384,6 @@ onBeforeUnmount(() => {
         @action="openAdd"
       />
 
-      <!-- Local — the only editable group, so Add lives on its header -->
       <section v-else class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
           <h4 class="text-text-heading m-0 text-sm font-semibold">
@@ -392,7 +410,6 @@ onBeforeUnmount(() => {
             :key="variable.id ?? index"
             :data-test="`synthetics-check-variables-panel-card-${index}`"
           >
-            <!-- Edit mode — swaps the card in place, visually highlighted -->
             <div
               v-if="editingIndex === index"
               class="rounded-default border-accent flex flex-col gap-3 border px-3 py-2.5"
@@ -450,7 +467,6 @@ onBeforeUnmount(() => {
               </div>
             </div>
 
-            <!-- Display mode — names only; the value lives on the name's hover -->
             <div v-else class="flex min-w-0 items-center gap-2 text-sm">
               <OIcon
                 name="edit-note"
@@ -462,8 +478,6 @@ onBeforeUnmount(() => {
                 {{ variable.name }}
                 <OTooltip :content="localValueTooltip(variable)" side="top" />
               </span>
-              <!-- This local wins over an inherited name of the same spelling.
-                   shrink-0 so an overflowing name ellipsizes, never the badge. -->
               <span v-if="unionNames.has(variable.name)" class="flex shrink-0">
                 <OTooltip :content="t('synthetics.variablesPanel.overridesInherited')" side="top">
                   <OIcon
@@ -489,6 +503,18 @@ onBeforeUnmount(() => {
                   <OTooltip :content="t('common.edit')" side="top" />
                 </OButton>
                 <OButton
+                  v-if="checkId && isSaved(variable)"
+                  icon-only
+                  icon-left="drive-file-move"
+                  variant="ghost"
+                  size="icon"
+                  :aria-label="t('synthetics.promoteCheck.action', { name: variable.name })"
+                  :data-test="`synthetics-check-variables-panel-promote-${index}-btn`"
+                  @click="promoting = variable"
+                >
+                  <OTooltip :content="t('synthetics.promoteCheck.tooltip')" side="top" />
+                </OButton>
+                <OButton
                   icon-only
                   icon-left="delete"
                   variant="ghost"
@@ -506,7 +532,6 @@ onBeforeUnmount(() => {
           </li>
         </ul>
 
-        <!-- Add form — at the end of the list, scrolled into view on open -->
         <div
           v-if="adding"
           ref="addFormRef"
@@ -600,8 +625,6 @@ onBeforeUnmount(() => {
           }}
         </template>
       </p>
-      <!-- Removing an override is a silent value change, not a breakage —
-           steps keep referencing the name and start resolving the fallback. -->
       <p v-if="pendingRemoveFallbackScope" class="pb-2">
         {{
           t("synthetics.variablesPanel.removeOverrideNote", {
@@ -611,5 +634,15 @@ onBeforeUnmount(() => {
         }}
       </p>
     </ODialog>
+
+    <PromoteCheckVariableDialog
+      v-if="checkId"
+      v-model:open="promoteDialogOpen"
+      :check-id="checkId"
+      :name="promoting?.name ?? ''"
+      :secure="!!promoting?.secure"
+      :environments="savedEnvironmentNames"
+      @done="onPromoted"
+    />
   </aside>
 </template>

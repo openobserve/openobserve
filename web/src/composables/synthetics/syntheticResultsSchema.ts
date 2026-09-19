@@ -178,8 +178,6 @@ export interface SyntheticRun {
   location: string;
   device: string;
   browserEngine: string;
-  /** The env this job was fanned out for; '' on unscoped checks and rows
-   *  written before the field existed — "unattributed", not an environment. */
   environment: string;
   triggerType: string;
   error: string;
@@ -926,11 +924,6 @@ function escapeSqlLiteral(value: string): string {
   return value.replace(/'/g, "''");
 }
 
-/**
- * `AND environment = '…'` for a scoped query, '' otherwise. Callers gate on the
- * stream schema actually having the column — naming an absent field is rejected
- * outright by the search API, and rows written before the stamp have none.
- */
 function environmentPredicate(environment?: string): string {
   return environment ? ` AND environment = '${escapeSqlLiteral(environment)}'` : "";
 }
@@ -1035,8 +1028,6 @@ export function buildHistogramSql(
   hasAttemptsField = false,
   hasStatusReasonField = false,
   environment?: string,
-  /** Adds `environment` to SELECT + GROUP BY for the per-env chart series.
-   *  Caller gates on the schema having the column, as with `environment`. */
   splitByEnvironment = false,
 ): string {
   const id = escapeSqlLiteral(monitorId);
@@ -2235,16 +2226,6 @@ export function mapHistogram(
   return Array.from(buckets.values()).sort((a, b) => a.tsMs - b.tsMs);
 }
 
-/**
- * Folds env-split histogram rows into per-env bucket series plus the blended
- * series the errors chart and empty-state gating keep reading.
- *
- * Blended counts are sums and the average is total-weighted, both exact.
- * Blended per-bucket p95 is left at 0 — percentiles do not recombine, and in
- * split mode nothing renders it (the response chart draws the per-env series
- * and the KPI p95 has its own query). Rows with no environment fold into the
- * blended series only: "unattributed" is not an environment.
- */
 export function mapHistogramSplit(
   rawHits: Record<string, unknown>[],
   startMicros: number,

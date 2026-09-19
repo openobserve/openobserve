@@ -37,13 +37,6 @@ function apiOrigin(): string {
   return base.endsWith("/") ? base.slice(0, -1) : base;
 }
 
-/**
- * Create/update body for a shared variable.
- *
- * `value` is optional so an update can leave a write-only secret alone: the
- * client only ever holds `has_value`, never the value, so it has nothing to
- * send back. Omitting it means "keep what is stored".
- */
 export interface SyntheticsVariablePayload {
   name: string;
   value?: string;
@@ -226,24 +219,19 @@ const syntheticsService = {
   bulkDeleteLocations: (orgIdentifier: string, ids: string[]) =>
     http().delete(`/api/${orgIdentifier}/synthetics/locations`, { data: { ids } }),
 
-  // ── Shared variables and environments ──────────────────────────────────
-  //
-  // Two scopes, deliberately kept apart: unscoped variables under
-  // /synthetics/variables, environment-scoped ones under the environment that
-  // governs them. The URL is the access-control boundary, so a caller cannot
-  // reach a production secret through the global route by accident.
-
   listGlobalVariables: (orgIdentifier: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/variables`),
 
   createGlobalVariable: (orgIdentifier: string, body: SyntheticsVariablePayload) =>
     http().post(`/api/${orgIdentifier}/synthetics/variables`, body),
 
-  updateGlobalVariable: (orgIdentifier: string, id: string, body: SyntheticsVariablePayload) =>
-    http().put(`/api/${orgIdentifier}/synthetics/variables/${id}`, body),
+  updateGlobalVariable: (
+    orgIdentifier: string,
+    id: string,
+    body: SyntheticsVariablePayload,
+    force = false,
+  ) => http().put(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`, body),
 
-  // `force` is the confirmation collected after the guard listed the checks
-  // that reference this variable; without it the server refuses with 409.
   deleteGlobalVariable: (orgIdentifier: string, id: string, force = false) =>
     http().delete(`/api/${orgIdentifier}/synthetics/variables/${id}?force=${force}`),
 
@@ -283,9 +271,10 @@ const syntheticsService = {
     env: string,
     id: string,
     body: SyntheticsVariablePayload,
+    force = false,
   ) =>
     http().put(
-      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}`,
+      `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
       body,
     ),
 
@@ -294,14 +283,6 @@ const syntheticsService = {
       `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
     ),
 
-  /**
-   * Shared secret values for replay, when the org has opted in.
-   *
-   * The one endpoint that returns a shared secret's plaintext. It 403s unless
-   * the org enabled auto-fill AND the caller may write the environment
-   * governing each secret, so a failure here is ordinary and the caller falls
-   * back to prompting rather than treating it as an error.
-   */
   replaySecrets: (orgIdentifier: string, checkId: string) =>
     http().post(`/api/${orgIdentifier}/synthetics/${checkId}/replay-secrets`, {}),
 
@@ -312,11 +293,6 @@ const syntheticsService = {
   /** Every environment's resolved set in one call, keyed by environment name. */
   resolvedVariablesGrouped: (orgIdentifier: string, checkId: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables?envs=all`),
-
-  // ── Scope moves ────────────────────────────────────────────────────────
-  //
-  // Each authorizes the scope being left; the server checks the one being
-  // entered, because no single route can name both.
 
   promoteCheckVariable: (
     orgIdentifier: string,

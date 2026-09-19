@@ -253,8 +253,6 @@ export function useSyntheticResults(t: TranslateFn) {
     } catch {
       return null;
     }
-    // A scope the stream cannot express falls through to the execution-row
-    // tally, which scopes on the results stream instead — see the caller.
     if (environment && !hasStepEnvField) return null;
 
     try {
@@ -320,8 +318,6 @@ export function useSyntheticResults(t: TranslateFn) {
       } catch {
         // Schema not available — omit retry_history, which is safe.
       }
-      // A scope no stored row can express means there is nothing to tally —
-      // empty is the honest answer, not mislabeled blended numbers.
       if (environment && !hasEnvField) return emptyStepStats();
       // C7 — once the probe writes `retry_step_ids`, the flaky column is
       // answered by three scalars on the rows that actually retried, so the
@@ -435,8 +431,6 @@ export function useSyntheticResults(t: TranslateFn) {
       const schemaFields = await fetchSchemaFields();
       const hasAttemptsField = schemaFields.has("attempts");
       const hasStatusReasonField = schemaFields.has("status_reason");
-      // A scope no stored row can express (the column has never been ingested)
-      // yields honest emptiness — not blended data mislabeled as one env.
       if (environment && !schemaFields.has("environment")) {
         kpi.value = { ...EMPTY_KPI };
         buckets.value = [];
@@ -459,7 +453,6 @@ export function useSyntheticResults(t: TranslateFn) {
       // cached histogram beside it. Every count tile is a plain sum over the
       // buckets, so this is exact rather than an approximation — only p95 needs
       // its own (small) query, because percentiles do not sum.
-      // Split is meaningless under a scope, and impossible pre-stamp.
       const split = splitEnvironments && !environment && schemaFields.has("environment");
       const histogramRowsP = executeQuery(
         buildHistogramSql(

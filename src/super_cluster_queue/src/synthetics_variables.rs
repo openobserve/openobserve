@@ -13,24 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Applies shared variables and environments replicated from the region a user
-//! edited in.
-//!
-//! Values arrive as PLAINTEXT and are encrypted here under this region's own
-//! key. Ciphertext made in the producing region is unreadable here, which is
-//! o2-enterprise#2451, fixed at this boundary rather than by sharing keys.
-//!
-//! Everything goes through the RAW `infra::table` layer, never the synthetics
-//! service layer. Two reasons, and the second is the load-bearing one: the
-//! service re-publishes, which would bounce the message between regions
-//! forever, and it re-runs validation, the reserved-prefix rule and the
-//! resolved-set cap — so a region could refuse a row the origin accepted and
-//! diverge with nobody told.
-//!
-//! Applies are idempotent, because the queue redelivers: an upsert is
-//! last-write-wins by primary key, a delete is a delete, and a batch is one
-//! transaction.
-
 use infra::{
     errors::{Error, Result},
     table::{
@@ -46,7 +28,7 @@ use sea_orm::{ConnectionTrait, TransactionTrait};
 
 pub(crate) async fn process(msg: Message) -> Result<()> {
     match msg.message_type {
-        MessageType::SyntheticsVariablesTable => process_msg(msg.try_into()?).await,
+        MessageType::SyntheticsTable => process_msg(msg.try_into()?).await,
         _ => {
             log::error!(
                 "[SUPER_CLUSTER:DB] synthetics_variables: invalid message type {:?} key {}",
@@ -73,21 +55,16 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
             synthetics_environments::apply_upsert(conn, &environment_record(payload)).await?;
         }
         SyntheticsVariablesMessage::EnvironmentDelete { org_id, id } => {
-            // Cascades to the variables scoped to it, the same delete the
-            // origin ran.
             synthetics_environments::delete(conn, &org_id, &id).await?;
         }
         SyntheticsVariablesMessage::VariablePut { org_id, payload } => {
             let record = variable_record(&org_id, payload).await?;
-            ensure_global_parent(conn, &record).await?;
-            synthetics_variables::apply_upsert(conn, &record).await?;
+            apply_ops(conn, &org_id, &[Write::Variable(record)]).await?;
         }
         SyntheticsVariablesMessage::VariableDelete { org_id, id } => {
             synthetics_variables::delete_row(conn, &org_id, &id).await?;
         }
         SyntheticsVariablesMessage::Batch { org_id, ops } => {
-            // Encrypt before opening the transaction: `get_dek` can mint and
-            // persist a key, and that must not run inside one.
             let mut writes = Vec::with_capacity(ops.len());
             for op in ops {
                 writes.push(match op {
@@ -104,13 +81,11 @@ async fn process_msg(msg: SyntheticsVariablesMessage) -> Result<()> {
         }
     }
 
-    // This region's own nodes still hold the pre-apply set in their 15-second
-    // cache. The event is intra-cluster, so it cannot loop back out.
     synthetics_variables::invalidate_and_publish(&org_id).await;
     Ok(())
 }
 
-/// Applies a batch in one transaction, so half a split can never land.
+/// Applies writes in one transaction; a variable that loses to a newer row is skipped, not retried.
 async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     org_id: &str,
@@ -120,11 +95,11 @@ async fn apply_ops<C: ConnectionTrait + TransactionTrait>(
     for write in writes {
         match write {
             Write::Environment(record) => {
-                synthetics_environments::apply_upsert(&txn, record).await?
+                synthetics_environments::apply_upsert(&txn, record).await?;
             }
             Write::Variable(record) => {
                 ensure_global_parent(&txn, record).await?;
-                synthetics_variables::apply_upsert(&txn, record).await?
+                synthetics_variables::apply_upsert(&txn, record).await?;
             }
             Write::Delete(id) => {
                 synthetics_variables::delete_row(&txn, org_id, id).await?;
@@ -227,9 +202,6 @@ mod tests {
 
     #[tokio::test]
     async fn a_message_from_another_table_is_rejected() {
-        // The payload is a perfectly good variable write, so only the type
-        // check can reject it — a processor that decoded first and asked
-        // questions later would apply it.
         let payload = config::utils::json::to_vec(&SyntheticsVariablesMessage::VariablePut {
             org_id: "org1".to_string(),
             payload: variable("hunter2"),
@@ -240,7 +212,7 @@ mod tests {
             Some(payload.into()),
             None,
             false,
-            MessageType::SyntheticsTable,
+            MessageType::SyntheticsLocationsTable,
         );
         let err = process(msg).await.unwrap_err();
         assert!(
@@ -249,31 +221,21 @@ mod tests {
         );
     }
 
-    /// `has_value` is `!value.is_empty()`, so encrypting an empty column would
-    /// report an unset secret as set in every region but the one it was
-    /// written in.
     #[tokio::test]
     async fn an_unset_secret_stays_unset_on_apply() {
         let record = variable_record("org1", variable("")).await.unwrap();
         assert_eq!(record.value, "");
     }
 
-    /// The wire carries plaintext, and the row must not. Storing what arrived
-    /// is o2-enterprise#2451 with the regions swapped.
     #[tokio::test]
     async fn a_value_is_encrypted_before_it_is_stored() {
         let Ok(record) = variable_record("org1", variable("hunter2")).await else {
-            // `get_dek` needs a meta store, which a unit test has no business
-            // standing up. The empty-value path above covers the branch that
-            // does not.
             return;
         };
         assert!(record.value.starts_with("AESenc:"), "{}", record.value);
         assert_ne!(record.value, "hunter2");
     }
 
-    /// A split writes several rows at once, and a region holding half of one
-    /// resolves a set no region ever had.
     #[tokio::test]
     async fn a_batch_that_fails_halfway_leaves_nothing_behind() {
         use sea_orm::{ConnectionTrait, Database, EntityTrait, Schema};
@@ -286,24 +248,30 @@ mod tests {
         ))
         .await
         .unwrap();
-        // The same uniqueness the migration creates, which is what the second
-        // write in the batch below collides with.
         db.execute_unprepared("CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)")
             .await
             .unwrap();
 
+        db.execute_unprepared(
+            "CREATE TRIGGER no_second AFTER INSERT ON synthetics_variables \
+             WHEN NEW.id = 'var-2' BEGIN SELECT RAISE(ABORT, 'refused'); END",
+        )
+        .await
+        .unwrap();
+
         let mut first = variable_record("org1", variable("")).await.unwrap();
         first.id = "var-1".to_string();
-        let mut collides = first.clone();
-        collides.id = "var-2".to_string();
+        let mut second = first.clone();
+        second.id = "var-2".to_string();
+        second.name = "OTHER".to_string();
 
         let err = apply_ops(
             &db,
             "org1",
-            &[Write::Variable(first), Write::Variable(collides)],
+            &[Write::Variable(first), Write::Variable(second)],
         )
         .await
-        .expect_err("the second write collides on the unique index");
+        .expect_err("the second write is refused");
         assert!(!err.to_string().is_empty());
 
         let left = infra::table::entity::synthetics_variables::Entity::find()
@@ -366,8 +334,6 @@ mod tests {
 
     #[test]
     fn an_environment_crosses_with_the_origin_id() {
-        // A replicated check stores environment ids, so a locally minted id
-        // would leave that check resolving nothing at all.
         let record = environment_record(SyntheticsEnvironmentPayload {
             id: "env-prod".to_string(),
             org_id: "org1".to_string(),
@@ -408,5 +374,26 @@ mod tests {
         };
         let record = variable_record("org1", payload).await.unwrap();
         assert_eq!(record.env, "global_org1");
+    }
+
+    #[tokio::test]
+    async fn a_variable_message_on_the_synthetics_type_byte_is_decoded() {
+        let payload = config::utils::json::to_vec(&SyntheticsVariablesMessage::VariableDelete {
+            org_id: "org1".to_string(),
+            id: "var-1".to_string(),
+        })
+        .unwrap();
+        let msg = Message::new(
+            "/synthetics_variables/".to_string(),
+            Some(payload.into()),
+            None,
+            false,
+            MessageType::SyntheticsTable,
+        );
+        let decoded: SyntheticsVariablesMessage = msg.try_into().unwrap();
+        assert!(matches!(
+            decoded,
+            SyntheticsVariablesMessage::VariableDelete { ref id, .. } if id == "var-1"
+        ));
     }
 }

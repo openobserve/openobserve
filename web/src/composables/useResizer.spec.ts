@@ -31,8 +31,6 @@ function drag(onMouseDown: (e: MouseEvent) => void, fromX: number, toX: number) 
 
 describe("useResizer", () => {
   it("reads function limits at drag time, not at setup", () => {
-    // Regression: OSplitter's limits change after mount (collapsed [100,100]
-    // widening to [55,85]); a snapshot clamp snapped the first drag to 100.
     let min = 100;
     let max = 100;
     const onResize = vi.fn();

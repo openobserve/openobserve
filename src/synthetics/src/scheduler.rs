@@ -475,10 +475,6 @@ pub async fn run() {
             // so counting it would leave the run permanently short — never
             // complete, never alerted on. `job_count` is knowable only after the
             // gate has run.
-            // Environments sit beside locations in the fan-out. An empty list
-            // means one unscoped job per location, which is every check that
-            // pre-dates environments — so the gate below runs exactly once for
-            // them and nothing about their scheduling changes.
             let environments: Vec<Option<&str>> = if synthetic.environments.is_empty() {
                 vec![None]
             } else {
@@ -489,9 +485,6 @@ pub async fn run() {
                     .collect()
             };
 
-            // Built eagerly rather than as a lazy chain: the loop body awaits, and a closure
-            // capturing the borrow across those awaits does not satisfy the higher-ranked bound the
-            // async block needs.
             let mut fanout: Vec<(Option<&str>, &String)> = Vec::new();
             for env in &environments {
                 for location in &synthetic.locations {
@@ -537,8 +530,6 @@ pub async fn run() {
                 });
             }
 
-            // Reported per location: with environments the same location can be
-            // denied several times over, and each would emit an identical record.
             denied.sort();
             denied.dedup();
 

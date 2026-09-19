@@ -13,8 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Shared variables and environments.
-
 use axum::{
     Json,
     extract::{Path, Query},
@@ -22,6 +20,8 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use common::meta::http::HttpResponse as MetaHttpResponse;
+#[cfg(any(feature = "enterprise", test))]
+use config::meta::synthetics_variables::SyntheticsEnvironmentView;
 use config::meta::synthetics_variables::{
     PromoteVariableRequest, SplitVariableRequest, SyntheticsEnvironmentRequest,
     SyntheticsVariableRequest,
@@ -29,8 +29,8 @@ use config::meta::synthetics_variables::{
 #[cfg(feature = "enterprise")]
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{UserEmail, is_ofga_object_visible};
-use openobserve_synthetics::service::SyntheticsEnvironmentRecord;
+use openobserve_core::auth::UserEmail;
+use openobserve_synthetics::service::{SyntheticsEnvironmentRecord, UsageConflict};
 
 /// Confirmation that the caller has seen the deletion guard's list.
 #[derive(Debug, Default, serde::Deserialize)]
@@ -46,8 +46,6 @@ pub struct ResolvedQuery {
     pub envs: Option<String>,
 }
 
-/// OpenFGA resource key for an environment. Its object id is the environment
-/// *name*, which is why names are validated as FGA-safe on write.
 #[cfg(feature = "enterprise")]
 const ENVIRONMENT_RESOURCE: &str = "synthetic_environment";
 
@@ -114,21 +112,25 @@ pub async fn create_synthetics_variable(
     params(
         ("org_id" = String, Path, description = "Organization name"),
         ("id" = String, Path, description = "Variable ID"),
+        ("force" = Option<bool>, Query, description = "Rename even while checks reference the old name"),
     ),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn update_synthetics_variable(
     Path((org_id, id)): Path<(String, String)>,
+    Query(q): Query<ForceQuery>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
-    match openobserve_synthetics::service::update_variable(&org_id, None, &id, body).await {
+    match openobserve_synthetics::service::update_variable(&org_id, None, &id, body, q.force).await
+    {
         Ok(Some(view)) => MetaHttpResponse::json(view),
         Ok(None) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -147,6 +149,7 @@ pub async fn update_synthetics_variable(
     responses(
         (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Checks still reference the variable; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn delete_synthetics_variable(
@@ -156,8 +159,6 @@ pub async fn delete_synthetics_variable(
     match openobserve_synthetics::service::delete_variable(&org_id, None, &id, q.force).await {
         Ok(true) => MetaHttpResponse::ok("variable deleted"),
         Ok(false) => MetaHttpResponse::not_found("variable not found"),
-        // The guard names what it is guarding, so the client can render the
-        // confirmation without a second call.
         Err(e) => MetaHttpResponse::conflict(e),
     }
 }
@@ -185,34 +186,33 @@ pub async fn list_synthetics_environments(
         Err(e) => return variables_error("list_environments", e),
     };
 
-    // Per-object filtering on top of the route's LIST check: the route proves
-    // the caller may list environments at all, this decides which ones.
+    // Per environment: `list_objects_for_user` is None unless list-only-permitted is on.
     #[cfg(feature = "enterprise")]
     let environments = {
-        let permitted = match openobserve_api_common::auth::validator::list_objects_for_user(
-            &org_id,
-            &user_email.user_id,
-            "GET",
-            ENVIRONMENT_RESOURCE,
-        )
-        .await
-        {
-            Ok(permitted) => permitted,
-            Err(e) => return MetaHttpResponse::forbidden(e.to_string()),
-        };
-        environments
+        let checks = environments
+            .iter()
+            .filter(|env| !env.is_global)
+            .map(|env| async {
+                openobserve_core::auth::check_permissions(
+                    &env.name,
+                    &org_id,
+                    &user_email.user_id,
+                    ENVIRONMENT_RESOURCE,
+                    "GET",
+                    None,
+                    false,
+                    false,
+                    true,
+                )
+                .await
+                .then(|| env.name.clone())
+            });
+        let readable: std::collections::HashSet<String> = futures::future::join_all(checks)
+            .await
             .into_iter()
-            // Global reads are open (design §7), as `GET /variables` is.
-            .filter(|env| {
-                env.is_global
-                    || is_ofga_object_visible(
-                        &org_id,
-                        ENVIRONMENT_RESOURCE,
-                        &env.name,
-                        permitted.as_deref(),
-                    )
-            })
-            .collect::<Vec<_>>()
+            .flatten()
+            .collect();
+        readable_environments(environments, &readable)
     };
 
     MetaHttpResponse::json(environments)
@@ -293,6 +293,7 @@ pub async fn update_synthetics_environment(
     responses(
         (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "The environment is in use or still holds variables; see the message", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn delete_synthetics_environment(
@@ -302,8 +303,6 @@ pub async fn delete_synthetics_environment(
     match openobserve_synthetics::service::delete_environment(&org_id, &env, q.force).await {
         Ok(true) => MetaHttpResponse::ok("environment deleted"),
         Ok(false) => MetaHttpResponse::not_found("environment not found"),
-        // The guard names the secrets or variables blocking the delete, so the
-        // client can render the confirmation without a second call.
         Err(e) => MetaHttpResponse::conflict(e),
     }
 }
@@ -393,15 +392,18 @@ pub async fn create_synthetics_environment_variable(
         ("org_id" = String, Path, description = "Organization name"),
         ("env" = String, Path, description = "Environment name"),
         ("id" = String, Path, description = "Variable ID"),
+        ("force" = Option<bool>, Query, description = "Rename even while checks reference the old name"),
     ),
     request_body(content = Object, description = "Variable definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn update_synthetics_environment_variable(
     Path((org_id, env, id)): Path<(String, String, String)>,
+    Query(q): Query<ForceQuery>,
     Json(body): Json<SyntheticsVariableRequest>,
 ) -> Response {
     let record = match resolve_environment(&org_id, &env).await {
@@ -409,11 +411,18 @@ pub async fn update_synthetics_environment_variable(
         Ok(None) => return MetaHttpResponse::not_found("environment not found"),
         Err(response) => return response,
     };
-    match openobserve_synthetics::service::update_variable(&org_id, Some(&record), &id, body).await
+    match openobserve_synthetics::service::update_variable(
+        &org_id,
+        Some(&record),
+        &id,
+        body,
+        q.force,
+    )
+    .await
     {
         Ok(Some(view)) => MetaHttpResponse::json(view),
         Ok(None) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -433,6 +442,7 @@ pub async fn update_synthetics_environment_variable(
     responses(
         (status = 200, description = "Deleted",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "Checks still reference the variable; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn delete_synthetics_environment_variable(
@@ -453,6 +463,18 @@ pub async fn delete_synthetics_environment_variable(
     }
 }
 
+/// Global reads are open (design §7); every other environment needs its own GET.
+#[cfg(any(feature = "enterprise", test))]
+fn readable_environments(
+    environments: Vec<SyntheticsEnvironmentView>,
+    readable: &std::collections::HashSet<String>,
+) -> Vec<SyntheticsEnvironmentView> {
+    environments
+        .into_iter()
+        .filter(|env| env.is_global || readable.contains(&env.name))
+        .collect()
+}
+
 /// Turns the URL's environment name into the row the service works against.
 async fn resolve_environment(
     org_id: &str,
@@ -461,6 +483,15 @@ async fn resolve_environment(
     openobserve_synthetics::service::get_environment(org_id, env)
         .await
         .map_err(|e| variables_error("get_environment", e))
+}
+
+/// 409 for the reference guard, like a delete, so the client can confirm and re-send with force.
+fn update_error(error: anyhow::Error) -> Response {
+    if error.downcast_ref::<UsageConflict>().is_some() {
+        MetaHttpResponse::conflict(error)
+    } else {
+        MetaHttpResponse::bad_request(error)
+    }
 }
 
 fn variables_error(operation: &str, error: anyhow::Error) -> Response {
@@ -495,8 +526,6 @@ pub async fn get_synthetic_resolved_variables(
     Query(q): Query<ResolvedQuery>,
 ) -> Response {
     match q.envs.as_deref() {
-        // The flat shape resolves the first environment only and predates the
-        // grouped one; kept byte-identical until every client passes `envs=all`.
         None => match openobserve_synthetics::service::resolved_variables(&org_id, &id).await {
             Ok(Some(resolved)) => MetaHttpResponse::json(resolved),
             Ok(None) => MetaHttpResponse::not_found("check not found"),
@@ -545,9 +574,6 @@ pub async fn promote_synthetic_variable(
     #[cfg(not(feature = "enterprise"))]
     let created_by = String::new();
 
-    // The route authorizes the CHECK. The destination scope is a second object
-    // with its own owner, so it is checked here — otherwise anyone who can edit
-    // a check could plant a value in an environment they cannot touch.
     let destination = match &body.environment {
         Some(env) => match resolve_environment(&org_id, env).await {
             Ok(Some(record)) => record,
@@ -651,8 +677,6 @@ pub async fn split_synthetics_variable(
     #[cfg(not(feature = "enterprise"))]
     let created_by = String::new();
 
-    // Every destination is a separate object with its own owner, so each is
-    // checked before any row is written.
     #[cfg(feature = "enterprise")]
     for target in &body.targets {
         match resolve_environment(&org_id, &target.environment).await {
@@ -731,9 +755,6 @@ pub async fn get_synthetic_replay_secrets(
     Path((org_id, id)): Path<(String, String)>,
     #[cfg(feature = "enterprise")] Headers(user_email): Headers<UserEmail>,
 ) -> Response {
-    // Gate one: the org opted in. Off by default, and the default is the point
-    // — every other path treats a shared secret as write-only, and this one
-    // hands plaintext to a browser.
     if !db::organization::get_org_setting(&org_id)
         .await
         .map(|s| s.synthetics_replay_autofill)
@@ -750,9 +771,6 @@ pub async fn get_synthetic_replay_secrets(
         Err(e) => return variables_error("replay_secrets", e),
     };
 
-    // Gate two: write on the environment governing each secret. Read access is
-    // not enough — this releases a value that no read path ever returns, so it
-    // is bounded by the permission that lets you replace it.
     #[cfg(feature = "enterprise")]
     let secrets = {
         let mut permitted = Vec::with_capacity(secrets.len());
@@ -776,8 +794,6 @@ pub async fn get_synthetic_replay_secrets(
         permitted
     };
 
-    // Named, never valued. HTTP audit already records the request; this records
-    // which credentials it actually released, which the request line cannot say.
     if !secrets.is_empty() {
         let names: Vec<&str> = secrets.iter().map(|s| s.name.as_str()).collect();
         tracing::info!(
@@ -796,7 +812,6 @@ pub async fn get_synthetic_replay_secrets(
     )
 }
 
-/// Body of a duplicate request.
 #[derive(Debug, Default, serde::Deserialize, utoipa::ToSchema)]
 pub struct DuplicateEnvironmentBody {
     pub name: String,
@@ -859,5 +874,41 @@ pub async fn duplicate_synthetics_environment(
     {
         Ok(view) => MetaHttpResponse::json(view),
         Err(e) => MetaHttpResponse::bad_request(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn env(name: &str, is_global: bool) -> SyntheticsEnvironmentView {
+        SyntheticsEnvironmentView {
+            name: name.into(),
+            is_global,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_rename_blocked_by_references_is_a_conflict_like_a_delete() {
+        let conflict = update_error(UsageConflict("referenced".to_string()).into());
+        assert_eq!(conflict.status(), StatusCode::CONFLICT);
+        let invalid = update_error(anyhow::anyhow!("name: invalid"));
+        assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn an_environment_the_caller_cannot_get_is_dropped_but_global_stays() {
+        let envs = vec![
+            env("global", true),
+            env("staging", false),
+            env("production", false),
+        ];
+        let readable = std::collections::HashSet::from(["staging".to_string()]);
+        let names: Vec<String> = readable_environments(envs, &readable)
+            .into_iter()
+            .map(|e| e.name)
+            .collect();
+        assert_eq!(names, ["global", "staging"]);
     }
 }

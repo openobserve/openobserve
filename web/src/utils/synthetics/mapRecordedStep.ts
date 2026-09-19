@@ -266,12 +266,6 @@ export function journeyToWireSteps(steps: BrowserStep[]): WireStep[] {
  * Substitute `{{ VAR_NAME }}` placeholders in wire step string fields with
  * actual variable values. Operates on all string fields that could contain
  * variable references (value, url, text, key, selector, name).
- *
- * An unbound `{{NAME}}` is left verbatim rather than replaced with "": `{{...}}`
- * is not necessarily a variable reference, and nothing here can tell a typo from
- * a check that legitimately types those characters into a field. The probe's
- * `substituteSecretsV2` makes the same choice — the two must agree or replay and
- * run type different characters.
  */
 export function substituteVariables(step: WireStep, vars: Record<string, string>): WireStep {
   const re = /\{\{\s*(\w+)\s*\}\}/g;

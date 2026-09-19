@@ -21,6 +21,7 @@ import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
 import { queryClient } from "@/composables/query/queryClient";
 import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { cloneDeep } from "lodash-es";
 import { useRouter, useRoute, onBeforeRouteLeave } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -38,12 +39,18 @@ import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type { WireStep } from "@/types/synthetics";
 import ReplaySecretPrompt from "@/components/synthetics/variables/ReplaySecretPrompt.vue";
-import type { ResolvedVariable } from "@/components/synthetics/variables/resolved";
 import {
-  mergeReplayVariables,
+  buildResolvedGrouped,
+  type ResolvedVariable,
+} from "@/components/synthetics/variables/resolved";
+import {
   partitionReplaySecrets,
+  replayInputs,
   secretsNeededForReplay,
+  sharedPlainValues,
+  type ReplaySecretScope,
 } from "@/components/synthetics/variables/replaySecrets";
+import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import {
@@ -385,6 +392,7 @@ async function loadForEdit(id: string) {
     const res = await syntheticsService.get(org, id, String(route.query.folder ?? ""));
     const mapped = mapResponseToBrowserCheck(res.data as Record<string, unknown>);
     check.value = mapped;
+    savedCheck.value = cloneDeep(mapped);
     checkName.value = mapped.name;
     startUrl.value = mapped.url;
     journeyStepDone.value = true;
@@ -480,6 +488,9 @@ onMounted(() => {
 
 // When true, BrowserJourney starts recording immediately on mount
 const autoRecord = ref(false);
+
+/** The check as last loaded or saved, which is what server-side moves act on. */
+const savedCheck = ref<BrowserCheck | null>(null);
 
 const check = ref<BrowserCheck>({
   name: "",
@@ -776,6 +787,7 @@ async function persist(): Promise<boolean> {
       toast({ variant: "success", message: t("synthetics.newCheck.saved") });
     }
     isDirty.value = false;
+    savedCheck.value = cloneDeep(check.value);
     return true;
   } catch (err: any) {
     dismiss();
@@ -901,32 +913,56 @@ function validateJourneyBeforeReplay(): boolean {
   return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
 
-/**
- * The check's resolved set, for deciding which secrets replay has to ask for.
- *
- * Empty for an unsaved check, which is correct: with no id there is nothing to
- * resolve against, and every placeholder is the check's own or unbound.
- */
-const resolvedVariables = ref<ResolvedVariable[]>([]);
-watch(
-  () => (check.value as any).id,
-  async (id) => {
-    if (!id) {
-      resolvedVariables.value = [];
-      return;
-    }
-    try {
-      const org = store.state.selectedOrganization.identifier;
-      const res = await syntheticsService.resolvedVariables(org, id);
-      resolvedVariables.value = res.data ?? [];
-    } catch {
-      // Costs the prompt, not the replay — an unsupplied secret types as
-      // literal text and the failure names itself on the page.
-      resolvedVariables.value = [];
-    }
-  },
-  { immediate: true },
-);
+const {
+  environments: sharedEnvironments,
+  globals: sharedGlobals,
+  loaded: sharedVariablesLoaded,
+  refresh: fetchSharedVariables,
+} = useSharedVariables();
+onMounted(fetchSharedVariables);
+
+function onVariablePromoted(name: string) {
+  if (!savedCheck.value) return;
+  savedCheck.value = {
+    ...savedCheck.value,
+    variables: (savedCheck.value.variables ?? []).filter((v) => v.name !== name),
+  };
+}
+
+/** Replay and a scheduled run resolve the check's first environment. */
+const replayEnvironmentId = computed(() => check.value.environments?.[0]);
+
+const replayResolved = computed<ResolvedVariable[]>(() => {
+  const grouped = buildResolvedGrouped(
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    replayEnvironmentId.value ? [replayEnvironmentId.value] : [],
+    check.value.variables ?? [],
+  );
+  return grouped.resolved[grouped.environments[0] ?? ""] ?? [];
+});
+
+/** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
+const knownVariableNames = computed(() => {
+  if (!sharedVariablesLoaded.value) return undefined;
+  const grouped = buildResolvedGrouped(
+    sharedEnvironments.value,
+    sharedGlobals.value,
+    check.value.environments ?? [],
+    check.value.variables ?? [],
+  );
+  return new Set(
+    Object.values(grouped.resolved)
+      .flat()
+      .map((v) => v.name),
+  );
+});
+
+const replaySecretScope = computed<ReplaySecretScope>(() => ({
+  org: store.state.selectedOrganization.identifier,
+  checkId: check.value.id ?? "",
+  environment: replayEnvironmentId.value ?? "",
+}));
 
 /** Steps waiting on secret values, held between the prompt and the replay. */
 const pendingReplaySteps = ref<WireStep[] | null>(null);
@@ -939,10 +975,8 @@ function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
 
-  // A shared secret has no value on the client by design, so replay either
-  // asks for it or types the placeholder literally. Ask, once per session.
-  const needed = secretsNeededForReplay(steps, resolvedVariables.value);
-  const { known, missing } = partitionReplaySecrets(needed);
+  const needed = secretsNeededForReplay(steps, replayResolved.value);
+  const { known, missing } = partitionReplaySecrets(replaySecretScope.value, needed);
   if (missing.length === 0) {
     startReplay(steps, known);
     return;
@@ -950,26 +984,22 @@ function runReplay(journey: BrowserStep[]) {
   void resumeReplayWithSecrets(steps, known, missing);
 }
 
-/**
- * Fill the missing secrets from the server if the org allows it, and prompt for
- * whatever is left.
- *
- * Auto-fill is off by default and additionally requires write on each secret's
- * environment, so a 403 or a partial answer is the ordinary case rather than an
- * error — either way the author is asked for the remainder.
- */
 async function resumeReplayWithSecrets(
   steps: WireStep[],
   known: Record<string, string>,
   missing: string[],
 ) {
   let filled: Record<string, string> = {};
-  try {
-    const org = store.state.selectedOrganization.identifier;
-    const res = await syntheticsService.replaySecrets(org, (check.value as any).id ?? "");
-    filled = res.data ?? {};
-  } catch {
-    filled = {};
+  const checkId = check.value.id;
+  if (checkId) {
+    try {
+      const org = store.state.selectedOrganization.identifier;
+      const res = await syntheticsService.replaySecrets(org, checkId);
+      filled = res.data ?? {};
+    } catch {
+      // Auto-fill is opt-in and needs write on each environment, so a refusal is the ordinary case.
+      filled = {};
+    }
   }
 
   const stillMissing = missing.filter((name) => filled[name] === undefined);
@@ -987,21 +1017,20 @@ function onReplaySecretsSupplied(supplied: Record<string, string>) {
   const steps = pendingReplaySteps.value;
   pendingReplaySteps.value = null;
   if (!steps) return;
-  const { known } = partitionReplaySecrets(replaySecretNames.value);
+  const { known } = partitionReplaySecrets(replaySecretScope.value, replaySecretNames.value);
   startReplay(steps, { ...known, ...autoFilledSecrets.value, ...supplied });
   autoFilledSecrets.value = {};
 }
 
 function startReplay(steps: WireStep[], secrets: Record<string, string>) {
+  const { url, variables } = replayInputs(
+    check.value.url,
+    check.value.variables ?? [],
+    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
+    secrets,
+  );
   recorder
-    .replay(
-      steps,
-      check.value.url,
-      mergeReplayVariables(check.value.variables ?? [], secrets),
-      check.value.auth,
-      check.value.headers,
-      check.value.cookies,
-    )
+    .replay(steps, url, variables, check.value.auth, check.value.headers, check.value.cookies)
     .catch((err) => {
       recorder.error.value = err instanceof Error ? err.message : String(err);
     });
@@ -1215,6 +1244,7 @@ function onClearResults() {
                     ref="journeyRef"
                     v-model="check.journey"
                     :start-url="check.url"
+                    :known-variables="knownVariableNames"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
                     :can-record-from-failure="canRecordFromFailure"
@@ -1247,8 +1277,11 @@ function onClearResults() {
                 <CheckVariablesPanel
                   v-if="variablesPanelOpen"
                   :check="check"
+                  :check-id="check.id"
+                  :saved="savedCheck"
                   class="border-border-default border-t"
                   @update:check="onConfigureUpdate"
+                  @promoted="onVariablePromoted"
                 />
               </template>
             </OSplitter>
@@ -1438,6 +1471,7 @@ function onClearResults() {
   <ReplaySecretPrompt
     v-model:open="replaySecretPromptOpen"
     :names="replaySecretNames"
+    :scope="replaySecretScope"
     @supplied="onReplaySecretsSupplied"
   />
 </template>

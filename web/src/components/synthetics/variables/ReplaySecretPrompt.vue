@@ -13,11 +13,6 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-Replay substitutes in the browser, so any value it could use is a value the
-page could read - the same property as write-only, with the sign flipped. A
-shared secret therefore has no value here, and the honest options are to ask or
-to let it type as literal text. This asks.
 -->
 
 <template>
@@ -48,8 +43,6 @@ to let it type as literal text. This asks.
     </div>
 
     <template #footer>
-      <!-- Skipping is legitimate: an unsupplied secret types as literal text,
-           so the replay still runs and fails where the value was needed. -->
       <OButton variant="outline" size="sm" data-test="synthetics-replay-secret-skip" @click="skip">
         {{ t("synthetics.replaySecrets.skip") }}
       </OButton>
@@ -71,9 +64,9 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import { rememberReplaySecret } from "./replaySecrets";
+import { rememberReplaySecret, type ReplaySecretScope } from "./replaySecrets";
 
-const props = defineProps<{ open: boolean; names: string[] }>();
+const props = defineProps<{ open: boolean; names: string[]; scope: ReplaySecretScope }>();
 const emit = defineEmits<{
   "update:open": [value: boolean];
   supplied: [values: Record<string, string>];
@@ -95,9 +88,10 @@ watch(
 
 function submit() {
   const supplied = Object.fromEntries(Object.entries(values.value).filter(([, v]) => v.length > 0));
-  // In memory only, for this tab. See `replaySecrets.ts` for why not storage.
   if (remember.value) {
-    for (const [name, value] of Object.entries(supplied)) rememberReplaySecret(name, value);
+    for (const [name, value] of Object.entries(supplied)) {
+      rememberReplaySecret(props.scope, name, value);
+    }
   }
   emit("supplied", supplied);
   emit("update:open", false);
