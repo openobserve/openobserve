@@ -1230,7 +1230,7 @@ pub async fn get_referenced_by(
         ("org_id" = String, Path, description = "Organization name"),
     ),
     security(("Authorization" = [])),
-    request_body(content = Object, description = r#"{"job_id": 42, "probe_features": ["start_load"]}"#, content_type = "application/json"),
+    request_body(content = Object, description = r#"{"job_id": 42}"#, content_type = "application/json"),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = Object),
         (status = 404, description = "Job not found"),

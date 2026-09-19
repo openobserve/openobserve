@@ -506,9 +506,6 @@ use crate::{RESULTS_STREAM, STEP_RESULTS_STREAM};
 #[derive(Debug, Deserialize)]
 pub struct ResolveRequest {
     pub job_id: String,
-    /// Wire names of the capabilities the probe announces; a pre-`start_load` probe sends none.
-    #[serde(default)]
-    pub probe_features: Vec<String>,
 }
 
 /// Viewport dimensions delivered to the probe so it doesn't need hardcoded device tables.
@@ -1066,7 +1063,6 @@ pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
 pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
 pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
-pub const REASON_CONFIG_START_LOAD_UNSUPPORTED: &str = "config_start_load_unsupported";
 
 /// Expansion could not produce a runnable journey (§5.11); `guard_failure` marks family 2 — a guard
 /// of ours failed.
@@ -1193,31 +1189,6 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
     )?;
     expand_for_resolve(conn, &mut synthetic).await?;
 
-    // Private locations run relaxed SSRF: probing the customer's own network is the point.
-    let location_record = synthetics_locations::get(&check.location)
-        .await
-        .ok()
-        .flatten();
-    let ssrf_policy = match &location_record {
-        Some(l) if l.kind == synthetics_locations::KIND_PRIVATE => "relaxed".to_string(),
-        _ => "strict".to_string(),
-    };
-    // Human label for the result record (id fallback keeps it non-empty).
-    let location_label = location_record
-        .map(|l| l.label)
-        .unwrap_or_else(|| check.location.clone());
-
-    // Gated on the expanded list: the probe decides the start load from the list it receives.
-    if synthetic.check_type == SyntheticType::Browser {
-        let steps = synthetic
-            .config
-            .get("steps")
-            .and_then(|s| s.as_array())
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        start_load_gate(steps, &req.probe_features, &location_label).map_err(anyhow::Error::new)?;
-    }
-
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
     // Redact cookie values — probe reads from env_inject._AUTH_COOKIES instead.
@@ -1267,6 +1238,20 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         metadata["environment"] =
             serde_json::json!(environment_display_name(&check.org_id, env_id).await);
     }
+
+    // Private locations run relaxed SSRF: probing the customer's own network is the point.
+    let location_record = synthetics_locations::get(&check.location)
+        .await
+        .ok()
+        .flatten();
+    let ssrf_policy = match &location_record {
+        Some(l) if l.kind == synthetics_locations::KIND_PRIVATE => "relaxed".to_string(),
+        _ => "strict".to_string(),
+    };
+    // Human label for the result record (id fallback keeps it non-empty).
+    let location_label = location_record
+        .map(|l| l.label)
+        .unwrap_or_else(|| check.location.clone());
 
     // Ingest destination for agent-mode probes — looked up at resolve time so
     // the token is never at rest in the queue (01 §7.1).
@@ -1540,33 +1525,6 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     })?;
     synthetic.config["steps"] = serde_json::Value::Array(expanded);
     Ok(())
-}
-
-/// Skip rule A1: only the first executed step decides; a later navigate is a reload.
-fn needs_start_load(steps: &[serde_json::Value]) -> bool {
-    !steps
-        .first()
-        .is_some_and(|s| s.get("action").and_then(|a| a.as_str()) == Some("navigate"))
-}
-
-/// Old probes (B1): a probe that cannot open the Starting URL is not handed a journey needing it.
-fn start_load_gate(
-    steps: &[serde_json::Value],
-    probe_features: &[String],
-    location_label: &str,
-) -> Result<(), ConfigError> {
-    if !needs_start_load(steps) || probe_features.iter().any(|f| f == "start_load") {
-        return Ok(());
-    }
-    Err(ConfigError {
-        status_reason: REASON_CONFIG_START_LOAD_UNSUPPORTED,
-        message: format!(
-            "Location {location_label} runs an agent that cannot open the Starting URL. Upgrade \
-             the agent, or add a Navigate first Step."
-        ),
-        // Customer-fixable (upgrade the agent or add a navigate), not a guard of ours failing.
-        guard_failure: false,
-    })
 }
 
 /// The 200 an ack that did not apply gets: a duplicate, or a late one from a
@@ -2175,28 +2133,6 @@ mod tests {
         assert_eq!(req.steps_executed, 0);
         assert_eq!(req.steps_defined, 0);
         assert_eq!(req.browser_ms, 0);
-    }
-
-    /// A probe built before the start load resolves with the job id alone; absence must parse.
-    #[test]
-    fn an_old_probe_resolves_without_probe_features_and_announces_none() {
-        let req: ResolveRequest =
-            serde_json::from_value(serde_json::json!({ "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv" }))
-                .expect("a resolve without probe_features must still deserialize");
-
-        assert_eq!(req.job_id, "2MNfNTxePfZ1pnY5gKVLkwsVRXv");
-        assert!(req.probe_features.is_empty());
-    }
-
-    #[test]
-    fn a_probe_announcing_the_start_load_is_read_verbatim() {
-        let req: ResolveRequest = serde_json::from_value(serde_json::json!({
-            "job_id": "2MNfNTxePfZ1pnY5gKVLkwsVRXv",
-            "probe_features": ["start_load"],
-        }))
-        .unwrap();
-
-        assert_eq!(req.probe_features, vec!["start_load".to_string()]);
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
@@ -3369,104 +3305,6 @@ mod tests {
             let err = expand_journey(&parent(&["nested"], 1), &children, &[]).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
-        }
-    }
-
-    // The old-probe gate (B1). Pure over the EXPANDED list, so these need no database.
-    mod start_load {
-        use std::collections::HashMap;
-
-        use config::meta::synthetics_composition::ChildJourney;
-        use serde_json::json;
-
-        use super::super::*;
-
-        const LOCATION: &str = "Berlin office";
-        const OLD_PROBE: &[String] = &[];
-
-        fn nav(id: &str) -> serde_json::Value {
-            json!({ "id": id, "action": "navigate", "url": "https://x" })
-        }
-
-        fn click(id: &str) -> serde_json::Value {
-            json!({ "id": id, "action": "click", "name": "Sign in",
-                    "locator": { "candidates": [ { "kind": "css", "value": "#x" } ] } })
-        }
-
-        fn start_load_probe() -> Vec<String> {
-            vec!["start_load".to_string()]
-        }
-
-        /// Only the FIRST executed step decides; a later navigate is a reload, not the opener.
-        #[test]
-        fn the_start_load_happens_unless_the_first_step_navigates() {
-            assert!(!needs_start_load(&[nav("s1"), click("s2")]));
-            assert!(needs_start_load(&[click("s1"), nav("s2")]));
-        }
-
-        #[test]
-        fn an_old_probe_dispatches_a_navigate_first_journey_normally() {
-            start_load_gate(&[nav("s1"), click("s2")], OLD_PROBE, LOCATION).unwrap();
-        }
-
-        #[test]
-        fn a_probe_with_the_start_load_dispatches_a_click_first_journey() {
-            start_load_gate(&[click("s1")], &start_load_probe(), LOCATION).unwrap();
-        }
-
-        #[test]
-        fn an_old_probe_fails_a_click_first_journey_as_a_config_error_naming_the_location() {
-            let err = start_load_gate(&[click("s1")], OLD_PROBE, LOCATION).unwrap_err();
-            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
-            // Customer-fixable (upgrade the agent or add a navigate), not a guard of ours failing.
-            assert!(!err.guard_failure);
-            assert_eq!(
-                err.message,
-                "Location Berlin office runs an agent that cannot open the Starting URL. Upgrade \
-                 the agent, or add a Navigate first Step."
-            );
-        }
-
-        /// The feature is matched by its wire name; an unrelated announcement unlocks nothing.
-        #[test]
-        fn only_the_start_load_feature_unlocks_a_click_first_journey() {
-            let other = vec!["something_else".to_string()];
-            let err = start_load_gate(&[click("s1")], &other, LOCATION).unwrap_err();
-            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
-        }
-
-        fn login_child(first: serde_json::Value) -> HashMap<String, ChildJourney> {
-            HashMap::from([(
-                "login".to_string(),
-                ChildJourney {
-                    id: "login".into(),
-                    name: "login".into(),
-                    steps: vec![first, click("c1")],
-                },
-            )])
-        }
-
-        fn parent_opening_with_login() -> Vec<serde_json::Value> {
-            vec![json!({ "id": "r0", "action": "subtest", "subtest": { "id": "login" } })]
-        }
-
-        /// A1: the gate reads the list the probe receives, so the child's opener counts.
-        #[test]
-        fn a_parent_whose_child_opens_with_navigate_dispatches_to_an_old_probe() {
-            let children = login_child(nav("c0"));
-            let expanded = expand_journey(&parent_opening_with_login(), &children, &[]).unwrap();
-            assert!(!needs_start_load(&expanded));
-            start_load_gate(&expanded, OLD_PROBE, LOCATION).unwrap();
-        }
-
-        #[test]
-        fn a_parent_whose_child_opens_with_click_needs_the_start_load() {
-            let children = login_child(click("c0"));
-            let expanded = expand_journey(&parent_opening_with_login(), &children, &[]).unwrap();
-            assert!(needs_start_load(&expanded));
-            let err = start_load_gate(&expanded, OLD_PROBE, LOCATION).unwrap_err();
-            assert_eq!(err.status_reason, REASON_CONFIG_START_LOAD_UNSUPPORTED);
-            start_load_gate(&expanded, &start_load_probe(), LOCATION).unwrap();
         }
     }
 }
