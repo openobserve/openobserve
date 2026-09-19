@@ -387,7 +387,9 @@ describe("ConnectDataSourcePopup", () => {
       await flushPromises();
       await nextTick();
 
-      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
+        true,
+      );
       const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
       expect(record.status).toBe("pending_day2");
       expect(segment.track).toHaveBeenCalledWith(
@@ -402,7 +404,9 @@ describe("ConnectDataSourcePopup", () => {
       wrapper = buildWrapper();
       await flushPromises();
 
-      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
+        false,
+      );
     });
 
     it("starts the day-2 clock silently (no button, no track) when the org already has data", async () => {
