@@ -3,7 +3,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later -->
 
 <!-- Log-explorer results filtered by a clicked dashboard cell; row click opens a detail drawer. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, defineAsyncComponent } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { useI18nTyped, raw } from "@/types/i18n";
@@ -17,7 +17,6 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
-import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
@@ -25,6 +24,7 @@ import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
 const ChartRenderer = defineAsyncComponent(
@@ -83,23 +83,19 @@ const pageSize = ref(100);
 const loading = ref(false);
 const errorMsg = ref("");
 
-const cols = computed((): string[] => {
-  if (!events.value.length) return [];
-  const keys = Object.keys(events.value[0]);
-  return [
-    ...keys.filter((k) => k === "_timestamp"),
-    ...keys.filter((k) => k !== "_timestamp" && !k.startsWith("_")),
-  ];
-});
-// OTable column defs for the results grid (same table component as the alert list).
-const resultColumns = computed<OTableColumnDef[]>(() =>
-  (cols.value.length ? cols.value : ["_timestamp", "source"]).map((c) => ({
-    id: c,
-    header: c === "_timestamp" ? t("panel.logExplorer.timestamp") : raw(c),
-    accessorKey: c,
-  })),
-);
-const resultPageSizeOptions = [50, 100, 250, 500];
+const resultTotalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)));
+
+// Inline per-row JSON expand (same interaction as Surrounding events), keyed by page index.
+const resultExpandedIdx = ref(new Set<number>());
+function toggleResultExpand(i: number) {
+  const next = new Set(resultExpandedIdx.value);
+  if (next.has(i)) next.delete(i);
+  else next.add(i);
+  resultExpandedIdx.value = next;
+}
+function isResultExpanded(i: number) {
+  return resultExpandedIdx.value.has(i);
+}
 
 // ── SQL editor ────────────────────────────────────────────────────────────────
 const customSql = ref("");
@@ -425,6 +421,38 @@ function closeEventDetail() {
   router.replace({ query: q });
 }
 
+// Push-nav: step through the loaded events without returning to the list.
+const selectedIndex = computed(() =>
+  selectedEvent.value ? events.value.indexOf(selectedEvent.value) : -1,
+);
+const hasPrev = computed(() => selectedIndex.value > 0);
+const hasNext = computed(
+  () => selectedIndex.value >= 0 && selectedIndex.value < events.value.length - 1,
+);
+function goPrev() {
+  if (hasPrev.value) openEventDetail(events.value[selectedIndex.value - 1]);
+}
+function goNext() {
+  if (hasNext.value) openEventDetail(events.value[selectedIndex.value + 1]);
+}
+function onDetailKeydown(e: KeyboardEvent) {
+  if (!selectedEvent.value) return;
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    goPrev();
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    goNext();
+  } else if (e.key === "Escape") {
+    // Return to the results list instead of letting the drawer close.
+    e.preventDefault();
+    e.stopPropagation();
+    closeEventDetail();
+  }
+}
+onMounted(() => window.addEventListener("keydown", onDetailKeydown, true));
+onBeforeUnmount(() => window.removeEventListener("keydown", onDetailKeydown, true));
+
 // Details tab: field/value rows, filtered by the search box.
 const detailFilter = ref("");
 const wrapDetailValues = ref(false);
@@ -541,6 +569,7 @@ async function runSql(sql: string, fromOffset: number) {
     );
     events.value = res.data?.hits ?? [];
     total.value = res.data?.total ?? events.value.length;
+    resultExpandedIdx.value = new Set();
   } catch (e: any) {
     errorMsg.value = `${e?.response?.data?.error ?? e?.message ?? "Search failed"}\n\n${sql}`;
     events.value = [];
@@ -675,95 +704,82 @@ function openInLogs() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col overflow-hidden">
-    <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
-    <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
-      <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
-        <div class="flex-1" />
-        <DateTime
-          default-type="absolute"
-          :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
-          data-test-name="dashboard-log-drawer-date-time"
-          @on:date-change="onDateChange"
-        />
-        <OButton
-          size="sm"
-          :variant="showSql ? 'primary' : 'outline'"
-          icon-left="code"
-          data-test="log-explorer-sql-toggle"
-          @click="showSql = !showSql"
-        >
-          {{ t("panel.logExplorer.queryMode") }}
-        </OButton>
-        <OButton
-          size="sm"
-          variant="outline"
-          icon-left="open-in-new"
-          data-test="log-explorer-open-in-logs"
-          @click="openInLogs"
-        >
-          {{ t("panel.logExplorer.openInLogs") }}
-        </OButton>
-        <OButton
-          size="icon-sm"
-          variant="outline"
-          icon-left="refresh"
-          :loading="loading"
-          data-test="log-explorer-run"
-          @click="runQuery"
-        >
-          <OTooltip :content="t('panel.logExplorer.runQuery')" />
-        </OButton>
-      </div>
-      <div v-if="showSql" class="px-2 pb-2">
-        <div class="border-border-default rounded-default overflow-hidden border">
-          <QueryEditor
-            :query="customSql"
-            :languages="['sql']"
-            editor-height="4rem"
-            hide-nl-toggle
-            data-test-prefix="log-explorer-editor"
-            @update:query="customSql = $event"
-            @run-query="runQuery"
+    <div v-show="!detailOpen" class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <!-- ── Toolbar: datetime picker + open-in-logs + run ───── -->
+      <div class="border-border-default flex min-w-0 shrink-0 flex-col border-b">
+        <div class="flex min-w-0 items-center gap-2 px-2 pt-3 pb-2">
+          <div class="flex-1" />
+          <DateTime
+            default-type="absolute"
+            :default-absolute-time="{ startTime: rangeStart, endTime: rangeEnd }"
+            data-test-name="dashboard-log-drawer-date-time"
+            @on:date-change="onDateChange"
           />
+          <OButton
+            size="sm"
+            :variant="showSql ? 'primary' : 'outline'"
+            icon-left="code"
+            data-test="log-explorer-sql-toggle"
+            @click="showSql = !showSql"
+          >
+            {{ t("panel.logExplorer.queryMode") }}
+          </OButton>
+          <OButton
+            size="sm"
+            variant="outline"
+            icon-left="open-in-new"
+            data-test="log-explorer-open-in-logs"
+            @click="openInLogs"
+          >
+            {{ t("panel.logExplorer.openInLogs") }}
+          </OButton>
+          <OButton
+            size="icon-sm"
+            variant="outline"
+            icon-left="refresh"
+            :loading="loading"
+            data-test="log-explorer-run"
+            @click="runQuery"
+          >
+            <OTooltip :content="t('panel.logExplorer.runQuery')" />
+          </OButton>
+        </div>
+        <div v-if="showSql" class="px-2 pb-2">
+          <div class="border-border-default rounded-default overflow-hidden border">
+            <QueryEditor
+              :query="customSql"
+              :languages="['sql']"
+              editor-height="4rem"
+              hide-nl-toggle
+              data-test-prefix="log-explorer-editor"
+              @update:query="customSql = $event"
+              @run-query="runQuery"
+            />
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- ── Error ────────────────────────────────────────────────────── -->
-    <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
-      <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
-      <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
-        errorMsg
-      }}</code>
-    </div>
+      <!-- ── Error ────────────────────────────────────────────────────── -->
+      <div v-if="errorMsg" class="flex shrink-0 items-start gap-2 px-4 py-3">
+        <OIcon name="error-outline" size="sm" class="text-error-500 mt-0.5 shrink-0" />
+        <code class="text-error-500 font-mono text-xs break-all whitespace-pre-wrap">{{
+          errorMsg
+        }}</code>
+      </div>
 
-    <!-- ── Results — same OTable as the alert list (sticky header, loading
-         skeleton, server pagination); no hand-rolled table/header gap ── -->
-    <OTable
-      v-else
-      class="min-h-0 flex-1"
-      :frame="false"
-      :data="events"
-      :columns="resultColumns"
-      :loading="loading"
-      :horizontal-scroll="true"
-      :row-class="(row: any) => (selectedEvent === row ? 'dld-row--active' : '')"
-      pagination="server"
-      :current-page="page + 1"
-      :total-count="total"
-      :page-size="pageSize"
-      :page-size-options="resultPageSizeOptions"
-      width="100%"
-      :show-global-filter="false"
-      :default-columns="false"
-      data-test="log-explorer-results-table"
-      @update:current-page="(p: number) => goToPage(p - 1)"
-      @update:page-size="(n: number) => (pageSize = n)"
-      @row-click="(row: any) => openEventDetail(row)"
-    >
-      <template #cell-_timestamp="{ value }">{{ fmtTs(value) }}</template>
-      <template #empty>
-        <div class="flex flex-col items-center justify-center gap-4 px-6 py-10">
+      <!-- ── Results — rendered by the dashboard table-panel renderer for parity ── -->
+      <div
+        v-else
+        class="relative flex min-h-0 flex-1 flex-col"
+        data-test="log-explorer-results-table"
+      >
+        <OInnerLoading :showing="loading" size="sm" :label="t('common.loading')" />
+
+        <!-- Empty state (after the fetch settles) -->
+        <div
+          v-if="!loading && !events.length"
+          class="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-10"
+        >
           <OIcon name="manage-search" size="xl" class="text-text-secondary opacity-30" />
           <span class="text-text-secondary text-sm">{{ t("panel.logExplorer.noEvents") }}</span>
           <code
@@ -771,33 +787,125 @@ function openInLogs() {
             >{{ customSql }}</code
           >
         </div>
-      </template>
-    </OTable>
 
-    <!-- ── Event detail drawer ─────────────────────────────────────── -->
-    <ODrawer
-      :open="detailOpen"
-      side="right"
-      :width="55"
-      bleed
-      :title="t('panel.logExplorer.detail.drawerTitle')"
-      data-test="log-explorer-event-detail-drawer"
-      @update:open="
-        (v) => {
-          if (!v) closeEventDetail();
-        }
-      "
-    >
-      <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
-        <!-- Event meta strip -->
+        <!-- Highlighted log rows — same LogsHighLighting + expandable JSON as Surrounding events. -->
+        <div v-else class="min-h-0 flex-1 overflow-y-auto">
+          <template v-for="(ev, i) in events" :key="i">
+            <div
+              class="dld-result-row border-border-default hover:bg-surface-subtle flex cursor-pointer items-center gap-2 border-b px-2 py-1"
+              @click="toggleResultExpand(i)"
+            >
+              <button
+                class="dld-expand-btn shrink-0"
+                :aria-label="isResultExpanded(i) ? t('common.collapse') : t('common.expand')"
+                @click.stop="toggleResultExpand(i)"
+              >
+                <OIcon :name="isResultExpanded(i) ? 'expand-less' : 'expand-more'" size="xs" />
+              </button>
+              <span class="text-text-secondary shrink-0 text-xs whitespace-nowrap tabular-nums">{{
+                fmtTs(ev._timestamp)
+              }}</span>
+              <span class="min-w-0 flex-1 truncate font-mono text-xs">
+                <LogsHighLighting :data="ev" :show-braces="true" />
+              </span>
+              <span
+                class="text-text-secondary hover:text-accent flex shrink-0 cursor-pointer"
+                data-test="log-explorer-row-open"
+                @click.stop="openEventDetail(ev)"
+              >
+                <OIcon name="chevron-right" size="sm" />
+                <OTooltip :content="t('panel.logExplorer.detail.insights')" />
+              </span>
+            </div>
+            <div
+              v-if="isResultExpanded(i)"
+              class="dld-json-preview border-border-default bg-surface-panel border-b px-2 py-2"
+              @click.stop
+            >
+              <JsonPreview
+                :value="ev"
+                mode="sidebar"
+                :stream-name="stream"
+                :show-copy-button="true"
+                hide-view-related
+                hide-search-term-actions
+                hide-field-options
+                @copy="copyToClipboard"
+              />
+            </div>
+          </template>
+        </div>
+
+        <!-- Server pagination: the list shows one loaded page; controls fetch the next. -->
         <div
-          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-3 border-b px-2 py-2"
+          v-if="total > 0"
+          class="bg-dialog-bg border-border-default sticky bottom-0 z-10 flex w-full items-center border-t px-3 py-2"
         >
+          <div class="flex-1" />
+          <TablePaginationControls
+            :show-pagination="true"
+            :pagination="{ page: page + 1, rowsPerPage: pageSize }"
+            :total-rows="total"
+            :pages-number="resultTotalPages"
+            :is-first-page="page === 0"
+            :is-last-page="page >= resultTotalPages - 1"
+            @update:rows-per-page="(n: number) => (pageSize = n)"
+            @first-page="goToPage(0)"
+            @prev-page="goToPage(page - 1)"
+            @next-page="goToPage(page + 1)"
+            @last-page="goToPage(resultTotalPages - 1)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DETAIL MODE: pushed in place of the list (single surface, no stacked drawer) ── -->
+    <template v-if="detailOpen">
+      <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
+        <!-- Push-nav header: back to results · event position · copy link -->
+        <div
+          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b px-2 py-2"
+        >
+          <OButton
+            size="icon-sm"
+            variant="ghost"
+            icon-left="arrow-back"
+            :aria-label="t('panel.logExplorer.detail.back')"
+            data-test="log-explorer-detail-back"
+            @click="closeEventDetail"
+          >
+            <OTooltip :content="t('panel.logExplorer.detail.back')" />
+          </OButton>
           <div class="flex min-w-0 flex-1 flex-col">
             <span class="text-text-heading text-xs font-medium tabular-nums">{{
               fmtTs(selectedEvent["_timestamp"])
             }}</span>
             <span class="text-text-secondary text-xs">{{ stream }}</span>
+          </div>
+          <div class="flex shrink-0 items-center gap-1">
+            <OButton
+              size="icon-sm"
+              variant="outline"
+              icon-left="chevron-left"
+              :disabled="!hasPrev"
+              data-test="log-explorer-detail-prev"
+              @click="goPrev"
+            >
+              <OTooltip :content="t('panel.logExplorer.detail.prevEvent')" />
+            </OButton>
+            <span class="text-text-secondary w-12 text-center text-xs tabular-nums"
+              >{{ selectedIndex + 1 }} / {{ events.length }}</span
+            >
+            <OButton
+              size="icon-sm"
+              variant="outline"
+              icon-left="chevron-right"
+              :disabled="!hasNext"
+              data-test="log-explorer-detail-next"
+              @click="goNext"
+            >
+              <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
+            </OButton>
           </div>
           <OButton size="sm" variant="outline" icon-left="link" @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
@@ -1205,7 +1313,7 @@ function openInLogs() {
           </OTabPanel>
         </OTabPanels>
       </div>
-    </ODrawer>
+    </template>
   </div>
 </template>
 
@@ -1279,14 +1387,6 @@ function openInLogs() {
 .dld-editor__body :deep(textarea:focus) {
   border-left-color: color-mix(in srgb, var(--color-accent) 90%, transparent);
   outline: none;
-}
-
-/* Active results row (selected event) — applied to OTable's row via :row-class. */
-.dld-row--active {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-}
-.dld-row--active:hover {
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
 }
 
 /* ── Insight sections ────────────────────────────────────────────────────── */
