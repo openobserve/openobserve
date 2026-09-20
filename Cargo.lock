@@ -9338,6 +9338,7 @@ dependencies = [
  "o2_enterprise",
  "object_store",
  "parking_lot 0.12.5",
+ "prometheus",
  "promql-parser",
  "rayon",
  "regex",

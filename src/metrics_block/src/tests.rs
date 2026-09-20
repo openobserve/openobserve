@@ -711,11 +711,13 @@ fn dense_row_lookup_is_owned_shared_by_arc_and_capacity_accounted() {
         index.blocks.iter().map(|b| b.row_start).collect::<Vec<_>>()
     );
     let before = index.estimated_heap_size();
+    let directory_before = index.estimated_directory_size();
     let old_capacity = index.row_starts.capacity();
     index.row_starts.reserve_exact(123);
     let added = (index.row_starts.capacity() - old_capacity) * std::mem::size_of::<u64>();
     assert!(added > 0);
     assert_eq!(index.estimated_heap_size() - before, added);
+    assert_eq!(index.estimated_directory_size() - directory_before, added);
     let index = Arc::new(index);
     let other = Arc::clone(&index);
     assert!(Arc::ptr_eq(&index, &other));

@@ -22,6 +22,9 @@ use config::{
         },
         stream::{FileKey, FileSelection},
     },
+    metrics::metrics_index_blocks_cache::{
+        CacheMetrics, CacheRecorder, EvictionReason, LookupResult, METRICS, RejectionReason,
+    },
     utils::hash::gxhash,
 };
 use datafusion::{arrow::datatypes::DataType, error::DataFusionError};
@@ -48,7 +51,7 @@ static METADATA_WORKERS: LazyLock<Arc<Semaphore>> = LazyLock::new(|| {
     ))
 });
 static INDEX_CACHE: LazyLock<Mutex<IndexCache>> =
-    LazyLock::new(|| Mutex::new(IndexCache::default()));
+    LazyLock::new(|| Mutex::new(IndexCache::new(METRICS.clone())));
 
 struct BlockingMetadata<T> {
     handle: JoinHandle<Result<T>>,
@@ -110,32 +113,128 @@ struct CachedIndex {
 }
 
 struct IndexCache {
-    entries: LruCache<CacheKey, (Arc<CachedIndex>, usize)>,
+    entries: LruCache<CacheKey, (Arc<CachedIndex>, CacheWeight)>,
     bytes: usize,
+    components: [usize; 3],
+    limit: usize,
+    metrics: CacheMetrics,
 }
 
 impl IndexCache {
-    fn trim(&mut self, limit: usize) {
-        while self.bytes > limit {
-            let Some((_, (_, size))) = self.entries.remove_lru() else {
-                break;
-            };
-            self.bytes = self.bytes.saturating_sub(size);
+    fn new(metrics: CacheMetrics) -> Self {
+        Self {
+            entries: LruCache::new_unbounded(),
+            bytes: 0,
+            components: [0; 3],
+            limit: 0,
+            metrics,
         }
+    }
+
+    fn trim(&mut self, limit: usize) {
+        self.update(|cache, recorder| {
+            cache.limit = limit;
+            cache.evict_until_fit(limit, recorder, EvictionReason::LimitShrink);
+        });
     }
 
     fn get(&mut self, key: &CacheKey) -> Option<Arc<CachedIndex>> {
-        self.entries.get(key).map(|entry| Arc::clone(&entry.0))
+        self.update(|cache, recorder| {
+            if cache.limit == 0 {
+                recorder.lookup(LookupResult::Disabled);
+                return None;
+            }
+            let entry = cache.entries.get(key).map(|entry| Arc::clone(&entry.0));
+            recorder.lookup(if entry.is_some() {
+                LookupResult::Hit
+            } else {
+                LookupResult::Miss
+            });
+            entry
+        })
     }
 
     fn remove(&mut self, key: &CacheKey) {
-        if let Some((_, size)) = self.entries.remove(key) {
-            self.bytes = self.bytes.saturating_sub(size);
-        }
+        self.update(|cache, recorder| {
+            if let Some((_, weight)) = cache.entries.remove(key) {
+                cache.subtract(weight);
+                recorder.invalidated(weight.total);
+            }
+        });
     }
 
     fn insert(&mut self, key: CacheKey, index: Arc<CachedIndex>, limit: usize) {
-        let size = index
+        self.update(|cache, recorder| {
+            cache.limit = limit;
+            if limit == 0 {
+                recorder.rejected(RejectionReason::Disabled);
+                return;
+            }
+            let weight = CacheWeight::new(&key, &index);
+            if weight.total > limit {
+                recorder.rejected(RejectionReason::Oversize);
+                return;
+            }
+            let previous = cache.entries.insert(key, (index, weight)).map(|(_, old)| {
+                cache.subtract(old);
+                old.total
+            });
+            cache.bytes = cache.bytes.saturating_add(weight.total);
+            for (total, amount) in cache.components.iter_mut().zip(weight.components) {
+                *total = total.saturating_add(amount);
+            }
+            recorder.admitted(weight.total, previous);
+            cache.evict_until_fit(limit, recorder, EvictionReason::Capacity);
+        });
+    }
+
+    fn evict_until_fit(
+        &mut self,
+        limit: usize,
+        recorder: &mut CacheRecorder,
+        reason: EvictionReason,
+    ) {
+        while self.bytes > limit {
+            let Some((_, (_, weight))) = self.entries.remove_lru() else {
+                break;
+            };
+            self.subtract(weight);
+            recorder.evicted(weight.total, reason);
+        }
+    }
+
+    fn subtract(&mut self, weight: CacheWeight) {
+        self.bytes = self.bytes.saturating_sub(weight.total);
+        for (total, amount) in self.components.iter_mut().zip(weight.components) {
+            *total = total.saturating_sub(amount);
+        }
+    }
+
+    fn update<T>(&mut self, update: impl FnOnce(&mut Self, &mut CacheRecorder) -> T) -> T {
+        let metrics = self.metrics.clone();
+        metrics.update(|recorder| {
+            let result = update(self, recorder);
+            recorder.resident(self.limit, self.bytes, self.entries.len(), self.components);
+            result
+        })
+    }
+}
+
+impl Default for IndexCache {
+    fn default() -> Self {
+        Self::new(CacheMetrics::new(0))
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CacheWeight {
+    total: usize,
+    components: [usize; 3],
+}
+
+impl CacheWeight {
+    fn new(key: &CacheKey, index: &CachedIndex) -> Self {
+        let total = index
             .index
             .estimated_heap_size()
             .saturating_add(std::mem::size_of::<CachedIndex>())
@@ -145,27 +244,15 @@ impl IndexCache {
             .saturating_add(key.labels.capacity() * std::mem::size_of::<String>())
             .saturating_add(key.labels.iter().map(String::capacity).sum::<usize>())
             .saturating_add(8 * std::mem::size_of::<usize>());
-        if size > limit {
-            return;
-        }
-        if let Some((_, previous)) = self.entries.insert(key, (index, size)) {
-            self.bytes = self.bytes.saturating_sub(previous);
-        }
-        self.bytes = self.bytes.saturating_add(size);
-        while self.bytes > limit {
-            let Some((_, (_, size))) = self.entries.remove_lru() else {
-                break;
-            };
-            self.bytes = self.bytes.saturating_sub(size);
-        }
-    }
-}
-
-impl Default for IndexCache {
-    fn default() -> Self {
+        let directory = index.index.estimated_directory_size().min(total);
+        let labels = index
+            .index
+            .labels
+            .get_array_memory_size()
+            .min(total - directory);
         Self {
-            entries: LruCache::new_unbounded(),
-            bytes: 0,
+            total,
+            components: [directory, labels, total - directory - labels],
         }
     }
 }
@@ -922,7 +1009,7 @@ async fn load_index_inner(
     let cached = {
         let mut cache = INDEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
         cache.trim(limit);
-        if limit > 0 { cache.get(&key) } else { None }
+        cache.get(&key)
     };
     let permit = workers
         .acquire_owned()
@@ -959,7 +1046,7 @@ async fn load_index_inner(
                 return Err(error);
             }
         };
-        if limit > 0 && !cache_hit {
+        if !cache_hit {
             INDEX_CACHE
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
@@ -1010,12 +1097,10 @@ async fn load_index_inner(
         Ok(Arc::new(CachedIndex { index, binding }))
     })
     .await?;
-    if limit > 0 {
-        INDEX_CACHE
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .insert(key, Arc::clone(&entry), limit);
-    }
+    INDEX_CACHE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(key, Arc::clone(&entry), limit);
     Ok(Arc::new(LoadedFile {
         account: file.account.clone(),
         sidecar,
@@ -2941,6 +3026,259 @@ mod tests {
                 assert_eq!(outputs[0], outputs[1], "{name}");
             }
         }
+    }
+
+    fn observed_cache() -> (IndexCache, prometheus::Registry) {
+        let metrics = CacheMetrics::new(0);
+        let registry = prometheus::Registry::new();
+        registry.register(Box::new(metrics.clone())).unwrap();
+        (IndexCache::new(metrics), registry)
+    }
+
+    fn cache_entry() -> (CacheKey, Arc<CachedIndex>, CacheWeight) {
+        let (file, bytes) = file(&[(1, 10, 1.0, Some("a-long-label-buffer"))]);
+        let parent = ParentIdentity {
+            object_key: file.key.clone(),
+            rows: 1,
+            compressed_size: 123,
+        };
+        let (binding, footer) = SidecarBinding::parse(
+            bytes.len() as u64,
+            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+        )
+        .unwrap();
+        let index = Arc::new(
+            metrics_block::decode_index(
+                Bytes::copy_from_slice(
+                    &bytes
+                        [footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+                ),
+                &footer,
+                &parent,
+                &["group".into()],
+            )
+            .unwrap(),
+        );
+        let key = CacheKey {
+            account: "a".into(),
+            parent,
+            labels: vec!["group".into()],
+        };
+        let entry = Arc::new(CachedIndex { index, binding });
+        let weight = CacheWeight::new(&key, &entry);
+        (key, entry, weight)
+    }
+
+    fn cache_snapshot(registry: &prometheus::Registry) -> HashMap<String, f64> {
+        let mut values = HashMap::new();
+        for family in registry.gather() {
+            let name = family
+                .name()
+                .strip_prefix("zo_metrics_index_blocks_cache_")
+                .unwrap();
+            for metric in family.get_metric() {
+                assert!(metric.get_label().iter().all(|label| {
+                    [
+                        "cluster",
+                        "instance",
+                        "role",
+                        "component",
+                        "result",
+                        "reason",
+                    ]
+                    .contains(&label.name())
+                }));
+                let label = metric
+                    .get_label()
+                    .iter()
+                    .find(|label| ["component", "result", "reason"].contains(&label.name()));
+                let name = label.map_or_else(
+                    || name.to_owned(),
+                    |label| format!("{name}:{}", label.value()),
+                );
+                let value = if metric.gauge.is_some() {
+                    metric.gauge.as_ref().unwrap().value()
+                } else {
+                    metric.counter.as_ref().unwrap().value()
+                };
+                assert!(value >= 0.0);
+                assert!(values.insert(name, value).is_none());
+            }
+        }
+        assert_eq!(
+            values["accounted_bytes:directory"]
+                + values["accounted_bytes:labels"]
+                + values["accounted_bytes:other"],
+            values["used_bytes"]
+        );
+        assert_eq!(
+            values["admitted_bytes_total"]
+                - values["replaced_bytes_total"]
+                - values["evicted_bytes_total:capacity"]
+                - values["evicted_bytes_total:limit_shrink"]
+                - values["invalidated_bytes_total"],
+            values["used_bytes"]
+        );
+        assert_eq!(
+            values["admissions_total"]
+                - values["replacements_total"]
+                - values["evictions_total:capacity"]
+                - values["evictions_total:limit_shrink"]
+                - values["invalidations_total"],
+            values["entries"]
+        );
+        values
+    }
+
+    #[test]
+    fn metadata_cache_metrics_track_lru_replacement_invalidation_and_shrink() {
+        let (mut cache, registry) = observed_cache();
+        let (a, entry, weight) = cache_entry();
+        let mut b = a.clone();
+        b.account = "b".into();
+        let mut c = a.clone();
+        c.account = "c".into();
+        cache.trim(weight.total * 2);
+        assert!(cache.get(&a).is_none());
+        cache.insert(a.clone(), Arc::clone(&entry), weight.total * 2);
+        let first = cache_snapshot(&registry);
+        assert_eq!(first["used_bytes"], weight.total as f64);
+        for (name, bytes) in ["directory", "labels", "other"]
+            .into_iter()
+            .zip(weight.components)
+        {
+            assert_eq!(first[&format!("accounted_bytes:{name}")], bytes as f64);
+        }
+        cache.insert(b.clone(), Arc::clone(&entry), weight.total * 2);
+        assert!(cache.get(&a).is_some());
+        cache.insert(c.clone(), Arc::clone(&entry), weight.total * 2);
+        assert!(cache.get(&b).is_none());
+        assert!(cache.get(&a).is_some());
+        cache.insert(a.clone(), entry, weight.total * 2);
+        cache.remove(&c);
+        cache.remove(&c);
+        cache.trim(weight.total - 1);
+        let values = cache_snapshot(&registry);
+        for name in [
+            "used_bytes",
+            "entries",
+            "accounted_bytes:directory",
+            "accounted_bytes:labels",
+            "accounted_bytes:other",
+        ] {
+            assert_eq!(values[name], 0.0);
+        }
+        assert_eq!(values["lookups_total:hit"], 2.0);
+        assert_eq!(values["lookups_total:miss"], 2.0);
+        assert_eq!(values["admissions_total"], 4.0);
+        assert_eq!(values["admitted_bytes_total"], (weight.total * 4) as f64);
+        assert_eq!(values["replacements_total"], 1.0);
+        assert_eq!(values["replaced_bytes_total"], weight.total as f64);
+        assert_eq!(values["evictions_total:capacity"], 1.0);
+        assert_eq!(values["evicted_bytes_total:capacity"], weight.total as f64);
+        assert_eq!(values["evictions_total:limit_shrink"], 1.0);
+        assert_eq!(
+            values["evicted_bytes_total:limit_shrink"],
+            weight.total as f64
+        );
+        assert_eq!(values["invalidations_total"], 1.0);
+        assert_eq!(values["invalidated_bytes_total"], weight.total as f64);
+    }
+
+    #[test]
+    fn metadata_cache_metrics_reject_disabled_and_oversize_without_admission() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        cache.trim(0);
+        assert!(cache.get(&key).is_none());
+        cache.insert(key.clone(), Arc::clone(&entry), 0);
+        cache.trim(weight.total - 1);
+        assert!(cache.get(&key).is_none());
+        cache.insert(key.clone(), Arc::clone(&entry), weight.total - 1);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["admission_rejections_total:disabled"], 1.0);
+        assert_eq!(values["admission_rejections_total:oversize"], 1.0);
+        assert_eq!(values["lookups_total:disabled"], 1.0);
+        assert_eq!(values["lookups_total:miss"], 1.0);
+        assert_eq!(values["admissions_total"], 0.0);
+        cache.insert(key, entry, weight.total);
+        cache.trim(0);
+        let reset = cache_snapshot(&registry);
+        assert_eq!(reset["limit_bytes"], 0.0);
+        assert_eq!(reset["used_bytes"], 0.0);
+        assert_eq!(reset["entries"], 0.0);
+        let (_, registry) = observed_cache();
+        assert!(
+            cache_snapshot(&registry)
+                .values()
+                .all(|value| *value == 0.0)
+        );
+    }
+
+    #[test]
+    fn metadata_cache_metrics_remain_coherent_during_concurrent_mutation_and_scraping() {
+        let (cache, registry) = observed_cache();
+        let cache = Arc::new(Mutex::new(cache));
+        let (key, entry, weight) = cache_entry();
+        std::thread::scope(|scope| {
+            for worker in 0..4 {
+                let cache = Arc::clone(&cache);
+                let mut key = key.clone();
+                key.account = ((b'a' + worker) as char).to_string();
+                let entry = Arc::clone(&entry);
+                scope.spawn(move || {
+                    for iteration in 0..100 {
+                        let mut cache = cache.lock().unwrap();
+                        cache.trim(weight.total * 3);
+                        cache.insert(key.clone(), Arc::clone(&entry), weight.total * 3);
+                        assert!(cache.get(&key).is_some());
+                        if iteration % 5 == 0 {
+                            cache.remove(&key);
+                        }
+                    }
+                });
+            }
+            for _ in 0..1000 {
+                cache_snapshot(&registry);
+            }
+        });
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["admissions_total"], 400.0);
+        assert_eq!(values["lookups_total:hit"], 400.0);
+        assert_eq!(values["invalidations_total"], 80.0);
+        assert!(values["evictions_total:capacity"] >= 1.0);
+        assert!(values["entries"] <= 3.0);
+        assert!(values["used_bytes"] <= values["limit_bytes"]);
+    }
+
+    #[tokio::test]
+    async fn metadata_cache_metrics_release_accounting_before_cancelled_query_arc() {
+        let (mut cache, registry) = observed_cache();
+        let (key, entry, weight) = cache_entry();
+        let weak = Arc::downgrade(&entry.index);
+        cache.insert(key.clone(), entry, weight.total);
+        let cache = Arc::new(Mutex::new(cache));
+        let worker_cache = Arc::clone(&cache);
+        let (started, entered) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let held = Arc::clone(&worker_cache.lock().unwrap().get(&key).unwrap().index);
+            started.send(()).unwrap();
+            std::future::pending::<()>().await;
+            drop(held);
+        });
+        entered.await.unwrap();
+        cache.lock().unwrap().trim(0);
+        let values = cache_snapshot(&registry);
+        assert_eq!(values["used_bytes"], 0.0);
+        assert_eq!(values["entries"], 0.0);
+        assert_eq!(
+            values["evicted_bytes_total:limit_shrink"],
+            weight.total as f64
+        );
+        assert!(weak.upgrade().is_some());
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(weak.upgrade().is_none());
     }
 
     #[test]

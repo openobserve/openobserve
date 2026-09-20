@@ -38,6 +38,7 @@ tracing.workspace = true
 memmap2 = "0.9.11"
 
 [dev-dependencies]
+prometheus.workspace = true
 tempfile.workspace = true
 object_store.workspace = true
 expect-test.workspace = true

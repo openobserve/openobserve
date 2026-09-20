@@ -140,6 +140,17 @@ impl Index {
             )
     }
 
+    pub fn estimated_directory_size(&self) -> usize {
+        self.blocks
+            .capacity()
+            .saturating_mul(std::mem::size_of::<BlockMeta>())
+            .saturating_add(
+                self.row_starts
+                    .capacity()
+                    .saturating_mul(std::mem::size_of::<u64>()),
+            )
+    }
+
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
         ensure!(block < self.blocks.len(), "block index out of bounds");
         let column = self

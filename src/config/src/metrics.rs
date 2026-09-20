@@ -16,6 +16,7 @@
 // On-call keeps its metrics in their own file: the set is a coherent story
 // about one subsystem, and reading it as a block is the only way to see that
 // the bad outcomes are all covered.
+pub mod metrics_index_blocks_cache;
 pub mod oncall;
 
 use std::{collections::HashMap, sync::LazyLock as Lazy};
@@ -2603,6 +2604,9 @@ pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
 });
 
 fn register_metrics(registry: &Registry) {
+    registry
+        .register(Box::new(metrics_index_blocks_cache::METRICS.clone()))
+        .expect("Metric registered");
     // http latency
     registry
         .register(Box::new(HTTP_INCOMING_REQUESTS.clone()))
