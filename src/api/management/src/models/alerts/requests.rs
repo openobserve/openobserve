@@ -153,6 +153,9 @@ pub struct AnomalyAlertFields {
     /// Delivered-alert budget per day; mutually exclusive with `percentile`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
+    /// Half-width of the level window in seconds; absent keeps the one-day default.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_half_width_seconds: Option<i64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -349,6 +352,10 @@ pub struct UpdateAnomalyAlertFields {
     /// Set-only through this endpoint: clearing a budget goes through the direct anomaly API.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
+    /// Set-only through this endpoint, like the budget above: clearing the half-width back to
+    /// the default goes through the direct anomaly API, which carries the double-option.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_half_width_seconds: Option<i64>,
     pub alert_enabled: Option<bool>,
     pub enabled: Option<bool>,
     /// Moves the config to this folder. Naming a folder you cannot write to
