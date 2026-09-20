@@ -450,6 +450,29 @@ describe("convertSankeyData", () => {
       expect(formattedTooltip).toBe("TestNode : formatted_unit_1024");
     });
 
+    it("should escape HTML in node and link names", () => {
+      const panelSchema = {
+        queries: [
+          {
+            fields: {
+              source: { alias: "source_field" },
+              target: { alias: "target_field" },
+              value: { alias: "value_field" },
+            },
+          },
+        ],
+        config: {},
+      };
+      const payload = '<img src=x onerror="alert(1)">';
+      const searchQueryData = [[{ source_field: payload, target_field: "B", value_field: 1 }]];
+
+      const result = convertSankeyData(panelSchema, searchQueryData);
+      const formattedTooltip = result.options.tooltip.formatter({ name: payload, value: 1 });
+
+      expect(formattedTooltip).not.toContain("<img");
+      expect(formattedTooltip).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    });
+
     it("should handle basic tooltip structure", () => {
       const panelSchema = {
         queries: [

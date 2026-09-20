@@ -34,7 +34,9 @@ use {
     },
     crate::search::{
         query_manager::cancel_query_inner,
-        utils::{StreamPermissionResourceType, check_stream_permissions},
+        utils::{
+            StreamPermissionResourceType, check_cipher_key_permissions, check_stream_permissions,
+        },
     },
     axum::http::HeaderMap,
     config::{
@@ -192,6 +194,10 @@ pub async fn submit_job(
             {
                 return res;
             }
+        }
+
+        if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+            return res;
         }
 
         // add stream_names for rbac
