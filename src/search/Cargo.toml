@@ -69,3 +69,7 @@ utoipa.workspace = true
 vortex = { workspace = true }
 vortex-btrblocks = { workspace = true }
 vortex-datafusion = { workspace = true }
+
+[dev-dependencies]
+promql.workspace = true
+promql-parser.workspace = true

@@ -11237,6 +11237,8 @@ dependencies = [
  "opentelemetry",
  "parking_lot 0.12.5",
  "parquet",
+ "promql",
+ "promql-parser",
  "prost 0.14.4",
  "proto",
  "rand 0.10.2",

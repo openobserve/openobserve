@@ -454,8 +454,7 @@ mod tests {
                 compressed_size: size,
                 ..Default::default()
             };
-            let (cached, hits, misses) =
-                inspect_file_cache("blocks", &entries, &mut stats, "parquet").await;
+            let (cached, hits, misses) = inspect_file_cache("blocks", &entries, &mut stats).await;
             assert!(cached.is_empty());
             assert_eq!((hits, misses), (0, 1));
             assert_eq!(
@@ -490,7 +489,7 @@ mod tests {
             assert!(option_calls.load(Ordering::Relaxed) > 0);
             let mut inspected = ScanStats::default();
             let (cached, hits, misses) =
-                inspect_file_cache("blocks", &entries, &mut inspected, "parquet").await;
+                inspect_file_cache("blocks", &entries, &mut inspected).await;
             assert_eq!((cached.len(), hits, misses), (1, 1, 0));
             assert_eq!(inspected.querier_memory_cached_files, 1);
             infra::cache::file_data::memory::remove(&key).await.unwrap();

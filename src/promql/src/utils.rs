@@ -24,7 +24,7 @@ use datafusion::{
     common::ScalarValue,
     error::Result,
     functions::regex::regexp_like,
-    logical_expr::utils::disjunction,
+    logical_expr::{expr_fn::cast, utils::disjunction},
     prelude::{DataFrame, Expr, col, lit},
 };
 use hashbrown::HashSet;
@@ -91,6 +91,11 @@ pub fn matcher_predicates(schema: &Schema, matchers: &Matchers) -> Vec<Expr> {
             MatchOp::NotEqual => column.not_eq(literal(mat.value.clone())),
             MatchOp::Re(regex) | MatchOp::NotRe(regex) => {
                 let regex = format!("^{}$", regex.as_str());
+                let column = if matches!(field_type, DataType::Dictionary(_, _)) {
+                    cast(column, DataType::Utf8View)
+                } else {
+                    column
+                };
                 let predicate = regexp_like().call(vec![column, lit(regex)]);
                 if matches!(mat.op, MatchOp::NotRe(_)) {
                     predicate.not()

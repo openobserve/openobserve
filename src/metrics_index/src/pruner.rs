@@ -43,16 +43,7 @@ use crate::{
     reader::{evaluate_metrics_index, load_metrics_index_blocks, load_metrics_index_file},
 };
 
-/// Apply the `.midx` metrics indexes of indexed metrics files in `files` before
-/// registering the metrics table.
-///
-/// This mirrors the PromQL Tantivy path: matching physical rows are attached
-/// to each indexed [`FileKey`] (files without a matching series are
-/// dropped) and the generic DataFusion scan later converts that selection into
-/// a Parquet access plan. Files of any other layout are left untouched, in
-/// place, for a full scan. `Ok(None)` means no file or matcher was eligible.
-/// `Ok(Some((took_ms, exact)))`: `exact` means every selection holds exactly
-/// the matching rows, so re-applying the matchers row by row is redundant.
+/// Unusable sidecars retain their source files and residual matchers for format-specific scans.
 pub async fn search(
     trace_id: &str,
     files: &mut Vec<FileKey>,
@@ -213,12 +204,14 @@ pub async fn search(
                         load_metrics_index_file(&account, &sidecar_path, max_timestamp, Arc::clone(&labels))
                             .await?
                     };
+                    let parquet_parent = data_path.ends_with(".parquet");
                     tokio::task::spawn_blocking(move || {
                         let complete = sidecar_covers_labels(data.schema.as_ref(), &labels);
-                        // indexes without the key predate it: written with the fixed size
-                        let row_group_size = data
-                            .row_group_size
-                            .unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32);
+                        let row_group_size = if parquet_parent {
+                            Some(data.row_group_size.unwrap_or(PARQUET_MAX_ROW_GROUP_SIZE as u32))
+                        } else {
+                            None
+                        };
                         let physical_filter =
                             create_physical_filter(data.schema.as_ref(), &matchers)?;
                         evaluate_metrics_index(&data, physical_filter.as_deref(), expected_rows)
@@ -288,7 +281,7 @@ pub async fn search(
         if ranges.is_empty() {
             return false;
         }
-        file.with_selection(FileSelection::RowRanges(ranges), Some(row_group_size));
+        file.with_selection(FileSelection::RowRanges(ranges), row_group_size);
         true
     });
 

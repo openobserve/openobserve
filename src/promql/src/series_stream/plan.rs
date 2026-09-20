@@ -23,8 +23,8 @@ use config::{
     meta::{
         plan::generate_plan_string,
         promql::{
-            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL,
-            VALUE_LABEL, value::EvalContext,
+            BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, MetricsBlockScan,
+            NAME_LABEL, VALUE_LABEL, value::EvalContext,
         },
     },
 };
@@ -39,16 +39,19 @@ use datafusion::{
     },
     prelude::{DataFrame, SessionContext, col, lit},
 };
+use futures::future::BoxFuture;
 use hashbrown::HashSet;
 use promql_parser::{label::Matchers, parser::LabelModifier};
 use tokio::task::JoinSet;
 
-use super::hash_sorted::HashSortedSeriesStream;
+use super::{SeriesSource, blocks, hash_sorted::HashSortedSeriesStream};
 use crate::{
     aggregations::AggOp,
     functions::KEEP_METRIC_NAME_FUNC,
     utils::{apply_matchers, apply_time_window},
 };
+
+type SourceFuture = BoxFuture<'static, Result<SeriesSource>>;
 
 /// The selector being scanned; `offset` is the `offset` modifier in microseconds.
 pub(crate) struct StreamingSelector<'a> {
@@ -101,8 +104,6 @@ struct PlannedPartition {
     task_ctx: Arc<TaskContext>,
 }
 
-/// One hash-sorted stream per partition over the selector's hash-sorted table, projected to the
-/// sample columns plus the label columns; `None` when the layout cannot stream in order.
 pub(crate) async fn execute_partitioned(
     ctx: &SessionContext,
     schema: &Schema,
@@ -110,14 +111,50 @@ pub(crate) async fn execute_partitioned(
     label_cols: LabelColumns,
     lookback: i64,
     eval_ctx: &EvalContext,
-) -> Result<
-    Option<Vec<impl Future<Output = Result<HashSortedSeriesStream>> + Send + 'static + use<>>>,
-> {
+) -> Result<Option<Vec<SourceFuture>>> {
     if schema
         .field_with_name(HASH_LABEL)
         .is_ok_and(|field| field.data_type() != &DataType::UInt64)
     {
         return Ok(None);
+    }
+    let label_cols = Arc::new(label_cols);
+    let partitions = ctx.state().config().target_partitions();
+    if selector.matchers.matchers.is_empty()
+        && selector.matchers.or_matchers.is_empty()
+        && let Some(scan) = ctx.state().config().get_extension::<MetricsBlockScan>()
+        && scan.table_name == selector.table_name
+    {
+        let intervals = hash_partitions(partitions).collect::<Vec<_>>();
+        match blocks::prepare(
+            &scan,
+            Arc::clone(&label_cols),
+            &intervals,
+            selector.offset,
+            lookback,
+            eval_ctx,
+        )
+        .await
+        {
+            Ok(prepared) => {
+                return Ok(Some(
+                    prepared
+                        .into_iter()
+                        .map(|partition| {
+                            Box::pin(async move {
+                                Ok(SeriesSource::Block(blocks::BlockSeriesStream::new(
+                                    partition,
+                                )))
+                            }) as SourceFuture
+                        })
+                        .collect(),
+                ));
+            }
+            Err(error) => log::info!(
+                "[trace_id: {}] [PromQL] metrics blocks fallback before execution: {error}",
+                eval_ctx.trace_id
+            ),
+        }
     }
     let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {
@@ -137,18 +174,23 @@ pub(crate) async fn execute_partitioned(
             columns.push(name);
         }
     }
-    let partitions = ctx.state().config().target_partitions();
     let Some(partition_inputs) =
         build_partition_inputs(&df, &columns, partitions, &eval_ctx.trace_id).await?
     else {
         return Ok(None);
     };
-    let label_cols = Arc::new(label_cols);
     let offset = selector.offset;
     Ok(Some(
         partition_inputs
             .into_iter()
-            .map(|streams| HashSortedSeriesStream::start(streams, label_cols.clone(), offset))
+            .map(|streams| {
+                let columns = Arc::clone(&label_cols);
+                Box::pin(async move {
+                    HashSortedSeriesStream::start(streams, columns, offset)
+                        .await
+                        .map(SeriesSource::DataFusion)
+                }) as SourceFuture
+            })
             .collect(),
     ))
 }

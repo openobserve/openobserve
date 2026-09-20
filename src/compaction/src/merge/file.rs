@@ -502,7 +502,7 @@ mod tests {
 
     const PLANNED_SIZE: usize = 1024;
 
-    async fn produced_indexed_output() -> MergedFile {
+    async fn produced_indexed_output(format: FileFormat) -> MergedFile {
         use datafusion::{
             arrow::{
                 array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
@@ -529,7 +529,7 @@ mod tests {
         let table = Arc::new(MemTable::try_new(Arc::clone(&schema), vec![vec![batch]]).unwrap());
         let mut output = MergeOutput::for_compactor(StreamType::Metrics)
             .with_file_key_prefix("files/publish/metrics/m/2026/09/20/00");
-        output.file_format = FileFormat::Parquet;
+        output.file_format = format;
         output.metrics_blocks_enabled = true;
         merge::merge_parquet_files(
             schema,
@@ -551,14 +551,13 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn single_pass_publication_returns_only_after_data_and_index_uploads() {
-        for fail_at in [None, Some(0usize), Some(1)] {
-            let file = produced_indexed_output().await;
+        for (format, fail_at) in [FileFormat::Parquet, FileFormat::Vortex]
+            .into_iter()
+            .flat_map(|format| [None, Some(0usize), Some(1)].map(|failure| (format, failure)))
+        {
+            let file = produced_indexed_output(format).await;
             let key = file
-                .file_key(
-                    "files/publish/metrics/m/2026/09/20/00",
-                    "unused",
-                    FileFormat::Parquet,
-                )
+                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
                 .unwrap();
             let paths = match &file {
                 MergedFile::MetricsIndexed {
@@ -584,7 +583,7 @@ mod tests {
             assert_eq!(result.is_ok(), fail_at.is_none());
             let puts = puts.lock().unwrap();
             assert_eq!(puts.len(), if fail_at == Some(0) { 1 } else { 2 });
-            assert!(puts[0].0.ends_with(".parquet"));
+            assert!(puts[0].0.ends_with(format.extension()));
             if puts.len() == 2 {
                 assert!(puts[1].0.ends_with(".midx"));
                 assert!(!puts[1].1.starts_with(b"ARROW1"));
@@ -595,29 +594,27 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn single_pass_materialization_failure_precedes_all_publication() {
-        let file = produced_indexed_output().await;
-        let key = file
-            .file_key(
-                "files/publish/metrics/m/2026/09/20/00",
-                "unused",
-                FileFormat::Parquet,
-            )
-            .unwrap();
-        if let MergedFile::MetricsIndexed {
-            metrics_index_path, ..
-        } = &file
-        {
-            std::fs::remove_file(metrics_index_path).unwrap();
+        for format in [FileFormat::Parquet, FileFormat::Vortex] {
+            let file = produced_indexed_output(format).await;
+            let key = file
+                .file_key("files/publish/metrics/m/2026/09/20/00", "unused", format)
+                .unwrap();
+            if let MergedFile::MetricsIndexed {
+                metrics_index_path, ..
+            } = &file
+            {
+                std::fs::remove_file(metrics_index_path).unwrap();
+            }
+            let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let calls = Arc::clone(&count);
+            let result = publish_merged_output(file, &key, false, move |_, _| {
+                calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async { Ok(()) }
+            })
+            .await;
+            assert!(result.is_err());
+            assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 0);
         }
-        let count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let calls = Arc::clone(&count);
-        let result = publish_merged_output(file, &key, false, move |_, _| {
-            calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-            async { Ok(()) }
-        })
-        .await;
-        assert!(result.is_err());
-        assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 0);
     }
 
     fn planned_file(key: &str) -> FileKey {

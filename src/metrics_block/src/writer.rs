@@ -85,27 +85,46 @@ impl<W: Write> BlockWriter<W> {
     }
 
     pub fn finish_for_parquet(
-        mut self,
+        self,
         parent: ParentIdentity,
         metadata: ParquetMetaData,
+    ) -> Result<W> {
+        ensure!(
+            parent.object_key.ends_with(".parquet"),
+            "Parquet finalization requires a Parquet parent"
+        );
+        ensure!(
+            u64::try_from(metadata.file_metadata().num_rows())? == parent.rows,
+            "Parquet parent row count mismatch"
+        );
+        let row_group_size =
+            verified_row_group_size(&metadata)?.context("unsupported Parquet row-group layout")?;
+        let stored =
+            ArrowReaderMetadata::try_new(Arc::new(metadata), ArrowReaderOptions::default())?;
+        self.finish_for_source(parent, Arc::clone(stored.schema()), Some(row_group_size))
+    }
+
+    /// The container adapter must verify the completed file before supplying its source facts.
+    pub fn finish_for_source(
+        mut self,
+        parent: ParentIdentity,
+        stored_schema: SchemaRef,
+        row_group_size: Option<u32>,
     ) -> Result<W> {
         validate_parent(&parent)?;
         ensure!(
             self.parent.as_ref().is_none_or(|known| known == &parent),
             "parent identity changed"
         );
+        ensure!(self.rows == parent.rows, "source/parent row count mismatch");
+        ensure!(row_group_size != Some(0), "invalid parent row group size");
         ensure!(
-            self.rows == parent.rows
-                && u64::try_from(metadata.file_metadata().num_rows())? == parent.rows,
-            "source/Parquet parent row count mismatch"
+            !parent.object_key.ends_with(".vortex") || row_group_size.is_none(),
+            "Vortex has no Parquet row groups"
         );
-        let row_group_size =
-            verified_row_group_size(&metadata)?.context("unsupported Parquet row-group layout")?;
-        let stored =
-            ArrowReaderMetadata::try_new(Arc::new(metadata), ArrowReaderOptions::default())?;
         ensure!(
-            schema_matches(&self.schema, stored.schema()),
-            "stored Parquet source schema changed"
+            schema_matches(&self.schema, &stored_schema),
+            "stored source schema changed"
         );
         let labels = self
             .label_indices
@@ -113,7 +132,7 @@ impl<W: Write> BlockWriter<W> {
             .map(|i| self.schema.field(*i).name().clone())
             .collect::<Vec<_>>();
         let charge =
-            static_metadata_charge(stored.schema(), Some(&parent), &labels, self.metadata_limit)?;
+            static_metadata_charge(&stored_schema, Some(&parent), &labels, self.metadata_limit)?;
         let estimate = self
             .writer_metadata_estimate
             .checked_sub(self.static_metadata_estimate)
@@ -125,13 +144,17 @@ impl<W: Write> BlockWriter<W> {
         )?;
         self.writer_metadata_estimate = estimate;
         self.static_metadata_estimate = charge;
-        self.schema = Arc::clone(stored.schema());
+        self.schema = stored_schema;
         self.metadata_properties
             .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
         self.metadata_properties
             .insert(SCHEMA_KEY.to_owned(), canonical_schema_json(&self.schema)?);
-        self.metadata_properties
-            .insert(ROW_GROUP_SIZE_KEY.to_owned(), row_group_size.to_string());
+        if let Some(size) = row_group_size {
+            self.metadata_properties
+                .insert(ROW_GROUP_SIZE_KEY.to_owned(), size.to_string());
+        } else {
+            self.metadata_properties.remove(ROW_GROUP_SIZE_KEY);
+        }
         self.parent = Some(parent);
         self.finish()
     }
@@ -538,6 +561,10 @@ pub fn build_from_parquet<T: ChunkReader + 'static>(
     reader: T,
     parent: ParentIdentity,
 ) -> Result<Vec<u8>> {
+    ensure!(
+        parent.object_key.ends_with(".parquet"),
+        "Parquet rebuild requires a Parquet parent"
+    );
     ensure!(
         reader.len() == parent.compressed_size,
         "Parquet parent size mismatch"

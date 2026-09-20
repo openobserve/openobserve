@@ -5,10 +5,11 @@ use std::{collections::HashMap, sync::Arc};
 use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, FixedSizeBinaryArray, Int64Array, LargeStringArray,
-        RecordBatch, RecordBatchOptions, StringArray, StringViewArray, UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, DictionaryArray, FixedSizeBinaryArray, Int64Array,
+        LargeStringArray, RecordBatch, RecordBatchOptions, StringArray, StringViewArray,
+        UInt8Array, UInt16Array, UInt32Array, UInt64Array,
     },
-    datatypes::{DataType, Schema, SchemaRef},
+    datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
 use serde::{Deserialize, Serialize};
 
@@ -85,7 +86,16 @@ impl<'a> CompactMetadata<'a> {
         Arc::new(self.header.schema.clone())
     }
 
+    #[cfg(test)]
     pub(crate) fn batch(&self, projection: &[usize]) -> Result<RecordBatch> {
+        self.batch_inner(projection, false)
+    }
+
+    pub(crate) fn compact_batch(&self, projection: &[usize]) -> Result<RecordBatch> {
+        self.batch_inner(projection, true)
+    }
+
+    fn batch_inner(&self, projection: &[usize], compact_labels: bool) -> Result<RecordBatch> {
         let mut fields = Vec::with_capacity(projection.len());
         let mut columns = Vec::with_capacity(projection.len());
         let mut expanded = 0usize;
@@ -103,12 +113,16 @@ impl<'a> CompactMetadata<'a> {
                 "compact decompressed size mismatch"
             );
             let field = self.header.schema.field(i);
-            let col = decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?;
+            let col = if compact_labels && crate::is_label_type(field.data_type()) {
+                decode_labels_compact(&raw, field.data_type(), self.header.rows, &mut expanded)?
+            } else {
+                decode_column(&raw, field.data_type(), self.header.rows, &mut expanded)?
+            };
             ensure!(
                 field.is_nullable() || col.null_count() == 0,
                 "null compact non-nullable column"
             );
-            fields.push(field.clone());
+            fields.push(field.clone().with_data_type(col.data_type().clone()));
             columns.push(col);
         }
         Ok(RecordBatch::try_new_with_options(
@@ -406,4 +420,153 @@ fn decode_labels(
         DataType::Utf8View => Arc::new(StringViewArray::from(values)),
         _ => unreachable!(),
     })
+}
+
+fn decode_labels_compact(
+    raw: &[u8],
+    kind: &DataType,
+    rows: usize,
+    expanded: &mut usize,
+) -> Result<ArrayRef> {
+    let direct = decode_labels(raw, kind, rows, expanded)?;
+    let mut input = Input::new(raw);
+    let count = input.u32()? as usize;
+    let mut dictionary = Vec::with_capacity(count);
+    for _ in 0..count {
+        let len = input.u32()? as usize;
+        dictionary.push(std::str::from_utf8(input.take(len)?)?);
+    }
+    let width = if count <= 256 {
+        1
+    } else if count <= 65536 {
+        2
+    } else {
+        4
+    };
+    let estimated = dictionary
+        .iter()
+        .map(|value| value.len() + 4)
+        .sum::<usize>()
+        .saturating_add(rows.saturating_mul(width))
+        .saturating_add(rows.div_ceil(8))
+        .saturating_add(512);
+    if estimated >= direct.get_array_memory_size() {
+        return Ok(direct);
+    }
+    let mut ids = Vec::with_capacity(rows);
+    for _ in 0..rows {
+        let id = input.u32()?;
+        ids.push((id != u32::MAX).then_some(id));
+    }
+    let values: ArrayRef = Arc::new(StringArray::from_iter_values(dictionary));
+    let compact: ArrayRef = match width {
+        1 => Arc::new(DictionaryArray::<UInt8Type>::try_new(
+            UInt8Array::from_iter(
+                ids.iter()
+                    .map(|id| id.map(|v| u8::try_from(v).expect("validated dictionary width"))),
+            ),
+            values,
+        )?),
+        2 => Arc::new(DictionaryArray::<UInt16Type>::try_new(
+            UInt16Array::from_iter(
+                ids.iter()
+                    .map(|id| id.map(|v| u16::try_from(v).expect("validated dictionary width"))),
+            ),
+            values,
+        )?),
+        _ => Arc::new(DictionaryArray::<UInt32Type>::try_new(
+            UInt32Array::from(ids),
+            values,
+        )?),
+    };
+    Ok(
+        if compact.get_array_memory_size() < direct.get_array_memory_size() {
+            compact
+        } else {
+            direct
+        },
+    )
+}
+
+#[cfg(test)]
+mod adaptive_tests {
+    use super::*;
+
+    #[test]
+    fn dictionary_width_boundaries_preserve_null_and_all_codes() {
+        for (cardinality, width) in [
+            (255, DataType::UInt8),
+            (256, DataType::UInt8),
+            (257, DataType::UInt16),
+            (65535, DataType::UInt16),
+            (65536, DataType::UInt16),
+            (65537, DataType::UInt32),
+        ] {
+            let values = (0..cardinality)
+                .map(|i| format!("label-{i:06}"))
+                .collect::<Vec<_>>();
+            let rows = values
+                .iter()
+                .map(|value| Some(value.as_str()))
+                .chain(values.iter().map(|value| Some(value.as_str())))
+                .chain(std::iter::once(None))
+                .collect::<Vec<_>>();
+            let source: ArrayRef = Arc::new(StringArray::from(rows));
+            let raw = encode_labels(source.as_ref()).unwrap();
+            let decoded =
+                decode_labels_compact(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+            assert_eq!(
+                decoded.data_type(),
+                &DataType::Dictionary(Box::new(width), Box::new(DataType::Utf8))
+            );
+            assert_eq!(
+                crate::label_value(decoded.as_ref(), cardinality - 1).unwrap(),
+                Some(values[cardinality - 1].as_str())
+            );
+            assert_eq!(
+                crate::label_value(decoded.as_ref(), cardinality * 2).unwrap(),
+                None
+            );
+            assert!(decoded.get_array_memory_size() < source.get_array_memory_size());
+        }
+    }
+
+    #[test]
+    fn compact_labels_keep_high_cardinality_direct_and_null_empty_distinct() {
+        for kind in [DataType::Utf8, DataType::LargeUtf8, DataType::Utf8View] {
+            let values = (0..1024)
+                .map(|i| {
+                    if i % 3 == 0 {
+                        None
+                    } else if i % 3 == 1 {
+                        Some("")
+                    } else {
+                        Some("repeated")
+                    }
+                })
+                .collect::<Vec<_>>();
+            let source: ArrayRef = match kind {
+                DataType::Utf8 => Arc::new(StringArray::from(values)),
+                DataType::LargeUtf8 => Arc::new(LargeStringArray::from(values)),
+                _ => Arc::new(StringViewArray::from(values)),
+            };
+            let raw = encode_labels(source.as_ref()).unwrap();
+            let decoded = decode_labels_compact(&raw, &kind, source.len(), &mut 0).unwrap();
+            assert!(
+                matches!(decoded.data_type(),DataType::Dictionary(key,_) if **key==DataType::UInt8)
+            );
+            for row in 0..source.len() {
+                assert_eq!(
+                    crate::label_value(source.as_ref(), row).unwrap(),
+                    crate::label_value(decoded.as_ref(), row).unwrap()
+                );
+            }
+        }
+        let source: ArrayRef = Arc::new(StringArray::from_iter_values(
+            (0..1024).map(|i| format!("unique-{i:06}")),
+        ));
+        let raw = encode_labels(source.as_ref()).unwrap();
+        let decoded = decode_labels_compact(&raw, &DataType::Utf8, source.len(), &mut 0).unwrap();
+        assert_eq!(decoded.data_type(), &DataType::Utf8);
+    }
 }

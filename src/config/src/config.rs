@@ -2891,7 +2891,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_METRICS_INDEX_BLOCKS_ENABLED",
         default = false,
-        help = "Write and read lossless series blocks in metrics indexes. Requires ZO_METRICS_INDEX_ENABLED; keeps Parquet for SQL and fallback."
+        help = "Write and read lossless series blocks in metrics indexes. Requires ZO_METRICS_INDEX_ENABLED; keeps the original Parquet or Vortex data for SQL and fallback."
     )]
     pub metrics_index_blocks_enabled: bool,
     #[env_config(name = "ZO_COMPACT_INTERVAL", default = 10)] // seconds

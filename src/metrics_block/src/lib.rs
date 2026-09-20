@@ -2,20 +2,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 mod compact;
+mod directory;
 mod reader;
 mod writer;
 
 use std::{
     collections::{HashMap, HashSet},
-    ops::Range,
+    ops::{Deref, Range},
+    sync::Arc,
 };
 
 use anyhow::{Result, anyhow, ensure};
 use arrow::{
-    array::{Array, LargeStringArray, RecordBatch, StringArray, StringViewArray},
-    datatypes::{DataType, Schema, SchemaRef},
+    array::{
+        Array, DictionaryArray, LargeStringArray, RecordBatch, RecordBatchOptions, StringArray,
+        StringViewArray,
+    },
+    datatypes::{DataType, Schema, SchemaRef, UInt8Type, UInt16Type, UInt32Type},
 };
-pub use reader::{BlockDecoder, decode_block, decode_index, read_footer};
+pub use directory::{BlockDirectory, BlockIter};
+pub use reader::{BlockDecoder, decode_additional_labels, decode_block, decode_index, read_footer};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 pub use writer::{BlockWriter, build_from_parquet};
@@ -63,7 +69,7 @@ pub struct ParentIdentity {
     pub compressed_size: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Footer {
     pub version: u32,
     pub metadata_range: Range<u64>,
@@ -107,14 +113,19 @@ pub struct DecodedBlockRef<'a> {
 }
 
 #[derive(Debug)]
-pub struct Index {
+pub struct IndexBase {
     pub row_group_size: Option<u32>,
     pub parent: ParentIdentity,
     pub source_schema: SchemaRef,
-    pub blocks: Vec<BlockMeta>,
-    row_starts: Vec<u64>,
-    /// One row per block, containing only requested label columns.
+    pub blocks: BlockDirectory,
+    footer: Footer,
+}
+
+#[derive(Debug)]
+pub struct Index {
+    pub base: Arc<IndexBase>,
     pub labels: RecordBatch,
+    missing: Vec<String>,
 }
 
 impl Index {
@@ -122,18 +133,13 @@ impl Index {
         let schema_bytes =
             serde_json::to_vec(self.source_schema.as_ref()).map_or(MAX_METADATA_BYTES, |v| v.len());
         std::mem::size_of::<Self>()
-            .saturating_add(
-                self.blocks
-                    .capacity()
-                    .saturating_mul(std::mem::size_of::<BlockMeta>()),
-            )
-            .saturating_add(
-                self.row_starts
-                    .capacity()
-                    .saturating_mul(std::mem::size_of::<u64>()),
-            )
+            .saturating_add(std::mem::size_of::<IndexBase>())
+            .saturating_add(32)
+            .saturating_add(self.blocks.allocated_bytes())
             .saturating_add(self.parent.object_key.capacity())
             .saturating_add(self.labels.get_array_memory_size())
+            .saturating_add(self.missing.capacity() * std::mem::size_of::<String>())
+            .saturating_add(self.missing.iter().map(String::capacity).sum::<usize>())
             .saturating_add(schema_bytes.saturating_mul(2))
             .saturating_add(
                 (self.source_schema.fields().len() + self.labels.num_columns()).saturating_mul(512),
@@ -141,35 +147,123 @@ impl Index {
     }
 
     pub fn estimated_directory_size(&self) -> usize {
-        self.blocks
-            .capacity()
-            .saturating_mul(std::mem::size_of::<BlockMeta>())
-            .saturating_add(
-                self.row_starts
-                    .capacity()
-                    .saturating_mul(std::mem::size_of::<u64>()),
-            )
+        self.blocks.allocated_bytes()
     }
 
+    pub fn missing_labels(&self, names: &[String]) -> Result<Vec<String>> {
+        ensure!(
+            names.len() <= MAX_LABEL_COLUMNS,
+            "too many requested labels"
+        );
+        let mut missing = Vec::new();
+        for name in names {
+            let Ok(field) = self.source_schema.field_with_name(name) else {
+                continue;
+            };
+            ensure!(
+                is_label_type(field.data_type()),
+                "requested source field lacks identity label metadata"
+            );
+            if self.labels.column_by_name(name).is_none() && !missing.contains(name) {
+                missing.push(name.clone());
+            }
+        }
+        Ok(missing)
+    }
+
+    pub fn project(&self, names: &[String]) -> Result<Self> {
+        ensure!(
+            self.missing_labels(names)?.is_empty(),
+            "requested label column not loaded"
+        );
+        let schema = self.labels.schema();
+        let mut fields = Vec::new();
+        let mut columns = Vec::new();
+        for name in names {
+            if fields
+                .iter()
+                .any(|field: &Arc<arrow::datatypes::Field>| field.name() == name)
+            {
+                continue;
+            }
+            if let Ok(index) = schema.index_of(name) {
+                fields.push(Arc::clone(&schema.fields()[index]));
+                columns.push(Arc::clone(self.labels.column(index)));
+            }
+        }
+        Ok(Self {
+            base: Arc::clone(&self.base),
+            missing: names
+                .iter()
+                .filter(|name| self.source_schema.field_with_name(name).is_err())
+                .cloned()
+                .collect(),
+            labels: RecordBatch::try_new_with_options(
+                Arc::new(Schema::new(fields)),
+                columns,
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+            )?,
+        })
+    }
+
+    pub fn merge_columns(&self, other: &Self) -> Result<Self> {
+        ensure!(
+            Arc::ptr_eq(&self.base, &other.base)
+                || (self.base.footer == other.base.footer
+                    && self.parent == other.parent
+                    && self.source_schema == other.source_schema
+                    && self.row_group_size == other.row_group_size),
+            "cannot mix metadata bindings"
+        );
+        let mut fields = self.labels.schema().fields().to_vec();
+        let mut columns = self.labels.columns().to_vec();
+        for (field, column) in other
+            .labels
+            .schema()
+            .fields()
+            .iter()
+            .zip(other.labels.columns())
+        {
+            if self.labels.column_by_name(field.name()).is_none() {
+                fields.push(Arc::clone(field));
+                columns.push(Arc::clone(column));
+            }
+        }
+        Ok(Self {
+            base: Arc::clone(&self.base),
+            missing: Vec::new(),
+            labels: RecordBatch::try_new_with_options(
+                Arc::new(Schema::new(fields)),
+                columns,
+                &RecordBatchOptions::new().with_row_count(Some(self.blocks.len())),
+            )?,
+        })
+    }
+
+    pub fn for_cache(mut self) -> Self {
+        self.missing = Vec::new();
+        self
+    }
+
+    #[inline]
     pub fn label_value(&self, block: usize, name: &str) -> Result<Option<&str>> {
         ensure!(block < self.blocks.len(), "block index out of bounds");
-        let column = self
-            .labels
-            .column_by_name(name)
-            .ok_or_else(|| anyhow!("label was not projected: {name}"))?;
+        let Some(column) = self.labels.column_by_name(name) else {
+            ensure!(
+                self.missing.iter().any(|missing| missing == name),
+                "label was not projected: {name}"
+            );
+            return Ok(None);
+        };
         label_value(column.as_ref(), block)
     }
 
     pub fn label_values(&self, block: usize, names: &[String]) -> Result<Vec<Option<String>>> {
-        ensure!(block < self.blocks.len(), "block index out of bounds");
         names
             .iter()
             .map(|name| {
-                let column = self
-                    .labels
-                    .column_by_name(name)
-                    .ok_or_else(|| anyhow!("label was not projected: {name}"))?;
-                Ok(label_value(column.as_ref(), block)?.map(str::to_owned))
+                self.label_value(block, name)
+                    .map(|value| value.map(str::to_owned))
             })
             .collect()
     }
@@ -180,10 +274,6 @@ impl Index {
         hash_interval: Option<(u64, u64)>,
         time_range: Option<(i64, i64)>,
     ) -> Result<Vec<usize>> {
-        ensure!(
-            self.row_starts.len() == self.blocks.len(),
-            "row lookup/descriptor count mismatch"
-        );
         let mut normalized: Vec<Range<u64>> = Vec::new();
         if let Some(ranges) = ranges {
             ensure!(ranges.len() <= MAX_BLOCKS, "too many selection ranges");
@@ -212,36 +302,36 @@ impl Index {
         let mut selected_spans = Vec::with_capacity(normalized.len());
         for range in normalized {
             let start = self
-                .row_starts
-                .binary_search(&range.start)
+                .blocks
+                .row_boundary(range.start)
                 .map_err(|_| anyhow!("selection starts inside a sample block"))?;
             let end = if range.end == self.parent.rows {
                 self.blocks.len()
             } else {
-                self.row_starts
-                    .binary_search(&range.end)
+                self.blocks
+                    .row_boundary(range.end)
                     .map_err(|_| anyhow!("selection ends inside a sample block"))?
             };
             ensure!(start < end, "empty block selection");
             ensure!(
-                self.blocks[start].row_start == range.start
-                    && (end == self.blocks.len() || self.blocks[end].row_start == range.end),
+                self.blocks.row_start(start) == range.start
+                    && (end == self.blocks.len() || self.blocks.row_start(end) == range.end),
                 "row lookup/descriptor endpoint mismatch"
             );
             ensure!(
-                start == 0 || self.blocks[start - 1].hash != self.blocks[start].hash,
+                start == 0 || self.blocks.hash(start - 1) != self.blocks.hash(start),
                 "selection starts inside a source series"
             );
             ensure!(
-                end == self.blocks.len() || self.blocks[end - 1].hash != self.blocks[end].hash,
+                end == self.blocks.len() || self.blocks.hash(end - 1) != self.blocks.hash(end),
                 "selection ends inside a source series"
             );
             selected_spans.push(start..end);
         }
         let hash_span = match hash_interval {
             Some((lo, hi)) if lo <= hi => {
-                self.blocks.partition_point(|b| b.hash < lo)
-                    ..self.blocks.partition_point(|b| b.hash <= hi)
+                self.blocks.hash_partition_point(|hash| hash < lo)
+                    ..self.blocks.hash_partition_point(|hash| hash <= hi)
             }
             Some(_) => 0..0,
             None => 0..self.blocks.len(),
@@ -250,15 +340,21 @@ impl Index {
         for span in selected_spans {
             let start = span.start.max(hash_span.start);
             let end = span.end.min(hash_span.end);
-            for (index, block) in self.blocks[start.min(end)..end].iter().enumerate() {
-                if time_range.is_none_or(|(lo, hi)| {
-                    lo <= hi && block.min_timestamp <= hi && block.max_timestamp >= lo
-                }) {
-                    result.push(start + index);
+            for index in start..end {
+                if time_range.is_none_or(|(lo, hi)| self.blocks.overlaps_time(index, lo, hi)) {
+                    result.push(index);
                 }
             }
         }
         Ok(result)
+    }
+}
+
+impl Deref for Index {
+    type Target = IndexBase;
+
+    fn deref(&self) -> &Self::Target {
+        &self.base
     }
 }
 
@@ -278,7 +374,7 @@ pub fn max_compressed_block_len(row_count: u32) -> Result<usize> {
     Ok(zstd::zstd_safe::compress_bound(raw))
 }
 
-/// Only immutable indexed Parquet metrics objects can own this container.
+/// Only immutable indexed metrics objects with a supported source format can own this container.
 pub fn sidecar_path(parent_key: &str) -> Option<String> {
     let mut parts: Vec<_> = parent_key.split('/').map(str::to_owned).collect();
     if parts.len() < 9
@@ -291,7 +387,10 @@ pub fn sidecar_path(parent_key: &str) -> Option<String> {
         return None;
     }
     let name = parts.last()?;
-    let id = name.strip_prefix("indexed-v1-")?.strip_suffix(".parquet")?;
+    let name = name.strip_prefix("indexed-v1-")?;
+    let id = name
+        .strip_suffix(".parquet")
+        .or_else(|| name.strip_suffix(".vortex"))?;
     if id.is_empty() {
         return None;
     }
@@ -382,6 +481,21 @@ fn label_value(array: &dyn Array, row: usize) -> Result<Option<&str>> {
     }
     if let Some(a) = array.as_any().downcast_ref::<StringViewArray>() {
         return Ok(Some(a.value(row)));
+    }
+    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt8Type>>() {
+        return label_value(
+            array.values().as_ref(),
+            usize::from(array.keys().value(row)),
+        );
+    }
+    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt16Type>>() {
+        return label_value(
+            array.values().as_ref(),
+            usize::from(array.keys().value(row)),
+        );
+    }
+    if let Some(array) = array.as_any().downcast_ref::<DictionaryArray<UInt32Type>>() {
+        return label_value(array.values().as_ref(), array.keys().value(row) as usize);
     }
     Err(anyhow!("unsupported identity label array"))
 }

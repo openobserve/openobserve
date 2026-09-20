@@ -145,10 +145,9 @@ pub(crate) async fn create_context(
         .collect_vec();
     let (cache_type, cache_hits, cache_misses) =
         if cfg.compact.metrics_index_enabled && cfg.compact.metrics_index_blocks_enabled {
-            let (_, hits, misses) =
-                inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats, "parquet")
-                    .instrument(enter_span.clone())
-                    .await;
+            let (_, hits, misses) = inspect_file_cache(trace_id, &cache_inputs, &mut scan_stats)
+                .instrument(enter_span.clone())
+                .await;
             (file_data::CacheType::None, hits, misses)
         } else {
             cache_files(trace_id, &cache_inputs, &mut scan_stats, "parquet")
@@ -302,7 +301,7 @@ fn block_selection_fraction(files: &[FileKey]) -> Option<f64> {
     let mut total = 0u128;
     for file in files {
         if file.deleted
-            || !file.key.ends_with(".parquet")
+            || config::FileFormat::from_extension(&file.key).is_none()
             || MetricsFileLayout::of(&file.key) != Some(MetricsFileLayout::Indexed)
             || file.meta.compressed_size <= 0
         {
@@ -428,7 +427,7 @@ mod block_selection_tests {
         unselected.selection = None;
         assert_eq!(block_selection_fraction(&[sparse, unselected]), None);
         for key in [
-            "files/org/metrics/metric/2026/01/01/00/indexed-v1-id.vortex",
+            "files/org/metrics/metric/2026/01/01/00/indexed-v1-id.unsupported",
             "files/org/metrics/metric/2026/01/01/00/hash-sorted-v1-id.parquet",
         ] {
             let mut file = selected(100, std::iter::once(0..10).collect());
@@ -439,6 +438,32 @@ mod block_selection_tests {
         deleted.deleted = true;
         assert_eq!(block_selection_fraction(&[deleted]), None);
     }
+    #[test]
+    fn native_admission_accepts_vortex_and_mixed_parent_formats() {
+        let parquet = selected(100, std::iter::once(0..10).collect());
+        let mut vortex = selected(200, std::iter::once(0..20).collect());
+        vortex.key = vortex.key.replace(".parquet", ".vortex");
+        vortex.row_group_size = None;
+        assert_eq!(
+            block_selection_fraction(std::slice::from_ref(&vortex)),
+            Some(0.1)
+        );
+        let files = vec![parquet, vortex];
+        assert_eq!(block_selection_fraction(&files), Some(0.1));
+        assert!(
+            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false, true)
+                .is_some()
+        );
+        assert!(
+            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, false, false)
+                .is_none()
+        );
+        assert!(
+            block_scan_candidate("m", &files, FileSortOrder::HashTimestampAsc, true, true)
+                .is_none()
+        );
+    }
+
     #[test]
     fn block_rollout_flag_gates_all_selection_densities() {
         for end in [1, 25, 100] {

@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 use std::{collections::HashSet, sync::Arc};
 
-use anyhow::{Context, Result, anyhow, ensure};
+use anyhow::{Context, Result, ensure};
 use arrow::{
     array::{
-        Array, ArrayRef, BooleanArray, FixedSizeBinaryArray, Int64Array, LargeStringArray,
-        RecordBatch, RecordBatchOptions, StringArray, StringViewArray, UInt32Array, UInt64Array,
+        Array, ArrayRef, BooleanArray, FixedSizeBinaryArray, Int64Array, RecordBatch,
+        RecordBatchOptions, UInt32Array, UInt64Array,
     },
-    datatypes::{DataType, Field, Schema},
+    datatypes::{DataType, Schema},
 };
 use bytes::Bytes;
 
@@ -165,6 +165,40 @@ pub fn decode_index(
     expected: &ParentIdentity,
     requested_labels: &[String],
 ) -> Result<Index> {
+    decode_index_inner(metadata, footer, expected, requested_labels, None)
+}
+
+pub fn decode_additional_labels(
+    metadata: Bytes,
+    footer: &Footer,
+    existing: &Index,
+    requested_labels: &[String],
+) -> Result<Index> {
+    decode_index_inner(
+        metadata,
+        footer,
+        &existing.parent,
+        requested_labels,
+        Some(&existing.base),
+    )
+}
+
+pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
+    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize)?;
+    decoder.decode(payload, block)?;
+    Ok(DecodedBlock {
+        timestamps: decoder.timestamps,
+        value_bits: decoder.value_bits,
+    })
+}
+
+fn decode_index_inner(
+    metadata: Bytes,
+    footer: &Footer,
+    expected: &ParentIdentity,
+    requested_labels: &[String],
+    existing: Option<&Arc<IndexBase>>,
+) -> Result<Index> {
     ensure!(
         u64::try_from(metadata.len())?
             == footer
@@ -259,7 +293,11 @@ pub fn decode_index(
         requested_labels.len() <= MAX_LABEL_COLUMNS,
         "too many requested labels"
     );
-    let mut projection: Vec<_> = (0..DIRECTORY_FIELDS).collect();
+    let mut projection: Vec<_> = if existing.is_some() {
+        Vec::new()
+    } else {
+        (0..DIRECTORY_FIELDS).collect()
+    };
     let mut requested = Vec::new();
     for name in requested_labels {
         if requested.contains(name) {
@@ -276,7 +314,76 @@ pub fn decode_index(
         requested.push(name.clone());
     }
     projection.sort_unstable();
-    let batch = compact.batch(&projection)?;
+    let batch = compact.compact_batch(&projection)?;
+    let count = batch.num_rows();
+    ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
+    let row_group_size = properties
+        .get(ROW_GROUP_SIZE_KEY)
+        .map(|value| value.parse::<u32>())
+        .transpose()?;
+    ensure!(row_group_size != Some(0), "invalid parent row group size");
+    ensure!(
+        !parent.object_key.ends_with(".vortex") || row_group_size.is_none(),
+        "Vortex parent cannot declare Parquet row groups"
+    );
+    let base = if let Some(base) = existing {
+        ensure!(
+            base.footer == *footer
+                && base.parent == parent
+                && base.source_schema.as_ref() == &source_schema
+                && base.row_group_size == row_group_size
+                && base.blocks.len() == count,
+            "additional labels have a different metadata binding"
+        );
+        Arc::clone(base)
+    } else {
+        Arc::new(IndexBase {
+            row_group_size,
+            parent,
+            source_schema: Arc::new(source_schema),
+            blocks: decode_directory(&batch, expected, footer)?,
+            footer: footer.clone(),
+        })
+    };
+    let blocks = &base.blocks;
+    let mut missing = Vec::new();
+    let mut fields = Vec::new();
+    let mut columns: Vec<ArrayRef> = Vec::new();
+    for name in requested {
+        if let Some(column) = batch.column_by_name(&name) {
+            fields.push(Arc::new(batch.schema().field_with_name(&name)?.clone()));
+            columns.push(Arc::clone(column));
+        } else {
+            missing.push(name);
+        }
+    }
+    let labels = RecordBatch::try_new_with_options(
+        Arc::new(Schema::new(fields)),
+        columns,
+        &RecordBatchOptions::new().with_row_count(Some(count)),
+    )?;
+    for i in 1..count {
+        if blocks.block(i).hash == blocks.block(i - 1).hash {
+            for column in labels.columns() {
+                ensure!(
+                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
+                    "label metadata changes within one series"
+                );
+            }
+        }
+    }
+    Ok(Index {
+        base,
+        labels,
+        missing,
+    })
+}
+
+fn decode_directory(
+    batch: &RecordBatch,
+    parent: &ParentIdentity,
+    footer: &Footer,
+) -> Result<BlockDirectory> {
     let count = batch.num_rows();
     ensure!(count > 0 && count <= MAX_BLOCKS, "block count limit");
     for i in 0..DIRECTORY_FIELDS {
@@ -327,8 +434,8 @@ pub fn decode_index(
         .as_any()
         .downcast_ref::<FixedSizeBinaryArray>()
         .context("checksum type")?;
-    let mut blocks: Vec<BlockMeta> = Vec::with_capacity(count);
-    let mut owned_row_starts = Vec::with_capacity(count);
+    let mut blocks =
+        crate::directory::DirectoryBuilder::new(count, parent.rows, footer.payload_end);
     let mut next_row = 0u64;
     let mut next_offset = 0u64;
     let mut previous: Option<(u64, i64)> = None;
@@ -390,70 +497,13 @@ pub fn decode_index(
             "block outside parent bounds"
         );
         previous = Some((block.hash, block.max_timestamp));
-        owned_row_starts.push(block.row_start);
         blocks.push(block);
     }
     ensure!(
         next_row == parent.rows && next_offset == footer.payload_end,
         "directory does not tile source rows and payload"
     );
-    let mut fields = Vec::new();
-    let mut columns: Vec<ArrayRef> = Vec::new();
-    for name in requested {
-        if let Some(column) = batch.column_by_name(&name) {
-            fields.push(Arc::new(batch.schema().field_with_name(&name)?.clone()));
-            let values = (0..count)
-                .map(|row| label_value(column.as_ref(), row))
-                .collect::<Result<Vec<_>>>()?;
-            let owned: ArrayRef = match column.data_type() {
-                DataType::Utf8 => Arc::new(StringArray::from_iter(values)),
-                DataType::LargeUtf8 => Arc::new(LargeStringArray::from_iter(values)),
-                DataType::Utf8View => Arc::new(StringViewArray::from_iter(values)),
-                _ => return Err(anyhow!("unsupported projected label")),
-            };
-            columns.push(owned);
-        } else {
-            fields.push(Arc::new(Field::new(name, DataType::Utf8, true)));
-            columns.push(Arc::new(StringArray::from(vec![None::<&str>; count])));
-        }
-    }
-    let labels = RecordBatch::try_new_with_options(
-        Arc::new(Schema::new(fields)),
-        columns,
-        &RecordBatchOptions::new().with_row_count(Some(count)),
-    )?;
-    for i in 1..count {
-        if blocks[i].hash == blocks[i - 1].hash {
-            for column in labels.columns() {
-                ensure!(
-                    label_value(column.as_ref(), i)? == label_value(column.as_ref(), i - 1)?,
-                    "label metadata changes within one series"
-                );
-            }
-        }
-    }
-    let row_group_size = properties
-        .get(ROW_GROUP_SIZE_KEY)
-        .map(|value| value.parse::<u32>())
-        .transpose()?;
-    ensure!(row_group_size != Some(0), "invalid parent row group size");
-    Ok(Index {
-        row_group_size,
-        parent,
-        source_schema: Arc::new(source_schema),
-        blocks,
-        row_starts: owned_row_starts,
-        labels,
-    })
-}
-
-pub fn decode_block(payload: &[u8], block: &BlockMeta) -> Result<DecodedBlock> {
-    let mut decoder = BlockDecoder::with_capacity(block.row_count as usize)?;
-    decoder.decode(payload, block)?;
-    Ok(DecodedBlock {
-        timestamps: decoder.timestamps,
-        value_bits: decoder.value_bits,
-    })
+    Ok(blocks.finish())
 }
 
 fn read_u32(bytes: &[u8], offset: usize) -> Result<u32> {

@@ -225,16 +225,24 @@ pub(super) fn evaluate_metrics_index(
 }
 
 fn metrics_block_index_data(index: &metrics_block::Index) -> Result<MetricsIndexData> {
-    let row_group_size = index.row_group_size.ok_or_else(|| {
-        DataFusionError::Execution("Block index lacks parent row group size".into())
-    })?;
+    let row_group_size = match config::FileFormat::from_extension(&index.parent.object_key) {
+        Some(config::FileFormat::Parquet) => Some(index.row_group_size.ok_or_else(|| {
+            DataFusionError::Execution("Parquet block index lacks parent row group size".into())
+        })?),
+        Some(config::FileFormat::Vortex) if index.row_group_size.is_none() => None,
+        _ => {
+            return Err(DataFusionError::Execution(
+                "Invalid block parent format/row-group binding".into(),
+            ));
+        }
+    };
     let mut fields = vec![arrow::datatypes::Field::new(
         METRICS_INDEX_ROW_COUNT,
         arrow::datatypes::DataType::UInt32,
         false,
     )];
     let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
-        index.blocks.iter().map(|b| b.row_count),
+        index.blocks.row_counts(),
     ))];
     for (i, field) in index.labels.schema().fields().iter().enumerate() {
         if index.source_schema.field_with_name(field.name()).is_ok() {
@@ -250,7 +258,7 @@ fn metrics_block_index_data(index: &metrics_block::Index) -> Result<MetricsIndex
         parent_records: Some(
             usize::try_from(index.parent.rows).map_err(|e| DataFusionError::External(e.into()))?,
         ),
-        row_group_size: Some(row_group_size),
+        row_group_size,
     })
 }
 
@@ -668,6 +676,85 @@ mod tests {
                 let filter =
                     crate::pruner::create_physical_filter(&data.schema, &matchers).unwrap();
                 evaluate_metrics_index(data, filter.as_deref(), 4).unwrap()
+            });
+            assert_eq!(selected[0], selected[1], "{matchers:?}");
+        }
+    }
+    #[test]
+    fn compact_dictionary_predicates_match_legacy_metadata() {
+        let count = 2048;
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+            Field::new("tag", DataType::Utf8, true),
+        ]));
+        let tags: ArrayRef = Arc::new(StringArray::from(
+            (0..count)
+                .map(|row| [None, Some(""), Some("a"), Some("b")][row % 4])
+                .collect::<Vec<_>>(),
+        ));
+        let source = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(UInt64Array::from_iter_values(0..count as u64)),
+                Arc::new(Int64Array::from(vec![10; count])),
+                Arc::new(Float64Array::from(vec![1.; count])),
+                tags,
+            ],
+        )
+        .unwrap();
+        let mut parquet = Vec::new();
+        let mut writer = ArrowWriter::try_new(&mut parquet, Arc::clone(&schema), None).unwrap();
+        writer.write(&source).unwrap();
+        writer.close().unwrap();
+        let parent = metrics_block::ParentIdentity {
+            object_key: "files/o/metrics/m/2026/09/20/00/indexed-v1-dictionary.parquet".into(),
+            rows: count as u64,
+            compressed_size: parquet.len() as u64,
+        };
+        let bytes =
+            metrics_block::build_from_parquet(Bytes::from(parquet), parent.clone()).unwrap();
+        let footer = metrics_block::read_footer(
+            &bytes[bytes.len() - metrics_block::FOOTER_LEN..],
+            bytes.len() as u64,
+        )
+        .unwrap();
+        let labels = vec!["tag".to_string(), "missing".to_string()];
+        let index = metrics_block::decode_index(
+            Bytes::copy_from_slice(
+                &bytes[footer.metadata_range.start as usize..footer.metadata_range.end as usize],
+            ),
+            &footer,
+            &parent,
+            &labels,
+        )
+        .unwrap();
+        assert!(
+            matches!(index.labels.column_by_name("tag").unwrap().data_type(),DataType::Dictionary(key,_) if **key==DataType::UInt8)
+        );
+        let compact = metrics_block_index_data(&index).unwrap();
+        let mut legacy = crate::MetricsIndexWriter::try_new(&schema).unwrap();
+        legacy.write(&source).unwrap();
+        let legacy = decode_metrics_index(
+            "legacy",
+            Bytes::from(legacy.finish(count as i64, Some(count)).unwrap()),
+            &labels,
+        )
+        .unwrap();
+        for matcher in [
+            Matcher::new(MatchOp::Equal, "tag", ""),
+            Matcher::new(MatchOp::Equal, "tag", "a"),
+            Matcher::new(MatchOp::NotEqual, "tag", "a"),
+            Matcher::new(MatchOp::Re("a|b".parse().unwrap()), "tag", "a|b"),
+            Matcher::new(MatchOp::NotRe("a".parse().unwrap()), "tag", "a"),
+            Matcher::new(MatchOp::Equal, "missing", ""),
+        ] {
+            let matchers = Matchers::new(vec![matcher]);
+            let selected = [&legacy, &compact].map(|data| {
+                let filter =
+                    crate::pruner::create_physical_filter(&data.schema, &matchers).unwrap();
+                evaluate_metrics_index(data, filter.as_deref(), count).unwrap()
             });
             assert_eq!(selected[0], selected[1], "{matchers:?}");
         }

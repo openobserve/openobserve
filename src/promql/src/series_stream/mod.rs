@@ -38,26 +38,26 @@ pub(crate) trait SeriesStream: Send {
 }
 
 pub(crate) enum SeriesSource {
-    Parquet(hash_sorted::HashSortedSeriesStream),
+    DataFusion(hash_sorted::HashSortedSeriesStream),
     Block(blocks::BlockSeriesStream),
 }
 
 impl SeriesStream for SeriesSource {
     async fn advance(&mut self) -> Result<Option<u64>> {
         match self {
-            Self::Parquet(source) => source.advance().await,
+            Self::DataFusion(source) => source.advance().await,
             Self::Block(source) => source.advance().await,
         }
     }
     fn labels(&mut self) -> Labels {
         match self {
-            Self::Parquet(source) => source.labels(),
+            Self::DataFusion(source) => source.labels(),
             Self::Block(source) => source.labels(),
         }
     }
     async fn consume(&mut self, samples: &mut Vec<Sample>) -> Result<()> {
         match self {
-            Self::Parquet(source) => source.consume(samples).await,
+            Self::DataFusion(source) => source.consume(samples).await,
             Self::Block(source) => source.consume(samples).await,
         }
     }

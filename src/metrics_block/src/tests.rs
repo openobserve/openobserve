@@ -105,12 +105,13 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
     let blob = fixture();
     let index = index(&blob, &["label_b", "label_a", "missing"]).unwrap();
     assert_eq!(index.blocks.len(), 4);
-    assert!(!index.blocks[0].strictly_increasing);
-    assert!(index.blocks[1].strictly_increasing);
+    assert!(!index.blocks.block(0).strictly_increasing);
+    assert!(index.blocks.block(1).strictly_increasing);
     let mut actual = Vec::new();
     for (i, block) in index.blocks.iter().enumerate() {
         let range = block.payload_range();
-        let decoded = decode_block(&blob[range.start as usize..range.end as usize], block).unwrap();
+        let decoded =
+            decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
         for (time, value) in decoded.timestamps.iter().zip(&decoded.value_bits) {
             actual.push((block.hash, *time, *value));
         }
@@ -133,7 +134,10 @@ fn roundtrip_preserves_bits_duplicates_null_empty_and_batch_boundaries() {
         vec![Some("".into()), None]
     );
     assert!(index.label_value(0, "not_projected").is_err());
-    assert!(index.estimated_heap_size() >= index.blocks.len() * std::mem::size_of::<BlockMeta>());
+    assert_eq!(
+        index.estimated_directory_size(),
+        index.blocks.len() * 72 + index.blocks.len().div_ceil(8)
+    );
 }
 
 #[test]
@@ -228,7 +232,7 @@ fn parent_version_checksums_bounds_and_decoder_claims_are_checked() {
     assert!(read_footer(&end, blob.len() as u64).is_err());
     assert!(read_footer(&end[..63], blob.len() as u64).is_err());
     let index = index(&blob, &[]).unwrap();
-    let b = &index.blocks[0];
+    let b = &index.blocks.block(0);
     let range = b.payload_range();
     let payload = &blob[range.start as usize..range.end as usize];
     let mut corrupt = payload.to_vec();
@@ -344,7 +348,12 @@ fn paths_and_supported_schema_are_generic_but_strict() {
         sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.parquet").as_deref(),
         Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
     );
+    assert_eq!(
+        sidecar_path("files/o/metrics/m/2026/09/18/07/custom=x/indexed-v1-a.vortex").as_deref(),
+        Some("files/o/midx/m/2026/09/18/07/custom=x/indexed-v1-a.midx")
+    );
     for key in [
+        "files/o/metrics/m/2026/09/18/07/indexed-v1-a.unknown",
         "files/o/logs/m/2026/09/18/07/indexed-v1-a.parquet",
         "files/o/metrics/m/2026/09/18/07/hash-sorted-v1-a.parquet",
         "files/o/metrics/m/2026/09/18/../indexed-v1-a.parquet",
@@ -434,7 +443,7 @@ fn binary_range_selection_handles_disjoint_endpoints_and_partial_series() {
 fn excessive_compressed_length_and_capacity_classification() {
     let blob = fixture();
     let index = index(&blob, &[]).unwrap();
-    let mut block = index.blocks[0].clone();
+    let mut block = index.blocks.block(0).clone();
     let range = block.payload_range();
     block.payload_len =
         u32::try_from(max_compressed_block_len(block.row_count).unwrap() + 1).unwrap();
@@ -491,8 +500,11 @@ fn duplicates_across_chunk_boundary_remain_exact_and_visible() {
     let blob = writer.finish().unwrap();
     let index = index(&blob, &[]).unwrap();
     assert!(index.blocks.iter().all(|block| block.strictly_increasing));
-    assert_eq!(index.blocks[0].max_timestamp, index.blocks[1].min_timestamp);
-    assert_eq!(index.blocks[0].hash, index.blocks[1].hash);
+    assert_eq!(
+        index.blocks.block(0).max_timestamp,
+        index.blocks.block(1).min_timestamp
+    );
+    assert_eq!(index.blocks.block(0).hash, index.blocks.block(1).hash);
 }
 
 #[test]
@@ -595,7 +607,7 @@ fn lossless_transform_preserves_extreme_timestamps_resets_and_all_float_bits() {
         for block in &index.blocks {
             let range = block.payload_range();
             let decoded =
-                decode_block(&blob[range.start as usize..range.end as usize], block).unwrap();
+                decode_block(&blob[range.start as usize..range.end as usize], &block).unwrap();
             actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
         }
         assert_eq!(actual, timestamp.into_iter().zip(bits).collect::<Vec<_>>());
@@ -636,7 +648,7 @@ fn linear_selection_reference(
         .blocks
         .iter()
         .enumerate()
-        .filter(|(i, block)| *i == 0 || index.blocks[*i - 1].hash != block.hash)
+        .filter(|(i, block)| *i == 0 || index.blocks.block(*i - 1).hash != block.hash)
         .map(|(_, block)| block.row_start as usize)
         .collect();
     boundaries.push(index.parent.rows as usize);
@@ -704,24 +716,11 @@ fn dense_row_lookup_matches_independent_series_range_reference() {
 }
 
 #[test]
-fn dense_row_lookup_is_owned_shared_by_arc_and_capacity_accounted() {
-    let mut index = index(&fixture(), &[]).unwrap();
-    assert_eq!(
-        index.row_starts,
-        index.blocks.iter().map(|b| b.row_start).collect::<Vec<_>>()
-    );
-    let before = index.estimated_heap_size();
-    let directory_before = index.estimated_directory_size();
-    let old_capacity = index.row_starts.capacity();
-    index.row_starts.reserve_exact(123);
-    let added = (index.row_starts.capacity() - old_capacity) * std::mem::size_of::<u64>();
-    assert!(added > 0);
-    assert_eq!(index.estimated_heap_size() - before, added);
-    assert_eq!(index.estimated_directory_size() - directory_before, added);
-    let index = Arc::new(index);
-    let other = Arc::clone(&index);
-    assert!(Arc::ptr_eq(&index, &other));
-    assert_eq!(index.row_starts.as_ptr(), other.row_starts.as_ptr());
+fn compact_row_lookup_shares_one_immutable_base_and_counts_actual_storage() {
+    let index = index(&fixture(), &[]).unwrap();
+    assert_eq!(index.estimated_directory_size(), 4 * 72 + 1);
+    let other = index.project(&[]).unwrap();
+    assert!(Arc::ptr_eq(&index.base, &other.base));
     assert_eq!(
         other.select_blocks(Some(&[4..7]), None, None).unwrap(),
         vec![2, 3]
@@ -732,20 +731,13 @@ fn dense_row_lookup_is_owned_shared_by_arc_and_capacity_accounted() {
 fn dense_row_lookup_rejects_descriptor_divergence_and_partial_series_before_pruning() {
     let blob = fixture();
     for endpoint in [0, 2] {
-        let mut index = index(&blob, &[]).unwrap();
-        index.blocks[endpoint].row_start += 1;
-        let error = index.select_blocks(Some(&[0..4]), None, None).unwrap_err();
-        assert!(error.to_string().contains("endpoint mismatch"));
+        let mut starts = vec![0, 2, 4, 6];
+        starts[endpoint] += 1;
+        let corrupt = replace_column(&blob, 1, Arc::new(UInt64Array::from(starts)));
+        assert!(index(&corrupt, &[]).is_err());
     }
-    let mut index = index(&blob, &[]).unwrap();
-    index.blocks.pop();
-    assert!(
-        index
-            .select_blocks(None, None, None)
-            .unwrap_err()
-            .to_string()
-            .contains("count mismatch")
-    );
+    let corrupt = replace_column(&blob, 2, Arc::new(UInt32Array::from(vec![2, 2, 2, 2])));
+    assert!(index(&corrupt, &[]).is_err());
     let index = crate::tests::index(&blob, &[]).unwrap();
     for ranges in [
         vec![1..4],
@@ -861,7 +853,7 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
     for block in &parsed.blocks {
         let range = block.payload_range();
         let decoded =
-            decode_block(&container[range.start as usize..range.end as usize], block).unwrap();
+            decode_block(&container[range.start as usize..range.end as usize], &block).unwrap();
         actual.extend(decoded.timestamps.into_iter().zip(decoded.value_bits));
     }
     assert_eq!(
