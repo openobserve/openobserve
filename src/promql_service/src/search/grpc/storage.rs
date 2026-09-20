@@ -219,6 +219,15 @@ pub(crate) async fn create_context(
         }
     };
 
+    // every indexed file was pruned away: nothing in storage can match the selector
+    if files.is_empty() {
+        log::info!(
+            "[trace_id {trace_id}] promql->search->storage: metrics-index pruning left no files, index took: {} ms",
+            scan_stats.idx_took
+        );
+        return Ok(None);
+    }
+
     log::info!(
         "[trace_id {trace_id}] promql->search->storage: after metrics-index pruning, files {}, scan_size {}, compressed_size {}, index took: {} ms",
         scan_stats.files,

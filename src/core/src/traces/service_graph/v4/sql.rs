@@ -687,7 +687,7 @@ pub fn model_display_expr(model_expr: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ");
     format!(
-        "CASE {arms} ELSE regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', '') END"
+        "CASE {arms} ELSE regexp_replace(regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', ''), '\\[[^\\]]*\\]$', '') END"
     )
 }
 
@@ -1567,7 +1567,7 @@ mod tests {
         let expr = model_display_expr("m");
         assert!(expr.starts_with("CASE WHEN regexp_like(m, '"));
         assert!(expr.ends_with(
-            " ELSE regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', '') END"
+            " ELSE regexp_replace(regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', ''), '\\[[^\\]]*\\]$', '') END"
         ));
         assert!(expr.contains("WHEN regexp_like(m, 'gpt-5\\.2-pro') THEN 'gpt-5.2-pro'"));
         assert!(expr.contains("WHEN regexp_like(m, '(?i)deepseek-v4-pro') THEN 'deepseek-v4-pro'"));
