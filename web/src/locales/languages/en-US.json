@@ -7501,6 +7501,8 @@
       "noFieldsFound": "No fields found",
       "noticeHybridFallback": "Fallback detection",
       "noticeHybridFallbackTooltip": "The hybrid threshold was unavailable on recent runs, so detection fell back to the frozen threshold. Scoring continues on the frozen threshold until the model is retrained.",
+      "noticeRetrain": "Auto-retraining",
+      "noticeRetrainTooltip": "The saved model could not be read after an upgrade, so it was discarded and the config was queued for retraining automatically. No action is required; detection resumes once training completes.",
       "noticeSkipAbsence": "Absence grading fell behind the Look Back Window; the span that could no longer be fetched was skipped and recorded.",
       "noticeSkipScored": "Detection runs arrived further apart than the Look Back Window covers, so closed buckets left the window before a run could judge them.",
       "noticeWindowFloor": "Window too narrow",
