@@ -873,7 +873,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :title="t('alerts.cloneTitle')"
         :secondary-button-label="t('alerts.cancel')"
         :primary-button-label="t('alerts.save')"
-        :primary-button-disabled="isSubmitting"
+        :primary-button-disabled="isSubmitting || !toBeCloneAlertName.trim()"
         @click:secondary="showForm = false"
         @click:primary="submitForm"
       >
@@ -2539,6 +2539,17 @@ export default defineComponent({
       }
     };
     const submitForm = async () => {
+      // #14627: neither clone endpoint rejects a blank name, and an unnamed
+      // alert is a row that cannot be searched, toggled or deleted by name. The
+      // disabled Save button is the affordance; this guard is what makes a stale
+      // handler or a keyboard submit harmless.
+      if (!toBeCloneAlertName.value.trim()) {
+        toast({
+          variant: "error",
+          message: t("alerts.nameRequired"),
+        });
+        return;
+      }
       // Anomaly rows: use the dedicated /clone endpoint (no fetch+mutate dance needed)
       if (toBeClonedIsAnomaly.value) {
         if (!toBeClonestreamType.value) {
@@ -2618,7 +2629,10 @@ export default defineComponent({
             message: t("toastMessages.alerts.alertClonedSuccessfully"),
           });
           showForm.value = false;
-          await getAlertsFn(store, folderIdToBeCloned.value);
+          // force (#14626): the list this refetches is the one the clone was
+          // just added to, and an unforced fetchQuery answers from cache —
+          // leaving the new row invisible until the user refreshes by hand.
+          await getAlertsFn(store, folderIdToBeCloned.value, "", true, "", true);
           activeFolderId.value = folderIdToBeCloned.value;
         } catch (e: any) {
           dismiss();
@@ -2663,7 +2677,9 @@ export default defineComponent({
       toBeClonedAlert.value.name = toBeCloneAlertName.value;
       toBeClonedAlert.value.stream_name = toBeClonestreamName.value;
       toBeClonedAlert.value.stream_type = toBeClonestreamType.value;
-      toBeClonedAlert.value.folder_id = activeFolderId.value;
+      // The destination, not the folder being cloned from (#14625): the create
+      // endpoint refuses a body folder_id that disagrees with its ?folder=.
+      toBeClonedAlert.value.folder_id = folderIdToBeCloned.value;
       try {
         //removed id from the alert payload
         if (toBeClonedAlert.value?.id) {
