@@ -20,6 +20,7 @@ import { http, HttpResponse } from "msw";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { queryClient } from "@/composables/query/queryClient";
 
 // ── Config mock — must be hoisted so the component import sees it ─────────────
 const mockConfig = vi.hoisted(() => ({
@@ -39,6 +40,7 @@ import segment from "@/services/segment_analytics";
 const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
 const PENDING_KEY = "connectDataSourcePromptPending";
 const SESSION_SHOWN_KEY = `connectDataSourcePromptShown:${USER_EMAIL}`;
+const SUMMARY_CHECKED_KEY = `connectDataSourceSummaryChecked:${USER_EMAIL}`;
 const SLACK_STATE_KEY = `slackCommunityInvite:${USER_EMAIL}`;
 const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
 
@@ -46,7 +48,7 @@ const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
 const ODialogStub = {
   name: "ODialog",
   inheritAttrs: false,
-  props: ["open", "size", "showClose"],
+  props: ["open", "size", "showClose", "title"],
   emits: ["update:open"],
   template: `
     <div
@@ -54,6 +56,7 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-size="size"
     >
+      <h2 data-test="connect-data-source-popup-title">{{ title }}</h2>
       <slot />
       <button
         data-test="o-dialog-close-btn"
@@ -104,6 +107,7 @@ describe("ConnectDataSourcePopup", () => {
 
     localStorage.clear();
     sessionStorage.clear();
+    queryClient.clear();
     vi.clearAllMocks();
   });
 
@@ -111,6 +115,7 @@ describe("ConnectDataSourcePopup", () => {
     wrapper?.unmount();
     localStorage.clear();
     sessionStorage.clear();
+    queryClient.clear();
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });
@@ -217,7 +222,7 @@ describe("ConnectDataSourcePopup", () => {
       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
     });
 
-    it("marks the session as resolved when the org already has data, so a later mount skips the summary call", async () => {
+    it("marks only the summary-check key (not the shared session-shown key) when the org already has data, so a later mount skips the summary call", async () => {
       let summaryCalls = 0;
       global.server.use(
         http.get(SUMMARY_URL, () => {
@@ -228,7 +233,10 @@ describe("ConnectDataSourcePopup", () => {
 
       wrapper = buildWrapper();
       await flushPromises();
-      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBe("true");
+      expect(sessionStorage.getItem(SUMMARY_CHECKED_KEY)).toBe("true");
+      // The popup never opened, so it must not claim the shared session-shown
+      // key — CommunitySlackInvite reads that key to mean the popup actually opened.
+      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBeNull();
       expect(summaryCalls).toBe(1);
 
       wrapper.unmount();

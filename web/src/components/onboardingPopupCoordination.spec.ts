@@ -26,6 +26,7 @@ import { http, HttpResponse } from "msw";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
+import { queryClient } from "@/composables/query/queryClient";
 
 const mockConfig = vi.hoisted(() => ({
   isCloud: "true" as string,
@@ -100,6 +101,7 @@ describe("ConnectDataSourcePopup + CommunitySlackInvite coordination", () => {
 
     localStorage.clear();
     sessionStorage.clear();
+    queryClient.clear();
   });
 
   afterEach(() => {
@@ -107,6 +109,7 @@ describe("ConnectDataSourcePopup + CommunitySlackInvite coordination", () => {
     slackInvite?.unmount();
     localStorage.clear();
     sessionStorage.clear();
+    queryClient.clear();
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });
@@ -133,6 +136,19 @@ describe("ConnectDataSourcePopup + CommunitySlackInvite coordination", () => {
     ({ connectDataPopup, slackInvite } = buildWrappers());
     await flushPromises();
 
+    expect(connectDataPopup.find("[data-open]").attributes("data-open")).toBe("false");
+    expect(slackInvite.find("[data-open]").attributes("data-open")).toBe("true");
+  });
+
+  it("still shows the due day-2 invite when the org turns out to already have data via the summary fetch (isDataIngested not yet known)", async () => {
+    setDueDay2Record();
+    mockSummary(3); // org already has data, but the store doesn't know that yet
+
+    ({ connectDataPopup, slackInvite } = buildWrappers());
+    await flushPromises();
+
+    // ConnectDataSourcePopup never opens (data already exists) — it must not
+    // claim the session in a way that blocks the standalone invite.
     expect(connectDataPopup.find("[data-open]").attributes("data-open")).toBe("false");
     expect(slackInvite.find("[data-open]").attributes("data-open")).toBe("true");
   });

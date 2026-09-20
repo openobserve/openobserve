@@ -20,8 +20,9 @@ import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
-import organizationService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
+import { queryClient } from "@/composables/query/queryClient";
+import { orgSummaryQuery } from "@/services/organizations.queries";
 import {
   connectDataPopupSettled,
   connectDataPromptSessionKey,
@@ -53,15 +54,23 @@ const userEmail = store.state.userInfo?.email ?? "anonymous";
 // the "new session" boundary the spec wants — re-show every session until
 // data exists, unlike the Slack popup's one-time-ever persistence.
 const sessionShownKey = connectDataPromptSessionKey(userEmail);
+// Separate from sessionShownKey: this only dedupes the summary lookup when the
+// popup itself never opened (org already had data) — it must NOT satisfy
+// CommunitySlackInvite's "did the popup claim this session" check.
+const summaryCheckedSessionKey = `connectDataSourceSummaryChecked:${userEmail}`;
 // Survives a reload mid-onboarding, before GetStarted dispatches its
 // completion event.
 const PENDING_KEY = "connectDataSourcePromptPending";
+// If the default org never resolves this session, don't leave CommunitySlackInvite
+// blocked on connectDataPopupSettled forever.
+const ORG_RESOLVE_TIMEOUT_MS = 5000;
 
 // Rides along on this popup; CommunitySlackInvite.vue owns the day-2 follow-up if unclicked.
 const showSlackInviteButton = ref(false);
 const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
 
 let stopOrgWatch: (() => void) | null = null;
+let orgResolveTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const track = (event: string, properties: Record<string, any> = {}) => {
   try {
@@ -82,11 +91,21 @@ const checkAndMaybeShow = async () => {
   // waits on this so the two popups never end up open at the same time.
   connectDataPopupSettled.value = false;
 
-  if (config.isCloud !== "true") {
+  // Remote kill-switch: lets ops disable/ramp the popup without a redeploy.
+  // Defaults on (fail open) so an unset flag doesn't change existing behavior.
+  if (
+    config.isCloud !== "true" ||
+    store.state.zoConfig?.connect_data_source_popup_enabled === false
+  ) {
     connectDataPopupSettled.value = true;
     return;
   }
   if (sessionStorage.getItem(sessionShownKey) === "true") {
+    connectDataPopupSettled.value = true;
+    return;
+  }
+  // Already resolved earlier this session (has-data branch below ran once) — skip re-fetching the summary.
+  if (sessionStorage.getItem(summaryCheckedSessionKey) === "true") {
     connectDataPopupSettled.value = true;
     return;
   }
@@ -111,6 +130,11 @@ const checkAndMaybeShow = async () => {
         },
         { once: true },
       );
+      // If the org never resolves this session, settle anyway so CommunitySlackInvite
+      // isn't blocked on connectDataPopupSettled for the rest of the session.
+      orgResolveTimeout = setTimeout(() => {
+        if (!connectDataPopupSettled.value) connectDataPopupSettled.value = true;
+      }, ORG_RESOLVE_TIMEOUT_MS);
     }
     return;
   }
@@ -118,13 +142,15 @@ const checkAndMaybeShow = async () => {
   try {
     // The shared isDataIngested store flag is only set behind an opt-in
     // deployment config and isn't reliably populated this early, so check
-    // directly rather than trust it.
-    const response = await organizationService.get_organization_summary(orgIdentifier);
-    const hasData = !!response.data?.streams?.num_streams;
+    // directly rather than trust it. Read through the shared cache so a
+    // returning session doesn't re-fire the /summary request.
+    const summary = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
+    const hasData = !!summary?.streams?.num_streams;
     if (hasData) {
       store.dispatch("setIsDataIngested", true);
-      // Mark this session resolved too, so a later mount skips the summary call.
-      sessionStorage.setItem(sessionShownKey, "true");
+      // Dedupe the summary lookup for the rest of this session — NOT sessionShownKey,
+      // which CommunitySlackInvite reads to mean "the popup actually opened".
+      sessionStorage.setItem(summaryCheckedSessionKey, "true");
       markSlackInviteOffered(userEmail);
       return;
     }
@@ -154,9 +180,14 @@ const checkAndMaybeShow = async () => {
 const onOnboardingComplete = () => checkAndMaybeShow();
 
 onMounted(() => {
-  // Cloud-only: bail out entirely on Enterprise / open source so nothing is
-  // captured, listened for, or shown there.
-  if (config.isCloud !== "true") return;
+  // Cloud-only, and remotely killable: bail out entirely on Enterprise / open
+  // source, or when ops disable the flag, so nothing is captured, listened
+  // for, or shown there.
+  if (
+    config.isCloud !== "true" ||
+    store.state.zoConfig?.connect_data_source_popup_enabled === false
+  )
+    return;
 
   // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
   const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
@@ -175,6 +206,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("o2:onboarding-complete", onOnboardingComplete);
   stopOrgWatch?.();
+  if (orgResolveTimeout) clearTimeout(orgResolveTimeout);
 });
 
 const connectDataSource = () => {
@@ -208,21 +240,16 @@ const handleOpenChange = (open: boolean) => {
   <ODialog
     data-test="connect-data-source-popup-dialog"
     :open="isOpen"
+    :title="t('connectDataSourcePopup.title')"
     size="sm"
     @update:open="handleOpenChange"
   >
-    <div class="flex flex-col gap-4 p-2">
-      <div class="flex items-start gap-3">
-        <div
-          class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
-          aria-hidden="true"
-        >
-          <OIcon name="database" size="md" class="text-icon-chip-primary-text" />
-        </div>
-
-        <h2 data-test="connect-data-source-popup-title" class="flex-1 self-center">
-          {{ t("connectDataSourcePopup.title") }}
-        </h2>
+    <div class="flex flex-col gap-4">
+      <div
+        class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
+        aria-hidden="true"
+      >
+        <OIcon name="database" size="md" class="text-icon-chip-primary-text" />
       </div>
 
       <p data-test="connect-data-source-popup-description" class="text-text-secondary">
