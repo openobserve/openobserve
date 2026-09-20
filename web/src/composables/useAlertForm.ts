@@ -293,7 +293,12 @@ export const defaultAnomalyConfig = () => ({
   enabled: true,
   last_error: undefined as string | undefined,
   // Set only by the config API (§4.8); the UI keys the health badge on it, never on error-string prefixes.
-  notice_class: null as "window_floor" | "window_skip" | "hybrid_fallback" | null,
+  notice_class: null as
+    | "window_floor"
+    | "window_skip"
+    | "hybrid_fallback"
+    | "retrain"
+    | null,
   last_detection_run: undefined as number | undefined,
   next_run_at: undefined as number | undefined,
   // Feature 2: anomaly configs carry the same triage metadata as alerts.

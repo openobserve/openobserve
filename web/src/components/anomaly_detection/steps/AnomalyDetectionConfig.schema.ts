@@ -277,6 +277,11 @@ export const anomalyNoticeBadgeKeys = (
         labelKey: "alerts.anomaly.noticeHybridFallback",
         tooltipKeys: ["alerts.anomaly.noticeHybridFallbackTooltip"],
       };
+    case "retrain":
+      return {
+        labelKey: "alerts.anomaly.noticeRetrain",
+        tooltipKeys: ["alerts.anomaly.noticeRetrainTooltip"],
+      };
     default:
       return null;
   }
