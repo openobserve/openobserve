@@ -266,6 +266,7 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.retrain_interval_days = Set(src.retrain_interval_days);
     active.threshold = Set(src.threshold);
     active.alert_budget_per_day = Set(src.alert_budget_per_day);
+    active.level_half_width_seconds = Set(src.level_half_width_seconds);
     active.seasonality = Set(src.seasonality);
     active.is_trained = Set(src.is_trained);
     active.training_started_at = Set(src.training_started_at);
@@ -379,6 +380,7 @@ mod tests {
             retrain_interval_days: 1,
             threshold: 95,
             alert_budget_per_day: None,
+            level_half_width_seconds: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,
@@ -608,6 +610,7 @@ mod tests {
             retrain_interval_days,
             threshold,
             alert_budget_per_day,
+            level_half_width_seconds,
             seasonality,
             is_trained,
             training_started_at,
@@ -653,6 +656,8 @@ mod tests {
             ("threshold", Scope::Replicated),
             // User-authored sensitivity config like `threshold`; peers must read the same budget.
             ("alert_budget_per_day", Scope::Replicated),
+            // User-authored fit config like `threshold`; a peer must fit the same bandwidth.
+            ("level_half_width_seconds", Scope::Replicated),
             ("seasonality", Scope::Replicated),
             ("is_trained", Scope::Replicated),
             ("training_started_at", Scope::Replicated),
@@ -708,6 +713,7 @@ mod tests {
             retrain_interval_days: 7,
             threshold: 99,
             alert_budget_per_day: Some(2.0),
+            level_half_width_seconds: None,
             seasonality: "daily".to_string(),
             is_trained: true,
             training_started_at: Some(11),
