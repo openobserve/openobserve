@@ -57,7 +57,7 @@ use {
 };
 
 #[cfg(feature = "enterprise")]
-use crate::search::utils::check_cipher_key_permissions;
+use crate::search::utils::{check_cipher_key_permissions, check_cipher_key_permissions_multi};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -1423,8 +1423,12 @@ pub async fn search_multi_stream(
     }
 
     #[cfg(feature = "enterprise")]
-    for req in queries.iter() {
-        if let Some(res) = check_cipher_key_permissions(&org_id, &user_id, &req.query.sql).await {
+    {
+        let sqls = queries
+            .iter()
+            .map(|req| req.query.sql.as_str())
+            .collect::<Vec<_>>();
+        if let Some(res) = check_cipher_key_permissions_multi(&org_id, &user_id, &sqls).await {
             report_to_audit(
                 user_id.clone(),
                 org_id.clone(),

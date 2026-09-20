@@ -113,12 +113,27 @@ pub async fn check_cipher_key_permissions(
     user_id: &str,
     sql: &str,
 ) -> Option<Response> {
+    check_cipher_key_permissions_multi(org_id, user_id, std::slice::from_ref(&sql)).await
+}
+
+/// [`check_cipher_key_permissions`] over several statements, checking each distinct key once.
+#[cfg(feature = "enterprise")]
+pub async fn check_cipher_key_permissions_multi(
+    org_id: &str,
+    user_id: &str,
+    sqls: &[&str],
+) -> Option<Response> {
     use o2_openfga::meta::mapping::OFGA_MODELS;
 
-    let keys_used = match search::sql::visitor::cipher_key::get_cipher_key_names(sql) {
-        Ok(v) => v,
-        Err(e) => return Some(MetaHttpResponse::bad_request(e.to_string())),
-    };
+    let mut keys_used = Vec::new();
+    for sql in sqls {
+        match search::sql::visitor::cipher_key::get_cipher_key_names(sql) {
+            Ok(v) => keys_used.extend(v),
+            Err(e) => return Some(MetaHttpResponse::bad_request(e.to_string())),
+        }
+    }
+    keys_used.sort_unstable();
+    keys_used.dedup();
     if keys_used.is_empty() || is_root_user(user_id) {
         return None;
     }
