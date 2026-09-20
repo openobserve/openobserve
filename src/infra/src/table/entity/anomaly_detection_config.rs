@@ -29,6 +29,9 @@ pub struct Model {
     /// Alert budget (delivered alerts/day). NULL = percentile mode, exactly the pre-budget
     /// behaviour.
     pub alert_budget_per_day: Option<f64>,
+    /// Level-window half-width in SECONDS. NULL = the shipped one-day default, which is what
+    /// every config written before this column existed means.
+    pub level_half_width_seconds: Option<i64>,
     pub seasonality: String,
     pub is_trained: bool,
     pub training_started_at: Option<i64>,
@@ -102,6 +105,7 @@ mod tests {
             retrain_interval_days: 1,
             threshold: 95,
             alert_budget_per_day: None,
+            level_half_width_seconds: None,
             seasonality: "none".to_string(),
             is_trained: false,
             training_started_at: None,
