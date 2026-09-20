@@ -15,14 +15,19 @@ use arrow::{
     },
     datatypes::{DataType, Field, Schema, SchemaRef},
 };
-use parquet::{arrow::arrow_reader::ParquetRecordBatchReaderBuilder, file::reader::ChunkReader};
+use parquet::{
+    arrow::arrow_reader::{
+        ArrowReaderMetadata, ArrowReaderOptions, ParquetRecordBatchReaderBuilder,
+    },
+    file::{metadata::ParquetMetaData, reader::ChunkReader},
+};
 
 use crate::*;
 
 pub struct BlockWriter<W: Write> {
     output: W,
     schema: SchemaRef,
-    parent: ParentIdentity,
+    parent: Option<ParentIdentity>,
     label_indices: Vec<usize>,
     hash_index: usize,
     time_index: usize,
@@ -38,6 +43,7 @@ pub struct BlockWriter<W: Write> {
     blocks: Vec<BlockMeta>,
     labels: Vec<Vec<Option<String>>>,
     writer_metadata_estimate: usize,
+    static_metadata_estimate: usize,
     metadata_limit: usize,
     writer_metadata_limit: usize,
     metadata_properties: HashMap<String, String>,
@@ -64,6 +70,72 @@ impl<W: Write> BlockWriter<W> {
         )
     }
 
+    /// Parent identity is required before metadata or a footer can be emitted.
+    pub fn new_pending(output: W, schema: SchemaRef, max_block_rows: usize) -> Result<Self> {
+        let labels = identity_label_columns(&schema)?;
+        Self::new_inner(
+            output,
+            schema,
+            labels,
+            None,
+            max_block_rows,
+            MAX_METADATA_BYTES,
+            MAX_WRITER_METADATA_BYTES,
+        )
+    }
+
+    pub fn finish_for_parquet(
+        mut self,
+        parent: ParentIdentity,
+        metadata: ParquetMetaData,
+    ) -> Result<W> {
+        validate_parent(&parent)?;
+        ensure!(
+            self.parent.as_ref().is_none_or(|known| known == &parent),
+            "parent identity changed"
+        );
+        ensure!(
+            self.rows == parent.rows
+                && u64::try_from(metadata.file_metadata().num_rows())? == parent.rows,
+            "source/Parquet parent row count mismatch"
+        );
+        let row_group_size =
+            verified_row_group_size(&metadata)?.context("unsupported Parquet row-group layout")?;
+        let stored =
+            ArrowReaderMetadata::try_new(Arc::new(metadata), ArrowReaderOptions::default())?;
+        ensure!(
+            schema_matches(&self.schema, stored.schema()),
+            "stored Parquet source schema changed"
+        );
+        let labels = self
+            .label_indices
+            .iter()
+            .map(|i| self.schema.field(*i).name().clone())
+            .collect::<Vec<_>>();
+        let charge =
+            static_metadata_charge(stored.schema(), Some(&parent), &labels, self.metadata_limit)?;
+        let estimate = self
+            .writer_metadata_estimate
+            .checked_sub(self.static_metadata_estimate)
+            .and_then(|size| size.checked_add(charge))
+            .context("metadata accounting overflow")?;
+        capacity(
+            estimate <= self.writer_metadata_limit,
+            "MAX_WRITER_METADATA_BYTES",
+        )?;
+        self.writer_metadata_estimate = estimate;
+        self.static_metadata_estimate = charge;
+        self.schema = Arc::clone(stored.schema());
+        self.metadata_properties
+            .insert(PARENT_KEY.to_owned(), serde_json::to_string(&parent)?);
+        self.metadata_properties
+            .insert(SCHEMA_KEY.to_owned(), canonical_schema_json(&self.schema)?);
+        self.metadata_properties
+            .insert(ROW_GROUP_SIZE_KEY.to_owned(), row_group_size.to_string());
+        self.parent = Some(parent);
+        self.finish()
+    }
+
     pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
         ensure!(!self.failed, "writer is poisoned by an earlier failure");
         let result = self.write_inner(batch);
@@ -76,7 +148,12 @@ impl<W: Write> BlockWriter<W> {
     pub fn finish(mut self) -> Result<W> {
         ensure!(!self.failed, "writer is poisoned");
         ensure!(
-            self.rows == self.parent.rows,
+            self.rows
+                == self
+                    .parent
+                    .as_ref()
+                    .context("parent identity is not bound")?
+                    .rows,
             "source/parent row count mismatch"
         );
         self.flush_block()?;
@@ -106,14 +183,29 @@ impl<W: Write> BlockWriter<W> {
         metadata_limit: usize,
         writer_metadata_limit: usize,
     ) -> Result<Self> {
-        ensure!(
-            sidecar_path(&parent.object_key).is_some(),
-            "unsupported parent object key"
-        );
-        ensure!(
-            parent.rows > 0 && parent.compressed_size > 0,
-            "empty parent unsupported"
-        );
+        Self::new_inner(
+            output,
+            schema,
+            label_columns,
+            Some(parent),
+            max_block_rows,
+            metadata_limit,
+            writer_metadata_limit,
+        )
+    }
+
+    fn new_inner(
+        output: W,
+        schema: SchemaRef,
+        label_columns: Vec<String>,
+        parent: Option<ParentIdentity>,
+        max_block_rows: usize,
+        metadata_limit: usize,
+        writer_metadata_limit: usize,
+    ) -> Result<Self> {
+        if let Some(parent) = &parent {
+            validate_parent(parent)?;
+        }
         capacity(
             schema.fields().len() <= MAX_LABEL_COLUMNS + 3 + NON_IDENTITY.len(),
             "MAX_LABEL_COLUMNS",
@@ -127,14 +219,13 @@ impl<W: Write> BlockWriter<W> {
             "MAX_LABEL_COLUMNS",
         )?;
         let writer_metadata_estimate =
-            static_metadata_charge(&schema, &parent, &label_columns, metadata_limit)?;
+            static_metadata_charge(&schema, parent.as_ref(), &label_columns, metadata_limit)?;
         capacity(
             writer_metadata_estimate <= writer_metadata_limit,
             "MAX_WRITER_METADATA_BYTES",
         )?;
-        let metadata_properties = [
+        let mut metadata_properties: HashMap<String, String> = [
             (VERSION_KEY.to_owned(), VERSION.to_string()),
-            (PARENT_KEY.to_owned(), serde_json::to_string(&parent)?),
             (
                 SCHEMA_KEY.to_owned(),
                 canonical_schema_json(schema.as_ref())?,
@@ -146,6 +237,9 @@ impl<W: Write> BlockWriter<W> {
         ]
         .into_iter()
         .collect();
+        if let Some(parent) = &parent {
+            metadata_properties.insert(PARENT_KEY.to_owned(), serde_json::to_string(parent)?);
+        }
         let source_labels = identity_label_columns(&schema)?;
         ensure!(
             source_labels.len() == label_columns.len()
@@ -207,6 +301,7 @@ impl<W: Write> BlockWriter<W> {
             blocks: Vec::new(),
             labels: Vec::new(),
             writer_metadata_estimate,
+            static_metadata_estimate: writer_metadata_estimate,
             metadata_limit,
             writer_metadata_limit,
             metadata_properties,
@@ -272,7 +367,9 @@ impl<W: Write> BlockWriter<W> {
                 self.admit_block(self.current_block_charge)?;
             }
             ensure!(
-                self.rows < self.parent.rows,
+                self.parent
+                    .as_ref()
+                    .is_none_or(|parent| self.rows < parent.rows),
                 "source exceeds parent row count"
             );
             self.timestamps.push(timestamp);
@@ -508,6 +605,43 @@ fn build_from_builder<T: ChunkReader + 'static>(
     writer.finish()
 }
 
+fn validate_parent(parent: &ParentIdentity) -> Result<()> {
+    ensure!(
+        sidecar_path(&parent.object_key).is_some(),
+        "unsupported parent object key"
+    );
+    ensure!(
+        parent.rows > 0 && parent.compressed_size > 0,
+        "empty parent unsupported"
+    );
+    Ok(())
+}
+
+fn verified_row_group_size(metadata: &ParquetMetaData) -> Result<Option<u32>> {
+    let groups = metadata.row_groups();
+    let Some(first) = groups.first() else {
+        return Ok(None);
+    };
+    let size = u32::try_from(first.num_rows())?;
+    let rows = groups.iter().try_fold(0i64, |sum, group| {
+        sum.checked_add(group.num_rows())
+            .context("Parquet row-group count overflow")
+    })?;
+    ensure!(
+        rows == metadata.file_metadata().num_rows(),
+        "Parquet row groups do not cover parent rows"
+    );
+    Ok((size > 0
+        && groups.iter().enumerate().all(|(i, group)| {
+            if i + 1 == groups.len() {
+                group.num_rows() > 0 && group.num_rows() <= i64::from(size)
+            } else {
+                group.num_rows() == i64::from(size)
+            }
+        }))
+    .then_some(size))
+}
+
 fn canonical_schema_json(schema: &Schema) -> Result<String> {
     let mut value = serde_json::to_value(schema)?;
     value.sort_all_objects();
@@ -534,12 +668,12 @@ fn block_metadata_charge<'a>(labels: impl Iterator<Item = Option<&'a str>>) -> R
 
 fn static_metadata_charge(
     schema: &Schema,
-    parent: &ParentIdentity,
+    parent: Option<&ParentIdentity>,
     labels: &[String],
     limit: usize,
 ) -> Result<usize> {
     let source = encoded_size(schema, limit)?;
-    let parent = encoded_size(parent, limit)?;
+    let parent = parent.map_or(Ok(0), |parent| encoded_size(parent, limit))?;
     let labels = encoded_size(&labels, limit)?;
     let total = source
         .checked_add(parent)
@@ -586,7 +720,8 @@ mod bounds_tests {
     fn borrowed_label_is_admitted_before_owning_it() {
         let text = "x".repeat(1024);
         let (schema, names, batch, parent) = input(1, 1, Some(&text));
-        let base = static_metadata_charge(&schema, &parent, &names, MAX_METADATA_BYTES).unwrap();
+        let base =
+            static_metadata_charge(&schema, Some(&parent), &names, MAX_METADATA_BYTES).unwrap();
         let limit = base + block_metadata_charge([None].into_iter()).unwrap() + 100;
         let mut writer = BlockWriter::new_with_metadata_limits(
             Vec::new(),
@@ -608,7 +743,8 @@ mod bounds_tests {
     #[test]
     fn null_labels_charge_owned_slots_and_stop_before_growth() {
         let (schema, names, batch, parent) = input(MAX_LABEL_COLUMNS, 3, None);
-        let base = static_metadata_charge(&schema, &parent, &names, MAX_METADATA_BYTES).unwrap();
+        let base =
+            static_metadata_charge(&schema, Some(&parent), &names, MAX_METADATA_BYTES).unwrap();
         let charge = block_metadata_charge(std::iter::repeat_n(None, MAX_LABEL_COLUMNS)).unwrap();
         assert!(charge >= MAX_LABEL_COLUMNS * std::mem::size_of::<Option<String>>());
         let limit = base + charge * 2;
@@ -653,7 +789,8 @@ mod bounds_tests {
     #[test]
     fn static_schema_field_metadata_and_encoded_output_are_bounded() {
         let (schema, names, _, parent) = input(1, 1, None);
-        let base = static_metadata_charge(&schema, &parent, &names, MAX_METADATA_BYTES).unwrap();
+        let base =
+            static_metadata_charge(&schema, Some(&parent), &names, MAX_METADATA_BYTES).unwrap();
         for field_metadata in [false, true] {
             let metadata = HashMap::from([("semantic".into(), "x".repeat(8192))]);
             let changed = if field_metadata {

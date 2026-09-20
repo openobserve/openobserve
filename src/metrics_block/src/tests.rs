@@ -884,3 +884,45 @@ fn parquet_build_roundtrip_preserves_sql_source_and_row_groups() {
         assert_eq!((times.value(row), values.value(row).to_bits()), *expected);
     }
 }
+
+#[test]
+fn pending_writer_requires_real_parent_and_verifies_final_parquet_identity() {
+    use parquet::arrow::{ArrowWriter, arrow_reader::ParquetRecordBatchReaderBuilder};
+    let input = batch(&rows());
+    let mut data = Vec::new();
+    let mut parquet = ArrowWriter::try_new(&mut data, input.schema(), None).unwrap();
+    parquet.write(&input).unwrap();
+    parquet.close().unwrap();
+    let bytes = Bytes::from(data);
+    let reader = ParquetRecordBatchReaderBuilder::try_new(bytes.clone()).unwrap();
+    let metadata = reader.metadata().as_ref().clone();
+    let parent = ParentIdentity {
+        compressed_size: bytes.len() as u64,
+        ..parent()
+    };
+    let pending = || {
+        let mut writer =
+            BlockWriter::new_pending(Vec::new(), input.schema(), MAX_BLOCK_ROWS).unwrap();
+        writer.write(&input).unwrap();
+        writer
+    };
+    assert!(pending().finish().is_err());
+    let mut wrong = parent.clone();
+    wrong.rows += 1;
+    assert!(
+        pending()
+            .finish_for_parquet(wrong, metadata.clone())
+            .is_err()
+    );
+    let mut wrong = parent.clone();
+    wrong.object_key = "not-a-metrics-parent".into();
+    assert!(
+        pending()
+            .finish_for_parquet(wrong, metadata.clone())
+            .is_err()
+    );
+    let encoded = pending()
+        .finish_for_parquet(parent.clone(), metadata)
+        .unwrap();
+    assert_eq!(encoded, build_from_parquet(bytes, parent).unwrap());
+}
