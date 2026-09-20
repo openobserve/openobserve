@@ -85,7 +85,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 // 86: create synthetics shared variables tables; add env to synthetics_jobs.
 // 87: add input_preview to llm_annotation_queue_items.
 // 88: add iam password policy tables.
-pub const DB_SCHEMA_VERSION: u64 = 88;
+// 89: add level_half_width_seconds to anomaly_detection_config.
+pub const DB_SCHEMA_VERSION: u64 = 89;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables

@@ -134,6 +134,15 @@ pub struct CreateAnomalyConfigRequest {
     /// Delivered-alert budget per day; mutually exclusive with `percentile` in one request.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alert_budget_per_day: Option<f64>,
+    /// Half-width of the level window, in seconds. Absent keeps the one-day default.
+    ///
+    /// The level is a rolling median of the seasonal residual over `+-half_width`, so this is
+    /// how wide a swing the level absorbs instead of leaving for the forest to score — and,
+    /// because the trailing knot crosses a level step at exactly half this span, it is also
+    /// how old a step must be before the fit can see it. Clamped against the histogram
+    /// interval and the training window; the effective value comes back on the response.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub level_half_width_seconds: Option<i64>,
     pub rcf_num_trees: Option<i32>,
     pub rcf_tree_size: Option<i32>,
     pub rcf_shingle_size: Option<i32>,
@@ -194,6 +203,15 @@ pub struct UpdateAnomalyConfigRequest {
     )]
     #[schema(value_type = Option<f64>)]
     pub alert_budget_per_day: Option<Option<f64>>,
+    /// Double-option like the budget: `Some(None)` clears back to the one-day default, which
+    /// a plain `Option` could never express once a value had been set.
+    #[serde(
+        default,
+        deserialize_with = "double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schema(value_type = Option<i64>)]
+    pub level_half_width_seconds: Option<Option<i64>>,
     pub retrain_interval_days: Option<i32>,
     pub alert_enabled: Option<bool>,
     pub alert_destinations: Option<Vec<String>>,
@@ -583,6 +601,10 @@ pub async fn create_config(
         last_error: None,
         last_processed_timestamp: None,
         current_model_version: 0,
+        // Stored as the operator wrote it, `None` and all: the clamp belongs at fit time,
+        // where the interval and the training window it is clamped against are the ones the
+        // fit actually used. Storing a clamped value would freeze today's bounds into the row.
+        level_half_width_seconds: req.level_half_width_seconds,
         rcf_num_trees: req.rcf_num_trees.unwrap_or(
             o2_enterprise::enterprise::common::config::get_config()
                 .anomaly_detection
@@ -768,6 +790,10 @@ pub async fn update_config(
         existing.threshold,
     )
     .map_err(validation_error)?;
+    // `Some(None)` clears back to the default and needs no bound; only an explicit value does.
+    if let Some(Some(half_width)) = req.level_half_width_seconds {
+        validate_level_half_width(half_width).map_err(validation_error)?;
+    }
 
     let mut active_model = existing.into_active_model();
 
@@ -883,6 +909,12 @@ pub async fn update_config(
         let clamped = training_window_days.max(1);
         retryable_change |= previous.training_window_days != clamped;
         active_model.training_window_days = Set(clamped);
+    }
+    if let Some(half_width) = req.level_half_width_seconds {
+        // Retryable: it changes the level the baseline is fitted with, so the stored model no
+        // longer answers the config it was trained for.
+        retryable_change |= previous.level_half_width_seconds != half_width;
+        active_model.level_half_width_seconds = Set(half_width);
     }
     if let Some(retrain_interval_days) = req.retrain_interval_days {
         active_model.retrain_interval_days = Set(retrain_interval_days);
@@ -1199,6 +1231,7 @@ pub async fn clone_config(
         retrain_interval_days: src.retrain_interval_days,
         threshold: src.threshold,
         alert_budget_per_day: src.alert_budget_per_day,
+        level_half_width_seconds: src.level_half_width_seconds,
         seasonality: src.seasonality.clone(),
         is_trained: false,
         training_started_at: None,
@@ -1691,6 +1724,9 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     validated_budget_create(req.percentile, req.alert_budget_per_day)?;
+    if let Some(half_width) = req.level_half_width_seconds {
+        validate_level_half_width(half_width)?;
+    }
 
     // Delegated so create and update cannot drift to two differently-worded rules.
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
@@ -1774,6 +1810,27 @@ fn validate_detection_function(combined: &str) -> Result<()> {
 fn validate_budget_value(budget: f64) -> Result<()> {
     if !budget.is_finite() || budget <= 0.0 {
         anyhow::bail!("alert_budget_per_day must be a finite value greater than 0");
+    }
+    Ok(())
+}
+
+/// The level half-width as a span the trainer can carry, in seconds.
+///
+/// Bounded on both sides at the API rather than only clamped at fit time. The clamp is the
+/// safety net, but it is silent to whoever typed the number: without this, `-86400` or
+/// `9_300_000_000_000` stores cleanly, then reads back as a value the fit never used. The
+/// ceiling is a year, far above any training window the level can be fitted over, so it
+/// rejects a typo rather than a choice — and it keeps the trainer's microsecond conversion
+/// clear of `i64` by six orders of magnitude.
+fn validate_level_half_width(half_width_seconds: i64) -> Result<()> {
+    const ONE_YEAR_SECONDS: i64 = 365 * 86_400;
+    if half_width_seconds <= 0 {
+        anyhow::bail!("level_half_width_seconds must be greater than 0");
+    }
+    if half_width_seconds > ONE_YEAR_SECONDS {
+        anyhow::bail!(
+            "level_half_width_seconds must be at most {ONE_YEAR_SECONDS} (one year); the level              window must fit inside the training window"
+        );
     }
     Ok(())
 }
@@ -2843,6 +2900,7 @@ pub fn config_to_training_config(
         retrain_interval_days: config.retrain_interval_days,
         threshold: config.threshold,
         alert_budget_per_day: config.alert_budget_per_day,
+        level_half_width_seconds: config.level_half_width_seconds,
         seasonality: serde_json::from_str(&format!("\"{}\"", config.seasonality))
             .unwrap_or_default(),
         is_trained: config.is_trained,
