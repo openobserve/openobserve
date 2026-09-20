@@ -167,9 +167,11 @@ pub async fn save_user_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineEr
 pub async fn update_pipeline(mut pipeline: Pipeline) -> Result<(), PipelineError> {
     default_source_org(&mut pipeline);
 
-    let Ok(existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
+    let Ok(mut existing_pipeline) = pipeline::get_by_id(&pipeline.id).await else {
         return Err(PipelineError::NotFound(pipeline.id));
     };
+    // Both sides, or a legacy row's empty org reads as a source change on every edit.
+    default_source_org(&mut existing_pipeline);
 
     if existing_pipeline == pipeline {
         return Ok(());

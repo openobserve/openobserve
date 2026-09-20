@@ -12,7 +12,8 @@ A `source` omitting `org_id` used to slip past the guard: the incoming stream
 compared unequal to the fully-qualified entries from `list_streams_with_pipeline`,
 so the check never fired and the pipeline was stored unqualified. `save_pipeline`
 and `update_pipeline` now default an empty source org to the pipeline's own org
-(`default_source_org`), which the last test covers.
+(`default_source_org`), covered by `test_source_without_org_id_rejects_the_second_pipeline`
+and `test_source_and_nodes_without_org_id_reject_the_second_pipeline`.
 
 Worth keeping green: with two realtime pipelines on one stream, both fire per
 record. Measured on a pre-fix build, 5 ingested records produced `successful: 10`
@@ -70,6 +71,12 @@ def _realtime_pipeline(name, stream, include_org_id=True, include_node_org_id=Tr
 
 def _create(session, base_url, payload):
     return session.post(f"{base_url}api/{ORG_ID}/pipelines", json=payload)
+
+
+def _get_by_name(session, base_url, name):
+    resp = session.get(f"{base_url}api/{ORG_ID}/pipelines")
+    assert resp.status_code == 200, f"pipeline list failed: {resp.status_code} {resp.text}"
+    return next((p for p in resp.json().get("list", []) if p.get("name") == name), None)
 
 
 def _delete_by_name(session, base_url, name):
@@ -226,3 +233,33 @@ class TestRealtimePipelineExclusivity:
         finally:
             _delete_by_name(session, base_url, first)
             _delete_by_name(session, base_url, second)
+
+    def test_editing_a_pipeline_without_touching_its_source_succeeds(
+        self, create_session, base_url, random_string
+    ):
+        """Normalizing only the incoming side would read a legacy empty org as a source
+        change, and changing a realtime source is rejected by design — blocking all edits."""
+        session = create_session
+        suffix = random_string(6).lower()
+        stream = f"pytest_6443_edit_{suffix}"
+        name = f"pytest6443ed{suffix}"
+
+        _ingest(session, base_url, stream)
+        time.sleep(3)
+        try:
+            resp = _create(session, base_url, _realtime_pipeline(name, stream))
+            assert resp.status_code == 200, f"create: {resp.status_code} {resp.text}"
+            time.sleep(3)
+
+            stored = _get_by_name(session, base_url, name)
+            assert stored, f"#6443: the created pipeline must be listed"
+            stored["description"] = "edited, source untouched"
+
+            resp = session.put(f"{base_url}api/{ORG_ID}/pipelines", json=stored)
+            logger.info("edit without source change -> %s %s", resp.status_code, resp.text[:200])
+            assert resp.status_code == 200, (
+                "#6443: editing a realtime pipeline without touching its source must succeed. "
+                f"Got {resp.status_code} {resp.text}"
+            )
+        finally:
+            _delete_by_name(session, base_url, name)
