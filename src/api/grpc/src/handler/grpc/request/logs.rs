@@ -13,11 +13,13 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::{meta::otlp::OtlpRequestType, metrics};
+use config::meta::otlp::OtlpRequestType;
 use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
 };
 use tonic::{Response, Status};
+
+use crate::handler::grpc::request::otlp::{error_status, export_reply, observe_ok};
 
 #[derive(Default)]
 pub struct LogsServer;
@@ -57,7 +59,7 @@ impl LogsService for LogsServer {
             user_email = user_id.to_str().unwrap();
         };
 
-        match openobserve_core::logs::otlp::handle_request(
+        let resp = openobserve_core::logs::otlp::handle_request(
             0,
             org_id.unwrap().to_str().unwrap(),
             in_req,
@@ -66,23 +68,10 @@ impl LogsService for LogsServer {
             OtlpRequestType::Grpc,
         )
         .await
-        {
-            Ok(_) => {
-                // metrics
-                let time = start.elapsed().as_secs_f64();
-                metrics::GRPC_RESPONSE_TIME
-                    .with_label_values(&["/otlp/v1/logs", "200", "", "", "", ""])
-                    .observe(time);
-                metrics::GRPC_INCOMING_REQUESTS
-                    .with_label_values(&["/otlp/v1/logs", "200", "", "", "", ""])
-                    .inc();
-
-                Ok(Response::new(ExportLogsServiceResponse {
-                    partial_success: None,
-                }))
-            }
-            Err(e) => Err(Status::internal(e.to_string())),
-        }
+        .map_err(|e| error_status(&e))?;
+        let reply = export_reply(resp).await?;
+        observe_ok("/otlp/v1/logs", start);
+        Ok(Response::new(reply))
     }
 }
 
