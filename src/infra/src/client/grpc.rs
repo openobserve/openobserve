@@ -15,7 +15,10 @@
 
 use std::sync::{Arc, LazyLock as Lazy};
 
-use config::{RwAHashMap, get_config, meta::cluster::NodeInfo};
+use config::{
+    RwAHashMap, get_config,
+    meta::cluster::{Node, NodeInfo},
+};
 use proto::cluster_rpc::{
     self, cluster_info_service_client::ClusterInfoServiceClient, metrics_client::MetricsClient,
     node_service_client::NodeServiceClient, search_client::SearchClient,
@@ -44,6 +47,43 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
         {
             self.0.insert(key, val);
         }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MetricsResponseCompression {
+    verified_loopback_addr: Option<String>,
+}
+
+impl MetricsResponseCompression {
+    pub fn for_node(node: &Node) -> Self {
+        Self::for_identity(
+            &node.uuid,
+            &node.grpc_addr,
+            &config::cluster::LOCAL_NODE.uuid,
+            &config::cluster::get_local_grpc_addr(),
+        )
+    }
+
+    fn for_identity(peer_uuid: &str, peer_addr: &str, local_uuid: &str, local_addr: &str) -> Self {
+        let verified = !peer_uuid.is_empty()
+            && peer_uuid == local_uuid
+            && peer_addr == local_addr
+            && url::Url::parse(peer_addr).ok().is_some_and(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && match url.host() {
+                        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+                        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+                        _ => false,
+                    }
+            });
+        Self {
+            verified_loopback_addr: verified.then(|| peer_addr.to_owned()),
+        }
+    }
+
+    fn accepts_gzip_for(&self, actual_addr: &str) -> bool {
+        self.verified_loopback_addr.as_deref() != Some(actual_addr)
     }
 }
 
@@ -190,6 +230,31 @@ pub async fn make_grpc_metrics_client<T>(
     >,
     Error,
 > {
+    make_grpc_metrics_client_with_response_compression(
+        trace_id,
+        org_id,
+        request,
+        node,
+        timeout,
+        MetricsResponseCompression::default(),
+    )
+    .await
+}
+
+#[tracing::instrument(name = "promql:search:grpc:metrics:make_client_with_policy", skip_all)]
+pub async fn make_grpc_metrics_client_with_response_compression<T>(
+    trace_id: &str,
+    org_id: &str,
+    request: &mut Request<T>,
+    node: &Arc<dyn NodeInfo>,
+    timeout: u64,
+    response_compression: MetricsResponseCompression,
+) -> Result<
+    MetricsClient<
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+    >,
+    Error,
+> {
     let cfg = get_config();
     let org_id: MetadataValue<_> = org_id
         .parse()
@@ -217,18 +282,18 @@ pub async fn make_grpc_metrics_client<T>(
         .get_auth_token()
         .parse()
         .map_err(|_| Error::Message("invalid token".to_string()))?;
-    let channel = get_cached_channel(&node.get_grpc_addr())
-        .await
-        .map_err(|err| {
-            log::error!(
-                "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
-                node.get_grpc_addr(),
-                err
-            );
-            let err = ErrorCodes::from_json(err.message())
-                .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
-            Error::ErrorCode(err)
-        })?;
+    let grpc_addr = node.get_grpc_addr();
+    let accept_response_gzip = response_compression.accepts_gzip_for(&grpc_addr);
+    let channel = get_cached_channel(&grpc_addr).await.map_err(|err| {
+        log::error!(
+            "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
+            grpc_addr,
+            err
+        );
+        let err = ErrorCodes::from_json(err.message())
+            .unwrap_or(ErrorCodes::ServerInternalError(err.to_string()));
+        Error::ErrorCode(err)
+    })?;
     let mut client = cluster_rpc::metrics_client::MetricsClient::with_interceptor(
         channel,
         move |mut req: Request<()>| {
@@ -240,9 +305,14 @@ pub async fn make_grpc_metrics_client<T>(
     );
     client = client
         .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
+    log::info!(
+        "[trace_id {trace_id}] promql->search->grpc: metrics response compression gzip={accept_response_gzip}"
+    );
+    if accept_response_gzip {
+        client = client.accept_compressed(CompressionEncoding::Gzip);
+    }
     Ok(client)
 }
 
@@ -386,6 +456,334 @@ mod tests {
         let mut map = MetadataMap(&mut inner);
         map.set("x-empty", String::new());
         assert!(inner.contains_key("x-empty"));
+    }
+
+    #[test]
+    fn test_metrics_compression_requires_matching_identity_and_numeric_loopback() {
+        use super::MetricsResponseCompression as Policy;
+
+        for addr in [
+            "http://127.0.0.1:5081",
+            "https://127.1.2.3:5081",
+            "http://[::1]:5081",
+        ] {
+            assert!(
+                !Policy::for_identity("local-id", addr, "local-id", addr).accepts_gzip_for(addr)
+            );
+        }
+        for (peer, addr, local, local_addr) in [
+            (
+                "other-id",
+                "http://127.0.0.1:5081",
+                "local-id",
+                "http://127.0.0.1:5081",
+            ),
+            ("", "http://127.0.0.1:5081", "", "http://127.0.0.1:5081"),
+            (
+                "local-id",
+                "http://127.0.0.1:5082",
+                "local-id",
+                "http://127.0.0.1:5081",
+            ),
+            (
+                "local-id",
+                "https://127.0.0.1:5081",
+                "local-id",
+                "http://127.0.0.1:5081",
+            ),
+            (
+                "local-id",
+                "http://127.0.0.1:5081/",
+                "local-id",
+                "http://127.0.0.1:5081",
+            ),
+            (
+                "local-id",
+                "http://localhost:5081",
+                "local-id",
+                "http://localhost:5081",
+            ),
+            (
+                "local-id",
+                "http://127.0.0.1.example.com:5081",
+                "local-id",
+                "http://127.0.0.1.example.com:5081",
+            ),
+            (
+                "local-id",
+                "http://10.0.0.1:5081",
+                "local-id",
+                "http://10.0.0.1:5081",
+            ),
+            (
+                "local-id",
+                "http://[2001:db8::1]:5081",
+                "local-id",
+                "http://[2001:db8::1]:5081",
+            ),
+            (
+                "local-id",
+                "grpc://127.0.0.1:5081",
+                "local-id",
+                "grpc://127.0.0.1:5081",
+            ),
+            ("local-id", "not-a-url", "local-id", "not-a-url"),
+        ] {
+            assert!(
+                Policy::for_identity(peer, addr, local, local_addr).accepts_gzip_for(addr),
+                "{peer} {addr}"
+            );
+        }
+        assert!(Policy::default().accepts_gzip_for("http://127.0.0.1:5081"));
+        let local_proof = Policy::for_identity(
+            "local-id",
+            "http://127.0.0.1:5081",
+            "local-id",
+            "http://127.0.0.1:5081",
+        );
+        assert!(local_proof.accepts_gzip_for("http://127.0.0.1:5082"));
+        let node = &config::cluster::LOCAL_NODE;
+        assert_eq!(
+            Policy::for_node(node),
+            Policy::for_identity(
+                &node.uuid,
+                &node.grpc_addr,
+                &node.uuid,
+                &config::cluster::get_local_grpc_addr(),
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn test_metrics_response_compression_negotiation_preserves_headers_and_roundtrip() {
+        use std::sync::{Arc, Mutex};
+
+        use config::meta::cluster::NodeInfo;
+        use proto::cluster_rpc::{
+            self,
+            metrics_server::{Metrics, MetricsServer},
+        };
+        use tonic::{Request, Response, Status, codec::CompressionEncoding, transport::Server};
+
+        use super::{
+            MetricsResponseCompression, make_grpc_metrics_client,
+            make_grpc_metrics_client_with_response_compression,
+        };
+
+        type HeaderSnapshot = (
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        );
+        #[derive(Clone)]
+        struct Echo {
+            observed: Arc<Mutex<Vec<HeaderSnapshot>>>,
+        }
+        #[tonic::async_trait]
+        impl Metrics for Echo {
+            async fn query(
+                &self,
+                request: Request<cluster_rpc::MetricsQueryRequest>,
+            ) -> Result<Response<cluster_rpc::MetricsQueryResponse>, Status> {
+                let metadata = request.metadata();
+                let get = |key: &str| {
+                    metadata
+                        .get(key)
+                        .and_then(|value| value.to_str().ok())
+                        .map(str::to_owned)
+                };
+                self.observed.lock().unwrap().push((
+                    get("authorization"),
+                    get(&config::get_config().grpc.org_header_key),
+                    get("grpc-encoding"),
+                    get("grpc-accept-encoding"),
+                    get("traceparent"),
+                ));
+                if get("authorization").as_deref() != Some("fixture-internal-token")
+                    || request.get_ref().org_id != "fixture-org"
+                {
+                    return Err(Status::unauthenticated("fixture metadata mismatch"));
+                }
+                Ok(Response::new(cluster_rpc::MetricsQueryResponse {
+                    job: request.get_ref().job.clone(),
+                    result_type: "matrix".into(),
+                    series: vec![cluster_rpc::Series {
+                        metric: vec![cluster_rpc::Label {
+                            name: "path".into(),
+                            value: "/generic".into(),
+                        }],
+                        samples: samples(),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                }))
+            }
+            type DataStream =
+                futures::stream::Empty<Result<cluster_rpc::MetricsQueryResponse, Status>>;
+            async fn data(
+                &self,
+                _: Request<cluster_rpc::MetricsQueryRequest>,
+            ) -> Result<Response<Self::DataStream>, Status> {
+                Ok(Response::new(futures::stream::empty()))
+            }
+        }
+        #[derive(Debug)]
+        struct Peer(String);
+        impl NodeInfo for Peer {
+            fn get_grpc_addr(&self) -> String {
+                self.0.clone()
+            }
+            fn get_auth_token(&self) -> String {
+                "fixture-internal-token".into()
+            }
+            fn get_name(&self) -> String {
+                "fixture-node".into()
+            }
+            fn is_local(&self) -> bool {
+                true
+            }
+        }
+        struct AbortServer(tokio::task::AbortHandle);
+        impl Drop for AbortServer {
+            fn drop(&mut self) {
+                self.0.abort();
+            }
+        }
+
+        fn samples() -> Vec<cluster_rpc::Sample> {
+            [
+                0,
+                (-0.0f64).to_bits(),
+                1.25f64.to_bits(),
+                (-2.5f64).to_bits(),
+                f64::MAX.to_bits(),
+                f64::MIN_POSITIVE.to_bits(),
+                1,
+                0x7ff8_0000_0000_0042,
+                f64::INFINITY.to_bits(),
+                f64::NEG_INFINITY.to_bits(),
+            ]
+            .into_iter()
+            .enumerate()
+            .map(|(i, bits)| cluster_rpc::Sample {
+                time: i as i64 * 15_000_000,
+                value: f64::from_bits(bits),
+            })
+            .collect()
+        }
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = format!("http://{}", listener.local_addr().unwrap());
+        let incoming = futures::stream::unfold(listener, |listener| async {
+            Some((listener.accept().await.map(|(stream, _)| stream), listener))
+        });
+        let observed = Arc::new(Mutex::new(Vec::new()));
+        let service = MetricsServer::new(Echo {
+            observed: Arc::clone(&observed),
+        })
+        .accept_compressed(CompressionEncoding::Gzip)
+        .send_compressed(CompressionEncoding::Gzip);
+        let server = tokio::spawn(
+            Server::builder()
+                .add_service(service)
+                .serve_with_incoming(incoming),
+        );
+        let _server_guard = AbortServer(server.abort_handle());
+        let peer: Arc<dyn NodeInfo> = Arc::new(Peer(addr.clone()));
+        let local =
+            MetricsResponseCompression::for_identity("verified-id", &addr, "verified-id", &addr);
+        let remote =
+            MetricsResponseCompression::for_identity("different-id", &addr, "verified-id", &addr);
+        let traceparent = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01";
+        let mut received = Vec::new();
+        let different_endpoint = "http://127.0.0.1:1";
+        let mismatched = MetricsResponseCompression::for_identity(
+            "verified-id",
+            different_endpoint,
+            "verified-id",
+            different_endpoint,
+        );
+        assert!(!mismatched.accepts_gzip_for(different_endpoint));
+        assert!(mismatched.accepts_gzip_for(&addr));
+        for policy in [None, Some(local), Some(remote), Some(mismatched)] {
+            let expect_gzip = policy
+                .as_ref()
+                .is_none_or(|policy| policy.accepts_gzip_for(&addr));
+            let mut request = Request::new(cluster_rpc::MetricsQueryRequest {
+                org_id: "fixture-org".into(),
+                ..Default::default()
+            });
+            request
+                .metadata_mut()
+                .insert("traceparent", traceparent.parse().unwrap());
+            let response = if let Some(policy) = policy {
+                let mut client = make_grpc_metrics_client_with_response_compression(
+                    "fixture-trace",
+                    "fixture-org",
+                    &mut request,
+                    &peer,
+                    17,
+                    policy,
+                )
+                .await
+                .unwrap();
+                assert!(request.metadata().contains_key("grpc-timeout"));
+                client.query(request).await.unwrap()
+            } else {
+                let mut client = make_grpc_metrics_client(
+                    "fixture-trace",
+                    "fixture-org",
+                    &mut request,
+                    &peer,
+                    17,
+                )
+                .await
+                .unwrap();
+                assert!(request.metadata().contains_key("grpc-timeout"));
+                client.query(request).await.unwrap()
+            };
+            let encoding = response
+                .metadata()
+                .get("grpc-encoding")
+                .and_then(|value| value.to_str().ok());
+            if !expect_gzip {
+                assert_ne!(encoding, Some("gzip"));
+            } else {
+                assert_eq!(encoding, Some("gzip"));
+            }
+            let response = response.into_inner();
+            assert_eq!(response.result_type, "matrix");
+            assert_eq!(response.series[0].metric[0].value, "/generic");
+            received.push(
+                response.series[0]
+                    .samples
+                    .iter()
+                    .map(|sample| (sample.time, sample.value.to_bits()))
+                    .collect::<Vec<_>>(),
+            );
+        }
+        assert_eq!(received[0], received[1]);
+        assert_eq!(received[0], received[2]);
+        assert_eq!(received[0], received[3]);
+        assert_eq!(received[0].len(), samples().len());
+        let headers = observed.lock().unwrap().clone();
+        assert_eq!(headers.len(), 4);
+        for (index, (auth, org, request_encoding, accepted, trace)) in headers.iter().enumerate() {
+            assert_eq!(auth.as_deref(), Some("fixture-internal-token"));
+            assert_eq!(org.as_deref(), Some("fixture-org"));
+            assert_eq!(request_encoding.as_deref(), Some("gzip"));
+            assert_eq!(trace.as_deref(), Some(traceparent));
+            let accepts_gzip = accepted
+                .as_ref()
+                .is_some_and(|value| value.split(',').any(|encoding| encoding.trim() == "gzip"));
+            assert_eq!(accepts_gzip, index != 1);
+        }
+        drop(headers);
+        super::CHANNELS.write().await.remove(&addr);
+        server.abort();
+        assert!(server.await.unwrap_err().is_cancelled());
     }
 
     #[test]
