@@ -92,7 +92,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :row-class="(row: PaneRow) => (row.kind === 'scope' ? 'bg-surface-subtle' : '')"
         dense
         fill-height
-        pagination="server"
+        :key="paginationMode"
+        :pagination="paginationMode"
         :current-page="currentPage"
         :page-size="pageSize"
         :page-size-options="[25, 50, 100]"
@@ -110,17 +111,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="text-text-heading truncate font-medium">{{ row.label }}</span>
             <span class="text-text-secondary truncate text-xs">{{ row.hint }}</span>
           </div>
-          <span
-            v-else-if="row.kind === 'empty'"
-            class="text-text-secondary text-sm"
-            data-test="edit-role-module-pane-no-match"
-          >
-            {{
-              query || scope === "granted"
-                ? t("iam.editRole.noMatchingResources")
-                : t("iam.editRole.moduleHasNoResources")
-            }}
-          </span>
           <OButton
             v-else-if="row.node.has_entities && row.node.childName"
             variant="ghost-primary"
@@ -137,27 +127,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </span>
         </template>
         <template v-for="action in ACTIONS" :key="action" #[`cell-${action}`]="{ row }">
-          <template v-if="row.kind !== 'empty'">
-            <OCheckbox
-              v-if="row.node.permission?.[action]?.show"
-              :model-value="isChecked(row.node, row.resource, action, row.depth)"
-              :disabled="loading || lockedByWiderScope(row.node, row.resource, action, row.depth)"
-              :title="checkboxHint(row.node, row.resource, action, row.depth)"
-              :data-test="checkboxTest(row, action)"
-              @update:model-value="(value) => change(row.node, action, !!value)"
-            />
-            <!-- A dash, not a disabled box: a disabled box already means "granted by a wider scope". -->
-            <span
-              v-else
-              class="text-text-secondary"
-              :title="t('iam.editRole.actionNotApplicable')"
-              :data-test="`${checkboxTest(row, action)}-na`"
-            >
-              {{ raw("—") }}
-            </span>
-          </template>
+          <OCheckbox
+            v-if="row.node.permission?.[action]?.show"
+            :model-value="isChecked(row.node, row.resource, action, row.depth)"
+            :disabled="loading || lockedByWiderScope(row.node, row.resource, action, row.depth)"
+            :title="checkboxHint(row.node, row.resource, action, row.depth)"
+            :data-test="checkboxTest(row, action)"
+            @update:model-value="(value) => change(row.node, action, !!value)"
+          />
+          <!-- A dash, not a disabled box: a disabled box already means "granted by a wider scope". -->
+          <span
+            v-else
+            class="text-text-secondary"
+            :title="t('iam.editRole.actionNotApplicable')"
+            :data-test="`${checkboxTest(row, action)}-na`"
+          >
+            {{ raw("—") }}
+          </span>
         </template>
       </OTable>
+    </div>
+
+    <!-- A module with nothing to list still says what the scope above it covers. -->
+    <div
+      v-if="!entities.length"
+      class="border-border-default text-text-secondary flex shrink-0 items-center gap-1 border-t px-3 py-2 text-xs"
+      data-test="edit-role-module-pane-no-resources"
+    >
+      <OIcon name="info" size="sm" class="shrink-0" />
+      <span>{{ t("iam.editRole.moduleHasNoResources") }}</span>
+      <span>{{ t("iam.editRole.moduleHasNoResourcesHint") }}</span>
+    </div>
+    <div
+      v-else-if="!filteredEntities.length"
+      class="border-border-default text-text-secondary flex shrink-0 items-center gap-2 border-t px-3 py-2 text-xs"
+      data-test="edit-role-module-pane-no-match"
+    >
+      <span>{{ t("iam.editRole.noMatchingResources") }}</span>
+      <OButton
+        variant="ghost-primary"
+        size="xs"
+        data-test="edit-role-module-pane-clear-filter"
+        @click="clearFilter"
+      >
+        {{ t("iam.editRole.clearFilter") }}
+      </OButton>
     </div>
   </div>
 </template>
@@ -167,6 +181,7 @@ import { computed, ref, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
@@ -258,8 +273,7 @@ type PaneRow =
       label: I18nText;
       hint: I18nText;
     }
-  | { kind: "entity"; rowKey: string; node: any; resource: string; depth: number }
-  | { kind: "empty"; rowKey: string };
+  | { kind: "entity"; rowKey: string; node: any; resource: string; depth: number };
 
 const page = ref(1);
 
@@ -354,9 +368,7 @@ const tableRows = computed<PaneRow[]>(() => {
       depth: props.scopes.length,
     }));
 
-  return entityRows.length || !scopeRows.length
-    ? [...scopeRows, ...entityRows]
-    : [...scopeRows, { kind: "empty", rowKey: "empty" }];
+  return [...scopeRows, ...entityRows];
 });
 
 const checkboxTest = (row: PaneRow, action: string) =>
@@ -365,6 +377,14 @@ const checkboxTest = (row: PaneRow, action: string) =>
     : row.kind === "entity"
       ? `edit-role-permissions-table-body-row-${row.node.name}-col-${action}-checkbox`
       : "";
+
+// OTable snapshots `pagination` at mount, so the mode change is keyed to remount the table.
+const paginationMode = computed(() => (props.entities.length ? "server" : "none"));
+
+const clearFilter = () => {
+  query.value = "";
+  scope.value = "all";
+};
 
 const grantedRowCount = computed(() => props.entities.filter(hasEffectiveGrant).length);
 

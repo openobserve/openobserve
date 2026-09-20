@@ -384,3 +384,55 @@ describe("ModulePane - loaded lists", () => {
     expect(wrapper.findAll('button[role="checkbox"]:not([disabled])')).toHaveLength(0);
   });
 });
+
+describe("ModulePane - empty module", () => {
+  // A module with nothing to list must not offer a pager over zero rows.
+  it("drops the pagination bar and explains what the scope still covers", async () => {
+    const wrapper = await mountPane([makeScope("enrichment_table", [], ["enrichment_table"])], []);
+
+    expect(wrapper.find('[data-test="o2-table-pagination-actions"]').exists()).toBe(false);
+    const note = wrapper.find('[data-test="edit-role-module-pane-no-resources"]');
+    expect(note.text()).toContain(String(i18n.global.t("iam.editRole.moduleHasNoResources")));
+    expect(note.text()).toContain(String(i18n.global.t("iam.editRole.moduleHasNoResourcesHint")));
+  });
+
+  it("still draws the scope row so the type level grant stays editable", async () => {
+    const wrapper = await mountPane([makeScope("enrichment_table", [], ["enrichment_table"])], []);
+
+    expect(scopeBox(wrapper, "enrichment_table", "AllowGet").exists()).toBe(true);
+  });
+
+  it("keeps the pager once the module has resources", async () => {
+    const wrapper = await mountPane([], [makeNode("cpu")]);
+
+    expect(wrapper.find('[data-test="o2-table-pagination-actions"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(false);
+  });
+});
+
+describe("ModulePane - filter matches nothing", () => {
+  // A dead end is worse than an empty list: the way back must be one click.
+  it("offers to clear a search that matched nothing", async () => {
+    const wrapper = await mountPane([], [makeNode("cpu"), makeNode("mem")]);
+    await wrapper.find('[data-test="edit-role-module-pane-search"] input').setValue("zzz");
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-resources"]').exists()).toBe(false);
+
+    await wrapper.find('[data-test="edit-role-module-pane-clear-filter"]').trigger("click");
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').exists()).toBe(false);
+    expect(entityBox(wrapper, "cpu", "AllowGet").exists()).toBe(true);
+  });
+
+  it("clears the Granted filter too, so a granted-only view is not a dead end", async () => {
+    const wrapper = await mountPane([], [makeNode("cpu"), makeNode("mem")]);
+    await wrapper.find('[data-test="edit-role-module-pane-filter-granted"]').trigger("click");
+
+    expect(wrapper.find('[data-test="edit-role-module-pane-no-match"]').exists()).toBe(true);
+
+    await wrapper.find('[data-test="edit-role-module-pane-clear-filter"]').trigger("click");
+
+    expect(entityBox(wrapper, "cpu", "AllowGet").exists()).toBe(true);
+  });
+});
