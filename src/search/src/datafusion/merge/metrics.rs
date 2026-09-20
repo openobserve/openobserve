@@ -811,6 +811,132 @@ mod tests {
         );
     }
 
+    async fn legacy_query_ranges(index: &[u8], predicate: &str) -> Vec<std::ops::Range<usize>> {
+        use arrow::ipc::reader::FileReader;
+        use datafusion::prelude::SessionContext;
+        let reader = FileReader::try_new(std::io::Cursor::new(index), None).unwrap();
+        let mut row_start = 0u64;
+        let mut ranges = Vec::new();
+        for batch in reader {
+            let batch = batch.unwrap();
+            let counts = batch
+                .column_by_name(metrics_index::METRICS_INDEX_ROW_COUNT)
+                .unwrap()
+                .as_any()
+                .downcast_ref::<arrow::array::UInt32Array>()
+                .unwrap();
+            let starts = counts
+                .values()
+                .iter()
+                .map(|count| {
+                    let start = row_start;
+                    row_start += u64::from(*count);
+                    start
+                })
+                .collect::<Vec<_>>();
+            let mut fields = batch.schema().fields().to_vec();
+            fields.push(Arc::new(Field::new(
+                "source_row_start",
+                DataType::UInt64,
+                false,
+            )));
+            let mut columns = batch.columns().to_vec();
+            columns.push(Arc::new(UInt64Array::from(starts)));
+            let batch = RecordBatch::try_new(Arc::new(Schema::new(fields)), columns).unwrap();
+            let ctx = SessionContext::new();
+            ctx.register_batch("legacy", batch).unwrap();
+            let sql = format!(
+                "SELECT source_row_start, \"{}\" FROM legacy WHERE {predicate} ORDER BY source_row_start",
+                metrics_index::METRICS_INDEX_ROW_COUNT
+            );
+            for selected in ctx.sql(&sql).await.unwrap().collect().await.unwrap() {
+                let starts = selected
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<UInt64Array>()
+                    .unwrap();
+                let counts = selected
+                    .column(1)
+                    .as_any()
+                    .downcast_ref::<arrow::array::UInt32Array>()
+                    .unwrap();
+                ranges.extend((0..selected.num_rows()).map(|row| {
+                    let start = starts.value(row) as usize;
+                    start..start + counts.value(row) as usize
+                }));
+            }
+        }
+        ranges
+    }
+
+    #[tokio::test]
+    async fn single_pass_replay_preserves_same_hash_label_changes_across_input_batches() {
+        use std::sync::atomic::Ordering;
+        let mut fields = block_schema(None, false).fields().to_vec();
+        fields.push(Arc::new(Field::new("zone", DataType::Utf8, false)));
+        let schema = Arc::new(Schema::new(fields));
+        let rows = (0..6)
+            .map(|row| (1, 10 + row * 10, Some((row as f64).to_bits())))
+            .collect::<Vec<_>>();
+        let mut columns = block_batch(&schema, &rows).columns().to_vec();
+        columns[3] = Arc::new(arrow::array::StringArray::from(vec![
+            Some("a"),
+            Some("b"),
+            Some("b"),
+            None,
+            Some(""),
+            Some("b"),
+        ]));
+        columns[4] = Arc::new(arrow::array::StringArray::from(vec![
+            "x", "x", "y", "y", "y", "y",
+        ]));
+        let batch = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
+        for sink in [CompactMergeOutput::Memory, CompactMergeOutput::Disk] {
+            let stats = GenerationStats::default();
+            let file = produce(
+                &schema,
+                vec![batch.slice(0, 1), batch.slice(1, 5)],
+                block_output(sink, stats.clone()),
+            )
+            .await
+            .unwrap()
+            .remove(0);
+            let (data, meta, index) = file.into_upload_parts().await.unwrap();
+            let index = tokio::fs::read(index.unwrap()).await.unwrap();
+            assert!(index.starts_with(b"ARROW1"));
+            assert_eq!(sample_rows(bytes::Bytes::from(data)), rows);
+            assert_eq!(meta.records, 6);
+            assert_eq!(legacy_query_ranges(&index, "tag = 'a'").await, vec![0..1]);
+            assert_eq!(
+                legacy_query_ranges(&index, "tag = 'b'").await,
+                vec![1..2, 2..3, 5..6]
+            );
+            assert_eq!(
+                legacy_query_ranges(&index, "tag = 'b' AND zone = 'x'").await,
+                vec![1..2]
+            );
+            assert_eq!(
+                legacy_query_ranges(&index, "tag = 'b' AND zone = 'y'").await,
+                vec![2..3, 5..6]
+            );
+            assert_eq!(legacy_query_ranges(&index, "tag IS NULL").await, vec![3..4]);
+            assert_eq!(legacy_query_ranges(&index, "tag = ''").await, vec![4..5]);
+            assert_eq!(stats.counters.block_builds.load(Ordering::SeqCst), 1);
+            assert_eq!(stats.counters.legacy_builds.load(Ordering::SeqCst), 1);
+            assert_eq!(stats.counters.parquet_replays.load(Ordering::SeqCst), 1);
+            assert_eq!(stats.counters.fallbacks.load(Ordering::SeqCst), 1);
+            assert!(
+                stats
+                    .counters
+                    .paths
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .all(|path| !path.exists())
+            );
+        }
+    }
+
     #[tokio::test]
     async fn single_pass_rotation_preserves_bits_and_fragments_without_legacy_or_replay() {
         let schema = block_schema(Some("preserved".into()), false);

@@ -225,7 +225,7 @@ fn replay_legacy(
         .with_batch_size(metrics_block::MAX_BLOCK_ROWS)
         .build()?
     {
-        index.write(&batch.context("failed to replay completed Parquet")?)?;
+        index.write_with_label_boundaries(&batch.context("failed to replay completed Parquet")?)?;
     }
     let bytes = index.finish(meta.records, Some(PARQUET_MAX_ROW_GROUP_SIZE))?;
     let (mut file, path) = new_file(stats)?;

@@ -359,4 +359,99 @@ mod tests {
             vec![Range { start: 0, end: 6 }]
         );
     }
+    #[test]
+    fn replay_label_boundaries_preserve_promql_pruning_for_hash_collisions() {
+        use arrow::array::{Float64Array, Int64Array, LargeStringArray, StringArray, UInt64Array};
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("tag", DataType::Utf8, true),
+            Field::new("zone", DataType::LargeUtf8, false),
+            Field::new("instance", DataType::Utf8View, false),
+        ]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 1, 1, 1, 1, 1, 2])),
+                Arc::new(Int64Array::from_iter_values(0..9)),
+                Arc::new(Float64Array::from_iter_values((0..9).map(|i| i as f64))),
+                Arc::new(StringArray::from(vec![
+                    Some("a"),
+                    Some("b"),
+                    Some("b"),
+                    Some("b"),
+                    None,
+                    Some(""),
+                    Some("b"),
+                    Some("b"),
+                    Some("b"),
+                ])),
+                Arc::new(LargeStringArray::from(vec![
+                    "x", "x", "x", "y", "y", "y", "y", "y", "y",
+                ])),
+                Arc::new(StringViewArray::from(vec![
+                    "base", "base", "base", "base", "base", "base", "i1", "i2", "i2",
+                ])),
+            ],
+        )
+        .unwrap();
+        let mut writer = MetricsIndexWriter::try_new(&schema).unwrap();
+        writer.write_with_label_boundaries(&batch).unwrap();
+        let bytes = writer
+            .finish(9, Some(config::PARQUET_MAX_ROW_GROUP_SIZE))
+            .unwrap();
+        let data = decode_metrics_index(
+            "replay-label-boundaries",
+            Bytes::from(bytes),
+            &["tag".into(), "zone".into(), "instance".into()],
+        )
+        .unwrap();
+        let counts = data.batches[0]
+            .column_by_name(METRICS_INDEX_ROW_COUNT)
+            .unwrap()
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap();
+        assert_eq!(counts.values().as_ref(), &[1, 2, 1, 1, 1, 1, 1, 1]);
+        for (matchers, expected) in [
+            (
+                vec![Matcher::new(MatchOp::Equal, "tag", "b")],
+                vec![1..4, 6..9],
+            ),
+            (
+                vec![Matcher::new(MatchOp::Equal, "tag", "")],
+                vec![Range { start: 5, end: 6 }],
+            ),
+            (
+                vec![
+                    Matcher::new(MatchOp::Equal, "tag", "b"),
+                    Matcher::new(MatchOp::Equal, "zone", "x"),
+                ],
+                vec![Range { start: 1, end: 3 }],
+            ),
+            (
+                vec![
+                    Matcher::new(MatchOp::Equal, "tag", "b"),
+                    Matcher::new(MatchOp::Equal, "instance", "i2"),
+                ],
+                vec![Range { start: 7, end: 9 }],
+            ),
+        ] {
+            let filter = create_physical_filter(&data.schema, &Matchers::new(matchers)).unwrap();
+            assert_eq!(
+                evaluate_metrics_index(&data, filter.as_deref(), 9).unwrap(),
+                expected
+            );
+        }
+        let mut columns = batch.columns().to_vec();
+        columns[0] = Arc::new(UInt64Array::from(vec![None; 9]));
+        let null_hashes = RecordBatch::try_new(Arc::clone(&schema), columns).unwrap();
+        assert!(
+            MetricsIndexWriter::try_new(&schema)
+                .unwrap()
+                .write_with_label_boundaries(&null_hashes)
+                .is_err()
+        );
+    }
 }
