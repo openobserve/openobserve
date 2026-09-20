@@ -183,7 +183,7 @@ impl Serialize for Sample {
     {
         let mut seq = serializer.serialize_seq(Some(2))?;
         seq.serialize_element(&(self.timestamp / 1_000_000))?;
-        seq.serialize_element(&self.value.to_string())?;
+        seq.serialize_element(&SampleValueDisplay(self.value))?;
         seq.end()
     }
 }
@@ -238,6 +238,17 @@ impl Sample {
     #[allow(dead_code)]
     pub fn is_nan(&self) -> bool {
         self.value.is_nan()
+    }
+}
+
+struct SampleValueDisplay(f64);
+
+impl Serialize for SampleValueDisplay {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.collect_str(&self.0)
     }
 }
 
@@ -1017,6 +1028,21 @@ mod tests {
 
     use super::*;
 
+    // Existing serializer text is the compatibility contract.
+    struct LegacySample<'a>(&'a Sample);
+
+    impl Serialize for LegacySample<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut seq = serializer.serialize_seq(Some(2))?;
+            seq.serialize_element(&(self.0.timestamp / 1_000_000))?;
+            seq.serialize_element(&self.0.value.to_string())?;
+            seq.end()
+        }
+    }
+
     fn generate_test_labels() -> Labels {
         let labels: Labels = vec![
             Arc::new(Label {
@@ -1412,6 +1438,121 @@ mod tests {
         let sample = Sample::new(1_609_459_200_000_000, 42.5); // 2021-01-01 00:00:00 UTC in microseconds
         let json = serde_json::to_string(&sample).unwrap();
         assert_eq!(json, "[1609459200,\"42.5\"]");
+    }
+
+    fn assert_sample_display_matches_legacy(sample: Sample) {
+        let expected = serde_json::to_vec(&LegacySample(&sample)).unwrap();
+        assert_eq!(
+            serde_json::to_vec(&sample).unwrap(),
+            expected,
+            "timestamp={}, value bits={:016x}",
+            sample.timestamp,
+            sample.value.to_bits()
+        );
+        assert_eq!(
+            serde_json::to_value(sample).unwrap(),
+            serde_json::from_slice::<serde_json::Value>(&expected).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_sample_display_exact_edge_case_text() {
+        let bits = [
+            0,
+            1,
+            0x8000_0000_0000_0000, // negative zero
+            0x8000_0000_0000_0001, // negative smallest subnormal
+            0x000f_ffff_ffff_ffff, // largest subnormal
+            0x0010_0000_0000_0000, // smallest normal
+            0x7fef_ffff_ffff_ffff, // largest finite
+            0xffef_ffff_ffff_ffff,
+            f64::INFINITY.to_bits(),
+            f64::NEG_INFINITY.to_bits(),
+            0x7ff0_0000_0000_0001, // signaling NaN payload
+            0x7ff8_0000_0000_0001,
+            0x7ff8_0000_0000_0042,
+            0xfff8_0000_0000_0042,
+            1.0f64.to_bits(),
+            (-1.0f64).to_bits(),
+            0.1f64.to_bits(),
+            f64::EPSILON.to_bits(),
+            1e-7f64.to_bits(),
+            1e20f64.to_bits(),
+        ];
+        let timestamps = [
+            i64::MIN,
+            -1_000_001,
+            -1_000_000,
+            -999_999,
+            -1,
+            0,
+            1,
+            999_999,
+            1_000_000,
+            1_000_001,
+            1_609_459_200_000_000,
+            i64::MAX,
+        ];
+        for timestamp in timestamps {
+            for bits in bits {
+                assert_sample_display_matches_legacy(Sample::new(timestamp, f64::from_bits(bits)));
+            }
+        }
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, -0.0)).unwrap(),
+            "[0,\"-0\"]"
+        );
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, f64::INFINITY)).unwrap(),
+            "[0,\"inf\"]"
+        );
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, f64::NEG_INFINITY)).unwrap(),
+            "[0,\"-inf\"]"
+        );
+        assert_eq!(
+            serde_json::to_string(&Sample::new(0, f64::NAN)).unwrap(),
+            "[0,\"NaN\"]"
+        );
+    }
+
+    #[test]
+    fn test_sample_display_exact_random_finite_text() {
+        // Deterministic bit-pattern coverage, independent of rand versions.
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut checked = 0;
+        while checked < 10_000 {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let value = f64::from_bits(state);
+            if value.is_finite() {
+                assert_sample_display_matches_legacy(Sample::new(
+                    state.rotate_left(19) as i64,
+                    value,
+                ));
+                checked += 1;
+            }
+        }
+    }
+
+    #[test]
+    fn test_sample_display_preserves_point_order_and_pretty_json() {
+        let samples = vec![
+            Sample::new(1_000_000, 0.0),
+            Sample::new(-1_000_001, -0.0),
+            Sample::new(1_000_000, f64::NAN),
+            Sample::new(0, f64::INFINITY),
+            Sample::new(i64::MAX, f64::from_bits(1)),
+        ];
+        let legacy: Vec<_> = samples.iter().map(LegacySample).collect();
+        let mut direct = Vec::new();
+        serde_json::to_writer(&mut direct, &samples).unwrap();
+        assert_eq!(direct, serde_json::to_vec(&legacy).unwrap());
+        assert_eq!(
+            serde_json::to_string_pretty(&samples).unwrap(),
+            serde_json::to_string_pretty(&legacy).unwrap()
+        );
     }
 
     #[test]
