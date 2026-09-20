@@ -570,6 +570,21 @@ describe("legendConfiguration", () => {
       expect(result.tooltip.formatter).toBeDefined();
     });
 
+    it("should escape HTML in the legend tooltip", () => {
+      const hoveredSeriesState = {
+        value: { hoveredSeriesName: null, setHoveredSeriesName: vi.fn() },
+      };
+
+      const result = createBaseLegendConfig(
+        { type: "line", config: { show_legends: true } },
+        hoveredSeriesState,
+      );
+
+      expect(result.tooltip.formatter({ name: "<img src=x onerror=alert(1)>" })).toBe(
+        "&lt;img src=x onerror=alert(1)&gt;",
+      );
+    });
+
     it("should handle formatter for hovered series", () => {
       const panelSchema = {
         type: "line",
