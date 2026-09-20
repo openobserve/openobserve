@@ -19,17 +19,23 @@ import SelectDashboardDropdown from "./SelectDashboardDropdown.vue";
 import i18n from "@/locales";
 import { createStore } from "vuex";
 
-// Mock the utils functions
-vi.mock("@/utils/commons", () => ({
-  getAllDashboardsByFolderId: vi.fn().mockResolvedValue([
-    { title: "Dashboard 1", dashboardId: "dash1" },
-    { title: "Dashboard 2", dashboardId: "dash2" },
-  ]),
-  getDashboard: vi.fn().mockResolvedValue({
-    title: "Dashboard 1",
-    dashboardId: "dash1",
-  }),
-}));
+// The component reads through useDashboards → dashboardsByFolderQuery, so the
+// stub goes on the service the query calls, overlaid onto the real module.
+vi.mock("@/services/dashboards", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn().mockResolvedValue({
+        data: {
+          dashboards: [
+            { title: "Dashboard 1", dashboard_id: "dash1", created: "2024-01-02T00:00:00Z" },
+            { title: "Dashboard 2", dashboard_id: "dash2", created: "2024-01-01T00:00:00Z" },
+          ],
+        },
+      }),
+    },
+  });
+});
 
 // Stub ODialog so tests are deterministic (no Portal/Reka teleport) and so we
 // can assert on the props the component forwards + emit the click events
@@ -321,8 +327,8 @@ describe("SelectDashboardDropdown", () => {
 
   describe("edge cases", () => {
     it("should set selectedDashboard to null when folder has no dashboards", async () => {
-      const commons = await import("@/utils/commons");
-      (commons.getAllDashboardsByFolderId as any).mockResolvedValueOnce([]);
+      const dashboards = (await import("@/services/dashboards")).default;
+      vi.mocked(dashboards.list).mockResolvedValueOnce({ data: { dashboards: [] } } as any);
 
       const wrapper = mountComponent({}, store);
       await flushPromises();
@@ -332,26 +338,36 @@ describe("SelectDashboardDropdown", () => {
     });
 
     it("should not load dashboards when folderId is null", async () => {
-      const commons = await import("@/utils/commons");
-      (commons.getAllDashboardsByFolderId as any).mockClear();
+      const dashboards = (await import("@/services/dashboards")).default;
+      vi.mocked(dashboards.list).mockClear();
 
       const wrapper = mountComponent({ folderId: null }, store);
       await flushPromises();
 
-      expect(commons.getAllDashboardsByFolderId).not.toHaveBeenCalled();
+      expect(dashboards.list).not.toHaveBeenCalled();
       expect(wrapper.vm.dashboardList).toEqual([]);
     });
 
     it("should reload dashboards when folderId prop changes", async () => {
-      const commons = await import("@/utils/commons");
+      const dashboards = (await import("@/services/dashboards")).default;
       const wrapper = mountComponent({}, store);
       await flushPromises();
 
-      (commons.getAllDashboardsByFolderId as any).mockClear();
+      vi.mocked(dashboards.list).mockClear();
       await wrapper.setProps({ folderId: "default" });
       await flushPromises();
 
-      expect(commons.getAllDashboardsByFolderId).toHaveBeenCalledWith(expect.anything(), "default");
+      // folderId is the 7th argument of the list builder.
+      expect(dashboards.list).toHaveBeenCalledWith(
+        0,
+        1000,
+        "name",
+        false,
+        "",
+        "org123",
+        "default",
+        "",
+      );
     });
   });
 });

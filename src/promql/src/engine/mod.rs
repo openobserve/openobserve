@@ -116,11 +116,24 @@ impl Engine {
 
                 let lhs = scalar_operand(lhs, &expr.lhs, &self.eval_ctx);
                 let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
+                let lhs_scalar = expr.lhs.value_type() == ValueType::Scalar;
+                let rhs_scalar = expr.rhs.value_type() == ValueType::Scalar;
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value =
                             binary::scalar_binary_operations(token, left, right, return_bool, op)?;
                         Value::Float(value)
+                    }
+                    // a range-query scalar is one label-less series that label matching would drop
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if rhs_scalar && !lhs_scalar && right.len() == 1 =>
+                    {
+                        binary::vector_step_scalar_bin_op(expr, left, &right[0].samples, false)?
+                    }
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if lhs_scalar && !rhs_scalar && left.len() == 1 =>
+                    {
+                        binary::vector_step_scalar_bin_op(expr, right, &left[0].samples, true)?
                     }
                     (Value::Matrix(left), Value::Matrix(right)) => {
                         binary::vector_bin_op(expr, left, right)?
@@ -768,10 +781,17 @@ pub(crate) mod tests {
             ] {
                 let series = matrix(eval_on_empty(&query, 3).await.unwrap());
                 assert_eq!(series.len(), 1, "{query}");
-                assert_eq!(series[0].samples.len(), 1, "{query}");
-                assert_eq!(series[0].samples[0].timestamp, timestamp, "{query}");
+                // a scalar holds a value at every step, so a rejected step is NaN, not absent
+                assert_eq!(series[0].samples.len(), 3, "{query}");
+                let matched: Vec<_> = series[0]
+                    .samples
+                    .iter()
+                    .filter(|sample| !sample.value.is_nan())
+                    .collect();
+                assert_eq!(matched.len(), 1, "{query}");
+                assert_eq!(matched[0].timestamp, timestamp, "{query}");
                 assert_eq!(
-                    series[0].samples[0].value,
+                    matched[0].value,
                     timestamp as f64 / 1_000_000.0 + 1.0,
                     "{query}"
                 );
@@ -799,6 +819,24 @@ pub(crate) mod tests {
                 );
                 assert_eq!(sample.value, 3.0, "{query}");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_scalar_operand_broadcasts_to_labelled_series() {
+        let labelled = r#"label_replace(vector(6), "job", "x", "", "")"#;
+        for (query, expected) in [
+            (format!("{labelled} / scalar(vector(3))"), 2.0),
+            (format!("scalar(vector(3)) / {labelled}"), 0.5),
+            (format!("{labelled} > scalar(vector(3))"), 6.0),
+            (format!("scalar(vector(3)) < {labelled}"), 6.0),
+        ] {
+            let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            assert_eq!(series[0].labels.len(), 1, "{query}");
+            assert_eq!(series[0].labels[0].value, "x", "{query}");
+            let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+            assert_eq!(values, vec![expected; 3], "{query}");
         }
     }
 

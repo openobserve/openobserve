@@ -73,20 +73,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="functionsRefresh"
                 data-test="functions-list-refresh-btn"
-                @click="getJSTransforms"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="functionsRefresh"
-                />
-              </OButton>
+                @click="refreshJSTransforms"
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -290,10 +285,17 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import {
+  bulkDeleteFunctionsMutation,
+  deleteFunctionMutation,
+  functionsQuery,
+} from "@/services/jstransform.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
 
 export default defineComponent({
   name: "functionList",
@@ -310,7 +312,7 @@ export default defineComponent({
     ODropdown,
     ODropdownItem,
     OSearchInput,
-    OTooltip,
+    ORefreshButton,
   },
   emits: [
     "updated:fields",
@@ -322,7 +324,6 @@ export default defineComponent({
     const store = useStore();
     const { t } = useI18nTyped();
     const router = useRouter();
-    const jsTransforms: any = ref([]);
     const formData: any = ref({});
     const showAddJSTransformDialog: any = ref(false);
     const selectedDelete: any = ref(null);
@@ -374,6 +375,8 @@ export default defineComponent({
       window.open(routeUrl, "_blank");
     };
 
+    const orgId = useOrgId();
+
     // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not FunctionList itself.
     const currentPage = ref(1);
     const onPageChange = (page: number) => {
@@ -387,70 +390,90 @@ export default defineComponent({
       }, 0);
     };
 
-    const loading = ref(true);
-    const forbidden = ref(false);
-    const getJSTransforms = () => {
-      loading.value = true;
-      forbidden.value = false;
-      // return ;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.functions.pleaseWaitWhileLoadingFunctions"),
-        timeout: 0,
-      });
+    // The list is the query, not a copy of it. Anything that invalidates
+    // ["org", id, "functions"] — this page's writes, the two in the Logs search
+    // bar, the function form — repaints these rows with no wiring here.
+    // `Object.assign` rather than a spread: `queryOptions()` brands its key with
+    // the result type, and spreading into a fresh literal drops the brand (data
+    // degrades to `unknown`). Assigning onto the returned object keeps it.
+    const functions = useQuery(() =>
+      Object.assign(functionsQuery(orgId.value), { enabled: !!orgId.value }),
+    );
 
-      jsTransformService
-        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
-        .then((res) => {
-          resultTotal.value = res.data.list.length;
-          if (router.currentRoute.value.query.action == "add") {
-            showAddUpdateFn({ row: undefined });
-          }
-          jsTransforms.value = res.data.list.map((data: any) => {
-            if (router.currentRoute.value.query.action == "update") {
-              if (router.currentRoute.value.query.name == data.name) {
-                showAddUpdateFn({ row: data });
-              }
-            }
+    // TanStack's own distinction, bound straight to the two UI affordances:
+    // `isPending` is the cold read (OTable swaps in its skeleton), `isFetching`
+    // is any request in flight, including one with rows already on screen.
+    const loading = functions.isPending;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = functions.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    const fetching = functions.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = functions.dataUpdatedAt;
+    // main restored the page inside the old chain's `.finally`; the query has no
+    // such hook, so the same restore rides the cold read settling instead.
+    watch(
+      loading,
+      (isLoading) => {
+        if (isLoading) return;
+        restorePageIndex();
+      },
+      { once: true },
+    );
 
-            return {
-              name: data.name,
-              function: data.function,
-              params: data.params,
-              // order: data.order ? data.order : 1,
-              // stream_name: data.stream_name ? data.stream_name : "--",
-              // stream_type: data.stream_type ? data.stream_type : "--",
-              transType: data.transType.toString(),
-              // ingest: data.stream_name ? true : false,
-              actions: "",
-            };
-          });
+    const jsTransforms = computed(() =>
+      (functions.data.value ?? []).map((data: any) => ({
+        name: data.name,
+        function: data.function,
+        params: data.params,
+        transType: data.transType.toString(),
+        actions: "",
+      })),
+    );
 
-          searchObj.data.transforms = jsTransforms.value;
-
-          dismiss();
-        })
-        .catch((err) => {
-          console.error("Error while pulling function", err);
-
-          dismiss();
-          forbidden.value = err?.response?.status === 403;
-          if (err?.response?.status && !forbidden.value) {
-            toast({
-              variant: "error",
-              message: t("toastMessages.functions.errorWhilePullingFunction"),
-            });
-          }
-        })
-        .finally(() => {
-          loading.value = false;
-          restorePageIndex();
+    // Was a manual `.catch` on every read. The query owns its own error now, so
+    // this fires once per failure however the read was triggered.
+    watch(functions.error, (err: any) => {
+      if (!err) return;
+      console.error("Error while pulling function", err);
+      if (err?.response?.status && err?.response?.status != 403) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.functions.errorWhilePullingFunction"),
         });
-    };
+      }
+    });
 
-    if (jsTransforms.value == "" || jsTransforms.value == undefined) {
-      getJSTransforms();
-    }
+    // Bridge for consumers still reading `searchObj.data.transforms`.
+    watch(jsTransforms, (rows) => (searchObj.data.transforms = rows), { immediate: true });
+
+    // The ?action= deep links open a dialog off the first non-empty result, so
+    // they are latched: a cached paint followed by a fresh one must not open it
+    // twice. Was folded into the row mapping, which ran on every paint.
+    let deepLinkOpened = false;
+    watch(
+      functions.data,
+      (list) => {
+        if (!list || deepLinkOpened) return;
+        const { action, name } = router.currentRoute.value.query;
+        if (action == "add") {
+          deepLinkOpened = true;
+          showAddUpdateFn({ row: undefined });
+        } else if (action == "update") {
+          const row = list.find((data: any) => data.name == name);
+          if (row) {
+            deepLinkOpened = true;
+            showAddUpdateFn({ row });
+          }
+        }
+      },
+      { immediate: true },
+    );
+
+    // Bound to the refresh button: always reaches the server.
+    const refreshJSTransforms = () => functions.refetch();
 
     const resultTotal = ref<number>(0);
     const pageSize = ref(20);
@@ -529,7 +552,8 @@ export default defineComponent({
         },
       });
       showAddJSTransformDialog.value = false;
-      getJSTransforms();
+      // No reload call: the save mutation invalidated the scope, so the mounted
+      // query has already refetched.
     };
 
     const hideForm = () => {
@@ -542,16 +566,17 @@ export default defineComponent({
       });
     };
 
+    const deleteFunction = useMutation(() => deleteFunctionMutation(orgId.value));
+
     const deleteFn = () => {
-      jsTransformService
-        .delete(store.state.selectedOrganization.identifier, selectedDelete.value.name)
+      deleteFunction
+        .mutateAsync(selectedDelete.value.name)
         .then((res: any) => {
           if (res.data.code == 200) {
             toast({
               variant: "success",
               message: res.data.message,
             });
-            getJSTransforms();
           } else {
             toast({
               variant: "error",
@@ -662,6 +687,8 @@ export default defineComponent({
       confirmBulkDelete.value = true;
     };
 
+    const bulkDelete = useMutation(() => bulkDeleteFunctionsMutation(orgId.value));
+
     const bulkDeleteFunctions = async () => {
       bulkDeleteLoading.value = true;
       const dismiss = toast({
@@ -685,10 +712,7 @@ export default defineComponent({
           ids: selectedFunctions.value.map((f: any) => f.name),
         };
 
-        const response = await jsTransformService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDelete.mutateAsync(payload.ids);
 
         dismiss();
 
@@ -734,8 +758,6 @@ export default defineComponent({
         }
 
         selectedFunctions.value = [];
-        // Refresh functions list
-        getJSTransforms();
       } catch (error: any) {
         dismiss();
         console.error("Error deleting functions:", error);
@@ -769,7 +791,7 @@ export default defineComponent({
       {
         id: "functionsRefresh",
         handler: () => {
-          if (!isInputFocused()) getJSTransforms();
+          if (!isInputFocused()) refreshJSTransforms();
         },
       },
       {
@@ -790,8 +812,10 @@ export default defineComponent({
       hideForm,
       confirmDelete,
       selectedDelete,
-      getJSTransforms,
       loading,
+      fetching,
+      lastUpdatedAt,
+      refreshJSTransforms,
       forbidden,
       resultTotal,
       refreshList,

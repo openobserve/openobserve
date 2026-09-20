@@ -5,10 +5,14 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/services/iam", () => ({
-  getResources: vi.fn(),
-  updateRole: vi.fn(),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  const getResources = vi.fn();
+  return overlayServiceMock(await importOriginal(), {
+    getResources,
+    updateRole: vi.fn(),
+  });
+});
 
 import { getResources, updateRole } from "@/services/iam";
 import { buildReadonlyPermissions, seedReadonlyRolePermissions } from "./readonlyPreset";

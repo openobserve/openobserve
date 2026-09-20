@@ -16,8 +16,6 @@
 #[cfg(feature = "enterprise")]
 use ::search::AuditContext;
 #[cfg(feature = "enterprise")]
-use ::search::sql::visitor::cipher_key::get_cipher_key_names;
-#[cfg(feature = "enterprise")]
 use audit::audit;
 use axum::{
     Json,
@@ -58,6 +56,8 @@ use {
     openobserve_core::organization::is_org_in_free_trial_period,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::search::utils::{check_cipher_key_permissions, check_cipher_key_permissions_multi};
 use crate::{
     common::{
         meta::{self, http::HttpResponse as MetaHttpResponse},
@@ -321,50 +321,9 @@ pub async fn search_multi(
                 }
             }
 
-            let keys_used = match get_cipher_key_names(&req.query.sql) {
-                Ok(v) => v,
-                Err(e) => {
-                    return map_error_to_http_response(&e, Some(trace_id));
-                }
-            };
-            if !keys_used.is_empty() {
-                log::info!("keys used : {keys_used:?}");
-            }
-            // Check permissions on stream ends
-            // Check permissions on keys
-            for key in keys_used {
-                if !db::user::is_root_user(user_id) {
-                    let user: config::meta::user::User =
-                        get_user(Some(&org_id), user_id).await.unwrap();
-
-                    if !openobserve_core::authz::check_permissions(
-                        user_id,
-                        AuthExtractor {
-                            auth: "".to_string(),
-                            method: "GET".to_string(),
-                            o2_type: format!(
-                                "{}:{}",
-                                OFGA_MODELS
-                                    .get("cipher_keys")
-                                    .map_or("cipher_keys", |model| model.key),
-                                key
-                            ),
-                            org_id: org_id.clone(),
-                            bypass_check: false,
-                            parent_id: "".to_string(),
-                            use_all_org: false,
-                            use_self_context: false,
-                            use_self_parent: true,
-                        },
-                        user.role,
-                        user.is_external,
-                    )
-                    .await
-                    {
-                        return MetaHttpResponse::forbidden("Unauthorized Access to key");
-                    }
-                    // Check permissions on key ends
-                }
+            if let Some(res) = check_cipher_key_permissions(&org_id, user_id, &req.query.sql).await
+            {
+                return res;
             }
         }
 
@@ -1460,6 +1419,33 @@ pub async fn search_multi_stream(
                 .await;
             }
             return http_response;
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let sqls = queries
+            .iter()
+            .map(|req| req.query.sql.as_str())
+            .collect::<Vec<_>>();
+        if let Some(res) = check_cipher_key_permissions_multi(&org_id, &user_id, &sqls).await {
+            report_to_audit(
+                user_id.clone(),
+                org_id.clone(),
+                trace_id.clone(),
+                res.status().into(),
+                Some("Unauthorized Access to key".to_string()),
+                "POST".to_string(),
+                format!("/api/{}/_search_multi_stream", org_id),
+                query
+                    .iter()
+                    .map(|(k, v)| format!("{}={}", k, v))
+                    .collect::<Vec<_>>()
+                    .join("&"),
+                body_bytes.clone(),
+            )
+            .await;
+            return res;
         }
     }
 

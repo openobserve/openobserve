@@ -6,14 +6,17 @@ import { ref } from "vue";
 import ImportAlert from "./ImportAlert.vue";
 
 // Mock all external dependencies
-vi.mock("@/services/alerts", () => ({
-  default: {
-    create_by_alert_id: vi.fn(),
-    listByFolderId: vi.fn().mockResolvedValue({
-      data: { list: [] },
-    }),
-  },
-}));
+vi.mock("@/services/alerts", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create_by_alert_id: vi.fn(),
+      listByFolderId: vi.fn().mockResolvedValue({
+        data: { list: [] },
+      }),
+    },
+  });
+});
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
@@ -46,8 +49,14 @@ vi.mock("@/router", () => ({
   },
 }));
 
-vi.mock("@/services/alert_templates", () => ({ default: {} }));
-vi.mock("@/services/alert_destination", () => ({ default: {} }));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), { default: {} });
+});
 vi.mock("axios", () => ({
   default: {
     get: vi.fn().mockResolvedValue({

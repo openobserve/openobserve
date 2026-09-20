@@ -355,6 +355,8 @@ mod tests {
         assert!(labels.contains(&"_all"));
         assert!(labels.contains(&"trace_id"));
         assert!(labels.contains(&"span_id"));
+        assert!(labels.contains(&"start_time"));
+        assert!(labels.contains(&"flag"));
         assert!(!labels.contains(&"job"));
     }
 
