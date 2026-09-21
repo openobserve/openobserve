@@ -146,13 +146,10 @@ async fn run_merge_query(
 
     // print the physical plan
     if cfg.common.print_key_sql {
-        let plan = datafusion::physical_plan::displayable(physical_plan.as_ref())
-            .indent(false)
-            .to_string();
-        println!("+---------------------------+--------------------------+");
-        println!("merge_parquet_files");
-        println!("+---------------------------+--------------------------+");
-        println!("{plan}");
+        log::info!(
+            "{}",
+            config::meta::plan::generate_plan_string("merge_parquet_files", physical_plan.as_ref())
+        );
     }
 
     let mut batch_stream = execute_stream(physical_plan, ctx.task_ctx())?;
