@@ -1481,6 +1481,23 @@ export default defineComponent({
         // Get global time params - ensure we always have time params
         const timeParams = getQueryParamsForDuration(selectedDate.value);
 
+        // Preserve the cell-explorer deep-link params so a shared "Copy link" reopens the drawer.
+        const cellParams: Record<string, any> = {};
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          if (route.query[k] !== undefined) cellParams[k] = route.query[k];
+        }
+
         const newQuery = {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
@@ -1492,6 +1509,7 @@ export default defineComponent({
           ...panelTimeParams, // Panel time params (generated + preserved)
           print: store.state.printMode,
           searchtype: route.query.searchtype,
+          ...cellParams, // Keep cell-explorer deep link intact
         };
 
         // CRITICAL: Only update URL if query has actually changed
