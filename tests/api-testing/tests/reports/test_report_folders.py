@@ -3,7 +3,7 @@
 Endpoints (verified src/api/management/src/request/folders.rs, folder_type=reports):
   GET/POST   /api/v2/{org}/folders/reports
   GET/PUT/DELETE /api/v2/{org}/folders/reports/{id}
-  POST       /api/v2/{org}/reports/move   {report_ids, dst_folder_id}
+  PATCH      /api/v2/{org}/reports/move   {report_ids, dst_folder_id}
 
 A folder holding reports cannot be deleted (FolderError::DeleteWithReports -> 400).
 Report creation is environment-gated (report save needs Chrome/report-server); the
@@ -136,7 +136,7 @@ class TestReportFolderMoveAndGuard:
             )
             assert NON_EMPTY_DELETE_ERROR in blocked.text, f"missing guard message: {blocked.text}"
 
-            move_out = client.post(
+            move_out = client.patch(
                 "reports/move",
                 prefix=V2,
                 json={"report_ids": [report_id], "dst_folder_id": "default"},
