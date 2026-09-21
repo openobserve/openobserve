@@ -44,6 +44,7 @@ use std::{
         Arc, LazyLock as Lazy, OnceLock, RwLock,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -90,6 +91,9 @@ static FLUSH_RX: OnceLock<&'static tokio::sync::Mutex<mpsc::Receiver<FlushRecord
 
 /// Dedicated NATS queue for HA sync of quota deductions across nodes.
 pub const TRIAL_QUOTA_HA_QUEUE: &str = "trial_quota_ha_queue";
+
+// nodes flush deltas to the DB every few seconds, so the replay only needs the last hour
+const TRIAL_QUOTA_HA_QUEUE_MAX_AGE: Duration = Duration::from_secs(3600);
 
 /// Max `updated_at` (micros) from DB rows loaded during init_from_db.
 /// NATS messages with timestamp <= this are already reflected in the DB
@@ -768,7 +772,13 @@ pub async fn subscribe_ha_queue() {
     }
 
     let q = infra::queue::get_queue().await;
-    if let Err(e) = q.create(TRIAL_QUOTA_HA_QUEUE).await {
+    let queue_config = infra::queue::QueueConfigBuilder::new()
+        .max_age(TRIAL_QUOTA_HA_QUEUE_MAX_AGE)
+        .build();
+    if let Err(e) = q
+        .create_with_config(TRIAL_QUOTA_HA_QUEUE, queue_config)
+        .await
+    {
         log::error!("[TRIAL_QUOTA] Failed to create HA queue: {e}");
         return;
     }

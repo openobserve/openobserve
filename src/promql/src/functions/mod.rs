@@ -43,6 +43,7 @@ mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod predict_linear;
+mod present_over_time;
 mod quantile_over_time;
 mod resets;
 mod scalar;
@@ -110,6 +111,7 @@ pub(crate) enum Func {
     Minute,
     Month,
     PredictLinear,
+    PresentOverTime,
     QuantileOverTime,
     Rate,
     Resets,
@@ -186,6 +188,7 @@ impl Func {
             Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
             Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
             Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
+            Func::PresentOverTime => Box::new(present_over_time::PresentOverTimeFunc),
             Func::Rate => Box::new(ExtrapolationKind::Rate),
             Func::Resets => Box::new(resets::ResetsFunc),
             Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
