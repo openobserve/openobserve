@@ -13526,6 +13526,7 @@
       "scopeGlobal": "This variable applies in every environment.",
       "searchPlaceholder": "Search variables",
       "secretNeedsEnvironment": "Global holds no secrets. Create the secret in the environment that should guard it.",
+      "secretWriteOnly": "The value is write-only. Nothing shows it again after it is saved.",
       "title": "Variables",
       "updated": "Variable updated",
       "usedBy": "Used by",

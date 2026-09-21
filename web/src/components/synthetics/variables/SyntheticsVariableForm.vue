@@ -56,19 +56,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @update:model-value="upperCaseName"
       />
 
-      <OFormSelect
-        name="kind"
-        :label="t('synthetics.variables.kind')"
-        :options="kindOptions"
-        :disabled="isEdit || !environment"
-        :hint="!environment ? t('synthetics.variables.secretNeedsEnvironment') : undefined"
-        data-test="synthetics-variable-kind-select"
-        @update:model-value="onKindChange"
-      />
+      <div class="flex flex-col gap-1">
+        <OFormSelect
+          name="kind"
+          :label="t('synthetics.variables.kind')"
+          :options="kindOptions"
+          :disabled="isEdit || !environment"
+          data-test="synthetics-variable-kind-select"
+          @update:model-value="onKindChange"
+        />
+        <p
+          v-if="!environment"
+          class="text-muted-foreground text-sm"
+          data-test="synthetics-variable-kind-caption"
+        >
+          {{ t("synthetics.variables.secretNeedsEnvironment") }}
+        </p>
+      </div>
 
       <div v-if="isEdit && data?.kind === 'secret' && data?.has_value && !replacing">
         <p class="text-muted-foreground text-sm" data-test="synthetics-variable-value-set">
           {{ t("synthetics.variables.valueSet", { when: updatedRelative }) }}
+        </p>
+        <p class="text-muted-foreground text-sm" data-test="synthetics-variable-secret-write-only">
+          {{ t("synthetics.variables.secretWriteOnly") }}
         </p>
         <OButton
           variant="outline"

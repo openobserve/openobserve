@@ -306,3 +306,95 @@ describe("SyntheticsVariableForm — the name is upper-case from the first keyst
     expect(message).not.toContain("my_url");
   });
 });
+
+describe("SyntheticsVariableForm — captions explain the locked Kind and the write-only secret", () => {
+  let wrapper: VueWrapper;
+  const locale = "en-us";
+  const keys = ["secretNeedsEnvironment", "secretWriteOnly"] as const;
+  const originals: Partial<Record<(typeof keys)[number], string>> = {};
+
+  // Sentinels prove the caption goes through the locale key, not a hard-coded string.
+  beforeEach(() => {
+    const variables = (i18n.global.getLocaleMessage(locale) as any).synthetics?.variables ?? {};
+    for (const key of keys) originals[key] = variables[key];
+    i18n.global.mergeLocaleMessage(locale, {
+      synthetics: {
+        variables: {
+          secretNeedsEnvironment: "SENTINEL_GLOBAL",
+          secretWriteOnly: "SENTINEL_WRITE_ONLY",
+        },
+      },
+    });
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    const variables = (i18n.global.getLocaleMessage(locale) as any).synthetics.variables;
+    for (const key of keys) {
+      if (originals[key] === undefined) delete variables[key];
+      else variables[key] = originals[key];
+    }
+  });
+
+  const secretEdit = (has_value: boolean) => ({
+    environment: "staging",
+    isEdit: true,
+    data: { id: "v1", name: "TOKEN", kind: "secret", has_value },
+  });
+
+  it("ships both caption keys in en-US", () => {
+    for (const key of keys) {
+      expect(originals[key], key).toBeTypeOf("string");
+    }
+  });
+
+  it("on the global tab, tells why no secret can be created there", () => {
+    wrapper = mountForm({ environment: null });
+
+    expect(wrapper.text()).toContain("SENTINEL_GLOBAL");
+  });
+
+  it("inside an environment, shows no such caption", () => {
+    wrapper = mountForm({ environment: "staging" });
+
+    expect(wrapper.text()).not.toContain("SENTINEL_GLOBAL");
+  });
+
+  it("no longer passes the caption as a hint the select would drop", () => {
+    wrapper = mountForm({ environment: null });
+
+    expect(wrapper.findComponent(OFormSelect).attributes("hint")).toBeUndefined();
+  });
+
+  it("editing a stored secret says the value is write-only", () => {
+    wrapper = mountForm(secretEdit(true));
+
+    expect(wrapper.find('[data-test="synthetics-variable-value-set"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("SENTINEL_WRITE_ONLY");
+  });
+
+  it("editing a secret with no stored value shows the input, not the write-only caption", () => {
+    wrapper = mountForm(secretEdit(false));
+
+    expect(wrapper.text()).not.toContain("SENTINEL_WRITE_ONLY");
+  });
+
+  it("choosing Replace swaps the write-only caption for the value input", async () => {
+    wrapper = mountForm(secretEdit(true));
+    (wrapper.vm as any).replacing = true;
+    await nextTick();
+
+    expect(wrapper.find('[data-test="synthetics-variable-value-set"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("SENTINEL_WRITE_ONLY");
+  });
+
+  it("editing a plain variable says nothing about write-only", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "URL", kind: "plain", value: "https://a.test", has_value: true },
+    });
+
+    expect(wrapper.text()).not.toContain("SENTINEL_WRITE_ONLY");
+  });
+});
