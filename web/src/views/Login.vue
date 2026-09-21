@@ -163,9 +163,11 @@ export default defineComponent({
             store.dispatch("setSelectedOrganization", tempDefaultOrg);
           }
           //here check if the config.Iscloud is true and the redirectURI is there any new_user_login == true
+          // skip the onboarding prompt for invited users, who get new_user_login == true too on their first login
           if (
             config.isCloud == "true" &&
-            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true"
+            checkCallBackValues(router.currentRoute.value.hash, "new_user_login") == "true" &&
+            checkCallBackValues(router.currentRoute.value.hash, "pending_invites") != "true"
           ) {
             localStorage.setItem("isFirstTimeLogin", "true");
           }

@@ -48,7 +48,7 @@ const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
 const ODialogStub = {
   name: "ODialog",
   inheritAttrs: false,
-  props: ["open", "size", "showClose", "title"],
+  props: ["open", "size", "showClose"],
   emits: ["update:open"],
   template: `
     <div
@@ -56,7 +56,6 @@ const ODialogStub = {
       :data-open="String(open)"
       :data-size="size"
     >
-      <h2 data-test="connect-data-source-popup-title">{{ title }}</h2>
       <slot />
       <button
         data-test="o-dialog-close-btn"
