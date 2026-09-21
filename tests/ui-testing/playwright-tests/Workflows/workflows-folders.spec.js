@@ -225,8 +225,10 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
     await pm.workflowFoldersPage.openEditorFromRow(wf.name);
-    // Editing: the create-only folder picker is absent and the folder renders as static text.
+    // Editing: the create-only picker is gone, and the folder it was opened from is the
+    // one the header names — absence alone would also pass on an editor that lost it.
     await pm.workflowFoldersPage.expectEditorFolderPickerHidden();
+    await pm.workflowFoldersPage.expectEditorFolderStatic(FOLDER_B);
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderB);
 
     await page.goBack();
@@ -273,11 +275,15 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
   test('WFF-UI-08: the trigger-type tab filters inside the active folder', {
     tag: ['@workflowFolders', '@P1'],
   }, async ({ page }) => {
-    // Two different trigger kinds live in the same folder, so the concrete
-    // trigger tab must keep one and hide the other — filtering, not just showing.
-    const alertWf = await seedWorkflow(page, { folderId: ctx.folderA });
+    // Two trigger kinds in one folder, sharing a search token: the token keeps BOTH rows
+    // candidates, so the trigger tab is the only thing that can hide either. Without the
+    // shared token, expectWorkflowVisible's retry can leave one name in the search box and
+    // the "other row is gone" assertion passes on the name filter instead of the tab.
+    const token = `trg${uniq()}`;
+    const alertWf = await seedWorkflow(page, { folderId: ctx.folderA, name: `wf_auto_fld_${token}_alert` });
     const incidentWf = await seedWorkflow(page, {
       folderId: ctx.folderA,
+      name: `wf_auto_fld_${token}_incident`,
       triggerKind: 'incident_event',
     });
 
@@ -285,16 +291,16 @@ test.describe('Workflow folders', { tag: ['@workflows', '@workflowFolders', '@en
     await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
     await pm.workflowFoldersPage.expectWorkflowVisible(incidentWf.name);
 
+    // Both fetched and both matching the query — the filter is client-side over the rows
+    // already in hand, so the tab switch below needs no refetch to be observable.
+    await pm.workflowFoldersPage.searchWorkflows(token);
+    await expect(pm.workflowFoldersPage.workflowRowAnchor(alertWf.name)).toBeVisible();
+    await expect(pm.workflowFoldersPage.workflowRowAnchor(incidentWf.name)).toBeVisible();
+
     await pm.workflowFoldersPage.selectListTab('alert_fired');
-    await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
-    // Clear any search the visibility retry typed, so the incident workflow is
-    // hidden by the trigger tab alone, never by the name filter.
-    await pm.workflowFoldersPage.clearWorkflowSearch();
-    // The clear re-fires the slow list GET; re-assert the alert workflow is
-    // still shown so the list is known to have re-rendered before asserting the
-    // incident workflow is absent (a bare not.toBeVisible passes mid-reload).
-    await pm.workflowFoldersPage.expectWorkflowVisible(alertWf.name);
-    await pm.workflowFoldersPage.expectWorkflowNotVisible(incidentWf.name);
+    await pm.workflowFoldersPage.expectListTabActive('alert_fired');
+    await expect(pm.workflowFoldersPage.workflowRowAnchor(alertWf.name)).toBeVisible();
+    await expect(pm.workflowFoldersPage.workflowRowAnchor(incidentWf.name)).toBeHidden();
     await pm.workflowFoldersPage.expectFolderInUrl(ctx.folderA);
   });
 
