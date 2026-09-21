@@ -726,6 +726,30 @@ pub async fn handle_request(
         return Ok(otlp_export_response(&res, req_type)); // just return
     }
 
+    // A pattern-manager failure must not fail the request, matching the traces path exactly.
+    #[cfg(feature = "vectorscan")]
+    {
+        match o2_enterprise::enterprise::re_patterns::get_pattern_manager().await {
+            Ok(pattern_manager) => {
+                for (stream, data) in json_data_by_stream.iter_mut() {
+                    if let Err(e) = pattern_manager.process_at_ingestion(
+                        org_id,
+                        StreamType::Logs,
+                        stream,
+                        &mut data.0,
+                    ) {
+                        log::error!(
+                            "[LOGS:OTLP] error applying SDR patterns for stream {stream}: {e}"
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+            }
+        }
+    }
+
     // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
     let write_result = super::write_logs_by_stream(
         thread_id,
