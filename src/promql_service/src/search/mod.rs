@@ -41,10 +41,7 @@ use infra::{
 };
 use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
-    ast::{
-        at_modifier::resolve_at_modifiers,
-        selector_window::{SelectorWindow, selector_window},
-    },
+    ast::{at_modifier::resolve_query, selector_window::selector_window},
     micros,
 };
 use promql_parser::parser;
@@ -118,6 +115,13 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.timeout = timeout as i64;
     req.is_super_cluster = is_super_cluster;
+    // whatever splits the range below sees only its own part of it
+    let stmt = req.query.as_mut().unwrap();
+    if let Some(query) = resolve_query(&stmt.query, stmt.start, stmt.end, stmt.step)
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?
+    {
+        stmt.query = query;
+    }
 
     let mut stop_watch = TookWatcher::new();
 
@@ -275,7 +279,7 @@ pub async fn search(
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
 async fn search_in_cluster(
     trace_id: &str,
-    mut req: cluster_rpc::MetricsQueryRequest,
+    req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
     nodes: &[Node],
 ) -> Result<Value> {
@@ -283,7 +287,9 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
-    let window = pin_query(req.query.as_mut().unwrap())?;
+    let window = parser::parse(&req.query.as_ref().unwrap().query)
+        .map(|ast| selector_window(&ast))
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -564,21 +570,6 @@ async fn search_in_cluster(
     Ok(values)
 }
 
-/// Resolves `@ start()` / `@ end()` on the whole range before it is split across workers.
-fn pin_query(stmt: &mut cluster_rpc::MetricsQueryStmt) -> Result<SelectorWindow> {
-    let mut ast =
-        parser::parse(&stmt.query).map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
-    // the evaluated grid is the adjusted one, so `end()` is its last step
-    let (start, end) = match stmt.step {
-        0 => (stmt.start, stmt.end),
-        step => adjust_start_end(stmt.start, stmt.end, step),
-    };
-    if resolve_at_modifiers(&mut ast, start, end) {
-        stmt.query = ast.to_string();
-    }
-    Ok(selector_window(&ast))
-}
-
 async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics = HashMap::new();
@@ -857,59 +848,5 @@ mod tests {
 
         // Verify the default is the expected value (40,000)
         assert_eq!(expected_default, 40_000);
-    }
-
-    fn stmt(query: &str, start: i64, end: i64, step: i64) -> cluster_rpc::MetricsQueryStmt {
-        cluster_rpc::MetricsQueryStmt {
-            query: query.to_string(),
-            start,
-            end,
-            step,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn test_pin_query_resolves_start_and_end_on_the_whole_range() {
-        // both bounds sit on the 60 s grid, so the cache alignment leaves them alone
-        let second = 1_000_000;
-        let mut stmt = stmt(
-            "a and topk(5, rate(a[1h] @ end())) or a @ start()",
-            1_600_000_020 * second,
-            1_600_000_620 * second,
-            60 * second,
-        );
-        let window = pin_query(&mut stmt).unwrap();
-        assert_eq!(
-            stmt.query,
-            "a and topk(5, rate(a[1h] @ 1600000620.000)) or a @ 1600000020.000"
-        );
-        assert_eq!(window.pinned, Some(1_600_000_620 * second));
-        // resolving is stable, so a repeated request keys the cache on the same text
-        let resolved = stmt.query.clone();
-        pin_query(&mut stmt).unwrap();
-        assert_eq!(stmt.query, resolved);
-    }
-
-    #[test]
-    fn test_pin_query_keeps_the_query_text_without_start_or_end() {
-        let query = "sum  by (job) (rate(a[5m]  @ 1600000000))";
-        let mut stmt = stmt(query, 0, 600_000_000, 60_000_000);
-        let window = pin_query(&mut stmt).unwrap();
-        assert_eq!(stmt.query, query);
-        assert_eq!(window.pinned, Some(1_600_000_000_000_000));
-    }
-
-    #[test]
-    fn test_pin_query_on_an_instant_query() {
-        let at = 1_600_000_000_000_000;
-        let mut stmt = stmt("a @ end()", at, at, 0);
-        pin_query(&mut stmt).unwrap();
-        assert_eq!(stmt.query, "a @ 1600000000.000");
-    }
-
-    #[test]
-    fn test_pin_query_rejects_an_unparsable_query() {
-        assert!(pin_query(&mut stmt("a @", 0, 0, 0)).is_err());
     }
 }

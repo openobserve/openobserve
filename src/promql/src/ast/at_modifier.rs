@@ -18,7 +18,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use datafusion::error::{DataFusionError, Result};
 use promql_parser::parser::{AtModifier, Expr, Offset};
 
-use crate::micros;
+use crate::{adjust_start_end, micros};
 
 /// Functions whose value follows the evaluation timestamp, so a pinned argument does not pin them.
 const TIME_DEPENDENT_FUNCS: [&str; 11] = [
@@ -68,6 +68,25 @@ pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
         changed = true;
     });
     changed
+}
+
+/// The query text with `@ start()` / `@ end()` pinned, `None` when it uses neither.
+pub fn resolve_query(
+    query: &str,
+    start: i64,
+    end: i64,
+    step: i64,
+) -> Result<Option<String>, String> {
+    if !query.contains('@') {
+        return Ok(None);
+    }
+    let mut expr = promql_parser::parser::parse(query)?;
+    // the evaluated grid is the adjusted one, so `end()` is its last step
+    let (start, end) = match step {
+        0 => (start, end),
+        step => adjust_start_end(start, end, step),
+    };
+    Ok(resolve_at_modifiers(&mut expr, start, end).then(|| expr.to_string()))
 }
 
 /// The pinned instant in microseconds, `None` while it is still `start()` / `end()`.
@@ -219,6 +238,32 @@ mod tests {
             vec![Some(T + 9_999_000), Some(T + 1_235_000), None],
             "{reparsed}"
         );
+    }
+
+    #[test]
+    fn test_resolve_query_pins_start_and_end_to_the_evaluated_grid() {
+        let second = 1_000_000;
+        let query = "a and topk(5, rate(a[1h] @ end())) or a @ start()";
+        let resolved = resolve_query(query, 1_600_000_025 * second, T + 630 * second, 60 * second)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            resolved,
+            "a and topk(5, rate(a[1h] @ 1600000620.000)) or a @ 1600000020.000"
+        );
+        // a partition of the range re-resolves nothing, so every partition keeps the same pins
+        assert_eq!(resolve_query(&resolved, 0, T, 60 * second).unwrap(), None);
+    }
+
+    #[test]
+    fn test_resolve_query_rewrites_only_what_uses_start_or_end() {
+        assert_eq!(
+            resolve_query("a @ end()", T, T, 0).unwrap(),
+            Some("a @ 1600000000.000".to_string())
+        );
+        assert_eq!(resolve_query("a  @ 1600000000", 0, T, 0).unwrap(), None);
+        assert_eq!(resolve_query("sum  by (job) (a)", 0, T, 0).unwrap(), None);
+        assert!(resolve_query("a @", 0, T, 0).is_err());
     }
 
     #[test]

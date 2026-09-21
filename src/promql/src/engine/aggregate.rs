@@ -126,10 +126,6 @@ impl Engine {
         expr: &PromExpr,
         modifier: &Option<LabelModifier>,
     ) -> Result<Option<Value>> {
-        // the shape reads the selector under the call, which would skip the call's own pin
-        if matches!(pin(expr)?, Pin::At(_)) {
-            return Ok(None);
-        }
         let Some(shape) = fused_agg_shape(expr) else {
             return Ok(None);
         };
@@ -163,6 +159,10 @@ fn fused_agg_shape(expr: &PromExpr) -> Option<FusedAggShape<'_>> {
         .search
         .feature_metrics_fused_agg_enabled
     {
+        return None;
+    }
+    // the shape reads the selector under the call, which would skip a pin `exec_expr` evaluates
+    if !matches!(pin(expr), Ok(Pin::Varies)) {
         return None;
     }
     match expr {
@@ -288,6 +288,18 @@ mod tests {
             Some(("last_over_time".to_string(), false, Some(None)))
         );
         assert_eq!(shape("sum(abs(m))"), None);
+    }
+
+    #[test]
+    fn test_fused_agg_shape_leaves_a_pinned_child_to_exec_expr() {
+        assert_eq!(shape("topk(time(), rate(m[5m] @ 1100))"), None);
+        assert_eq!(shape("topk(time(), m @ 1100 offset 1m)"), None);
+        assert_eq!(shape("sum(rate(m[5m] @ end()))"), None);
+        // a pin inside a subquery is reached through `exec_expr` on the range argument
+        assert_eq!(
+            shape("sum(rate((m @ 1100)[5m:1m]))"),
+            Some(("rate".to_string(), true, None))
+        );
     }
 
     #[test]
