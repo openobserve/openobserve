@@ -17,6 +17,8 @@
 // The check is exposed separately so a caller can confirm before the org is written to.
 
 import dashboardsService from "@/services/dashboards";
+import { dashboardKeys } from "@/services/dashboards.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import hostMetricsDashboard from "@/assets/dashboards/host_metrics.dashboard.json";
 
 export const HOST_METRICS_DASHBOARD_TITLE = "Host Metrics";
@@ -97,6 +99,8 @@ async function doImport(orgId: string): Promise<HostMetricsImportResult> {
       return { status: "exists", dashboardId: existing.dashboardId, folderId: "default" };
     }
     const created = await dashboardsService.create(orgId, hostMetricsDashboard, "default");
+    // The create bypasses the dashboards query, so the cached folder lists must be told or they hide the new dashboard.
+    void queryClient.invalidateQueries({ queryKey: dashboardKeys.all(orgId) });
     const dashboardId = created.data?.[`v${created.data?.version}`]?.dashboardId ?? "";
     return { status: "created", dashboardId, folderId: "default" };
   } catch (err: any) {

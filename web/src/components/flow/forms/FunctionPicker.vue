@@ -355,7 +355,10 @@ import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import functionsService from "@/services/jstransform";
+import { functionsQuery, saveFunctionMutation } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import { isJsFunction } from "@/utils/functionLanguage";
 
 const AddFunction = defineAsyncComponent(() => import("@/components/functions/AddFunction.vue"));
@@ -497,20 +500,16 @@ const wantsJs = computed(() => props.language === "javascript");
 const matchesHostLanguage = (func: any) =>
   wantsJs.value ? isJsFunction(func) : !isJsFunction(func);
 
+// A function save anywhere goes through saveFunctionMutation, which expires this list, so the post-save reload reads fresh.
 const getFunctions = async () => {
   loading.value = true;
   try {
-    const res = await functionsService.list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
+    const list = await queryClient.fetchQuery(
+      functionsQuery(store.state.selectedOrganization.identifier),
     );
     const names: string[] = [];
     const defs: Record<string, string> = {};
-    (res.data?.list || []).forEach((func: any) => {
+    (list || []).forEach((func: any) => {
       if (matchesHostLanguage(func)) {
         names.push(func.name);
         defs[func.name] = func.function;
@@ -590,6 +589,10 @@ const fnPayload = (name: string) => ({
   transType: wantsJs.value ? 1 : 0,
 });
 
+const orgId = useOrgId();
+const createFunction = useMutation(() => saveFunctionMutation(orgId.value, () => false));
+const updateFunction = useMutation(() => saveFunctionMutation(orgId.value, () => true));
+
 const afterSaved = async (name: string) => {
   await getFunctions();
   await nextTick();
@@ -601,10 +604,7 @@ const onSavedSubmit = async (v: SavedFunctionForm) => {
   if (v.isSavedFunctionAction === "create") {
     savingFn.value = true;
     try {
-      const res: any = await functionsService.create(
-        store.state.selectedOrganization.identifier,
-        fnPayload(v.savedFunctionName),
-      );
+      const res: any = await createFunction.mutateAsync(fnPayload(v.savedFunctionName));
       toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.saved")) });
       savedDialog.value = false;
       await afterSaved(v.savedFunctionName);
@@ -626,10 +626,7 @@ const onSavedSubmit = async (v: SavedFunctionForm) => {
 const executeUpdate = async () => {
   savingFn.value = true;
   try {
-    const res: any = await functionsService.update(
-      store.state.selectedOrganization.identifier,
-      fnPayload(fnToUpdateName.value),
-    );
+    const res: any = await updateFunction.mutateAsync(fnPayload(fnToUpdateName.value));
     toast({ variant: "success", message: raw(res?.data?.message || t("flow.function.updated")) });
     fnUpdateConfirm.value = false;
     savedDialog.value = false;

@@ -7909,6 +7909,7 @@ dependencies = [
  "arrow-flight",
  "arrow-schema",
  "async-stream",
+ "axum",
  "bytes",
  "common",
  "config",

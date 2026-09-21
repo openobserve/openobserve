@@ -6,8 +6,9 @@
  * Before #14351, cloning a composite alert flattened it to a simple alert
  * instead of routing through the dedicated /clone endpoint, so the clone lost
  * its composite_condition and child references. Covers the same-folder clone,
- * identity preservation, cross-folder routing, cancel, and a clone whose
- * child alert was subsequently deleted.
+ * identity preservation, cross-folder routing, cancel, the copy landing paused,
+ * the duplicate name the prefilled dialog produces, and the delete guard the
+ * clone extends over the children it now shares with its source.
  */
 
 const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
@@ -17,7 +18,7 @@ const testLogger = require('../../utils/test-logger.js');
 const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
 const {
   uniq, simpleAlert, compositeAlert,
-  createAlert, findAlertId, findAlertIdInFolder, getAlert,
+  createAlert, listAlerts, findAlertId, findAlertIdInFolder, getAlert,
   deleteAlertInFolder, deleteAlertFolder, seedAlertFixtures, createAlertFolder,
 } = require('../../utils/alerts-api-helpers.js');
 
@@ -59,11 +60,11 @@ test.describe('Clone Composite Alerts testcases', {
     return { id, name };
   }
 
-  async function createCompositeFixture(page, children) {
+  async function createCompositeFixture(page, children, overrides = {}) {
     const name = uniq('composite_clone');
     const response = await createAlert(
       page,
-      compositeAlert(name, children.map((child) => child.id)),
+      compositeAlert(name, children.map((child) => child.id), overrides),
     );
     expect(response.status(), await response.text()).toBe(200);
     const id = await findAlertId(page, name);
@@ -167,6 +168,10 @@ test.describe('Clone Composite Alerts testcases', {
     expect(newId, 'cloned composite must land in the chosen target folder').toBeTruthy();
     created.push({ id: newId, folderId: targetFolderId });
     expect(await findAlertId(page, newName), 'clone must NOT remain in the default folder').toBeUndefined();
+
+    // The list follows the clone rather than leaving the user in the folder
+    // they cloned from, where the new alert is nowhere to be seen.
+    await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
     testLogger.info('Composite clone routed to the target folder, not default');
   });
 
@@ -189,22 +194,19 @@ test.describe('Clone Composite Alerts testcases', {
     testLogger.info('Cancel dismissed the dialog and created no clone');
   });
 
-  test('should clone a composite whose child alert was deleted', {
-    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
+  test('should create the clone paused even when the source composite is running', {
+    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P1'],
   }, async ({ page }) => {
-    const child = await createChild(page, uniq('composite_clone_child'));
-    const survivingChild = await createChild(page, uniq('composite_clone_child_survivor'));
-    const source = await createCompositeFixture(page, [child, survivingChild]);
-
-    // Clone is id-based and copies the stored expression; a deleted child must
-    // not block it. Remove the child from the tracked cleanup set first.
-    await deleteAlertInFolder(page, child.id, 'default');
-    created = created.filter((entry) => entry.id !== child.id);
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB], { enabled: true });
+    const sourceAlert = await getAlert(page, source.id);
+    expect(sourceAlert.enabled, 'the source must start out running').toBe(true);
+    expect(sourceAlert.scheduler_job_present, 'an enabled composite owns a scheduler job').toBe(true);
 
     await openCompositeList(page);
     await pm.compositeAlertsPage.clickCloneButton(source.name);
     await pm.compositeAlertsPage.expectCloneDialogVisible();
-    await pm.compositeAlertsPage.expectStreamSelectsHidden();
 
     const newName = `${source.name} - Copy`;
     await pm.compositeAlertsPage.fillCloneName(newName);
@@ -212,10 +214,118 @@ test.describe('Clone Composite Alerts testcases', {
     await pm.compositeAlertsPage.expectCloneSuccessToast();
 
     const newId = await findAlertId(page, newName);
-    expect(newId, 'clone with a stale child reference must still be created').toBeTruthy();
+    expect(newId, 'cloned composite must be findable by name').toBeTruthy();
     created.push({ id: newId, folderId: 'default' });
-    await expect(pm.compositeAlertsPage.listBadge(newId)).toBeVisible();
-    await expect(pm.compositeAlertsPage.listChildCount(newId)).toBeVisible();
-    testLogger.info('Composite cloned despite its child having been deleted');
+
+    // A clone is never armed: duplicating an alert to edit it must not start a
+    // second stream of notifications behind the user's back.
+    const clone = await getAlert(page, newId);
+    expect(clone.enabled, 'clone must land paused even though the source was running').toBe(false);
+    expect(clone.scheduler_job_present, 'a paused clone owns no scheduler job').toBe(false);
+
+    // The row toggle is the only affordance that tells the two apart on the
+    // list, so it has to disagree between source and copy.
+    await expect(pm.compositeAlertsPage.listEnableToggle(newName)).toHaveAttribute('data-row-action', 'resume');
+    await expect(pm.compositeAlertsPage.listEnableToggle(source.name)).toHaveAttribute('data-row-action', 'pause');
+    testLogger.info('Clone of a running composite landed paused and unscheduled');
+  });
+
+  test('should keep the prefilled name and leave two composites answering to it', {
+    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
+  }, async ({ page }) => {
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
+
+    await openCompositeList(page);
+    await pm.compositeAlertsPage.clickCloneButton(source.name);
+    await pm.compositeAlertsPage.expectCloneDialogVisible();
+    await pm.compositeAlertsPage.expectCloneNamePrefilled(source.name);
+
+    // Saving the dialog untouched is the default path, and alert names are not
+    // unique (a plain alert create accepts a duplicate too), so the folder ends
+    // up holding two composites under one name.
+    await pm.compositeAlertsPage.submitClone();
+    await pm.compositeAlertsPage.expectCloneSuccessToast();
+
+    const rows = (await listAlerts(page)).filter((row) => row.name === source.name);
+    expect(rows, 'the copy must be a second row, not an overwrite').toHaveLength(2);
+    const copy = rows.find((row) => row.alert_id !== source.id);
+    expect(copy, 'the second row must be a new alert, not the source again').toBeTruthy();
+    created.push({ id: copy.alert_id, folderId: 'default' });
+
+    // Assertions stay on the API from here: every row-level selector is keyed
+    // by name, and two rows now answer to this one.
+    const sourceAlert = await getAlert(page, source.id);
+    const clone = await getAlert(page, copy.alert_id);
+    expect(clone.alert_type).toBe('composite');
+    expect(clone.composite_condition.expression).toBe(sourceAlert.composite_condition.expression);
+    testLogger.info('Clone kept the prefilled name and created a second row under it');
+  });
+
+  test('should extend the blocked-delete guard from the source to the clone', {
+    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
+  }, async ({ page }) => {
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
+
+    await openCompositeList(page);
+    await pm.compositeAlertsPage.clickCloneButton(source.name);
+    await pm.compositeAlertsPage.expectCloneDialogVisible();
+
+    const newName = `${source.name} - Copy`;
+    await pm.compositeAlertsPage.fillCloneName(newName);
+    await pm.compositeAlertsPage.submitClone();
+    await pm.compositeAlertsPage.expectCloneSuccessToast();
+
+    const newId = await findAlertId(page, newName);
+    expect(newId, 'cloned composite must be findable by name').toBeTruthy();
+    created.push({ id: newId, folderId: 'default' });
+
+    // The clone copies the stored id expression, so the children it shares with
+    // its source are now held twice over: the delete has to name both parents,
+    // not just the one the user remembers building.
+    await pm.compositeAlertsPage.openList();
+    await pm.alertsPage.searchAlert(childA.name);
+    await pm.compositeAlertsPage.attemptRowDelete(childA.name);
+
+    await expect(pm.compositeAlertsPage.referenceDrawer()).toBeVisible();
+    await expect(pm.compositeAlertsPage.referenceParent(source.id)).toBeVisible();
+    await expect(pm.compositeAlertsPage.referenceParent(newId)).toBeVisible();
+    expect(await findAlertId(page, childA.name), 'the child must survive the refused delete').toBeTruthy();
+    testLogger.info('Cloning a composite extended the child delete guard to the copy');
+  });
+
+  test('should refuse a blank clone name', {
+    tag: ['@composite-alert-clone', '@all', '@alerts', '@alerts-composite', '@P2'],
+  }, async ({ page }) => {
+    const childA = await createChild(page, uniq('composite_clone_child_a'));
+    const childB = await createChild(page, uniq('composite_clone_child_b'));
+    const source = await createCompositeFixture(page, [childA, childB]);
+
+    await openCompositeList(page);
+    await pm.compositeAlertsPage.clickCloneButton(source.name);
+    await pm.compositeAlertsPage.expectCloneDialogVisible();
+
+    // Nothing below the dialog validates the name — the composite create path
+    // accepts "" where a plain alert is rejected 400 — so an empty name has to
+    // be refused here or it stores a row that cannot be searched, toggled or
+    // deleted by name. Whitespace is not a name either.
+    await pm.compositeAlertsPage.fillCloneName('');
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeDisabled();
+    await pm.compositeAlertsPage.fillCloneName('   ');
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeDisabled();
+
+    await pm.compositeAlertsPage.fillCloneName(`${source.name} - Copy`);
+    await expect(pm.compositeAlertsPage.cloneSubmitButton()).toBeEnabled();
+
+    await pm.compositeAlertsPage.cancelClone();
+    await pm.compositeAlertsPage.expectCloneDialogHidden();
+    expect(
+      (await listAlerts(page)).filter((row) => !row.name || !row.name.trim()),
+      'no unnamed alert may exist in the folder',
+    ).toHaveLength(0);
+    testLogger.info('Blank clone name kept Save disabled and created nothing');
   });
 });

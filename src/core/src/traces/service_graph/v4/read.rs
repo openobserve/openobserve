@@ -30,7 +30,10 @@ use config::meta::{
 
 use super::{
     PROCESSED_TIMESTAMP_STREAM,
-    resolve::{REASON_AMBIGUOUS, REASON_CARDINALITY, REASON_IP_ONLY, REASON_NO_PEER},
+    resolve::{
+        CLIENT_TYPE_USER, CLIENT_USER, REASON_AMBIGUOUS, REASON_CARDINALITY, REASON_IP_ONLY,
+        REASON_NO_PEER,
+    },
     writer::{
         LABEL_TRACE_STREAM, M_AGENT_INSTANCES, M_CLIENT_SECONDS, M_REQUEST_FAILED_TOTAL,
         M_REQUEST_TOTAL, M_SERVER_SECONDS, M_UNRESOLVED_TOTAL,
@@ -57,6 +60,27 @@ const IDX_ORG_INBOUND: usize = 15;
 const IDX_ORG_SERVER_COUNT: usize = 16;
 const PLAN_LEN_UNFILTERED: usize = 15;
 const PLAN_LEN_FILTERED: usize = 17;
+const PLAN_NAMES: [&str; PLAN_LEN_FILTERED] = [
+    "requests",
+    "failed",
+    "client_p50",
+    "client_p95",
+    "client_p99",
+    "server_p50",
+    "server_p95",
+    "server_p99",
+    "server_count",
+    "unresolved",
+    "processed",
+    "instances",
+    "baseline_p50",
+    "baseline_p95",
+    "baseline_p99",
+    "org_inbound",
+    "org_server_count",
+];
+/// The OTel collector's servicegraph connector labels its entry and unresolved edges this way.
+const COLLECTOR_VIRTUAL_NODE: &str = "virtual_node";
 /// Results read through the edge matcher; an `agent_env` filter is enforced on these rows.
 const IDX_EDGE_FAMILY: [usize; 9] = [
     IDX_REQUESTS,
@@ -195,23 +219,45 @@ where
 {
     let range_secs = ((end - start) / 1_000_000).max(1);
     let plan = plan_queries(filter, range_secs, start, end).map_err(anyhow::Error::msg)?;
-    let results = run_plan(&plan, run).await?;
-    assemble(results, filter.agent_env.as_deref())
+    let (results, degraded) = settle_plan(run_plan(&plan, run).await)?;
+    let (input, mut meta) = assemble(results, filter.agent_env.as_deref())?;
+    meta.degraded = degraded;
+    Ok((input, meta))
 }
 
 /// Never drops a running search: its task and search-server registration would leak.
 async fn run_plan<F, Fut>(
     plan: &[(String, i64)],
     run: F,
-) -> Result<Vec<Vec<InstantValue>>, anyhow::Error>
+) -> Vec<Result<Vec<InstantValue>, anyhow::Error>>
 where
     F: Fn(String, i64) -> Fut,
     Fut: Future<Output = Result<Vec<InstantValue>, anyhow::Error>>,
 {
-    futures::future::join_all(plan.iter().map(|(q, at)| run(q.clone(), *at)))
-        .await
-        .into_iter()
-        .collect()
+    futures::future::join_all(plan.iter().map(|(q, at)| run(q.clone(), *at))).await
+}
+
+/// Only the edge counts are load-bearing; any other failed query is read as empty and reported.
+fn settle_plan(
+    results: Vec<Result<Vec<InstantValue>, anyhow::Error>>,
+) -> Result<(Vec<Vec<InstantValue>>, Vec<String>), anyhow::Error> {
+    let mut degraded = vec![];
+    let mut settled = Vec::with_capacity(results.len());
+    for (i, r) in results.into_iter().enumerate() {
+        let name = PLAN_NAMES.get(i).copied().unwrap_or("query");
+        match r {
+            Ok(rows) => settled.push(rows),
+            Err(e) if i == IDX_REQUESTS || i == IDX_FAILED => {
+                return Err(anyhow::anyhow!("{name} query failed: {e}"));
+            }
+            Err(e) => {
+                log::warn!("[ServiceGraph] v4 read: {name} query failed, read as empty: {e}");
+                degraded.push(name.to_string());
+                settled.push(vec![]);
+            }
+        }
+    }
+    Ok((settled, degraded))
 }
 
 /// Query text and evaluation time in the fixed order `assemble` consumes.
@@ -256,7 +302,7 @@ fn assemble(
     if let Some(env) = agent_env {
         scope_to_env(&mut results, env);
     }
-    let edges = assemble_edges(&results);
+    let (edges, collector_unresolved) = assemble_edges(&results);
     let nodes = assemble_nodes(&results);
     let (org_inbound, org_requests_server) = if filtered {
         (
@@ -266,10 +312,13 @@ fn assemble(
     } else {
         org_maps_from(&edges, &nodes)
     };
+    let mut unresolved = unresolved_counts(&results[IDX_UNRESOLVED]);
+    unresolved.no_peer += collector_unresolved;
     let meta = TopologyMeta {
         source: "v4".to_string(),
         processed_up_to: processed_up_to(&results[IDX_PROCESSED]),
-        unresolved: unresolved_counts(&results[IDX_UNRESOLVED]),
+        unresolved,
+        degraded: vec![],
     };
     let input = TopologyInput {
         edges,
@@ -433,13 +482,25 @@ fn label_rows(rows: &[InstantValue], label: &str) -> Vec<(String, f64)> {
         .collect()
 }
 
+/// A collector `user` virtual node is our entry edge; other virtual-node edges stay marked to be
+/// dropped.
 fn edge_identity(r: &InstantValue) -> EdgeIdentity {
     let l = &r.labels;
+    let client = l.get_value("client");
+    let connection_type = l.get_value("connection_type");
+    if connection_type == COLLECTOR_VIRTUAL_NODE && client == CLIENT_USER {
+        return (
+            client,
+            CLIENT_TYPE_USER.to_string(),
+            l.get_value("server"),
+            String::new(),
+        );
+    }
     (
-        l.get_value("client"),
+        client,
         l.get_value("client_type"),
         l.get_value("server"),
-        l.get_value("connection_type"),
+        connection_type,
     )
 }
 
@@ -502,7 +563,8 @@ fn org_maps_from(
 }
 
 /// Counts create the edge; a quantile row without a count row is ignored.
-fn assemble_edges(results: &[Vec<InstantValue>]) -> Vec<MetricEdge> {
+/// Edges plus the requests of collector edges to `unknown`, which have no server to draw.
+fn assemble_edges(results: &[Vec<InstantValue>]) -> (Vec<MetricEdge>, u64) {
     let mut edges: BTreeMap<EdgeIdentity, MetricEdge> = BTreeMap::new();
     for (id, stream, v) in edge_stream_rows(&results[IDX_REQUESTS]) {
         let e = edges.entry(id).or_default();
@@ -519,8 +581,15 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> Vec<MetricEdge> {
             }
         }
     }
-    edges
+    let mut unresolved = 0.0;
+    let edges = edges
         .into_iter()
+        .filter(|((_, _, _, connection_type), e)| {
+            if connection_type == COLLECTOR_VIRTUAL_NODE {
+                unresolved += e.requests;
+            }
+            connection_type != COLLECTOR_VIRTUAL_NODE
+        })
         .map(|((client, client_type, server, connection_type), mut e)| {
             e.streams.sort_by(|a, b| a.0.cmp(&b.0));
             MetricEdge {
@@ -531,7 +600,8 @@ fn assemble_edges(results: &[Vec<InstantValue>]) -> Vec<MetricEdge> {
                 ..e
             }
         })
-        .collect()
+        .collect();
+    (edges, unresolved.round() as u64)
 }
 
 fn assemble_nodes(results: &[Vec<InstantValue>]) -> Vec<MetricNode> {
@@ -1456,14 +1526,77 @@ mod tests {
             Ok(vec![])
         })
         .await;
-        assert!(ret.is_err());
+        assert!(ret[0].is_err());
+        assert!(ret[1..].iter().all(Result::is_ok));
         assert_eq!(completed.load(Ordering::SeqCst), 3);
 
-        let ok = run_plan(&plan, |_, _| async move { Ok(vec![row(&[], 1.0)]) })
-            .await
-            .unwrap();
+        let ok = run_plan(&plan, |_, _| async move { Ok(vec![row(&[], 1.0)]) }).await;
         assert_eq!(ok.len(), 4);
-        assert_eq!(ok[3][0].sample.value, 1.0);
+        assert_eq!(ok[3].as_ref().unwrap()[0].sample.value, 1.0);
+    }
+
+    #[test]
+    fn test_settle_plan_degrades_optional_queries_only() {
+        let mut results: Vec<Result<Vec<InstantValue>, anyhow::Error>> =
+            (0..PLAN_LEN_UNFILTERED).map(|_| Ok(vec![])).collect();
+        results[IDX_INSTANCES] = Err(anyhow::anyhow!("boom"));
+        results[IDX_BASELINE_Q] = Err(anyhow::anyhow!("boom"));
+        let (settled, degraded) = settle_plan(results).unwrap();
+        assert_eq!(settled.len(), PLAN_LEN_UNFILTERED);
+        assert_eq!(degraded, vec!["instances", "baseline_p50"]);
+
+        let mut results: Vec<Result<Vec<InstantValue>, anyhow::Error>> =
+            (0..PLAN_LEN_UNFILTERED).map(|_| Ok(vec![])).collect();
+        results[IDX_FAILED] = Err(anyhow::anyhow!("boom"));
+        assert!(
+            settle_plan(results)
+                .unwrap_err()
+                .to_string()
+                .starts_with("failed query failed")
+        );
+    }
+
+    #[test]
+    fn test_collector_virtual_node_edges() {
+        let mut r = empty_results(PLAN_LEN_UNFILTERED);
+        r[IDX_REQUESTS] = vec![
+            row(
+                &[
+                    ("client", "user"),
+                    ("connection_type", "virtual_node"),
+                    ("server", "gateway"),
+                ],
+                7.0,
+            ),
+            row(
+                &[
+                    ("client", "gateway"),
+                    ("connection_type", "virtual_node"),
+                    ("server", "unknown"),
+                ],
+                5.0,
+            ),
+            row(&[("client", "gateway"), ("server", "api")], 3.0),
+        ];
+        let (edges, dropped) = assemble_edges(&r);
+        assert_eq!(dropped, 5);
+        let ids: Vec<(&str, &str, &str, &str)> = edges
+            .iter()
+            .map(|e| {
+                (
+                    e.client.as_str(),
+                    e.client_type.as_str(),
+                    e.server.as_str(),
+                    e.connection_type.as_str(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            ids,
+            vec![("gateway", "", "api", ""), ("user", "user", "gateway", "")]
+        );
+        let (_, meta) = assemble(r, None).unwrap();
+        assert_eq!(meta.unresolved.no_peer, 5);
     }
 
     #[test]

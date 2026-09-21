@@ -24,10 +24,13 @@ import AddRole from "@/components/iam/roles/AddRole.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-vi.mock("@/services/iam", () => ({
-  createRole: vi.fn(),
-  updateRole: vi.fn(),
-}));
+vi.mock("@/services/iam", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    createRole: vi.fn(),
+    updateRole: vi.fn(),
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),

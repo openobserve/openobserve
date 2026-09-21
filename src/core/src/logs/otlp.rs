@@ -48,7 +48,7 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -132,6 +132,51 @@ fn build_otlp_log_record(
     }
     rec[TIMESTAMP_COL_NAME] = timestamp.into();
     Some(rec)
+}
+
+/// ProtoJSON rules: int64 as a decimal string, and `partial_success` omitted on a clean success.
+fn export_response_to_proto_json(res: &ExportLogsServiceResponse) -> json::Value {
+    match &res.partial_success {
+        Some(ps) if ps.rejected_log_records != 0 || !ps.error_message.is_empty() => {
+            let mut partial = json::Map::new();
+            if ps.rejected_log_records != 0 {
+                partial.insert(
+                    "rejectedLogRecords".to_string(),
+                    json::Value::String(ps.rejected_log_records.to_string()),
+                );
+            }
+            if !ps.error_message.is_empty() {
+                partial.insert(
+                    "errorMessage".to_string(),
+                    json::Value::String(ps.error_message.clone()),
+                );
+            }
+            json::json!({ "partialSuccess": partial })
+        }
+        _ => json::json!({}),
+    }
+}
+
+/// OTLP/HTTP requires the response body to use the encoding the request arrived in.
+fn format_http_response(res: ExportLogsServiceResponse, req_type: OtlpRequestType) -> Response {
+    match req_type {
+        OtlpRequestType::HttpJson => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, CONTENT_TYPE_JSON)],
+            json::to_vec(&export_response_to_proto_json(&res)).expect("serialize response"),
+        )
+            .into_response(),
+        _ => {
+            let mut out = BytesMut::with_capacity(res.encoded_len());
+            res.encode(&mut out).expect("Out of memory");
+            (
+                StatusCode::OK,
+                [(header::CONTENT_TYPE, CONTENT_TYPE_PROTO)],
+                out.freeze(),
+            )
+                .into_response()
+        }
+    }
 }
 
 pub async fn handle_request(
@@ -715,68 +760,36 @@ pub async fn handle_request(
         });
     }
 
-    let (content_type, endpoint) = match req_type {
-        OtlpRequestType::HttpJson => (CONTENT_TYPE_JSON, "/api/otlp/v1/logs"),
-        OtlpRequestType::HttpProtobuf => (CONTENT_TYPE_PROTO, "/api/otlp/v1/logs"),
-        OtlpRequestType::Grpc => (CONTENT_TYPE_PROTO, "/grpc/otlp/logs"),
+    let endpoint = match req_type {
+        OtlpRequestType::Grpc => "/grpc/otlp/logs",
+        _ => "/api/otlp/v1/logs",
     };
 
     // if no data, fast return
     if json_data_by_stream.is_empty() {
-        let mut out = BytesMut::with_capacity(res.encoded_len());
-        res.encode(&mut out).expect("Out of memory");
-        return Ok((
-            StatusCode::OK,
-            [(header::CONTENT_TYPE, content_type)],
-            out.freeze(),
-        )
-            .into_response()); // just return
+        return Ok(format_http_response(res, req_type)); // just return
     }
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+    // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut status,
+        &mut IngestionStatus::Record(stream_status.status),
         json_data_by_stream,
         size_by_stream,
         derived_streams,
         None,
     )
-    .await
-    {
-        // A deleting-stream skip is surfaced on IngestionResponse for the HEC
-        // collector; OTLP's protobuf response has no field for it, so it keeps
-        // reporting 200 exactly as before.
-        Ok(_skipped) => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("200", out)
-        }
-        Err(e) => {
-            log::error!("Error while writing logs: {e}");
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            res.partial_success = Some(ExportLogsPartialSuccess {
-                rejected_log_records: stream_status.status.failed as i64,
-                error_message: stream_status.status.error,
-            });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("500", out)
-        }
-    };
+    .await;
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        metric_rpt_status_code,
+        if write_result.is_ok() { "200" } else { "500" },
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -789,12 +802,15 @@ pub async fn handle_request(
         .with_label_values(&label_values)
         .inc();
 
-    Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, content_type)],
-        response_body.freeze(),
-    )
-        .into_response())
+    if let Err(e) = write_result {
+        log::error!("Error while writing logs: {e}");
+        return Ok(MetaHttpResponse::error_with_header(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("error while writing log data: {e}"),
+        ));
+    }
+
+    Ok(format_http_response(res, req_type))
 }
 
 #[cfg(test)]
@@ -804,15 +820,50 @@ mod tests {
         utils::{flatten, json},
     };
     use opentelemetry_proto::tonic::{
-        collector::logs::v1::ExportLogsServiceRequest,
+        collector::logs::v1::{
+            ExportLogsPartialSuccess, ExportLogsServiceRequest, ExportLogsServiceResponse,
+        },
         common::v1::{
             AnyValue, InstrumentationScope, KeyValue,
             any_value::Value::{BoolValue, DoubleValue, IntValue, StringValue},
         },
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
     };
+    use prost::Message;
 
-    use super::{normalized_resource_map, otlp_log_record};
+    use super::{
+        CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, export_response_to_proto_json, format_http_response,
+        normalized_resource_map, otlp_log_record,
+    };
+
+    fn partial_response(rejected: i64, error: &str) -> ExportLogsServiceResponse {
+        ExportLogsServiceResponse {
+            partial_success: Some(ExportLogsPartialSuccess {
+                rejected_log_records: rejected,
+                error_message: error.to_string(),
+            }),
+        }
+    }
+
+    async fn response_parts(
+        res: ExportLogsServiceResponse,
+        req_type: OtlpRequestType,
+    ) -> (axum::http::StatusCode, String, Vec<u8>) {
+        let response = format_http_response(res, req_type);
+        let status = response.status();
+        let content_type = response
+            .headers()
+            .get(axum::http::header::CONTENT_TYPE)
+            .expect("content-type header")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap()
+            .to_vec();
+        (status, content_type, body)
+    }
 
     fn kv(key: &str, value: opentelemetry_proto::tonic::common::v1::any_value::Value) -> KeyValue {
         KeyValue {
@@ -1617,5 +1668,96 @@ mod tests {
         .await;
 
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn json_request_gets_a_json_body_not_protobuf() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "Too old data, only last 5 hours data can be ingested."),
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        let parsed: json::Value = json::from_slice(&body).expect("body must parse as JSON");
+        assert_eq!(
+            parsed["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("1".into())
+        );
+        assert!(
+            parsed["partialSuccess"]["errorMessage"]
+                .as_str()
+                .unwrap()
+                .contains("Too old data")
+        );
+        assert_ne!(body.first(), Some(&0x0a), "must not be a protobuf payload");
+    }
+
+    #[tokio::test]
+    async fn json_request_with_nothing_rejected_gets_an_empty_json_object() {
+        let (_, content_type, body) = response_parts(
+            ExportLogsServiceResponse {
+                partial_success: None,
+            },
+            OtlpRequestType::HttpJson,
+        )
+        .await;
+
+        assert_eq!(content_type, CONTENT_TYPE_JSON);
+        assert_eq!(String::from_utf8(body).unwrap(), "{}");
+    }
+
+    #[tokio::test]
+    async fn protobuf_request_still_gets_a_protobuf_body() {
+        let (status, content_type, body) = response_parts(
+            partial_response(1, "rejected"),
+            OtlpRequestType::HttpProtobuf,
+        )
+        .await;
+
+        assert_eq!(status, axum::http::StatusCode::OK);
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(
+            decoded.partial_success.unwrap().rejected_log_records,
+            1,
+            "protobuf clients must keep the payload they had before"
+        );
+    }
+
+    #[tokio::test]
+    async fn grpc_request_still_gets_a_protobuf_body() {
+        let (_, content_type, body) =
+            response_parts(partial_response(2, "rejected"), OtlpRequestType::Grpc).await;
+
+        assert_eq!(content_type, CONTENT_TYPE_PROTO);
+        let decoded = ExportLogsServiceResponse::decode(body.as_slice()).expect("valid protobuf");
+        assert_eq!(decoded.partial_success.unwrap().rejected_log_records, 2);
+    }
+
+    #[test]
+    fn proto_json_omits_partial_success_when_nothing_was_rejected() {
+        let res = ExportLogsServiceResponse {
+            partial_success: None,
+        };
+        assert_eq!(export_response_to_proto_json(&res), json::json!({}));
+
+        let empty = partial_response(0, "");
+        assert_eq!(export_response_to_proto_json(&empty), json::json!({}));
+    }
+
+    #[test]
+    fn proto_json_encodes_the_reject_count_as_a_decimal_string() {
+        let value = export_response_to_proto_json(&partial_response(7, "boom"));
+        assert_eq!(
+            value["partialSuccess"]["rejectedLogRecords"],
+            json::Value::String("7".into()),
+            "ProtoJSON encodes int64 as a string, not a number"
+        );
+        assert_eq!(
+            value["partialSuccess"]["errorMessage"],
+            json::Value::String("boom".into())
+        );
     }
 }

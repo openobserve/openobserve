@@ -7,22 +7,28 @@ import organizationsService from "@/services/organizations";
 import config from "@/aws-exports";
 
 // Mock the services
-vi.mock("@/services/users", () => ({
-  default: {
-    orgUsers: vi.fn(),
-    invitedUsers: vi.fn(),
-    getRoles: vi.fn(),
-    getUserGroups: vi.fn(),
-    getUserRoles: vi.fn(),
-    delete: vi.fn(),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      orgUsers: vi.fn(),
+      invitedUsers: vi.fn(),
+      getRoles: vi.fn(),
+      getUserGroups: vi.fn(),
+      getUserRoles: vi.fn(),
+      delete: vi.fn(),
+    },
+  });
+});
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    update_member_role: vi.fn(),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      update_member_role: vi.fn(),
+    },
+  });
+});
 
 // Mock vue-i18n. Resolve keys against the real app locale so migrated t()
 // calls produce the actual English text the notification assertions expect.

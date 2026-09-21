@@ -500,6 +500,21 @@ impl LlmScoreRecord {
         }
     }
 
+    /// Infer the flattened `_llm_scores` Arrow schema used to initialize the stream.
+    pub fn schema_for_reflection() -> anyhow::Result<arrow_schema::Schema> {
+        let sample = crate::utils::json::to_value(Self::init_for_reflection())?;
+        // Match log ingestion by flattening before schema inference.
+        let sample = crate::utils::flatten::flatten(sample)?;
+        let sample = sample
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("Failed to convert LlmScoreRecord to JSON object"))?;
+
+        Ok(crate::utils::schema::infer_json_schema_from_map(
+            LLM_SCORES_STREAM,
+            crate::meta::stream::StreamType::Logs,
+            std::iter::once(sample),
+        )?)
+    }
     pub fn is_newer_than(&self, other: &Self) -> bool {
         (self.score_version, self._timestamp, self.id.as_str())
             > (other.score_version, other._timestamp, other.id.as_str())

@@ -200,7 +200,8 @@ import { copyToClipboard } from "@/utils/clipboard";
 import CodeQueryEditor from "@/components/CodeQueryEditor.vue";
 import WorkflowConfigHeader from "./WorkflowConfigHeader.vue";
 import { buildConditionPreview } from "@/utils/conditionPreview";
-import functionsService from "@/services/jstransform";
+import { functionsQuery } from "@/services/jstransform.queries";
+import { queryClient } from "@/composables/query/queryClient";
 import { isCustomDestination } from "@/utils/destinationType";
 import { useWorkflowDestinations } from "@/plugins/workflows/useWorkflowDestinations";
 import type { Destination } from "@/ts/interfaces/alert";
@@ -337,20 +338,14 @@ const triggerKindTitle = computed<I18nText>(() =>
   t(triggerDef(data.value.trigger_kind || DEFAULT_TRIGGER_KIND).nodeTitleKey),
 );
 
-// A function node stores only its NAME — fetch definitions once to show the code
-// read-only. On failure the name + flatten badge still render (code just omitted).
+// A function node stores only its NAME — read the shared functions list to show the
+// code read-only. On failure the name + flatten badge still render (code just omitted).
 const functionDefs = ref<Record<string, string>>({});
 const loadFunctionDefs = async () => {
   try {
-    const res = await functionsService.list(
-      1,
-      100000,
-      "name",
-      false,
-      "",
-      store.state.selectedOrganization.identifier,
+    const list = await queryClient.fetchQuery(
+      functionsQuery(store.state.selectedOrganization.identifier),
     );
-    const list = res.data?.list || [];
     const map: Record<string, string> = {};
     for (const f of list) map[f.name] = f.function;
     functionDefs.value = map;

@@ -34,13 +34,16 @@ vi.mock("@/services/auth", () => ({
   },
 }));
 
-vi.mock("@/services/organizations", () => ({
-  default: {
-    os_list: vi.fn().mockResolvedValue({
-      data: { data: [] },
-    }),
-  },
-}));
+vi.mock("@/services/organizations", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      os_list: vi.fn().mockResolvedValue({
+        data: { data: [] },
+      }),
+    },
+  });
+});
 
 vi.mock("@/utils/zincutils", () => ({
   getBasicAuth: vi.fn().mockReturnValue("basic-auth-token"),

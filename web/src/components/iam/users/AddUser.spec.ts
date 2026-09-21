@@ -34,15 +34,17 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
-vi.mock("@/services/users", () => ({
-  default: {
-    create: vi.fn(),
-    update: vi.fn(),
-    updateexistinguser: vi.fn(),
-    getUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
-    get: vi.fn(() => Promise.resolve({ data: { lockout: { locked: false } } })),
-  },
-}));
+vi.mock("@/services/users", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: vi.fn(),
+      update: vi.fn(),
+      updateexistinguser: vi.fn(),
+      getUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
+    },
+  });
+});
 
 vi.mock("@/services/reodotdev_analytics", () => ({
   useReo: () => ({ track: vi.fn() }),

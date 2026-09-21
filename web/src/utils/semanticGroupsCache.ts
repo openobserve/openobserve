@@ -13,46 +13,23 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The org's semantic field groups, fetched once and shared. Correlation reads
-// them through useServiceCorrelation; chart code reads them directly, so the
-// fetch, its TTL and its in-flight dedupe live here rather than inside a
-// composable neither caller can reach.
+// The fetch lives here rather than in a composable because chart code, which reads these directly, cannot reach one.
 
-import serviceStreamsApi from "@/services/service_streams";
+import { queryClient } from "@/composables/query/queryClient";
+import { semanticGroupsQuery } from "@/services/service_streams.queries";
+import { isServiceStreamKey, serviceStreamKeys } from "@/services/service_streams.querykeys";
 import type { FieldAlias } from "@/services/service_streams";
 
 /** Also the TTL the sibling key-fields / field-grouping caches age against. */
 export const SEMANTIC_GROUPS_CACHE_TTL_MS = 5 * 60 * 1000;
 
-interface CacheEntry {
-  data: FieldAlias[];
-  timestamp: number;
-}
-
-const cache = new Map<string, CacheEntry>();
-const pending = new Map<string, Promise<FieldAlias[]>>();
-/** Held only for the life of one request, so every awaiter sees the same failure. */
-const lastFailure = new Map<string, any>();
-
 /**
  * Whatever groups are held for an org, without fetching and without evicting —
  * a read, safe inside a computed. Age is deliberately ignored: a caller that
- * only decorates (a legend name) is better off with stale rules than none, and
- * `loadSemanticGroups` does its own freshness check before serving the cache.
+ * only decorates (a legend name) is better off with stale rules than none.
  */
 export function getCachedSemanticGroups(org: string): FieldAlias[] | null {
-  return cache.get(org)?.data ?? null;
-}
-
-/** Fresh within the TTL, or null — what `loadSemanticGroups` serves from. */
-function getFreshSemanticGroups(org: string): FieldAlias[] | null {
-  const entry = cache.get(org);
-  if (!entry) return null;
-  if (Date.now() - entry.timestamp >= SEMANTIC_GROUPS_CACHE_TTL_MS) {
-    cache.delete(org);
-    return null;
-  }
-  return entry.data;
+  return queryClient.getQueryData<FieldAlias[]>(serviceStreamKeys.semanticGroups(org)) ?? null;
 }
 
 /**
@@ -64,56 +41,33 @@ export async function loadSemanticGroups(
   org: string,
   onError?: (err: any) => void,
 ): Promise<FieldAlias[]> {
-  const cached = getFreshSemanticGroups(org);
-  if (cached) return cached;
-
-  const inFlight = pending.get(org);
-  if (inFlight) {
-    const groups = await inFlight;
-    // A second caller awaiting the SAME request used to get [] with no failure
-    // signal — indistinguishable from "this org has no groups". It then raised a
-    // false groups-missing warning AND never populated its 403 negative cache,
-    // so the doomed request re-fired forever. The failure travels with the promise.
-    const failure = lastFailure.get(org);
-    if (failure) onError?.(failure);
-    return groups;
+  // Fresh-hit fast path: `fetchQuery` resolves only after the client's own scheduling, and the traces field pipeline awaits this inline.
+  const state = queryClient.getQueryState<FieldAlias[]>(serviceStreamKeys.semanticGroups(org));
+  if (
+    state?.data !== undefined &&
+    Date.now() - state.dataUpdatedAt < SEMANTIC_GROUPS_CACHE_TTL_MS
+  ) {
+    return state.data;
   }
-
-  // Deferred so the body cannot run before `pending` holds it: a synchronous
-  // throw from the service would otherwise reach `finally` first, delete nothing,
-  // and let the `set` below pin an already-settled `[]` for this org forever.
-  lastFailure.delete(org);
-  const request = Promise.resolve().then(async (): Promise<FieldAlias[]> => {
-    try {
-      const response = await serviceStreamsApi.getSemanticGroups(org);
-      cache.set(org, { data: response.data, timestamp: Date.now() });
-      return response.data;
-    } catch (err: any) {
-      lastFailure.set(org, err);
-      onError?.(err);
-      console.error("Error loading semantic groups:", err);
-      return [];
-    } finally {
-      pending.delete(org);
-    }
-  });
-
-  pending.set(org, request);
-  return await request;
+  try {
+    return await queryClient.fetchQuery(semanticGroupsQuery(org));
+  } catch (err: any) {
+    onError?.(err);
+    console.error("Error loading semantic groups:", err);
+    return [];
+  }
 }
 
 /** Drop one org's cached groups — after settings change them, say. */
 export function clearSemanticGroupsCacheForOrg(org: string) {
-  cache.delete(org);
-  pending.delete(org);
-  lastFailure.delete(org);
+  queryClient.removeQueries({ queryKey: serviceStreamKeys.semanticGroups(org), exact: true });
 }
 
 /** Drop every cached org — org switch, logout, tests. */
 export function clearSemanticGroupsCache() {
-  cache.clear();
-  pending.clear();
-  lastFailure.clear();
+  queryClient.removeQueries({
+    predicate: (query) => isServiceStreamKey(query.queryKey, "semanticGroups"),
+  });
 }
 
 /** Per-org cache ages, for debugging. */
@@ -125,12 +79,15 @@ export function getSemanticGroupsCacheStatus(): Record<
     {};
   const now = Date.now();
 
-  for (const [org, entry] of cache.entries()) {
-    const age = now - entry.timestamp;
-    status[org] = {
+  for (const query of queryClient.getQueryCache().getAll()) {
+    if (!isServiceStreamKey(query.queryKey, "semanticGroups")) continue;
+    const data = query.state.data as FieldAlias[] | undefined;
+    if (data === undefined) continue;
+    const age = now - query.state.dataUpdatedAt;
+    status[String(query.queryKey[1])] = {
       age_seconds: Math.round(age / 1000),
       expired: age >= SEMANTIC_GROUPS_CACHE_TTL_MS,
-      groups_count: entry.data.length,
+      groups_count: data.length,
     };
   }
 

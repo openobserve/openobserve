@@ -3568,6 +3568,12 @@
     "joinSlack": "슬랙에 가입하세요",
     "maybeLater": "아마 나중에"
   },
+  "connectDataSourcePopup": {
+    "title": "시작하려면 먼저 첫 번째 데이터 소스를 연결하세요.",
+    "description": "보여드릴 것이 많지만, 먼저 데이터를 연결해야 합니다. 대부분의 팀은 약 1분 안에 첫 로그를 확인합니다.",
+    "connectButton": "데이터 소스 연결",
+    "slackLink": "저희 Slack 커뮤니티에도 참여해 주세요"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "일시 중지된 위치에서 계속",
     "startFromNow": "지금부터 시작합니다.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "이벤트 페이로드",
       "payloadIndex": "{field} 필드는 스트림을 선택합니다. 이 필드가 없는 이벤트는 {stream} 스트림으로 전송됩니다.",
       "payloadTime": "{field} 필드는 에포크 초이며 소수 값도 허용됩니다. 이 필드가 없거나 양수가 아니면 수신 시간이 사용됩니다.",
+      "windowTitle": "수집 윈도를 벗어난 타임스탬프는 삭제됩니다",
+      "windowBody": "{past}(기본값 5시간)보다 오래되었거나 {future}(기본값 24시간)보다 미래인 이벤트는 삭제되지만, Splunk 클라이언트는 오류를 재시도하지 않으므로 요청은 여전히 코드 0을 반환합니다. 따라서 하드코딩되었거나 오래된 타임스탬프는 아무것도 저장하지 않으면서 전송에 성공한 것처럼 보입니다.",
       "payloadMetadata": "{fields} 필드는 이벤트의 컬럼으로 저장됩니다.",
       "healthTitle": "헬스 체크",
       "healthBody": "GET 요청은 인증이 필요하지 않으며 {response}를 응답합니다.",
@@ -16465,13 +16473,10 @@
       "columnMemory": "메모리 (현재)",
       "columnDisk": "디스크 % (현재)",
       "columnLoad": "15분 부하 (현재)",
+      "columnCores": "코어",
       "columnLastSeen": "마지막 확인",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "호스트 메트릭 대시보드",
-      "importConfirmTitle": "호스트 메트릭 대시보드를 추가할까요?",
-      "importConfirmMessage": "아직 이 대시보드가 없습니다. 추가하면 기본 폴더에 'Host Metrics'라는 대시보드가 생성되고, 이 호스트에 대해 열립니다.",
-      "importConfirmOk": "추가하고 열기",
-      "importConfirmCancel": "취소",
+      "loadPerCore": "({value}/코어)",
       "windowsLivenessNote": "Windows 호스트는 에이전트가 부하 메트릭(system_cpu_load_average_15m)을 보고할 때만 이 목록에 표시됩니다. Windows 에이전트가 실행 중인데 여기에 없다면 수집기 구성에서 부하 스크래퍼를 활성화하거나 에이전트를 업데이트하세요.",
       "panel": {
         "cpuBusy": "CPU 사용률",
@@ -17881,6 +17886,7 @@
     "target_rotation_all": "{rotation} 로테이션의 모든 구성원",
     "target_rotation_deleted": "이 팀에 더 이상 없는 로테이션",
     "target_rotation_legacy": "현재 온콜 담당자",
+    "target_unrecognized": "이 화면에서 인식할 수 없는 대상",
     "ladderPoolEveryone": "{rotation} 로테이션의 모든 구성원",
     "target_user": "특정 사용자",
     "target_whole_team": "팀 전체",
