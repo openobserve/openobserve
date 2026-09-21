@@ -1052,6 +1052,15 @@ mod tests {
             ("m @ 1100 offset 20s", 12.0),
             ("m @ 1110", 15.0),
             ("sum_over_time(m[1m] @ 1100)", 36.0),
+            // every single-argument range function hoists whole, whichever evaluator it uses
+            ("count_over_time(m[1m] @ 1100)", 3.0),
+            ("max_over_time(m[1m] @ 1100)", 15.0),
+            ("absent_over_time(m[1m] @ 100)", 1.0),
+            ("quantile_over_time(0.5, m[1m] @ 1100)", 12.0),
+            // an instant-vector argument is hoisted on its own under any other function
+            ("clamp(m @ 1100, 0, 10)", 10.0),
+            ("round(m @ 1100 / 2, 5)", 10.0),
+            ("clamp_max(m @ 1100, time())", 15.0),
             ("sum_over_time(((m[1m] @ 1100)))", 36.0),
             ("sum_over_time(m[1m] @ 1100 offset 20s)", 27.0),
             ("sum(m @ 1100)", 30.0),
