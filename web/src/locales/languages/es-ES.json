@@ -5910,6 +5910,9 @@
         "details": "Detalles",
         "json": "JSON",
         "insights": "Perspectivas",
+        "back": "Volver a los resultados",
+        "prevEvent": "Evento anterior",
+        "nextEvent": "Evento siguiente",
         "copyLink": "Copiar enlace",
         "copy": "Copiar",
         "copyValue": "Copiar valor",
@@ -9359,7 +9362,28 @@
     "listConjunctionAnd": "{list} y {last}",
     "runsIn": "Se ejecuta en",
     "recommendedByFieldCoverage": "Recomendado según la cobertura de campos en sus flujos.",
-    "listConjunctionAndTwo": "{first} y {last}"
+    "listConjunctionAndTwo": "{first} y {last}",
+    "domainOrgMappings": {
+      "title": "Asignaciones de dominio a organización",
+      "subtitle": "Los nuevos usuarios que inicien sesión con un dominio de correo coincidente se añaden a la organización automáticamente.",
+      "addMapping": "Agregar asignación",
+      "editMapping": "Editar asignación",
+      "empty": "Aún no hay asignaciones. Use “{addLabel}” para agregar una.",
+      "domain": "Dominio de correo",
+      "domainHelp": "La parte después de {at_sign} en la dirección de correo del usuario.",
+      "organization": "Organización",
+      "organizationPlaceholder": "Identificador de la organización",
+      "organizationHelp": "El identificador de la organización a la que se añaden los usuarios coincidentes.",
+      "organizationRequired": "La organización es obligatoria",
+      "baseRole": "Rol base",
+      "baseRoleHelp": "El rol que se asigna a los usuarios coincidentes en esa organización.",
+      "userGroup": "Grupo de usuarios",
+      "userGroupPlaceholder": "Nombre del grupo",
+      "userGroupHelp": "Opcional. Los usuarios coincidentes también se unen a este grupo en esa organización.",
+      "duplicateDomain": "Ya existe una asignación para este dominio",
+      "confirmRemove": "¿Está seguro de que desea eliminar la asignación de {domain}?",
+      "deleteTitle": "Eliminar asignación"
+    }
   },
   "reports": {
     "frequencyUnits": {

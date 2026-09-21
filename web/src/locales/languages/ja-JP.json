@@ -5910,6 +5910,9 @@
         "details": "詳細",
         "json": "JSON",
         "insights": "インサイト",
+        "back": "結果に戻る",
+        "prevEvent": "前のイベント",
+        "nextEvent": "次のイベント",
         "copyLink": "リンクをコピー",
         "copy": "コピー",
         "copyValue": "値をコピー",
@@ -9359,7 +9362,28 @@
     "listConjunctionAnd": "{list}、および {last}",
     "runsIn": "実行環境",
     "recommendedByFieldCoverage": "ストリームのフィールドカバレッジに基づく推奨です。",
-    "listConjunctionAndTwo": "{first} と {last}"
+    "listConjunctionAndTwo": "{first} と {last}",
+    "domainOrgMappings": {
+      "title": "ドメインと組織のマッピング",
+      "subtitle": "一致するメールドメインでサインインした新規ユーザーは、自動的に組織に追加されます。",
+      "addMapping": "マッピングを追加",
+      "editMapping": "マッピングを編集",
+      "empty": "マッピングはまだありません。「{addLabel}」を使用して追加してください。",
+      "domain": "メールドメイン",
+      "domainHelp": "ユーザーのメールアドレスで {at_sign} より後の部分。",
+      "organization": "組織",
+      "organizationPlaceholder": "組織識別子",
+      "organizationHelp": "一致するユーザーが追加される組織の識別子。",
+      "organizationRequired": "組織は必須です",
+      "baseRole": "基本ロール",
+      "baseRoleHelp": "一致するユーザーがその組織で付与されるロール。",
+      "userGroup": "ユーザーグループ",
+      "userGroupPlaceholder": "グループ名",
+      "userGroupHelp": "任意。一致するユーザーはその組織内でこのグループにも参加します。",
+      "duplicateDomain": "このドメインのマッピングはすでに存在します",
+      "confirmRemove": "{domain} のマッピングを削除してもよろしいですか？",
+      "deleteTitle": "マッピングを削除"
+    }
   },
   "reports": {
     "frequencyUnits": {

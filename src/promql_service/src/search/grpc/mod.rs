@@ -166,11 +166,12 @@ pub async fn search(
         // 2. generate search group with max records stream
         let start_ts = std::time::Instant::now();
         let wal_floor = wal_floor();
-        // no cut without streaming, and none around a subquery, whose inner expression is per-group
+        // no cut without streaming, around a per-group subquery, or with an `@` pin on the WAL
         let cut = if cfg.search.feature_metrics_streaming_agg_enabled
             && !query.query_exemplars
             && !req.is_super_cluster
             && !plan.window.subquery
+            && plan.window.pinned.is_none()
         {
             wal_cut(start, end, step, micros(plan.window.ahead), wal_floor)
         } else {
@@ -201,7 +202,7 @@ pub async fn search(
         // 3. search each group
         for (start, end) in group {
             let mut req = req.clone();
-            req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
+            req.need_wal = plan.window.reaches(end, wal_floor);
             req.query.as_mut().unwrap().start = start;
             req.query.as_mut().unwrap().end = end;
             let resp = search_inner(&req).await?;
@@ -325,7 +326,7 @@ pub async fn data(
     let wal_floor = wal_floor();
     for (start, end) in group {
         let mut req = req.clone();
-        req.need_wal = end + micros(plan.window.ahead) >= wal_floor;
+        req.need_wal = plan.window.reaches(end, wal_floor);
         req.query.as_mut().unwrap().start = start;
         req.query.as_mut().unwrap().end = end;
         let resp = search_inner(&req).await?;
