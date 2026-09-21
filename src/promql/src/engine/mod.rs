@@ -32,7 +32,7 @@ use promql_parser::parser::{
 
 use crate::{
     ast::{
-        at_modifier::{Pin, pin},
+        at_modifier::{Pin, pin, uses_at},
         label_usage::labels_dropped_at_root,
     },
     binary,
@@ -58,6 +58,8 @@ pub struct Engine {
     skip_labels: bool,
     /// The result type of the query
     result_type: Option<String>,
+    /// Whether the expression may still carry an `@`; `exec_expr` skips the pin check without one.
+    has_at_modifier: bool,
 }
 
 impl Engine {
@@ -69,6 +71,7 @@ impl Engine {
             disable_label_selector: false,
             skip_labels: false,
             result_type: None,
+            has_at_modifier: true,
             trace_id: trace_id.to_string(),
         }
     }
@@ -81,6 +84,7 @@ impl Engine {
         self.skip_labels = !self.ctx.query_ctx.query_exemplars
             && !self.ctx.query_ctx.query_data
             && labels_dropped_at_root(prom_expr);
+        self.has_at_modifier = uses_at(prom_expr);
         let value = match self.exec_root_range_selector(prom_expr).await? {
             Some(value) => value,
             None => self.exec_expr(prom_expr).await?,
@@ -91,7 +95,8 @@ impl Engine {
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
         // a range vector has no value to repeat, the call around it is what gets pinned
-        if let Pin::At(at) = pin(prom_expr)?
+        if self.has_at_modifier
+            && let Pin::At(at) = pin(prom_expr)?
             && prom_expr.value_type() != ValueType::Matrix
         {
             return self.exec_pinned(prom_expr, at).await;

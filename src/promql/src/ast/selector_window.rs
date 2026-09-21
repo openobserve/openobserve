@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use promql_parser::parser::{AtModifier, Expr, Offset, VectorSelector};
 
-use crate::{ast::at_modifier::at_micros, micros};
+use crate::{ast::at_modifier::at_micros, micros, utils::offset_micros};
 
 /// What a query reads beyond its evaluation range.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -89,14 +89,7 @@ fn vector_selector_window(vs: &VectorSelector) -> SelectorWindow {
 
 fn pinned_read_end(at: &AtModifier, offset: &Option<Offset>) -> i64 {
     // an unresolved `start()` / `end()` is unknown here, so assume it reaches any floor
-    let Some(at) = at_micros(at) else {
-        return i64::MAX;
-    };
-    match offset {
-        Some(Offset::Pos(offset)) => at - micros(*offset),
-        Some(Offset::Neg(offset)) => at + micros(*offset),
-        None => at,
-    }
+    at_micros(at).map_or(i64::MAX, |at| at - offset_micros(offset))
 }
 
 fn negative_offset(offset: &Option<Offset>) -> Duration {

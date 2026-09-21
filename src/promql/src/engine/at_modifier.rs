@@ -50,7 +50,7 @@ impl Engine {
         }
     }
 
-    async fn exec_at(&mut self, expr: &PromExpr, at: i64) -> Result<Value> {
+    pub(super) async fn exec_at(&mut self, expr: &PromExpr, at: i64) -> Result<Value> {
         let mut expr = expr.clone();
         rebase_at(&mut expr, at);
         let pinned_ctx = Arc::new(PromqlContext {
@@ -61,9 +61,12 @@ impl Engine {
         let pinned_eval_ctx = EvalContext::new(at, at, self.eval_ctx.step, self.trace_id.clone());
         let ctx = std::mem::replace(&mut self.ctx, pinned_ctx);
         let eval_ctx = std::mem::replace(&mut self.eval_ctx, pinned_eval_ctx);
+        // the rebase left no `@` behind
+        let has_at_modifier = std::mem::replace(&mut self.has_at_modifier, false);
         let value = self.exec_expr(&expr).await;
         self.ctx = ctx;
         self.eval_ctx = eval_ctx;
+        self.has_at_modifier = has_at_modifier;
         value
     }
 }

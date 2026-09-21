@@ -1063,6 +1063,8 @@ mod tests {
             ("topk(time(), m @ 1100)", 15.0),
             // pins to different instants are still step invariant together
             ("m @ 1160 - m @ 1100", 9.0),
+            // two pins hoisted apart: the second is still checked after the first was evaluated
+            ("m @ 1100 + m * 0 + m @ 1160", 39.0),
             (
                 "quantile_over_time(scalar(sum(m @ 1160)) / 96, m[1m] @ 1100)",
                 12.0,
@@ -1132,17 +1134,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_at_modifier_pins_the_window_of_a_call_that_stays_on_the_steps() {
+        // the pinned window holds 9, 12, 15 on a slope of 0.15 / s, its last sample at `last`
+        let line = |last: i64, at: i64| 15.0 + 0.15 * (at - last) as f64 + 0.15 * 60.0;
+        let cases = [
+            ("predict_linear(m[1m] @ 1100, 60)", 100),
+            ("predict_linear((m[1m] @ 1100), 60)", 100),
+            // an offset moves the samples it reads forward, and the line with them
+            ("predict_linear(m[1m] @ 1120 offset 20s, 60)", 120),
+        ];
+        for (query, last) in cases {
+            let samples = pinned_values(false, query).await;
+            assert_eq!(samples.len(), 3, "{query}");
+            for ((ts, value), second) in samples.iter().zip([60, 120, 180]) {
+                assert_eq!(*ts, BASE + second * SECOND, "{query}");
+                assert!(
+                    (value - line(last, second)).abs() < 1e-9,
+                    "{query}: {value}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_pins_a_range_argument_beside_an_unpinned_parameter() {
+        let instant = BASE + 180 * SECOND;
+        let mut engine = engine_at(provider(false, false), 30, instant, 0, None);
+        // `sum(m)` is 54 at the instant, so the parameter is 0.5 without being pinned itself
+        let query = "quantile_over_time(scalar(sum(m)) / 108, m[1m] @ 1100)";
+        let expr = promql_parser::parser::parse(query).unwrap();
+        let (value, _) = engine.exec(&expr).await.unwrap();
+        for (_, samples) in canonical(value) {
+            assert_eq!(samples, vec![(instant, 12.0)]);
+        }
+    }
+
+    #[tokio::test]
     async fn test_at_modifier_fails_loudly_where_it_cannot_pin() {
         let cases = [
-            (
-                "predict_linear(m[1m] @ 1100, 60)",
-                "@ modifier is not supported",
-            ),
             ("m[1m] @ 1100", "@ modifier is not supported"),
-            (
-                "predict_linear((m[1m] @ 1100), 60)",
-                "@ modifier is not supported",
-            ),
+            ("(m[1m] @ 1100)", "@ modifier is not supported"),
             (
                 "max_over_time(m[1m:20s] @ 1100)",
                 "Subquery: @ modifier is not supported",

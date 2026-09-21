@@ -25,8 +25,14 @@ pub(crate) fn quantile_over_time(
     phi_quantile: f64,
     data: Value,
     eval_ctx: &EvalContext,
+    pinned: Option<i64>,
 ) -> Result<Value> {
-    super::eval_range(data, QuantileOverTimeFunc::new(phi_quantile), eval_ctx)
+    super::eval_range_at(
+        data,
+        QuantileOverTimeFunc::new(phi_quantile),
+        eval_ctx,
+        pinned,
+    )
 }
 
 pub struct QuantileOverTimeFunc {

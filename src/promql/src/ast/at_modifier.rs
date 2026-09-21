@@ -16,9 +16,12 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{AtModifier, Expr, Offset};
+use promql_parser::{
+    parser::{AtModifier, Expr, Offset},
+    util::{ExprVisitor, walk_expr},
+};
 
-use crate::{adjust_start_end, micros};
+use crate::{adjust_start_end, utils::offset_micros};
 
 /// Functions whose value follows the evaluation timestamp, so a pinned argument does not pin them.
 const TIME_DEPENDENT_FUNCS: [&str; 11] = [
@@ -101,6 +104,29 @@ pub(crate) fn at_micros(at: &AtModifier) -> Option<i64> {
     Some(to_millis(micros))
 }
 
+/// Whether any `@` is left in the expression; without one nothing can be pinned.
+pub(crate) fn uses_at(expr: &Expr) -> bool {
+    let mut visitor = AtVisitor(false);
+    let _ = walk_expr(&mut visitor, expr);
+    visitor.0
+}
+
+struct AtVisitor(bool);
+
+impl ExprVisitor for AtVisitor {
+    type Error = &'static str;
+
+    fn pre_visit(&mut self, expr: &Expr) -> std::result::Result<bool, Self::Error> {
+        self.0 |= match expr {
+            Expr::VectorSelector(vs) => vs.at.is_some(),
+            Expr::MatrixSelector(ms) => ms.vs.at.is_some(),
+            Expr::Subquery(sq) => sq.at.is_some(),
+            _ => false,
+        };
+        Ok(!self.0)
+    }
+}
+
 pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
     Ok(match expr {
         Expr::VectorSelector(vs) => selector_pin(&vs.at)?,
@@ -137,7 +163,7 @@ pub(crate) fn rebase_at(expr: &mut Expr, reference: i64) {
         let Some(pinned) = at.take().as_ref().and_then(at_micros) else {
             return;
         };
-        let behind = reference - pinned + signed_offset(offset);
+        let behind = reference - pinned + offset_micros(offset);
         *offset = match behind {
             0 => None,
             1.. => Some(Offset::Pos(Duration::from_micros(behind.unsigned_abs()))),
@@ -154,14 +180,6 @@ fn selector_pin(at: &Option<AtModifier>) -> Result<Pin> {
                 "@ start() / @ end() must be resolved before evaluation".to_string(),
             )
         }),
-    }
-}
-
-fn signed_offset(offset: &Option<Offset>) -> i64 {
-    match offset {
-        Some(Offset::Pos(offset)) => micros(*offset),
-        Some(Offset::Neg(offset)) => -micros(*offset),
-        None => 0,
     }
 }
 
@@ -303,6 +321,15 @@ mod tests {
         );
         assert_eq!(pin_of("timestamp(a @ 1600000000)").unwrap(), Pin::Varies);
         assert_eq!(pin_of("a @ 1600000000 + time()").unwrap(), Pin::Varies);
+    }
+
+    #[test]
+    fn test_uses_at_finds_a_modifier_anywhere() {
+        let uses = |query: &str| uses_at(&parser::parse(query).unwrap());
+        assert!(!uses("sum(rate(a[5m] offset 1m)) / b"));
+        assert!(uses("sum(rate(a[5m] @ 1600000000)) / b"));
+        assert!(uses("a and topk(5, b @ end())"));
+        assert!(uses("max_over_time(a[1h:1m] @ 1600000000)"));
     }
 
     #[test]
