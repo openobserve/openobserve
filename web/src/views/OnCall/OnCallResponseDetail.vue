@@ -281,6 +281,14 @@
                     :label="t('oncall.tabPriorCauses')"
                     data-test="oncall-response-tab-causes"
                   />
+                  <!-- Absent on a deployment with no agent, rather than a tab
+                       that opens on nothing. -->
+                  <OTab
+                    v-if="report"
+                    name="report"
+                    :label="t('oncall.tabReport')"
+                    data-test="oncall-response-tab-report"
+                  />
                 </OTabs>
                 <OButton
                   v-if="activeDetailTab === 'activity'"
@@ -332,6 +340,11 @@
                       :loading="priorCausesLoading"
                       @open="openResponse"
                     />
+                  </OTabPanel>
+
+                  <!-- The working behind the verdict card's one sentence. -->
+                  <OTabPanel name="report" data-test="oncall-response-report">
+                    <OnCallReportCard :report="report" :loading="reportLoading" />
                   </OTabPanel>
                 </OTabPanels>
               </OCardSection>
@@ -605,6 +618,7 @@ import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OnCallFiringHistory from "@/components/oncall/OnCallFiringHistory.vue";
 import OnCallPriorCauses from "@/components/oncall/OnCallPriorCauses.vue";
+import OnCallReportCard from "@/components/oncall/OnCallReportCard.vue";
 import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallVerdictCard from "@/components/oncall/OnCallVerdictCard.vue";
 import OnCallResponseDetailSkeleton from "./OnCallResponseDetailSkeleton.vue";
@@ -626,6 +640,7 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
+  OnCallResponseReport,
   OnCallPosition,
   PromoteSeverity,
   ResolutionCause,
@@ -777,6 +792,8 @@ const resolveNote = ref("");
 const priorCauses = ref<CauseGroup[]>([]);
 const firingHistory = ref<OnCallResponse[]>([]);
 const priorCausesLoading = ref(false);
+const report = ref<OnCallResponseReport | null>(null);
+const reportLoading = ref(false);
 /// Only the fields the page shows — the stream, and the condition that
 /// tripped it; the rest of the payload belongs on the alert's own screen,
 /// which the subject row links to. `query_condition`/`condition` is `any`
@@ -1015,6 +1032,7 @@ async function fetchResponse() {
     await fetchSubjectAlert();
     await fetchHandoffTargets();
     await fetchPriorCauses();
+    await fetchReport();
     await fetchEscalation();
     await fetchDeliveries();
     await fetchTeamContext();
@@ -1218,6 +1236,23 @@ async function fetchPriorCauses() {
     firingHistory.value = historyRes.status === "fulfilled" ? (historyRes.value.data ?? []) : [];
   } finally {
     priorCausesLoading.value = false;
+  }
+}
+
+// 404 is the ordinary answer — no agent ran, or it never answered — so a
+// failure here leaves the tab hidden rather than surfacing an error.
+async function fetchReport() {
+  reportLoading.value = true;
+  try {
+    const res = await oncallService.responseReport({
+      org_identifier: orgId.value,
+      response_id: responseId.value,
+    });
+    report.value = res.data ?? null;
+  } catch {
+    report.value = null;
+  } finally {
+    reportLoading.value = false;
   }
 }
 

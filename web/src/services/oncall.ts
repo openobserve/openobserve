@@ -27,6 +27,7 @@ import type {
   OnCallPolicy,
   OnCallResponse,
   OnCallResponseEvent,
+  OnCallResponseReport,
   OnCallSchedule,
   PresetDescriptor,
   OnCallPosition,
@@ -534,6 +535,18 @@ const oncall = {
   priorCauses: ({ org_identifier, response_id }: { org_identifier: string; response_id: string }) =>
     http().get<CauseGroup[]>(
       `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/prior-causes`,
+    ),
+
+  /// The full agent report this page carried. 404s when no agent ran.
+  responseReport: ({
+    org_identifier,
+    response_id,
+  }: {
+    org_identifier: string;
+    response_id: string;
+  }) =>
+    http().get<OnCallResponseReport>(
+      `/api/${org_identifier}/oncall/responses/${encodeURIComponent(response_id)}/report`,
     ),
 
   /// The individual past firings of the same subject, newest first, with the

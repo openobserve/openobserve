@@ -927,6 +927,14 @@ export interface CauseGroup {
   last_closed_at?: number | null;
 }
 
+/// What the agent wrote for this page, kept per record — the verdict card's
+/// one sentence is the conclusion, this is the working behind it.
+export interface OnCallResponseReport {
+  report: string;
+  model?: string | null;
+  generated_at: number;
+}
+
 /// One row of the pages list when grouping is on: the most recent firing of
 /// an alert, plus every firing it stands for.
 export interface OnCallResponseGroup {
