@@ -192,7 +192,9 @@ pub struct Query {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
     // anomaly queries bin via date_bin; the tantivy fast path bins on the epoch grid
-    #[serde(default)]
+    // Internal-only: an API caller must not be able to disable the index optimizer.
+    #[serde(skip)]
+    #[schema(ignore)]
     pub bypass_index_optimizer: bool,
 }
 
@@ -3732,6 +3734,27 @@ mod tests {
         assert!(obj.contains_key("alert_name"));
         assert!(obj.contains_key("report_id"));
         assert!(obj.contains_key("dashboard_id"));
+    }
+
+    #[test]
+    fn test_bypass_index_optimizer_is_not_settable_over_the_wire() {
+        let q: Query = serde_json::from_str(
+            r#"{"sql":"select 1","start_time":0,"end_time":1,"bypass_index_optimizer":true}"#,
+        )
+        .unwrap();
+        assert!(!q.bypass_index_optimizer);
+        let internal = Query {
+            bypass_index_optimizer: true,
+            ..Default::default()
+        };
+        assert!(internal.bypass_index_optimizer);
+        let json = serde_json::to_value(&internal).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("bypass_index_optimizer")
+        );
     }
 
     #[test]
