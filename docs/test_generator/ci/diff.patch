@@ -1,0 +1,2609 @@
+===== COMPLETE LIST OF CHANGED FILES (25 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/components/CommunitySlackInvite.spec.ts
+web/src/components/CommunitySlackInvite.vue
+web/src/components/ConnectDataSourcePopup.spec.ts
+web/src/components/ConnectDataSourcePopup.vue
+web/src/components/onboardingPopupCoordination.spec.ts
+web/src/layouts/MainLayout.vue
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/utils/slackCommunityInvite.spec.ts
+web/src/utils/slackCommunityInvite.ts
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 6743503f794..7176f2ea6e2 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -5098,6 +5098,12 @@
+     "ok": "565339bc4d33d728",
+     "startFromNow": "b51cf273d8b6649a"
+   },
++  "connectDataSourcePopup": {
++    "connectButton": "6f9ce9f34879bb33",
++    "description": "e3bfcb60996b7b1d",
++    "slackLink": "3a37b5feb4984ec3",
++    "title": "9c5541789be6984d"
++  },
+   "correlation": {
+     "addCustomGroup": "460770f6d1bdad26",
+     "alertDeduplicationMessage": "bc755a6265e8c4a9",
+diff --git a/web/src/components/CommunitySlackInvite.spec.ts b/web/src/components/CommunitySlackInvite.spec.ts
+index fb809992470..d0d7d2156ad 100644
+--- a/web/src/components/CommunitySlackInvite.spec.ts
++++ b/web/src/components/CommunitySlackInvite.spec.ts
+@@ -20,10 +20,6 @@ import i18n from "@/locales";
+ import store from "@/test/unit/helpers/store";
+ 
+ // ── Config mock — must be hoisted so the component import sees it ─────────────
+-// vi.hoisted() runs before any imports; the returned object is captured so that
+-// individual tests can mutate `mockConfig.isCloud` and `mockConfig.isEnterprise`
+-// before mounting. The factory closure then uses the hoisted reference — this is
+-// the only way to have a mutable mock for a default-export primitive-ish object.
+ const mockConfig = vi.hoisted(() => ({
+   isCloud: "true" as string,
+   isEnterprise: "false" as string,
+@@ -33,13 +29,16 @@ vi.mock("@/aws-exports", () => ({
+   default: mockConfig,
+ }));
+ 
++vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
++
+ import CommunitySlackInvite from "./CommunitySlackInvite.vue";
++import segment from "@/services/segment_analytics";
+ 
+ // ── Constants ─────────────────────────────────────────────────────────────────
+-const PENDING_KEY = "communitySlackInvitePending";
+ const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
+-const SEEN_KEY = `communitySlackInviteSeen:${USER_EMAIL}`;
++const STATE_KEY = `slackCommunityInvite:${USER_EMAIL}`;
+ const DEFAULT_SLACK_URL = "https://short.openobserve.ai/community";
++const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
+ 
+ // ── ODialog stub ──────────────────────────────────────────────────────────────
+ // ODialog uses reka-ui's DialogPortal which teleports content outside the
+@@ -65,7 +64,15 @@ const ODialogStub = {
+   `,
+ };
+ 
+-// ── Mount factory ─────────────────────────────────────────────────────────────
++// A `pending_day2` record left over from ConnectDataSourcePopup's touchpoint.
++// `hoursAgo` controls whether the day-2 threshold has elapsed yet.
++function setPendingDay2(hoursAgo: number) {
++  localStorage.setItem(
++    STATE_KEY,
++    JSON.stringify({ status: "pending_day2", shownAt: Date.now() - hoursAgo * 60 * 60 * 1000 }),
++  );
++}
++
+ function buildWrapper() {
+   return mount(CommunitySlackInvite, {
+     global: {
+@@ -83,30 +90,28 @@ function buildWrapper() {
+ // Component: CommunitySlackInvite
+ // Props:     none
+ // Emits:     none
+-// Store deps: store.state.userInfo.email (seenKey), store.state.zoConfig.custom_slack_url,
++// Store deps: store.state.userInfo.email, store.state.zoConfig.custom_slack_url,
+ //             store.state.zoConfig.slack_member_count
+ // Service deps: config.isCloud, config.isEnterprise (mocked via vi.mock)
+ // Child components: ODialog (stubbed), OButton (real), OIcon (real), SlackIcon (real)
+ // Conditional states:
+ //   - Cloud vs non-Cloud (isCloud !== "true" → nothing shown)
+-//   - First login vs returning session
+-//   - Already seen (seenKey = "true") → never shown
+-//   - PENDING_KEY present → shows (returning session) or after onboarding event (first login)
++//   - First-time login (isFirstTimeLogin = "true") → never opens, defers entirely
++//     to ConnectDataSourcePopup for that session
++//   - Day-2 record not yet "pending_day2", or shownAt < 24h ago → stays closed
++//   - Day-2 record "pending_day2" and shownAt >= 24h ago → opens on mount
+ //   - memberCount present/absent → different captionText
+ // User interactions: close-btn click, join-btn click, maybe-later-btn click
+-// Async operations: none (synchronous onMounted logic)
++// Async operations: none (synchronous mount-time check)
+ 
+ describe("CommunitySlackInvite", () => {
+   let wrapper: VueWrapper;
+   let openSpy: ReturnType<typeof vi.spyOn>;
+ 
+-  // Default each test to: Cloud, not first login, PENDING_KEY set, not seen.
+-  // This makes the dialog open on mount without waiting for the onboarding event.
+   beforeEach(() => {
+     mockConfig.isCloud = "true";
+     mockConfig.isEnterprise = "false";
+ 
+-    // Reset store to defaults (userInfo.email = "example@gmail.com" by default in store.ts)
+     store.commit("setConfig", {
+       ...store.state.zoConfig,
+       custom_slack_url: null,
+@@ -118,6 +123,7 @@ describe("CommunitySlackInvite", () => {
+ 
+     localStorage.clear();
+     openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
++    vi.clearAllMocks();
+   });
+ 
+   afterEach(() => {
+@@ -130,47 +136,32 @@ describe("CommunitySlackInvite", () => {
+   // ── Rendering ───────────────────────────────────────────────────────────────
+ 
+   describe("rendering", () => {
+-    it("renders the ODialog stub when dialog is open", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
++    it("renders the ODialog stub", () => {
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').exists()).toBe(true);
+     });
+ 
+-    it("shows dialog as open when PENDING_KEY is true and not yet seen", async () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++    it("shows the dialog open on mount when the day-2 threshold has elapsed", async () => {
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+       await nextTick();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+     });
+ 
+-    it("shows dialog as closed when PENDING_KEY is not set", () => {
+-      // Arrange — no localStorage setup, dialog should stay closed
+-
+-      // Act
++    it("stays closed when there is no invite record at all", () => {
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+     it("renders the localized title text inside an h2", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-title"]').text()).toBe(
+         "Join the OpenObserve community on Slack",
+       );
+@@ -178,95 +169,54 @@ describe("CommunitySlackInvite", () => {
+     });
+ 
+     it("renders the localized description text", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-description"]').text()).toContain(
+         "Learn, ask questions",
+       );
+     });
+ 
+     it("renders the Join Slack button with localized label", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+       expect(joinBtn.exists()).toBe(true);
+       expect(joinBtn.text()).toContain("Join the Slack");
+     });
+ 
+     it("renders the Maybe later button with localized label", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+       expect(laterBtn.exists()).toBe(true);
+       expect(laterBtn.text()).toBe("Maybe later");
+     });
+ 
+     it("passes size='sm' to ODialog", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-size")).toBe("sm");
+     });
+ 
+     it("renders 3 benefit items", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-benefit-0"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="community-slack-invite-benefit-1"]').exists()).toBe(true);
+       expect(wrapper.find('[data-test="community-slack-invite-benefit-2"]').exists()).toBe(true);
+     });
+ 
+-    it("renders each benefit with its localized text", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert
+-      expect(wrapper.find('[data-test="community-slack-invite-benefit-0"]').text()).toContain(
+-        "Answers from the core team",
+-      );
+-      expect(wrapper.find('[data-test="community-slack-invite-benefit-1"]').text()).toContain(
+-        "Setup help",
+-      );
+-      expect(wrapper.find('[data-test="community-slack-invite-benefit-2"]').text()).toContain(
+-        "Early word on releases",
+-      );
+-    });
+-
+     it("does not call window.open on initial render", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(openSpy).not.toHaveBeenCalled();
+     });
+   });
+@@ -274,178 +224,84 @@ describe("CommunitySlackInvite", () => {
+   // ── Cloud gate ───────────────────────────────────────────────────────────────
+ 
+   describe("Cloud gate", () => {
+-    it("never opens dialog on non-Cloud (isCloud is 'false')", () => {
+-      // Arrange
++    it("never opens on non-Cloud, even with an elapsed day-2 record", () => {
+       mockConfig.isCloud = "false";
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
++  });
+ 
+-    it("does not set PENDING_KEY for non-Cloud first-time login", () => {
+-      // Arrange
+-      mockConfig.isCloud = "false";
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert — guard returned before any localStorage writes
+-      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+-    });
++  // ── First-login gate ─────────────────────────────────────────────────────────
++  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
++  // first-login session — the day-2 clock only starts once that session ends.
+ 
+-    it("does not add o2:onboarding-complete listener on non-Cloud", () => {
+-      // Arrange
+-      mockConfig.isCloud = "false";
+-      const addEventSpy = vi.spyOn(window, "addEventListener");
++  describe("first-login gate", () => {
++    it("does not open during first-time login even with an elapsed day-2 record", () => {
++      localStorage.setItem("isFirstTimeLogin", "true");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+-      const onboardingListeners = addEventSpy.mock.calls.filter(
+-        ([event]) => event === "o2:onboarding-complete",
+-      );
+ 
+-      // Assert
+-      expect(onboardingListeners).toHaveLength(0);
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("shows dialog on Cloud with PENDING_KEY set", async () => {
+-      // Arrange — already default (isCloud = "true")
+-      localStorage.setItem(PENDING_KEY, "true");
++    it("opens normally once isFirstTimeLogin is cleared (returning session)", async () => {
++      localStorage.removeItem("isFirstTimeLogin");
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+       await nextTick();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+     });
+   });
+ 
+-  // ── First-login flow ─────────────────────────────────────────────────────────
+-
+-  describe("first-login flow", () => {
+-    it("sets PENDING_KEY when isFirstTimeLogin is true and not yet seen", () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert
+-      expect(localStorage.getItem(PENDING_KEY)).toBe("true");
+-    });
+-
+-    it("does not set PENDING_KEY if already seen", () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-      localStorage.setItem(SEEN_KEY, "true");
++  // ── Day-2 trigger ────────────────────────────────────────────────────────────
+ 
+-      // Act
++  describe("day-2 trigger", () => {
++    it("stays closed when the record is still 'not_asked' (no touchpoint yet)", () => {
+       wrapper = buildWrapper();
+ 
+-      // Assert
+-      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+-    });
+-
+-    it("does not open dialog immediately on first login (waits for onboarding event)", () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-
+-      // Act — mount without dispatching onboarding event
+-      wrapper = buildWrapper();
+-
+-      // Assert — PENDING_KEY was set but dialog is still closed
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("adds o2:onboarding-complete listener on first login in Cloud", () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-      const addEventSpy = vi.spyOn(window, "addEventListener");
++    it("stays closed when pending but less than 24h have elapsed", () => {
++      setPendingDay2(5);
+ 
+-      // Act
+       wrapper = buildWrapper();
+-      const onboardingListeners = addEventSpy.mock.calls.filter(
+-        ([event]) => event === "o2:onboarding-complete",
+-      );
+-
+-      // Assert
+-      expect(onboardingListeners).toHaveLength(1);
+-    });
+ 
+-    it("opens dialog after o2:onboarding-complete event is dispatched", async () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-      wrapper = buildWrapper();
+-
+-      // Assert — closed before event
+-      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+-
+-      // Act — dispatch the onboarding-complete event
+-      window.dispatchEvent(new Event("o2:onboarding-complete"));
+-      await wrapper.vm.$nextTick();
+-
+-      // Assert — now open
+-      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+-    });
+-
+-    it("does not open dialog after onboarding event if already seen", async () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-      // Seen key is set but PENDING_KEY would be set too (seen check in maybeShow)
+-      localStorage.setItem(SEEN_KEY, "true");
+-      wrapper = buildWrapper();
+-
+-      // Act
+-      window.dispatchEvent(new Event("o2:onboarding-complete"));
+-      await wrapper.vm.$nextTick();
+-
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+-  });
+ 
+-  // ── Returning session flow ───────────────────────────────────────────────────
++    it("opens exactly at the 24h boundary", async () => {
++      setPendingDay2(24);
+ 
+-  describe("returning session flow", () => {
+-    it("shows dialog immediately when PENDING_KEY is set and not first login", async () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-      // isFirstTimeLogin not set → returning session
+-
+-      // Act
+       wrapper = buildWrapper();
+       await nextTick();
+ 
+-      // Assert — opens immediately via maybeShow()
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+     });
+ 
+-    it("does not open dialog if PENDING_KEY is absent", () => {
+-      // Arrange — no PENDING_KEY
++    it("stays closed when already resolved", () => {
++      localStorage.setItem(STATE_KEY, JSON.stringify({ status: "resolved", shownAt: null }));
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("does not open dialog if PENDING_KEY is set but user has already seen it", () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
+-      localStorage.setItem(SEEN_KEY, "true");
++    it("fires community_slack_prompt_shown with source standalone_day2 when it opens", () => {
++      setPendingDay2(25);
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+-      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++      expect(segment.track).toHaveBeenCalledWith(
++        "community_slack_prompt_shown",
++        expect.objectContaining({ source: "standalone_day2" }),
++      );
+     });
+   });
+ 
+@@ -453,64 +309,45 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("Join Slack button", () => {
+     beforeEach(() => {
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+       wrapper = buildWrapper();
+     });
+ 
+     it("calls window.open with the default slack URL, '_blank', 'noopener'", async () => {
+-      // Arrange
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+ 
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+     });
+ 
+-    it("calls window.open exactly once per click", async () => {
+-      // Arrange
+-      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+-
+-      // Act
+-      await joinBtn.trigger("click");
+-
+-      // Assert
+-      expect(openSpy).toHaveBeenCalledTimes(1);
+-    });
+-
+     it("closes the dialog after clicking Join Slack", async () => {
+-      // Arrange
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+ 
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("sets seen key in localStorage after clicking Join Slack", async () => {
+-      // Arrange
++    it("marks the invite resolved in localStorage after clicking Join Slack", async () => {
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+ 
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("resolved");
+     });
+ 
+-    it("removes PENDING_KEY from localStorage after clicking Join Slack", async () => {
+-      // Arrange
++    it("fires community_slack_prompt_joined with source standalone_day2", async () => {
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+ 
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+-      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
++      expect(segment.track).toHaveBeenCalledWith(
++        "community_slack_prompt_joined",
++        expect.objectContaining({ source: "standalone_day2" }),
++      );
+     });
+   });
+ 
+@@ -518,51 +355,32 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("Maybe later button", () => {
+     beforeEach(() => {
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+       wrapper = buildWrapper();
+     });
+ 
+     it("closes the dialog when Maybe later is clicked", async () => {
+-      // Arrange
+       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+ 
+-      // Act
+       await laterBtn.trigger("click");
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("sets seen key in localStorage when Maybe later is clicked", async () => {
+-      // Arrange
++    it("does NOT mark the invite resolved — Maybe later can show again later", async () => {
+       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+ 
+-      // Act
+       await laterBtn.trigger("click");
+ 
+-      // Assert
+-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+-    });
+-
+-    it("removes PENDING_KEY when Maybe later is clicked", async () => {
+-      // Arrange
+-      const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+-
+-      // Act
+-      await laterBtn.trigger("click");
+-
+-      // Assert
+-      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("pending_day2");
+     });
+ 
+     it("does NOT call window.open when Maybe later is clicked", async () => {
+-      // Arrange
+       const laterBtn = wrapper.find('[data-test="community-slack-invite-maybe-later-btn"]');
+ 
+-      // Act
+       await laterBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).not.toHaveBeenCalled();
+     });
+   });
+@@ -571,77 +389,43 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("close button / handleOpenChange path", () => {
+     beforeEach(() => {
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+       wrapper = buildWrapper();
+     });
+ 
+     it("closes the dialog when the close button is clicked", async () => {
+-      // Arrange
+       const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+       expect(closeBtn.exists()).toBe(true);
+ 
+-      // Act
+       await closeBtn.trigger("click");
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+-    it("sets seen key in localStorage when close button is clicked", async () => {
+-      // Arrange
+-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+-
+-      // Act
+-      await closeBtn.trigger("click");
+-
+-      // Assert
+-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
+-    });
+-
+-    it("removes PENDING_KEY when close button is clicked", async () => {
+-      // Arrange
+-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+-
+-      // Act
+-      await closeBtn.trigger("click");
+-
+-      // Assert
+-      expect(localStorage.getItem(PENDING_KEY)).toBeNull();
+-    });
+-
+     it("does NOT call window.open when dismissed via close button", async () => {
+-      // Arrange
+       const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+ 
+-      // Act
+       await closeBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).not.toHaveBeenCalled();
+     });
+ 
+-    it("dismisses when ODialog emits update:open=false", async () => {
+-      // Arrange — simulate Escape / overlay click paths inside real ODialog
++    it("dismisses when ODialog emits update:open=false, without resolving the invite", async () => {
+       const dialogStub = wrapper.findComponent(ODialogStub);
+ 
+-      // Act
+       await dialogStub.vm.$emit("update:open", false);
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+-      expect(localStorage.getItem(SEEN_KEY)).toBe("true");
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("pending_day2");
+     });
+ 
+     it("does NOT dismiss when ODialog emits update:open=true", async () => {
+-      // Arrange — update:open=true means the dialog is opening, not closing
+       const dialogStub = wrapper.findComponent(ODialogStub);
+ 
+-      // Act
+       await dialogStub.vm.$emit("update:open", true);
+ 
+-      // Assert — dialog stays open, seen key NOT written
+       expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+-      expect(localStorage.getItem(SEEN_KEY)).toBeNull();
+     });
+   });
+ 
+@@ -649,73 +433,43 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("slackUrl computed", () => {
+     it("uses the default community URL when not Enterprise", async () => {
+-      // Arrange — isEnterprise = "false" (default)
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+       wrapper = buildWrapper();
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+ 
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+     });
+ 
+     it("uses the custom Slack URL when Enterprise and custom_slack_url is set", async () => {
+-      // Arrange
+       const customUrl = "https://enterprise.slack.com/my-org";
+       mockConfig.isEnterprise = "true";
+       store.commit("setConfig", {
+         ...store.state.zoConfig,
+         custom_slack_url: customUrl,
+       });
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+ 
+-      // Mount AFTER setting config so computed reads the correct value
+       wrapper = buildWrapper();
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+-
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).toHaveBeenCalledWith(customUrl, "_blank", "noopener");
+     });
+ 
+     it("falls back to default URL when Enterprise but custom_slack_url is falsy", async () => {
+-      // Arrange
+       mockConfig.isEnterprise = "true";
+       store.commit("setConfig", {
+         ...store.state.zoConfig,
+         custom_slack_url: null,
+       });
+-      localStorage.setItem(PENDING_KEY, "true");
+-      wrapper = buildWrapper();
+-      const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+-
+-      // Act
+-      await joinBtn.trigger("click");
+-
+-      // Assert
+-      expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+-    });
++      setPendingDay2(25);
+ 
+-    it("falls back to default URL when Enterprise is 'false' even with a custom_slack_url set", async () => {
+-      // Arrange — isEnterprise = "false" → condition short-circuits
+-      const customUrl = "https://enterprise.slack.com/my-org";
+-      mockConfig.isEnterprise = "false";
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        custom_slack_url: customUrl,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
+       wrapper = buildWrapper();
+       const joinBtn = wrapper.find('[data-test="community-slack-invite-join-btn"]');
+-
+-      // Act
+       await joinBtn.trigger("click");
+ 
+-      // Assert
+       expect(openSpy).toHaveBeenCalledWith(DEFAULT_SLACK_URL, "_blank", "noopener");
+     });
+   });
+@@ -724,164 +478,63 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("captionText computed", () => {
+     it("shows qualitative community note when slack_member_count is absent", () => {
+-      // Arrange — no member count in store (already default: null)
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+         "Engineers and the OpenObserve team, active every day",
+       );
+     });
+ 
+     it("shows member count text when slack_member_count is a positive number", () => {
+-      // Arrange — 4250 members → floored to 4200 → "4,200+ members"
+       store.commit("setConfig", {
+         ...store.state.zoConfig,
+         slack_member_count: 4250,
+       });
+-      localStorage.setItem(PENDING_KEY, "true");
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toContain(
+         "4,200+",
+       );
+     });
+ 
+-    it("shows member count without '+' suffix when count is below 100", () => {
+-      // Arrange — 50 members → no floor to 100, no "+"
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        slack_member_count: 50,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert
+-      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
+-      expect(text).toContain("50");
+-      expect(text).not.toContain("+");
+-    });
+-
+     it("falls back to community note when slack_member_count is 0", () => {
+-      // Arrange — 0 is not > 0, so memberCount returns null
+       store.commit("setConfig", {
+         ...store.state.zoConfig,
+         slack_member_count: 0,
+       });
+-      localStorage.setItem(PENDING_KEY, "true");
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert
+       expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+         "Engineers and the OpenObserve team, active every day",
+       );
+     });
+-
+-    it("falls back to community note when slack_member_count is negative", () => {
+-      // Arrange
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        slack_member_count: -5,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert
+-      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+-        "Engineers and the OpenObserve team, active every day",
+-      );
+-    });
+-
+-    it("floors member count to nearest 100 (e.g. 1999 → 1900+)", () => {
+-      // Arrange
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        slack_member_count: 1999,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert
+-      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
+-      expect(text).toContain("1,900+");
+-      expect(text).not.toContain("1,999");
+-    });
+   });
+ 
+-  // ── seenKey uses user email ──────────────────────────────────────────────────
++  // ── per-user state key ───────────────────────────────────────────────────────
+ 
+-  describe("per-user seen key", () => {
+-    it("uses the user email from the store to build the seenKey", async () => {
+-      // Arrange — store has email = "example@gmail.com"
+-      localStorage.setItem(PENDING_KEY, "true");
+-      wrapper = buildWrapper();
+-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
++  describe("per-user state key", () => {
++    it("reads the day-2 record keyed by the user email from the store", async () => {
++      setPendingDay2(25);
+ 
+-      // Act
+-      await closeBtn.trigger("click");
+-
+-      // Assert — the exact keyed entry was written
+-      expect(localStorage.getItem(`communitySlackInviteSeen:${USER_EMAIL}`)).toBe("true");
+-    });
+-
+-    it("uses 'anonymous' seenKey when userInfo has no email", async () => {
+-      // Arrange — clear email before mounting
+-      store.commit("setUserInfo", { email: undefined });
+-      localStorage.setItem(PENDING_KEY, "true");
+       wrapper = buildWrapper();
+-      const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+-
+-      // Act
+-      await closeBtn.trigger("click");
++      await nextTick();
+ 
+-      // Assert — falls back to "anonymous"
+-      expect(localStorage.getItem("communitySlackInviteSeen:anonymous")).toBe("true");
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+     });
+-  });
+-
+-  // ── Listener cleanup on unmount ──────────────────────────────────────────────
+ 
+-  describe("listener cleanup", () => {
+-    it("removes o2:onboarding-complete listener on unmount", () => {
+-      // Arrange
+-      localStorage.setItem("isFirstTimeLogin", "true");
+-      const removeEventSpy = vi.spyOn(window, "removeEventListener");
+-      wrapper = buildWrapper();
+-
+-      // Act
+-      wrapper.unmount();
+-      const removals = removeEventSpy.mock.calls.filter(
+-        ([event]) => event === "o2:onboarding-complete",
++    it("falls back to the 'anonymous' key when userInfo has no email", async () => {
++      store.commit("setUserInfo", { email: undefined });
++      localStorage.setItem(
++        "slackCommunityInvite:anonymous",
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1000 }),
+       );
+ 
+-      // Assert
+-      expect(removals.length).toBeGreaterThanOrEqual(1);
+-    });
+-
+-    it("does not open dialog after unmount even if onboarding event fires", () => {
+-      // Arrange — first login flow: listener registered, then unmount
+-      localStorage.setItem("isFirstTimeLogin", "true");
+       wrapper = buildWrapper();
+-      wrapper.unmount();
++      await nextTick();
+ 
+-      // Act — event fires after unmount
+-      expect(() => {
+-        window.dispatchEvent(new Event("o2:onboarding-complete"));
+-      }).not.toThrow();
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
+     });
+   });
+ 
+@@ -889,63 +542,33 @@ describe("CommunitySlackInvite", () => {
+ 
+   describe("edge cases", () => {
+     it("closing via close button a second time does not throw", async () => {
+-      // Arrange
+-      localStorage.setItem(PENDING_KEY, "true");
++      setPendingDay2(25);
+       wrapper = buildWrapper();
+       const closeBtn = wrapper.find('[data-test="community-slack-invite-close-btn"]');
+ 
+-      // Act + Assert — two dismissals, no throw
+       await closeBtn.trigger("click");
+       expect(() => closeBtn.trigger("click")).not.toThrow();
+     });
+ 
+-    it("renders correctly with exact member count of 100 (boundary: floored to 100, shows '+')", () => {
+-      // Arrange
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        slack_member_count: 100,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
++    it("does not throw when the stored record is corrupted JSON", () => {
++      localStorage.setItem(STATE_KEY, "{not-json");
+ 
+-      // Act
+-      wrapper = buildWrapper();
+-
+-      // Assert — 100 floors to 100, and n >= 100 so "+" is appended
+-      const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
+-      expect(text).toContain("100+");
++      expect(() => {
++        wrapper = buildWrapper();
++      }).not.toThrow();
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
+     });
+ 
+     it("renders correctly with very large member count (e.g. 1,000,000)", () => {
+-      // Arrange
+       store.commit("setConfig", {
+         ...store.state.zoConfig,
+         slack_member_count: 1_000_000,
+       });
+-      localStorage.setItem(PENDING_KEY, "true");
+ 
+-      // Act
+       wrapper = buildWrapper();
+ 
+-      // Assert — floored to 1,000,000, shows commas and "+"
+       const text = wrapper.find('[data-test="community-slack-invite-members-text"]').text();
+       expect(text).toContain("1,000,000+");
+     });
+-
+-    it("renders without throwing when slack_member_count is NaN", () => {
+-      // Arrange
+-      store.commit("setConfig", {
+-        ...store.state.zoConfig,
+-        slack_member_count: NaN,
+-      });
+-      localStorage.setItem(PENDING_KEY, "true");
+-
+-      // Act + Assert — falls back gracefully
+-      expect(() => {
+-        wrapper = buildWrapper();
+-      }).not.toThrow();
+-      expect(wrapper.find('[data-test="community-slack-invite-members-text"]').text()).toBe(
+-        "Engineers and the OpenObserve team, active every day",
+-      );
+-    });
+   });
+ });
+diff --git a/web/src/components/CommunitySlackInvite.vue b/web/src/components/CommunitySlackInvite.vue
+index fb51dc39c83..3927c4edb63 100644
+--- a/web/src/components/CommunitySlackInvite.vue
++++ b/web/src/components/CommunitySlackInvite.vue
+@@ -15,11 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ -->
+ 
+ <script setup lang="ts">
+-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
++import { computed, onMounted, ref, watch } from "vue";
+ import { raw, useI18nTyped } from "@/types/i18n";
+ import { useStore } from "vuex";
+ import config from "@/aws-exports";
+ import { addCommasToNumber } from "@/utils/zincutils";
++import segment from "@/services/segment_analytics";
++import {
++  connectDataPopupSettled,
++  connectDataPromptSessionKey,
++  getCommunitySlackUrl,
++  markSlackInviteResolved,
++  shouldShowStandaloneSlackInvite,
++} from "@/utils/slackCommunityInvite";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+@@ -28,59 +36,55 @@ import SlackIcon from "@/components/icons/SlackIcon.vue";
+ const { t } = useI18nTyped();
+ const store = useStore();
+ 
+-// ── One-time first-login invite (self-contained) ───────────────────────────
+-// Shown once on a Cloud user's first login, then never again for that user.
+-// Cloud-only — never shown on self-hosted Enterprise or open source.
+-// All trigger/persistence state lives here so the host layout stays clean.
++// Day-2 follow-up for a user who didn't act on ConnectDataSourcePopup's embedded offer — clock is shared via utils/slackCommunityInvite.ts.
+ const isOpen = ref(false);
+ 
+-// Per-user "seen" record + a pending flag that survives reloads until the user
+-// actually dismisses the invite (so it still appears if they leave mid-onboarding).
+-const seenKey = `communitySlackInviteSeen:${store.state.userInfo?.email ?? "anonymous"}`;
+-const PENDING_KEY = "communitySlackInvitePending";
++const userEmail = store.state.userInfo?.email ?? "anonymous";
+ 
+-// Community Slack URL — enterprise can override it via backend config.
+-const slackUrl = computed(() => {
+-  if (config.isEnterprise == "true" && store.state.zoConfig?.custom_slack_url) {
+-    return store.state.zoConfig.custom_slack_url;
++const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
++
++const track = (event: string, properties: Record<string, any> = {}) => {
++  try {
++    segment.track(event, {
++      org_id: store.state.selectedOrganization?.identifier,
++      user_id: store.state.userInfo?.email,
++      source: "standalone_day2",
++      ...properties,
++    });
++  } catch {
++    // Telemetry must never break the page.
+   }
+-  return "https://short.openobserve.ai/community";
+-});
++};
+ 
+-const maybeShow = () => {
+-  if (localStorage.getItem(PENDING_KEY) === "true" && localStorage.getItem(seenKey) !== "true") {
++const maybeShowStandaloneInvite = () => {
++  // ConnectDataSourcePopup gets first refusal on this session — if it claimed the
++  // session (shown, or about to be), the two popups must not stack.
++  if (sessionStorage.getItem(connectDataPromptSessionKey(userEmail)) === "true") return;
++  if (shouldShowStandaloneSlackInvite(userEmail)) {
+     isOpen.value = true;
++    track("community_slack_prompt_shown");
+   }
+ };
+ 
+-// GetStarted (full-screen onboarding) dispatches this when it completes; for
+-// brand-new users we wait for it so two dialogs never stack.
+-const onOnboardingComplete = () => maybeShow();
+-
+ onMounted(() => {
+   // Cloud-only: bail out entirely on Enterprise / open source so nothing is
+-  // captured, listened for, or shown there.
++  // captured or shown there.
+   if (config.isCloud !== "true") return;
+ 
+-  // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
+-  // Capture it into a pending flag before GetStarted clears it.
+-  const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
++  // Never compete with ConnectDataSourcePopup/GetStarted during the user's
++  // first-login session — the day-2 clock only starts once that session ends.
++  if (localStorage.getItem("isFirstTimeLogin") === "true") return;
+ 
+-  if (isFirstLogin && localStorage.getItem(seenKey) !== "true") {
+-    localStorage.setItem(PENDING_KEY, "true");
++  if (connectDataPopupSettled.value) {
++    maybeShowStandaloneInvite();
++    return;
+   }
+-
+-  if (isFirstLogin) {
+-    // GetStarted is taking over the screen — show the invite once it finishes.
+-    window.addEventListener("o2:onboarding-complete", onOnboardingComplete);
+-  } else {
+-    // Returning session with the invite still pending — show it now.
+-    maybeShow();
+-  }
+-});
+-
+-onBeforeUnmount(() => {
+-  window.removeEventListener("o2:onboarding-complete", onOnboardingComplete);
++  // ConnectDataSourcePopup is still deciding whether it opens this session — wait for it.
++  const stopWaiting = watch(connectDataPopupSettled, (settled) => {
++    if (!settled) return;
++    stopWaiting();
++    maybeShowStandaloneInvite();
++  });
+ });
+ 
+ // Real member count, sourced from the backend `/config` response
+@@ -118,12 +122,12 @@ const avatarBgClasses = [
+   "bg-avatar-tint-4",
+ ];
+ 
+-// Every dismissal path (× / overlay / Escape, Maybe later, or Join Slack)
+-// closes the dialog and marks it seen so it never shows again for this user.
++// × / overlay / Escape / Maybe later: closes the dialog only. Only joinSlack()
++// resolves the invite for good — "Maybe later" means the day-2 popup can show
++// again on a later session.
+ const dismiss = () => {
++  track("community_slack_prompt_dismissed");
+   isOpen.value = false;
+-  localStorage.setItem(seenKey, "true");
+-  localStorage.removeItem(PENDING_KEY);
+ };
+ 
+ const handleOpenChange = (open: boolean) => {
+@@ -132,7 +136,9 @@ const handleOpenChange = (open: boolean) => {
+ 
+ const joinSlack = () => {
+   window.open(slackUrl.value, "_blank", "noopener");
+-  dismiss();
++  markSlackInviteResolved(userEmail);
++  track("community_slack_prompt_joined");
++  isOpen.value = false;
+ };
+ </script>
+ 
+diff --git a/web/src/components/ConnectDataSourcePopup.spec.ts b/web/src/components/ConnectDataSourcePopup.spec.ts
+new file mode 100644
+index 00000000000..5f25bfe7e06
+--- /dev/null
++++ b/web/src/components/ConnectDataSourcePopup.spec.ts
+@@ -0,0 +1,455 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
++import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
++import { nextTick } from "vue";
++import { http, HttpResponse } from "msw";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import { queryClient } from "@/composables/query/queryClient";
++
++// ── Config mock — must be hoisted so the component import sees it ─────────────
++const mockConfig = vi.hoisted(() => ({
++  isCloud: "true" as string,
++}));
++
++vi.mock("@/aws-exports", () => ({
++  default: mockConfig,
++}));
++
++vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
++
++import ConnectDataSourcePopup from "./ConnectDataSourcePopup.vue";
++import segment from "@/services/segment_analytics";
++
++// ── Constants ─────────────────────────────────────────────────────────────────
++const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
++const PENDING_KEY = "connectDataSourcePromptPending";
++const SESSION_SHOWN_KEY = `connectDataSourcePromptShown:${USER_EMAIL}`;
++const SUMMARY_CHECKED_KEY = `connectDataSourceSummaryChecked:${USER_EMAIL}`;
++const SLACK_STATE_KEY = `slackCommunityInvite:${USER_EMAIL}`;
++const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
++
++// ── ODialog stub ──────────────────────────────────────────────────────────────
++const ODialogStub = {
++  name: "ODialog",
++  inheritAttrs: false,
++  props: ["open", "size", "showClose", "title"],
++  emits: ["update:open"],
++  template: `
++    <div
++      data-test="o-dialog-stub"
++      :data-open="String(open)"
++      :data-size="size"
++    >
++      <h2 data-test="connect-data-source-popup-title">{{ title }}</h2>
++      <slot />
++      <button
++        data-test="o-dialog-close-btn"
++        @click="$emit('update:open', false)"
++      >Close</button>
++    </div>
++  `,
++};
++
++function buildWrapper() {
++  return mount(ConnectDataSourcePopup, {
++    global: {
++      plugins: [store, router, i18n],
++      stubs: {
++        ODialog: ODialogStub,
++      },
++    },
++  });
++}
++
++// The shared global MSW handler for /summary returns a `streams` ARRAY (see
++// src/test/unit/mockData/home.ts), so `streams.num_streams` is undefined
++// against it — the popup reads that as "no data". Override per-test with this
++// helper for cases that need a specific stream count.
++function mockSummary(numStreams: number) {
++  global.server.use(
++    http.get(SUMMARY_URL, () => {
++      return HttpResponse.json({ streams: { num_streams: numStreams } });
++    }),
++  );
++}
++
++describe("ConnectDataSourcePopup", () => {
++  let wrapper: VueWrapper;
++
++  beforeEach(() => {
++    mockConfig.isCloud = "true";
++
++    store.commit("setUserInfo", { email: USER_EMAIL });
++    store.commit("setSelectedOrganization", {
++      label: "default Organization",
++      id: 159,
++      identifier: "default",
++      user_email: USER_EMAIL,
++      subscription_type: "",
++    });
++    store.dispatch("setIsDataIngested", false);
++
++    localStorage.clear();
++    sessionStorage.clear();
++    queryClient.clear();
++    vi.clearAllMocks();
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    localStorage.clear();
++    sessionStorage.clear();
++    queryClient.clear();
++    vi.clearAllMocks();
++    vi.restoreAllMocks();
++  });
++
++  // ── Cloud gate ───────────────────────────────────────────────────────────────
++
++  describe("Cloud gate", () => {
++    it("never opens on non-Cloud, even after the onboarding-complete event", async () => {
++      mockConfig.isCloud = "false";
++      localStorage.setItem("isFirstTimeLogin", "true");
++
++      wrapper = buildWrapper();
++      window.dispatchEvent(new Event("o2:onboarding-complete"));
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++
++    it("does not add an o2:onboarding-complete listener on non-Cloud", () => {
++      mockConfig.isCloud = "false";
++      const addEventSpy = vi.spyOn(window, "addEventListener");
++
++      wrapper = buildWrapper();
++      const listeners = addEventSpy.mock.calls.filter(
++        ([event]) => event === "o2:onboarding-complete",
++      );
++
++      expect(listeners).toHaveLength(0);
++    });
++  });
++
++  // ── First-login flow ─────────────────────────────────────────────────────────
++
++  describe("first-login flow", () => {
++    it("sets the pending flag and does not open immediately", () => {
++      localStorage.setItem("isFirstTimeLogin", "true");
++
++      wrapper = buildWrapper();
++
++      expect(localStorage.getItem(PENDING_KEY)).toBe("true");
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++
++    it("registers the o2:onboarding-complete listener", () => {
++      localStorage.setItem("isFirstTimeLogin", "true");
++      const addEventSpy = vi.spyOn(window, "addEventListener");
++
++      wrapper = buildWrapper();
++      const listeners = addEventSpy.mock.calls.filter(
++        ([event]) => event === "o2:onboarding-complete",
++      );
++
++      expect(listeners).toHaveLength(1);
++    });
++
++    it("opens after o2:onboarding-complete fires when the org has no data", async () => {
++      mockSummary(0);
++      localStorage.setItem("isFirstTimeLogin", "true");
++      wrapper = buildWrapper();
++
++      window.dispatchEvent(new Event("o2:onboarding-complete"));
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
++      expect(segment.track).toHaveBeenCalledWith(
++        "onboarding_prompt_shown",
++        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
++      );
++    });
++
++    it("stays closed and dispatches setIsDataIngested(true) when the org already has data", async () => {
++      mockSummary(3);
++      localStorage.setItem("isFirstTimeLogin", "true");
++      wrapper = buildWrapper();
++
++      window.dispatchEvent(new Event("o2:onboarding-complete"));
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++      expect(store.state.organizationData.isDataIngested).toBe(true);
++      expect(segment.track).not.toHaveBeenCalledWith("onboarding_prompt_shown", expect.anything());
++    });
++  });
++
++  // ── Returning-session flow ───────────────────────────────────────────────────
++
++  describe("returning-session flow", () => {
++    it("checks directly on mount (no isFirstTimeLogin) and opens when there is no data", async () => {
++      mockSummary(0);
++
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
++      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBe("true");
++    });
++
++    it("stays closed when the org already has data", async () => {
++      mockSummary(5);
++
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++
++    it("marks only the summary-check key (not the shared session-shown key) when the org already has data, so a later mount skips the summary call", async () => {
++      let summaryCalls = 0;
++      global.server.use(
++        http.get(SUMMARY_URL, () => {
++          summaryCalls += 1;
++          return HttpResponse.json({ streams: { num_streams: 5 } });
++        }),
++      );
++
++      wrapper = buildWrapper();
++      await flushPromises();
++      expect(sessionStorage.getItem(SUMMARY_CHECKED_KEY)).toBe("true");
++      // The popup never opened, so it must not claim the shared session-shown
++      // key — CommunitySlackInvite reads that key to mean the popup actually opened.
++      expect(sessionStorage.getItem(SESSION_SHOWN_KEY)).toBeNull();
++      expect(summaryCalls).toBe(1);
++
++      wrapper.unmount();
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(summaryCalls).toBe(1);
++    });
++
++    it("skips the summary call entirely when isDataIngested is already known true", async () => {
++      let summaryCalls = 0;
++      global.server.use(
++        http.get(SUMMARY_URL, () => {
++          summaryCalls += 1;
++          return HttpResponse.json({ streams: { num_streams: 0 } });
++        }),
++      );
++      store.dispatch("setIsDataIngested", true);
++
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(summaryCalls).toBe(0);
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++  });
++
++  // ── Session cap ──────────────────────────────────────────────────────────────
++
++  describe("session cap", () => {
++    it("never opens when already shown this session, even with no data", async () => {
++      mockSummary(0);
++      sessionStorage.setItem(SESSION_SHOWN_KEY, "true");
++
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++  });
++
++  // ── Org identifier not yet resolved ──────────────────────────────────────────
++
++  describe("org identifier resolution", () => {
++    it("waits for the org identifier to resolve, then opens", async () => {
++      mockSummary(0);
++      store.commit("setSelectedOrganization", {
++        label: "",
++        id: 0,
++        identifier: "",
++        user_email: USER_EMAIL,
++        subscription_type: "",
++      });
++
++      wrapper = buildWrapper();
++      await nextTick();
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++
++      store.commit("setSelectedOrganization", {
++        label: "default Organization",
++        id: 159,
++        identifier: "default",
++        user_email: USER_EMAIL,
++        subscription_type: "",
++      });
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
++    });
++  });
++
++  // ── Action handlers ──────────────────────────────────────────────────────────
++
++  describe("action handlers", () => {
++    beforeEach(async () => {
++      mockSummary(0);
++      wrapper = buildWrapper();
++      await flushPromises();
++    });
++
++    it("navigates to the ingestion page and fires the connect event", async () => {
++      const routerSpy = vi.spyOn(wrapper.vm.$router, "push");
++      const connectBtn = wrapper.find('[data-test="connect-data-source-popup-connect-btn"]');
++
++      await connectBtn.trigger("click");
++
++      expect(segment.track).toHaveBeenCalledWith(
++        "onboarding_prompt_connect_clicked",
++        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
++      );
++      expect(routerSpy).toHaveBeenCalledWith({
++        name: "ingestion",
++        query: { org_identifier: "default" },
++      });
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++
++    it("closes and fires the dismissed event when the dialog's close button is clicked", async () => {
++      const closeBtn = wrapper.find('[data-test="o-dialog-close-btn"]');
++
++      await closeBtn.trigger("click");
++
++      expect(segment.track).toHaveBeenCalledWith(
++        "onboarding_prompt_dismissed",
++        expect.objectContaining({ org_id: "default", user_id: USER_EMAIL }),
++      );
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("false");
++    });
++
++    it("fires the dismissed event exactly once when closed via overlay/Escape (update:open=false)", async () => {
++      const dialogStub = wrapper.findComponent(ODialogStub);
++
++      await dialogStub.vm.$emit("update:open", false);
++
++      const dismissedCalls = (segment.track as ReturnType<typeof vi.fn>).mock.calls.filter(
++        ([event]) => event === "onboarding_prompt_dismissed",
++      );
++      expect(dismissedCalls).toHaveLength(1);
++    });
++  });
++
++  // ── Rendering ─────────────────────────────────────────────────────────────────
++
++  describe("rendering", () => {
++    it("renders the exact spec copy", async () => {
++      mockSummary(0);
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="connect-data-source-popup-title"]').text()).toBe(
++        "To get started, let's connect your first data source.",
++      );
++      expect(wrapper.find('[data-test="connect-data-source-popup-description"]').text()).toBe(
++        "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
++      );
++      expect(wrapper.find('[data-test="connect-data-source-popup-connect-btn"]').text()).toContain(
++        "Connect a data source",
++      );
++    });
++
++    it("passes size='sm' to ODialog", async () => {
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      const dialog = wrapper.find('[data-test="o-dialog-stub"]');
++      expect(dialog.attributes("data-size")).toBe("sm");
++    });
++  });
++
++  // ── Embedded Slack invite ─────────────────────────────────────────────────────
++
++  describe("embedded Slack invite", () => {
++    it("renders the Slack link and starts the day-2 clock when the popup opens with no prior invite record", async () => {
++      mockSummary(0);
++      wrapper = buildWrapper();
++      await flushPromises();
++      await nextTick();
++
++      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
++        true,
++      );
++      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
++      expect(record.status).toBe("pending_day2");
++      expect(segment.track).toHaveBeenCalledWith(
++        "community_slack_prompt_shown",
++        expect.objectContaining({ source: "connect_data_popup" }),
++      );
++    });
++
++    it("does not render the Slack link once the invite is already resolved", async () => {
++      localStorage.setItem(SLACK_STATE_KEY, JSON.stringify({ status: "resolved", shownAt: null }));
++      mockSummary(0);
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
++        false,
++      );
++    });
++
++    it("starts the day-2 clock silently (no button, no track) when the org already has data", async () => {
++      mockSummary(5);
++      wrapper = buildWrapper();
++      await flushPromises();
++
++      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
++      expect(record.status).toBe("pending_day2");
++      expect(segment.track).not.toHaveBeenCalledWith(
++        "community_slack_prompt_shown",
++        expect.anything(),
++      );
++    });
++
++    it("clicking the Slack link opens Slack, marks resolved, and does not close the popup", async () => {
++      mockSummary(0);
++      wrapper = buildWrapper();
++      await flushPromises();
++      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
++
++      const slackLink = wrapper.find('[data-test="connect-data-source-popup-slack-link"]');
++      await slackLink.trigger("click");
++
++      expect(openSpy).toHaveBeenCalledWith(
++        "https://short.openobserve.ai/community",
++        "_blank",
++        "noopener",
++      );
++      const record = JSON.parse(localStorage.getItem(SLACK_STATE_KEY) ?? "{}");
++      expect(record.status).toBe("resolved");
++      expect(wrapper.find('[data-test="o-dialog-stub"]').attributes("data-open")).toBe("true");
++      expect(wrapper.find('[data-test="connect-data-source-popup-slack-link"]').exists()).toBe(
++        false,
++      );
++    });
++  });
++});
+diff --git a/web/src/components/ConnectDataSourcePopup.vue b/web/src/components/ConnectDataSourcePopup.vue
+new file mode 100644
+index 00000000000..ab426a129c8
+--- /dev/null
++++ b/web/src/components/ConnectDataSourcePopup.vue
+@@ -0,0 +1,283 @@
++<!-- Copyright 2026 OpenObserve Inc.
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU Affero General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU Affero General Public License for more details.
++
++You should have received a copy of the GNU Affero General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++-->
++
++<script setup lang="ts">
++import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
++import { useI18nTyped } from "@/types/i18n";
++import { useStore } from "vuex";
++import { useRouter } from "vue-router";
++import config from "@/aws-exports";
++import segment from "@/services/segment_analytics";
++import { queryClient } from "@/composables/query/queryClient";
++import { orgSummaryQuery } from "@/services/organizations.queries";
++import {
++  connectDataPopupSettled,
++  connectDataPromptSessionKey,
++  getCommunitySlackUrl,
++  markSlackInviteOffered,
++  markSlackInviteResolved,
++  shouldOfferSlackInvite,
++} from "@/utils/slackCommunityInvite";
++import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
++import OButton from "@/lib/core/Button/OButton.vue";
++import OIcon from "@/lib/core/Icon/OIcon.vue";
++import SlackIcon from "@/components/icons/SlackIcon.vue";
++
++const { t } = useI18nTyped();
++const store = useStore();
++const router = useRouter();
++
++// ── "Connect your first data source" prompt (self-contained) ───────────────
++// Shown at the same trigger moment the Slack invite used to use (first login,
++// after GetStarted finishes), then re-shown once per session until the
++// account has ingested data. Cloud-only — never shown on self-hosted
++// Enterprise or open source. All trigger/persistence state lives here so the
++// host layout stays clean.
++const isOpen = ref(false);
++
++const userEmail = store.state.userInfo?.email ?? "anonymous";
++
++// sessionStorage (not localStorage): clears on tab close, which is exactly
++// the "new session" boundary the spec wants — re-show every session until
++// data exists, unlike the Slack popup's one-time-ever persistence.
++const sessionShownKey = connectDataPromptSessionKey(userEmail);
++// Separate from sessionShownKey: this only dedupes the summary lookup when the
++// popup itself never opened (org already had data) — it must NOT satisfy
++// CommunitySlackInvite's "did the popup claim this session" check.
++const summaryCheckedSessionKey = `connectDataSourceSummaryChecked:${userEmail}`;
++// Survives a reload mid-onboarding, before GetStarted dispatches its
++// completion event.
++const PENDING_KEY = "connectDataSourcePromptPending";
++// If the default org never resolves this session, don't leave CommunitySlackInvite
++// blocked on connectDataPopupSettled forever.
++const ORG_RESOLVE_TIMEOUT_MS = 5000;
++
++// Rides along on this popup; CommunitySlackInvite.vue owns the day-2 follow-up if unclicked.
++const showSlackInviteButton = ref(false);
++const slackUrl = computed(() => getCommunitySlackUrl(store.state.zoConfig?.custom_slack_url));
++
++let stopOrgWatch: (() => void) | null = null;
++let orgResolveTimeout: ReturnType<typeof setTimeout> | null = null;
++
++const track = (event: string, properties: Record<string, any> = {}) => {
++  try {
++    // RudderStack is never identify()'d in this app, so every event is
++    // anonymous unless org/user context rides in the properties themselves.
++    segment.track(event, {
++      org_id: store.state.selectedOrganization?.identifier,
++      user_id: store.state.userInfo?.email,
++      ...properties,
++    });
++  } catch {
++    // Telemetry must never break the page.
++  }
++};
++
++const checkAndMaybeShow = async () => {
++  // Held false until this session's open/no-open decision is final — CommunitySlackInvite
++  // waits on this so the two popups never end up open at the same time.
++  connectDataPopupSettled.value = false;
++
++  // Remote kill-switch: lets ops disable/ramp the popup without a redeploy.
++  // Defaults on (fail open) so an unset flag doesn't change existing behavior.
++  if (
++    config.isCloud !== "true" ||
++    store.state.zoConfig?.connect_data_source_popup_enabled === false
++  ) {
++    connectDataPopupSettled.value = true;
++    return;
++  }
++  if (sessionStorage.getItem(sessionShownKey) === "true") {
++    connectDataPopupSettled.value = true;
++    return;
++  }
++  // Already resolved earlier this session (has-data branch below ran once) — skip re-fetching the summary.
++  if (sessionStorage.getItem(summaryCheckedSessionKey) === "true") {
++    connectDataPopupSettled.value = true;
++    return;
++  }
++  // Already known true elsewhere (MainLayout, useStreams, ...) — skip the summary call.
++  if (store.state.organizationData.isDataIngested) {
++    // This popup won't open, so this is the account's day-1 touchpoint — starts the Slack day-2 clock silently.
++    markSlackInviteOffered(userEmail);
++    connectDataPopupSettled.value = true;
++    return;
++  }
++
++  const orgIdentifier = store.state.selectedOrganization?.identifier;
++  if (!orgIdentifier) {
++    // Fresh session — the default org is still resolving asynchronously.
++    // Wait for it once instead of silently skipping this session. Stays
++    // unsettled until the watcher re-invokes this.
++    if (!stopOrgWatch) {
++      stopOrgWatch = watch(
++        () => store.state.selectedOrganization?.identifier,
++        (id) => {
++          if (id) checkAndMaybeShow();
++        },
++        { once: true },
++      );
++      // If the org never resolves this session, settle anyway so CommunitySlackInvite
++      // isn't blocked on connectDataPopupSettled for the rest of the session.
++      orgResolveTimeout = setTimeout(() => {
++        if (!connectDataPopupSettled.value) connectDataPopupSettled.value = true;
++      }, ORG_RESOLVE_TIMEOUT_MS);
++    }
++    return;
++  }
++
++  try {
++    // The shared isDataIngested store flag is only set behind an opt-in
++    // deployment config and isn't reliably populated this early, so check
++    // directly rather than trust it. Read through the shared cache so a
++    // returning session doesn't re-fire the /summary request.
++    const summary = await queryClient.fetchQuery(orgSummaryQuery(orgIdentifier));
++    const hasData = !!summary?.streams?.num_streams;
++    if (hasData) {
++      store.dispatch("setIsDataIngested", true);
++      // Dedupe the summary lookup for the rest of this session — NOT sessionShownKey,
++      // which CommunitySlackInvite reads to mean "the popup actually opened".
++      sessionStorage.setItem(summaryCheckedSessionKey, "true");
++      markSlackInviteOffered(userEmail);
++      return;
++    }
++  } catch (error) {
++    // Fail closed — this is a marketing prompt, not a navigation gate.
++    console.warn("ConnectDataSourcePopup: failed to check organization summary:", error);
++    return;
++  } finally {
++    connectDataPopupSettled.value = true;
++  }
++
++  // Read before marking, so the button renders on the same open that starts the clock.
++  showSlackInviteButton.value = shouldOfferSlackInvite(userEmail);
++  markSlackInviteOffered(userEmail);
++
++  isOpen.value = true;
++  sessionStorage.setItem(sessionShownKey, "true");
++  localStorage.removeItem(PENDING_KEY);
++  track("onboarding_prompt_shown");
++  if (showSlackInviteButton.value) {
++    track("community_slack_prompt_shown", { source: "connect_data_popup" });
++  }
++};
++
++// GetStarted (full-screen onboarding) dispatches this when it completes; for
++// brand-new users we wait for it so two dialogs never stack.
++const onOnboardingComplete = () => checkAndMaybeShow();
++
++onMounted(() => {
++  // Cloud-only, and remotely killable: bail out entirely on Enterprise / open
++  // source, or when ops disable the flag, so nothing is captured, listened
++  // for, or shown there.
++  if (
++    config.isCloud !== "true" ||
++    store.state.zoConfig?.connect_data_source_popup_enabled === false
++  )
++    return;
++
++  // `isFirstTimeLogin` is set on the new_user_login callback (Cloud only).
++  const isFirstLogin = localStorage.getItem("isFirstTimeLogin") === "true";
++
++  if (isFirstLogin) {
++    localStorage.setItem(PENDING_KEY, "true");
++    // GetStarted is taking over the screen — show the prompt once it finishes.
++    window.addEventListener("o2:onboarding-complete", onOnboardingComplete);
++  } else {
++    // Returning session — a fresh opportunity to show, gated on session +
++    // ingested-data checks above.
++    checkAndMaybeShow();
++  }
++});
++
++onBeforeUnmount(() => {
++  window.removeEventListener("o2:onboarding-complete", onOnboardingComplete);
++  stopOrgWatch?.();
++  if (orgResolveTimeout) clearTimeout(orgResolveTimeout);
++});
++
++const connectDataSource = () => {
++  track("onboarding_prompt_connect_clicked");
++  isOpen.value = false;
++  router.push({
++    name: "ingestion",
++    query: { org_identifier: store.state.selectedOrganization.identifier },
++  });
++};
++
++const dismiss = () => {
++  track("onboarding_prompt_dismissed");
++  isOpen.value = false;
++};
++
++// Doesn't close this popup — connecting data stays the primary ask even if the user also joins Slack.
++const joinSlackFromPopup = () => {
++  window.open(slackUrl.value, "_blank", "noopener");
++  markSlackInviteResolved(userEmail);
++  showSlackInviteButton.value = false;
++  track("community_slack_prompt_joined", { source: "connect_data_popup" });
++};
++
++const handleOpenChange = (open: boolean) => {
++  if (!open) dismiss();
++};
++</script>
++
++<template>
++  <ODialog
++    data-test="connect-data-source-popup-dialog"
++    :open="isOpen"
++    :title="t('connectDataSourcePopup.title')"
++    size="sm"
++    @update:open="handleOpenChange"
++  >
++    <div class="flex flex-col gap-4">
++      <div
++        class="rounded-default bg-icon-chip-primary-bg flex h-12 w-12 shrink-0 items-center justify-center"
++        aria-hidden="true"
++      >
++        <OIcon name="database" size="md" class="text-icon-chip-primary-text" />
++      </div>
++
++      <p data-test="connect-data-source-popup-description" class="text-text-secondary">
++        {{ t("connectDataSourcePopup.description") }}
++      </p>
++
++      <OButton
++        data-test="connect-data-source-popup-connect-btn"
++        variant="primary"
++        class="w-full"
++        @click="connectDataSource"
++      >
++        {{ t("connectDataSourcePopup.connectButton") }}
++      </OButton>
++
++      <OButton
++        v-if="showSlackInviteButton"
++        data-test="connect-data-source-popup-slack-link"
++        variant="ghost-subtle"
++        size="sm"
++        class="self-center"
++        @click="joinSlackFromPopup"
++      >
++        <template #icon-left>
++          <SlackIcon class="h-3.5 w-3.5" />
++        </template>
++        {{ t("connectDataSourcePopup.slackLink") }}
++      </OButton>
++    </div>
++  </ODialog>
++</template>
+diff --git a/web/src/components/onboardingPopupCoordination.spec.ts b/web/src/components/onboardingPopupCoordination.spec.ts
+new file mode 100644
+index 00000000000..3930c6dbe3d
+--- /dev/null
++++ b/web/src/components/onboardingPopupCoordination.spec.ts
+@@ -0,0 +1,155 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++// MainLayout mounts ConnectDataSourcePopup and CommunitySlackInvite together.
++// ConnectDataSourcePopup's per-session decision crosses an await (the
++// organization-summary call), while CommunitySlackInvite's day-2 check used to
++// run synchronously on mount — on a returning session where the day-2 clock had
++// already elapsed, both dialogs could end up open at once. These tests mount
++// both components side by side, the way MainLayout does, to guard against that.
++
++import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
++import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
++import { http, HttpResponse } from "msw";
++import i18n from "@/locales";
++import store from "@/test/unit/helpers/store";
++import router from "@/test/unit/helpers/router";
++import { queryClient } from "@/composables/query/queryClient";
++
++const mockConfig = vi.hoisted(() => ({
++  isCloud: "true" as string,
++  isEnterprise: "false" as string,
++}));
++
++vi.mock("@/aws-exports", () => ({
++  default: mockConfig,
++}));
++
++vi.mock("@/services/segment_analytics", () => ({ default: { track: vi.fn() } }));
++
++import ConnectDataSourcePopup from "./ConnectDataSourcePopup.vue";
++import CommunitySlackInvite from "./CommunitySlackInvite.vue";
++
++const USER_EMAIL = "example@gmail.com"; // matches store.ts userInfo.email
++const SLACK_STATE_KEY = `slackCommunityInvite:${USER_EMAIL}`;
++const SUMMARY_URL = `${store.state.API_ENDPOINT}/api/:org/summary`;
++const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
++
++const ODialogStub = {
++  name: "ODialog",
++  inheritAttrs: false,
++  props: ["open", "size", "showClose"],
++  emits: ["update:open"],
++  template: `<div :data-open="String(open)"><slot /></div>`,
++};
++
++// A `pending_day2` record whose day-2 clock has already elapsed — the scenario
++// where the standalone Slack popup is "due" on the same mount that
++// ConnectDataSourcePopup also decides to open.
++function setDueDay2Record() {
++  localStorage.setItem(
++    SLACK_STATE_KEY,
++    JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1000 }),
++  );
++}
++
++function mockSummary(numStreams: number) {
++  global.server.use(
++    http.get(SUMMARY_URL, () => HttpResponse.json({ streams: { num_streams: numStreams } })),
++  );
++}
++
++function buildWrappers() {
++  const globalOpts = {
++    plugins: [store, router, i18n],
++    stubs: { ODialog: ODialogStub },
++  };
++  return {
++    connectDataPopup: mount(ConnectDataSourcePopup, { global: globalOpts }),
++    slackInvite: mount(CommunitySlackInvite, { global: globalOpts }),
++  };
++}
++
++describe("ConnectDataSourcePopup + CommunitySlackInvite coordination", () => {
++  let connectDataPopup: VueWrapper;
++  let slackInvite: VueWrapper;
++
++  beforeEach(() => {
++    mockConfig.isCloud = "true";
++
++    store.commit("setUserInfo", { email: USER_EMAIL });
++    store.commit("setSelectedOrganization", {
++      label: "default Organization",
++      id: 159,
++      identifier: "default",
++      user_email: USER_EMAIL,
++      subscription_type: "",
++    });
++    store.dispatch("setIsDataIngested", false);
++
++    localStorage.clear();
++    sessionStorage.clear();
++    queryClient.clear();
++  });
++
++  afterEach(() => {
++    connectDataPopup?.unmount();
++    slackInvite?.unmount();
++    localStorage.clear();
++    sessionStorage.clear();
++    queryClient.clear();
++    vi.clearAllMocks();
++    vi.restoreAllMocks();
++  });
++
++  it("never has both dialogs open at once on a returning session with a due day-2 invite and no ingested data", async () => {
++    setDueDay2Record();
++    mockSummary(0); // no data ingested
++
++    ({ connectDataPopup, slackInvite } = buildWrappers());
++    await flushPromises();
++
++    const connectOpen = connectDataPopup.find("[data-open]").attributes("data-open");
++    const slackOpen = slackInvite.find("[data-open]").attributes("data-open");
++    expect(connectOpen === "true" && slackOpen === "true").toBe(false);
++    // ConnectDataSourcePopup takes priority — it should be the one that opened.
++    expect(connectOpen).toBe("true");
++    expect(slackOpen).toBe("false");
++  });
++
++  it("still shows the due day-2 invite once ConnectDataSourcePopup settles without opening (data already ingested)", async () => {
++    setDueDay2Record();
++    store.dispatch("setIsDataIngested", true);
++
++    ({ connectDataPopup, slackInvite } = buildWrappers());
++    await flushPromises();
++
++    expect(connectDataPopup.find("[data-open]").attributes("data-open")).toBe("false");
++    expect(slackInvite.find("[data-open]").attributes("data-open")).toBe("true");
++  });
++
++  it("still shows the due day-2 invite when the org turns out to already have data via the summary fetch (isDataIngested not yet known)", async () => {
++    setDueDay2Record();
++    mockSummary(3); // org already has data, but the store doesn't know that yet
++
++    ({ connectDataPopup, slackInvite } = buildWrappers());
++    await flushPromises();
++
++    // ConnectDataSourcePopup never opens (data already exists) — it must not
++    // claim the session in a way that blocks the standalone invite.
++    expect(connectDataPopup.find("[data-open]").attributes("data-open")).toBe("false");
++    expect(slackInvite.find("[data-open]").attributes("data-open")).toBe("true");
++  });
++});
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 174df78eb47..51ee4f42e78 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+     >
+       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+     </ODialog>
++    <ConnectDataSourcePopup />
+     <CommunitySlackInvite />
+     <PredefinedThemes />
+     <ShortcutCheatsheet v-model:open="showShortcuts" />
+@@ -261,6 +262,7 @@ import PredefinedThemes from "../components/PredefinedThemes.vue";
+ import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
+ import GetStarted from "@/components/login/GetStarted.vue";
+ import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
++import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
+ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+ import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
+@@ -304,6 +306,7 @@ export default defineComponent({
+     ShortcutCheatsheet,
+     GetStarted,
+     CommunitySlackInvite,
++    ConnectDataSourcePopup,
+     ODialog,
+     ODrawer,
+     OButton,
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index 99b1ec2262c..f384992b443 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "انضم إلى السلاك",
+     "maybeLater": "ربما لاحقا"
+   },
++  "connectDataSourcePopup": {
++    "title": "للبدء، لنقم بتوصيل مصدر البيانات الأول الخاص بك.",
++    "description": "لدينا الكثير لنعرضه لك، لكننا نحتاج أولاً إلى توصيل بياناتك. تشاهد معظم الفرق أول سجلاتها خلال حوالي دقيقة واحدة.",
++    "connectButton": "توصيل مصدر بيانات",
++    "slackLink": "انضم أيضًا إلى مجتمعنا على Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "تابع من حيث توقف",
+     "startFromNow": "ابدأ من الآن.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index 6bcf7e01cc1..d51d9a5e632 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Tritt dem Slack bei",
+     "maybeLater": "Vielleicht später"
+   },
++  "connectDataSourcePopup": {
++    "title": "Verbinden wir zunächst Ihre erste Datenquelle.",
++    "description": "Wir haben Ihnen viel zu zeigen, aber zuerst müssen wir Ihre Daten verbinden. Die meisten Teams sehen ihre ersten Logs in etwa einer Minute.",
++    "connectButton": "Datenquelle verbinden",
++    "slackLink": "Auch unserer Slack-Community beitreten"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Fortsetzen, wo es angehalten wurde",
+     "startFromNow": "Ab jetzt starten.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 490178648b8..81cff8086bc 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Join the Slack",
+     "maybeLater": "Maybe later"
+   },
++  "connectDataSourcePopup": {
++    "title": "To get started, let's connect your first data source.",
++    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
++    "connectButton": "Connect a data source",
++    "slackLink": "Also join our Slack community"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Continue from where it paused",
+     "startFromNow": "Start from now.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 784871dc3a9..74bad66f547 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Únete a Slack",
+     "maybeLater": "Quizá más tarde"
+   },
++  "connectDataSourcePopup": {
++    "title": "Para empezar, conectemos tu primera fuente de datos.",
++    "description": "Tenemos mucho que mostrarte, pero primero necesitamos conectar tus datos. La mayoría de los equipos ven sus primeros registros en aproximadamente un minuto.",
++    "connectButton": "Conectar una fuente de datos",
++    "slackLink": "Únete también a nuestra comunidad de Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Continuar desde donde se pausó",
+     "startFromNow": "Comenzar desde ahora.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 1ad20e3e14b..a11c07c168b 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Rejoignez le Slack",
+     "maybeLater": "Peut-être plus tard"
+   },
++  "connectDataSourcePopup": {
++    "title": "Pour commencer, connectons votre première source de données.",
++    "description": "Nous avons beaucoup à vous montrer, mais nous devons d'abord connecter vos données. La plupart des équipes voient leurs premiers logs en environ une minute.",
++    "connectButton": "Connecter une source de données",
++    "slackLink": "Rejoignez aussi notre communauté Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Reprendre là où il s'est arrêté",
+     "startFromNow": "Commencer maintenant.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 058f5fa9394..e134c5b35db 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Unisciti a Slack",
+     "maybeLater": "Forse più tardi"
+   },
++  "connectDataSourcePopup": {
++    "title": "Per iniziare, colleghiamo la tua prima fonte di dati.",
++    "description": "Abbiamo molto da mostrarti, ma dobbiamo prima collegare i tuoi dati. La maggior parte dei team vede i primi log in circa un minuto.",
++    "connectButton": "Collega una fonte di dati",
++    "slackLink": "Unisciti anche alla nostra community Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Continua da dove si era fermato",
+     "startFromNow": "Inizia da ora.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index 0995577b7d2..acafa78f81b 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Slack に参加しよう",
+     "maybeLater": "たぶん後で"
+   },
++  "connectDataSourcePopup": {
++    "title": "始めるには、まず最初のデータソースを接続しましょう。",
++    "description": "お見せしたいことがたくさんありますが、まずデータを接続する必要があります。ほとんどのチームは約1分で最初のログを確認できます。",
++    "connectButton": "データソースを接続",
++    "slackLink": "Slackコミュニティにもご参加ください"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "一時停止した場所から続行",
+     "startFromNow": "今から開始します。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 89049e6a2a5..6e9dd95bf92 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "슬랙에 가입하세요",
+     "maybeLater": "아마 나중에"
+   },
++  "connectDataSourcePopup": {
++    "title": "시작하려면 먼저 첫 번째 데이터 소스를 연결하세요.",
++    "description": "보여드릴 것이 많지만, 먼저 데이터를 연결해야 합니다. 대부분의 팀은 약 1분 안에 첫 로그를 확인합니다.",
++    "connectButton": "데이터 소스 연결",
++    "slackLink": "저희 Slack 커뮤니티에도 참여해 주세요"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "일시 중지된 위치에서 계속",
+     "startFromNow": "지금부터 시작합니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index c847ddc3385..071c9baac57 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Sluit je aan bij de Slack",
+     "maybeLater": "Misschien later"
+   },
++  "connectDataSourcePopup": {
++    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
++    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
++    "connectButton": "Een gegevensbron verbinden",
++    "slackLink": "Sluit je ook aan bij onze Slack-community"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
+     "startFromNow": "Vanaf nu starten.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index 051d9b02825..e72ac3e164e 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Dołącz do Slacka",
+     "maybeLater": "Może później"
+   },
++  "connectDataSourcePopup": {
++    "title": "Aby zacząć, połączmy Twoje pierwsze źródło danych.",
++    "description": "Mamy Ci wiele do pokazania, ale najpierw musimy połączyć Twoje dane. Większość zespołów widzi swoje pierwsze logi w ciągu około minuty.",
++    "connectButton": "Połącz źródło danych",
++    "slackLink": "Dołącz także do naszej społeczności na Slacku"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Kontynuuj od miejsca, w którym przerwano",
+     "startFromNow": "Zacznij od teraz.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 722ee7bc680..332fbc0407d 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Participe do Slack",
+     "maybeLater": "Talvez mais tarde"
+   },
++  "connectDataSourcePopup": {
++    "title": "Para começar, vamos conectar a sua primeira fonte de dados.",
++    "description": "Temos muito para lhe mostrar, mas primeiro precisamos de conectar os seus dados. A maioria das equipas vê os primeiros logs em cerca de um minuto.",
++    "connectButton": "Conectar uma fonte de dados",
++    "slackLink": "Participe também da nossa comunidade no Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Continuar de onde pausou",
+     "startFromNow": "Começar a partir de agora.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 1a1cf3c423a..9cbb60dfa31 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Присоединиться к Slack",
+     "maybeLater": "Может быть позже"
+   },
++  "connectDataSourcePopup": {
++    "title": "Для начала подключим ваш первый источник данных.",
++    "description": "Нам есть что вам показать, но сначала нужно подключить ваши данные. Большинство команд видят свои первые логи примерно через минуту.",
++    "connectButton": "Подключить источник данных",
++    "slackLink": "Также присоединяйтесь к нашему сообществу в Slack"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Продолжить с места остановки",
+     "startFromNow": "Начать с текущего момента.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 8b79fb29e09..01e6668559b 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Slack'e Katılın",
+     "maybeLater": "Belki daha sonra"
+   },
++  "connectDataSourcePopup": {
++    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
++    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
++    "connectButton": "Bir veri kaynağı bağla",
++    "slackLink": "Ayrıca Slack topluluğumuza katılın"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Kaldığı yerden devam et",
+     "startFromNow": "Şu andan itibaren başlat.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 6de2bf0b656..3db63cfa3a7 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "Tham gia Slack",
+     "maybeLater": "Để sau"
+   },
++  "connectDataSourcePopup": {
++    "title": "Để bắt đầu, hãy kết nối nguồn dữ liệu đầu tiên của bạn.",
++    "description": "Chúng tôi có rất nhiều điều để cho bạn xem, nhưng trước tiên chúng tôi cần kết nối dữ liệu của bạn. Hầu hết các nhóm thấy nhật ký đầu tiên của họ trong khoảng một phút.",
++    "connectButton": "Kết nối nguồn dữ liệu",
++    "slackLink": "Ngoài ra, hãy tham gia cộng đồng Slack của chúng tôi"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "Tiếp tục từ nơi đã tạm dừng",
+     "startFromNow": "Bắt đầu từ bây giờ.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 2dafd8fda90..9f388fd56b8 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "加入 Slack",
+     "maybeLater": "也许以后再说"
+   },
++  "connectDataSourcePopup": {
++    "title": "首先，让我们连接您的第一个数据源。",
++    "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
++    "connectButton": "连接数据源",
++    "slackLink": "也欢迎加入我们的 Slack 社区"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "从暂停处继续",
+     "startFromNow": "从现在开始",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 6f1d2ba47e5..8c41afc6f50 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -3568,6 +3568,12 @@
+     "joinSlack": "加入 Slack",
+     "maybeLater": "稍後再說"
+   },
++  "connectDataSourcePopup": {
++    "title": "首先，讓我們連接您的第一個資料來源。",
++    "description": "我們有很多內容想向您展示，但首先需要連接您的資料。大多數團隊大約一分鐘內就能看到第一批日誌。",
++    "connectButton": "連接資料來源",
++    "slackLink": "也加入我們的 Slack 社群"
++  },
+   "confirmDialog": {
+     "continueFromWherePaused": "從暫停處繼續",
+     "startFromNow": "從現在開始。",
+diff --git a/web/src/utils/slackCommunityInvite.spec.ts b/web/src/utils/slackCommunityInvite.spec.ts
+new file mode 100644
+index 00000000000..0c78494dcb6
+--- /dev/null
++++ b/web/src/utils/slackCommunityInvite.spec.ts
+@@ -0,0 +1,99 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, beforeEach } from "vitest";
++import {
++  markSlackInviteOffered,
++  markSlackInviteResolved,
++  shouldOfferSlackInvite,
++  shouldShowStandaloneSlackInvite,
++} from "./slackCommunityInvite";
++
++const EMAIL = "example@gmail.com";
++const STATE_KEY = `slackCommunityInvite:${EMAIL}`;
++const LEGACY_SEEN_KEY = `communitySlackInviteSeen:${EMAIL}`;
++const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
++
++describe("slackCommunityInvite", () => {
++  beforeEach(() => {
++    localStorage.clear();
++  });
++
++  describe("legacy state migration", () => {
++    it("treats a legacy communitySlackInviteSeen:<email> flag as already resolved", () => {
++      localStorage.setItem(LEGACY_SEEN_KEY, "true");
++
++      expect(shouldOfferSlackInvite(EMAIL)).toBe(false);
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
++    });
++
++    it("ignores the legacy flag once a new-format record exists", () => {
++      localStorage.setItem(LEGACY_SEEN_KEY, "true");
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++
++      // The new-format pending_day2 record wins over the legacy resolved flag.
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(true);
++    });
++
++    it("does not treat a missing or non-'true' legacy flag as resolved", () => {
++      localStorage.setItem(LEGACY_SEEN_KEY, "false");
++
++      expect(shouldOfferSlackInvite(EMAIL)).toBe(true);
++    });
++  });
++
++  describe("not_asked -> pending_day2 -> resolved", () => {
++    it("starts as not_asked and offers the embedded invite", () => {
++      expect(shouldOfferSlackInvite(EMAIL)).toBe(true);
++    });
++
++    it("moves to pending_day2 on first offer and stops offering the embedded invite again", () => {
++      markSlackInviteOffered(EMAIL);
++
++      expect(shouldOfferSlackInvite(EMAIL)).toBe(false);
++      const record = JSON.parse(localStorage.getItem(STATE_KEY) ?? "{}");
++      expect(record.status).toBe("pending_day2");
++    });
++
++    it("does not show the standalone invite before the day-2 delay has elapsed", () => {
++      markSlackInviteOffered(EMAIL);
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
++    });
++
++    it("shows the standalone invite once the day-2 delay has elapsed", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(true);
++    });
++
++    it("resolving suppresses the standalone invite for good", () => {
++      localStorage.setItem(
++        STATE_KEY,
++        JSON.stringify({ status: "pending_day2", shownAt: Date.now() - DAY2_DELAY_MS - 1 }),
++      );
++
++      markSlackInviteResolved(EMAIL);
++
++      expect(shouldShowStandaloneSlackInvite(EMAIL)).toBe(false);
++    });
++  });
++});
+diff --git a/web/src/utils/slackCommunityInvite.ts b/web/src/utils/slackCommunityInvite.ts
+new file mode 100644
+index 00000000000..6837899e447
+--- /dev/null
++++ b/web/src/utils/slackCommunityInvite.ts
+@@ -0,0 +1,98 @@
++// Copyright 2026 OpenObserve Inc.
++
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { ref } from "vue";
++import config from "@/aws-exports";
++
++export type SlackInviteStatus = "not_asked" | "pending_day2" | "resolved";
++
++interface SlackInviteRecord {
++  status: SlackInviteStatus;
++  shownAt: number | null;
++}
++
++// Gives the day-2 dedicated popup a full day to elapse, not a same-session retry.
++const DAY2_DELAY_MS = 24 * 60 * 60 * 1000;
++
++// Legacy key from the exit-intent invite this replaced — set "true" on that invite's
++// dismiss or join, both of which were permanent. Migrated below so those users aren't
++// re-invited under the new state machine.
++const legacySeenKey = (email: string): string => `communitySlackInviteSeen:${email}`;
++
++const storageKey = (email: string): string => `slackCommunityInvite:${email}`;
++
++// Shared with ConnectDataSourcePopup so both read/write the same session key.
++export const connectDataPromptSessionKey = (email: string): string =>
++  `connectDataSourcePromptShown:${email}`;
++
++// Flips false while ConnectDataSourcePopup is deciding whether to open this session (that
++// decision crosses an await), so CommunitySlackInvite never opens before it lands — the two
++// popups must never be open at once. Defaults true so a standalone mount (tests, or when
++// ConnectDataSourcePopup itself bails out) is never blocked.
++export const connectDataPopupSettled = ref(true);
++
++const readRecord = (email: string): SlackInviteRecord => {
++  try {
++    const raw = localStorage.getItem(storageKey(email));
++    if (raw) {
++      const parsed = JSON.parse(raw);
++      if (parsed?.status === "pending_day2" || parsed?.status === "resolved") {
++        return { status: parsed.status, shownAt: parsed.shownAt ?? null };
++      }
++    }
++    if (localStorage.getItem(legacySeenKey(email)) === "true") {
++      return { status: "resolved", shownAt: null };
++    }
++    return { status: "not_asked", shownAt: null };
++  } catch {
++    return { status: "not_asked", shownAt: null };
++  }
++};
++
++const writeRecord = (email: string, record: SlackInviteRecord): void => {
++  try {
++    localStorage.setItem(storageKey(email), JSON.stringify(record));
++  } catch {
++    // Persistence failing just means the invite may be asked again later; survivable.
++  }
++};
++
++// Whether ConnectDataSourcePopup should offer its embedded "Join Slack" action.
++export const shouldOfferSlackInvite = (email: string): boolean =>
++  readRecord(email).status === "not_asked";
++
++// Starts the day-2 clock on the invite's first touchpoint, shown or silent — an ignored offer resolves to exactly one later dedicated ask.
++export const markSlackInviteOffered = (email: string): void => {
++  if (readRecord(email).status !== "not_asked") return;
++  writeRecord(email, { status: "pending_day2", shownAt: Date.now() });
++};
++
++// Joining or declining the day-2 popup both end the ask for good — the two outcomes don't need to stay distinguishable in storage.
++export const markSlackInviteResolved = (email: string): void => {
++  writeRecord(email, { status: "resolved", shownAt: readRecord(email).shownAt });
++};
++
++// Whether the dedicated day-2 popup is due: offered once, at least a day ago, still unresolved.
++export const shouldShowStandaloneSlackInvite = (email: string): boolean => {
++  const record = readRecord(email);
++  if (record.status !== "pending_day2" || record.shownAt == null) return false;
++  return Date.now() - record.shownAt >= DAY2_DELAY_MS;
++};
++
++// Shared so the embedded and standalone entry points never resolve two different links.
++export const getCommunitySlackUrl = (customSlackUrl: string | undefined): string => {
++  if (config.isEnterprise === "true" && customSlackUrl) return customSlackUrl;
++  return "https://short.openobserve.ai/community";
++};

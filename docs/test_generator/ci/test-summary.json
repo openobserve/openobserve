@@ -1,0 +1,7 @@
+[
+  {
+    "title": "Connect and Slack onboarding popups never render on the OSS build",
+    "action": "new",
+    "verifies": "both Cloud-only onboarding dialogs (ConnectDataSourcePopup and CommunitySlackInvite) stay out of the DOM with count 0 on the OSS build, on first paint and after navigating to Logs"
+  }
+]
