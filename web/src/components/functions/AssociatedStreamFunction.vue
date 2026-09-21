@@ -48,16 +48,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="ms-auto" data-test="stream-association-search-input">
             <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
           </div>
-          <OButton
-            data-test="log-stream-refresh-stats-btn"
-            class="ms-3 mb-1"
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="sm-action"
-            @click="getLogStream"
-            icon-left="refresh"
-          >
-            {{ t(`logStream.refreshStats`) }}
-          </OButton>
+            class="ms-3 mb-1"
+            :last-run-at="lastUpdatedAt"
+            data-test="log-stream-refresh-stats-btn"
+            @click="() => getLogStream(true)"
+          />
         </div>
       </template>
 
@@ -177,6 +175,7 @@ import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
 import useStreams from "@/composables/useStreams";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
@@ -193,6 +192,7 @@ export default defineComponent({
     SchemaIndex,
     NoData,
     OButton,
+    ORefreshButton,
     ODrawer,
     OInnerLoading,
     OSwitch,
@@ -206,6 +206,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const router = useRouter();
     const logStream = ref([]);
+    const lastUpdatedAt = ref<number | null>(null);
     const showIndexSchemaDialog = ref(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
@@ -257,7 +258,7 @@ export default defineComponent({
     ];
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
-    const { getStreams } = useStreams(t);
+    const { getStreams, getStreamsFetchedAt } = useStreams(t);
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -360,7 +361,7 @@ export default defineComponent({
       return cols;
     });
 
-    const getLogStream = () => {
+    const getLogStream = (force = false) => {
       if (store.state.selectedOrganization != null) {
         previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
         const dismiss = toast({
@@ -369,7 +370,7 @@ export default defineComponent({
           timeout: 0,
         });
 
-        getStreams("", false)
+        getStreams("", false, false, force)
           .then((res: any) => {
             let doc_num = "";
             let storage_size = "";
@@ -396,6 +397,9 @@ export default defineComponent({
                   stream_type: data.stream_type,
                 };
               });
+            void getStreamsFetchedAt().then((at) => {
+              lastUpdatedAt.value = at ?? Date.now();
+            });
 
             if (logStream.value.length > 0) {
               getAllFunctions();
@@ -590,6 +594,7 @@ export default defineComponent({
       selectedIds,
       orgData,
       getLogStream: getLogStream,
+      lastUpdatedAt,
       resultTotal,
       // listSchema,
       deleteStream,

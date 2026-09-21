@@ -298,7 +298,9 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import alertsService from "../../services/alerts";
-import anomalyDetectionService from "../../services/anomaly_detection";
+import { saveAnomalyConfigMutation } from "@/services/anomaly_detection.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { useOrgId } from "@/composables/query";
 import useStreams from "@/composables/useStreams";
 import BaseImport from "../common/BaseImport.vue";
 import SelectFolderDropDown from "../common/sidebar/SelectFolderDropDown.vue";
@@ -387,6 +389,12 @@ export default defineComponent({
       },
     });
     const streamTypes = ["logs", "metrics", "traces"];
+    const anomalyOrgId = useOrgId();
+    // The anomaly import branch is a create; the mutation drops the anomaly scope.
+    const createAnomalyConfig = useMutation(() =>
+      saveAnomalyConfigMutation(anomalyOrgId.value, () => undefined),
+    );
+
     const selectedFolderId = ref<any>(
       props.folderId || router.currentRoute.value.query.folder || "default",
     );
@@ -576,11 +584,17 @@ export default defineComponent({
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };
-        await anomalyDetectionService.create(org, payload, selectedFolderId.value || "default");
+        // This branch returns before the regular path's refresh below, so it emits its own.
+        await createAnomalyConfig.mutateAsync({
+          payload,
+          folderId: selectedFolderId.value || "default",
+        });
         alertCreators.value.push({
           message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
         });
+        emit("update:alerts", store, selectedFolderId.value);
+        getActiveFolderAlerts(selectedFolderId.value);
         return true;
       } catch (e: any) {
         alertCreators.value.push({

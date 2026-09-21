@@ -421,7 +421,8 @@ import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OStep from "@/lib/navigation/Stepper/OStep.vue";
 import OStepper from "@/lib/navigation/Stepper/OStepper.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import alertsService from "@/services/alerts";
+import { saveAlertMutation } from "@/services/alerts.queries";
+import { useMutation } from "@tanstack/vue-query";
 import destinationService from "@/services/alert_destination";
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
@@ -757,6 +758,9 @@ const setResult = (id: string, patch: Partial<InstallResult>) => {
   );
 };
 
+// Each create drops the scope itself, so nothing refreshes after the batch.
+const installAlert = useMutation(() => saveAlertMutation(orgIdentifier(), () => false));
+
 const install = async (ids: string[]) => {
   if (isInstalling.value) return;
   // Defensive: every path to step 5 sets this, but installing against an empty
@@ -814,7 +818,7 @@ const install = async (ids: string[]) => {
           overrides: batchOverrides,
         });
 
-        await alertsService.create_by_alert_id(orgIdentifier(), payload, folderId.value);
+        await installAlert.mutateAsync({ payload, folderId: folderId.value });
         setResult(entry.id, { status: "installed" });
         installedNow.push(entry.id);
       } catch (error) {

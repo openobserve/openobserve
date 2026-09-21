@@ -33,7 +33,7 @@ const NULL_PORT: &str = "CAST(NULL AS BIGINT)";
 const ROOT_PRED: &str = "(reference_parent_span_id IS NULL OR reference_parent_span_id = '')";
 const NO_AGENT_PRED: &str = "(gen_ai_agent_name IS NULL OR gen_ai_agent_name = '')";
 
-/// Missing optional columns become typed NULL constants with the same alias; GROUP BY never moves.
+/// Missing optional columns become typed NULL constants with the same alias, outside GROUP BY.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Columns {
     pub infer_self_key: bool,
@@ -197,6 +197,15 @@ impl Columns {
 
     pub fn supports_join(&self) -> bool {
         self.trace_id && self.span_id && self.reference_parent_span_id
+    }
+
+    /// Q2/QL gate: without any of these a CLIENT span can only ever be `no_peer`.
+    pub fn has_peer_keys(&self) -> bool {
+        self.infer_peer_key
+            || self.infer_peer_ip
+            || self.rpc_service
+            || self.infer_service_name
+            || (self.operation_name && self.supports_join())
     }
 
     /// Q0 gate; an agent id without a name never builds an agent node (§4.6), so it does not count.
@@ -450,19 +459,26 @@ pub fn build_self_identity_query(cols: &Columns, stream: &str, start: i64, end: 
     format!(
         "SELECT service_name, {self_key}, {self_port}, {self_ip}, {rpc}, \
          COUNT(*) FILTER (WHERE CAST(span_kind AS VARCHAR) IN ('2','5')) AS server_requests, COUNT(*) AS requests \
-         FROM \"{stream}\" WHERE {range} AND ({kind}) GROUP BY 1,2,3,4,5",
+         FROM \"{stream}\" WHERE {range} AND ({kind}) GROUP BY {group}",
         self_key = opt_str(cols.infer_self_key, "infer_self_key"),
         self_port = opt_port(cols.infer_self_port, "infer_self_port"),
         self_ip = opt_str(cols.infer_self_ip, "infer_self_ip"),
         rpc = opt_str(cols.rpc_service, "rpc_service"),
         range = time_range(start, end),
         kind = kind_pred(cols, "('2','3','4','5')"),
+        group = group_by(&[
+            true,
+            cols.infer_self_key,
+            cols.infer_self_port,
+            cols.infer_self_ip,
+            cols.rpc_service,
+        ]),
     )
 }
 
 /// Pairing learner (design §4.2 "QL"); `None` when a join column is missing (a hard SQL error).
 pub fn build_pairing_query(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
-    if !cols.supports_join() {
+    if !cols.supports_join() || !cols.has_peer_keys() {
         return None;
     }
     let suffixes = sample_suffixes(LEARN_SAMPLE)
@@ -477,25 +493,37 @@ pub fn build_pairing_query(cols: &Columns, stream: &str, start: i64, end: i64) -
          WHERE c._timestamp >= {start} AND c._timestamp < {end} AND p._timestamp >= {start} AND p._timestamp < {end} \
          AND right(c.trace_id, 2) IN ({suffixes}) AND right(p.trace_id, 2) IN ({suffixes}) \
          AND CAST(c.span_kind AS VARCHAR) IN ('1','2','5') AND CAST(p.span_kind AS VARCHAR) IN ('3','4') \
-         AND c.service_name != p.service_name GROUP BY 1,2,3,4,5,6,7",
+         AND c.service_name != p.service_name GROUP BY {group}",
         peer_key = opt_col(cols.infer_peer_key, "p.infer_peer_key", NULL_STR),
         peer_port = opt_col(cols.infer_peer_port, "p.infer_peer_port", NULL_PORT),
         peer_ip = opt_col(cols.infer_peer_ip, "p.infer_peer_ip", NULL_STR),
         peer_rpc = opt_col(cols.rpc_service, "p.rpc_service", NULL_STR),
         sig = sig_expr(cols, "p."),
+        group = group_by(&[
+            true,
+            cols.infer_peer_key,
+            cols.infer_peer_port,
+            cols.infer_peer_ip,
+            cols.rpc_service,
+            cols.operation_name,
+            true,
+        ]),
     ))
 }
 
-pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
+pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
+    if !cols.has_peer_keys() {
+        return None;
+    }
     let explicit_peer = if cols.peer_service {
         "(peer_service IS NOT NULL AND peer_service != '')"
     } else {
         "false"
     };
-    format!(
+    Some(format!(
         "SELECT service_name AS client, {peer_key}, {peer_port}, {peer_ip}, {rpc}, {sig} AS op_sig, \
          {svc_name}, {svc_type}, {explicit_peer} AS explicit_peer, {m} \
-         FROM \"{stream}\" WHERE {range} AND CAST(span_kind AS VARCHAR) IN ('3','4') GROUP BY 1,2,3,4,5,6,7,8,9",
+         FROM \"{stream}\" WHERE {range} AND CAST(span_kind AS VARCHAR) IN ('3','4') GROUP BY {group}",
         peer_key = opt_str(cols.infer_peer_key, "infer_peer_key"),
         peer_port = opt_port(cols.infer_peer_port, "infer_peer_port"),
         peer_ip = opt_str(cols.infer_peer_ip, "infer_peer_ip"),
@@ -505,7 +533,18 @@ pub fn build_q2(cols: &Columns, stream: &str, start: i64, end: i64) -> String {
         svc_type = opt_str(cols.infer_service_type, "infer_service_type"),
         m = metrics_block(cols, ""),
         range = time_range(start, end),
-    )
+        group = group_by(&[
+            true,
+            cols.infer_peer_key,
+            cols.infer_peer_port,
+            cols.infer_peer_ip,
+            cols.rpc_service,
+            cols.operation_name,
+            cols.infer_service_name,
+            cols.infer_service_type,
+            cols.peer_service,
+        ]),
+    ))
 }
 
 pub fn build_q3(cols: &Columns, stream: &str, start: i64, end: i64) -> Option<String> {
@@ -648,7 +687,7 @@ pub fn model_display_expr(model_expr: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ");
     format!(
-        "CASE {arms} ELSE regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', '') END"
+        "CASE {arms} ELSE regexp_replace(regexp_replace(regexp_replace(lower({model_expr}), '^[^/]+/', ''), '-[0-9]{{8}}$', ''), '\\[[^\\]]*\\]$', '') END"
     )
 }
 
@@ -713,6 +752,17 @@ fn opt_port(present: bool, col: &str) -> String {
     } else {
         format!("{NULL_PORT} AS {col}")
     }
+}
+
+// DataFusion rejects two NULL constants in one GROUP BY ("duplicate unqualified field name NULL")
+fn group_by(present: &[bool]) -> String {
+    present
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| **p)
+        .map(|(i, _)| (i + 1).to_string())
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn sig_expr(cols: &Columns, prefix: &str) -> String {
@@ -1006,7 +1056,7 @@ mod tests {
         let bare = build_self_identity_query(&cols, "t", 1, 2);
         assert_eq!(select_aliases(&full), select_aliases(&bare));
         assert_eq!(group_by(&full), "1,2,3,4,5");
-        assert_eq!(group_by(&bare), "1,2,3,4,5");
+        assert_eq!(group_by(&bare), "1");
         assert!(bare.contains("CAST(NULL AS VARCHAR) AS infer_self_key"));
         assert!(bare.contains("CAST(NULL AS BIGINT) AS infer_self_port"));
         assert!(bare.contains("IN ('2','3','4','5'))"));
@@ -1015,13 +1065,12 @@ mod tests {
 
     #[test]
     fn test_q2_substitution_keeps_positions() {
-        let full = build_q2(&Columns::all(), "t", 1, 2);
+        let full = build_q2(&Columns::all(), "t", 1, 2).unwrap();
         let cols = Columns {
             infer_peer_key: false,
             infer_peer_port: false,
             infer_peer_ip: false,
             rpc_service: false,
-            operation_name: false,
             infer_service_name: false,
             infer_service_type: false,
             peer_service: false,
@@ -1030,15 +1079,17 @@ mod tests {
             span_status: false,
             ..Columns::all()
         };
-        let bare = build_q2(&cols, "t", 1, 2);
+        let bare = build_q2(&cols, "t", 1, 2).unwrap();
         assert_eq!(select_aliases(&full), select_aliases(&bare));
         assert_eq!(group_by(&full), "1,2,3,4,5,6,7,8,9");
-        assert_eq!(group_by(&bare), "1,2,3,4,5,6,7,8,9");
+        assert_eq!(group_by(&bare), "1,6");
         assert!(
             full.contains("(peer_service IS NOT NULL AND peer_service != '') AS explicit_peer")
         );
         assert!(bare.contains("false AS explicit_peer"));
-        assert!(bare.contains("CAST(NULL AS VARCHAR) AS op_sig"));
+        assert!(bare.contains(
+            "CASE WHEN CAST(NULL AS VARCHAR) IS NULL AND CAST(NULL AS VARCHAR) IS NULL AND CAST(NULL AS VARCHAR) IS NULL THEN operation_name END AS op_sig"
+        ));
         assert!(full.contains(
             "CASE WHEN infer_peer_key IS NULL AND infer_peer_ip IS NULL AND rpc_service IS NULL THEN operation_name END AS op_sig"
         ));
@@ -1046,7 +1097,7 @@ mod tests {
             infer_peer_ip: false,
             ..Columns::all()
         };
-        let sql = build_q2(&partial, "t", 1, 2);
+        let sql = build_q2(&partial, "t", 1, 2).unwrap();
         assert!(sql.contains("CAST(NULL AS VARCHAR) AS infer_peer_ip"));
         assert!(sql.contains("CASE WHEN infer_peer_key IS NULL AND CAST(NULL AS VARCHAR) IS NULL"));
     }
@@ -1076,6 +1127,58 @@ mod tests {
         };
         let sql = build_pairing_query(&no_op, "t", 1, 2).unwrap();
         assert!(sql.contains("CAST(NULL AS VARCHAR) AS peer_sig"));
+        assert_eq!(group_by(&sql), "1,2,3,4,5,7");
+    }
+
+    #[test]
+    fn test_q2_and_pairing_need_a_peer_key() {
+        let none = Columns {
+            infer_peer_key: false,
+            infer_peer_ip: false,
+            rpc_service: false,
+            infer_service_name: false,
+            operation_name: false,
+            ..Columns::all()
+        };
+        assert!(build_q2(&none, "t", 1, 2).is_none());
+        assert!(build_pairing_query(&none, "t", 1, 2).is_none());
+        let sig_only = Columns {
+            operation_name: true,
+            ..none
+        };
+        assert!(build_q2(&sig_only, "t", 1, 2).is_some());
+        assert!(build_pairing_query(&sig_only, "t", 1, 2).is_some());
+        let sig_without_join = Columns {
+            reference_parent_span_id: false,
+            ..sig_only
+        };
+        assert!(build_q2(&sig_without_join, "t", 1, 2).is_none());
+    }
+
+    #[test]
+    fn test_group_by_skips_null_placeholders() {
+        let cols = Columns {
+            infer_peer_key: false,
+            infer_peer_port: false,
+            infer_peer_ip: false,
+            infer_self_key: false,
+            infer_self_port: false,
+            infer_self_ip: false,
+            ..Columns::all()
+        };
+        assert_eq!(
+            group_by(&build_self_identity_query(&cols, "t", 1, 2)),
+            "1,5"
+        );
+        assert_eq!(
+            group_by(&build_pairing_query(&cols, "t", 1, 2).unwrap()),
+            "1,5,6,7"
+        );
+        assert_eq!(
+            group_by(&build_q2(&cols, "t", 1, 2).unwrap()),
+            "1,5,6,7,8,9"
+        );
+        assert_eq!(super::group_by(&[true, false, true]), "1,3");
     }
 
     #[test]
@@ -1464,7 +1567,7 @@ mod tests {
         let expr = model_display_expr("m");
         assert!(expr.starts_with("CASE WHEN regexp_like(m, '"));
         assert!(expr.ends_with(
-            " ELSE regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', '') END"
+            " ELSE regexp_replace(regexp_replace(regexp_replace(lower(m), '^[^/]+/', ''), '-[0-9]{8}$', ''), '\\[[^\\]]*\\]$', '') END"
         ));
         assert!(expr.contains("WHEN regexp_like(m, 'gpt-5\\.2-pro') THEN 'gpt-5.2-pro'"));
         assert!(expr.contains("WHEN regexp_like(m, '(?i)deepseek-v4-pro') THEN 'deepseek-v4-pro'"));

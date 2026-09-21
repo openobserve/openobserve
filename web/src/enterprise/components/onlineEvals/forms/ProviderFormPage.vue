@@ -208,6 +208,8 @@ import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import onlineEvalsService, { type Provider } from "@/services/online-evals.service";
+import { saveProviderMutation } from "@/services/online-evals.service.queries";
+import { useMutation } from "@tanstack/vue-query";
 import {
   DEFAULT_PROVIDER_BASE_URLS,
   SUGGESTED_PROVIDER_BASE_URLS,
@@ -317,19 +319,22 @@ function buildPayload(value: ProviderForm) {
   };
 }
 
-// @submit handler — OForm only calls this once the whole schema passes, so the
-// schema (not a manual guard) gates the save. OForm awaits this promise → the
-// Save button spinner spans the whole save (no manual `isSaving` ref).
+// Create vs update is this form's decision; the cache consequence is declared beside the endpoint.
+const saveProvider = useMutation(() =>
+  saveProviderMutation(
+    props.orgId,
+    () => props.mode === "edit" && !!props.row,
+    () => props.row?.id ?? "",
+  ),
+);
+
+// Runs only after the schema passes; `value` is untransformed, so trim/split here, and OForm awaits it so the Save spinner spans the write.
 async function save(value: ProviderForm) {
   if (!props.orgId) return;
   try {
     const payload = buildPayload(value);
 
-    if (props.mode === "edit" && props.row) {
-      await onlineEvalsService.providers.update(props.orgId, props.row.id, payload);
-    } else {
-      await onlineEvalsService.providers.create(props.orgId, payload);
-    }
+    await saveProvider.mutateAsync(payload);
     toast({
       variant: "success",
       message: t("onlineEvals.saved", { label: t("onlineEvals.singular.providers") }),

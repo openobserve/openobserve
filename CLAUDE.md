@@ -9,6 +9,13 @@
   pass: `cargo clippy --workspace --all-targets -- -W clippy::too_many_lines
   -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings`.
 
+## Frontend (web/)
+
+- After every change under `web/`, run `npm run format:check` from `web/`
+  before considering the task done. If it flags a file, fix it with
+  `npx prettier --write <file>` (not a full-repo `--write`) and re-run
+  `format:check` to confirm it's clean.
+
 ## Rust code organization
 
 Item order inside a file/module, top to bottom (clippy's default grouping):

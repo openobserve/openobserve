@@ -50,6 +50,7 @@ vi.mock("@/utils/zincutils", () => ({
   useLocalOrganization: vi.fn(),
   useLocalTimezone: vi.fn(),
   invalidateLoginData: vi.fn(),
+  getPath: vi.fn(() => "/"),
 }));
 
 // ---------------------------------------------------------------------------

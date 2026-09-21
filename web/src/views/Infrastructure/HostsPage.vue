@@ -127,6 +127,9 @@ const first = (v: unknown): string | undefined => {
   return flat[0] != null ? String(flat[0]) : undefined;
 };
 
+// Bookmarks predating the Host column's rename still carry ?sort=host_name.
+const LEGACY_SORT_FIELD: Record<string, string> = { host_name: "display_name" };
+
 const restoreFromQuery = () => {
   const q = route.query;
   if (first(q.name)) nameFilter.value = first(q.name)!;
@@ -134,7 +137,7 @@ const restoreFromQuery = () => {
   if (q.os) osFilter.value = [q.os].flat().map(String);
   const pageParam = Number(first(q.page));
   if (Number.isFinite(pageParam) && pageParam > 1) page.value = pageParam;
-  if (first(q.sort)) sortBy.value = first(q.sort)!;
+  if (first(q.sort)) sortBy.value = LEGACY_SORT_FIELD[first(q.sort)!] ?? first(q.sort)!;
   if (first(q.desc)) sortDesc.value = first(q.desc) !== "false";
 };
 
@@ -208,6 +211,11 @@ const drawerHost = computed(() => first(route.query.host) ?? "");
 const drawerStatus = computed(
   () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.status ?? "UNKNOWN",
 );
+// Falls back to the series key so a deep link to a host outside the loaded rows still gets a heading.
+const drawerDisplayName = computed(
+  () =>
+    list.rows.value.find((r) => r.host_name === drawerHost.value)?.display_name ?? drawerHost.value,
+);
 const drawerOs = computed(
   () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.os_type ?? null,
 );
@@ -246,7 +254,7 @@ const statusLabel = (status: string) =>
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 const columns = computed<OTableColumnDef<HostRow>[]>(() => [
-  { id: "host", header: t("infra.hosts.columnHost"), accessorKey: "host_name", sortable: true },
+  { id: "host", header: t("infra.hosts.columnHost"), accessorKey: "display_name", sortable: true },
   { id: "os", header: t("infra.hosts.columnOs"), accessorKey: "os_type", size: 96, sortable: true },
   {
     id: "status",
@@ -287,7 +295,15 @@ const columns = computed<OTableColumnDef<HostRow>[]>(() => [
     id: "load",
     header: t("infra.hosts.columnLoad"),
     accessorKey: "load",
-    size: 96,
+    size: 130,
+    sortable: true,
+    meta: { align: "right" },
+  },
+  {
+    id: "cores",
+    header: t("infra.hosts.columnCores"),
+    accessorKey: "cores",
+    size: 80,
     sortable: true,
     meta: { align: "right" },
   },
@@ -301,13 +317,14 @@ const columns = computed<OTableColumnDef<HostRow>[]>(() => [
 ]);
 
 const SORT_FIELD_BY_COLUMN: Record<string, string> = {
-  host: "host_name",
+  host: "display_name",
   os: "os_type",
   status: "status",
   cpu: "cpu",
   memory: "memoryPct",
   disk: "disk",
   load: "load",
+  cores: "cores",
   lastSeen: "lastSeen",
 };
 
@@ -316,10 +333,11 @@ const onSortChange = (params: OTableSortParams) => {
   sortDesc.value = params.order === "desc";
 };
 
-const sortColumnId = computed(
-  () =>
-    Object.entries(SORT_FIELD_BY_COLUMN).find(([, field]) => field === sortBy.value)?.[0] ?? "cpu",
-);
+const sortColumnId = computed(() => {
+  // A raw host_name can still arrive by paths that bypass restoreFromQuery's legacy mapping.
+  const field = LEGACY_SORT_FIELD[sortBy.value] ?? sortBy.value;
+  return Object.entries(SORT_FIELD_BY_COLUMN).find(([, f]) => f === field)?.[0] ?? "cpu";
+});
 
 const tintClass = (value: number | null) => {
   const tint = utilizationTint(value);
@@ -336,6 +354,12 @@ const barValue = (value: number | null) => (value == null ? 0 : value / 100);
 
 const pct = (value: number | null) => (value == null ? raw("—") : raw(`${Math.round(value)}%`));
 const num = (value: number | null) => (value == null ? raw("—") : raw(value.toFixed(2)));
+
+// Absent whenever cores never resolved, or the collector already divided load itself.
+const loadPerCore = (row: HostRow) =>
+  row.loadPerCore != null
+    ? t("infra.hosts.loadPerCore", { value: row.loadPerCore.toFixed(2) })
+    : undefined;
 
 // The shared dashboard byte scaler, so a 900MB container and a 512GB host both read correctly.
 const bytes = (value: number) => formatUnitValue(getUnitValue(value, "bytes", "", 1));
@@ -546,7 +570,7 @@ const osToggleLabel = (slug: string) =>
                 :data-test="`hosts-row-${row.host_name}`"
                 @click="openDrawer(row.host_name)"
               >
-                {{ raw(row.host_name) }}
+                {{ raw(row.display_name) }}
               </OButton>
             </template>
             <template #cell-os="{ row }">
@@ -632,7 +656,24 @@ const osToggleLabel = (slug: string) =>
               </div>
             </template>
             <template #cell-load="{ row }">
-              <span>{{ num(row.load) }}</span>
+              <div
+                class="flex w-full items-baseline justify-end gap-1"
+                :data-test="`hosts-cell-load-${row.host_name}`"
+              >
+                <span class="tabular-nums">{{ num(row.load) }}</span>
+                <OText
+                  v-if="loadPerCore(row)"
+                  variant="meta"
+                  class="text-2xs tabular-nums"
+                  :data-test="`hosts-load-per-core-${row.host_name}`"
+                  >{{ loadPerCore(row) }}</OText
+                >
+              </div>
+            </template>
+            <template #cell-cores="{ row }">
+              <span class="tabular-nums" :data-test="`hosts-cell-cores-${row.host_name}`">{{
+                raw(row.cores != null ? String(row.cores) : "—")
+              }}</span>
             </template>
             <template #cell-lastSeen="{ row }">
               <span>{{ raw(row.lastSeen ?? "—") }}</span>
@@ -645,6 +686,7 @@ const osToggleLabel = (slug: string) =>
     <HostDetailDrawer
       v-if="drawerHost"
       :host-name="drawerHost"
+      :display-name="drawerDisplayName"
       :status="drawerStatus"
       :os-type="drawerOs"
       :last-seen-us="drawerLastSeenUs"
