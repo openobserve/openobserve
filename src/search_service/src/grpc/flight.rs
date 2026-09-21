@@ -58,7 +58,7 @@ use crate::{
     datafusion::{
         distributed_plan::{
             NewEmptyExecVisitor, ReplaceTableScanExec, codec::get_physical_extension_codec,
-            empty_exec::NewEmptyExec, rewrite::aggregate_optimize_rewrite,
+            rewrite::aggregate_optimize_rewrite,
         },
         exec::{DataFusionContextBuilder, register_udf},
         optimizer::physical_optimizer::{
@@ -449,9 +449,9 @@ pub async fn search(
         tables.push(Arc::new(enrichment_table) as _);
     }
 
-    // create a Union Plan to merge all tables
+    // Scan projections refer to the full schema, not the placeholder's projected output.
     let start = std::time::Instant::now();
-    let union_table = create_union_table(empty_exec, tables);
+    let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
     log::info!(
         "{}",
         search_inspector_fields(
@@ -536,14 +536,6 @@ pub async fn search(
     );
 
     Ok((ctx, physical_plan, scan_stats))
-}
-
-fn create_union_table(
-    empty_exec: &NewEmptyExec,
-    tables: Vec<Arc<dyn TableProvider>>,
-) -> NewUnionTable {
-    // Scan projections refer to the full schema, not the placeholder's projected output.
-    NewUnionTable::new(empty_exec.full_schema(), tables)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -858,6 +850,7 @@ mod tests {
     use super::*;
     use crate::{
         datafusion::{
+            distributed_plan::empty_exec::NewEmptyExec,
             optimizer::logical_optimizer::rewrite_histogram::RewriteHistogram,
             table_provider::empty_table::NewEmptyTable, udf::histogram_udf,
         },
@@ -901,7 +894,7 @@ mod tests {
                         )) as Arc<dyn TableProvider>
                     })
                     .collect();
-                let union_table = create_union_table(empty_exec, tables);
+                let union_table = NewUnionTable::new(empty_exec.full_schema(), tables);
                 let scan = union_table
                     .scan(
                         &ctx.state(),
