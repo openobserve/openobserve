@@ -11,11 +11,18 @@ server-side behaviour that page documents and that #14613 actually changed:
 
 It provisions its own Splunk HEC token so it exercises the real root-mounted
 ``/services/collector`` endpoint rather than a stand-in ingest path.
+
+The "stale" offset is derived from the server's own ZO_INGEST_ALLOWED_UPTO so
+the events are genuinely out of window whatever that is set to (CI raises it to
+48h for backfill tests); searches use a window WIDE enough to span the stale
+timestamp, so a record that was wrongly stored instead of dropped is caught
+rather than hidden behind a short lookback.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 
@@ -27,9 +34,16 @@ from support.wait import wait_until
 
 logger = logging.getLogger(__name__)
 
-# Default ZO_INGEST_ALLOWED_UPTO is 5h; 10h in the past is unambiguously out of
-# window regardless of clock skew on the runner.
-STALE_OFFSET_SECONDS = 10 * 60 * 60
+# The server drops events older than ZO_INGEST_ALLOWED_UPTO hours (default 5;
+# CI sets 48 for backfill tests). Read the same value the server runs with and
+# push the stale events a full day past it so they are unambiguously dropped.
+WINDOW_HOURS = int(os.environ.get("ZO_INGEST_ALLOWED_UPTO", "5"))
+STALE_OFFSET_SECONDS = (WINDOW_HOURS + 24) * 60 * 60
+
+# Search back past the stale timestamp (+2 days) so a row that was stored at its
+# stale time instead of dropped is found — a short lookback would hide it and
+# turn a non-drop into a false "dropped" pass.
+SEARCH_MINUTES = int(STALE_OFFSET_SECONDS / 60) + 2 * 24 * 60
 
 DROP_METRIC = "zo_ingest_records_dropped_total"
 
@@ -61,10 +75,14 @@ def _event(marker: str, *, index: str, time_seconds: float | None) -> str:
 
 
 def _marker_count(client: OpenObserveClient, index: str, marker: str) -> int:
-    """Rows in ``index`` carrying ``marker``; 0 if the stream does not exist yet."""
+    """Rows in ``index`` carrying ``marker``; 0 if the stream does not exist yet.
+
+    The window spans past the stale timestamp on purpose: a stale row that was
+    stored rather than dropped must be visible here so the test can fail on it.
+    """
     resp = client.search.sql(
         f"SELECT COUNT(*) AS count FROM \"{index}\" WHERE marker = '{marker}'",
-        minutes=60,
+        minutes=SEARCH_MINUTES,
         raise_for_status=False,
     )
     if resp.status_code != 200:
@@ -181,7 +199,8 @@ def test_mixed_batch_stores_in_window_and_drops_stale(
     """A batch of one fresh + one stale event: fresh is stored, stale is not.
 
     The fresh row is the readiness gate — once it is searchable the batch has
-    been processed, so the stale row's absence is a real drop, not ingest lag.
+    been processed, so the stale row's absence (searched over a window that
+    spans its timestamp) is a real drop, not ingest lag or a lookback miss.
     """
     index = unique_name("hecwin")
     fresh, stale = uuid.uuid4().hex, uuid.uuid4().hex
