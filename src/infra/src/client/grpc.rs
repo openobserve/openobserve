@@ -223,7 +223,7 @@ pub async fn make_grpc_metrics_client<T>(
     >,
     Error,
 > {
-    make_grpc_metrics_client_with_policy(
+    make_grpc_client_with_policy(
         trace_id,
         org_id,
         request,
@@ -235,7 +235,7 @@ pub async fn make_grpc_metrics_client<T>(
 }
 
 #[tracing::instrument(name = "promql:search:grpc:metrics:make_client_with_policy", skip_all)]
-pub async fn make_grpc_metrics_client_with_policy<T>(
+pub async fn make_grpc_client_with_policy<T>(
     trace_id: &str,
     org_id: &str,
     request: &mut Request<T>,
@@ -530,9 +530,7 @@ mod tests {
         };
         use tonic::{Request, Response, Status, codec::CompressionEncoding, transport::Server};
 
-        use super::{
-            ResponseCompression, make_grpc_metrics_client, make_grpc_metrics_client_with_policy,
-        };
+        use super::{ResponseCompression, make_grpc_client_with_policy, make_grpc_metrics_client};
 
         type HeaderSnapshot = (
             Option<String>,
@@ -681,7 +679,7 @@ mod tests {
                 .metadata_mut()
                 .insert("traceparent", traceparent.parse().unwrap());
             let response = if let Some(policy) = policy {
-                let mut client = make_grpc_metrics_client_with_policy(
+                let mut client = make_grpc_client_with_policy(
                     "fixture-trace",
                     "fixture-org",
                     &mut request,
