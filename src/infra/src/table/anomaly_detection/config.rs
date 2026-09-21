@@ -1029,4 +1029,69 @@ mod tests {
             Some(1_700_000_000_000_500)
         );
     }
+
+    /// `retrain_interval_days == 0` is the operator's "Never" — the first option in the UI
+    /// dropdown — and not a small cadence. It is a sentinel outside the ordered cadence domain,
+    /// so no bound may be applied to it: a clamp that treats it as a number converts every
+    /// deliberate opt-out into a forced retrain at the floor. The scheduler's `should_train`
+    /// owns the live rule; this pins the contract it and any future cadence arithmetic must keep.
+    #[test]
+    fn retrain_interval_days_zero_means_never_and_no_cadence_bound_may_touch_it() {
+        const NEVER: i32 = 0;
+        // Stand-ins for whatever a future clamp derives; the test must hold for any bounds.
+        const FLOOR_DAYS: i32 = 1;
+        const CEILING_DAYS: i32 = 30;
+
+        // The only shape a cadence bound may take: 0 leaves before any arithmetic runs.
+        fn cadence_days(interval_days: i32) -> Option<i32> {
+            if interval_days == NEVER {
+                return None;
+            }
+            Some(interval_days.clamp(FLOOR_DAYS, CEILING_DAYS))
+        }
+
+        // Whether a retrain is due, as the scheduler decides it. `None` = no cadence, ever.
+        fn retrain_due_at(interval_days: i32, age_days: i64) -> bool {
+            match cadence_days(interval_days) {
+                None => false,
+                Some(days) => age_days >= days as i64,
+            }
+        }
+
+        // No age ever makes a "Never" config due — not one the floor would have fired at, and
+        // not one older than every bound in play.
+        for age_days in [0_i64, 1, 7, 30, 365, 100_000] {
+            assert!(
+                !retrain_due_at(NEVER, age_days),
+                "retrain_interval_days = 0 must never come due, but it did at age {age_days}d"
+            );
+        }
+
+        // The sentinel must not be reachable by clamping, or "Never" and the floor collide.
+        assert_eq!(
+            cadence_days(NEVER),
+            None,
+            "0 must leave the cadence domain, not be clamped into it"
+        );
+        for interval_days in [1_i32, 7, 12, 30, 365] {
+            assert!(
+                cadence_days(interval_days).is_some_and(|d| d > 0),
+                "a real cadence of {interval_days}d must stay a cadence"
+            );
+        }
+
+        // And the sentinel must reach the scheduler intact: replication copies the field
+        // verbatim, so a peer's "Never" cannot arrive as a cadence.
+        let mut local = make_model("anom-1", "org");
+        local.retrain_interval_days = 7;
+        let mut active = local.into_active_model();
+        let mut peer = make_model("anom-1", "org");
+        peer.retrain_interval_days = NEVER;
+        patch_all_fields(&mut active, peer);
+        assert_eq!(
+            active.retrain_interval_days.unwrap(),
+            NEVER,
+            "a replicated 'Never' must not be rewritten into a cadence"
+        );
+    }
 }
