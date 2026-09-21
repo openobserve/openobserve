@@ -3763,15 +3763,26 @@ export class AlertsPage {
      * @param {string} streamName - Name of the log stream
      * @param {string} alertName - Name for the alert
      */
+    /** The data-test VALUE inside a `[data-test="..."]` selector. */
+    _dataTestValue(selector) {
+        const m = selector.match(/\[data-test="([^"]+)"\]/);
+        if (!m) throw new Error(`Not a data-test selector: ${selector}`);
+        return m[1];
+    }
+
     async setupScheduledAlertWizardToStep2(streamName, alertName) {
         await this.clickAddAlertButton();
         await this.fillAlertName(alertName);
         await this.selectStreamType('logs');
 
-        // Select stream via OSelect popover with deterministic waits (cloud may load streams slowly)
-        const popoverSelector = `${this.locators.streamNameDropdown}-popover`;
-        const searchSelector = `${this.locators.streamNameDropdown}-search`;
-        const optionByValue = `${this.locators.streamNameDropdown}-option[data-test-value="${streamName}"]`;
+        // Select stream via OSelect popover with deterministic waits (cloud may load streams slowly).
+        // OSelect derives its popover/search/option data-tests from the trigger's VALUE, so the
+        // suffix goes inside the attribute — appending it to the bracketed selector builds
+        // invalid CSS ('[data-test="x"]-option') that matches nothing.
+        const streamDataTest = this._dataTestValue(this.locators.streamNameDropdown);
+        const popoverSelector = `[data-test="${streamDataTest}-popover"]`;
+        const searchSelector = `[data-test="${streamDataTest}-search"]`;
+        const optionByValue = `[data-test="${streamDataTest}-option"][data-test-value="${streamName}"]`;
         let streamSelected = false;
         for (let attempt = 0; attempt < 3 && !streamSelected; attempt++) {
             await this.page.locator(this.locators.streamNameDropdown).click();
@@ -4191,6 +4202,34 @@ export class AlertsPage {
         const vrlEditor = this.page.locator('[data-test="scheduled-alert-vrl-function-editor"]');
         await expect(vrlEditor).toBeVisible({ timeout });
         testLogger.info('VRL editor is visible');
+    }
+
+    /**
+     * Record every search endpoint the query-editor dialog calls from now on.
+     *
+     * The dialog picks `_search` or `_search_multi` off `multiTimeRange`, so
+     * which one it hit is the contract — a result-shape assertion cannot tell
+     * the two apart once the response has been rendered.
+     */
+    async captureSearchRequests() {
+        this._searchRequests = [];
+        this.page.on('request', (req) => {
+            const url = req.url();
+            if (req.method() === 'POST' && url.includes('/_search')) this._searchRequests.push(url);
+        });
+        testLogger.info('Capturing search requests');
+    }
+
+    /** Exact endpoint names seen since captureSearchRequests(), most recent last. */
+    getCapturedSearchEndpoints() {
+        return (this._searchRequests || []).map(
+            (url) => new URL(url).pathname.split('/').filter(Boolean).pop(),
+        );
+    }
+
+    /** The "results across all time windows" chip on the Query Result pane. */
+    getMultiWindowBadge() {
+        return this.page.locator('.multi-window-badge');
     }
 
     /**

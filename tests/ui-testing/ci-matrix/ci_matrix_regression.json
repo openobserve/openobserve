@@ -34,7 +34,8 @@
       "alerts-14306-composite-clone.spec.js",
       "alerts-14308-composite-trigger-timestamps.spec.js",
       "alerts-measure-column-default.spec.js",
-      "alerts-from-dashboard-panel.spec.js"
+      "alerts-from-dashboard-panel.spec.js",
+      "alerts-query-editor-search-endpoint.spec.js"
     ],
     "disabled": []
   },
@@ -142,6 +143,15 @@
     "run_files": [
       "function-delete-confirm.spec.js",
       "pipeline-query-filter-removal.spec.js"
+    ],
+    "disabled": []
+  },
+  {
+    "testfolder": "SLO-Regression",
+    "actual_folder": "RegressionSet/SLO",
+    "browser": "chrome",
+    "run_files": [
+      "slo-error-messages.spec.js"
     ],
     "disabled": []
   }

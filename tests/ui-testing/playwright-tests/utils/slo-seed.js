@@ -580,7 +580,7 @@ async function waitForSloMeasured(page, sloId, {
  *
  * @returns {Promise<string>} the destination name, to pick in the form
  */
-async function seedNotificationDestination(page, baseName) {
+async function seedNotificationDestination(page, baseName, { url = null } = {}) {
   const org = getOrgIdentifier();
   const v1 = `${baseUrl()}/api/${org}`;
   const template = `${baseName}_tmpl`;
@@ -603,7 +603,7 @@ async function seedNotificationDestination(page, baseName) {
 
   const destRes = await post(`${v1}/alerts/destinations`, {
     name: destination,
-    url: `${v1}/${baseName}_sink/_json`,
+    url: url || `${v1}/${baseName}_sink/_json`,
     method: 'post',
     template,
     type: 'http',
