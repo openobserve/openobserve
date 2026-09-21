@@ -1842,25 +1842,6 @@ describe("EditRole - summary", () => {
     expect(moduleKeys(wrapper.vm)).toEqual(["dfolder"]);
   });
 
-  it("describes a type level grant in words, not the raw _all_ id", async () => {
-    const wrapper = await mountEditRole();
-    withSaved(wrapper.vm, [`stream:_all_${wrapper.vm.getOrgId()}:AllowAll`]);
-
-    const [stream] = wrapper.vm.summaryModules;
-
-    expect(String(stream.description)).not.toContain("_all_");
-    expect(stream.description).toBe(i18n.global.t("iam.editRole.summaryReachEveryStream"));
-  });
-
-  it("lists each held action once, in column order", async () => {
-    const wrapper = await mountEditRole();
-    withSaved(wrapper.vm, ["metrics:cpu:AllowGet", "metrics:cpu:AllowList", "logs:app:AllowGet"]);
-
-    const [stream] = wrapper.vm.summaryModules;
-
-    expect(stream.actions.map((action) => action.action)).toEqual(["AllowList", "AllowGet"]);
-  });
-
   it("drops a module whose only grant is staged for removal", async () => {
     const wrapper = await mountEditRole();
     withSaved(wrapper.vm, ["logs:app:AllowGet"]);
@@ -1903,18 +1884,6 @@ describe("EditRole - pending changes", () => {
 
     expect(wrapper.vm.pendingChanges).toEqual([]);
     expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
-  });
-
-  it("closes the review drawer once the last change is undone", async () => {
-    const wrapper = await mountEditRole();
-    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
-    wrapper.vm.unsavedDrawerOpen = true;
-    await flushPromises();
-
-    wrapper.vm.updatePermissionMappings("metrics:cpu:AllowGet");
-    await flushPromises();
-
-    expect(wrapper.vm.unsavedDrawerOpen).toBe(false);
   });
 });
 

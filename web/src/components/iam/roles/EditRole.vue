@@ -239,30 +239,21 @@ import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { resourcesQuery } from "@/services/iam.queries";
 import { queryClient } from "@/composables/query/queryClient";
-import { computed, defineAsyncComponent, nextTick, ref, watch, type Ref } from "vue";
+import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import useRoleGrants, { buildGrantKey, splitGrantKey } from "@/composables/iam/useRoleGrants";
+import useRoleGrants, { buildGrantKey } from "@/composables/iam/useRoleGrants";
 import ModuleRail, { type RailModule } from "@/components/iam/roles/ModuleRail.vue";
 import ModulePane from "@/components/iam/roles/ModulePane.vue";
 import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.vue";
-import UnsavedChangesDrawer, {
-  type PendingChange,
-} from "@/components/iam/roles/UnsavedChangesDrawer.vue";
-import RoleSummary, {
-  type SummaryAction,
-  type SummaryModule,
-} from "@/components/iam/roles/RoleSummary.vue";
-import {
-  buildRoleModules,
-  GROUP_LABEL_KEYS,
-  STREAM_PARENT_KEY,
-} from "@/components/iam/roles/roleModules";
+import UnsavedChangesDrawer from "@/components/iam/roles/UnsavedChangesDrawer.vue";
+import RoleSummary from "@/components/iam/roles/RoleSummary.vue";
+import { buildRoleModules, GROUP_LABEL_KEYS } from "@/components/iam/roles/roleModules";
 import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
@@ -272,6 +263,7 @@ import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
 import { useSavedGrantExpansion } from "@/composables/iam/useSavedGrantExpansion";
 import { useRoleScopes } from "@/composables/iam/useRoleScopes";
 import { useModuleNavigation } from "@/composables/iam/useModuleNavigation";
+import { useRoleSummary } from "@/composables/iam/useRoleSummary";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -513,160 +505,6 @@ const { moduleScopes, folderScopes, streamTypeScopes } = useRoleScopes({
   t,
   ACTION_ORDER,
 });
-
-const resourceParent = (resource: string) =>
-  permissionsState.resources.find((candidate: any) => candidate.key === resource)?.parent;
-
-// Names come from entities the role load already fetched; an unloaded id shows as itself.
-const entityLabel = (resource: string, entity: string) => {
-  if (entity === `_all_${getOrgId()}`) {
-    return resource === STREAM_PARENT_KEY
-      ? t("iam.editRole.scopeEveryStream")
-      : t("iam.editRole.scopeAllOf", { module: resourceLabel(resource) });
-  }
-
-  const parent = resourceParent(resource);
-  const pools = [
-    heavyResourceEntities.value[resource],
-    resourceMapper.value[resource]?.entities,
-    ...(parent ? (resourceMapper.value[parent]?.entities ?? []) : []).map(
-      (folder: any) => folder.entities,
-    ),
-  ];
-  for (const pool of pools) {
-    const match = pool?.find((candidate: any) => candidate.name === entity);
-    if (match) return raw(match.display_name ?? entity);
-  }
-  return raw(entity);
-};
-
-type GrantState = "saved" | "added" | "removed";
-
-// resource -> entity -> grants, including staged removals so they stay reviewable until saved.
-const grantsByResource = computed(() => {
-  const byResource = new Map<string, Map<string, { action: string; state: GrantState }[]>>();
-  const record = (key: string, state: GrantState) => {
-    const { resource, entity, permission } = splitGrantKey(key);
-    const byEntity = byResource.get(resource) ?? new Map();
-    byEntity.set(entity, [...(byEntity.get(entity) ?? []), { action: permission, state }]);
-    byResource.set(resource, byEntity);
-  };
-  selectedPermissionsHash.value.forEach((key: string) =>
-    record(key, addedPermissions.value[key] ? "added" : "saved"),
-  );
-  Object.keys(removedPermissions.value).forEach((key) => record(key, "removed"));
-  return byResource;
-});
-
-const isWideEntity = (entity: string) => entity === `_all_${getOrgId()}`;
-
-const summaryActions = (actions: Iterable<string>): SummaryAction[] =>
-  [...new Set(actions)]
-    .sort((a, b) => ACTION_ORDER.indexOf(a) - ACTION_ORDER.indexOf(b))
-    .map((action) => ({
-      action,
-      label: t(ACTION_LABEL_KEYS[action as keyof typeof ACTION_LABEL_KEYS] ?? "iam.all"),
-    }));
-
-// Only a loaded list has a known size, so coverage reads "N of M" when it can and "N" otherwise.
-const knownTotal = (resource: string): number | undefined =>
-  heavyResourceEntities.value[resource]?.length ??
-  (resourceMapper.value[resource]?.entities?.length || undefined);
-
-const heldGrants = (resource: string) =>
-  [...(grantsByResource.value.get(resource)?.entries() ?? [])]
-    .map(
-      ([entity, grants]) => [entity, grants.filter((grant) => grant.state !== "removed")] as const,
-    )
-    .filter(([, grants]) => grants.length);
-
-const actionsOf = (held: ReturnType<typeof heldGrants>) =>
-  summaryActions(held.flatMap(([, grants]) => grants.map((grant) => grant.action)));
-
-// "N of M" when the list is loaded, a plain count otherwise.
-const specificReach = (resource: string, count: number) => {
-  const total = knownTotal(resource);
-  return total
-    ? t("iam.editRole.summaryReachSome", {
-        count: count.toLocaleString(),
-        total: total.toLocaleString(),
-      })
-    : t("iam.editRole.summaryGrantCount", { count }, count);
-};
-
-const moduleDescription = (moduleKey: string, countedKeys: string[]): I18nText => {
-  const rootWide = heldGrants(moduleKey).some(([entity]) => isWideEntity(entity));
-  if (rootWide) {
-    return moduleKey === STREAM_PARENT_KEY
-      ? t("iam.editRole.summaryReachEveryStream")
-      : t("iam.editRole.summaryReachAllOf", { module: resourceLabel(moduleKey) });
-  }
-
-  const granted = countedKeys
-    .map((key) => ({ key, held: heldGrants(key) }))
-    .filter(({ held }) => held.length);
-  if (granted.length !== 1) {
-    return raw(granted.map(({ key }) => resourceLabel(key)).join(", "));
-  }
-
-  const [{ key, held }] = granted;
-  const specific = held.filter(([entity]) => !isWideEntity(entity));
-  return t("iam.editRole.summaryReachOne", {
-    label: resourceLabel(key),
-    reach: specific.length
-      ? specificReach(key, specific.length)
-      : t("iam.editRole.summaryReachAll"),
-  });
-};
-
-const summaryModules = computed<SummaryModule[]>(() => {
-  const heldResources = new Set(
-    [...grantsByResource.value.keys()].filter((resource) => heldGrants(resource).length),
-  );
-
-  return roleModules.value
-    .filter((module) => module.countedKeys.some((key) => heldResources.has(key)))
-    .map((module) => {
-      const rail = railModules.value.find((candidate) => candidate.key === module.key);
-      return {
-        moduleKey: module.key,
-        label: rail?.label ?? moduleLabel(module.key),
-        icon: module.icon,
-        group: module.group,
-        granted: rail?.granted ?? 0,
-        description: moduleDescription(module.key, module.countedKeys),
-        actions: actionsOf(module.countedKeys.flatMap((key) => heldGrants(key))),
-      };
-    });
-});
-
-const pendingChanges = computed<PendingChange[]>(() => {
-  const changes: PendingChange[] = [];
-  grantsByResource.value.forEach((byEntity, resource) => {
-    byEntity.forEach((grants, entity) => {
-      (["added", "removed"] as const).forEach((state) => {
-        const ofState = grants.filter((grant) => grant.state === state);
-        if (!ofState.length) return;
-        changes.push({
-          id: `${resource}-${entity}-${state}`,
-          state,
-          label: entityLabel(resource, entity),
-          moduleLabel: raw(resourceLabel(resource)),
-          actions: summaryActions(ofState.map((grant) => grant.action)),
-          keys: ofState.map((grant) => buildGrantKey(resource, grant.action, entity)),
-        });
-      });
-    });
-  });
-  return changes;
-});
-// Nothing left to review once the last change is undone, so the drawer gets out of the way.
-watch(
-  () => pendingChanges.value.length,
-  (count) => {
-    if (!count) unsavedDrawerOpen.value = false;
-  },
-);
 
 const applyPreset = async (presetId: string) => {
   if (presetId === "readonly") seedReadonlyPreset();
@@ -924,6 +762,25 @@ const getDefaultResource = (): Resource => {
 const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
+
+// What the role grants and what changed since load live in their own file.
+const { summaryModules, pendingChanges } = useRoleSummary({
+  selectedPermissionsHash,
+  addedPermissions,
+  removedPermissions,
+  permissionsState,
+  resourceMapper,
+  heavyResourceEntities,
+  roleModules,
+  railModules,
+  unsavedDrawerOpen,
+  resourceLabel,
+  moduleLabel,
+  getOrgId,
+  t,
+  ACTION_ORDER,
+  ACTION_LABEL_KEYS,
+});
 
 const savePermissionHash = () => {
   grants.seedSaved(
