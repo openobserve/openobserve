@@ -13631,15 +13631,6 @@
       "usedBy": "Used by {n} checks: {names}",
       "usedByHint": "The split is refused while any of these checks would lose the value: a check with no environments, or one that runs in an environment not given a value here."
     },
-    "replaySecrets": {
-      "confirm": "Replay",
-      "description": "Replay runs in your browser, so shared secrets cannot be filled in automatically. Enter them to replay with real values.",
-      "remember": "Remember for this session",
-      "rememberHint": "Kept in this tab only, never saved to the browser or sent anywhere.",
-      "skip": "Replay without them",
-      "title": "Values needed for replay",
-      "valuePlaceholder": "Value"
-    },
     "versionPrefix": "v",
     "tokens": {
       "title": "Synthetics Tokens",
@@ -14672,7 +14663,7 @@
       "stepNameRequired": "Give this step a name — it is what run results show",
       "typeTextRequired": "Enter the text this step should type",
       "expectedRequired": "Enter the value this assertion should expect",
-      "urlInvalid": "Enter a valid URL starting with http:// or https://",
+      "urlInvalid": "Enter a URL starting with http://, https:// or a variable placeholder",
       "navigateUrlInvalid": "Enter a URL starting with http://, https:// or a variable placeholder",
       "urlRequired": "Starting URL is required",
       "fixHighlightedFields": "Fix the highlighted fields before saving",

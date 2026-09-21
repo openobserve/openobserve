@@ -283,9 +283,6 @@ const syntheticsService = {
       `/api/${orgIdentifier}/synthetics/environments/${encodeURIComponent(env)}/variables/${id}?force=${force}`,
     ),
 
-  replaySecrets: (orgIdentifier: string, checkId: string) =>
-    http().post(`/api/${orgIdentifier}/synthetics/${checkId}/replay-secrets`, {}),
-
   /** The merged set for one check, with the scope each name comes from. */
   resolvedVariables: (orgIdentifier: string, checkId: string) =>
     http().get(`/api/${orgIdentifier}/synthetics/${checkId}/resolved-variables`),

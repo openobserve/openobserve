@@ -29,6 +29,11 @@ export function substitutePlaceholders(text: string, values: Record<string, stri
   );
 }
 
+/** The server's `with_default_scheme`: no `://` reads as https, at save time and at run time. */
+export function withDefaultScheme(value: string): string {
+  return !value || value.includes("://") ? value : `https://${value}`;
+}
+
 /** The server's `validate_http_url` for a templated URL: names stand in for a token, no scheme reads as https. */
 export function isHttpUrlTemplate(value: string): boolean {
   if (/\s/.test(value)) return false;
@@ -36,7 +41,7 @@ export function isHttpUrlTemplate(value: string): boolean {
   const probe = substitutePlaceholders(value, tokens);
   if (probe.includes("{{")) return false;
   try {
-    const url = new URL(probe.includes("://") ? probe : `https://${probe}`);
+    const url = new URL(withDefaultScheme(probe));
     return (url.protocol === "http:" || url.protocol === "https:") && url.hostname !== "";
   } catch {
     return false;

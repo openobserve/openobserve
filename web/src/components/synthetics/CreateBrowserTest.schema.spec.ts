@@ -97,6 +97,12 @@ describe("makeBrowserCheckSaveSchema monitor fields", () => {
     expect(issuePaths(result)).toEqual([]);
   });
 
+  it("should accept a templated URL, as the gate does", () => {
+    const result = schema.safeParse({ ...valid, url: "{{BASE_URL}}/login" });
+
+    expect(issuePaths(result)).not.toContain("url");
+  });
+
   // A check with no location is never scheduled anywhere, so it can never run.
   it("should reject a check with no locations", () => {
     const result = schema.safeParse({ ...valid, locations: [], journey: [] });
@@ -141,6 +147,36 @@ describe("makeBrowserCheckGateSchema", () => {
     const result = schema.safeParse({ name: "Checkout", url: "https://app.test" });
 
     expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a URL whose scheme lives inside a placeholder", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}}/login" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a bare placeholder as the whole URL", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}}" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should accept a placeholder inside a host that already has a scheme", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "https://{{HOST}}.example.com" });
+
+    expect(issuePaths(result)).toEqual([]);
+  });
+
+  it("should still reject a templated URL with whitespace", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL}} /x" });
+
+    expect(issueMessage(result, "url")).toBe("synthetics.validation.urlInvalid");
+  });
+
+  it("should still reject a placeholder that never closes", () => {
+    const result = schema.safeParse({ name: "Checkout", url: "{{BASE_URL/x" });
+
+    expect(issuePaths(result)).toContain("url");
   });
 });
 

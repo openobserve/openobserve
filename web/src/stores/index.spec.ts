@@ -15,10 +15,6 @@
 
 import { describe, expect, it } from "vitest";
 import store from "./index";
-import {
-  partitionReplaySecrets,
-  rememberReplaySecret,
-} from "@/components/synthetics/variables/replaySecrets";
 
 // `store` is an imported singleton mutated by every test in this file, so the
 // DECLARED initial state cannot be observed from inside a test that has already
@@ -243,27 +239,5 @@ describe("root store", () => {
       expect(cache().byTraceId).toEqual({});
       expect(cache().knownStreams).toEqual([]);
     });
-  });
-});
-
-describe("remembered replay secrets", () => {
-  const scope = { org: "acme", checkId: "c1", environment: "prod" };
-  const remembered = () => partitionReplaySecrets(scope, ["PASSWORD"]).missing.length === 0;
-
-  it("are forgotten when the org changes, and kept when it does not", async () => {
-    await store.dispatch("setSelectedOrganization", { identifier: "acme" });
-    rememberReplaySecret(scope, "PASSWORD", "hunter2");
-
-    await store.dispatch("setSelectedOrganization", { identifier: "acme" });
-    expect(remembered()).toBe(true);
-
-    await store.dispatch("setSelectedOrganization", { identifier: "zeta" });
-    expect(remembered()).toBe(false);
-  });
-
-  it("are forgotten on logout", async () => {
-    rememberReplaySecret(scope, "PASSWORD", "hunter2");
-    await store.dispatch("logout");
-    expect(remembered()).toBe(false);
   });
 });

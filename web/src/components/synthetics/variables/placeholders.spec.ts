@@ -19,6 +19,7 @@ import {
   placeholderNames,
   substitutePlaceholders,
   unboundPlaceholders,
+  withDefaultScheme,
 } from "./placeholders";
 
 describe("placeholderNames", () => {
@@ -83,5 +84,23 @@ describe("isHttpUrlTemplate", () => {
     for (const value of ["{{BASE_URL}} /login", "{{BASE_URL/login", "{{}}/x", "ftp://{{HOST}}/x"]) {
       expect(isHttpUrlTemplate(value), value).toBe(false);
     }
+  });
+});
+
+describe("withDefaultScheme", () => {
+  it("prefixes https when the value has no scheme", () => {
+    expect(withDefaultScheme("example.com/login")).toBe("https://example.com/login");
+  });
+
+  it("leaves a value with a scheme alone", () => {
+    expect(withDefaultScheme("http://example.com")).toBe("http://example.com");
+  });
+
+  it("prefixes an unresolved template too, as the server does", () => {
+    expect(withDefaultScheme("{{BASE_URL}}/x")).toBe("https://{{BASE_URL}}/x");
+  });
+
+  it("leaves an empty value empty", () => {
+    expect(withDefaultScheme("")).toBe("");
   });
 });

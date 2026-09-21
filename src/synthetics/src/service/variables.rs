@@ -39,14 +39,6 @@ thread_local! {
 static PUBLISH_QUEUE: std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<PublishJob>>> =
     std::sync::Mutex::new(None);
 
-/// One shared secret released to a browser for replay.
-pub struct ReplaySecret {
-    pub name: String,
-    /// The environment that governs it, and what the caller checks write permission against.
-    pub environment: String,
-    pub value: String,
-}
-
 #[cfg(any(feature = "enterprise", test))]
 type PublishSend =
     Box<dyn FnMut() -> std::pin::Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>> + Send>;
@@ -736,62 +728,6 @@ where
         );
     }
     Ok(Some(grouped))
-}
-
-/// Decrypted shared secrets a check's steps reference, for replay auto-fill.
-pub async fn replay_secrets(
-    org_id: &str,
-    check_id: &str,
-) -> anyhow::Result<Option<Vec<ReplaySecret>>> {
-    let conn = get_orm_client_ro().await;
-    let Some(check) = synthetics_checks::get(conn, org_id, check_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-    else {
-        return Ok(None);
-    };
-
-    let mut referenced = placeholder_names(&check_placeholder_text(&check));
-    for own in &check.variables {
-        referenced.remove(&own.name);
-    }
-    if referenced.is_empty() {
-        return Ok(Some(Vec::new()));
-    }
-
-    let envs = synthetics_environments::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let rows = synthetics_variables::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-
-    let global_id = synthetics_environments::global_environment_id(org_id);
-    let job_env = check.environments.first().map(String::as_str);
-    let candidates: Vec<_> = rows
-        .iter()
-        .filter(|v| v.is_secret() && referenced.contains(&v.name))
-        .filter(|v| !v.value.is_empty())
-        .filter(|v| applies_to(v, job_env, &global_id))
-        .collect();
-    if candidates.is_empty() {
-        return Ok(Some(Vec::new()));
-    }
-
-    let dek = synthetics_dek(org_id).await?;
-    let mut out = Vec::with_capacity(candidates.len());
-    for row in candidates {
-        let environment = envs
-            .iter()
-            .find(|e| e.id == row.env)
-            .map_or_else(|| row.env.clone(), |e| e.name.clone());
-        out.push(ReplaySecret {
-            name: row.name.clone(),
-            environment,
-            value: decrypt_secret(&dek, &row.value)?,
-        });
-    }
-    Ok(Some(out))
 }
 
 /// Moves a check-scoped variable up into the shared tier.

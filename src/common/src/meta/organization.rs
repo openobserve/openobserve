@@ -540,9 +540,6 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
-    /// Let replay auto-fill shared synthetics secrets for users who may write them.
-    #[serde(default)]
-    pub synthetics_replay_autofill: bool,
 }
 
 impl Default for OrganizationSetting {
@@ -576,7 +573,6 @@ impl Default for OrganizationSetting {
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
-            synthetics_replay_autofill: false,
         }
     }
 }
@@ -1522,7 +1518,6 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
-            synthetics_replay_autofill: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1551,7 +1546,6 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
-            synthetics_replay_autofill: false,
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

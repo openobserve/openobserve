@@ -38,18 +38,12 @@ import type {
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
 import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
 import type { WireStep } from "@/types/synthetics";
-import ReplaySecretPrompt from "@/components/synthetics/variables/ReplaySecretPrompt.vue";
+import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
 import {
-  buildResolvedGrouped,
-  type ResolvedVariable,
-} from "@/components/synthetics/variables/resolved";
-import {
-  partitionReplaySecrets,
+  defaultReplayEnvironmentId,
   replayInputs,
-  secretsNeededForReplay,
   sharedPlainValues,
-  type ReplaySecretScope,
-} from "@/components/synthetics/variables/replaySecrets";
+} from "@/components/synthetics/variables/replayInputs";
 import { useSharedVariables } from "@/components/synthetics/variables/useSharedVariables";
 import { computeRunBudget, formatBudgetDuration, JOB_LEASE_MS } from "@/utils/synthetics/runBudget";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
@@ -931,18 +925,23 @@ function onVariablePromoted(name: string) {
   };
 }
 
-/** Replay and a scheduled run resolve the check's first environment. */
-const replayEnvironmentId = computed(() => check.value.environments?.[0]);
+/** Written by the environment selector when it lands; until then the default rule decides. */
+const replayEnvironmentOverride = ref<string | undefined>();
+/** Replay resolves one environment: the override, else the check's first, else the org's first. */
+const replayEnvironmentId = computed(
+  () =>
+    replayEnvironmentOverride.value ??
+    defaultReplayEnvironmentId(check.value.environments ?? [], sharedEnvironments.value),
+);
 
-const replayResolved = computed<ResolvedVariable[]>(() => {
-  const grouped = buildResolvedGrouped(
-    sharedEnvironments.value,
-    sharedGlobals.value,
-    replayEnvironmentId.value ? [replayEnvironmentId.value] : [],
+/** The url and variables replay and recording run with, resolved against that environment. */
+const replayInputsForCheck = computed(() =>
+  replayInputs(
+    check.value.url,
     check.value.variables ?? [],
-  );
-  return grouped.resolved[grouped.environments[0] ?? ""] ?? [];
-});
+    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
+  ),
+);
 
 /** Every name the check resolves in any of its environments; undefined until the shared tiers load. */
 const knownVariableNames = computed(() => {
@@ -960,77 +959,14 @@ const knownVariableNames = computed(() => {
   );
 });
 
-const replaySecretScope = computed<ReplaySecretScope>(() => ({
-  org: store.state.selectedOrganization.identifier,
-  checkId: check.value.id ?? "",
-  environment: replayEnvironmentId.value ?? "",
-}));
-
-/** Steps waiting on secret values, held between the prompt and the replay. */
-const pendingReplaySteps = ref<WireStep[] | null>(null);
-const replaySecretNames = ref<string[]>([]);
-const replaySecretPromptOpen = ref(false);
-/** Values already in hand, remembered or server-supplied, merged back in when the prompt closes. */
-const heldSecrets = ref<Record<string, string>>({});
-
 function runReplay(journey: BrowserStep[]) {
   const steps = journeyToWireSteps(journey);
   if (steps.length === 0) return;
-
-  const needed = secretsNeededForReplay(steps, replayResolved.value);
-  const { known, missing } = partitionReplaySecrets(replaySecretScope.value, needed);
-  if (missing.length === 0) {
-    startReplay(steps, known);
-    return;
-  }
-  void resumeReplayWithSecrets(steps, known, missing);
+  startReplay(steps);
 }
 
-async function resumeReplayWithSecrets(
-  steps: WireStep[],
-  known: Record<string, string>,
-  missing: string[],
-) {
-  let filled: Record<string, string> = {};
-  const checkId = check.value.id;
-  // The server fills from the saved check's first environment, so an unsaved switch must not mix in its secrets.
-  if (checkId && savedCheck.value?.environments?.[0] === replayEnvironmentId.value) {
-    try {
-      const org = store.state.selectedOrganization.identifier;
-      const res = await syntheticsService.replaySecrets(org, checkId);
-      filled = res.data ?? {};
-    } catch {
-      // Auto-fill is opt-in and needs write on each environment, so a refusal is the ordinary case.
-      filled = {};
-    }
-  }
-
-  const stillMissing = missing.filter((name) => filled[name] === undefined);
-  if (stillMissing.length === 0) {
-    startReplay(steps, { ...known, ...filled });
-    return;
-  }
-  pendingReplaySteps.value = steps;
-  heldSecrets.value = { ...known, ...filled };
-  replaySecretNames.value = stillMissing;
-  replaySecretPromptOpen.value = true;
-}
-
-function onReplaySecretsSupplied(supplied: Record<string, string>) {
-  const steps = pendingReplaySteps.value;
-  pendingReplaySteps.value = null;
-  if (!steps) return;
-  startReplay(steps, { ...heldSecrets.value, ...supplied });
-  heldSecrets.value = {};
-}
-
-function startReplay(steps: WireStep[], secrets: Record<string, string>) {
-  const { url, variables } = replayInputs(
-    check.value.url,
-    check.value.variables ?? [],
-    sharedPlainValues(sharedEnvironments.value, sharedGlobals.value, replayEnvironmentId.value),
-    secrets,
-  );
+function startReplay(steps: WireStep[]) {
+  const { url, variables } = replayInputsForCheck.value;
   recorder
     .replay(steps, url, variables, check.value.auth, check.value.headers, check.value.cookies)
     .catch((err) => {
@@ -1245,7 +1181,7 @@ function onClearResults() {
                   <BrowserJourney
                     ref="journeyRef"
                     v-model="check.journey"
-                    :start-url="check.url"
+                    :start-url="replayInputsForCheck.url"
                     :known-variables="knownVariableNames"
                     :extension-ready="extensionReady"
                     :can-record-from="canRecordFrom"
@@ -1470,10 +1406,4 @@ function onClearResults() {
       <p class="py-2">{{ t("synthetics.newCheck.unsavedBody") }}</p>
     </ODialog>
   </OPageLayout>
-  <ReplaySecretPrompt
-    v-model:open="replaySecretPromptOpen"
-    :names="replaySecretNames"
-    :scope="replaySecretScope"
-    @supplied="onReplaySecretsSupplied"
-  />
 </template>
