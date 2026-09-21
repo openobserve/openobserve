@@ -482,7 +482,6 @@ const isGranted = (node: any, action: string) =>
 const isPendingRemoval = (node: any, action: string) =>
   !!grants.removed.value[permissionHashFor(node, action)];
 
-// The scope ladder lives in its own file: which rows are pinned, and what each one covers.
 const { moduleScopes, folderScopes, streamTypeScopes } = useRoleScopes({
   resourceMapper,
   isGranted,
@@ -743,7 +742,6 @@ const getOrgId = () => {
   return store.state.selectedOrganization.identifier;
 };
 
-// What the role grants and what changed since load live in their own file.
 const { summaryModules, pendingChanges } = useRoleSummary({
   selectedPermissionsHash,
   addedPermissions,
@@ -832,7 +830,6 @@ const expandPermission = async (resource: any) => {
   }
 };
 
-// The three presets live in their own file; they stage through the same handlers a click does.
 const { seedReadonlyPreset, seedDbmViewerPreset, seedK8sViewerPreset, applyPreset } =
   useRolePresets({
     permissionsState,
@@ -857,7 +854,6 @@ const getPermissionHash = (resourceName: string, permission: string, entity?: st
  * @param resource
  * @param typeOf - Type to assign the new entities that we get from the server
  */
-// Row building lives in its own file; it needs the tree and the grant store.
 const { updateEntityEntities, updateResourceEntities, updateResourceResource } =
   useRolePermissionRows({
     permissionsState,
@@ -868,7 +864,6 @@ const { updateEntityEntities, updateResourceEntities, updateResourceResource } =
     store,
   });
 
-// The list requests live in their own file; the row builders they feed stay here.
 const { getResourceEntities } = useRoleEntityLoaders({
   store,
   getStreams,
@@ -878,7 +873,6 @@ const { getResourceEntities } = useRoleEntityLoaders({
   updateResourceResource,
 });
 
-// The view of the open module and folder lives in its own file, with the moves that change it.
 const { activeModuleView, openFolderRow, navigateTrail } = useModuleNavigation({
   activeModule,
   openFolder,
@@ -893,7 +887,6 @@ const { activeModuleView, openFolderRow, navigateTrail } = useModuleNavigation({
   getResourceEntities,
 });
 
-// Expanding saved grants onto the tree lives in its own file; it may fetch rows to do it.
 const { updateRolePermissions } = useSavedGrantExpansion({
   permissionsState,
   decodePermission,
@@ -918,7 +911,6 @@ const updateEntityPermission = (
     });
 };
 
-// Table <-> JSON lives in its own file; the JSON is reconciled through the same staging a click uses.
 const { updatePermissionsUi, updateJsonInTable } = useRoleJsonView({
   permissionsUiType,
   permissionsJsonValue,
@@ -932,7 +924,6 @@ const { updatePermissionsUi, updateJsonInTable } = useRoleJsonView({
   getOrgId,
 });
 
-// Sending the changes lives in its own file; it reads the grant store and the member staging.
 const { saveRole } = useRoleSave({
   editingRole,
   permissionsUiType,
