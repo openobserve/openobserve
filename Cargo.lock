@@ -6862,6 +6862,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics_block"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arrow",
+ "arrow-schema",
+ "bytes",
+ "parquet",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "zstd",
+]
+
+[[package]]
 name = "metrics_index"
 version = "0.1.0"
 dependencies = [
@@ -6874,6 +6890,8 @@ dependencies = [
  "hashlink 0.11.1",
  "infra",
  "log",
+ "metrics_block",
+ "object_store",
  "promql",
  "promql-parser",
  "regex",
@@ -11201,6 +11219,7 @@ dependencies = [
  "log",
  "md5",
  "memchr",
+ "metrics_block",
  "metrics_index",
  "o2_enterprise",
  "object_store",

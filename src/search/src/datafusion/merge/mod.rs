@@ -13,6 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(feature = "enterprise")]
+pub mod downsampling;
+mod metrics;
+mod metrics_blocks;
+pub mod mode;
+mod result;
+mod single_file;
+
 use std::sync::Arc;
 
 use arrow::array::RecordBatch;
@@ -24,23 +32,15 @@ use datafusion::{
     physical_plan::execute_stream,
 };
 use futures::TryStreamExt;
+pub use mode::{MergeMode, MergeOutput};
 use parquet::{
     arrow::{AsyncArrowWriter, async_writer::AsyncFileWriter},
     file::metadata::KeyValue,
 };
+pub use result::{MergeResult, MergedFile};
 
 use super::table_provider::uniontable::NewUnionTable;
 use crate::datafusion::{exec::DataFusionContextBuilder, sort_order::FileSortOrder};
-
-#[cfg(feature = "enterprise")]
-pub mod downsampling;
-mod metrics;
-pub mod mode;
-mod result;
-mod single_file;
-
-pub use mode::{MergeMode, MergeOutput};
-pub use result::{MergeResult, MergedFile};
 
 /// Merge `tables` (the union of the input files) into one or more files
 /// according to `mode`, written as `output` says.
@@ -53,6 +53,7 @@ pub async fn merge_parquet_files(
     output: MergeOutput,
 ) -> Result<MergeResult> {
     let start = std::time::Instant::now();
+    let file_format = output.file_format;
     let sql = mode.sql(&schema);
     log::debug!("merge_parquet_files [{mode}] sql: {sql}");
     let (schema, rx, read_task) =
@@ -67,6 +68,10 @@ pub async fn merge_parquet_files(
                 metrics::MetricsOutput {
                     file_format: output.file_format,
                     max_file_size: get_config().compact.max_file_size,
+                    sink: output.sink,
+                    file_key_prefix: output.file_key_prefix,
+                    blocks_enabled: output.metrics_blocks_enabled,
+                    stats: metrics_blocks::GenerationStats::default(),
                     layout: mode
                         .metrics_file_layout()
                         .expect("metrics merge modes name their layout"),
@@ -110,10 +115,7 @@ pub async fn merge_parquet_files(
         files.len(),
         start.elapsed().as_millis()
     );
-    Ok(MergeResult {
-        files,
-        file_format: output.file_format,
-    })
+    Ok(MergeResult { files, file_format })
 }
 
 /// Plan and start `sql` over the union of `tables`; the record batches arrive

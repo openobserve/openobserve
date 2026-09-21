@@ -17,7 +17,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use arrow::{
     array::{Array, ArrayRef as ArrowArrayRef, RecordBatch, UInt32Array, UInt64Array},
-    compute::{concat_batches, take},
+    compute::{concat_batches, partition, take},
     datatypes::{DataType, Field, Schema},
     ipc::{
         CompressionType,
@@ -89,20 +89,7 @@ impl MetricsIndexWriter {
 
     /// Record the metrics series runs of one hash-ordered batch.
     pub fn write(&mut self, batch: &RecordBatch) -> Result<()> {
-        let hashes = batch
-            .column(self.hash_index)
-            .as_any()
-            .downcast_ref::<UInt64Array>()
-            .ok_or_else(|| {
-                DataFusionError::Plan(format!(
-                    "indexed metrics layout requires UInt64 {HASH_LABEL}"
-                ))
-            })?;
-        if hashes.null_count() > 0 {
-            return Err(DataFusionError::Execution(format!(
-                "indexed metrics layout found null {HASH_LABEL}"
-            )));
-        }
+        let hashes = self.hashes(batch)?;
         let num_rows = batch.num_rows();
         let mut first_rows = Vec::new();
         let mut row_counts = Vec::new();
@@ -122,14 +109,36 @@ impl MetricsIndexWriter {
             run_start = run_end;
         }
 
-        let indices = UInt32Array::from(first_rows);
-        let mut columns: Vec<ArrowArrayRef> = vec![Arc::new(UInt32Array::from(row_counts))];
-        for index in &self.label_indices {
-            columns.push(take(batch.column(*index).as_ref(), &indices, None)?);
-        }
-        self.pending_batches
-            .push(RecordBatch::try_new(Arc::clone(&self.schema), columns)?);
-        Ok(())
+        self.append_runs(batch, first_rows, row_counts)
+    }
+
+    /// Replay batches must preserve label boundaries even when distinct identities share a hash.
+    pub fn write_with_label_boundaries(&mut self, batch: &RecordBatch) -> Result<()> {
+        self.hashes(batch)?;
+        let columns = std::iter::once(&self.hash_index)
+            .chain(self.label_indices.iter())
+            .map(|index| Arc::clone(batch.column(*index)))
+            .collect::<Vec<_>>();
+        let runs = partition(&columns)?.ranges();
+        let first_rows = runs
+            .iter()
+            .map(|run| {
+                u32::try_from(run.start).map_err(|_| {
+                    DataFusionError::Execution("metrics batch exceeds u32 row index".to_string())
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let row_counts = runs
+            .iter()
+            .map(|run| {
+                u32::try_from(run.len()).map_err(|_| {
+                    DataFusionError::Execution(
+                        "metrics series run exceeds u32 row count".to_string(),
+                    )
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        self.append_runs(batch, first_rows, row_counts)
     }
 
     /// Encode the index for a data file of `parent_records` rows and the given parquet row-group
@@ -165,6 +174,40 @@ impl MetricsIndexWriter {
         let mut writer = ArrowFileWriter::try_new_with_options(Vec::new(), &schema, options)?;
         writer.write(&batch)?;
         Ok(writer.into_inner()?)
+    }
+
+    fn hashes<'a>(&self, batch: &'a RecordBatch) -> Result<&'a UInt64Array> {
+        let hashes = batch
+            .column(self.hash_index)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .ok_or_else(|| {
+                DataFusionError::Plan(format!(
+                    "indexed metrics layout requires UInt64 {HASH_LABEL}"
+                ))
+            })?;
+        if hashes.null_count() > 0 {
+            return Err(DataFusionError::Execution(format!(
+                "indexed metrics layout found null {HASH_LABEL}"
+            )));
+        }
+        Ok(hashes)
+    }
+
+    fn append_runs(
+        &mut self,
+        batch: &RecordBatch,
+        first_rows: Vec<u32>,
+        row_counts: Vec<u32>,
+    ) -> Result<()> {
+        let indices = UInt32Array::from(first_rows);
+        let mut columns: Vec<ArrowArrayRef> = vec![Arc::new(UInt32Array::from(row_counts))];
+        for index in &self.label_indices {
+            columns.push(take(batch.column(*index).as_ref(), &indices, None)?);
+        }
+        self.pending_batches
+            .push(RecordBatch::try_new(Arc::clone(&self.schema), columns)?);
+        Ok(())
     }
 }
 

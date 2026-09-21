@@ -22,7 +22,7 @@
 //! time range. [`MergeMode`] is decided once by the caller and passed down;
 //! every layer only asks it questions.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use arrow_schema::Schema;
 #[cfg(feature = "enterprise")]
@@ -224,16 +224,23 @@ impl fmt::Display for MergeMode {
 
 /// Where the merged file goes: file format and Parquet compression depend on
 /// whether the ingester or the compactor is writing.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct MergeOutput {
     pub file_format: FileFormat,
     /// Parquet compression override (`None` = configured default).
     pub parquet_compression: Option<&'static str>,
     /// Where a single merged file is built.
     pub sink: CompactMergeOutput,
+    pub metrics_blocks_enabled: bool,
+    pub file_key_prefix: Option<Arc<str>>,
 }
 
 impl MergeOutput {
+    pub fn with_file_key_prefix(mut self, prefix: &str) -> Self {
+        self.file_key_prefix = Some(Arc::from(prefix));
+        self
+    }
+
     /// Ingester movers: metrics always stay Parquet, optional no-compression.
     pub fn for_ingester(stream_type: StreamType) -> Self {
         let cfg = get_config();
@@ -244,6 +251,8 @@ impl MergeOutput {
                 .feature_ingester_none_compression
                 .then_some("none"),
             sink: CompactMergeOutput::Memory,
+            metrics_blocks_enabled: false,
+            file_key_prefix: None,
         }
     }
 
@@ -254,6 +263,9 @@ impl MergeOutput {
             file_format: output_file_format(stream_type, false, cfg.common.file_format),
             parquet_compression: None,
             sink: cfg.compact.merge_output,
+            metrics_blocks_enabled: cfg.compact.metrics_index_enabled
+                && cfg.compact.metrics_index_blocks_enabled,
+            file_key_prefix: None,
         }
     }
 }

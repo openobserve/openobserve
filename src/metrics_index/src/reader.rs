@@ -42,8 +42,24 @@ pub(super) struct MetricsIndexData {
 pub(super) async fn load_metrics_index_file(
     account: &str,
     path: &str,
+    parent_key: &str,
+    parent_rows: usize,
+    parent_size: i64,
     labels: Arc<Vec<String>>,
 ) -> Result<MetricsIndexData> {
+    let location = path.into();
+    let header = infra::cache::storage::get_range(account, &location, 0..6)
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?;
+    if header.as_ref() != b"ARROW1" {
+        let parent = metrics_block::ParentIdentity {
+            object_key: parent_key.to_string(),
+            rows: parent_rows as u64,
+            compressed_size: u64::try_from(parent_size)
+                .map_err(|error| DataFusionError::External(Box::new(error)))?,
+        };
+        return load_block_metadata(account, path, parent, labels).await;
+    }
     let bytes = infra::cache::file_data::get(account, path, None)
         .await
         .map_err(|error| DataFusionError::External(Box::new(error)))?;
@@ -108,23 +124,6 @@ pub(super) fn decode_metrics_index(
         parent_records,
         row_group_size,
     })
-}
-
-fn parse_metadata<T: std::str::FromStr>(
-    metadata: &HashMap<String, String>,
-    key: &str,
-    path: &str,
-) -> Result<Option<T>> {
-    metadata
-        .get(key)
-        .map(|value| {
-            value.parse::<T>().map_err(|_| {
-                DataFusionError::Execution(format!(
-                    "metrics index {path} has an invalid {key}: {value}"
-                ))
-            })
-        })
-        .transpose()
 }
 
 /// Evaluate `filter` over the run rows and collect the selected physical row
@@ -205,4 +204,320 @@ pub(super) fn evaluate_metrics_index(
         )));
     }
     Ok(ranges)
+}
+
+async fn load_block_metadata(
+    account: &str,
+    path: &str,
+    parent: metrics_block::ParentIdentity,
+    labels: Arc<Vec<String>>,
+) -> Result<MetricsIndexData> {
+    let location = path.into();
+    let size = infra::cache::storage::head(account, &location)
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?
+        .size;
+    let start = size
+        .checked_sub(metrics_block::FOOTER_LEN as u64)
+        .ok_or_else(|| DataFusionError::Execution("Truncated MIDX footer".into()))?;
+    let bytes = infra::cache::storage::get_range(account, &location, start..size)
+        .await
+        .map_err(|error| DataFusionError::External(Box::new(error)))?;
+    let footer = metrics_block::read_footer(&bytes, size)
+        .map_err(|error| DataFusionError::External(error.into()))?;
+    let metadata =
+        infra::cache::storage::get_range(account, &location, footer.metadata_range.clone())
+            .await
+            .map_err(|error| DataFusionError::External(Box::new(error)))?;
+    tokio::task::spawn_blocking(move || {
+        let index = metrics_block::decode_index(metadata, &footer, &parent, &labels)
+            .map_err(|error| DataFusionError::External(error.into()))?;
+        metrics_block_index_data(&index)
+    })
+    .await
+    .map_err(|error| DataFusionError::External(Box::new(error)))?
+}
+
+fn metrics_block_index_data(index: &metrics_block::Index) -> Result<MetricsIndexData> {
+    let row_group_size = match config::FileFormat::from_extension(&index.parent.object_key) {
+        Some(config::FileFormat::Parquet) => Some(index.row_group_size.ok_or_else(|| {
+            DataFusionError::Execution("Parquet block index lacks parent row group size".into())
+        })?),
+        Some(config::FileFormat::Vortex) if index.row_group_size.is_none() => None,
+        _ => {
+            return Err(DataFusionError::Execution(
+                "Invalid block parent format/row-group binding".into(),
+            ));
+        }
+    };
+    let mut fields = vec![arrow::datatypes::Field::new(
+        METRICS_INDEX_ROW_COUNT,
+        arrow::datatypes::DataType::UInt32,
+        false,
+    )];
+    let mut columns: Vec<arrow::array::ArrayRef> = vec![Arc::new(UInt32Array::from_iter_values(
+        index.blocks.row_counts(),
+    ))];
+    for (i, field) in index.labels.schema().fields().iter().enumerate() {
+        if let Ok(source_field) = index.source_schema.field_with_name(field.name()) {
+            fields.push(source_field.clone());
+            columns.push(arrow::compute::cast(
+                index.labels.column(i),
+                source_field.data_type(),
+            )?);
+        }
+    }
+    let schema = Arc::new(arrow::datatypes::Schema::new(fields));
+    let batch = RecordBatch::try_new(Arc::clone(&schema), columns)?;
+    Ok(MetricsIndexData {
+        schema,
+        batches: vec![batch],
+        parent_records: Some(
+            usize::try_from(index.parent.rows).map_err(|e| DataFusionError::External(e.into()))?,
+        ),
+        row_group_size,
+    })
+}
+
+fn parse_metadata<T: std::str::FromStr>(
+    metadata: &HashMap<String, String>,
+    key: &str,
+    path: &str,
+) -> Result<Option<T>> {
+    metadata
+        .get(key)
+        .map(|value| {
+            value.parse::<T>().map_err(|_| {
+                DataFusionError::Execution(format!(
+                    "metrics index {path} has an invalid {key}: {value}"
+                ))
+            })
+        })
+        .transpose()
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow::{
+        array::{Float64Array, Int64Array, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema},
+    };
+    use config::meta::stream::{FileKey, FileMeta, FileSelection};
+    use object_store::{ObjectStore, PutOptions};
+    use promql_parser::label::{MatchOp, Matcher, Matchers};
+
+    use super::*;
+    use crate::{MetricsFileLayout, MetricsIndexWriter};
+
+    fn fixture(
+        format: config::FileFormat,
+    ) -> (RecordBatch, metrics_block::ParentIdentity, Vec<u8>, Vec<u8>) {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("value", DataType::Float64, false),
+            Field::new("path", DataType::Utf8, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            schema.clone(),
+            vec![
+                Arc::new(UInt64Array::from(vec![1, 1, 1, 2, 2, 3])),
+                Arc::new(Int64Array::from(vec![10, 20, 30, 10, 20, 10])),
+                Arc::new(Float64Array::from(vec![1., 2., 3., 4., 5., 6.])),
+                Arc::new(StringArray::from(vec![
+                    Some("a"),
+                    Some("a"),
+                    Some("a"),
+                    None,
+                    None,
+                    Some(""),
+                ])),
+            ],
+        )
+        .unwrap();
+        let parent = metrics_block::ParentIdentity {
+            object_key: format!(
+                "files/test/metrics/m/2026/09/20/00/indexed-v1-{}{}",
+                config::ider::uuid(),
+                format.extension()
+            ),
+            rows: 6,
+            compressed_size: 123,
+        };
+        let row_group_size = (format == config::FileFormat::Parquet).then_some(100);
+        let mut legacy = MetricsIndexWriter::try_new(&schema).unwrap();
+        legacy.write(&batch).unwrap();
+        let legacy = legacy.finish(6, row_group_size).unwrap();
+        let mut writer =
+            metrics_block::BlockWriter::new_pending(Vec::new(), schema.clone(), 2).unwrap();
+        writer.write(&batch).unwrap();
+        let blocks = writer
+            .finish_for_source(parent.clone(), schema, row_group_size.map(|v| v as u32))
+            .unwrap();
+        (batch, parent, legacy, blocks)
+    }
+
+    #[tokio::test]
+    async fn block_metadata_matches_legacy_pruning_for_both_parent_formats() {
+        for format in [config::FileFormat::Parquet, config::FileFormat::Vortex] {
+            let (batch, parent, legacy, blocks) = fixture(format);
+            assert!(
+                decode_metrics_index(
+                    "legacy-only-parser",
+                    bytes::Bytes::from(blocks.clone()),
+                    &["path".into()]
+                )
+                .is_err()
+            );
+            let id = config::ider::uuid();
+            let account = format!("{id}:default");
+            let store = object_store::memory::InMemory::new();
+            let path = MetricsFileLayout::metrics_index_path(&parent.object_key).unwrap();
+            store
+                .put_opts(
+                    &path.clone().into(),
+                    bytes::Bytes::from(blocks).into(),
+                    PutOptions::default(),
+                )
+                .await
+                .unwrap();
+            infra::storage::add_account(&id, Box::new(store)).await;
+            let labels = Arc::new(vec!["path".into()]);
+            let old = decode_metrics_index("legacy", legacy.into(), &labels).unwrap();
+            let new = load_metrics_index_file(
+                &account,
+                &path,
+                &parent.object_key,
+                6,
+                123,
+                labels.clone(),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                new.schema
+                    .fields()
+                    .iter()
+                    .map(|f| f.name())
+                    .collect::<Vec<_>>(),
+                old.schema
+                    .fields()
+                    .iter()
+                    .map(|f| f.name())
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(new.parent_records, old.parent_records);
+            assert_eq!(new.row_group_size, old.row_group_size);
+            for (op, value) in [
+                (MatchOp::Equal, "a"),
+                (MatchOp::Equal, ""),
+                (MatchOp::NotEqual, "a"),
+                (MatchOp::Re(".*".parse().unwrap()), ".*"),
+            ] {
+                let matchers = Matchers::new(vec![Matcher::new(op, "path", value)]);
+                let filter = crate::pruner::create_physical_filter(&new.schema, &matchers).unwrap();
+                let legacy_filter =
+                    crate::pruner::create_physical_filter(&old.schema, &matchers).unwrap();
+                let expected = evaluate_metrics_index(&old, legacy_filter.as_deref(), 6).unwrap();
+                assert_eq!(
+                    evaluate_metrics_index(&new, filter.as_deref(), 6).unwrap(),
+                    expected
+                );
+                let mut files = vec![FileKey::new(
+                    0,
+                    account.clone(),
+                    parent.object_key.clone(),
+                    FileMeta {
+                        records: 6,
+                        compressed_size: 123,
+                        ..Default::default()
+                    },
+                    false,
+                )];
+                assert!(
+                    crate::search(
+                        "compatibility",
+                        &mut files,
+                        batch.schema().as_ref(),
+                        &matchers,
+                        1
+                    )
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .1
+                );
+                if expected.is_empty() {
+                    assert!(files.is_empty());
+                } else {
+                    assert_eq!(files.len(), 1);
+                    assert!(
+                        matches!(&files[0].selection, Some(FileSelection::RowRanges(ranges)) if ranges.as_ref() == &expected)
+                    );
+                }
+            }
+            assert!(
+                load_metrics_index_file(&account, &path, &parent.object_key, 6, 124, labels)
+                    .await
+                    .is_err()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn malformed_and_missing_indexes_leave_files_unpruned() {
+        for kind in ["missing", "truncated", "checksum", "legacy"] {
+            let (batch, parent, legacy, mut blocks) = fixture(config::FileFormat::Parquet);
+            let id = config::ider::uuid();
+            let account = format!("{id}:default");
+            let store = object_store::memory::InMemory::new();
+            let path = MetricsFileLayout::metrics_index_path(&parent.object_key).unwrap();
+            if kind != "missing" {
+                let bytes = match kind {
+                    "truncated" => vec![0; 7],
+                    "checksum" => {
+                        let len = blocks.len();
+                        blocks[len - 1] ^= 1;
+                        blocks
+                    }
+                    _ => legacy,
+                };
+                store
+                    .put_opts(
+                        &path.into(),
+                        bytes::Bytes::from(bytes).into(),
+                        PutOptions::default(),
+                    )
+                    .await
+                    .unwrap();
+            }
+            infra::storage::add_account(&id, Box::new(store)).await;
+            let mut files = vec![FileKey::new(
+                0,
+                account,
+                parent.object_key,
+                FileMeta {
+                    records: 6,
+                    compressed_size: 123,
+                    ..Default::default()
+                },
+                false,
+            )];
+            let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
+            let exact = crate::search(
+                "fallback",
+                &mut files,
+                batch.schema().as_ref(),
+                &matchers,
+                1,
+            )
+            .await
+            .unwrap()
+            .unwrap()
+            .1;
+            assert_eq!(exact, kind == "legacy");
+            assert_eq!(files.len(), 1);
+            assert_eq!(files[0].selection.is_some(), kind == "legacy");
+        }
+    }
 }
