@@ -50,6 +50,20 @@ vi.mock("vuex", () => ({
   })),
 }));
 
+// The composable is setup-only in the app but called bare here, so `useMutation`
+// has no injection context. Stub it to run the declared mutationFn directly —
+// the write still reaches the mocked service, which is what the tests assert on.
+vi.mock("@tanstack/vue-query", async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    useMutation: (options: any) => ({
+      mutateAsync: (vars: any) =>
+        (typeof options === "function" ? options() : options).mutationFn(vars),
+    }),
+  };
+});
+
 const {
   mockGetSystemTemplates,
   mockGetByName,
@@ -66,21 +80,27 @@ const {
   mockDestGetByName: vi.fn(),
 }));
 
-vi.mock("@/services/alert_templates", () => ({
-  default: {
-    get_system_templates: mockGetSystemTemplates,
-    get_by_name: mockGetByName,
-  },
-}));
+vi.mock("@/services/alert_templates", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_system_templates: mockGetSystemTemplates,
+      get_by_name: mockGetByName,
+    },
+  });
+});
 
-vi.mock("@/services/alert_destination", () => ({
-  default: {
-    create: mockDestCreate,
-    update: mockDestUpdate,
-    test: mockDestTest,
-    get_by_name: mockDestGetByName,
-  },
-}));
+vi.mock("@/services/alert_destination", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      create: mockDestCreate,
+      update: mockDestUpdate,
+      test: mockDestTest,
+      get_by_name: mockDestGetByName,
+    },
+  });
+});
 
 // The real prebuilt-templates utilities are lightweight and have no side
 // effects, so we let them run. However we need to stub out the

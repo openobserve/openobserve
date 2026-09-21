@@ -169,7 +169,8 @@ import useWorkflowCanvas, {
   isRetryableRun,
   retryWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
-import workflowService from "@/services/workflows";
+import { workflowsQuery } from "@/services/workflows.queries";
+import { queryClient } from "@/composables/query/queryClient";
 
 const { t } = useI18nTyped();
 
@@ -311,8 +312,8 @@ const onRetryRun = async () => {
 // only re-fetch when the shared state doesn't already hold this workflow.
 const loadWorkflow = async (id: string) => {
   try {
-    const res = await workflowService.listWorkflows(orgId.value);
-    const list = Array.isArray(res.data) ? res.data : (res.data?.list ?? []);
+    // The same default-folder read as the alert form's workflow picker, so it shares that cached list.
+    const list = await queryClient.fetchQuery(workflowsQuery(orgId.value));
     const wf = list.find((w: any) => w.id === id);
     if (!wf) {
       toast({ message: t("workflow.loadError"), variant: "error" });

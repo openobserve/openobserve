@@ -3568,6 +3568,12 @@
     "joinSlack": "Tham gia Slack",
     "maybeLater": "Để sau"
   },
+  "connectDataSourcePopup": {
+    "title": "Để bắt đầu, hãy kết nối nguồn dữ liệu đầu tiên của bạn.",
+    "description": "Chúng tôi có rất nhiều điều để cho bạn xem, nhưng trước tiên chúng tôi cần kết nối dữ liệu của bạn. Hầu hết các nhóm thấy nhật ký đầu tiên của họ trong khoảng một phút.",
+    "connectButton": "Kết nối nguồn dữ liệu",
+    "slackLink": "Ngoài ra, hãy tham gia cộng đồng Slack của chúng tôi"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Tiếp tục từ nơi đã tạm dừng",
     "startFromNow": "Bắt đầu từ bây giờ.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Payload sự kiện",
       "payloadIndex": "Trường {field} chọn stream. Các sự kiện không có nó sẽ đi vào stream {stream}.",
       "payloadTime": "Trường {field} là epoch giây, và giá trị thập phân cũng được chấp nhận. Khi nó bị thiếu hoặc không dương, thời gian nhận sẽ được dùng.",
+      "windowTitle": "Dấu thời gian ngoài cửa sổ thu nhận sẽ bị loại bỏ",
+      "windowBody": "Các sự kiện cũ hơn {past} (mặc định 5 giờ) hoặc xa hơn {future} (mặc định 24 giờ) sẽ bị loại bỏ, và yêu cầu vẫn trả về mã 0 vì ứng dụng khách Splunk không thử lại khi gặp lỗi. Do đó, một dấu thời gian cố định hoặc đã cũ trông giống như một lần gửi thành công nhưng không lưu gì cả.",
       "payloadMetadata": "Các trường {fields} được lưu dưới dạng cột trên sự kiện.",
       "healthTitle": "Kiểm tra tình trạng",
       "healthBody": "Yêu cầu GET không cần xác thực và trả về {response}.",
@@ -16465,13 +16473,10 @@
       "columnMemory": "Bộ nhớ (hiện tại)",
       "columnDisk": "Đĩa % (hiện tại)",
       "columnLoad": "Tải 15m (hiện tại)",
+      "columnCores": "Nhân",
       "columnLastSeen": "Lần cuối xuất hiện",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Bảng điều khiển Host Metrics",
-      "importConfirmTitle": "Thêm bảng điều khiển Host Metrics?",
-      "importConfirmMessage": "Bạn chưa có bảng điều khiển này. Thêm nó sẽ tạo một bảng điều khiển tên 'Host Metrics' trong thư mục Mặc định của bạn, rồi mở nó cho host này.",
-      "importConfirmOk": "Thêm và mở",
-      "importConfirmCancel": "Hủy",
+      "loadPerCore": "({value}/nhân)",
       "windowsLivenessNote": "Host Windows chỉ xuất hiện trong danh sách này khi agent báo cáo chỉ số tải (system_cpu_load_average_15m) — nếu các agent Windows của bạn đang chạy nhưng không có ở đây, hãy bật load scraper trong cấu hình collector hoặc cập nhật agent.",
       "panel": {
         "cpuBusy": "CPU bận",
@@ -17881,6 +17886,7 @@
     "target_rotation_all": "Mọi người trong {rotation}",
     "target_rotation_deleted": "Một vòng trực mà nhóm này không còn nữa",
     "target_rotation_legacy": "Bất kỳ ai đang trực",
+    "target_unrecognized": "Một mục tiêu mà màn hình này không nhận diện được",
     "ladderPoolEveryone": "mọi người trong {rotation}",
     "target_user": "Một người cụ thể",
     "target_whole_team": "Cả nhóm",

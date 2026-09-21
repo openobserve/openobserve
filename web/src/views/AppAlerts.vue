@@ -26,11 +26,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { queryClient } from "@/composables/query/queryClient";
+import { destinationsQuery } from "@/services/alert_destination.queries";
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
-import destinationService from "@/services/alert_destination";
 
 export default defineComponent({
   name: "AppAlerts",
@@ -53,12 +54,9 @@ export default defineComponent({
     };
     const getDestinations = () => {
       // if (store.state.selectedOrganization.status == "active") {
-      destinationService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
-        })
-        .then((res) => (destinations.value = res.data));
+      return queryClient
+        .fetchQuery(destinationsQuery(store.state.selectedOrganization.identifier, "alert"))
+        .then((list: any) => (destinations.value = list as any));
       // }
     };
 

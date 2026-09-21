@@ -193,7 +193,7 @@ describe("AlertGroupChart — the query handed to the renderer", () => {
     wrapper = await mountWith("SELECT _timestamp, log FROM \"logs\" WHERE svc = 'api'");
     expect(chartQuery(wrapper)).toBe(
       'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num FROM "logs" ' +
-        "WHERE svc = 'api' GROUP BY zo_sql_key",
+        "WHERE svc = 'api' GROUP BY 1",
     );
   });
 
@@ -244,7 +244,7 @@ describe("AlertGroupChart — the query handed to the renderer", () => {
     );
     const q = chartQuery(wrapper) as string;
     expect(q).toContain("zo_group_label");
-    expect(q).toMatch(/GROUP BY zo_sql_key, zo_group_label/i);
+    expect(q).toMatch(/GROUP BY 1, zo_group_label/i);
   });
 
   it("renders no panel when the rewrite cannot produce a chart query", async () => {

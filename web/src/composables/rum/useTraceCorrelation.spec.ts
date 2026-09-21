@@ -34,11 +34,14 @@ vi.mock("@/composables/useStreams", () => ({
 }));
 
 // Mock search service
-vi.mock("@/services/search", () => ({
-  default: {
-    search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: vi.fn(),
+    },
+  });
+});
 
 // Stream discovery: defaults to the constant with no indexed range, so
 // existing tests keep their `from "default"` shape and the caller's window;

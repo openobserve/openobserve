@@ -484,6 +484,14 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  createRemoteTaskMutation,
+  saveRemoteTaskDraftMutation,
+  testRemoteTaskConnectionMutation,
+} from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
 import remoteTasksService, {
   type RemoteTask,
   type RemoteTaskVerificationReport,
@@ -627,6 +635,11 @@ async function copySigningKey() {
   }
 }
 
+// Registering is create + test-connection; a draft save is its own write, and each declares the scope it drops.
+const createRemoteTask = useMutation(() => createRemoteTaskMutation(orgId.value));
+const saveRemoteTaskDraft = useMutation(() => saveRemoteTaskDraftMutation(orgId.value));
+const testRemoteTaskConnection = useMutation(() => testRemoteTaskConnectionMutation(orgId.value));
+
 /** The head this form is writing to. Set by the first successful create, so a
  *  retry after a failed test edits the draft rather than registering twice. */
 const draftEntityId = ref("");
@@ -765,19 +778,21 @@ async function publish(values: RemoteTaskFormValues) {
 
   try {
     if (!entityId) {
-      const created = await remoteTasksService.create(orgId.value, toCreatePayload(values));
+      const created = await createRemoteTask.mutateAsync(toCreatePayload(values));
       entityId = created.entityId;
       draftEntityId.value = entityId;
       draftHasSecret.value = valuesHaveSecret(values);
     } else if (!draftHasSecret.value) {
-      await remoteTasksService.saveDraft(
-        orgId.value,
+      await saveRemoteTaskDraft.mutateAsync({
         entityId,
-        toDraftPayload(values, draftFromVersion.value),
-      );
+        payload: toDraftPayload(values, draftFromVersion.value),
+      });
     }
 
-    const result = await remoteTasksService.testConnection(orgId.value, entityId, currentSample());
+    const result = await testRemoteTaskConnection.mutateAsync({
+      entityId,
+      sample: currentSample(),
+    });
     testReport.value = result.report ?? null;
 
     if (!result.published) {
@@ -819,6 +834,8 @@ async function publish(values: RemoteTaskFormValues) {
 async function rollbackDraft(entityId: string) {
   try {
     await remoteTasksService.delete(orgId.value, entityId);
+    // A raw delete, so the list's cached copy would keep the draft until its next refetch.
+    void queryClient.invalidateQueries({ queryKey: remoteTaskKeys.all(orgId.value) });
     draftEntityId.value = "";
     draftHasSecret.value = false;
   } catch {
@@ -832,13 +849,12 @@ async function saveDraftOnly(values: RemoteTaskFormValues) {
   if (!orgId.value || valuesHaveSecret(values)) return;
   try {
     if (draftEntityId.value) {
-      await remoteTasksService.saveDraft(
-        orgId.value,
-        draftEntityId.value,
-        toDraftPayload(values, draftFromVersion.value),
-      );
+      await saveRemoteTaskDraft.mutateAsync({
+        entityId: draftEntityId.value,
+        payload: toDraftPayload(values, draftFromVersion.value),
+      });
     } else {
-      const created = await remoteTasksService.create(orgId.value, toCreatePayload(values));
+      const created = await createRemoteTask.mutateAsync(toCreatePayload(values));
       draftEntityId.value = created.entityId;
       draftHasSecret.value = valuesHaveSecret(values);
     }

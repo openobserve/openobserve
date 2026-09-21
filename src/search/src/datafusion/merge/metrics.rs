@@ -40,7 +40,7 @@ use vortex::{
     session::VortexSession,
 };
 
-use super::{MergedFile, append_metadata};
+use super::{MergedFile, append_metadata, new_temp_file};
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 /// The files a hash-ordered merge is written into: their format, size bound and layout.
@@ -388,15 +388,6 @@ async fn merged_file(
         },
         None => MergedFile::MetricsHashMerged { data_path, meta },
     })
-}
-
-fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
-    // spool under data_tmp_dir, not the OS temp dir (often a RAM-backed
-    // tmpfs); it is wiped at startup, reclaiming files a crash orphaned
-    let tmp_dir = &config::get_config().common.data_tmp_dir;
-    std::fs::create_dir_all(tmp_dir)?;
-    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
-    Ok((tokio::fs::File::from_std(file), path))
 }
 
 async fn write_temp_file(buf: Vec<u8>) -> Result<tempfile::TempPath> {
