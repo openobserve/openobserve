@@ -13267,6 +13267,7 @@
     "leftJoin": "94452c5556275890",
     "logExplorer": {
       "detail": {
+        "back": "c7ef0e278b1e08c0",
         "copy": "e21f935f11d7e966",
         "copyLink": "dbf362d4f210c780",
         "copyValue": "c019c0f81132cb82",
@@ -13274,7 +13275,9 @@
         "drawerTitle": "949c28bfe0bb5b04",
         "insights": "2a932f90172e99ea",
         "insightsHint": "50b6f5f008290f78",
-        "json": "db1a21a0bc2ef8fb"
+        "json": "db1a21a0bc2ef8fb",
+        "nextEvent": "880dbf6cdade586c",
+        "prevEvent": "c025f0e0e895f5bb"
       },
       "event": "b8e1f80bd70ae078",
       "events": "862417b9e7c3720b",
