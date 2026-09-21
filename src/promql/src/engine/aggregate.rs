@@ -27,6 +27,7 @@ use promql_parser::parser::{
 use super::Engine;
 use crate::{
     aggregations::{self, AggOp},
+    ast::at_modifier::{Pin, pin},
     functions, series_stream, streaming_eval,
 };
 
@@ -125,6 +126,10 @@ impl Engine {
         expr: &PromExpr,
         modifier: &Option<LabelModifier>,
     ) -> Result<Option<Value>> {
+        // the shape reads the selector under the call, which would skip the call's own pin
+        if matches!(pin(expr)?, Pin::At(_)) {
+            return Ok(None);
+        }
         let Some(shape) = fused_agg_shape(expr) else {
             return Ok(None);
         };

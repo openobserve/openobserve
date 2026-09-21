@@ -16,7 +16,9 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::parser::{AtModifier, Expr};
+use promql_parser::parser::{AtModifier, Expr, Offset};
+
+use crate::micros;
 
 /// Functions whose value follows the evaluation timestamp, so a pinned argument does not pin them.
 const TIME_DEPENDENT_FUNCS: [&str; 11] = [
@@ -38,7 +40,7 @@ const TIME_DEPENDENT_FUNCS: [&str; 11] = [
 pub(crate) enum Pin {
     /// Reads no series, so it follows whatever it is combined with.
     Neutral,
-    /// Every selector is pinned to this instant, in microseconds.
+    /// Every selector is pinned; the latest of their instants, in microseconds.
     At(i64),
     Varies,
 }
@@ -47,7 +49,7 @@ impl Pin {
     fn merge(self, other: Self) -> Self {
         match (self, other) {
             (Pin::Neutral, pin) | (pin, Pin::Neutral) => pin,
-            (Pin::At(a), Pin::At(b)) if a == b => Pin::At(a),
+            (Pin::At(a), Pin::At(b)) => Pin::At(a.max(b)),
             _ => Pin::Varies,
         }
     }
@@ -56,7 +58,7 @@ impl Pin {
 /// Pins `@ start()` / `@ end()` to the whole query's bounds, which a worker never sees.
 pub fn resolve_at_modifiers(expr: &mut Expr, start: i64, end: i64) -> bool {
     let mut changed = false;
-    for_each_at(expr, &mut |at| {
+    for_each_at(expr, &mut |at, _| {
         let micros = match at {
             Some(AtModifier::Start) => start,
             Some(AtModifier::End) => end,
@@ -110,8 +112,19 @@ pub(crate) fn pin(expr: &Expr) -> Result<Pin> {
     })
 }
 
-pub(crate) fn strip_at(expr: &mut Expr) {
-    for_each_at(expr, &mut |at| *at = None);
+/// Turns every resolved `@` into the offset that reads the same samples from `reference`.
+pub(crate) fn rebase_at(expr: &mut Expr, reference: i64) {
+    for_each_at(expr, &mut |at, offset| {
+        let Some(pinned) = at.take().as_ref().and_then(at_micros) else {
+            return;
+        };
+        let behind = reference - pinned + signed_offset(offset);
+        *offset = match behind {
+            0 => None,
+            1.. => Some(Offset::Pos(Duration::from_micros(behind.unsigned_abs()))),
+            _ => Some(Offset::Neg(Duration::from_micros(behind.unsigned_abs()))),
+        };
+    });
 }
 
 fn selector_pin(at: &Option<AtModifier>) -> Result<Pin> {
@@ -125,12 +138,20 @@ fn selector_pin(at: &Option<AtModifier>) -> Result<Pin> {
     }
 }
 
-fn for_each_at(expr: &mut Expr, f: &mut impl FnMut(&mut Option<AtModifier>)) {
+fn signed_offset(offset: &Option<Offset>) -> i64 {
+    match offset {
+        Some(Offset::Pos(offset)) => micros(*offset),
+        Some(Offset::Neg(offset)) => -micros(*offset),
+        None => 0,
+    }
+}
+
+fn for_each_at(expr: &mut Expr, f: &mut impl FnMut(&mut Option<AtModifier>, &mut Option<Offset>)) {
     match expr {
-        Expr::VectorSelector(vs) => f(&mut vs.at),
-        Expr::MatrixSelector(ms) => f(&mut ms.vs.at),
+        Expr::VectorSelector(vs) => f(&mut vs.at, &mut vs.offset),
+        Expr::MatrixSelector(ms) => f(&mut ms.vs.at, &mut ms.vs.offset),
         Expr::Subquery(sq) => {
-            f(&mut sq.at);
+            f(&mut sq.at, &mut sq.offset);
             for_each_at(&mut sq.expr, f);
         }
         Expr::Unary(unary) => for_each_at(&mut unary.expr, f),
@@ -190,7 +211,7 @@ mod tests {
         let reparsed = parser::parse(&expr.to_string()).unwrap();
         let mut pinned = Vec::new();
         let mut reparsed_mut = reparsed.clone();
-        for_each_at(&mut reparsed_mut, &mut |at| {
+        for_each_at(&mut reparsed_mut, &mut |at, _| {
             pinned.push(at.as_ref().and_then(at_micros))
         });
         assert_eq!(
@@ -224,7 +245,7 @@ mod tests {
         );
         assert_eq!(
             pin_of("a @ 1600000000 + a @ 1600000060").unwrap(),
-            Pin::Varies
+            Pin::At(T + 60_000_000)
         );
         assert_eq!(pin_of("vector(1)").unwrap(), Pin::Neutral);
     }
@@ -259,9 +280,19 @@ mod tests {
     }
 
     #[test]
-    fn test_strip_at_keeps_the_offset() {
-        let mut expr = parser::parse("rate(a[5m] @ 1600000000 offset 1m)").unwrap();
-        strip_at(&mut expr);
-        assert_eq!(expr.to_string(), "rate(a[5m] offset 1m)");
+    fn test_rebase_at_reads_the_same_samples_from_the_reference() {
+        let rebased = |query: &str| {
+            let mut expr = parser::parse(query).unwrap();
+            rebase_at(&mut expr, T);
+            expr.to_string()
+        };
+        assert_eq!(
+            rebased("rate(a[5m] @ 1600000000 offset 1m)"),
+            "rate(a[5m] offset 1m)"
+        );
+        assert_eq!(rebased("a @ 1599999900"), "a offset 1m40s");
+        assert_eq!(rebased("a @ 1599999900 offset -1m40s"), "a");
+        assert_eq!(rebased("a @ 1599999900 offset -5m"), "a offset -3m20s");
+        assert_eq!(rebased("a offset 1m"), "a offset 1m");
     }
 }

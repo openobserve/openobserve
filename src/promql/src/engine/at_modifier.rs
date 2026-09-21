@@ -21,7 +21,7 @@ use promql_parser::parser::Expr as PromExpr;
 
 use super::Engine;
 use crate::{
-    ast::at_modifier::{Pin, pin, strip_at},
+    ast::at_modifier::{Pin, pin, rebase_at},
     exec::PromqlContext,
 };
 
@@ -52,7 +52,7 @@ impl Engine {
 
     async fn exec_at(&mut self, expr: &PromExpr, at: i64) -> Result<Value> {
         let mut expr = expr.clone();
-        strip_at(&mut expr);
+        rebase_at(&mut expr, at);
         let pinned_ctx = Arc::new(PromqlContext {
             start: at,
             end: at,

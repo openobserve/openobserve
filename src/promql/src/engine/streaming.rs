@@ -1058,6 +1058,15 @@ mod tests {
             ("sum(sum_over_time(m[1m] @ 1100))", 72.0),
             ("topk(2, m @ 1100) * 2", 30.0),
             ("max_over_time((m @ 1100)[1m:20s])", 15.0),
+            // a step-dependent parameter keeps the aggregation on the steps, not its pinned child
+            ("topk(time(), sum_over_time(m[1m] @ 1100))", 36.0),
+            ("topk(time(), m @ 1100)", 15.0),
+            // pins to different instants are still step invariant together
+            ("m @ 1160 - m @ 1100", 9.0),
+            (
+                "quantile_over_time(scalar(sum(m @ 1160)) / 96, m[1m] @ 1100)",
+                12.0,
+            ),
         ];
         for (query, expected) in cases {
             for streams in [true, false] {
@@ -1106,6 +1115,20 @@ mod tests {
         let last = canonical(pinned.clone())[0].1.last().copied();
         assert_eq!(last, Some((BASE + 100 * SECOND, 15.0)));
         assert_same_matrix(expected, pinned, "m[1m] @ 1100");
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_on_a_root_subquery_is_rejected_in_an_instant_query() {
+        let instant = BASE + 180 * SECOND;
+        for query in ["m[1m:20s] @ 1100", "(m[1m:20s] @ 1100)"] {
+            let mut engine = engine_at(provider(false, false), 30, instant, 0, None);
+            let expr = promql_parser::parser::parse(query).unwrap();
+            let err = engine.exec(&expr).await.expect_err(query).to_string();
+            assert!(
+                err.contains("Subquery: @ modifier is not supported"),
+                "{query}: {err}"
+            );
+        }
     }
 
     #[tokio::test]

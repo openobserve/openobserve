@@ -91,8 +91,8 @@ impl Engine {
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
         // a range vector has no value to repeat, the call around it is what gets pinned
-        if prom_expr.value_type() != ValueType::Matrix
-            && let Pin::At(at) = pin(prom_expr)?
+        if let Pin::At(at) = pin(prom_expr)?
+            && prom_expr.value_type() != ValueType::Matrix
         {
             return self.exec_pinned(prom_expr, at).await;
         }
