@@ -17,7 +17,7 @@ export class ConnectDataSourcePopupPage {
     this.slackPopup = page.locator('[data-test="community-slack-invite-dialog"]');
   }
 
-  /** Navigate to the Logs sub-route so absence can be re-verified after an SPA route change. */
+  /** Navigate to the Logs sub-route (full page reload) so absence can be re-verified after navigation. */
   async navigateToLogs(org) {
     const orgId = org || process.env['ORGNAME'] || 'default';
     await this.page.goto(`/web/logs?org_identifier=${orgId}`, { timeout: 30000 });

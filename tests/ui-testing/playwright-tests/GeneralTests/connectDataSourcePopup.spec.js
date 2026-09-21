@@ -39,8 +39,8 @@ test.describe('Connect Data Source Onboarding Popup testcases', () => {
     testLogger.info('Verifying both onboarding dialogs are absent on first paint');
     await pm.connectDataSourcePopupPage.expectBothDialogsAbsent();
 
-    // The onMounted bail-out must hold across a deeper SPA navigation, not just the
-    // first paint — navigate to Logs and re-assert absence to guard lazy re-mounts.
+    // The onMounted bail-out must hold across a full page reload, not just the
+    // first paint — navigate to Logs and re-assert absence to guard re-mounts.
     testLogger.info('Navigating to Logs and re-verifying absence');
     await pm.connectDataSourcePopupPage.navigateToLogs();
     await pm.connectDataSourcePopupPage.expectBothDialogsAbsent();
