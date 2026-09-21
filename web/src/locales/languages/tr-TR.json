@@ -3568,6 +3568,12 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
+  "connectDataSourcePopup": {
+    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
+    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
+    "connectButton": "Bir veri kaynağı bağla",
+    "slackLink": "Ayrıca Slack topluluğumuza katılın"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
