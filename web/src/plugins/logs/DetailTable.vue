@@ -481,7 +481,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
+import { defineComponent, ref, reactive, onBeforeMount, computed, watch, type PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -602,7 +602,9 @@ export default defineComponent({
     // Host-injected leading tabs (e.g. an Insights tab) rendered before JSON via a
     // `#panel-<name>` slot; lets a consumer present one unified tab bar when embedded.
     leadingTabs: {
-      type: Array,
+      type: Array as PropType<
+        Array<{ name: string; label: any; dataTest?: string; icon?: string }>
+      >,
       default: () => [],
     },
     // Embedded mode: the host owns navigation, so hide the built-in prev/next footer.
