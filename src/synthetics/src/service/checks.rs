@@ -164,6 +164,7 @@ pub async fn update_synthetic(
     mut body: Synthetic,
 ) -> anyhow::Result<Synthetic> {
     let conn = get_orm_client_rw().await;
+    let stored_type = keep_stored_type(conn, org_id, id, &mut body).await?;
 
     // Normalise locations exactly like create — a bare region stored on update
     // would never dispatch (region is derived from the "aws-" prefix).
@@ -173,7 +174,7 @@ pub async fn update_synthetic(
     // `start` freshness check (edits round-trip the original start date).
     validate_against_capabilities(org_id, id, &body, false).await?;
 
-    let locked = holds_browser_check(conn, org_id, std::slice::from_ref(&id.to_owned())).await?;
+    let locked = stored_type.as_ref().is_some_and(needs_composition_lock);
     let (org, check_id) = (org_id.to_owned(), id.to_owned());
     let (old_folder_pk, new_folder_pk, mut check) =
         run_composition_mutation(org_id, locked, async move {
@@ -640,6 +641,23 @@ fn needs_composition_lock(check_type: &SyntheticType) -> bool {
     *check_type == SyntheticType::Browser
 }
 
+// The table update keeps the stored type; validating the body's type checks the wrong rules.
+async fn keep_stored_type(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    id: &str,
+    body: &mut Synthetic,
+) -> anyhow::Result<Option<SyntheticType>> {
+    let stored = synthetics_checks::get(conn, org_id, id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map(|c| c.check_type);
+    if let Some(check_type) = &stored {
+        body.check_type = check_type.clone();
+    }
+    Ok(stored)
+}
+
 async fn holds_browser_check(
     conn: &DatabaseConnection,
     org_id: &str,
@@ -837,13 +855,14 @@ mod tests {
 
     use super::{
         composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
-        delete_synthetics_bulk_under_lock, holds_browser_check, needs_composition_lock,
-        run_composition_mutation,
+        delete_synthetics_bulk_under_lock, holds_browser_check, keep_stored_type,
+        needs_composition_lock, run_composition_mutation,
     };
     use crate::service::{
         composition::{
             CompositionError,
             tests::{db_with_synthetics_defaults, subtests_flag},
+            validate_for_save,
         },
         composition_lock,
     };
@@ -1077,6 +1096,42 @@ mod tests {
             parents_before
         );
         assert_eq!(refs_before["parent"], ["child"]);
+    }
+
+    #[tokio::test]
+    async fn an_update_cannot_relabel_a_browser_check_to_skip_the_save_rules() {
+        let _flag = subtests_flag(false).await;
+        let org = "org-x1";
+        let db = db_with_synthetics_defaults().await;
+        parent_and_child(&db, org).await;
+        let mut body = browser_in(
+            org,
+            "child",
+            serde_json::json!([{ "id": "r0", "action": "subtest", "subtest": { "id": "parent" } }]),
+        );
+        body.check_type = SyntheticType::Http;
+        validate_for_save(&db, org, Some("child"), &body)
+            .await
+            .expect("an http body skips the browser save rules");
+
+        let stored = keep_stored_type(&db, org, "child", &mut body)
+            .await
+            .unwrap();
+        assert_eq!(stored, Some(SyntheticType::Browser));
+        assert_eq!(body.check_type, SyntheticType::Browser);
+        let err = validate_for_save(&db, org, Some("child"), &body)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
+
+        let mut missing = check("gone", SyntheticType::Http);
+        assert_eq!(
+            keep_stored_type(&db, org, "gone", &mut missing)
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(missing.check_type, SyntheticType::Http);
     }
 
     fn browser_in(org_id: &str, id: &str, steps: serde_json::Value) -> Synthetic {

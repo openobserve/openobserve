@@ -444,10 +444,15 @@ async fn caller_can_read_children(
     body: &config::meta::synthetics::Synthetic,
     existing_id: Option<&str>,
 ) -> Result<Option<String>, anyhow::Error> {
-    let incoming = infra::table::synthetics_refs::refs_of(body);
-    // §5.7, settled 2026-09-09: only a reference the save ADDS is gated. Gating an unchanged
-    // set would lock an author out of editing a test they own, with deleting the reference as
-    // the only way to save.
+    // Read regardless of the body's type: an update keeps the stored type whatever it claims.
+    let incoming = body
+        .config
+        .get("steps")
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::as_slice)
+        .map(config::meta::synthetics_composition::subtest_refs)
+        .unwrap_or_default();
+    // Only added references are gated; else an author could lose edits to their own test.
     let stored = match existing_id {
         Some(id) => infra::table::synthetics_refs::refs_for_parents(
             infra::db::get_orm_client_ro().await,
