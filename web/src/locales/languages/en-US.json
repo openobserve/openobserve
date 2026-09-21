@@ -9381,7 +9381,8 @@
       "userGroupPlaceholder": "Group name",
       "userGroupHelp": "Optional. Matching users also join this group in that organization.",
       "duplicateDomain": "A mapping for this domain already exists",
-      "confirmRemove": "Remove the mapping for {domain}?"
+      "confirmRemove": "Are you sure you want to delete the mapping for {domain}?",
+      "deleteTitle": "Delete Mapping"
     }
   },
   "reports": {

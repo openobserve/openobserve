@@ -108,25 +108,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @save="onSaveMapping"
     />
 
-    <ODialog
-      data-test="settings-domain-org-mappings-remove-dialog"
-      v-model:open="confirmRemoveOpen"
-      size="sm"
-      :title="t('common.confirm')"
-      :secondary-button-label="t('confirmDialog.cancel')"
-      :primary-button-label="t('confirmDialog.ok')"
-      primary-button-variant="destructive"
-      @click:secondary="confirmRemoveOpen = false"
-      @click:primary="doRemove"
-    >
-      <p v-if="pendingRemoveIndex !== null">
-        {{
-          t("settings.domainOrgMappings.confirmRemove", {
-            domain: mappings[pendingRemoveIndex]?.domain,
-          })
-        }}
-      </p>
-    </ODialog>
+    <ConfirmDialog
+      v-model="confirmRemoveOpen"
+      :title="t('settings.domainOrgMappings.deleteTitle')"
+      :message="
+        t('settings.domainOrgMappings.confirmRemove', {
+          domain: pendingRemoveIndex !== null ? mappings[pendingRemoveIndex]?.domain : '',
+        })
+      "
+      @update:ok="doRemove"
+      @update:cancel="pendingRemoveIndex = null"
+    />
   </div>
 </template>
 
@@ -136,7 +128,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
-import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import DomainOrgMappingDialog from "./DomainOrgMappingDialog.vue";
 import type { DomainOrgMapping } from "./DomainOrgMappings.schema";
 
@@ -211,6 +203,5 @@ function doRemove() {
   if (index === null) return;
   commit(mappings.value.filter((_, i) => i !== index));
   pendingRemoveIndex.value = null;
-  confirmRemoveOpen.value = false;
 }
 </script>
