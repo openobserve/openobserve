@@ -246,7 +246,8 @@
       "login-form-validation.spec.js",
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
-      "connectDataSourcePopup.spec.js"
+      "connectDataSourcePopup.spec.js",
+      "domain-org-mapping.spec.js"
     ],
     "disabled": []
   },
