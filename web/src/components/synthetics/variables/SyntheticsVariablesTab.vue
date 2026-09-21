@@ -51,12 +51,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :is-edit="environmentDrawer.isEdit"
       :data="environmentDrawer.data"
       @update:list="refresh"
+      @created="landOn"
     />
 
     <SyntheticsDuplicateEnvironmentDialog
       v-model:open="duplicateDialogOpen"
       :source="duplicateSource"
-      @done="onDuplicated"
+      @done="landOn"
     />
   </div>
 </template>
@@ -174,9 +175,9 @@ async function removeEnvironment(environment: SyntheticsEnvironment) {
   }
 }
 
-async function onDuplicated(name: string) {
+// Land on what was just made, rather than leaving the user to find it.
+async function landOn(name: string) {
   await refresh();
-  // Land on what was just made, rather than leaving the user to find it.
   selectedScope.value = name;
 }
 

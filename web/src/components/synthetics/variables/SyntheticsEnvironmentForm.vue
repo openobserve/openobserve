@@ -76,7 +76,7 @@ import { serverMessage } from "./serverMessage";
 export default defineComponent({
   name: "SyntheticsEnvironmentForm",
   components: { ODialog, OForm, OFormInput, OFormTextarea, OBanner },
-  emits: ["close", "update:list", "update:open"],
+  emits: ["close", "created", "update:list", "update:open"],
   props: {
     open: { type: Boolean, default: false },
     isEdit: { type: Boolean, default: false },
@@ -104,10 +104,11 @@ export default defineComponent({
         description: String(values.description ?? ""),
       };
       try {
-        await (props.isEdit
+        const res = await (props.isEdit
           ? syntheticsService.updateEnvironment(org, props.data?.name ?? "", body)
           : syntheticsService.createEnvironment(org, body));
         emit("update:list");
+        if (!props.isEdit) emit("created", res?.data?.name ?? body.name);
         handleClose();
         toast({
           variant: "success",
