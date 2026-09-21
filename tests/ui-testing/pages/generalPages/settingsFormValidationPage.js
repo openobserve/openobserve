@@ -519,6 +519,12 @@ export class SettingsFormValidationPage {
         await expect(this.page.locator(`[data-test="settings-domain-org-mappings-item-domain-${index}"]`)).toHaveText(text);
     }
 
+    async expectDomainOrgMappingsItemDomainVisibleByText(domain) {
+        await expect(
+            this.page.locator(this.domainOrgMappingsList).getByText(`@${domain}`, { exact: true }),
+        ).toBeVisible();
+    }
+
     async expectDomainOrgMappingsItemOrgVisible(index, text) {
         await expect(this.page.locator(`[data-test="settings-domain-org-mappings-item-org-${index}"]`)).toHaveText(text);
     }
