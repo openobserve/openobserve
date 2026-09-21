@@ -574,10 +574,18 @@ async function waitForSloMeasured(page, sloId, {
  * Create a notification template + destination for burn-rate alerts.
  *
  * An SLO alert cannot be saved without one: the form rejects a submit with
- * "Alert destination or workflows is required". The destination points at this
- * instance's OWN ingest endpoint so delivery is self-contained and needs no
- * external service — the same trick `alerts-api-helpers.seedAlertFixtures` uses.
+ * "Alert destination or workflows is required". By default the destination
+ * points at this instance's OWN ingest endpoint so delivery is self-contained
+ * and needs no external service — the same trick
+ * `alerts-api-helpers.seedAlertFixtures` uses.
  *
+ * That default is a loopback URL, which the SSRF guard refuses unless the
+ * SERVER sets `ZO_SSRF_ALLOW_LOOPBACK`. Callers that only need the destination
+ * to EXIST (so a form or an Add button is enabled) should pass `url` to point
+ * it somewhere external instead; nothing is delivered there.
+ *
+ * @param {object} [options]
+ * @param {string} [options.url] - Destination URL; defaults to the self-ingest sink.
  * @returns {Promise<string>} the destination name, to pick in the form
  */
 async function seedNotificationDestination(page, baseName, { url = null } = {}) {

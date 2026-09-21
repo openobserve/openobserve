@@ -3758,6 +3758,13 @@ export class AlertsPage {
         return this.creationWizard._switchToAlertRulesTab();
     }
 
+    /** The data-test VALUE inside a `[data-test="..."]` selector. */
+    _dataTestValue(selector) {
+        const m = selector.match(/\[data-test="([^"]+)"\]/);
+        if (!m) throw new Error(`Not a data-test selector: ${selector}`);
+        return m[1];
+    }
+
     /**
      * Open a new scheduled alert wizard and fill setup fields (v3 UI — no step navigation needed).
      * Shared setup for tests that verify Step 2 features without full alert creation.
@@ -3766,13 +3773,6 @@ export class AlertsPage {
      * @param {string} streamName - Name of the log stream
      * @param {string} alertName - Name for the alert
      */
-    /** The data-test VALUE inside a `[data-test="..."]` selector. */
-    _dataTestValue(selector) {
-        const m = selector.match(/\[data-test="([^"]+)"\]/);
-        if (!m) throw new Error(`Not a data-test selector: ${selector}`);
-        return m[1];
-    }
-
     async setupScheduledAlertWizardToStep2(streamName, alertName) {
         await this.clickAddAlertButton();
         await this.fillAlertName(alertName);
