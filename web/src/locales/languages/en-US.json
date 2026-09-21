@@ -9362,7 +9362,28 @@
     "listConjunctionAnd": "{list}, and {last}",
     "runsIn": "Runs in",
     "recommendedByFieldCoverage": "Recommended based on field coverage in your streams.",
-    "listConjunctionAndTwo": "{first} and {last}"
+    "listConjunctionAndTwo": "{first} and {last}",
+    "domainOrgMappings": {
+      "title": "Domain to organization mappings",
+      "subtitle": "New users signing in with a matching email domain are added to the organization automatically.",
+      "addMapping": "Add mapping",
+      "editMapping": "Edit mapping",
+      "empty": "No mappings yet. Use “{addLabel}” to add one.",
+      "domain": "Email domain",
+      "domainHelp": "The part after {at_sign} in the user's email address.",
+      "organization": "Organization",
+      "organizationPlaceholder": "Organization identifier",
+      "organizationHelp": "The identifier of the organization matching users are added to.",
+      "organizationRequired": "Organization is required",
+      "baseRole": "Base role",
+      "baseRoleHelp": "The role matching users are given in that organization.",
+      "userGroup": "User group",
+      "userGroupPlaceholder": "Group name",
+      "userGroupHelp": "Optional. Matching users also join this group in that organization.",
+      "duplicateDomain": "A mapping for this domain already exists",
+      "confirmRemove": "Are you sure you want to delete the mapping for {domain}?",
+      "deleteTitle": "Delete Mapping"
+    }
   },
   "reports": {
     "frequencyUnits": {

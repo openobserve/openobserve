@@ -312,6 +312,21 @@ describe("OrganizationSettings", () => {
       });
     });
 
+    it("should prefer the server's response message over the HTTP status text", async () => {
+      const wrapper = createWrapper();
+      mockPostOrganizationSettings.mockRejectedValue({
+        message: "Request failed with status code 400",
+        response: { data: { message: "No org with org id abc found" } },
+      });
+
+      await wrapper.vm.saveOrgSettings(validValue);
+
+      expect(mockToast).toHaveBeenCalledWith({
+        message: "No org with org id abc found",
+        variant: "error",
+      });
+    });
+
     it("should fall back to a default message when the API error has none", async () => {
       const wrapper = createWrapper();
       mockPostOrganizationSettings.mockRejectedValue({});

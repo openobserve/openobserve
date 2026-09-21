@@ -9362,7 +9362,28 @@
     "listConjunctionAnd": "{list} và {last}",
     "runsIn": "Chạy trong",
     "recommendedByFieldCoverage": "Được đề xuất dựa trên mức độ bao phủ trường trong các luồng của bạn.",
-    "listConjunctionAndTwo": "{first} và {last}"
+    "listConjunctionAndTwo": "{first} và {last}",
+    "domainOrgMappings": {
+      "title": "Ánh xạ tên miền đến tổ chức",
+      "subtitle": "Người dùng mới đăng nhập bằng tên miền email khớp sẽ tự động được thêm vào tổ chức.",
+      "addMapping": "Thêm ánh xạ",
+      "editMapping": "Chỉnh sửa ánh xạ",
+      "empty": "Chưa có ánh xạ nào. Sử dụng “{addLabel}” để thêm.",
+      "domain": "Tên miền email",
+      "domainHelp": "Phần sau {at_sign} trong địa chỉ email của người dùng.",
+      "organization": "Tổ chức",
+      "organizationPlaceholder": "Mã định danh tổ chức",
+      "organizationHelp": "Mã định danh của tổ chức mà người dùng khớp được thêm vào.",
+      "organizationRequired": "Tổ chức là bắt buộc",
+      "baseRole": "Vai trò cơ bản",
+      "baseRoleHelp": "Vai trò được gán cho người dùng khớp trong tổ chức đó.",
+      "userGroup": "Nhóm người dùng",
+      "userGroupPlaceholder": "Tên nhóm",
+      "userGroupHelp": "Tùy chọn. Người dùng khớp cũng sẽ tham gia nhóm này trong tổ chức đó.",
+      "duplicateDomain": "Đã tồn tại ánh xạ cho tên miền này",
+      "confirmRemove": "Bạn có chắc chắn muốn xóa ánh xạ cho {domain} không?",
+      "deleteTitle": "Xóa ánh xạ"
+    }
   },
   "reports": {
     "frequencyUnits": {
