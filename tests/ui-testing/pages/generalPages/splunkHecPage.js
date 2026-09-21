@@ -19,6 +19,11 @@ export class SplunkHecPage {
         this.payloadContent = page.locator('[data-test="ingestion-logs-splunkhec-payload"] [data-test="rum-content-text"]');
         this.curlContent = page.locator('[data-test="ingestion-logs-splunkhec-example"] [data-test="rum-content-text"]');
         this.copyButtons = page.locator('[data-test="rum-copy-btn"]');
+
+        // Copy feedback toast (global success notification), kept local so this
+        // spec does not depend on another page object's toast helper.
+        this.successToast = page.locator('[data-test-variant="success"]');
+        this.successToastMessage = page.locator('[data-test-variant="success"] [data-test="o-toast-message"]');
     }
 
     // ==================== Navigation ====================
@@ -97,6 +102,16 @@ export class SplunkHecPage {
 
     async clickCopyButton(index) {
         await this.copyButtons.nth(index).click();
+    }
+
+    async expectCopyToast(expectedText = 'Copied Successfully', timeout = 5000) {
+        await expect(this.successToast.first()).toBeVisible({ timeout });
+        const text = await this.successToastMessage.first().textContent();
+        expect(text).toContain(expectedText);
+    }
+
+    async waitForCopyToastToHide(timeout = 7000) {
+        await expect(this.successToast.first()).toBeHidden({ timeout });
     }
 
     // ==================== Tokens Link ====================

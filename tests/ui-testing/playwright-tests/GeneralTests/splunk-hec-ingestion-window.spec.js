@@ -93,8 +93,8 @@ test.describe("Splunk HEC Ingestion Window Warning testcases", () => {
 
     for (let i = 0; i < copyCount; i++) {
       await pm.splunkHecPage.clickCopyButton(i);
-      await pm.ingestionConfigPage.verifyNotificationVisible('Copied Successfully');
-      await pm.ingestionConfigPage.waitForNotificationToHide();
+      await pm.splunkHecPage.expectCopyToast('Copied Successfully');
+      await pm.splunkHecPage.waitForCopyToastToHide();
     }
 
     testLogger.info('All four snippets copied successfully');

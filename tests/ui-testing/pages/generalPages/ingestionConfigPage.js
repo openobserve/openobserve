@@ -102,10 +102,6 @@ export class IngestionConfigPage {
         }
     }
 
-    async waitForNotificationToHide(timeout = 7000) {
-        await expect(this.successToast.first()).toBeHidden({ timeout });
-    }
-
     // ==================== Search Functionality ====================
 
     async getSearchInput() {

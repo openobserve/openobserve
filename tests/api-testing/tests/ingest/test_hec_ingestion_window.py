@@ -1,7 +1,8 @@
 """Splunk HEC ingestion-window API tests (behavioural coverage for PR #14613).
 
-The UI PR (#14641) covers the SplunkHec setup page. This suite covers the
-server-side behaviour that page documents and that #14613 actually changed:
+This PR's Playwright specs (#14641) cover the SplunkHec setup page (the UI).
+This suite covers the server-side behaviour that page documents and that the
+feature PR #14613 actually changed:
 
 - an out-of-window event still answers ``{"text":"Success","code":0}`` (the
   wire contract #14613 deliberately kept), yet stores nothing;
