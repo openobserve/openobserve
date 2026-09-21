@@ -270,6 +270,7 @@ import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
 import { useSavedGrantExpansion } from "@/composables/iam/useSavedGrantExpansion";
+import { useRoleScopes } from "@/composables/iam/useRoleScopes";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -502,84 +503,15 @@ const isGranted = (node: any, action: string) =>
 const isPendingRemoval = (node: any, action: string) =>
   !!grants.removed.value[permissionHashFor(node, action)];
 
-const typeScope = (resourceKey: string, node: any): ScopeRow => ({
-  key: resourceKey,
-  node,
-  resource: resourceKey,
-  covers: [resourceKey],
-  label: t("iam.editRole.scopeAllOf", { module: node?.display_name ?? resourceLabel(resourceKey) }),
-  hint: t("iam.editRole.scopeIncludesFuture"),
+// The scope ladder lives in its own file: which rows are pinned, and what each one covers.
+const { moduleScopes, folderScopes, streamTypeScopes } = useRoleScopes({
+  resourceMapper,
+  isGranted,
+  resourceLabel,
+  moduleLabel,
+  t,
+  ACTION_ORDER,
 });
-
-const everyStreamScope = (covers: string[]): ScopeRow => ({
-  key: STREAM_PARENT_KEY,
-  node: resourceMapper.value[STREAM_PARENT_KEY],
-  resource: STREAM_PARENT_KEY,
-  covers,
-  label: t("iam.editRole.scopeEveryStream"),
-  hint: t("iam.editRole.scopeEveryStreamHint"),
-});
-
-// Stream types are type rows under the `stream` node, so they are the rows the Streams module lists.
-const streamTypeKeys = () =>
-  (resourceMapper.value[STREAM_PARENT_KEY]?.entities ?? []).map((entity: any) => entity.name);
-
-const moduleScopes = (moduleKey: string): ScopeRow[] => {
-  const node = resourceMapper.value[moduleKey];
-  if (!node) return [];
-  return moduleKey === STREAM_PARENT_KEY
-    ? [everyStreamScope(streamTypeKeys())]
-    : [typeScope(moduleKey, node)];
-};
-
-// A parent scope is edited on its own screen, so a drilled level hides it but still names it as the source of any lock.
-const underHiddenParent = (parent: ScopeRow, parentModule: string, own: ScopeRow): ScopeRow[] => {
-  const grantsAnything = ACTION_ORDER.some(
-    (action) => parent.node && isGranted(parent.node, action),
-  );
-  return [
-    { ...parent, hidden: true },
-    grantsAnything
-      ? {
-          ...own,
-          hint: t("iam.editRole.scopeCoveredByParent", {
-            scope: parent.label,
-            module: moduleLabel(parentModule),
-          }),
-        }
-      : own,
-  ];
-};
-
-// model.fga defines each action on a folder item as `... or <ACTION> from parent`, so a folder grant reaches its items.
-const folderScopes = (moduleKey: string, folder: any): ScopeRow[] => {
-  const [moduleScope] = moduleScopes(moduleKey);
-  const items = folder.childName ? [folder.childName] : [];
-  const thisFolder: ScopeRow = {
-    key: `folder-${folder.name}`,
-    node: folder,
-    resource: moduleKey,
-    covers: items,
-    label: t("iam.editRole.scopeThisFolder"),
-    hint: t("iam.editRole.scopeThisFolderHint"),
-  };
-  // The type level grant reaches every folder, and through each folder its items.
-  return moduleScope
-    ? underHiddenParent(
-        { ...moduleScope, covers: [...moduleScope.covers, ...items] },
-        moduleKey,
-        thisFolder,
-      )
-    : [thisFolder];
-};
-
-// A stream type is an `_all_` scope in its own right, so everything beneath it inherits both rows.
-const streamTypeScopes = (typeNode: any): ScopeRow[] =>
-  underHiddenParent(
-    everyStreamScope([typeNode.name]),
-    STREAM_PARENT_KEY,
-    typeScope(typeNode.name, typeNode),
-  );
 
 const activeModuleView = computed(() => {
   const module = moduleOf(activeModule.value);
