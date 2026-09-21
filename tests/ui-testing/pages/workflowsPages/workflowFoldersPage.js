@@ -281,11 +281,12 @@ class WorkflowFoldersPage {
   // ---------- move ----------
 
   async openMoveDialog(workflowName) {
-    // The move control is rendered per-row but revealed on hover, so reveal it
-    // before clicking rather than bypassing actionability with force.
-    await this.workflowRowAnchor(workflowName).hover();
-    await this.moveWorkflowBtn(workflowName).waitFor({ state: 'visible', timeout: 5000 });
-    await this.moveWorkflowBtn(workflowName).click();
+    // Not hovered into view first: the row's view control owns a large tooltip panel that
+    // would then overlay these buttons. The move icon is rendered outright for a published
+    // row, so a plain click's actionability wait is enough — no force needed.
+    const moveBtn = this.moveWorkflowBtn(workflowName);
+    await moveBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await moveBtn.click();
     await expect(this.moveDialog).toBeVisible({ timeout: DIALOG_TIMEOUT_MS });
   }
 
