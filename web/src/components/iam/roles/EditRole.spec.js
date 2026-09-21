@@ -2040,6 +2040,42 @@ describe("EditRole - presets after undo", () => {
   });
 });
 
+describe("EditRole - preset cards", () => {
+  const staged = (wrapper) => Object.keys(wrapper.vm.addedPermissions);
+
+  // The Role Overview cards route through applyPreset, not the ?preset= query the other preset tests use.
+  it("runs the preset each card names", async () => {
+    const dbm = await mountEditRole();
+    await dbm.vm.applyPreset("dbm");
+    await flushPromises();
+    expect(staged(dbm).some((key) => key.startsWith("db_monitoring:"))).toBe(true);
+
+    const k8s = await mountEditRole();
+    await k8s.vm.applyPreset("k8s");
+    await flushPromises();
+    expect(staged(k8s).some((key) => key.startsWith("db_monitoring:"))).toBe(false);
+  });
+
+  it("does nothing for an unknown preset", async () => {
+    const wrapper = await mountEditRole();
+    await wrapper.vm.applyPreset("nope");
+    expect(staged(wrapper)).toEqual([]);
+  });
+
+  // A preset stages through toggle, which revokes a held key, so it must skip anything already held.
+  it("leaves a grant the role already holds untouched", async () => {
+    const wrapper = await mountEditRole();
+    await wrapper.vm.applyPreset("readonly");
+    const [held] = staged(wrapper);
+    expect(held).toBeDefined();
+
+    await wrapper.vm.applyPreset("readonly");
+
+    expect(wrapper.vm.selectedPermissionsHash.has(held)).toBe(true);
+    expect(Object.keys(wrapper.vm.removedPermissions)).toEqual([]);
+  });
+});
+
 describe("EditRole - overlapping entity loads", () => {
   // The loaders push into the list, so two overlapping opens must share one request.
   it("lists a resource's entities once when it is opened twice at the same time", async () => {
