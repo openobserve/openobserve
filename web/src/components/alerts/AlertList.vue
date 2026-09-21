@@ -959,7 +959,7 @@ import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { outcomeLabel, shouldShowRunOutcome } from "@/utils/alerts/runOutcome";
 import { debounce } from "lodash-es";
 import alertsService from "@/services/alerts";
-import oncallService from "@/services/oncall";
+import { oncallTeamsQuery } from "@/services/oncall.queries";
 import {
   isSloAlert,
   isUnplaceableSloAlert,
@@ -1073,10 +1073,9 @@ export default defineComponent({
     async function fetchOnCallTeams() {
       if (!oncallEnabled.value) return;
       try {
-        const res = await oncallService.listTeams({
-          org_identifier: store.state.selectedOrganization.identifier,
-        });
-        oncallTeams.value = res.data ?? [];
+        oncallTeams.value = await queryClient.fetchQuery(
+          oncallTeamsQuery(store.state.selectedOrganization.identifier),
+        );
       } catch {
         oncallTeams.value = [];
       }

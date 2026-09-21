@@ -17,8 +17,10 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
 import alertsService from "@/services/alerts";
 import oncallService from "@/services/oncall";
+import { responseProgressQuery } from "@/services/oncall.queries";
 import store from "@/test/unit/helpers/store";
 import { RESOLUTION_CAUSES } from "@/ts/interfaces/oncall";
 import OnCallResponseDetail from "@/views/OnCall/OnCallResponseDetail.vue";
@@ -417,6 +419,9 @@ describe("OnCallResponseDetail", () => {
     expect(banner.exists()).toBe(true);
     expect(banner.text()).toContain("unassigned");
 
+    // A second mount of the same id is served from cache, so the lapsed record
+    // only reaches the page on a fresh load.
+    queryClient.clear();
     const lapsed = await renderWith({ snoozed_until: (Date.now() - 60_000) * 1000 });
     expect(lapsed.find('[data-test="oncall-response-snoozed-banner"]').exists()).toBe(false);
   });
@@ -1073,6 +1078,47 @@ describe("OnCallResponseDetail", () => {
     expect(wrapper.findComponent({ name: "OnCallWhoIsOn" }).props("ackedBy")).toBe(
       "engineer@example.com",
     );
+  });
+
+  /// Both halves of the cache contract in one place: reopening a page inside
+  /// the stale window must cost nothing, and the ladder's countdown — which
+  /// lapses while the entry is still fresh — must still reach the server,
+  /// which only a forced re-read does.
+  it("serves a remount from cache, and still forces the lapsed countdown", async () => {
+    const first = await renderWith();
+    const before = {
+      response: service.getResponse.mock.calls.length,
+      team: service.getTeam.mock.calls.length,
+      members: service.listMembers.mock.calls.length,
+      teams: service.listTeams.mock.calls.length,
+      causes: service.priorCauses.mock.calls.length,
+      deliveries: service.listDeliveries.mock.calls.length,
+      onCall: service.whoIsOnCall.mock.calls.length,
+      progress: service.escalationProgress.mock.calls.length,
+    };
+    expect(before.response).toBe(1);
+    first.unmount();
+
+    await renderWith();
+
+    expect(service.getResponse.mock.calls.length).toBe(before.response);
+    expect(service.getTeam.mock.calls.length).toBe(before.team);
+    expect(service.listMembers.mock.calls.length).toBe(before.members);
+    expect(service.listTeams.mock.calls.length).toBe(before.teams);
+    expect(service.priorCauses.mock.calls.length).toBe(before.causes);
+    expect(service.listDeliveries.mock.calls.length).toBe(before.deliveries);
+    expect(service.whoIsOnCall.mock.calls.length).toBe(before.onCall);
+    expect(service.escalationProgress.mock.calls.length).toBe(before.progress);
+
+    // Seeded, not fetched: the entry is fresh, so an unforced re-read would be
+    // served from it and the countdown would never learn anything new.
+    queryClient.setQueryData(
+      responseProgressQuery(store.state.selectedOrganization.identifier, "resp_1").queryKey,
+      { fired: [], next_targets: [], next_at: Date.now() * 1000 - 1_000_000, exhausted: false },
+    );
+    await renderWith();
+
+    expect(service.escalationProgress.mock.calls.length).toBe(before.progress + 1);
   });
 });
 

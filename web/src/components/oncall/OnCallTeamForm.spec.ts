@@ -18,6 +18,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import OnCallTeamForm from "@/components/oncall/OnCallTeamForm.vue";
 import i18n from "@/locales";
+import { queryClient } from "@/composables/query/queryClient";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
@@ -340,6 +341,24 @@ describe("OnCallTeamForm", () => {
     expect(oncall.createTeam).toHaveBeenCalledOnce();
     expect(oncall.addMembers).not.toHaveBeenCalled();
     expect(oncall.setSchedule).not.toHaveBeenCalled();
+  });
+
+  /// The whole teams prefix, not the new team's own: nothing is cached under an
+  /// id the client learns from this very response, and the list the parent
+  /// re-reads afterwards is the entry that has to expire.
+  it("expires the teams scope when a create lands", async () => {
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    const wrapper = render();
+    await flushPromises();
+
+    setValues(wrapper, { name: "Payments" });
+    await submit(wrapper);
+    await flushPromises();
+
+    expect(invalidate).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["org", "default", "oncall", "teams"] }),
+    );
+    invalidate.mockRestore();
   });
 
   /// The team exists by the time this can fail, so reporting it as "could not

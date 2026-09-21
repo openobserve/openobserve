@@ -392,6 +392,31 @@ describe("OnCallRouting", () => {
     expect(wrapper.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
   });
 
+  /// A revisit pays for none of the three org reads; only the reader's Retry reaches the server.
+  it("serves a revisit from the cache and forces on retry", async () => {
+    service.ownershipStats.mockRejectedValueOnce(new Error("boom"));
+    const first = render();
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(1);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+
+    // Forced, so the two reads that SUCCEEDED are asked again rather than served.
+    first.findComponent('[data-test="oncall-routing-error"]').vm.$emit("action");
+    await flushPromises();
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(second.find('[data-test="oncall-routing-content"]').exists()).toBe(true);
+    expect(service.listTeams).toHaveBeenCalledTimes(2);
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+  });
+
   /// The queue's failure must not read as "everything is routed" — that is
   /// this screen's core claim. The rest of the page keeps working.
   it("shows the queue's own error without taking down the page", async () => {

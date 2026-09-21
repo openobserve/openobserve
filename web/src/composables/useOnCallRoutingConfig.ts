@@ -15,7 +15,8 @@
 
 import { readonly, ref } from "vue";
 
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { routingConfigQuery } from "@/services/oncall.queries";
 import type { RoutingConfig } from "@/ts/interfaces/oncall";
 
 /**
@@ -29,60 +30,59 @@ import type { RoutingConfig } from "@/ts/interfaces/oncall";
  * written: nominating a catch-all left the warning in the drawer still saying
  * there was none, because nothing told it.
  *
- * Module-scoped on purpose. A per-component cache would be three caches again.
+ * Sharing is now the query cache's job — org-rooted keys, one in-flight request
+ * per key, and a purge on org switch, all of which this file used to hand-roll.
+ * The refs below only mirror the entry for templates that read it synchronously.
  *
  * @example
  * const { config, load, refresh } = useOnCallRoutingConfig();
- * onMounted(() => load(orgId.value));      // no-op if another caller has it
+ * onMounted(() => load(orgId.value));      // cache-first
  * await refresh(orgId.value);              // after a write
  */
 const config = ref<RoutingConfig | null>(null);
-/** Which org the cached value belongs to — switching orgs must not inherit it. */
-let loadedFor: string | null = null;
-/** In-flight read, so simultaneous callers share one request rather than racing. */
-let inFlight: Promise<void> | null = null;
-/** True until the first read for the current org settles, shared so every caller can tell an unset config apart from one that hasn't loaded yet. */
+/** True while a read is in flight, so a caller can tell "unset" from "not loaded yet". */
 const loading = ref(false);
 
-async function read(orgId: string): Promise<void> {
+async function read(orgId: string, force: boolean): Promise<void> {
+  const options = routingConfigQuery(orgId);
   loading.value = true;
   try {
-    const res = await oncallService.getRoutingConfig({ org_identifier: orgId });
-    config.value = res.data ?? null;
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    config.value = await queryClient.fetchQuery(options);
   } catch {
     // Unset is the honest reading of "could not load": neither state claims a
     // catch-all exists, and a failed read must not make one appear or vanish.
     config.value = null;
   } finally {
-    loadedFor = orgId;
-    inFlight = null;
     loading.value = false;
   }
 }
 
 export function useOnCallRoutingConfig() {
-  /** Reads once per org. Callers may all call it; only the first fetches. */
+  /** Cache-first: inside the tier this resolves without a request. */
   function load(orgId: string): Promise<void> {
-    if (loadedFor === orgId && !inFlight) return Promise.resolve();
-    if (inFlight) return inFlight;
-    inFlight = read(orgId);
-    return inFlight;
+    return read(orgId, false);
   }
 
   /** Re-reads unconditionally. Call after writing the config. */
   function refresh(orgId: string): Promise<void> {
-    loadedFor = null;
-    inFlight = read(orgId);
-    return inFlight;
+    return read(orgId, true);
   }
 
   return { config: readonly(config), loading: readonly(loading), load, refresh };
 }
 
-/** Test seam — resets the module cache between cases. */
+/** Test seam — drops the cached entry, whatever org it was read for, and the mirrored refs. */
 export function __resetOnCallRoutingConfig() {
   config.value = null;
-  loadedFor = null;
-  inFlight = null;
   loading.value = false;
+  queryClient.removeQueries({
+    predicate: (query) => query.queryKey[2] === "oncall" && query.queryKey[3] === "routing",
+  });
 }

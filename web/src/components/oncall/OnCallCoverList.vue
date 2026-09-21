@@ -119,9 +119,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import { useMutation } from "@tanstack/vue-query";
 import { computed, ref, watch } from "vue";
 import { useStore } from "vuex";
 
+import { queryClient } from "@/composables/query/queryClient";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -130,7 +132,7 @@ import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import oncallService from "@/services/oncall";
+import { deleteOverrideMutation, teamOverridesQuery } from "@/services/oncall.queries";
 import type { Override, Rotation } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { formatInZone } from "@/utils/oncall";
@@ -182,6 +184,9 @@ const loading = ref(false);
 const removing = ref(false);
 const toRemove = ref<Override | null>(null);
 
+// Getter form, so the write follows an org switch and a change of team.
+const removeCoverWrite = useMutation(() => deleteOverrideMutation(orgId.value, props.teamId));
+
 const columns = computed<OTableColumnDef<Override>[]>(() => [
   {
     id: "who",
@@ -229,20 +234,28 @@ function windowOf(cover: Override): string {
 /// Newest first, because that is the one in force where two overlap. The
 /// endpoint already answers in this order for the unfiltered read; sorting
 /// here keeps it true for the windowed one as well.
-async function fetchCovers() {
+async function fetchCovers(force = false) {
   loading.value = true;
   try {
-    const res = await oncallService.listOverrides({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      ...(props.window ? { from: props.window.from, to: props.window.to } : {}),
-    });
-    // Filtered here rather than by the endpoint: `listOverrides` answers for
-    // the whole team, and asking per rotation would be N requests to narrow a
-    // list already in hand.
+    const options = teamOverridesQuery(
+      orgId.value,
+      props.teamId,
+      props.window?.from,
+      props.window?.to,
+    );
+    // Only a user-initiated refresh must reach the server; every other read takes the cache.
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const res = await queryClient.fetchQuery(options);
+    // Filtered here rather than per rotation: N requests to narrow a list already in hand.
     const all = props.rotationId
-      ? (res.data ?? []).filter((cover) => cover.rotation_id === props.rotationId)
-      : (res.data ?? []);
+      ? res.filter((cover) => cover.rotation_id === props.rotationId)
+      : res;
     covers.value = [...all].sort((a, b) => b.created_at - a.created_at || b.id.localeCompare(a.id));
   } catch {
     // A cover list that cannot load is not worth an error over the calendar it
@@ -259,13 +272,10 @@ async function removeCover() {
   if (!cover) return;
   removing.value = true;
   try {
-    await oncallService.deleteOverride({
-      org_identifier: orgId.value,
-      team_id: props.teamId,
-      override_id: cover.id,
-    });
+    await removeCoverWrite.mutateAsync(cover.id);
     toast({ variant: "success", message: t("oncall.coverRemoved") });
     toRemove.value = null;
+    // Unforced: the write expired the entry, so one server read repaints this ref.
     await fetchCovers();
     // The calendar above is resolved server-side, so it has to be re-asked:
     // the window this cover held now belongs to the rotation again.
@@ -280,9 +290,15 @@ async function removeCover() {
   }
 }
 
-watch(() => [props.teamId, props.window?.from, props.window?.to, props.rotationId], fetchCovers, {
-  immediate: true,
-});
+// Wrapped: a watcher hands its new value to the callback, which `force` would take.
+watch(
+  () => [props.teamId, props.window?.from, props.window?.to, props.rotationId],
+  () => fetchCovers(),
+  { immediate: true },
+);
 
-defineExpose({ refresh: fetchCovers });
+// The parent calls this after it changed something the server resolves itself.
+const refresh = () => fetchCovers(true);
+
+defineExpose({ refresh });
 </script>

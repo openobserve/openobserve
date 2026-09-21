@@ -148,14 +148,34 @@ describe("OnCallCoverList", () => {
   });
 
   /// Both bounds or neither: the endpoint refuses a half-specified window
-  /// rather than quietly answering the unfiltered list.
+  /// rather than quietly answering the unfiltered list. The service drops an
+  /// undefined bound before it builds the query string.
   it("sends no bounds at all when it has no window", async () => {
     render();
     await flushPromises();
 
     const call = service.listOverrides.mock.calls[0][0] as Record<string, unknown>;
-    expect(call).not.toHaveProperty("from");
-    expect(call).not.toHaveProperty("to");
+    expect(call.from).toBeUndefined();
+    expect(call.to).toBeUndefined();
+  });
+
+  /// The calendar above this list remounts on every tab and range change.
+  it("serves a remount from the cache, and reaches the server on refresh", async () => {
+    service.listOverrides.mockResolvedValue({ data: [cover()] } as any);
+
+    const first = render({ window: { from: FROM, to: FROM + 86_400_000_000 } });
+    await flushPromises();
+    expect(service.listOverrides).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = render({ window: { from: FROM, to: FROM + 86_400_000_000 } });
+    await flushPromises();
+    expect(service.listOverrides).toHaveBeenCalledTimes(1);
+
+    // The parent calls this after a write, so it cannot take the entry it outdated.
+    await (second.vm as unknown as { refresh: () => Promise<void> }).refresh();
+    await flushPromises();
+    expect(service.listOverrides).toHaveBeenCalledTimes(2);
   });
 
   describe("removing a cover", () => {

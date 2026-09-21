@@ -23,7 +23,9 @@ import store from "@/test/unit/helpers/store";
 import type { OnCallSchedule, OnCallTeamMember } from "@/ts/interfaces/oncall";
 import { MICROS_PER_WEEK } from "@/ts/interfaces/oncall";
 
-vi.mock("@/services/oncall", () => ({ default: { setSchedule: vi.fn() } }));
+vi.mock("@/services/oncall", () => ({
+  default: { setSchedule: vi.fn(), listUnavailability: vi.fn() },
+}));
 
 const service = vi.mocked(oncallService);
 
@@ -162,6 +164,7 @@ describe("OnCallScheduleEditor", () => {
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {
@@ -388,6 +391,23 @@ describe("OnCallScheduleEditor", () => {
     expect((service.setSchedule.mock.calls[0][0] as any).data.rotations).toHaveLength(1);
   });
 
+  /// The absence horizon is anchored on the clock, so an unbucketed key would
+  /// miss on every open and make a drawer somebody flicks in and out of cost a
+  /// request each time.
+  it("serves a reopened drawer's absences from the cache", async () => {
+    const wrapper = render({ schedule: schedule([rota("Primary")]) });
+    await flushPromises();
+
+    await openRotation(wrapper);
+    expect(service.listUnavailability).toHaveBeenCalledTimes(1);
+
+    wrapper.findComponent({ name: "ODrawer" }).vm.$emit("update:open", false);
+    await flushPromises();
+    await openRotation(wrapper);
+
+    expect(service.listUnavailability).toHaveBeenCalledTimes(1);
+  });
+
   /// Closing is not undo. A rotation that already exists is edited in the
   /// draft the bulk Save writes, so dismissing the drawer keeps the change —
   /// only the row nobody has finished adding is discarded.
@@ -524,6 +544,7 @@ describe("OnCallScheduleEditor — retiring a shift rule", () => {
     vi.setSystemTime(NOW);
     vi.clearAllMocks();
     service.setSchedule.mockResolvedValue({ data: {} } as any);
+    service.listUnavailability.mockResolvedValue({ data: [] } as any);
   });
 
   afterEach(() => {

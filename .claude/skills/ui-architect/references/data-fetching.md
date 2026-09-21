@@ -91,14 +91,18 @@ number.
 
 | Tier | Constant | Modules (current declarations) |
 | --- | --- | --- |
-| 1 min | `LIVE_STALE_TIME` | alerts (list, detail, history, dependencies), alert sources, anomaly detection, incidents, SLOs, synthetics monitors, enrichment-table job statuses |
-| 5 min | `MEDIUM_STALE_TIME` | logs & streams (name list, stream page, schema), saved views, traces (DAG, service graph), service correlation (semantic groups, identity config), org summary counts, AI observability (agents, experiments, remote tasks, datasets, queues), online evals |
-| 1 h | `NORMAL_STALE_TIME` | dashboards (+ annotations), pipelines (+ history), functions, query functions, workflows (folder lists, search, run history), reports, folders, nodes, IAM (users, roles, groups, resources, service accounts), ingestion/RUM tokens, org passcode, cipher keys, org settings, settings KV, alert destinations + templates, regex patterns, model pricing, AI toolsets, synthetics agent tokens |
+| 1 min | `LIVE_STALE_TIME` | alerts (list, detail, history, dependencies), alert sources, anomaly detection, incidents, SLOs, synthetics monitors, enrichment-table job statuses, on-call **state** (who is on call, team overview, escalation preview + progress, responses, deliveries, coverage gaps, unrouted signals, my on-call) |
+| 5 min | `MEDIUM_STALE_TIME` | logs & streams (name list, stream page, schema), saved views, traces (DAG, service graph), service correlation (semantic groups, identity config), org summary counts, AI observability (agents, experiments, remote tasks, datasets, queues), online evals, on-call **derived** (reachability, config risks, team load, resolved schedule, overrides, unavailability, ownership stats), DB monitoring instances |
+| 1 h | `NORMAL_STALE_TIME` | dashboards (+ annotations), pipelines (+ history), functions, query functions, workflows (folder lists, search, run history), reports, folders, nodes, IAM (users, roles, groups, resources, service accounts), ingestion/RUM tokens, org passcode, cipher keys, org settings, settings KV, alert destinations + templates, regex patterns, model pricing, AI toolsets, synthetics agent tokens, on-call **config** (teams, members, schedule, policy, presets, routing config, ownership rules, response history + prior causes) |
 | ∞ | `SESSION_STALE_TIME` | the two `/config` reads |
 | 0 | `staleTime: 0` | license, org cleanup-task poll (`refetchInterval` while its dialog is open) |
 
 - A new query joins its module's row. A new module: pick the row whose data
   changes at the same speed, and name it in the table above.
+- A module may span rows where its data genuinely changes at different speeds.
+  On-call is the worked example: the ladder is config (1 h), but who it would
+  wake right now moves at the next handover with no write behind it (1 min), so
+  the two cannot share a tier however closely they are read together.
 - **Never set `gcTime` on a declaration** — the client owns it. (The panel cache
   keeps its own `PANEL_GC_TIME`.)
 - Billing is not cached at all (no declarations; the billing pages call

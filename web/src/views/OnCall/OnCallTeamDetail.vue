@@ -86,7 +86,7 @@
         :description="raw(loadError)"
         :action-label="t('oncall.retry')"
         data-test="oncall-team-detail-error"
-        @action="fetchAll"
+        @action="refreshAll"
       />
     </OContent>
 
@@ -107,7 +107,7 @@
         :checked-at="insightsCheckedAt"
         :has-members="hasMembers"
         @act="onAttentionAct"
-        @recheck="fetchInsights"
+        @recheck="recheckInsights"
       />
 
       <!-- What the team HAS been doing, then the chain that decides it: when each
@@ -229,7 +229,7 @@
             :load="teamLoad"
             :testing="testingPage"
             :can-configure="canConfigure"
-            @changed="fetchAll"
+            @changed="onMembersChanged"
             @open-schedule="activeTab = 'schedule'"
             @test-page="sendTestPage"
           />
@@ -286,7 +286,7 @@
               :viewer-timezone="store.state.timezone"
               :window="scheduleWindow"
               :rotations="teamRotations"
-              @changed="fetchSegments"
+              @changed="onCoversChanged"
             />
 
             <OnCallSchedulePresets
@@ -424,7 +424,28 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import oncallService from "@/services/oncall";
+import { useMutation } from "@tanstack/vue-query";
+import { queryClient } from "@/composables/query/queryClient";
+import {
+  createOverrideMutation,
+  deleteOverrideMutation,
+  escalationPreviewQuery,
+  oncallTeamQuery,
+  oncallTeamsQuery,
+  ownershipRulesQuery,
+  resolvedScheduleQuery,
+  responsesQuery,
+  setTeamScheduleMutation,
+  teamConfigRisksQuery,
+  teamLoadQuery,
+  teamMembersQuery,
+  teamOverviewQuery,
+  teamPolicyQuery,
+  teamReachabilityQuery,
+  teamScheduleQuery,
+  testPageMutation,
+  whoIsOnCallQuery,
+} from "@/services/oncall.queries";
 import type {
   OnCallPolicy,
   OnCallResponse,
@@ -439,6 +460,7 @@ import type {
   TeamLoad,
   TeamReachability,
   ScheduleEditorIntent,
+  OwnershipRule,
 } from "@/ts/interfaces/oncall";
 import { MICROS_PER_DAY } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -628,31 +650,58 @@ function onAttentionAct(tab: string, rotation?: string | null) {
   if (target) openScheduleEditor({ mode: "edit", id: target.id });
 }
 
-async function fetchAll() {
+const scheduleWrite = useMutation(() => setTeamScheduleMutation(orgId.value, teamId.value));
+const coverWrite = useMutation(() => createOverrideMutation(orgId.value, teamId.value));
+const coverDeleteWrite = useMutation(() => deleteOverrideMutation(orgId.value, teamId.value));
+const testPageWrite = useMutation(() => testPageMutation(orgId.value));
+
+/// Cache-first everywhere; only a reader asking for a refresh forces a read.
+/// Invalidating with `refetchType: "none"` expires the entry before the fetch,
+/// so a force costs one request rather than two.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
+async function fetchAll(force = false) {
   loadError.value = null;
-  const org_identifier = orgId.value;
-  const team_id = teamId.value;
+  const org = orgId.value;
+  const id = teamId.value;
   try {
     const [teamRes, memberRes, scheduleRes, policyRes, onCallRes, teamsRes] = await Promise.all([
-      oncallService.getTeam({ org_identifier, team_id }),
-      oncallService.listMembers({ org_identifier, team_id }),
-      oncallService.getSchedule({ org_identifier, team_id }),
-      oncallService.getPolicy({ org_identifier, team_id }),
-      oncallService.whoIsOnCall({ org_identifier, team_id }),
-      oncallService.listTeams({ org_identifier }),
+      read<OnCallTeam | null>(oncallTeamQuery(org, id), force),
+      read<OnCallTeamMember[]>(teamMembersQuery(org, id), force),
+      read<OnCallSchedule | null>(teamScheduleQuery(org, id), force),
+      read<OnCallPolicy | null>(teamPolicyQuery(org, id), force),
+      read<OnCallPosition[]>(whoIsOnCallQuery(org, id), force),
+      read<OnCallTeam[]>(oncallTeamsQuery(org), force),
     ]);
-    team.value = teamRes.data;
-    teams.value = teamsRes.data ?? [];
-    members.value = memberRes.data ?? [];
-    schedule.value = scheduleRes.data ?? null;
-    policy.value = policyRes.data;
-    onCallNow.value = onCallRes.data ?? [];
+    team.value = teamRes;
+    teams.value = teamsRes;
+    members.value = memberRes;
+    schedule.value = scheduleRes;
+    policy.value = policyRes;
+    onCallNow.value = onCallRes;
     // Only on success, so a failed load never renders a team as uncovered.
     if (!loaded.value) {
       activeTab.value = routeTab.value ?? (members.value.length ? "overview" : "members");
     }
     loaded.value = true;
-    await Promise.allSettled([fetchRuleCount(), fetchPages(), fetchInsights(), fetchPreview()]);
+    await Promise.allSettled([
+      fetchRuleCount(force),
+      fetchPages(force),
+      fetchInsights(force),
+      fetchPreview(force),
+    ]);
   } catch (err: any) {
     // Entry fetch ONLY: a 404 on a specific team id past this point is a
     // missing record, not a missing feature.
@@ -670,13 +719,13 @@ async function fetchAll() {
 
 // The count feeds a warning tile, so a failed lookup leaves it at zero-known
 // rather than claiming the team has no routing.
-async function fetchRuleCount() {
+async function fetchRuleCount(force = false) {
   try {
-    const res = await oncallService.listOwnershipRules({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-    });
-    ruleCount.value = (res.data ?? []).length;
+    const rules = await read<OwnershipRule[]>(
+      ownershipRulesQuery(orgId.value, teamId.value),
+      force,
+    );
+    ruleCount.value = rules.length;
   } catch {
     ruleCount.value = 0;
   }
@@ -686,31 +735,29 @@ async function fetchRuleCount() {
 /// failure here costs those two surfaces, never the rest of the page.
 /// The three insight calls. Each degrades one panel rather than the page, so
 /// they are settled independently and never block the team from rendering.
-async function fetchInsights() {
-  const org_identifier = orgId.value;
-  const team_id = teamId.value;
+async function fetchInsights(force = false) {
+  const org = orgId.value;
+  const id = teamId.value;
   const [ov, reach, risks, load] = await Promise.allSettled([
-    oncallService.teamOverview({ org_identifier, team_id }),
-    oncallService.teamReachability({ org_identifier, team_id }),
-    oncallService.teamConfigRisks({ org_identifier, team_id }),
-    oncallService.teamLoad({ org_identifier, team_id }),
+    read<TeamOverview | null>(teamOverviewQuery(org, id), force),
+    read<TeamReachability | null>(teamReachabilityQuery(org, id), force),
+    read<ConfigRisks | null>(teamConfigRisksQuery(org, id), force),
+    read<TeamLoad | null>(teamLoadQuery(org, id), force),
   ]);
-  overview.value = ov.status === "fulfilled" ? (ov.value.data ?? null) : null;
-  reachability.value = reach.status === "fulfilled" ? (reach.value.data ?? null) : null;
-  configRisks.value = risks.status === "fulfilled" ? (risks.value.data ?? null) : null;
-  teamLoad.value = load.status === "fulfilled" ? (load.value.data ?? null) : null;
+  overview.value = ov.status === "fulfilled" ? ov.value : null;
+  reachability.value = reach.status === "fulfilled" ? reach.value : null;
+  configRisks.value = risks.status === "fulfilled" ? risks.value : null;
+  teamLoad.value = load.status === "fulfilled" ? load.value : null;
   insightsCheckedAt.value = Date.now() * 1000;
 }
 
-async function fetchPages() {
+async function fetchPages(force = false) {
   pagesLoading.value = true;
   try {
-    const res = await oncallService.listResponses({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      include_resolved: true,
-    });
-    responses.value = res.data ?? [];
+    responses.value = await read<OnCallResponse[]>(
+      responsesQuery(orgId.value, { team_id: teamId.value, include_resolved: true }),
+      force,
+    );
   } catch {
     responses.value = [];
   } finally {
@@ -761,10 +808,7 @@ const configRiskCount = computed(() => configRisks.value?.total ?? 0);
 async function sendTestPage() {
   testingPage.value = true;
   try {
-    const res = await oncallService.testPage({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-    });
+    const res = await testPageWrite.mutateAsync({ teamId: teamId.value });
     const data = res.data;
     // `attempts`, not `recipients` — the latter never existed on the wire.
     const reached = (data?.attempts ?? []).filter((attempt) => attempt.delivered).length;
@@ -805,7 +849,7 @@ async function sendTestPage() {
 ///
 /// A team with no rotations is not asked at all. It answers `[]` rather than
 /// one long gap segment, so there is nothing to draw and no call to spend.
-async function fetchSegments() {
+async function fetchSegments(force = false) {
   const { from, to } = scheduleWindow.value;
   if (!from || !to) return;
   const rotations = schedule.value?.rotations ?? [];
@@ -817,19 +861,16 @@ async function fetchSegments() {
   try {
     const answers = await Promise.all(
       rotations.map((rotation) =>
-        oncallService.resolvedSchedule({
-          org_identifier: orgId.value,
-          team_id: teamId.value,
-          from,
-          to,
-          rotation_id: rotation.id,
-        }),
+        read<ResolvedSegment[]>(
+          resolvedScheduleQuery(orgId.value, teamId.value, from, to, rotation.id),
+          force,
+        ),
       ),
     );
     // The primary may answer without echoing its own id, so the lane lookup
     // gets one it can match rather than an absent field.
-    segments.value = answers.flatMap((res, index) =>
-      (res.data ?? []).map((segment) => ({
+    segments.value = answers.flatMap((lane, index) =>
+      lane.map((segment) => ({
         ...segment,
         rotation_id: segment.rotation_id || rotations[index].id,
       })),
@@ -877,11 +918,7 @@ async function deleteRotation() {
   const name = current.rotations.find((rotation) => rotation.id === id)?.name ?? id;
   const rotations = current.rotations.filter((rotation) => rotation.id !== id);
   try {
-    await oncallService.setSchedule({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      data: { timezone: current.timezone, rotations },
-    });
+    await scheduleWrite.mutateAsync({ timezone: current.timezone, rotations });
     toast({ variant: "success", message: t("oncall.laneDeleted", { name: raw(name) }) });
     await onScheduleSaved();
   } catch (err: any) {
@@ -997,18 +1034,10 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
   coverSaving.value = true;
   let firstId: string | null = null;
   try {
-    const created = await oncallService.createOverride({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      data: value.first,
-    });
+    const created = await coverWrite.mutateAsync(value.first);
     firstId = created.data?.id ?? null;
 
-    await oncallService.createOverride({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      data: value.second,
-    });
+    await coverWrite.mutateAsync(value.second);
 
     coverOpen.value = false;
     toast({ variant: "success", message: t("oncall.swapSaved") });
@@ -1025,11 +1054,7 @@ async function saveSwap(value: { first: SwapCover; second: SwapCover }) {
       return;
     }
     try {
-      await oncallService.deleteOverride({
-        org_identifier: orgId.value,
-        team_id: teamId.value,
-        override_id: firstId,
-      });
+      await coverDeleteWrite.mutateAsync(firstId);
       toast({ variant: "error", message: t("oncall.swapRolledBack", { reason }) });
     } catch {
       // The undo failed too: one cover is live and the other is not. Saying
@@ -1073,11 +1098,7 @@ async function saveCover(value: {
 }) {
   coverSaving.value = true;
   try {
-    await oncallService.createOverride({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      data: value,
-    });
+    await coverWrite.mutateAsync(value);
     coverOpen.value = false;
     coverGap.value = null;
     // The message is "{name} covers {team} · {range}" and it was called with no
@@ -1106,24 +1127,22 @@ async function saveCover(value: {
 /// engine now says, not to keep staring at the form.
 /// The dry run for whichever priority is selected. Re-asked on every change,
 /// because the answer depends on who is on call at THIS instant.
-async function loadPreview(priority: number): Promise<EscalationPreview | null> {
+async function loadPreview(priority: number, force: boolean): Promise<EscalationPreview | null> {
   try {
-    const res = await oncallService.escalationPreview({
-      org_identifier: orgId.value,
-      team_id: teamId.value,
-      priority,
-    });
-    return res.data ?? null;
+    return await read<EscalationPreview | null>(
+      escalationPreviewQuery(orgId.value, teamId.value, priority),
+      force,
+    );
   } catch {
     // One priority failing must not blank the strip that lets you pick another.
     return null;
   }
 }
 
-async function fetchPreview() {
+async function fetchPreview(force = false) {
   const priority = Number(selectedPriority.value.replace(/\D/g, "")) || 1;
   previewLoading.value = true;
-  preview.value = await loadPreview(priority);
+  preview.value = await loadPreview(priority, force);
   previewLoading.value = false;
 }
 
@@ -1138,6 +1157,15 @@ async function onScheduleSaved() {
   await fetchAll();
   await fetchSegments();
 }
+
+/// Named rather than bound straight to the template: an event handler receives
+/// the event as its first argument, and `force` would take it as a yes. A
+/// child's `changed` is already covered by that write's own invalidation, so
+/// these two stay unforced and only the reader's own Retry and Recheck force.
+const refreshAll = () => fetchAll(true);
+const recheckInsights = () => fetchInsights(true);
+const onMembersChanged = () => fetchAll();
+const onCoversChanged = () => fetchSegments();
 
 function onTeamSaved() {
   editOpen.value = false;
@@ -1167,8 +1195,10 @@ watch(activeTab, (tab) => {
   });
 });
 
-watch(scheduleWindow, fetchSegments, { deep: true });
-watch(selectedPriority, fetchPreview);
+// Wrapped: a watcher hands the callback the new value, which `force` would read
+// as a yes and turn every window move into a forced refetch.
+watch(scheduleWindow, () => fetchSegments(), { deep: true });
+watch(selectedPriority, () => fetchPreview());
 
-onMounted(fetchAll);
+onMounted(() => fetchAll());
 </script>

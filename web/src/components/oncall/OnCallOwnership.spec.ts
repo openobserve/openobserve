@@ -330,6 +330,30 @@ describe("OnCallOwnership", () => {
     });
   });
 
+  /// A revisit inside the tier costs nothing; a rule write moves the queue the rules decide.
+  it("serves a revisit from the cache and re-reads both lists after a write", async () => {
+    service.deleteOwnershipRule.mockResolvedValue({ data: {} } as any);
+
+    const first = render();
+    await flushPromises();
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const wrapper = render();
+    await flushPromises();
+    expect(service.ownershipStats).toHaveBeenCalledTimes(1);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(1);
+
+    list(wrapper).vm.$emit("remove", { rule_id: "r9" });
+    await wrapper.vm.$nextTick();
+    await wrapper.findAllComponents({ name: "ConfirmDialog" })[0].vm.$emit("update:ok");
+    await flushPromises();
+
+    expect(service.ownershipStats).toHaveBeenCalledTimes(2);
+    expect(service.unroutedSignals).toHaveBeenCalledTimes(2);
+  });
+
   /// A team with no unrouted traffic and a server without the endpoint look
   /// identical from here, and neither deserves an error.
   it("survives an unrouted endpoint that is not there", async () => {

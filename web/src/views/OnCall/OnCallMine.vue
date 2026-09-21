@@ -165,7 +165,8 @@ import OContent from "@/lib/core/Content/OContent.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OText from "@/lib/core/Typography/OText.vue";
-import oncallService from "@/services/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { myOnCallQuery } from "@/services/oncall.queries";
 import type { MyOnCall } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { isOnCallUnavailable } from "@/utils/oncall";
@@ -189,8 +190,7 @@ const teamNames = computed(() =>
 /// rotation name and the handover instant, which this does not carry.
 async function fetchMine() {
   try {
-    const res = await oncallService.myOnCall({ org_identifier: orgId.value });
-    mine.value = res.data ?? null;
+    mine.value = await queryClient.fetchQuery(myOnCallQuery(orgId.value));
   } catch (err) {
     if (isOnCallUnavailable(err)) unavailable.value = true;
     mine.value = null;

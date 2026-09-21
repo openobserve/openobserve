@@ -252,6 +252,36 @@ describe("OnCallMyDeliveries", () => {
     });
   });
 
+  /// Both halves belong to one flow, because the second only means anything
+  /// given the first: once a revisit is served from cache, the re-read after a
+  /// write is the one that can silently be served from it too, leaving the rows
+  /// showing the state they had before the mark.
+  it("serves a revisit from cache, and still re-reads after a write", async () => {
+    service.myDeliveries.mockResolvedValue({
+      data: { total: 1, unread: 4, deliveries: [delivery({ read: false })] },
+    } as any);
+    service.markDeliveriesRead.mockResolvedValue({ data: { updated: 1, unread: 2 } } as any);
+
+    const first = render();
+    await flushPromises();
+    expect(service.myDeliveries).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const wrapper = render();
+    await flushPromises();
+    expect(service.myDeliveries).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('[data-test="oncall-my-deliveries-unread"]').text()).toContain("4");
+
+    await wrapper.find('[data-test="oncall-my-delivery-toggle-ev_88"]').trigger("click");
+    await flushPromises();
+
+    expect(service.markDeliveriesRead).toHaveBeenCalledTimes(1);
+    // The write expired this scope, so the re-read reaches the server.
+    expect(service.myDeliveries).toHaveBeenCalledTimes(2);
+    // 2 is only on the write's own response — the re-read still answers 4.
+    expect(wrapper.emitted("unread")?.some((e) => e[0] === 2)).toBe(true);
+  });
+
   it("opens the page a row was sent for", async () => {
     service.myDeliveries.mockResolvedValue({
       data: { total: 1, unread: 0, deliveries: [delivery()] },

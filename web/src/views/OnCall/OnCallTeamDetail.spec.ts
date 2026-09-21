@@ -16,6 +16,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { queryClient } from "@/composables/query/queryClient";
 import i18n from "@/locales";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import oncallService from "@/services/oncall";
@@ -163,6 +164,27 @@ describe("OnCallTeamDetail", () => {
   /// sit in the header beside a panel reading "no page can be delivered to
   /// anyone" — the chip answering the first question in a voice that sounded
   /// like an answer to both.
+  /// The heaviest read in the module — thirteen requests for one team — and the
+  /// tabs above it send people back and forth all day.
+  it("serves a revisit from the cache, and rechecks against the server", async () => {
+    const first = render();
+    await flushPromises();
+    expect(service.getTeam).toHaveBeenCalledTimes(1);
+    expect(service.teamOverview).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    const second = render();
+    await flushPromises();
+    expect(service.getTeam).toHaveBeenCalledTimes(1);
+    expect(service.teamOverview).toHaveBeenCalledTimes(1);
+
+    // "Recheck" is a reader saying the findings may be out of date, so it is
+    // the one path here that must not be answered from what we already hold.
+    second.findComponent({ name: "OnCallTeamAttention" }).vm.$emit("recheck");
+    await flushPromises();
+    expect(service.teamOverview).toHaveBeenCalledTimes(2);
+  });
+
   describe("the coverage chip", () => {
     function onCall(email: string) {
       service.whoIsOnCall.mockResolvedValue({
@@ -646,11 +668,22 @@ describe("OnCallTeamDetail", () => {
       expect(deleteConfirm(wrapper)!.props("modelValue")).toBe(false);
     });
 
-    /// The point of saving is to see what the engine now says.
+    /// The point of saving is to see what the engine now says. The editor's own
+    /// write expires the team's scope before it emits, which is what makes this
+    /// page's re-read reach the server without asking it to.
     it("refetches the schedule once the editor saves", async () => {
       const wrapper = await openSchedule();
       const before = service.getSchedule.mock.calls.length;
 
+      await queryClient.invalidateQueries({
+        queryKey: [
+          "org",
+          store.state.selectedOrganization.identifier,
+          "oncall",
+          "teams",
+          routeParams.teamId,
+        ],
+      });
       wrapper.findComponent({ name: "OnCallScheduleEditor" }).vm.$emit("saved");
       await flushPromises();
 

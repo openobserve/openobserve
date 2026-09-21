@@ -78,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           icon-left="refresh"
           :loading="loading"
           data-test="oncall-policies-refresh"
-          @click="fetchAll"
+          @click="refreshAll"
         >
           <OTooltip side="bottom" :content="t('oncall.refresh')" />
         </OButton>
@@ -152,8 +152,9 @@ import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import oncallService from "@/services/oncall";
-import type { OnCallTeam } from "@/ts/interfaces/oncall";
+import { queryClient } from "@/composables/query/queryClient";
+import { oncallTeamsQuery, teamPolicyQuery, whoIsOnCallQuery } from "@/services/oncall.queries";
+import type { OnCallPolicy, OnCallPosition, OnCallTeam } from "@/ts/interfaces/oncall";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { priorityLabel, priorityTagVariant, resolveLadder } from "@/utils/oncall";
 
@@ -251,21 +252,37 @@ const summaryStats = computed<StatItem[]>(() => [
   },
 ]);
 
+/// Cache-first on mount; the refresh button forces every read the page makes,
+/// which is why `force` is threaded down rather than read from a page-level ref.
+async function read<T>(
+  options: { queryKey: readonly unknown[]; [k: string]: any },
+  force: boolean,
+): Promise<T> {
+  if (force) {
+    await queryClient.invalidateQueries({
+      queryKey: options.queryKey,
+      exact: true,
+      refetchType: "none",
+    });
+  }
+  return queryClient.fetchQuery(options as any) as Promise<T>;
+}
+
 /// One request per team for the policy and one for the rotation: there is no
 /// bulk form of either, so the fan-out is the cost of the page. Settled rather
 /// than awaited together, so one team failing leaves the other rows readable.
-async function fetchTeamRow(team: OnCallTeam): Promise<PolicyRow | null> {
+async function fetchTeamRow(team: OnCallTeam, force: boolean): Promise<PolicyRow | null> {
   const [policyRes, onCallRes] = await Promise.allSettled([
-    oncallService.getPolicy({ org_identifier: orgId.value, team_id: team.id }),
-    oncallService.whoIsOnCall({ org_identifier: orgId.value, team_id: team.id }),
+    read<OnCallPolicy | null>(teamPolicyQuery(orgId.value, team.id), force),
+    read<OnCallPosition[]>(whoIsOnCallQuery(orgId.value, team.id), force),
   ]);
 
   // A policy we could not read is not a policy that pages nobody, and saying
   // so would send somebody to fix a team that is fine.
   if (policyRes.status !== "fulfilled") return null;
 
-  const slots = onCallRes.status === "fulfilled" ? (onCallRes.value.data ?? []) : [];
-  const rungs = policyRes.value.data?.rungs ?? [];
+  const slots = onCallRes.status === "fulfilled" ? (onCallRes.value ?? []) : [];
+  const rungs = policyRes.value?.rungs ?? [];
 
   return {
     teamId: team.id,
@@ -280,12 +297,11 @@ async function fetchTeamRow(team: OnCallTeam): Promise<PolicyRow | null> {
   };
 }
 
-async function fetchAll() {
+async function fetchAll(force = false) {
   loading.value = true;
   try {
-    const teamsRes = await oncallService.listTeams({ org_identifier: orgId.value });
-    const teams = teamsRes.data ?? [];
-    const settled = await Promise.all(teams.map((team) => fetchTeamRow(team)));
+    const teams = await read<OnCallTeam[]>(oncallTeamsQuery(orgId.value), force);
+    const settled = await Promise.all(teams.map((team) => fetchTeamRow(team, force)));
     allRows.value = settled.filter((row): row is PolicyRow => row !== null);
   } catch (err: any) {
     toast({
@@ -296,6 +312,10 @@ async function fetchAll() {
     loading.value = false;
   }
 }
+
+// Named, not `@click="fetchAll"`: the handler would receive the MouseEvent as
+// `force`.
+const refreshAll = () => fetchAll(true);
 
 function openTeam(row: PolicyRow) {
   router.push({
