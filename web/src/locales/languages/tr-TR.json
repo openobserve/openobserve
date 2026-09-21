@@ -3568,6 +3568,12 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
+  "connectDataSourcePopup": {
+    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
+    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
+    "connectButton": "Bir veri kaynağı bağla",
+    "slackLink": "Ayrıca Slack topluluğumuza katılın"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Olay yükü",
       "payloadIndex": "{field} alanı akışı seçer. Bu alan olmayan olaylar {stream} akışına gider.",
       "payloadTime": "{field} alanı epoch saniyesidir ve kesirli bir değer kabul edilir. Eksik olduğunda veya pozitif olmadığında, alınma zamanı kullanılır.",
+      "windowTitle": "Alım penceresinin dışındaki zaman damgaları atılır",
+      "windowBody": "{past} değerinden (varsayılan 5 saat) daha eski veya {future} değerinden (varsayılan 24 saat) daha ileri olan olaylar atılır ve Splunk istemcisi bir hatayı yeniden denemediği için istek yine de kod 0 yanıtı verir. Bu nedenle sabit kodlanmış veya eski bir zaman damgası, hiçbir şey kaydetmeyen başarılı bir gönderim gibi görünür.",
       "payloadMetadata": "{fields} alanları, olay üzerinde sütunlar olarak saklanır.",
       "healthTitle": "Sağlık kontrolü",
       "healthBody": "Bir GET isteği kimlik doğrulaması gerektirmez ve {response} yanıtını verir.",

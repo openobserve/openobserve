@@ -3568,6 +3568,12 @@
     "joinSlack": "Tritt dem Slack bei",
     "maybeLater": "Vielleicht später"
   },
+  "connectDataSourcePopup": {
+    "title": "Verbinden wir zunächst Ihre erste Datenquelle.",
+    "description": "Wir haben Ihnen viel zu zeigen, aber zuerst müssen wir Ihre Daten verbinden. Die meisten Teams sehen ihre ersten Logs in etwa einer Minute.",
+    "connectButton": "Datenquelle verbinden",
+    "slackLink": "Auch unserer Slack-Community beitreten"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Fortsetzen, wo es angehalten wurde",
     "startFromNow": "Ab jetzt starten.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Ereignis-Nutzlast",
       "payloadIndex": "Das Feld {field} wählt den Stream aus. Ereignisse ohne dieses Feld gehen an den Stream {stream}.",
       "payloadTime": "Das Feld {field} enthält Epochensekunden, wobei auch ein Bruchwert akzeptiert wird. Wenn es fehlt oder nicht positiv ist, wird die Empfangszeit verwendet.",
+      "windowTitle": "Zeitstempel außerhalb des Aufnahmefensters werden verworfen",
+      "windowBody": "Ereignisse, die älter als {past} (standardmäßig 5 Stunden) oder weiter in der Zukunft als {future} (standardmäßig 24 Stunden) sind, werden verworfen, und die Anfrage antwortet dennoch mit Code 0, da ein Splunk-Client einen Fehler nicht erneut sendet. Ein fest codierter oder veralteter Zeitstempel sieht daher wie ein erfolgreicher Versand aus, der nichts speichert.",
       "payloadMetadata": "Die Felder {fields} werden als Spalten am Ereignis gespeichert.",
       "healthTitle": "Integritätsprüfung",
       "healthBody": "Eine GET-Anfrage erfordert keine Authentifizierung und antwortet mit {response}.",

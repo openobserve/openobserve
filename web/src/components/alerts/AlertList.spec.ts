@@ -1351,11 +1351,15 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.props("size")).toBe("sm");
   });
 
-  it("clone dialog ODialog binds title, button labels, and primaryDisabled to isSubmitting", async () => {
+  it("clone dialog ODialog binds title, labels, and primaryDisabled to isSubmitting and a present name", async () => {
     const wrapper: any = await mountAlertList();
     await waitData(wrapper);
     wrapper.vm.showForm = true;
     wrapper.vm.isSubmitting = false;
+    // duplicateAlert() seeds this from the source row, so the dialog is never
+    // open with a blank name in the UI. Setting showForm alone reaches a state
+    // the user cannot.
+    wrapper.vm.toBeCloneAlertName = "orders_latency_clone";
     await wrapper.vm.$nextTick();
 
     const cloneDialog = wrapper.findComponent({ name: "ODialog" });
@@ -1365,6 +1369,14 @@ describe("AlertList - ODialog/ODrawer migration", () => {
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(false);
 
     wrapper.vm.isSubmitting = true;
+    await wrapper.vm.$nextTick();
+    expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
+
+    // #14627: a whitespace-only name is refused too. Neither clone endpoint
+    // rejects a blank name, and the resulting row cannot be searched, toggled
+    // or deleted by name — so Save has to be the gate.
+    wrapper.vm.isSubmitting = false;
+    wrapper.vm.toBeCloneAlertName = "   ";
     await wrapper.vm.$nextTick();
     expect(cloneDialog.props("primaryButtonDisabled")).toBe(true);
   });

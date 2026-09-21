@@ -34,7 +34,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 32] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 33] = [
     "rate",
     "irate",
     "increase",
@@ -49,6 +49,7 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 32] = [
     "sum_over_time",
     "count_over_time",
     "last_over_time",
+    "present_over_time",
     "stddev_over_time",
     "stdvar_over_time",
     "quantile_over_time",
