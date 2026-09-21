@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Pure composition helpers shared by save-time validation, the scheduler's step arithmetic and
-//! `resolve`.
+//! Composition helpers shared by save validation, scheduler step counts and `resolve`.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -27,7 +26,6 @@ pub const COMPOSED_NAME_SEPARATOR: &str = " › ";
 /// The fields the probe substitutes `{{VAR}}` in; the frontend must match this list (§5.2.1).
 const PLACEHOLDER_FIELDS: &[&str] = &["value", "url", "key"];
 
-/// A referenced check's identity and stored steps, as the expander needs them.
 #[derive(Debug, Clone)]
 pub struct ChildJourney {
     pub id: String,

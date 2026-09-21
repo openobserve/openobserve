@@ -27,15 +27,7 @@ import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import { syntheticsFolderName } from "@/utils/synthetics/routes";
 import { browserMaxSteps } from "@/utils/synthetics/runBudget";
 
-/**
- * `ownStepCount` is the EXECUTED count of the journey as it stands, not
- * `journey.length`: the warning and the 50-step cap are both measured in
- * executed steps, so a parent that already holds one reference must not
- * report its authored count when it executes more.
- *
- * It already includes this reference's own expansion, so it is the `after` figure; when the
- * host cannot expand the journey it is `undefined` and the delta is withheld, never guessed.
- */
+/** Executed count including this reference (the `after` figure); undefined withholds the delta. */
 const props = defineProps<{
   modelValue?: { id: string; name?: string };
   /** Shown for an `{ id }`-only persisted reference until the list supplies the real row. */
@@ -161,8 +153,7 @@ async function onPick(id: string) {
     return;
   }
   emit("update:modelValue", { id, name: check.name });
-  // Written after the emit and in one tick: a half-applied pick would render this component's
-  // new child against the host's previous count.
+  // After the emit, in one tick: a half-applied pick would pair the new child with the old count.
   childSteps.value = check.config?.steps?.length ?? 0;
   // Cleared before the await so a previous pick's run time never shows against this child.
   lastRunSeconds.value = null;
@@ -189,8 +180,7 @@ const before = computed(() => {
 const budgetSeconds = computed(() =>
   Math.round((props.journeyBudgetMs ?? DEFAULT_JOURNEY_BUDGET_MS) / 1000),
 );
-// A recent run within 80% of the allowance is close enough to worth flagging
-// before it starts being cut short by the runner.
+// Within 80% of the allowance is worth flagging before the runner starts cutting runs short.
 const isSlow = computed(
   () => lastRunSeconds.value !== null && lastRunSeconds.value > budgetSeconds.value * 0.8,
 );
@@ -255,8 +245,7 @@ const isSlow = computed(
       >
         {{ t("synthetics.journey.subtest.lastRunUnknown") }}
       </p>
-      <!-- The remedy comes before the number, mirroring validate_browser_config's
-           convention of naming the fix before the figure that triggered it. -->
+      <!-- The remedy comes before the number, as `validate_browser_config` names the fix first. -->
       <p
         v-if="isSlow"
         class="text-status-warning-text m-0 text-xs"

@@ -695,9 +695,7 @@ async fn create_synthetic_under_lock(
         .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
-/// The update mutation run under the composition lock. Returns the pre-update folder PK
-/// alongside the resolved new one, so the caller can react to a folder move after the lock
-/// (and its release, guaranteed exactly once) is out of the way.
+/// Returns the old and new folder PKs, so the caller handles a move after the lock is released.
 async fn update_synthetic_under_lock(
     conn: &DatabaseConnection,
     org_id: &str,
@@ -739,8 +737,7 @@ async fn update_synthetic_under_lock(
     Ok((old_folder_pk, new_folder_pk, check))
 }
 
-/// The delete mutation run under the composition lock: refuse a still-referenced check,
-/// then drain and delete it.
+/// Refuses a still-referenced check, then drains and deletes it.
 async fn delete_synthetic_under_lock(
     conn: &DatabaseConnection,
     org_id: &str,

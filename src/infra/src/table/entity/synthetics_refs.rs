@@ -1,5 +1,3 @@
-//! SeaORM entity for the derived subtest reference index.
-
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]

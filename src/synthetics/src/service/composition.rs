@@ -59,8 +59,7 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
     body: &Synthetic,
 ) -> Result<(), CompositionError> {
     let refs = synthetics_refs::refs_of(body);
-    // The gate lives here, not in `check_rules`: the rules must stay pure and testable
-    // with the flag at its default `false`.
+    // Gated here, not in `check_rules`, so the rules stay testable with the flag off.
     if !refs.is_empty() {
         let stored = match own_id {
             Some(id) => synthetics_refs::refs_for_parents(conn, org_id, &[id.to_owned()])
@@ -128,12 +127,7 @@ pub(crate) async fn ensure_not_referenced<C: ConnectionTrait>(
     }
 }
 
-/// Translates each parent's stored folder KSUID to the public slug.
-///
-/// The refs index stores `folders.id` because that is what the FK needs, but every synthetics
-/// API surface accepts and returns `folders.folder_id` — so a raw PK in a 409 body or a
-/// `referenced-by` payload names a folder the caller cannot resolve. Memoised per call for the
-/// same reason `list_synthetics` memoises it: one distinct folder covers almost every row.
+/// Refs store the folder PK for the FK, but every API surface speaks the public folder slug.
 pub async fn to_public_refs(mut parents: Vec<ParentRef>) -> Vec<ParentRef> {
     let mut slugs: HashMap<String, String> = HashMap::new();
     for parent in &mut parents {
@@ -210,8 +204,7 @@ fn check_rules(
             "expanded journey: {e} (re-save the referenced check to migrate its steps)"
         ))
     })?;
-    // A child's own secrets never travel with its steps (§5.2), so a legacy child holding
-    // in-place ciphertext would ship `AESenc:` to the probe. Refuse at the parent's save.
+    // A child's secrets do not travel with it, so legacy ciphertext would reach the probe.
     for child_id in &refs {
         let child = &children[child_id];
         if serde_json::to_string(&child.steps).is_ok_and(|s| s.contains("AESenc:")) {
@@ -391,8 +384,7 @@ pub(crate) mod tests {
         assert!(matches!(err, CompositionError::Invalid(m) if m.contains("http-1")));
     }
 
-    /// The mechanism behind "concurrent parent-save vs child-delete cannot commit a dangling
-    /// reference".
+    /// The mechanism that keeps a save racing a delete from committing a dangling reference.
     #[tokio::test]
     async fn the_composition_lock_serialises_critical_sections_per_org() {
         use std::sync::{
@@ -545,8 +537,7 @@ pub(crate) mod tests {
             "setup: other-org-parent must be created: {cross_org:?}"
         );
 
-        // Referenced: the full blocker list travels back, not a truncated one, and the other
-        // org's parent is excluded.
+        // The full blocker list comes back, and the other org's parent is excluded.
         let result = ensure_not_referenced(&db, "org1", &["child".to_string()]).await;
         let mut ids: Vec<String> = match result {
             Err(CompositionError::ReferencedBy(parents)) => {
@@ -557,7 +548,6 @@ pub(crate) mod tests {
         ids.sort();
         assert_eq!(ids, ["blocker-a", "blocker-b"]);
 
-        // Not referenced at all: the pre-pass clears it.
         ensure_not_referenced(&db, "org1", &["lonely".to_string()])
             .await
             .unwrap();

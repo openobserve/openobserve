@@ -379,12 +379,7 @@ pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::n
     .expect("Metric created")
 });
 
-/// Subtest expansion at `resolve` refused to hand the probe a journey — a
-/// deleted child, a nested reference, or an unreadable child config.
-///
-/// Deliberately unlabelled, same rationale as
-/// [`SYNTHETICS_UNREADABLE_CHECKS_TOTAL`]: it should sit at zero, and a
-/// per-org label would put customer-controlled ids into its cardinality.
+/// Unlabelled on purpose: it should sit at zero, and a per-org label adds customer ids.
 pub static SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
     IntCounter::with_opts(
         Opts::new(

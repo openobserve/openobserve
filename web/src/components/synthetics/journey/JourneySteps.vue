@@ -579,9 +579,7 @@ const startRowColspan = computed(
           {{ stepName(row) }}
         </span>
 
-        <!-- Sub-step progress on a collapsed reference row while its children run
-             (§7.3) — nothing auto-expands during `running`, so this is the only
-             place progress is visible until the author opens the row. -->
+        <!-- The only progress on a reference row while it runs: nothing auto-expands during `running`. -->
         <span
           v-if="mode === 'editor' && stepProgress(row)"
           class="text-text-secondary shrink-0 font-mono text-xs tabular-nums"
@@ -682,8 +680,7 @@ const startRowColspan = computed(
       <div class="flex shrink-0 items-center gap-0.5">
         <!-- Expand/collapse is handled by OTable's built-in expand button when expansion="multiple" -->
 
-        <!-- Disabled without `canRecordFrom` because the action promises a restore the
-             installed extension cannot perform. -->
+        <!-- Disabled without `canRecordFrom`: the installed extension cannot perform the restore. -->
         <OTooltip v-if="!readonly" :content="recordBeforeTooltip">
           <!-- The span is the hover target, not the button: a disabled control
                dispatches no pointer events, so a tooltip bound straight to it would

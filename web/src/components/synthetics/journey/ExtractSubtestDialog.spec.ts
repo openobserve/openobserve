@@ -124,12 +124,10 @@ function mountDialog(props: Record<string, unknown> = {}) {
   }) as VueWrapper;
 }
 
-/** Every form field wrapper: inputs first, then selects. */
 function formFields(w: VueWrapper): VueWrapper<ComponentPublicInstance>[] {
   return [...w.findAllComponents(OFormInput), ...w.findAllComponents(OFormSelect)];
 }
 
-/** The leaf control a named form field was rendered with. */
 function field(w: VueWrapper, name: string): VueWrapper<ComponentPublicInstance> {
   const wrapper = formFields(w).find((c) => c.props("name") === name);
   expect(wrapper, `field "${name}"`).toBeDefined();

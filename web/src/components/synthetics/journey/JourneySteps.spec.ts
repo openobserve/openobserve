@@ -1023,8 +1023,7 @@ describe("JourneySteps", () => {
     });
   });
 
-  // ── Preview mode ───────────────────────────────────────────────────
-  // A child's steps are a definition, not a run, so none of the results chrome applies.
+  // A child's steps are a definition, not a run, so no results chrome applies.
   describe("preview mode", () => {
     const CELLS_ABSENT = [
       "o2-table-cell-actions",
@@ -1174,7 +1173,6 @@ describe("JourneySteps", () => {
       expect(wrapper.find('[data-test="synthetics-journey-step-badge-0"]').exists()).toBe(true);
     });
   });
-  // ── Start row (row 0): the Starting URL, which is not a Step ──────────
   describe("start row", () => {
     const START_URL = "https://app.test/{{path}}";
 
@@ -1235,7 +1233,6 @@ describe("JourneySteps", () => {
       return row;
     }
 
-    /** Whether `a` comes before `b` in document order. */
     function precedes(a: Element, b: Element): boolean {
       return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
     }

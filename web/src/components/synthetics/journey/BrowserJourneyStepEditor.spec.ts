@@ -23,9 +23,7 @@ import SubtestPicker from "./SubtestPicker.vue";
 import store from "@/test/unit/helpers/store";
 import en from "@/locales/languages/en-US.json";
 
-// A subtest step mounts SubtestPicker, which fetches its options on mount —
-// stubbed to resolve empty rather than reject, since none of these tests care
-// about its contents.
+// SubtestPicker fetches its options on mount; resolve empty, since no test here reads them.
 vi.mock("@/services/synthetics", () => ({
   default: {
     listByFolderId: vi.fn().mockResolvedValue({ data: { checks: [] } }),
@@ -604,9 +602,7 @@ describe("BrowserJourneyStepEditor unbound variables", () => {
   });
 });
 
-// Task 13: turning a step into a subtest reference discards every execution
-// field it carried — a reference names another check, not an action — and
-// turning it back drops the reference the picker filled in.
+// A reference runs no action, so its execution fields go; turning back drops the reference.
 describe("BrowserJourneyStepEditor subtest action", () => {
   it("clears the execution fields when a step becomes a subtest, and the reference when it stops being one", async () => {
     const click: BrowserStep = {
@@ -643,10 +639,7 @@ describe("BrowserJourneyStepEditor subtest action", () => {
     expect((w2.emitted("update:step")!.at(-1)![0] as BrowserStep).subtest).toBeUndefined();
   });
 
-  // Task 15: the picker's feature gate. Both halves matter — without the ON
-  // case this test would pass trivially against pre-gate code, where the
-  // option is always offered, so the OFF-only assertion could not fail for
-  // the reason claimed.
+  // Both halves: without the ON case, the OFF assertion would pass against pre-gate code too.
   it.each([
     [true, true],
     [false, false],

@@ -55,9 +55,7 @@ pub struct CheckNotification {
     /// `sftp_degraded`, `flaky`. `None` from a probe too old to report one, in
     /// which case the message stays generic rather than guessing.
     pub status_reason: Option<String>,
-    /// `"config"` marks a run that never reached the target — the journey could
-    /// not be assembled — so the wording must say "misconfigured", not "probe
-    /// infrastructure error".
+    /// `config` means the journey could not be assembled, so the text says misconfigured.
     pub error_source: String,
     pub degraded: bool,
     /// Locations that did not pass, worst first.

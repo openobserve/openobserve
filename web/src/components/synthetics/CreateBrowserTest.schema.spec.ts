@@ -18,10 +18,7 @@ import { makeBrowserCheckGateSchema, makeBrowserCheckSaveSchema } from "./Create
 
 const t = (key: string) => key;
 
-// Most journey fixtures below exercise the target and reserved-id rules, not names,
-// so a name is supplied by default — step name is required (D10) and every fixture
-// would otherwise trip that rule for reasons unrelated to what it is testing. A
-// case that IS about names passes an explicit `name`, which wins over the default.
+// A default name keeps fixtures clear of the required-name rule; name cases pass their own.
 function form(journey: unknown[]) {
   return {
     name: "check",
@@ -267,7 +264,7 @@ describe("makeBrowserCheckSaveSchema journey validation", () => {
     expect(issuePaths(result)).toContain("journey.1.selector");
   });
 
-  // The Starting URL opens the run, so a journey no longer has to open its own page.
+  // The Starting URL opens the run, so a journey need not open its own page.
   it("lets a click open the journey", () => {
     const result = schema.safeParse(
       form([

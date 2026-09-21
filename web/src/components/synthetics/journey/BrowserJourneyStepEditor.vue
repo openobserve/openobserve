@@ -149,10 +149,7 @@ const showTarget = computed(() => stepNeedsTarget(props.step));
  */
 const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { candidates: [] });
 
-// Built inside a computed so the option wording follows the active locale
-// rather than freezing at whatever was loaded when the module first evaluated.
-// `subtest` is filtered out while composition is off — same `=== true` stance
-// the route guards take with `=== false`: an unknown flag hides the option.
+// A computed so the wording follows the locale; `=== true` hides subtest on an unknown flag.
 const actionSelectOptions = computed(() =>
   actionOptions(t).filter(
     (o) =>
@@ -192,8 +189,7 @@ const actionComputed = computed({
   set: (v: BrowserStep["action"]) => {
     if (v !== props.step.action && props.step.wire) actionChangedFromRecorded.value = true;
     if (v === "subtest") {
-      // A subtest step names no element and runs no action of its own — every
-      // execution field belongs to the OLD action and would misdescribe this one.
+      // A subtest runs no action of its own, so the old action's execution fields would misdescribe it.
       update({
         action: v,
         locator: undefined,
@@ -479,9 +475,7 @@ const hasAdvancedChanges = computed(
         />
       </div>
 
-      <!-- A subtest step names no element and runs no action of its own — it
-           runs another check's steps in its place, so every execution field
-           below (target, value, timeout, settle, flags) is inapplicable. -->
+      <!-- A subtest runs another check's steps, so no execution field below applies. -->
       <SubtestPicker
         v-if="props.step.action === 'subtest'"
         :model-value="props.step.subtest"

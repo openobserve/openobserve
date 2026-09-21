@@ -136,30 +136,13 @@ const props = defineProps<{
   definedNames?: string[];
   /** The check's variables, substituted into the Starting URL before the recorder opens it. */
   variables?: { name: string; value: string }[];
-  /**
-   * The ONE cache of fetched child journeys, owned by the host (`CreateBrowserTest`).
-   *
-   * A prop, not a local cache: reading and expanding a subtest reference here
-   * shares the exact same `Map` instance the host mounts on load, so a child
-   * fetched to preview a reference row is immediately available to the
-   * executed-step count the host computes, and vice versa — there is exactly
-   * one cache in memory, never two that can drift apart.
-   */
+  /** The host's one child-journey cache, shared so the preview and the executed count never drift. */
   childrenCache?: Map<string, ChildJourney>;
-  /**
-   * Composed-child-id → authored-row map for the PARENT's replay (Task 12's
-   * `expandJourney`), owned by the host. Undefined when the host has not run a
-   * replay yet, or replays without subtest support — every lookup then falls
-   * back to identity, so an ordinary journey behaves exactly as before.
-   */
+  /** Composed-child id to authored row for the parent's replay; undefined falls back to identity. */
   expansionMap?: ExpansionMap;
 }>();
 
-// Falls back to an empty Map for a host that has not wired the cache yet —
-// see the `childrenCache` prop doc. Every write still goes through
-// `props.childrenCache` when the host supplied one, so the single-cache
-// invariant holds whenever a real host is in play; this only keeps a bare
-// mount (tests, a host with no subtest support) from throwing.
+// A bare mount (tests, a host without subtests) has no cache prop; real hosts always pass one.
 const childrenCache = computed(() => props.childrenCache ?? new Map<string, ChildJourney>());
 
 // Declared before the immediate auto-expand watcher, which reaches `resultFor` during setup.
@@ -209,13 +192,7 @@ const anchorStepId = ref<string | null>(null);
 /** Only a session the recorder opened on the Starting URL starts with a synthetic navigate. */
 const recordingOpensStartUrl = ref(false);
 
-/**
- * Composed-child-id → authored-row map for THIS restore's own prefix expansion.
- *
- * A separate map from the `expansionMap` prop: that one belongs to the parent's
- * replay session, this restore is a different recorder instance entirely, started
- * from `startRecording`'s own `expandJourney` call over the prefix.
- */
+/** This restore's own expansion map: the restore runs in a different recorder than the replay. */
 const restoreExpansionMap = ref<ExpansionMap | undefined>(undefined);
 
 /** How many prefix steps have reported a result, for the restore banner. */
@@ -312,14 +289,7 @@ const isReplayTerminal = computed(
 // executing while `stopping`, so letting a step be edited would race the player.
 const isReplayLocked = computed(() => isReplayRunning.value || isReplayStopping.value);
 
-/**
- * Folds expanded child results onto their authored row (§7.3); identity for
- * ordinary steps.
- *
- * A reference row is `fail` as soon as any child failed (the runner stops the
- * reference there), `pass` once every one of its `childCount` children has
- * reported a passing result, and otherwise still in flight (`undefined`).
- */
+/** A reference row fails on any failed child, passes once all its children pass, else pending. */
 function resultFor(stepId: string): StepReplayResult | undefined {
   const own = props.stepResults?.get(stepId);
   if (own || !props.expansionMap) return own;
@@ -416,12 +386,7 @@ function stepDotState(stepId: string): StepDotState | undefined {
   if (result) {
     return result.passed ? "pass" : "fail";
   }
-  // Currently executing step. Gated on `running` deliberately: a stopped replay leaves
-  // the step it was interrupted on with no result, and rendering that as "active" is what
-  // left the journey showing a step spinning forever. Outside `running` it falls through
-  // to "pending" — an empty circle, which is the truth: that step never completed.
-  // The active id can be a composed child's — translate it to the reference row it
-  // belongs to, the same way a result is folded onto that row.
+  // Only while running (a stopped step must not spin); a child's id maps to its reference row.
   const activeStepId =
     props.activeStepId && props.expansionMap
       ? translateStepId(props.expansionMap, props.activeStepId)
@@ -627,19 +592,7 @@ const selectorErrors = ref<Set<string>>(new Set());
  */
 const stepFieldErrors = ref<Map<string, Record<string, string>>>(new Map());
 
-/**
- * Steps carrying at least one schema-level field error.
- *
- * `validateJourneySteps` enforces one rule of its own, but it is not the only
- * one that blocks a save: `stepNameRequired`, `retiredAction`, the navigate URL,
- * `typeTextRequired` and `expectedRequired` all live in the zod schema and reach
- * this component through `setStepFieldErrors` alone. Row highlighting and
- * auto-expand read this so those rules behave like the local one instead of
- * being announced by a toast and then shown nowhere.
- *
- * `clearFieldError` can leave a step with an empty record, so emptiness is
- * checked rather than mere presence of the key.
- */
+/** Steps with a schema error: those rules reach the journey only as field errors. */
 const fieldErrorStepIds = computed(
   () =>
     new Set(
@@ -692,9 +645,7 @@ function applyStepFieldErrors(issues: readonly { path: PropertyKey[]; message: s
     next.set(step.id, { ...(next.get(step.id) ?? {}), [field]: issue.message });
   }
   stepFieldErrors.value = next;
-  // This is the schema's only channel into the journey, so it owns the expansion
-  // the way validateJourneySteps owns it for its own rule. Without this the
-  // save's toast named fields that sat inside a collapsed row.
+  // The schema's only channel into the journey, so it owns revealing the errored rows.
   revealErroredSteps(next.keys());
 }
 
@@ -722,8 +673,7 @@ function clearFieldError(stepId: string, field: string) {
 }
 
 function validateJourneySteps(): boolean {
-  // Element-acting steps must name their element — by a v1 `selector` or a
-  // v2 locator bundle. See stepIsMissingTarget.
+  // Element-acting steps must name their element, by v1 selector or v2 locator.
   const selErrs = new Set<string>();
   for (const step of props.modelValue) {
     if (stepIsMissingTarget(step)) selErrs.add(step.id);
@@ -804,9 +754,7 @@ async function startRecording() {
   }
   recordingOpensStartUrl.value = false;
 
-  // The prefix is what gets restored, so a subtest reference in it has to be
-  // expanded first — the anchor cannot land inside a reference because `data`
-  // holds authored rows only, but the RESTORE runs the child's real steps.
+  // The restore runs the child's real steps, so a reference in the prefix is expanded first.
   let expandedPrefix = prefix;
   try {
     const children = await loadChildren(prefix, fetchChildJourneyForRestore);
@@ -1122,10 +1070,7 @@ function handleToggleExpand(row: BrowserStep) {
   }
 }
 
-// ── Subtest reference row preview ───────────────────────────────────────
-// Fetch status is transient UI state, not a second cache of journeys — the
-// journeys themselves live only in `props.childrenCache`, the one Map the
-// host owns; this only remembers which ids are in flight or were refused.
+// Fetch status only; the journeys themselves live in the host's one `childrenCache`.
 const loadingChildIds = ref<Set<string>>(new Set());
 const localRefusedChildIds = ref<Set<string>>(new Set());
 const localMissingChildIds = ref<Set<string>>(new Set());
@@ -1154,13 +1099,7 @@ function childFor(row: BrowserStep) {
   return row.subtest?.id ? childrenCache.value.get(row.subtest.id) : undefined;
 }
 
-/**
- * Rows for the read-only preview table, keyed by the COMPOSED id.
- *
- * This is an OTable nested inside another OTable's expansion slot, and a
- * child step id can collide with an authored one now that ids round-trip
- * unchanged — the composed id is what keeps every row in the DOM unique.
- */
+/** Keyed by composed id: child ids can collide with authored ones in the nested table. */
 function childRowsFor(row: BrowserStep) {
   const child = childFor(row);
   if (!child) return [];
@@ -1245,14 +1184,12 @@ const variablesToggleLabel = computed(() =>
     : t("synthetics.variablesPanel.openPanel"),
 );
 
-// ── Subtest composition ──────────────────────────────────────────────────
-// `=== true` so an unknown flag hides the button — the step editor's stance for its Subtest option.
+// `=== true` so an unknown flag hides the button, as the step editor does.
 const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
 
-// ── Executed step cap ────────────────────────────────────────────────────
-// Undefined `ownStepCount` (a child could not be loaded) shows no notice; the server backstop applies.
+// An unknown `ownStepCount` shows no notice; the server backstop applies.
 const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 const overCap = computed(
   () => props.ownStepCount !== undefined && props.ownStepCount > maxSteps.value,
@@ -1437,9 +1374,7 @@ const startRow = computed<BrowserStep | null>(() =>
 // ── Row status color: red left border for rows with validation errors ──────
 function getRowStatusColor(row: BrowserStep): string | undefined {
   const hasSelectorErr = selectorErrors.value.has(row.id);
-  // Schema-level errors count too, or "fix the highlighted fields" would name a
-  // row that carries no highlight — every rule except the local one reaches the
-  // journey only as a field error.
+  // Schema errors count too, or the toast would name a row with no highlight.
   const hasFieldErr = fieldErrorStepIds.value.has(row.id);
   if (hasSelectorErr || hasFieldErr) return "var(--color-status-error-text)";
   // Transient "this is the one you just added". It clears itself a moment later; the

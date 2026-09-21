@@ -626,8 +626,7 @@ pub(crate) fn distinct_org_ids(checks: &[synthetics_checks::DueCheck]) -> Vec<St
         .collect()
 }
 
-/// §5.11: the frozen ceiling must be the EXPANDED count, or composed runs under-bill and trip the
-/// clamp.
+/// The frozen ceiling must be the expanded count, or composed runs under-bill and clamp (§5.11).
 pub(crate) fn apply_expanded_counts(
     due: &mut [synthetics_checks::DueCheck],
     counts: &HashMap<String, usize>,

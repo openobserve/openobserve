@@ -96,8 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OBadge>
     </template>
 
-    <!-- Steps count (Browser mode) — expanded count from the server; null means
-         the journey could not be read, which is not the same as zero steps. -->
+    <!-- Null means the journey could not be read, which is not zero steps. -->
     <template #cell-steps="{ row }">
       <span class="flex min-w-0 items-center gap-2">
         <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
@@ -116,9 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
 
-    <!-- Used-by count (Browser mode) — how many other checks reference this one
-         as a subtest. Zero reads as a dash: a check nothing references is the
-         common case, not a value worth drawing the eye to. -->
+    <!-- Zero reads as a dash: most checks are referenced by nothing. -->
     <template #cell-referencedBy="{ row }">
       <span class="truncate" :data-test="`${dataTest}-cell-referencedBy`">{{
         (row as any).referencedBy

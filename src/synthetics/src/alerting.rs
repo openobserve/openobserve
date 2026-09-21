@@ -140,8 +140,7 @@ pub const ERROR_SOURCE_ORPHAN: &str = "orphan";
 /// only tell them apart by this value.
 pub const ERROR_SOURCE_DISPATCH: &str = "dispatch";
 
-/// `error_source` for a run whose journey could not be assembled (§5.11): not billed, but it
-/// alerts.
+/// `error_source` for a run whose journey could not be assembled (§5.11): unbilled, but alerts.
 pub const ERROR_SOURCE_CONFIG: &str = "config";
 
 /// What a completed run should send, if anything.
@@ -417,9 +416,7 @@ mod tests {
 
     #[test]
     fn a_config_error_is_failing_not_not_measured() {
-        // Unlike a queue drop, a config error is OUR fault but it is not
-        // scheduling lag — it means the check itself cannot run until someone
-        // fixes the definition, so it must page like any other outage.
+        // A config error is our fault but not lag: the check cannot run until fixed, so it pages.
         assert_eq!(
             classify(
                 Some("error"),

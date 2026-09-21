@@ -444,11 +444,7 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     pendingCommands.clear();
   }
 
-  /**
-   * Open the live port and ask the extension to start recording. The extension
-   * opens its own top-level tab; steps stream back over the port via setActions.
-   * `targetUrl` is the page that tab opens, so it is sent with its variables resolved.
-   */
+  /** The extension opens `targetUrl` in its own tab, so it is sent with variables resolved. */
   async function startRecording(
     targetUrl: string,
     testIdAttr?: string,

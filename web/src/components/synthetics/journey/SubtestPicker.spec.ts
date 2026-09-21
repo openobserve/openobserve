@@ -64,8 +64,7 @@ describe("SubtestPicker", () => {
     });
     const w = mountPicker();
     await flushPromises();
-    // Precondition: the component actually mounted and rendered a select —
-    // otherwise every assertion below that reads its props is vacuous.
+    // Precondition: a select rendered, or every prop assertion below is vacuous.
     expect(w.find('[data-test="synthetics-subtest-picker"]').exists()).toBe(true);
     expect(w.findComponent(OSelect).exists()).toBe(true);
   });
@@ -122,7 +121,7 @@ describe("SubtestPicker", () => {
     await flushPromises();
     // Assert the node is absent rather than matching copy, which changes with the locale.
     expect(w.find('[data-test="synthetics-subtest-delta"]').exists()).toBe(true);
-    // A 0-step child adds nothing; the old arithmetic rendered "4 \u2192 3", backwards.
+    // A 0-step child adds nothing, so the delta must never run backwards.
     expect(w.find('[data-test="synthetics-subtest-delta"]').text()).toContain("4 \u2192 4");
     expect(w.find('[data-test="synthetics-subtest-lastrun"]').exists()).toBe(false);
     // Design 5.11 state 3: show the delta only AND say the time impact is unknown.
@@ -170,8 +169,7 @@ describe("SubtestPicker", () => {
   });
 
   it("withholds the delta when the host count cannot contain the child", async () => {
-    // Re-picking a bigger child: the host's count still describes the previous one, so it is
-    // stale. Subtracting anyway rendered a negative "before" against the old child's name.
+    // Re-picking a bigger child: the host's count is stale, so no negative "before" may render.
     (syntheticsService.listByFolderId as ReturnType<typeof vi.fn>).mockResolvedValue({
       data: { checks: CHECKS },
     });
@@ -192,7 +190,6 @@ describe("SubtestPicker", () => {
   });
 });
 
-// ── Flat, annotated rows (Phase B) ───────────────────────────────────────────
 // Everything on a row comes from the list response; nothing costs a request per option.
 describe("SubtestPicker rows", () => {
   const NOW = new Date("2026-09-11T12:00:00Z");
@@ -332,7 +329,6 @@ describe("SubtestPicker rows", () => {
     expect(nested.disabled).toBe(true);
     expect(nested.subLabel).toBe("Already contains a subtest — nesting is limited to one level");
     expect(nested.badgeMuted).toBe(true);
-    // Eligible rows stay selectable.
     expect(rowOf(w, "login-test").disabled).not.toBe(true);
   });
 
@@ -382,7 +378,6 @@ describe("SubtestPicker rows", () => {
     expect(login.badge).toBe("Shared");
     expect(login.badgeMuted).toBe(true);
     expect(login.subLabel).toBe("13 steps · Used by 5 tests · Passed 4 minutes ago");
-    // A single referrer reads in the singular.
     expect(rowOf(w, "login-staging").subLabel).toContain("Used by 1 test ·");
     // Null steps, no referrers and an unknown status contribute no fragment, even with a timestamp.
     const fresh = rowOf(w, "fresh");
@@ -447,7 +442,6 @@ describe("SubtestPicker rows", () => {
   });
 });
 
-// ── Load state and the saved name ────────────────────────────────────────────
 describe("SubtestPicker load state", () => {
   const SAVED = { id: "login-test", name: "Login" };
 

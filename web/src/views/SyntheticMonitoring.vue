@@ -338,9 +338,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </p>
     </ODialog>
 
-    <!-- Delete blocked — this check (or, in bulk, a check outside the
-         selection) is referenced by others; deleting it first requires
-         removing those references. -->
+    <!-- Delete blocked: other checks reference this one (or, in bulk, one outside the selection). -->
     <ODialog
       v-model:open="blockedDeleteOpen"
       size="sm"
@@ -578,8 +576,7 @@ interface ApiMonitor {
   last_triggered_at: number;
   last_check_at: number | null;
   last_response_ms: number | null;
-  /** Expanded step count (browser checks) — null when the journey could not be
-   *  read, which is not the same as zero steps. */
+  /** Expanded step count (browser); null means unreadable, which is not zero steps. */
   steps: number | null;
   /** How many other checks reference this one as a subtest. */
   referenced_by: number;
@@ -837,10 +834,7 @@ const showMoveDialog = ref(false);
 const showBulkDeleteConfirm = ref(false);
 const monitorsToMove = ref<string[]>([]);
 
-// ── Delete blocked by composition (§5.3) ────────────────────────────────
-// A 409 `child_referenced` from either delete handler — the two mean different
-// things (a named parent vs. parents outside the selection) so they never
-// share a title, but both render through this one dialog.
+// Both delete handlers' 409s render here, with distinct titles for a named parent vs outside ones.
 interface BlockedReference {
   id: string;
   name: string;
@@ -893,8 +887,7 @@ const bulkDeleteMonitors = async () => {
     await loadMonitors(undefined, true);
   } catch (err: any) {
     dismiss();
-    // §5.3 ignores blockers inside the delete set — a 409 here is about
-    // parents OUTSIDE the selection, so this has no single check to name.
+    // §5.3 ignores blockers inside the delete set, so a 409 here has no single check to name.
     if (err?.response?.status === 409 && err.response.data?.code === "child_referenced") {
       blockedDelete.value = {
         title: t("synthetics.delete.blockedBulkTitle", { count: selectedMonitorIds.value.length }),

@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Org-scoped serialization for parent-save, child-save and delete, so no interleaving can commit
-//! a dangling reference (§5.5).
+//! Org-wide serialization of saves and deletes, so no interleaving commits a dangling reference.
 
 #[cfg(test)]
 pub(crate) static LOCK_CALLS: std::sync::LazyLock<
@@ -31,7 +30,6 @@ enum Inner {
     Distributed(Option<infra::dist_lock::Locker>),
 }
 
-/// Acquire the one composition lock for `org_id`.
 pub async fn lock(org_id: &str) -> Result<CompositionGuard, infra::errors::Error> {
     #[cfg(test)]
     {
@@ -52,9 +50,7 @@ pub async fn lock(org_id: &str) -> Result<CompositionGuard, infra::errors::Error
 }
 
 impl CompositionGuard {
-    /// Release the lock. Distributed release errors are returned so mutations
-    /// can surface a temporary-unavailability response instead of pretending
-    /// composition serialization completed cleanly.
+    /// Distributed release errors are returned so a mutation can report a temporary failure.
     pub async fn release(self) -> Result<(), infra::errors::Error> {
         match &self.inner {
             Inner::Local(guard) => {

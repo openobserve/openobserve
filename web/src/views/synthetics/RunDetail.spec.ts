@@ -635,7 +635,6 @@ describe("RunDetail — start load (row 0)", () => {
     return w;
   }
 
-  /** Whether `a` comes before `b` in document order. */
   function precedes(a: Element, b: Element): boolean {
     return !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
   }

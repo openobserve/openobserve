@@ -371,15 +371,7 @@ pub(crate) mod billing {
         // e. Clamp + zero fallback.
         let steps = resolve_billable(flags, &i);
 
-        // f. The job never ran: `"queue"` means it waited behind other jobs past
-        // its own `valid_until` — our scheduling lag, not their work.
-        //
-        // Step e's two `warn`s are logged BELOW this guard, not inside
-        // `resolve_billable`. The arithmetic order is still e then f; only the
-        // logging is deferred, because a queue-errored ack always carries
-        // `steps_executed = 0` and would otherwise fire the zero-fallback warning
-        // — "an un-upgraded probe is in the fleet", which A3 pages on.
-        // "config" never ran either: expansion failed before a browser was involved.
+        // Queue and config errors never ran: nothing billed, and no zero-fallback warning.
         if i.error_source == "queue" || i.error_source == crate::alerting::ERROR_SOURCE_CONFIG {
             return Vec::new();
         }
@@ -1066,8 +1058,7 @@ pub const REASON_CONFIG_REFERENCE_PENDING: &str = "config_reference_pending";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
 pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
 
-/// Expansion could not produce a runnable journey (§5.11); `guard_failure` marks family 2 — a guard
-/// of ours failed.
+/// Expansion could not produce a runnable journey; `guard_failure` means a guard of ours failed.
 #[derive(Debug, Clone)]
 pub struct ConfigError {
     pub status_reason: &'static str,
@@ -1409,10 +1400,7 @@ fn expand_journey(
         synthetics::is_composition_action,
         synthetics_composition::{ExpansionError, expand_steps, placeholders_in, subtest_refs},
     };
-    // Keyed on the ACTION, not on `subtest_refs`: a malformed step (action `subtest`, no
-    // `subtest.id`) yields no ref, so keying the early return on the ref list would hand it
-    // straight to the probe. It is also rejected BY NAME here rather than being left to fall
-    // through `expand_steps` as `MissingChild("")`, which would report it as a deleted child.
+    // Keyed on the action: a `subtest` step with no id yields no ref and would reach the probe.
     let mut has_reference = false;
     for step in parent_steps {
         if !step
@@ -1475,8 +1463,7 @@ fn expand_journey(
             guard_failure: false,
         });
     }
-    // Saving a CHILD never re-validates its parents, so the parent-save guard cannot hold this
-    // alone.
+    // Saving a child never re-validates its parents, so the parent-save guard is not enough.
     for child_id in subtest_refs(parent_steps) {
         let Some(child) = children.get(&child_id) else {
             continue;
@@ -1545,8 +1532,7 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
             .map_err(|e| anyhow::anyhow!(e.to_string()))?
             && child.check_type == SyntheticType::Browser
         {
-            // NOT `unwrap_or_default()`: a 0-step child would splice nothing, the reference
-            // would silently vanish, and the run would under-report against its frozen count.
+            // Not `unwrap_or_default`: a 0-step child would silently drop the reference.
             let cfg: BrowserConfig = serde_json::from_value(child.config).map_err(|e| {
                 config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
                 anyhow::Error::new(ConfigError {
@@ -1914,8 +1900,7 @@ async fn environment_names(org_id: &str, run_id: &str) -> Vec<String> {
         .collect()
 }
 
-/// Writes the self-describing result row for a config error; the ack path completes the run
-/// separately.
+/// Writes the result row for a config error; the ack path completes the run separately.
 pub async fn report_config_error_result(
     org_id: &str,
     job_id: &str,
@@ -3402,8 +3387,7 @@ mod tests {
 
         #[test]
         fn a_variable_is_matched_by_name_never_by_value() {
-            // Transposing name and value in `resolvable_names` compiles, and would hard-fail every
-            // composed check.
+            // A name/value swap in `resolvable_names` compiles and fails every composed check.
             let synthetic = config::meta::synthetics::Synthetic {
                 variables: vec![config::meta::synthetics::SyntheticVariable {
                     name: "TOKEN".into(),
@@ -3432,8 +3416,7 @@ mod tests {
             );
         }
 
-        // A {{NAME}} defined only as a browser secret resolves: the guard accepts it and env_inject
-        // carries it.
+        // A {{NAME}} defined only as a browser secret passes the guard and reaches env_inject.
         #[test]
         fn a_parent_secret_defines_a_child_placeholder_and_feeds_env_inject() {
             let synthetic = config::meta::synthetics::Synthetic {
@@ -3451,7 +3434,6 @@ mod tests {
             let children = HashMap::from([("login".to_string(), c)]);
             assert!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).is_ok());
 
-            // Plain config: the (already decrypted) secret value joins env_inject.
             let mut env_inject = HashMap::new();
             inject_browser_secrets(&synthetic.config, &mut env_inject);
             assert_eq!(
@@ -3459,7 +3441,6 @@ mod tests {
                 Some("hunter2")
             );
 
-            // Expanded config: expansion splices steps and leaves `secrets` untouched.
             let mut expanded_config = synthetic.config.clone();
             expanded_config["steps"] =
                 json!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).unwrap());

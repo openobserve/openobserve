@@ -470,7 +470,7 @@ describe("CheckVariablesPanel", () => {
     });
   });
 
-  // A subtest step runs no action of its own, so usage inside the referenced check must count.
+  // A variable used only inside a referenced check's steps must still count.
   describe("composed usage", () => {
     const composedCheck: BrowserCheck = checkWith(
       [{ id: "var-pw", name: "PASSWORD", value: "", secure: true, example: "" }],
@@ -490,7 +490,7 @@ describe("CheckVariablesPanel", () => {
       expect(wrapper.find(sel("-remove-dialog")).text()).toContain("referenced by 1 step");
     });
 
-    // With no children cache supplied the count must read exactly zero, not merely "not 1".
+    // `toBe(0)`: `not.toContain("1")` also passes in the always-0 bug state.
     it("reads as unreferenced when the child journeys have not been loaded", async () => {
       wrapper = mountPanel({ check: composedCheck });
 

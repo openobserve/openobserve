@@ -574,8 +574,7 @@ pub struct SyntheticListItem {
     pub status: SyntheticStatus,
     pub last_check_at: Option<i64>,
     pub last_response_ms: Option<f64>,
-    /// Steps that execute (expanded), browser checks only — what bills and draws down the pool
-    /// (§5.11).
+    /// Executed (expanded) steps, browser only: what bills and draws down the pool (§5.11).
     pub steps: Option<i32>,
     /// How many checks embed this one as a subtest.
     pub referenced_by: i32,
@@ -1313,22 +1312,7 @@ fn validate_net_retry_budget(
     Ok(())
 }
 
-/// The complete v2 action vocabulary — exactly Playwright's recorder action
-/// model, minus what a check cannot use.
-///
-/// Deliberately excludes `scroll`, `wait`/`waitFor` and `screenshot`: upstream
-/// `ActionName` has no counterpart for any of them, so the recorder never
-/// emitted one and the extension player could never replay one. They entered
-/// journeys only through the manual step editor, and using one aborted replay
-/// entirely. `type` and `keydown` are dropped as redundant aliases of `fill`
-/// and `press`.
-///
-/// `hover` joined in Playwright 1.56, which added it to the recorder action
-/// model and made it reachable from the action picker. It is executed by
-/// `Locator.hover` in the probe and `Frame.hover` in the extension player.
-///
-/// Every step the probe RECEIVES is executable by construction: expansion strips
-/// `V2_COMPOSITION_ACTIONS` first.
+/// Recorder actions a check can replay; `subtest` is not one, as expansion removes it first.
 const V2_STEP_ACTIONS: &[&str] = &[
     "navigate", "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
@@ -1338,8 +1322,7 @@ const V2_ELEMENT_ACTIONS: &[&str] = &[
     "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
 
-/// Actions that exist only in the stored vocabulary: expansion replaces them before any browser
-/// sees a journey.
+/// Stored-only actions: expansion replaces them before any browser sees a journey.
 pub const V2_COMPOSITION_ACTIONS: &[&str] = &["subtest"];
 
 /// Row ids the results UI owns ("no step" sentinel, start load row 0); a step may not claim them.

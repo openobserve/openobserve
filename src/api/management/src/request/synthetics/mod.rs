@@ -1254,8 +1254,7 @@ pub async fn job_resolve(
     }
 }
 
-/// Completes the job as an `error` with `error_source = "config"`: it alerts, it is not billed, and
-/// the probe is told to stop.
+/// Settles the job as a config error: it alerts, is not billed, and tells the probe to stop.
 async fn settle_config_error(
     org_id: &str,
     job_id: &str,

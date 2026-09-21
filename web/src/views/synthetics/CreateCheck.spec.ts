@@ -236,8 +236,7 @@ describe("CreateCheck", () => {
     });
   });
 
-  // Opening a child from its parent's editor is a push to the SAME route record with a
-  // different id, which reuses the mounted component unless the editor is keyed on it.
+  // A child opens as a param-only push on the same route, so the editor must be keyed on the id.
   describe("edit mode — id change", () => {
     it("remounts the browser editor when the edit id changes", async () => {
       mockedService.get.mockResolvedValue({ data: { type: "browser" } });

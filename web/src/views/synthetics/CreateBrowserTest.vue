@@ -542,13 +542,7 @@ const check = ref<BrowserCheck>({
   variables: [],
 });
 
-/**
- * The ONE cache of fetched child journeys, referenced by this check's subtest
- * steps (§7.3). `BrowserJourney` reads and writes through this exact `Map`
- * instance via a prop, rather than keeping a cache of its own, so a child
- * fetched to preview a reference row is immediately visible to
- * `executedStepCount` below and vice versa.
- */
+/** The one child-journey cache, shared with `BrowserJourney` so preview and count never drift. */
 const childrenCache = ref<Map<string, ChildJourney>>(new Map());
 
 /** Child ids the prefetch was refused (403) — the journey marks them without a second GET. */
@@ -565,18 +559,10 @@ const definedNames = computed(() =>
   [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
 );
 
-/**
- * Composed-child-id → authored-row map for the run currently on screen — set by
- * `runReplay` before it ships the expanded journey, so `BrowserJourney` can fold a
- * child's replay result back onto the reference row it belongs to (§7.3).
- */
+/** Composed-child id to reference row for the run on screen, so child results fold back. */
 const expansionMap = ref<ExpansionMap | undefined>(undefined);
 
-/**
- * How many steps this journey actually runs, expanding every subtest
- * reference — the number `SubtestPicker`'s insertion warning and the
- * server's 50-step cap are both measured in.
- */
+/** Steps the journey runs with every reference expanded: the unit of the warning and the cap. */
 const executedStepCount = computed(() => {
   try {
     return expandJourney(check.value.journey, childrenCache.value).steps.length;
@@ -593,11 +579,7 @@ const targetHint = computed(() =>
     : t("synthetics.checkDetails.startingUrlNotOpened"),
 );
 
-/**
- * The set of referenced-check ids the journey currently names, as a stable
- * string — so the watcher below only re-fetches when that SET actually
- * changes, not on every unrelated journey edit.
- */
+/** Referenced ids as a stable string, so the watcher refetches only when the set changes. */
 const subtestIdsSignature = computed(() =>
   [
     ...new Set(
@@ -609,16 +591,7 @@ const subtestIdsSignature = computed(() =>
     .join(","),
 );
 
-/**
- * Loads referenced checks into `childrenCache` as soon as they are named,
- * rather than waiting for `runReplay` (§7.3) — which is too late for the
- * variables usage count, the insertion warning's step count and the
- * reference row's preview, all of which render before any replay runs.
- * Fires once for the check as it loads (edit mode) and again whenever a
- * subtest step is added or removed. A failed fetch is logged, not fatal: the
- * affected surfaces fall back on their own (usage count 0, no step delta,
- * preview unavailable).
- */
+/** Loads children once named: the usage count, warning and preview render before any replay. */
 watch(
   subtestIdsSignature,
   async () => {
@@ -960,15 +933,7 @@ async function persist(): Promise<boolean> {
   }
 }
 
-/**
- * The editor's zod schema validates the AUTHORED journey; the server rejects a
- * composition failure with an index into the EXPANDED one, which the zod path
- * mapper (`applyStepFieldErrors` in BrowserJourney.vue) cannot resolve back to
- * an authored row. So this does not try to map the index: it scans the
- * server's message for a referenced child's name and attaches the failure to
- * that reference row instead, falling back to a plain toast when no name
- * matches. Returns whether the error was a composition failure at all.
- */
+/** The server's step index points into the expanded journey, so failures map by child name. */
 function mapCompositionSaveError(err: any): boolean {
   const message: string = err?.response?.data?.message ?? "";
   if (
@@ -1046,8 +1011,7 @@ const journeySelectionState = ref<{ count: number; isRecording: boolean; ids: st
 });
 const showBulkDeleteDialog = ref(false);
 
-// ── Extract to subtest (§14) ───────────────────────────────────────────────
-// `=== true` so an unknown flag hides the action — the journey editor's stance for its Subtest option.
+// `=== true` so an unknown flag hides the action, as the journey editor does.
 const isCompositionEnabled = computed(
   () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
@@ -1174,10 +1138,7 @@ function onContinueToConfigure() {
   currentStep.value = 2;
 }
 
-// ── Usage confirmation (§5.3) ────────────────────────────────────────────
-// Saving a check that other checks reference as a subtest changes what THEY
-// run too, on their next fire — the author should see that before it happens,
-// not discover it from an unrelated check's next run.
+// Saving a referenced check changes what its parents run, so the author confirms first.
 interface UsedByReference {
   id: string;
   name: string;
@@ -1195,12 +1156,7 @@ const usedByDialogOpen = computed({
 });
 let pendingSaveAction: (() => Promise<void>) | null = null;
 
-/**
- * Runs `afterPersist` directly in create mode or when nothing references this
- * check. Otherwise holds it behind the confirmation dialog. A failed
- * `referencedBy` lookup must not block the save — it is logged and the save
- * proceeds as if nothing was referencing it.
- */
+/** A failed `referencedBy` lookup must not block the save; it proceeds as unreferenced. */
 async function checkUsageThenSave(afterPersist: () => Promise<void>) {
   // Before the usage lookup, so an over-cap save sends no request at all.
   if (executedStepCount.value !== undefined && executedStepCount.value > maxSteps.value) {
@@ -1306,13 +1262,7 @@ function onReplayUpTo(upTo: number) {
   runReplay(check.value.journey.slice(0, Math.max(1, upTo)));
 }
 
-/**
- * Block replay on the same missing-target rule the Continue button uses.
- *
- * Deliberately the whole journey even for a prefix replay: `validateStepSelectors`
- * reports against the journey the editor is showing, and a partial pass would
- * leave the untouched later steps looking valid.
- */
+/** The whole journey even for a prefix replay, so untouched later steps do not look valid. */
 function validateJourneyBeforeReplay(): boolean {
   return journeyRef.value?.validateStepSelectors?.() ?? true;
 }
@@ -1369,12 +1319,7 @@ const knownVariableNames = computed(() => {
   );
 });
 
-/**
- * Expand subtest references before shipping the journey to the extension, so the
- * runner never sees a `subtest` step — it sees the child's own steps, spliced in
- * (§7.3). `expansionMap` is what lets `BrowserJourney` fold their results back
- * onto the reference row afterwards.
- */
+/** Expanded before shipping, so the runner never sees `subtest`; `expansionMap` folds results back. */
 async function runReplay(journey: BrowserStep[]) {
   let expanded = journey;
   expansionMap.value = undefined;
@@ -1913,8 +1858,7 @@ function onClearResults() {
       </div>
     </template>
 
-    <!-- Usage confirmation (§5.3) — other checks reference this one, so
-         saving changes what they run too, on their next fire. -->
+    <!-- Saving changes what the checks that reference this one run. -->
     <ODialog
       v-model:open="usedByDialogOpen"
       size="sm"

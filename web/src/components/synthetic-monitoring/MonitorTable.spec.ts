@@ -636,9 +636,7 @@ describe("MonitorTable", () => {
     });
   });
 
-  // ── Steps / Used-by cells (browser mode) ──────────────────────────────
-  // Task 15 / §5's list columns: `steps` is the server's EXPANDED count and
-  // `referencedBy` how many other checks use this one as a subtest.
+  // `steps` is the server's expanded count; `referencedBy` counts checks using this one.
   describe("steps and used-by cells", () => {
     it("renders the expanded step count and the used-by count in browser mode", () => {
       wrapper = mountMonitorTable({

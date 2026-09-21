@@ -203,7 +203,6 @@ import destinationService from "@/services/alert_destination";
 import { queryClient } from "@/composables/query/queryClient";
 import { syntheticsKeys } from "@/services/synthetics.querykeys";
 
-// ── Stubs ────────────────────────────────────────────────────────────────
 // Exposed by the real BrowserJourney; the host calls it after a refused save.
 const mockRevealCapNotice = vi.fn();
 // Exposed by the real BrowserJourney; the host calls it once the child is created.
@@ -878,7 +877,6 @@ describe("CreateBrowserTest", () => {
     });
   });
 
-  // ── Subtest references: what the host hands the journey and does for it ──
   describe("edit mode — subtest references", () => {
     const journeyStub = (w: VueWrapper) =>
       w.findComponent('[data-test="synthetics-browser-journey"]') as VueWrapper<any>;
@@ -1053,7 +1051,6 @@ describe("CreateBrowserTest", () => {
     });
   });
 
-  // ── Extract to subtest (§14) ─────────────────────────────────────────────
   describe("extract to subtest", () => {
     const OPEN_BTN = '[data-test="synthetics-extract-open-btn"]';
     const REASON = '[data-test="synthetics-extract-reason"]';
@@ -1395,7 +1392,6 @@ describe("CreateBrowserTest", () => {
     });
   });
 
-  // ── Executed step cap (Phase D) ──────────────────────────────────────────
   // The host already computes the executed count, so Save refuses before any request is sent.
   describe("edit mode — executed step cap", () => {
     const CAP_TOAST = "Too many executed steps — see the notice above the steps.";
@@ -1486,7 +1482,6 @@ describe("CreateBrowserTest", () => {
 
     it("switches to the Journey step so the notice is on screen", async () => {
       wrapper = await mountComposed(16);
-      // Reach Configure while the composition is still within the cap…
       await wrapper.find('[data-test="synthetics-create-save-continue-btn"]').trigger("click");
       await flushPromises();
       expect(wrapper.find('[data-test="synthetics-create-save-btn"]').exists()).toBe(true);
@@ -1494,7 +1489,6 @@ describe("CreateBrowserTest", () => {
       mockServiceReferencedBy.mockClear();
       mockToast.mockClear();
 
-      // …then push it over from there and save.
       (wrapper.vm as any).childrenCache.set("b", childOf("b", "Add items to cart", 17));
       await flushPromises();
       await wrapper.find('[data-test="synthetics-create-save-btn"]').trigger("click");

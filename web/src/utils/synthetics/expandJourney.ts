@@ -53,9 +53,7 @@ export function composedStepName(
   return `${prefix}${COMPOSED_NAME_SEPARATOR}${step}`;
 }
 
-/**
- * Mirrors the server expander (§7.3): same ids, same names, so Replay previews the real run.
- */
+/** Mirrors the server expander (§7.3): same ids and names, so Replay previews the real run. */
 export function expandJourney(
   steps: BrowserStep[],
   children: Map<string, ChildJourney>,

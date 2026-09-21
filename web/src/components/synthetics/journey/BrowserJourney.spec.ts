@@ -565,7 +565,7 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
     expect(expandedIds()).toContain("s2");
   });
 
-  // A first step that does not navigate is not an error any more, so nothing opens.
+  // A first step that does not navigate is not an error, so nothing opens.
   it("should leave a leading click collapsed and raise no toast", async () => {
     wrapper = mountJourney({
       modelValue: [
@@ -585,7 +585,6 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
     expect(mockToast).not.toHaveBeenCalled();
   });
 
-  // The red spine followed the first-step rule, which is gone.
   it("should not colour a leading click's row after validation", async () => {
     const StubWithStatusColor = {
       props: ["data", "mode", "selectedIds", "expandedIds", "getRowStatusColor"],
@@ -636,12 +635,7 @@ describe("BrowserJourney validateStepSelectors side effects", () => {
   });
 });
 
-// ── Schema-issue auto-expand ──────────────────────────────────────────────
-// `validateJourneySteps` knows one rule of its own (missing target).
-// Every OTHER save-blocking rule lives in the zod schema and reaches this
-// component only through `setStepFieldErrors`, which recorded the message but
-// never opened the row — so "fix the highlighted fields" pointed at a collapsed
-// row with no highlight on it.
+// Schema rules reach the journey only through `setStepFieldErrors`, so that must open the row.
 describe("BrowserJourney fieldIssues auto-expand", () => {
   let wrapper: VueWrapper;
 
@@ -1250,12 +1244,7 @@ describe("BrowserJourney per-step failure evidence", () => {
   });
 });
 
-// Real JourneySteps (and its real OTable) rather than a fake stub: the dot and
-// progress hooks these tests assert on are rendered by JourneySteps itself, and a
-// hand-written stub could echo back whatever id/index convention the test expects
-// without ever exercising the real one. BrowserJourneyStepEditor IS stubbed —
-// mounting it for real for a `subtest` row pulls in SubtestPicker, which fetches
-// the check list on mount against the real (unmocked) syntheticsService.
+// Real JourneySteps, since the hooks under test render there; the step editor stub avoids a fetch.
 const BrowserJourneyStepEditorStub = { template: '<div class="step-editor-stub" />' };
 const { JourneySteps: _droppedJourneyStepsStub, ...STUBS_WITH_REAL_JOURNEY_STEPS } = STUBS;
 
@@ -1343,11 +1332,9 @@ describe("BrowserJourney with a subtest reference", () => {
     const banner = w.find('[data-test="synthetics-journey-failed-banner"]');
     expect(banner.text()).toContain("synthetics.journey.subtest.failedAt");
     expect(banner.text()).not.toContain("2. fill email");
-    // The dot hook is index-based and 0-based, so the reference row — authored
-    // position 2 — is index 1.
+    // The dot hook is 0-based, so the reference row at position 2 is index 1.
     expect(w.find('[data-test="synthetics-journey-step-dot-1"]').exists()).toBe(true);
-    // The retry button on that card re-runs to the REFERENCE row's authored
-    // position (2), never to a composed child index the author never wrote.
+    // Retry re-runs to the reference row's authored position, never a composed child index.
     await w.find('[data-test="synthetics-journey-error-retry-btn"]').trigger("click");
     const emitted = w.emitted("replay-up-to")!;
     expect(emitted.length).toBeGreaterThan(0);
@@ -1370,16 +1357,13 @@ describe("BrowserJourney with a subtest reference", () => {
     const progress = w.find('[data-test="synthetics-journey-subtest-progress-1"]');
     expect(progress.exists()).toBe(true);
     expect(progress.text()).toContain("1/3");
-    // The active child ("s2_c2") is a composed id — the reference row's OWN dot
-    // must read "active", which only happens if it is translated back to "s2"
-    // before being compared against the row's id.
+    // The active id is composed ("s2_c2"), so the reference row lights only if it maps back to "s2".
     const dot = w.find('[data-test="synthetics-journey-step-dot-1"]');
     expect(dot.exists()).toBe(true);
     expect(dot.classes().join(" ")).toContain("badge-primary-soft-bg");
   });
 
-  // ── Phase C — replay inside a child ─────────────────────────────────────
-  // Named differently from `subtest.name` so the cache is proven to win the child-name lookup.
+  // Named unlike `subtest.name`, so the cache is proven to win the child-name lookup.
   const loginChild: ChildJourney = {
     id: "login-test",
     name: "Login (shared)",
@@ -1663,8 +1647,7 @@ describe("BrowserJourney with a subtest reference", () => {
   });
 });
 
-// ── Reference row preview (Phase A) ─────────────────────────────────────────
-// Ruled order is fields → environment note → preview.
+// Ruled order is fields, then environment note, then preview.
 describe("BrowserJourney reference row preview", () => {
   let w: VueWrapper;
 
@@ -1707,7 +1690,6 @@ describe("BrowserJourney reference row preview", () => {
   };
   const cacheWithLogin = () => new Map<string, ChildJourney>([["login-test", loginChild]]);
 
-  /** `a` comes before `b` in document order. */
   const precedes = (a: Node, b: Node) =>
     !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
@@ -1980,8 +1962,7 @@ describe("BrowserJourney reference row preview", () => {
   });
 });
 
-// ── Undefined placeholders (Phase B) ────────────────────────────────────────
-// A child reading a name the parent lacks fails at resolve time; naming it here moves that to the pick.
+// A child reading a name the parent lacks fails at resolve; naming it here moves that to the pick.
 describe("BrowserJourney undefined placeholders", () => {
   let w: VueWrapper;
 
@@ -2070,8 +2051,7 @@ describe("BrowserJourney undefined placeholders", () => {
   });
 });
 
-// ── Step cap (Phase D) ──────────────────────────────────────────────────────
-// Refused before any request and decomposed per §5.4 — an undecomposed count is unactionable.
+// Refused before any request and decomposed per §5.4: an undecomposed count is unactionable.
 describe("BrowserJourney step cap", () => {
   let w: VueWrapper;
 
@@ -2998,12 +2978,7 @@ describe("BrowserJourney restore-then-record", () => {
     expect(mockToast).not.toHaveBeenCalled();
   });
 
-  // C1 regression: restoring a prefix that contains a subtest reference caches the
-  // child's steps into the SAME Map `CreateBrowserTest.vue` writes through
-  // `mapWireSteps` — the mapped UI model, not the raw stored wire steps merely cast.
-  // Two writers hitting the one Map with different shapes is what corrupted replay: a
-  // stored `fill` step falls through `buildWireFromStep`'s missing `case "fill"` and
-  // replays as a click, and a stored `navigate` loses its target (`url` vs `value`).
+  // The restore must cache mapped steps, not raw wire steps: raw ones replay a `fill` as a click.
   it("caches a restored subtest child's steps through mapWireSteps, not a raw cast of the stored wire", async () => {
     mockSyntheticsGet.mockResolvedValue({
       data: {
@@ -3032,9 +3007,7 @@ describe("BrowserJourney restore-then-record", () => {
 
     const child = cache.get("login-test");
     expect(child).toBeDefined();
-    // A raw cast would leave action "fill" (an invalid StepAction) and no `value`
-    // (the wire step used `url`) on the navigate step — exactly what the corrupted
-    // cache used to hand to `journeyToWireSteps` on replay.
+    // A raw cast would keep action "fill" and put the navigate target in `url`, not `value`.
     expect(child.steps.map((s: BrowserStep) => s.action)).toEqual(["navigate", "type"]);
     expect(child.steps[0].value).toBe("https://example.com/login");
   });

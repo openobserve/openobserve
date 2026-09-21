@@ -137,14 +137,7 @@ pub async fn refs_for_parents<C: ConnectionTrait>(
     Ok(grouped)
 }
 
-/// Stored step count per child, counted in the DATABASE (§5.5.2); absent ids are absent from the
-/// map.
-///
-/// The count is a JSON length rather than a fetch-and-parse because this runs on the
-/// scheduler's 5 s tick: a stored journey may be up to `MAX_STEPS_JSON_BYTES` (256 KB), and
-/// transferring one per referenced child per tick to call `.len()` on it is the thing the
-/// design's aggregate exists to avoid. Backend-specific SQL follows the
-/// `increment_evaluation_generation` precedent in `alert_composites.rs:305-351`.
+/// Counted in the database: this runs every scheduler tick, and each journey can be 256 KB.
 pub async fn child_step_counts<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -188,8 +181,7 @@ pub async fn child_step_counts<C: ConnectionTrait>(
     Ok(counts)
 }
 
-// `config` is plain `json` on Postgres (not jsonb) and each backend names the array-length function
-// differently.
+// Postgres `config` is `json`, not jsonb, and each backend names the length function differently.
 fn step_length_expr(backend: sea_orm::DatabaseBackend) -> &'static str {
     match backend {
         // json_array_length raises on a non-array, which would fail the whole org's query.
@@ -237,16 +229,7 @@ mod tests {
         db
     }
 
-    /// `synthetics_checks::create` never sets `tz_offset` or the six runtime/alerting
-    /// counters (`last_triggered_at`, `last_check_status`, `consecutive_failures`,
-    /// `last_alert_at`, `alerting`, `degraded_notified_at`) — it relies on the column's
-    /// DB-level `DEFAULT`, exactly as the real migrations define it
-    /// (`m20260707_000001_create_synthetics_monitors`,
-    /// `m20260730_000001_add_alert_state_to_synthetics_monitors`). `db()`'s
-    /// `create_table_from_entity` carries no such defaults, so any test that calls
-    /// `create()` itself (rather than inserting a fully-populated model directly) needs a
-    /// schema that does, or the insert fails on those columns before `create()`'s own logic
-    /// — the one under test — ever runs.
+    /// `create()` relies on migration column defaults that `create_table_from_entity` omits.
     async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);
@@ -351,11 +334,7 @@ mod tests {
         assert!(list_parents(&db, "org1", "a").await.unwrap().is_empty());
     }
 
-    /// 04's checklist: "refs rows and their check row commit or roll back together."
-    ///
-    /// Forces the refs write to fail by dropping only that table, then asserts the check row
-    /// the same transaction inserted is gone too. Without a shared transaction the check
-    /// would survive and the index would silently disagree with the config.
+    /// Dropping only the refs table must also roll back the check row from the same transaction.
     #[tokio::test]
     async fn a_failed_refs_write_rolls_the_check_back_with_it() {
         use config::meta::synthetics::{Synthetic, SyntheticType};
@@ -374,10 +353,7 @@ mod tests {
             ..Synthetic::default()
         };
 
-        // Precondition: against a healthy, unmodified schema `create()` must succeed. Without
-        // this, a schema-setup regression could make the write below fail for a reason that
-        // has nothing to do with the dropped `synthetics_refs` table, and the test would pass
-        // for the wrong reason again.
+        // Precondition, so the failure below can only come from the dropped refs table.
         let healthy =
             crate::table::synthetics_checks::create(&db, "org1", make_parent("ok"), true).await;
         assert!(

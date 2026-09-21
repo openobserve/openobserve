@@ -35,7 +35,6 @@ vi.mock("@/services/synthetics", () => ({
   },
 }));
 
-// ── Stubs ──────────────────────────────────────────────────────────────────
 const STUBS = {
   ODrawer: {
     props: ["open", "title", "subTitle", "size", "bleed"],
@@ -56,7 +55,6 @@ const STUBS = {
   },
 };
 
-// ── Fixtures ──────────────────────────────────────────────────────────────
 const EXEC = "exec-1";
 
 function rawRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -168,7 +166,6 @@ describe("RunDetailDrawer", () => {
           ),
         }),
       ]);
-      // A failed location auto-expands its steps.
 
       const row0 = startRow(wrapper);
       expect(row0.exists(), "no start row rendered").toBe(true);
