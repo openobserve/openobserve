@@ -39,7 +39,12 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
-use promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
+use promql::{
+    DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
+    ast::{at_modifier::resolve_query, selector_window::selector_window},
+    micros,
+};
+use promql_parser::parser;
 use proto::cluster_rpc;
 use search_service::server_internal_error;
 use tracing::{Instrument, info_span};
@@ -110,6 +115,13 @@ pub async fn search(
     req.org_id = org_id.to_string();
     req.timeout = timeout as i64;
     req.is_super_cluster = is_super_cluster;
+    // whatever splits the range below sees only its own part of it
+    let stmt = req.query.as_mut().unwrap();
+    if let Some(query) = resolve_query(&stmt.query, stmt.start, stmt.end, stmt.step)
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?
+    {
+        stmt.query = query;
+    }
 
     let mut stop_watch = TookWatcher::new();
 
@@ -275,6 +287,9 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
+    let window = parser::parse(&req.query.as_ref().unwrap().query)
+        .map(|ast| selector_window(&ast))
+        .map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -288,7 +303,9 @@ async fn search_in_cluster(
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
-    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
+    // the cache keys on the output range, but a pinned value follows the data at `T` (#14688)
+    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none();
+    let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
@@ -388,9 +405,8 @@ async fn search_in_cluster(
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
         // if the end time is within the last 3 retention time, we need to fetch wal data
-        if req_query.end
-            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
-        {
+        let wal_floor = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        if window.reaches(req_query.end, wal_floor) {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
@@ -533,7 +549,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if cfg.common.result_cache_enabled
+    if cacheable
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,

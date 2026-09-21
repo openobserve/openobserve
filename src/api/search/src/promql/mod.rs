@@ -1403,7 +1403,7 @@ async fn search(
 async fn search_streaming(
     trace_id: &str,
     org_id: &str,
-    req: core_promql::MetricsQueryRequest,
+    mut req: core_promql::MetricsQueryRequest,
     user_email: &str,
     timeout: i64,
 ) -> Response {
@@ -1416,6 +1416,12 @@ async fn search_streaming(
         .enabled;
 
     // adjust start and end time
+    // each partition is searched as its own query, which would read `end()` as the partition's end
+    if let Ok(Some(query)) =
+        promql::ast::at_modifier::resolve_query(&req.query, req.start, req.end, req.step)
+    {
+        req.query = query;
+    }
     let (start, end) = promql::adjust_start_end(req.start, req.end, req.step);
     // generate partitions
     let partitions = generate_search_partition(&req.query, start, end, req.step);
