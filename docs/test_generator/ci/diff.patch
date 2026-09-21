@@ -1,0 +1,19 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/stores/index.ts
+===== END CHANGED FILES =====
+
+diff --git a/web/src/stores/index.ts b/web/src/stores/index.ts
+index 0c3eea69a2e..08b718f42d4 100644
+--- a/web/src/stores/index.ts
++++ b/web/src/stores/index.ts
+@@ -96,7 +96,7 @@ export default createStore({
+     organizations: [],
+     currentuser: useLocalCurrentUser() ? useLocalCurrentUser() : {},
+     searchCollapsibleSection: 20,
+-    theme: "",
++    theme: localStorage.getItem("theme") === "dark" ? "dark" : "light",
+     printMode: false,
+     organizationData: JSON.parse(JSON.stringify(organizationObj)),
+     zoConfig: <{ [key: string]: any }>{},

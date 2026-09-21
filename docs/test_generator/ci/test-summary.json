@@ -1,0 +1,5 @@
+[
+  { "title": "should default to light mode on a fresh load with no theme key", "action": "new", "verifies": "a fresh load with no localStorage theme key boots in light mode (.dark absent on <html>)" },
+  { "title": "should boot in dark mode when theme is seeded to 'dark' before app scripts run", "action": "new", "verifies": "pre-seeding localStorage theme='dark' before navigation makes the first paint dark" },
+  { "title": "should fall back to light mode for a corrupt non-'dark' theme value", "action": "new", "verifies": "a corrupt/legacy theme value (e.g. 'DARK') resolves to light via strict === 'dark' comparison" }
+]
