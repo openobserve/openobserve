@@ -267,6 +267,7 @@ import { useRoleSummary } from "@/composables/iam/useRoleSummary";
 import { useRolePresets } from "@/composables/iam/useRolePresets";
 import { useRoleJsonView } from "@/composables/iam/useRoleJsonView";
 import { useRoleSave } from "@/composables/iam/useRoleSave";
+import { useRolePermissionTree } from "@/composables/iam/useRolePermissionTree";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -560,124 +561,11 @@ const getUsers = () => {
   });
 };
 
-const getResourceByName = (
-  resources: Resource[],
-  resourceName: string,
-  level: number = 0,
-): Resource | null | undefined => {
-  for (let i = 0; i < resources.length; i++) {
-    if (resources[i].resourceName === resourceName) return resources[i];
-    else if (resources[i].childs.length) {
-      const isFound = getResourceByName(resources[i].childs, resourceName, level + 1);
-      if (isFound) return isFound;
-    }
-  }
-
-  if (!level) return null;
-  return undefined;
-};
-
-const setPermission = (resource: any, visited: Set<string>) => {
-  if (!resource || !resource.key) {
-    return;
-  }
-
-  // Prevent infinite recursion by tracking visited resources
-  if (visited.has(resource.key)) {
-    return;
-  }
-  visited.add(resource.key);
-
-  const resourcePermission = getDefaultResource();
-  resourcePermission.name = resource.key;
-  resourcePermission.resourceName = resource.key;
-  resourcePermission.display_name = resource.display_name;
-  resourcePermission.top_level = resource.top_level;
-
-  if (resource.has_entities) resourcePermission.has_entities = true;
-
-  resourcePermission.parent = resource.parent;
-
-  resourceMapper.value[resourcePermission.name] = resourcePermission;
-
-  if (resource.parent) {
-    const parentResource = getResourceByName(permissionsState.permissions, resource.parent);
-
-    if (parentResource) {
-      parentResource.childs.push(resourcePermission as Resource);
-      return;
-    } else {
-      // Find parent in resources array
-      const _parentResource = permissionsState.resources.find((r) => r.key === resource.parent);
-
-      if (_parentResource && !visited.has(_parentResource.key)) {
-        // Process parent first
-        setPermission(_parentResource, visited);
-
-        // Get the processed parent resource
-        const processedParentResource = getResourceByName(
-          permissionsState.permissions,
-          resource.parent,
-        );
-
-        if (processedParentResource) {
-          processedParentResource.childs.push(resourcePermission as Resource);
-        }
-      }
-    }
-  }
-
-  modifyResourcePermissions(resourcePermission);
-  if (
-    resourcePermission.name === "org" &&
-    store.state.selectedOrganization.identifier !== store.state.zoConfig.meta_org
-  ) {
-    return; // Skip adding 'org' resource if the organization is not _meta
-  }
-  permissionsState.permissions.push(resourcePermission as Resource);
-};
-
-const setDefaultPermissions = () => {
-  // Create a single visited set to be shared across all recursive calls
-  const visited = new Set<string>();
-
-  // Process resources in order of their parent relationships
-  const processResource = (resource: any) => {
-    if (!visited.has(resource.key)) {
-      setPermission(resource, visited);
-    }
-  };
-
-  // First process resources without parents
-  permissionsState.resources.filter((resource: any) => !resource.parent).forEach(processResource);
-
-  // Then process resources with parents
-  permissionsState.resources.filter((resource: any) => resource.parent).forEach(processResource);
-
-  // Filter out child resources from the top level
-  permissionsState.permissions = permissionsState.permissions.filter(
-    (resource) => !resource.parent,
-  );
-};
-const modifyResourcePermissions = (resource: Resource) => {
-  if (resource.resourceName === "settings") {
-    resource.permission.AllowList.show = false;
-    resource.permission.AllowDelete.show = false;
-    resource.permission.AllowPost.show = false;
-  }
-  if (resource.resourceName === "logs_pattern" || resource.resourceName === "logs_insights") {
-    resource.permission.AllowList.show = false;
-    resource.permission.AllowDelete.show = false;
-    resource.permission.AllowPost.show = false;
-    resource.permission.AllowPut.show = false;
-  }
-  if (resource.resourceName === "logs_cache") {
-    resource.permission.AllowList.show = false;
-    resource.permission.AllowGet.show = false;
-    resource.permission.AllowPost.show = false;
-    resource.permission.AllowPut.show = false;
-  }
-};
+const { getResourceByName, setDefaultPermissions } = useRolePermissionTree({
+  permissionsState,
+  resourceMapper,
+  store,
+});
 
 const getResourcePermissions = () => {
   // Single request returns the role's permissions across all resource types.
@@ -695,47 +583,6 @@ const getResourcePermissions = () => {
         reject(err);
       });
   });
-};
-
-const getDefaultResource = (): Resource => {
-  return {
-    name: "",
-    permission: {
-      AllowAll: {
-        show: true,
-        value: false,
-      },
-      AllowList: {
-        show: true,
-        value: false,
-      },
-      AllowGet: {
-        show: true,
-        value: false,
-      },
-      AllowDelete: {
-        show: true,
-        value: false,
-      },
-      AllowPost: {
-        show: true,
-        value: false,
-      },
-      AllowPut: {
-        show: true,
-        value: false,
-      },
-    },
-    display_name: "",
-    parent: "",
-    childs: [],
-    type: "Type",
-    resourceName: "",
-    entities: [],
-    has_entities: false,
-    is_loading: false,
-    top_level: true,
-  };
 };
 
 const getOrgId = () => {
