@@ -269,6 +269,7 @@ import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
+import { useSavedGrantExpansion } from "@/composables/iam/useSavedGrantExpansion";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -1072,192 +1073,6 @@ const savePermissionHash = () => {
   );
 };
 
-const updateRolePermissions = async (permissions: Permission[]) => {
-  let resourceMapper: { [key: string]: Resource } = {};
-  for (let i = 0; i < permissions.length; i++) {
-    try {
-      let {
-        resource,
-        entity,
-      }: {
-        resource: string;
-        entity: string;
-      } = decodePermission(permissions[i].object);
-
-      if (!resourceMapper[resource]) {
-        resourceMapper[resource] = getResourceByName(
-          permissionsState.permissions,
-          resource,
-        ) as Resource;
-      }
-      // Added it intentionally, as to get parent resource for dashboard, before getting dashboard permissions
-      if (!resourceMapper[resource] && resource === "dashboard") {
-        if (!resourceMapper["dfolder"]) {
-          resourceMapper["dfolder"] = getResourceByName(
-            permissionsState.permissions,
-            "dfolder",
-          ) as Resource;
-        }
-
-        await getResourceEntities(resourceMapper["dfolder"]);
-
-        if (!resourceMapper[resource]) {
-          resourceMapper[resource] = getResourceByName(
-            permissionsState.permissions,
-            resource,
-          ) as Resource;
-        }
-      }
-
-      if (!resourceMapper[resource] && resource === "alert") {
-        if (!resourceMapper["afolder"]) {
-          resourceMapper["afolder"] = getResourceByName(
-            permissionsState.permissions,
-            "afolder",
-          ) as Resource;
-        }
-
-        await getResourceEntities(resourceMapper["afolder"]);
-
-        if (!resourceMapper[resource]) {
-          resourceMapper[resource] = getResourceByName(
-            permissionsState.permissions,
-            resource,
-          ) as Resource;
-        }
-      }
-
-      if (!resourceMapper[resource] && resource === "report") {
-        if (!resourceMapper["rfolder"]) {
-          resourceMapper["rfolder"] = getResourceByName(
-            permissionsState.permissions,
-            "rfolder",
-          ) as Resource;
-        }
-
-        await getResourceEntities(resourceMapper["rfolder"]);
-
-        if (!resourceMapper[resource]) {
-          resourceMapper[resource] = getResourceByName(
-            permissionsState.permissions,
-            resource,
-          ) as Resource;
-        }
-      }
-
-      if (!resourceMapper[resource] && resource === "synthetics") {
-        if (!resourceMapper["synthetic_folder"]) {
-          resourceMapper["synthetic_folder"] = getResourceByName(
-            permissionsState.permissions,
-            "synthetic_folder",
-          ) as Resource;
-        }
-
-        await getResourceEntities(resourceMapper["synthetic_folder"]);
-
-        if (!resourceMapper[resource]) {
-          resourceMapper[resource] = getResourceByName(
-            permissionsState.permissions,
-            resource,
-          ) as Resource;
-        }
-      }
-
-      if (!resourceMapper[resource] && resource === "workflows") {
-        if (!resourceMapper["workflow_folder"]) {
-          resourceMapper["workflow_folder"] = getResourceByName(
-            permissionsState.permissions,
-            "workflow_folder",
-          ) as Resource;
-        }
-
-        await getResourceEntities(resourceMapper["workflow_folder"]);
-
-        if (!resourceMapper[resource]) {
-          resourceMapper[resource] = getResourceByName(
-            permissionsState.permissions,
-            resource,
-          ) as Resource;
-        }
-      }
-
-      if (!resourceMapper[resource]) continue;
-
-      if (resourceMapper[resource].parent && !resourceMapper[resourceMapper[resource].parent]) {
-        resourceMapper[resourceMapper[resource].parent] = getResourceByName(
-          permissionsState.permissions,
-          resourceMapper[resource].parent,
-        ) as Resource;
-      }
-
-      if (entity === "_all_" + getOrgId()) {
-        resourceMapper[resource].permission[permissions[i].permission].value = true;
-
-        continue;
-      }
-
-      if (resourceMapper[resource].parent)
-        await getResourceEntities(resourceMapper[resourceMapper[resource].parent]);
-
-      // This is just to handle dashboard permissions, need to fix this
-      if (resource === "dashboard") {
-        const [folderId] = entity.split("/");
-
-        const dashResource = resourceMapper["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        );
-        await getResourceEntities(dashResource as Entity);
-      } else if (resource === "alert") {
-        const [folderId] = entity.split("/");
-
-        const alertResource = resourceMapper["afolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        );
-        await getResourceEntities(alertResource as Entity);
-      } else if (resource === "report") {
-        const [folderId] = entity.split("/");
-
-        const reportResource = resourceMapper["rfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        );
-        await getResourceEntities(reportResource as Entity);
-      } else if (resource === "synthetics") {
-        // Synthetics entities are plain monitor ids (no folder prefix), so the
-        // owning folder can't be derived from the entity — load every folder's
-        // monitors so the permission can be matched to its row.
-        for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
-          await getResourceEntities(folderEntity as Entity);
-        }
-      } else if (resource === "workflows") {
-        // Plain workflow ids too, so the same sweep applies.
-        for (const folderEntity of resourceMapper["workflow_folder"]?.entities ?? []) {
-          await getResourceEntities(folderEntity as Entity);
-        }
-      } else if (
-        resource === "logs" ||
-        resource === "metrics" ||
-        resource === "traces" ||
-        resource === "index"
-      ) {
-        const streamResource = resourceMapper["stream"].entities.find(
-          (e: Entity) => e.name === resource,
-        );
-        await getResourceEntities(streamResource as Entity);
-      } else {
-        await getResourceEntities(resourceMapper[resource]);
-      }
-    } catch (err) {
-      console.log(err);
-    }
-  }
-
-  resourceMapper = {};
-
-  return new Promise((resolve) => {
-    resolve(true);
-  });
-};
-
 const decodePermission = (permission: string) => {
   const [resource, entity] = permission.split(":");
   return { resource, entity };
@@ -1628,6 +1443,15 @@ const { getResourceEntities } = useRoleEntityLoaders({
   updateResourceEntities,
   updateEntityEntities,
   updateResourceResource,
+});
+
+// Expanding saved grants onto the tree lives in its own file; it may fetch rows to do it.
+const { updateRolePermissions } = useSavedGrantExpansion({
+  permissionsState,
+  decodePermission,
+  getResourceByName,
+  getResourceEntities,
+  getOrgId,
 });
 
 const saveRole = () => {
