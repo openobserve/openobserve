@@ -80,6 +80,15 @@ const readCache = new Map<string, { values: string[]; ts: number }>();
 const READ_CACHE_TTL_MS = 60_000; // 1 minute
 const READ_CACHE_MAX_ENTRIES = 500;
 
+/**
+ * Called from the org-switch and logout purge paths. The IDB layer is purged
+ * there too; without this, a user signing out and back in within the TTL could
+ * be offered the previous user's captured values on an RBAC-restricted stream.
+ */
+export const clearReadCache = (): void => {
+  readCache.clear();
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface StreamContext {

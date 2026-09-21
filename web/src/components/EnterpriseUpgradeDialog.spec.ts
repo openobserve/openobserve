@@ -30,11 +30,14 @@ vi.mock("@/aws-exports", () => ({
 
 // Mock license_server service.
 const mockGetLicense = vi.fn();
-vi.mock("@/services/license_server", () => ({
-  default: {
-    get_license: (...args: any[]) => mockGetLicense(...args),
-  },
-}));
+vi.mock("@/services/license_server", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_license: (...args: any[]) => mockGetLicense(...args),
+    },
+  });
+});
 
 // Mock the lazy chart renderer so the component does not try to load echarts.
 vi.mock("@/components/dashboards/panels/ChartRenderer.vue", () => ({

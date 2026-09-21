@@ -31,6 +31,7 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
+import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
@@ -101,6 +102,7 @@ const SchemaPage = require("./generalPages/schemaPage.js");
 const SchemaLoadPage = require("./generalPages/schemaLoadPage.js");
 const APICleanup = require("./apiCleanup.js");
 const WorkflowsPage = require("./workflowsPages/workflowsPage.js");
+const WorkflowFoldersPage = require("./workflowsPages/workflowFoldersPage.js");
 
 // ===== LOGS, REPORTS, STREAMS, PIPELINES ADDITIONAL PAGE OBJECTS =====
 import { LogsQueryPage } from "./logsPages/logsQueryPage.js";
@@ -164,6 +166,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
+    this.incidentsPage = new IncidentsPage(page);
 
     // ===== SLO PAGE OBJECTS =====
     this.sloListPage = new SloListPage(page);
@@ -176,6 +179,7 @@ class PageManager {
 
     // ===== WORKFLOWS (v1) PAGE OBJECT =====
     this.workflowsPage = new WorkflowsPage(page);
+    this.workflowFoldersPage = new WorkflowFoldersPage(page);
 
     // ===== SANITY SPEC ADDITIONAL PAGE OBJECTS =====
     this.logsPage = new LogsPage(page);

@@ -3568,6 +3568,12 @@
     "joinSlack": "Únete a Slack",
     "maybeLater": "Quizá más tarde"
   },
+  "connectDataSourcePopup": {
+    "title": "Para empezar, conectemos tu primera fuente de datos.",
+    "description": "Tenemos mucho que mostrarte, pero primero necesitamos conectar tus datos. La mayoría de los equipos ven sus primeros registros en aproximadamente un minuto.",
+    "connectButton": "Conectar una fuente de datos",
+    "slackLink": "Únete también a nuestra comunidad de Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continuar desde donde se pausó",
     "startFromNow": "Comenzar desde ahora.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Carga útil del evento",
       "payloadIndex": "El campo {field} selecciona el stream. Los eventos que no lo incluyen van al stream {stream}.",
       "payloadTime": "El campo {field} está en segundos epoch y se acepta un valor fraccionario. Cuando falta o no es positivo, se usa la hora de recepción.",
+      "windowTitle": "Las marcas de tiempo fuera de la ventana de ingesta se descartan",
+      "windowBody": "Los eventos anteriores a {past} (5 horas de forma predeterminada) o posteriores a {future} (24 horas de forma predeterminada) se descartan, y la solicitud sigue respondiendo con el código 0 porque un cliente de Splunk no reintenta tras un error. Por eso, una marca de tiempo fija o desactualizada parece un envío correcto que no almacena nada.",
       "payloadMetadata": "Los campos {fields} se almacenan como columnas en el evento.",
       "healthTitle": "Comprobación de estado",
       "healthBody": "Una solicitud GET no requiere autenticación y responde {response}.",
@@ -16465,13 +16473,10 @@
       "columnMemory": "Memoria (actual)",
       "columnDisk": "Disco % (actual)",
       "columnLoad": "Carga 15m (actual)",
+      "columnCores": "Núcleos",
       "columnLastSeen": "Visto por última vez",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard de métricas de host",
-      "importConfirmTitle": "¿Agregar el dashboard Métricas de host?",
-      "importConfirmMessage": "Todavía no tienes este dashboard. Al agregarlo se crea un dashboard llamado 'Métricas de host' en tu carpeta Default y luego se abre para este host.",
-      "importConfirmOk": "Agregar y abrir",
-      "importConfirmCancel": "Cancelar",
+      "loadPerCore": "({value}/núcleo)",
       "windowsLivenessNote": "Los hosts Windows aparecen en esta lista solo cuando el agente reporta la métrica de carga (system_cpu_load_average_15m); si tus agentes Windows se están ejecutando pero no aparecen aquí, habilita el scraper de carga en la configuración del colector o actualiza el agente.",
       "panel": {
         "cpuBusy": "CPU ocupada",
@@ -17881,6 +17886,7 @@
     "target_rotation_all": "Todos en {rotation}",
     "target_rotation_deleted": "Una rotación que este equipo ya no tiene",
     "target_rotation_legacy": "Quien esté de guardia",
+    "target_unrecognized": "Un destino que esta pantalla no reconoce",
     "ladderPoolEveryone": "todos en {rotation}",
     "target_user": "Una persona concreta",
     "target_whole_team": "Todo el equipo",

@@ -341,6 +341,9 @@ export default defineComponent({
         }
       }
 
+      // A partial import still created rows, so the parent list reloads either way; only the navigation is reserved for a clean run.
+      if (successCount > 0) emit("update:list");
+
       if (successCount === totalCount) {
         toast({
           message: t("settings.importRegexPattern.importSuccess", { count: successCount }),
@@ -348,7 +351,6 @@ export default defineComponent({
         });
 
         setTimeout(() => {
-          emit("update:list");
           router.push({
             name: "regexPatterns",
             query: {

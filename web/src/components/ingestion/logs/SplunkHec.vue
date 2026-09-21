@@ -76,6 +76,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <OText variant="body" as="p">
         {{ t("ingestion.splunkHec.payloadTime", { field: raw("time") }) }}
       </OText>
+      <OBanner variant="warning" icon="schedule" data-test="ingestion-logs-splunkhec-window-note">
+        <div class="flex flex-col gap-1">
+          <OText variant="body-strong">{{ t("ingestion.splunkHec.windowTitle") }}</OText>
+          <OText variant="meta" as="p" class="leading-snug">
+            {{
+              t("ingestion.splunkHec.windowBody", {
+                past: raw("ZO_INGEST_ALLOWED_UPTO"),
+                future: raw("ZO_INGEST_ALLOWED_IN_FUTURE"),
+              })
+            }}
+          </OText>
+        </div>
+      </OBanner>
       <OText variant="body" as="p">
         {{
           t("ingestion.splunkHec.payloadMetadata", {
@@ -138,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { raw, useI18nTyped } from "@/types/i18n";
-import { computed, defineComponent } from "vue";
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { getImageURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
@@ -169,18 +182,37 @@ export default defineComponent({
     // Built here because the template compiler reads a literal `<token>` in an interpolation as markup.
     const authHeader = raw("Authorization: Splunk " + "<token>");
 
+    // No literal `time`: a hardcoded epoch ages past ZO_INGEST_ALLOWED_UPTO and is
+    // then discarded, which the collector still answers with code 0.
     const curlContent = `curl -k ${endpointUrl} \\
   -H "Authorization: Splunk [SPLUNK_HEC_TOKEN]" \\
-  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default","time":1789060000}'`;
+  -d '{"event":{"level":"info","log":"test message for openobserve"},"index":"default"}'`;
 
-    const payloadContent = `{
+    // `time` is documented by example here, so it stays — but read through a clock
+    // that ticks, since a page held open past ZO_INGEST_ALLOWED_UPTO would otherwise
+    // hand out an epoch that is silently discarded behind a code 0.
+    const nowSeconds = ref((Date.now() / 1000).toFixed(3));
+    const retickPayloadClock = () => {
+      nowSeconds.value = (Date.now() / 1000).toFixed(3);
+    };
+    let payloadClock: ReturnType<typeof setInterval> | undefined;
+    onMounted(() => {
+      payloadClock = setInterval(retickPayloadClock, 60_000);
+    });
+    onBeforeUnmount(() => {
+      clearInterval(payloadClock);
+    });
+
+    const payloadContent = computed(
+      () => `{
   "event": { "level": "info", "log": "test message for openobserve" },
   "index": "application",
-  "time": 1789060000.123,
+  "time": ${nowSeconds.value},
   "host": "web-01",
   "source": "/var/log/app.log",
   "sourcetype": "app:json"
-}`;
+}`,
+    );
 
     const healthContent = `curl -k ${collectorBase}/services/collector/health`;
 

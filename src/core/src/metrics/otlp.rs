@@ -763,7 +763,10 @@ fn columnar_base_labels(rec: &json::Value) -> Option<Vec<(String, String)>> {
     rec.as_object()?
         .iter()
         .map(|(name, value)| match value {
-            json::Value::String(value) if name.is_ascii() => Some((name.clone(), value.clone())),
+            // a resource or scope attribute named `exemplars` is dropped from every record
+            json::Value::String(value) if name.is_ascii() && name != EXEMPLARS_LABEL => {
+                Some((name.clone(), value.clone()))
+            }
             _ => None,
         })
         .collect()
@@ -1920,6 +1923,42 @@ mod tests {
         }
         let expected_size: usize = accepted.iter().map(json::estimate_json_bytes).sum();
         assert_eq!(written_size, expected_size);
+    }
+
+    #[test]
+    fn test_append_number_points_leaves_a_base_exemplars_attribute_to_the_json_path() {
+        let mut rec = json!({});
+        insert_attributes(
+            &mut rec,
+            &[
+                string_attr("exemplars", "attr"),
+                string_attr("region", "eu"),
+            ],
+        );
+        rec[NAME_LABEL] = json!("requests");
+        let points = vec![number_point(vec![string_attr("host", "a")], 1.5, 0)];
+
+        let fields = vec![
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+            Field::new("region", DataType::Utf8, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new("host", DataType::Utf8, true),
+            Field::new("start_time", DataType::Utf8, true),
+            Field::new("flag", DataType::Utf8, true),
+            Field::new(VALUE_LABEL, DataType::Float64, true),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, true),
+        ];
+        let mut columnar = ColumnarStream::for_schema(&Arc::new(Schema::new(fields))).unwrap();
+
+        let rejected: Vec<json::Value> = append_number_points(&mut columnar, &rec, &points)
+            .into_iter()
+            .map(|record| flatten_record(record).unwrap())
+            .collect();
+        assert!(columnar.into_entries("org", "requests").unwrap().is_empty());
+        assert_eq!(rejected.len(), 1);
+        assert!(rejected[0].get(EXEMPLARS_LABEL).is_none());
+        assert_eq!(rejected[0]["region"], json!("eu"));
     }
 
     #[test]
@@ -3245,6 +3284,57 @@ mod tests {
 
             assert_eq!(records.len(), 1);
             assert!(records[0].get("zone").is_none());
+        }
+
+        // ---- OTLP per-point metadata: `start_time` and `flag` are not dimensions
+
+        /// A cumulative counter restarts and reports a new `start_time` for the same stream. That
+        /// is the collector behaving correctly, so it must not cost the series its identity.
+        #[test]
+        fn test_process_sum_start_time_does_not_fork_the_series() {
+            let restarted = NumberDataPoint {
+                start_time_unix_nano: 1_700_000_000_000_000_000,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = sum_records(vec![number_dp(1.0, vec![attr("pod", "a")]), restarted]);
+
+            assert_eq!(records.len(), 2);
+            assert_ne!(
+                records[0]["start_time"], records[1]["start_time"],
+                "the two points must genuinely differ in start_time, or this proves nothing"
+            );
+            assert_eq!(
+                records[0][HASH_LABEL], records[1][HASH_LABEL],
+                "a restart must not fork one counter into two series"
+            );
+        }
+
+        /// A staleness marker flips `flag` to `DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK` on a
+        /// stream that is otherwise the same series.
+        #[test]
+        fn test_process_gauge_flag_does_not_fork_the_series() {
+            let stale = NumberDataPoint {
+                flags: 1,
+                ..number_dp(2.0, vec![attr("pod", "a")])
+            };
+            let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
+
+            assert_eq!(records.len(), 2);
+            assert_ne!(records[0]["flag"], records[1]["flag"]);
+            assert_eq!(
+                records[0][HASH_LABEL], records[1][HASH_LABEL],
+                "a staleness marker must not fork the series"
+            );
+        }
+
+        /// The columns are still written and still queryable; only their hold on series identity
+        /// is dropped.
+        #[test]
+        fn test_per_point_metadata_is_still_recorded() {
+            let records = sum_records(vec![number_dp(1.0, vec![])]);
+
+            assert_eq!(records[0]["start_time"], json!("0"));
+            assert_eq!(records[0]["flag"], json!("DATA_POINT_FLAGS_DO_NOT_USE"));
         }
 
         // ---- classic histogram

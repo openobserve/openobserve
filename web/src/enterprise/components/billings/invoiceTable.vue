@@ -57,11 +57,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import BillingService from "@/services/billings";
 import { onMounted, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import NoData from "@/components/shared/grid/NoData.vue";
-import BillingService from "@/services/billings";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -168,7 +168,7 @@ const getInvoiceHistory = () => {
   });
 
   BillingService.list_invoice_history(store.state.selectedOrganization.identifier)
-    .then((res) => {
+    .then((res: any) => {
       dismiss();
       const invoiceList = res.data.invoices;
       if (invoiceList.length > 0) {

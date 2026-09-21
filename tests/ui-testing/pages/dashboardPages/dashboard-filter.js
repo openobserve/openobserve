@@ -1,3 +1,5 @@
+import { expect } from "@playwright/test";
+
 export default class DashboardFilter {
   constructor(page) {
     this.page = page;
@@ -468,6 +470,27 @@ export default class DashboardFilter {
     await this.selectFieldFromDropdown(newFieldName, columnLocator);
   }
 
+  // The condition dropdown is portalled and animates in, so a click issued before it settles either misses the Condition tab or lands outside and dismisses the dropdown altogether; drive open -> tab -> operator as one retried unit so a lost click is recovered.
+  async openConditionTab(labelLocator, idx, timeout = 30000) {
+    const conditionTab = this.page
+      .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+      .last();
+    const operatorSelect = this.page
+      .locator('[data-test="dashboard-add-condition-operator"]')
+      .last();
+
+    await expect(async () => {
+      if (!(await conditionTab.isVisible().catch(() => false))) {
+        await labelLocator.click({ timeout: 5000 });
+        await conditionTab.waitFor({ state: "visible", timeout: 5000 });
+      }
+      if ((await conditionTab.getAttribute("data-state")) !== "active") {
+        await conditionTab.click({ force: true, timeout: 5000 });
+      }
+      await expect(operatorSelect).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout, intervals: [500, 1000, 2000] });
+  }
+
   // New robust function for nested group filter conditions
   async addNestedGroupFilterCondition(groupIndex, conditionIndex, fieldName, operator, value) {
     const idx = String(conditionIndex);
@@ -482,23 +505,9 @@ export default class DashboardFilter {
     await targetLabel.waitFor({ state: "visible", timeout: 5000 });
     await targetLabel.click();
 
-    // Step 4: Click the condition selector (appears in portal, use page scope)
+    // Step 4: Open the Condition tab of the portalled dropdown (it hosts the operator and value)
     if (operator || value) {
-      const conditionSelector = this.page
-        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
-        .last();
-      await conditionSelector.waitFor({ state: "visible", timeout: 5000 });
-      // The popover opened by the label click above is still animating in, and
-      // its Reka popper wrapper swallows pointer events until it settles — the
-      // plain click then fails actionability, and by the retry the tab has been
-      // re-mounted and detached. Force past the interception check, then gate on
-      // the operator dropdown (Step 5's target) actually being mounted.
-      await conditionSelector.click({ force: true, timeout: 10000 });
-      await this.page
-        .locator('[data-test="dashboard-add-condition-operator"]')
-        .last()
-        .waitFor({ state: "visible", timeout: 10000 })
-        .catch(() => {});
+      await this.openConditionTab(targetLabel, idx);
     }
 
     // Step 5: Select operator (dropdown appears in portal, use page scope)
