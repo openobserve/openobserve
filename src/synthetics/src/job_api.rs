@@ -3518,6 +3518,33 @@ mod tests {
             assert_eq!(out.len(), 2);
         }
 
+        fn holding(id: &str, child: &str) -> ChildJourney {
+            ChildJourney {
+                id: id.into(),
+                name: id.into(),
+                steps: parent(&[child], 1),
+            }
+        }
+
+        #[test]
+        fn a_two_node_cycle_ends_as_an_invalid_reference() {
+            let children = HashMap::from([
+                ("a".to_string(), holding("a", "b")),
+                ("b".to_string(), holding("b", "a")),
+            ]);
+            let err = expand_journey(&parent(&["b"], 1), &children, &HashSet::new(), 0, false)
+                .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+        }
+
+        #[test]
+        fn a_self_cycle_ends_as_an_invalid_reference() {
+            let children = HashMap::from([("a".to_string(), holding("a", "a"))]);
+            let err = expand_journey(&parent(&["a"], 1), &children, &HashSet::new(), 0, false)
+                .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+        }
+
         #[test]
         fn a_child_holding_a_reference_is_our_guard_failure() {
             let mut nested = child("nested", 2);

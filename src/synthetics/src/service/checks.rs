@@ -52,10 +52,11 @@ pub async fn create_synthetic(
     // normalisation so membership checks see canonical ids.
     validate_against_capabilities(org_id, "", &body, true).await?;
 
+    let conn = get_orm_client_rw().await;
     let locked = needs_composition_lock(&body.check_type);
     let (org, by) = (org_id.to_owned(), created_by.to_owned());
     let mut result = run_composition_mutation(org_id, locked, async move {
-        create_synthetic_under_lock(&org, body, &by).await
+        create_synthetic_under_lock(conn, &org, body, &by).await
     })
     .await?;
 
@@ -657,11 +658,11 @@ async fn holds_browser_check(
 
 /// Its own `?` scope, so the caller releases the lock exactly once on every outcome.
 async fn create_synthetic_under_lock(
+    conn: &DatabaseConnection,
     org_id: &str,
     mut body: Synthetic,
     created_by: &str,
 ) -> anyhow::Result<Synthetic> {
-    let conn = get_orm_client_rw().await;
     // On the RW connection: a lagging read replica would reopen the race the lock closes.
     composition::validate_for_save(conn, org_id, None, &body)
         .await
@@ -832,12 +833,20 @@ mod tests {
     };
 
     use config::meta::synthetics::{ReferenceState, Synthetic, SyntheticType};
-    use infra::table::synthetics_checks;
+    use infra::table::{synthetics_checks, synthetics_refs};
 
     use super::{
-        composition_fields, holds_browser_check, needs_composition_lock, run_composition_mutation,
+        composition_fields, create_synthetic_under_lock, delete_synthetic_under_lock,
+        delete_synthetics_bulk_under_lock, holds_browser_check, needs_composition_lock,
+        run_composition_mutation,
     };
-    use crate::service::{composition::tests::db_with_synthetics_defaults, composition_lock};
+    use crate::service::{
+        composition::{
+            CompositionError,
+            tests::{db_with_synthetics_defaults, subtests_flag},
+        },
+        composition_lock,
+    };
 
     fn lock_calls(org_id: &str) -> usize {
         composition_lock::LOCK_CALLS
@@ -970,5 +979,193 @@ mod tests {
         assert_eq!(row("m", true).3, Some(ReferenceState::Missing));
         assert_eq!(row("n", true).3, Some(ReferenceState::Nested));
         assert_eq!(row("b", true).3, Some(ReferenceState::Missing));
+    }
+
+    // The delete path drains `synthetics_jobs`, so it needs that table too.
+    async fn db_with_jobs() -> sea_orm::DatabaseConnection {
+        use sea_orm::{ConnectionTrait, Schema};
+        let db = db_with_synthetics_defaults().await;
+        let backend = db.get_database_backend();
+        db.execute(
+            backend.build(
+                &Schema::new(backend)
+                    .create_table_from_entity(infra::table::entity::synthetics_jobs::Entity),
+            ),
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn parent_and_child(db: &sea_orm::DatabaseConnection, org: &str) {
+        let nav = serde_json::json!({ "id": "s0", "action": "navigate", "url": "https://x" });
+        synthetics_checks::create(
+            db,
+            org,
+            browser_in(org, "child", serde_json::json!([nav])),
+            true,
+        )
+        .await
+        .unwrap();
+        synthetics_checks::create(
+            db,
+            org,
+            browser_in(
+                org,
+                "parent",
+                serde_json::json!([nav, { "id": "r0", "action": "subtest", "subtest": { "id": "child" } }]),
+            ),
+            true,
+        )
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn a_bulk_delete_of_a_parent_and_its_child_leaves_no_refs_rows() {
+        let org = "org-t3-delete";
+        let db = db_with_jobs().await;
+        parent_and_child(&db, org).await;
+        let ids = vec!["child".to_string(), "parent".to_string()];
+        let (mut deleted, outcome) = delete_synthetics_bulk_under_lock(&db, org, &ids).await;
+        outcome.unwrap();
+        deleted.sort();
+        assert_eq!(deleted, ids);
+        assert!(
+            synthetics_refs::refs_for_parents(&db, org, &ids)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            synthetics_refs::list_parents_for_many(&db, org, &ids)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_folder_move_of_a_child_leaves_its_refs_rows_unchanged() {
+        let org = "org-t3-move";
+        let db = db_with_synthetics_defaults().await;
+        parent_and_child(&db, org).await;
+        let parent = ["parent".to_string()];
+        let child = ["child".to_string()];
+        let refs_before = synthetics_refs::refs_for_parents(&db, org, &parent)
+            .await
+            .unwrap();
+        let parents_before = synthetics_refs::list_parents_for_many(&db, org, &child)
+            .await
+            .unwrap();
+        assert_eq!(
+            synthetics_checks::move_to_folder(&db, org, &child, "folder-2")
+                .await
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            synthetics_refs::refs_for_parents(&db, org, &parent)
+                .await
+                .unwrap(),
+            refs_before
+        );
+        assert_eq!(
+            synthetics_refs::list_parents_for_many(&db, org, &child)
+                .await
+                .unwrap(),
+            parents_before
+        );
+        assert_eq!(refs_before["parent"], ["child"]);
+    }
+
+    fn browser_in(org_id: &str, id: &str, steps: serde_json::Value) -> Synthetic {
+        Synthetic {
+            id: id.into(),
+            org_id: org_id.into(),
+            folder_id: "folder-1".into(),
+            name: id.into(),
+            check_type: SyntheticType::Browser,
+            config: serde_json::json!({ "steps": steps }),
+            ..Synthetic::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn a_parent_save_racing_a_child_delete_cannot_commit_a_dangling_reference() {
+        let _flag = subtests_flag(true).await;
+        race_parent_save_against_child_delete("org-t1-save-first", true).await;
+        race_parent_save_against_child_delete("org-t1-delete-first", false).await;
+    }
+
+    async fn race_parent_save_against_child_delete(org: &str, save_polled_first: bool) {
+        let db = db_with_jobs().await;
+        let nav = serde_json::json!({ "id": "s0", "action": "navigate", "url": "https://x" });
+        synthetics_checks::create(
+            &db,
+            org,
+            browser_in(org, "child", serde_json::json!([nav])),
+            true,
+        )
+        .await
+        .unwrap();
+        let parent = browser_in(
+            org,
+            "",
+            serde_json::json!([nav, { "id": "r0", "action": "subtest", "subtest": { "id": "child" } }]),
+        );
+
+        let save = async {
+            let guard = composition_lock::lock(org).await.unwrap();
+            let saved = create_synthetic_under_lock(&db, org, parent, "u@x").await;
+            guard.release().await.unwrap();
+            saved
+        };
+        let delete = async {
+            let guard = composition_lock::lock(org).await.unwrap();
+            let deleted = delete_synthetic_under_lock(&db, org, "child").await;
+            guard.release().await.unwrap();
+            deleted
+        };
+        let (saved, deleted) = if save_polled_first {
+            tokio::join!(save, delete)
+        } else {
+            let (deleted, saved) = tokio::join!(delete, save);
+            (saved, deleted)
+        };
+
+        let child_exists = synthetics_checks::get(&db, org, "child")
+            .await
+            .unwrap()
+            .is_some();
+        match (saved, deleted) {
+            (Ok(parent), Err(e)) => {
+                assert!(
+                    matches!(
+                        e.downcast_ref::<CompositionError>(),
+                        Some(CompositionError::ReferencedBy(_))
+                    ),
+                    "{e}"
+                );
+                assert!(child_exists);
+                assert!(
+                    synthetics_checks::get(&db, org, &parent.id)
+                        .await
+                        .unwrap()
+                        .is_some()
+                );
+            }
+            (Err(e), Ok(true)) => {
+                assert!(
+                    matches!(
+                        e.downcast_ref::<CompositionError>(),
+                        Some(CompositionError::Invalid(m)) if m.contains("'child'")
+                    ),
+                    "{e}"
+                );
+                assert!(!child_exists);
+            }
+            (saved, deleted) => panic!("no serial order ends here: {saved:?} / {deleted:?}"),
+        }
     }
 }

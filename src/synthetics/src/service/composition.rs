@@ -449,8 +449,16 @@ pub(crate) mod tests {
         assert_eq!(left[0].id, "p2");
     }
 
-    /// `create_table_from_entity` omits the migration's column DEFAULTs that
-    /// `synthetics_checks::create` relies on.
+    /// Flag tests hold this, so no other config swap can revert the flag mid-test.
+    pub(crate) async fn subtests_flag(enabled: bool) -> tokio::sync::MutexGuard<'static, ()> {
+        let guard = crate::CONFIG_SWAP_LOCK.lock().await;
+        let mut cfg = config::config::init();
+        cfg.synthetics.subtests_enabled = enabled;
+        config::CONFIG.store(std::sync::Arc::new(cfg));
+        guard
+    }
+
+    /// `synthetics_checks::create` relies on migration column defaults that entities omit.
     pub(crate) async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
@@ -591,10 +599,9 @@ pub(crate) mod tests {
         }
     }
 
-    // Runs with the flag at its default `false`.
     #[tokio::test]
     async fn the_disabled_flag_gates_only_an_added_reference() {
-        assert!(!config::get_config().synthetics.subtests_enabled);
+        let _flag = subtests_flag(false).await;
         let db = db_with_synthetics_defaults().await;
         for id in ["login", "logout"] {
             synthetics_checks::create(&db, "org1", child_row(id), true)
