@@ -16,10 +16,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use datafusion::error::{DataFusionError, Result};
-use promql_parser::{
-    parser::{AtModifier, Expr, Offset},
-    util::{ExprVisitor, walk_expr},
-};
+use promql_parser::parser::{AtModifier, Expr, Offset};
 
 use crate::{adjust_start_end, utils::offset_micros};
 
@@ -106,24 +103,17 @@ pub(crate) fn at_micros(at: &AtModifier) -> Option<i64> {
 
 /// Whether any `@` is left in the expression; without one nothing can be pinned.
 pub(crate) fn uses_at(expr: &Expr) -> bool {
-    let mut visitor = AtVisitor(false);
-    let _ = walk_expr(&mut visitor, expr);
-    visitor.0
-}
-
-struct AtVisitor(bool);
-
-impl ExprVisitor for AtVisitor {
-    type Error = &'static str;
-
-    fn pre_visit(&mut self, expr: &Expr) -> std::result::Result<bool, Self::Error> {
-        self.0 |= match expr {
-            Expr::VectorSelector(vs) => vs.at.is_some(),
-            Expr::MatrixSelector(ms) => ms.vs.at.is_some(),
-            Expr::Subquery(sq) => sq.at.is_some(),
-            _ => false,
-        };
-        Ok(!self.0)
+    // the parser's `walk_expr` skips an aggregation's parameter, which can carry an `@` too
+    match expr {
+        Expr::VectorSelector(vs) => vs.at.is_some(),
+        Expr::MatrixSelector(ms) => ms.vs.at.is_some(),
+        Expr::Subquery(sq) => sq.at.is_some() || uses_at(&sq.expr),
+        Expr::Unary(unary) => uses_at(&unary.expr),
+        Expr::Paren(paren) => uses_at(&paren.expr),
+        Expr::Binary(binary) => uses_at(&binary.lhs) || uses_at(&binary.rhs),
+        Expr::Aggregate(agg) => uses_at(&agg.expr) || agg.param.as_deref().is_some_and(uses_at),
+        Expr::Call(call) => call.args.args.iter().any(|arg| uses_at(arg)),
+        Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => false,
     }
 }
 
@@ -330,6 +320,9 @@ mod tests {
         assert!(uses("sum(rate(a[5m] @ 1600000000)) / b"));
         assert!(uses("a and topk(5, b @ end())"));
         assert!(uses("max_over_time(a[1h:1m] @ 1600000000)"));
+        assert!(uses("topk(scalar(n @ 1600000000), a)"));
+        assert!(uses("quantile(scalar(sum(n @ end())), a)"));
+        assert!(uses("-(a @ 1600000000)"));
     }
 
     #[test]

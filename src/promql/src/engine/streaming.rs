@@ -1179,6 +1179,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_at_modifier_in_an_aggregation_parameter() {
+        let instant = BASE + 180 * SECOND;
+        let mut engine = engine_at(provider(false, false), 30, instant, 0, None);
+        // `sum(m @ 1100)` is 30, so k is 1 and only the parameter carries an `@`
+        let expr = promql_parser::parser::parse("topk(scalar(sum(m @ 1100)) / 30, m)").unwrap();
+        let (value, _) = engine.exec(&expr).await.unwrap();
+        let series = canonical(value);
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].1, vec![(instant, 27.0)]);
+    }
+
+    #[tokio::test]
     async fn test_at_modifier_fails_loudly_where_it_cannot_pin() {
         let cases = [
             ("m[1m] @ 1100", "@ modifier is not supported"),
