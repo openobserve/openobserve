@@ -80,101 +80,108 @@ const rendered = computed(() => {
 });
 </script>
 
-<style scoped lang="scss">
-/* The agent writes markdown, so the rendered tags need spacing the card does
-   not give them. `:deep()` is required: v-html children never receive the
-   scope id. Tokens, not @apply — utilities do not resolve inside a scoped
-   SFC style block under Tailwind v4. */
-.report-body {
-  /* A report is prose. Past ~70 characters a line is measurably harder to
-     scan, and this is read at 3am. */
-  max-width: 68ch;
+<style scoped>
+/* keep(generated-content): the report is markdown rendered through `v-html`,
+   so there is no template to hang Tailwind utilities on. `:deep()` is required
+   for the same reason — v-html children never receive the scope id. Tokens
+   rather than @apply: utilities do not resolve inside a scoped SFC style block
+   under Tailwind v4. */
 
-  /* Capped at the screen's own 14px ceiling: a heading ramp taller than the
-     page title reads as a different application embedded in the card. */
-  :deep(h1) {
-    font-size: 1rem;
-  }
-  :deep(h2) {
-    font-size: 0.9375rem;
-  }
-  :deep(h3),
-  :deep(h4) {
-    font-size: 0.875rem;
-  }
-  :deep(h1),
-  :deep(h2),
-  :deep(h3),
-  :deep(h4) {
-    color: var(--color-text-heading);
-    font-weight: 600;
-    line-height: 1.4;
-  }
-  /* A section break and a subsection break must not look the same. */
-  :deep(h1),
-  :deep(h2) {
-    margin: 2rem 0 0.5rem;
-  }
-  :deep(h3),
-  :deep(h4) {
-    margin: 1rem 0 0.25rem;
-  }
-  :deep(> :first-child) {
-    margin-top: 0;
-  }
-  :deep(p),
-  :deep(ul),
-  :deep(ol),
-  :deep(table),
-  :deep(pre) {
-    margin-bottom: 0.5rem;
-  }
-  :deep(ul),
-  :deep(ol) {
-    padding-left: 1.25rem;
-    list-style-position: outside;
-  }
-  :deep(ul) {
-    list-style-type: disc;
-  }
-  :deep(ol) {
-    list-style-type: decimal;
-  }
-  :deep(code) {
-    background: var(--color-surface-subtle);
-    border-radius: 0.25rem;
-    padding: 0 0.25rem;
-    font-size: 0.75rem;
-  }
-  :deep(pre) {
-    background: var(--color-surface-subtle);
-    border-radius: 0.25rem;
-    padding: 0.5rem;
-    overflow-x: auto;
-    font-size: 0.75rem;
-  }
-  /* Inline padding on the first line of a block indents it past the rest, and
-     the chip background doubles up on the block's own. */
-  :deep(pre code) {
-    background: none;
-    border-radius: 0;
-    padding: 0;
-  }
-  :deep(table) {
-    width: 100%;
-    font-size: 0.75rem;
-  }
-  :deep(th),
-  :deep(td) {
-    /* `subtle` is ~1.07:1 on the card in light mode — the rule vanishes. */
-    border-bottom: 1px solid var(--color-border-default);
-    padding: 0.25rem 0.75rem 0.25rem 0;
-    text-align: left;
-  }
-  :deep(blockquote) {
-    border-left: 2px solid var(--color-border-default);
-    padding-left: 0.75rem;
-    color: var(--color-text-secondary);
-  }
+/* A report is prose. Past ~70 characters a line is measurably harder to scan,
+   and this is read at 3am. */
+.report-body {
+  max-width: 68ch;
+}
+
+/* Capped at the screen's own 14px ceiling: a heading ramp taller than the page
+   title reads as a different application embedded in the card. */
+.report-body :deep(h1) {
+  font-size: 1rem;
+}
+.report-body :deep(h2) {
+  font-size: 0.9375rem;
+}
+.report-body :deep(h3),
+.report-body :deep(h4) {
+  font-size: 0.875rem;
+}
+.report-body :deep(h1),
+.report-body :deep(h2),
+.report-body :deep(h3),
+.report-body :deep(h4) {
+  color: var(--color-text-heading);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* A section break and a subsection break must not look the same. */
+.report-body :deep(h1),
+.report-body :deep(h2) {
+  margin: 2rem 0 0.5rem;
+}
+.report-body :deep(h3),
+.report-body :deep(h4) {
+  margin: 1rem 0 0.25rem;
+}
+.report-body :deep(h1:first-child),
+.report-body :deep(h2:first-child) {
+  margin-top: 0;
+}
+
+.report-body :deep(p),
+.report-body :deep(ul),
+.report-body :deep(ol),
+.report-body :deep(table),
+.report-body :deep(pre) {
+  margin-bottom: 0.5rem;
+}
+.report-body :deep(ul),
+.report-body :deep(ol) {
+  padding-left: 1.25rem;
+  list-style-position: outside;
+}
+.report-body :deep(ul) {
+  list-style-type: disc;
+}
+.report-body :deep(ol) {
+  list-style-type: decimal;
+}
+
+.report-body :deep(code) {
+  background: var(--color-surface-subtle);
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+}
+.report-body :deep(pre) {
+  background: var(--color-surface-subtle);
+  border-radius: 0.25rem;
+  padding: 0.5rem;
+  overflow-x: auto;
+  font-size: 0.75rem;
+}
+/* Inline padding on the first line of a block indents it past the rest, and the
+   chip background doubles up on the block's own. */
+.report-body :deep(pre code) {
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+.report-body :deep(table) {
+  width: 100%;
+  font-size: 0.75rem;
+}
+/* `subtle` is ~1.07:1 on the card in light mode — the rule vanishes. */
+.report-body :deep(th),
+.report-body :deep(td) {
+  border-bottom: 0.0625rem solid var(--color-border-default);
+  padding: 0.25rem 0.75rem 0.25rem 0;
+  text-align: left;
+}
+.report-body :deep(blockquote) {
+  border-left: 0.125rem solid var(--color-border-default);
+  padding-left: 0.75rem;
+  color: var(--color-text-secondary);
 }
 </style>
