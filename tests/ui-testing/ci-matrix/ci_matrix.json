@@ -74,7 +74,8 @@
       "dashboard-sankey.spec.js",
       "dashboard-pie-donut.spec.js",
       "dashboard-metric-camelcase.spec.js",
-      "dashboard-create-alert.spec.js"
+      "dashboard-create-alert.spec.js",
+      "dashboard-zoom-brush.spec.js"
     ],
     "disabled": []
   },
