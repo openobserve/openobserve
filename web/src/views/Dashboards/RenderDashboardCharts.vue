@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                    Mounting everything up front froze large dashboards. -->
               <div
                 v-else-if="!shouldMountPanel(item.id)"
-                class="flex h-full flex-col p-2"
+                class="drag-cancel flex h-full flex-col p-2"
                 :data-test="`dashboard-panel-placeholder-${item.id}`"
               >
                 <span class="text-text-secondary truncate text-sm" :title="item.title">
@@ -852,7 +852,7 @@ export default defineComponent({
           draggable: {
             enable:
               !props.viewOnly && !saveDashboardData.isLoading.value && !props.simplifiedPanelView, // Enable dragging unless view-only or saving
-            handle: ".drag-allow", // Only allow dragging from specific handle
+            cancel: ".drag-cancel", // panel body defers to ECharts; only the header starts a grid drag
           },
           resizable: {
             enable:
