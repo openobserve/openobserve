@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/theme.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/GeneralTests/theme-management.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "theme-management.spec.js already covers the navbar toggle (Workflow 2) and persistence-across-reload (Workflow 3), plus the predefined-themes drawer and custom color. The App Theme Default feature's UNCOVERED headline behaviors are: (1) fresh-load defaults to LIGHT (Workflow 1), (2) pre-seeded theme==='dark' boots dark on first paint (Workflow 4), and (3) the strict === 'dark' fallback for corrupt/legacy values (Edge Case 2). None of those assert the default resolution. A new theme.spec.js is warranted because (a) run-context names it (spec_filename theme.spec.js), (b) the 'boots dark' test must seed localStorage via addInitScript BEFORE navigation, which conflicts with theme-management's serial beforeEach that already calls navigateToBase, and (c) it keeps 'theme default/mode' separate from 'theme management (predefined/custom color)'. Toggle + persistence + predefined-drawer are intentionally NOT duplicated; they remain covered by theme-management.spec.js. New file must be registered in tests/ui-testing/ci-matrix/ci_matrix.json under GeneralTests run_files."
-}
