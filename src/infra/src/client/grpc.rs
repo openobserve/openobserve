@@ -234,7 +234,7 @@ pub async fn make_grpc_metrics_client<T>(
     .await
 }
 
-#[tracing::instrument(name = "promql:search:grpc:metrics:make_client_with_policy", skip_all)]
+#[tracing::instrument(name = "grpc:make_client_with_policy", skip_all)]
 pub async fn make_grpc_client_with_policy<T>(
     trace_id: &str,
     org_id: &str,
@@ -279,7 +279,7 @@ pub async fn make_grpc_client_with_policy<T>(
     let accept_response_gzip = response_compression.accepts_gzip_for(&grpc_addr);
     let channel = get_cached_channel(&grpc_addr).await.map_err(|err| {
         log::error!(
-            "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
+            "[trace_id {trace_id}] grpc: node: {}, connect err: {:?}",
             grpc_addr,
             err
         );
@@ -300,9 +300,7 @@ pub async fn make_grpc_client_with_policy<T>(
         .send_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    log::info!(
-        "[trace_id {trace_id}] promql->search->grpc: metrics response compression gzip={accept_response_gzip}"
-    );
+    log::info!("[trace_id {trace_id}] grpc: response compression gzip={accept_response_gzip}");
     if accept_response_gzip {
         client = client.accept_compressed(CompressionEncoding::Gzip);
     }
