@@ -113,7 +113,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #cell-used_by_checks="{ row }">
         <span data-test="synthetics-variable-usage">
-          {{ t("synthetics.variables.usedByChecks", { n: row.used_by_checks }) }}
+          {{
+            t("synthetics.variables.usedByChecks", { n: row.used_by_checks }, row.used_by_checks)
+          }}
         </span>
       </template>
 
@@ -435,7 +437,11 @@ export default defineComponent({
     async function removeVariable(row: SyntheticsVariable) {
       const base =
         row.used_by_checks > 0
-          ? t("synthetics.variables.deleteUsed", { name: row.name, n: row.used_by_checks })
+          ? t(
+              "synthetics.variables.deleteUsed",
+              { name: row.name, n: row.used_by_checks },
+              row.used_by_checks,
+            )
           : t("synthetics.variables.deleteConfirm", { name: row.name });
       const fallback = deleteFallbackNote(row);
       const ok = await confirm({

@@ -13494,7 +13494,7 @@
       "shadowGlobalMessage": "{name} will override the global value in {env}. Other environments keep using the global.",
       "shadowedGlobalTitle": "Some environments keep their own values",
       "shadowedGlobalMessage": "{name} already has its own value in: {envs}. Those environments keep theirs; everywhere else uses this one.",
-      "deleteUsed": "{name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
+      "deleteUsed": "{name} is referenced by {n} check. It will resolve it as literal text until you update it. Delete anyway? | {name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
       "deleted": "Variable deleted",
       "description": "Description",
       "editTitle": "Edit Variable",
@@ -13530,7 +13530,7 @@
       "title": "Variables",
       "updated": "Variable updated",
       "usedBy": "Used by",
-      "usedByChecks": "{n} checks",
+      "usedByChecks": "Unused | {n} check | {n} checks",
       "value": "Value",
       "valueEmpty": "Empty",
       "valuePlaceholder": "Value",
@@ -13573,7 +13573,7 @@
       "subtitle": "Scope variables and secrets, and control who may manage them.",
       "title": "Environments",
       "updated": "Environment updated",
-      "usedByChecks": "Used by {n} checks",
+      "usedByChecks": "Unused | Used by {n} check | Used by {n} checks",
       "variables": "Variables"
     },
     "duplicateVariable": {
