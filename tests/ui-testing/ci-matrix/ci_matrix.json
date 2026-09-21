@@ -96,7 +96,8 @@
       "crossLinking.spec.js",
       "dashboard-multi-sql.spec.js",
       "crossLinkMultiStream.spec.js",
-      "dashboards-form-validation.spec.js"
+      "dashboards-form-validation.spec.js",
+      "dashboard-cell-explorer-detail.spec.js"
     ],
     "disabled": [
       {
