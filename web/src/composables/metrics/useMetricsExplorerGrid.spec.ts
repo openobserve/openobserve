@@ -13,7 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { effectScope, type EffectScope } from "vue";
 
 /**
  * The two bugs covered here are both SELF-SEALING — the grid ends up in a state
@@ -225,6 +226,19 @@ const landPreview = async (preview: Promise<any>, result: any) => {
 const HOUR_US = 3_600_000_000;
 const NOW_US = 1_700_000_000_000_000;
 
+// Every grid created via `createGrid` runs inside its own scope, stopped in
+// `afterEach` — otherwise its debounced sweep (`SWEEP_DEBOUNCE_MS`) outlives
+// the test that scheduled it and can fire during a LATER test, pushing
+// surprise entries into the shared `inFlight` array. Vue's own `onScopeDispose`
+// cleanup already clears that timer; it just needs a scope to run inside, since
+// these composables are otherwise called bare, outside any component.
+let activeScopes: EffectScope[] = [];
+const createGrid = (translate: typeof t) => {
+  const scope = effectScope(true);
+  activeScopes.push(scope);
+  return scope.run(() => useMetricsExplorerGrid(translate))!;
+};
+
 describe("useMetricsExplorerGrid", () => {
   beforeEach(() => {
     inFlight.length = 0;
@@ -236,8 +250,12 @@ describe("useMetricsExplorerGrid", () => {
     savePanelCacheMock.mockReset().mockResolvedValue(undefined);
   });
 
+  afterEach(() => {
+    activeScopes.splice(0).forEach((scope) => scope.stop());
+  });
+
   const setup = async () => {
-    const grid = useMetricsExplorerGrid(t);
+    const grid = createGrid(t);
     grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
     await grid.loadStreams();
     return grid;
@@ -672,7 +690,7 @@ describe("useMetricsExplorerGrid", () => {
     it("never renders more than the page size, however many come back empty", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
 
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -739,7 +757,7 @@ describe("useMetricsExplorerGrid", () => {
 
     it("showMore is how the user asks to spend more budget", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -757,7 +775,7 @@ describe("useMetricsExplorerGrid", () => {
     // grid has grown by a full increment, stepping over the no-data run.
     it("Show more steps over no-data cards so a click reveals a full page", async () => {
       getStreamsMock.mockResolvedValue({ list: sparseOrg(500) });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
@@ -1309,7 +1327,7 @@ describe("useMetricsExplorerGrid", () => {
           },
         ],
       });
-      const grid = useMetricsExplorerGrid(t);
+      const grid = createGrid(t);
       grid.setTimeRange({ start_time: NOW_US - HOUR_US, end_time: NOW_US });
       await grid.loadStreams();
 
