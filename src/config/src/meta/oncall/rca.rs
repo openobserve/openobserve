@@ -90,4 +90,38 @@ mod tests {
         let json = serde_json::to_value(&with_causes).unwrap();
         assert_eq!(json["past_causes"], serde_json::json!(["2x timeout"]));
     }
+
+    /// I2: the alert-only keys are additive. An unchanged `o2-ai` reads the
+    /// keys it knows and never sees the rest, so they must be absent — not
+    /// null — when there is nothing to say.
+    #[test]
+    fn test_the_alert_keys_are_sent_when_set_and_omitted_when_not() {
+        let bare = base(SubjectType::Alert, None);
+        let json = serde_json::to_value(&bare).unwrap();
+        let keys = json.as_object().unwrap();
+        for key in ["alert_name", "stream", "dimensions", "severity"] {
+            assert!(
+                !keys.contains_key(key),
+                "{key} must be omitted, not null: {json}"
+            );
+        }
+
+        let mut full = base(SubjectType::Alert, None);
+        full.alert_name = Some("payment-api high error rate".to_string());
+        full.stream = Some("payment_api_errors".to_string());
+        full.dimensions = Some(serde_json::json!({ "service": "payments" }));
+        full.severity = Some(crate::meta::alerts::priority::AlertPriority::P2);
+        let json = serde_json::to_value(&full).unwrap();
+        assert_eq!(
+            json["alert_name"],
+            serde_json::json!("payment-api high error rate")
+        );
+        assert_eq!(json["stream"], serde_json::json!("payment_api_errors"));
+        assert_eq!(
+            json["dimensions"],
+            serde_json::json!({ "service": "payments" })
+        );
+        // A bare int, not "P2" — `format_severity` in `o2-ai` renders the scale.
+        assert_eq!(json["severity"], serde_json::json!(2));
+    }
 }

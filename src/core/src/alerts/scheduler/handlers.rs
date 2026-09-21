@@ -1812,6 +1812,14 @@ async fn trigger_rca_for_alert_firing(
             return;
         };
 
+        // One report is written to every record this firing opened, so scoping the prompt to one
+        // group's dimensions would mis-describe the others. Sent only when they all agree.
+        let dimensions = pending
+            .iter()
+            .all(|p| p.dimensions == representative.dimensions)
+            .then(|| serde_json::to_value(&representative.dimensions).ok())
+            .flatten();
+
         // §2.2: one context for the whole firing — every record it opened reads the same answer.
         let context = config::meta::oncall::RcaContext {
             subject_type: config::meta::oncall::SubjectType::Alert,
@@ -1821,10 +1829,14 @@ async fn trigger_rca_for_alert_firing(
             org_id: org_id.clone(),
             previous_analysis: None,
             severity: Some(severity),
-            past_causes: Vec::new(),
+            past_causes: o2_enterprise::enterprise::alerts::rca_service::past_causes_for_record(
+                &org_id,
+                &representative.response.id,
+            )
+            .await,
             alert_name: Some(alert_name.clone()),
             stream: Some(stream_name),
-            dimensions: serde_json::to_value(&representative.dimensions).ok(),
+            dimensions,
         };
         let subjects: Vec<config::meta::oncall::SubjectRef> =
             pending.iter().map(|p| p.response.subject.clone()).collect();
