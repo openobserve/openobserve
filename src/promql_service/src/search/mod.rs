@@ -35,7 +35,7 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
-    client::grpc::{ResponseCompression, make_grpc_client_with_policy},
+    client::grpc::{ResponseCompression, make_grpc_metrics_client_with_policy},
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
@@ -412,7 +412,7 @@ async fn search_in_cluster(
                 let node = Arc::new(node) as _;
                 let org_id = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
-                let mut client = make_grpc_client_with_policy(
+                let mut client = make_grpc_metrics_client_with_policy(
                     &trace_id, &org_id, &mut request, &node, timeout, response_compression,
                 ).await?;
                 let response: cluster_rpc::MetricsQueryResponse = match client.query(request).await

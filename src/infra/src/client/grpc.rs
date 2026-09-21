@@ -223,7 +223,7 @@ pub async fn make_grpc_metrics_client<T>(
     >,
     Error,
 > {
-    make_grpc_client_with_policy(
+    make_grpc_metrics_client_with_policy(
         trace_id,
         org_id,
         request,
@@ -234,8 +234,8 @@ pub async fn make_grpc_metrics_client<T>(
     .await
 }
 
-#[tracing::instrument(name = "grpc:make_client_with_policy", skip_all)]
-pub async fn make_grpc_client_with_policy<T>(
+#[tracing::instrument(name = "promql:search:grpc:metrics:make_client_with_policy", skip_all)]
+pub async fn make_grpc_metrics_client_with_policy<T>(
     trace_id: &str,
     org_id: &str,
     request: &mut Request<T>,
@@ -279,7 +279,7 @@ pub async fn make_grpc_client_with_policy<T>(
     let accept_response_gzip = response_compression.accepts_gzip_for(&grpc_addr);
     let channel = get_cached_channel(&grpc_addr).await.map_err(|err| {
         log::error!(
-            "[trace_id {trace_id}] grpc: node: {}, connect err: {:?}",
+            "[trace_id {trace_id}] promql->search->grpc: node: {}, connect err: {:?}",
             grpc_addr,
             err
         );
@@ -300,7 +300,9 @@ pub async fn make_grpc_client_with_policy<T>(
         .send_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    log::info!("[trace_id {trace_id}] grpc: response compression gzip={accept_response_gzip}");
+    log::info!(
+        "[trace_id {trace_id}] promql->search->grpc: metrics response compression gzip={accept_response_gzip}"
+    );
     if accept_response_gzip {
         client = client.accept_compressed(CompressionEncoding::Gzip);
     }
@@ -528,7 +530,9 @@ mod tests {
         };
         use tonic::{Request, Response, Status, codec::CompressionEncoding, transport::Server};
 
-        use super::{ResponseCompression, make_grpc_client_with_policy, make_grpc_metrics_client};
+        use super::{
+            ResponseCompression, make_grpc_metrics_client, make_grpc_metrics_client_with_policy,
+        };
 
         type HeaderSnapshot = (
             Option<String>,
@@ -677,7 +681,7 @@ mod tests {
                 .metadata_mut()
                 .insert("traceparent", traceparent.parse().unwrap());
             let response = if let Some(policy) = policy {
-                let mut client = make_grpc_client_with_policy(
+                let mut client = make_grpc_metrics_client_with_policy(
                     "fixture-trace",
                     "fixture-org",
                     &mut request,
