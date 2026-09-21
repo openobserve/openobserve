@@ -114,7 +114,15 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
   let wrapper: any;
   let rumRequests: any[];
 
-  function mountWithDetails(details: any) {
+  // Answers the builder's _rumdata searches by the row type each one asks for.
+  function answerRumSearch(sql: string, rumRows: any[]) {
+    if (sql.includes("type = 'view'")) return rumRows.filter((r) => r.type === "view");
+    if (sql.includes("type='action'")) return rumRows.filter((r) => r.type === "action");
+    if (sql.includes("type = 'error'")) return rumRows.filter((r) => r.type !== "view");
+    return rumRows.filter((r) => r._oo_trace_id);
+  }
+
+  function mountWithDetails(details: any, rumRows: any[] = []) {
     rumRequests = [];
     globalThis.server.use(
       http.get(
@@ -131,7 +139,8 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
           const body: any = await request.json();
           if (body.query?.sql?.includes("_rumdata")) {
             rumRequests.push(body.query);
-            return HttpResponse.json({ took: 0, hits: [], total: 0, from: 0, size: 0 });
+            const hits = answerRumSearch(body.query.sql, rumRows);
+            return HttpResponse.json({ took: 0, hits, total: hits.length, from: 0, size: 0 });
           }
           return HttpResponse.json(details);
         },
@@ -139,6 +148,41 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     );
 
     return mountTraceDetails({ traceId: "test-trace-id" });
+  }
+
+  const RUM_SESSION_ID = "bf9f9e4f-34e8-4c4f-b43f-f27c17769d93";
+  const REPLAY_BUTTON = '[data-test="trace-details-view-session-replay-btn"]';
+
+  // A browser request that started the trace, plus the page view it came from.
+  function makeRumRows(sessionFlags: Record<string, unknown>) {
+    const base = {
+      session_id: RUM_SESSION_ID,
+      view_id: "view-1",
+      date: 1_755_853_746_000,
+      ...sessionFlags,
+    };
+    return [
+      {
+        ...base,
+        type: "resource",
+        _oo_trace_id: "test-trace-id",
+        _oo_span_id: "d4b07e603e2fa32f",
+        resource_url: "https://app.example/api/ai/chat_stream",
+        resource_method: "POST",
+        resource_type: "fetch",
+        resource_duration: 1_000_000,
+      },
+      { ...base, type: "view", view_url: "/web/ai", view_time_spent: 5_000_000 },
+    ];
+  }
+
+  async function mountBridge(rumRows: any[]) {
+    wrapper = mountWithDetails(makeDetailsResponse("d4b07e603e2fa32f"), rumRows);
+    await flushPromises();
+    await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(3), {
+      timeout: 5000,
+    });
+    await flushPromises();
   }
 
   function mountTraceDetails(props: Record<string, unknown>) {
@@ -240,5 +284,31 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     const selected = wrapper.vm.searchObj.data.traceDetails.selectedTrace;
     expect(selected.trace_start_time).toBe(TRACE_START_US);
     expect(selected.trace_end_time).toBe(TRACE_END_US + 1);
+  });
+
+  it("hides Play Session Replay when the browser session has no recording", async () => {
+    await mountBridge(makeRumRows({}));
+
+    expect(wrapper.vm.spanList.some((s: any) => s.rum_session_id === RUM_SESSION_ID)).toBe(true);
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(false);
+  });
+
+  it("shows Play Session Replay when the browser session has a recording", async () => {
+    await mountBridge(makeRumRows({ session_has_replay: true }));
+
+    expect(wrapper.find(REPLAY_BUTTON).exists()).toBe(true);
+  });
+
+  it("opens the RUM session, not the AI conversation, from Play Session Replay", async () => {
+    const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+    await mountBridge(makeRumRows({ session_has_replay: true }));
+
+    await wrapper.find(REPLAY_BUTTON).trigger("click");
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(push.mock.calls[0][0]).toMatchObject({
+      name: "SessionViewer",
+      params: { id: RUM_SESSION_ID },
+    });
   });
 });

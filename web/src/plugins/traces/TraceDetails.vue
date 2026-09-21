@@ -928,7 +928,7 @@ import TraceTimelineIcon from "@/components/icons/TraceTimelineIcon.vue";
 import ServiceMapIcon from "@/components/icons/ServiceMapIcon.vue";
 import { convertTimelineData, convertTraceServiceMapData } from "@/utils/traces/convertTraceData";
 import { getAllSpanColors } from "@/utils/traces/traceColors";
-import { resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
+import { resolveReplaySpan, resolveSessionId, resolveUrlTimeRange } from "./traceDetails.utils";
 import { buildFilterTerm, applyFilterTerm } from "@/utils/traces/filterUtils";
 import { buildPatternConsolidatedTree } from "@/utils/traces/patternDetection";
 import { useTracePatternTree } from "@/composables/useTracePatternTree";
@@ -1457,16 +1457,9 @@ export default defineComponent({
       return store.state.zoConfig.service_streams_enabled !== false;
     });
 
-    // Check if any RUM span has a session_id
-    const hasRumSessionId = computed(() => {
-      return spanList.value.some((span: any) => span.rum_session_id);
-    });
-
-    // Get the first RUM event with session_id for navigation
-    const firstRumSessionData = computed(() => {
-      const rumSpan = spanList.value.find((span: any) => span.rum_session_id);
-      return rumSpan || null;
-    });
+    // Gate and target share one span so the button never links to a session with nothing to play.
+    const replaySpan = computed(() => resolveReplaySpan(spanList.value));
+    const hasRumSessionId = computed(() => replaySpan.value !== null);
 
     // Computed properties for mode-based priority logic
     const effectiveTraceId = computed(() => {
@@ -2821,19 +2814,18 @@ export default defineComponent({
     };
 
     const redirectToSessionReplay = () => {
-      if (!firstRumSessionData.value || !firstRumSessionData.value.rum_session_id) {
-        return;
-      }
+      const span = replaySpan.value;
+      if (!span) return;
 
       router.push({
         name: "SessionViewer",
         params: {
-          id: firstRumSessionData.value.rum_session_id,
+          id: span.rum_session_id,
         },
         query: {
-          start_time: Math.floor(firstRumSessionData.value.start_time / 1000) - 1000000,
-          end_time: Math.ceil(firstRumSessionData.value.end_time / 1000) + 1000000,
-          event_time: firstRumSessionData.value.rum_date,
+          start_time: Math.floor(span.start_time / 1000) - 1000000,
+          end_time: Math.ceil(span.end_time / 1000) + 1000000,
+          event_time: span.rum_date,
         },
       });
     };
@@ -3076,7 +3068,7 @@ export default defineComponent({
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
       hasRumSessionId,
-      firstRumSessionData,
+      replaySpan,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,

@@ -1498,6 +1498,75 @@ describe("useRumSpanBuilder", () => {
   });
 
   // =========================================================================
+  // formatRumEventsAsSpans — replay flag
+  // =========================================================================
+
+  describe("formatRumEventsAsSpans — replay flag", () => {
+    const withReplay = { session_has_replay: true };
+
+    const buildAllKinds = (flag: Record<string, any>) => {
+      const traced = makeTracedResource({ date: 1_000_000, ...flag });
+      const view = makeViewEvent(flag);
+      const nearAction = makeActionEvent({ date: 1_000_000, ...flag });
+      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000, ...flag });
+      const resource = makeResourceEvent({ resource_type: "fetch", ...flag });
+      const errors = [1, 2, 3, 4].map((i) =>
+        makeErrorEvent({ error_id: `err-${i}`, date: 1_200_000 + i, ...flag }),
+      );
+      const { formatRumEventsAsSpans } = buildComposable();
+      return formatRumEventsAsSpans(
+        [traced],
+        [view],
+        [nearAction, farAction],
+        [resource, ...errors],
+      );
+    };
+
+    // The gate needs both fields, so the flag is asserted wherever a session id is.
+    const sessionSpans = (spans: any[]) => spans.filter((s) => s.rum_session_id);
+
+    it("should mark every session-bearing span as replayable when the rows carry session_has_replay", () => {
+      const spans = sessionSpans(buildAllKinds(withReplay));
+
+      expect(spans.map((s) => s.rum_event_type)).toEqual(
+        expect.arrayContaining(["view", "action", "collapsed_actions", "resource", "error"]),
+      );
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(true);
+      }
+    });
+
+    it("should mark every session-bearing span as not replayable when the rows lack session_has_replay", () => {
+      const spans = sessionSpans(buildAllKinds({}));
+
+      expect(spans.length).toBeGreaterThan(4);
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(false);
+      }
+    });
+
+    it("should treat an explicit false session_has_replay as not replayable", () => {
+      const spans = sessionSpans(buildAllKinds({ session_has_replay: false }));
+
+      expect(spans.length).toBeGreaterThan(4);
+      for (const span of spans) {
+        expect(span.rum_session_has_replay, span.span_id).toBe(false);
+      }
+    });
+
+    it("should take a collapsed group's replay flag from the browser request", () => {
+      const traced = makeTracedResource({ date: 1_000_000, session_has_replay: true });
+      const farAction = makeActionEvent({ action_id: "action-far", date: 5_000_000 });
+      const { formatRumEventsAsSpans } = buildComposable();
+
+      const spans = formatRumEventsAsSpans([traced], [], [farAction], [makeResourceEvent()]);
+
+      const collapsed = spans.find((s) => s.rum_event_type === "collapsed_actions");
+      expect(collapsed!.rum_session_has_replay).toBe(true);
+    });
+  });
+
+  // =========================================================================
   // formatRumEventsAsSpans — registerServiceColors
   // =========================================================================
 
