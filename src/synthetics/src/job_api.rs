@@ -1183,15 +1183,11 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         }
     }
 
-    if synthetic.check_type == SyntheticType::Browser {
-        inject_browser_secrets(&synthetic.config, &mut env_inject);
-    }
-
     synthetic.target = resolved_target(
         &synthetic.check_type,
         &substitute_placeholders(&synthetic.target, &env_inject),
     )?;
-    expand_for_resolve(conn, &mut synthetic).await?;
+    expand_for_resolve(conn, &mut synthetic, &mut env_inject).await?;
 
     // Redact password/token from auth before sending — probe uses env_inject instead.
     synthetic.auth = synthetic.auth.map(redact_auth);
@@ -1229,12 +1225,7 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         })
         .collect();
 
-    let trigger_type = synthetics_runs::get_run(conn, &check.run_id)
-        .await
-        .ok()
-        .flatten()
-        .map(|r| r.trigger_type)
-        .unwrap_or_else(|| "schedule".to_string());
+    let trigger_type = run_trigger_type(conn, &check.run_id).await;
 
     let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
@@ -1494,9 +1485,10 @@ fn expand_journey(
 async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
     conn: &C,
     synthetic: &mut config::meta::synthetics::Synthetic,
+    env_inject: &mut HashMap<String, String>,
 ) -> anyhow::Result<()> {
     use config::meta::{
-        synthetics::BrowserConfig,
+        synthetics::{BrowserConfig, is_composition_action},
         synthetics_composition::{ChildJourney, subtest_refs},
     };
     if synthetic.check_type != SyntheticType::Browser {
@@ -1508,10 +1500,17 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
         .and_then(|s| s.as_array())
         .cloned()
         .unwrap_or_default();
-    let refs = subtest_refs(&steps);
-    if refs.is_empty() {
+    // Keyed on the action so that a reference naming no child still reaches the boundary check.
+    if !steps.iter().any(|s| {
+        s.get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+    }) {
         return Ok(());
     }
+    // Only a child's `{{NAME}}` needs a parent secret in env_inject; a plain journey reads config.
+    inject_browser_secrets(&synthetic.config, env_inject);
+    let refs = subtest_refs(&steps);
     let mut children = HashMap::new();
     for child_id in refs.iter().collect::<std::collections::HashSet<_>>() {
         if let Some(child) = synthetics_checks::get_cached(conn, &synthetic.org_id, child_id)
@@ -1586,6 +1585,15 @@ fn stale_lease_response(
         failing_environments: Vec::new(),
         usage_events: Vec::new(),
     }
+}
+
+async fn run_trigger_type<C: sea_orm::ConnectionTrait>(conn: &C, run_id: &str) -> String {
+    synthetics_runs::get_run(conn, run_id)
+        .await
+        .ok()
+        .flatten()
+        .map(|r| r.trigger_type)
+        .unwrap_or_else(|| "schedule".to_string())
 }
 
 /// Acknowledges completion of a job.
@@ -1918,6 +1926,15 @@ pub async fn report_config_error_result(
     )
     .await;
     Ok(())
+}
+
+/// The trigger type that `resolve` would have sent for this job, so a config-error ack matches it.
+pub async fn job_trigger_type(job_id: &str) -> String {
+    let conn = get_orm_client_ro().await;
+    match synthetics_jobs::get_by_id(conn, job_id).await {
+        Ok(Some(job)) => run_trigger_type(conn, &job.run_id).await,
+        _ => "schedule".to_string(),
+    }
 }
 
 /// Resolves the alert decision for a completed run and persists the new state.
@@ -3394,6 +3411,45 @@ mod tests {
                 expand_journey(&parent(&["nested"], 1), &children, &HashSet::new()).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
+        }
+
+        async fn empty_db() -> sea_orm::DatabaseConnection {
+            sea_orm::Database::connect("sqlite::memory:").await.unwrap()
+        }
+
+        fn browser_synthetic(steps: serde_json::Value) -> config::meta::synthetics::Synthetic {
+            config::meta::synthetics::Synthetic {
+                check_type: SyntheticType::Browser,
+                config: json!({
+                    "steps": steps,
+                    "secrets": [ { "name": "PASSWORD", "value": "hunter2" } ]
+                }),
+                ..Default::default()
+            }
+        }
+
+        #[tokio::test]
+        async fn a_plain_journey_keeps_its_secrets_out_of_env_inject() {
+            let mut synthetic = browser_synthetic(json!(parent(&[], 2)));
+            let before = synthetic.config.clone();
+            let mut env_inject = HashMap::new();
+            expand_for_resolve(&empty_db().await, &mut synthetic, &mut env_inject)
+                .await
+                .unwrap();
+            assert!(env_inject.is_empty(), "{env_inject:?}");
+            assert_eq!(synthetic.config, before);
+        }
+
+        #[tokio::test]
+        async fn a_reference_naming_no_child_reaches_the_boundary_check() {
+            let mut synthetic =
+                browser_synthetic(json!([nav("s0"), { "id": "r0", "action": "subtest" }]));
+            let err = expand_for_resolve(&empty_db().await, &mut synthetic, &mut HashMap::new())
+                .await
+                .unwrap_err();
+            let err = err.downcast_ref::<ConfigError>().expect("a ConfigError");
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
+            assert!(err.message.contains("names no check"), "{}", err.message);
         }
     }
 }

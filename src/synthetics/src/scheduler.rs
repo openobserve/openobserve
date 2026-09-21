@@ -666,7 +666,10 @@ async fn expand_step_counts(
     for org_id in org_ids {
         match infra::table::synthetics_refs::child_step_counts(db, org_id, &child_ids).await {
             Ok(c) => counts.extend(c),
-            Err(e) => tracing::error!("[synthetics scheduler] child_step_counts for {org_id}: {e}"),
+            Err(e) => {
+                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+                tracing::error!("[synthetics scheduler] child_step_counts for {org_id}: {e}");
+            }
         }
     }
     apply_expanded_counts(due, &counts);

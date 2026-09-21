@@ -203,8 +203,8 @@ mod tests {
              environment put/delete, batch) and the check update a promote writes through the \
              table layer"
         );
-        // `location_entry`, `super_cluster_enabled` and composition's write gate read without publishing
-        const NON_PUBLISH_READS: usize = 3;
+        // `location_entry` and `super_cluster_enabled` read the flag without publishing
+        const NON_PUBLISH_READS: usize = 2;
         assert_eq!(
             guards,
             publishes + NON_PUBLISH_READS,

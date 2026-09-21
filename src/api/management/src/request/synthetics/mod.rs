@@ -436,29 +436,7 @@ pub async fn list_synthetics(
     }
 }
 
-/// References `incoming` has that `stored` did not — the only ones a save must gate (§5.7).
-///
-/// `cfg` matches its only caller, which is enterprise-gated, plus `test` so the rule stays
-/// testable in a default-feature build. Without the `cfg` this is dead code in an OSS build and
-/// `clippy -D warnings` fails the task.
-#[cfg(any(feature = "enterprise", test))]
-fn added_references(stored: &[String], incoming: &[String]) -> Vec<String> {
-    let had: std::collections::HashSet<&str> = stored.iter().map(String::as_str).collect();
-    let mut added: Vec<String> = incoming
-        .iter()
-        .filter(|id| !had.contains(id.as_str()))
-        .cloned()
-        .collect::<std::collections::HashSet<_>>()
-        .into_iter()
-        .collect();
-    added.sort();
-    added
-}
-
-/// §5.7: ADDING a reference is a "use" of the child, so the caller needs read on it.
-///
-/// Returns the first child the caller cannot read, or `None`. `existing_id` is the check being
-/// updated; references it already holds are not re-checked.
+/// Returns the first added child the caller cannot read: adding a reference uses it (§5.7).
 #[cfg(feature = "enterprise")]
 async fn caller_can_read_children(
     org_id: &str,
@@ -471,16 +449,21 @@ async fn caller_can_read_children(
     // set would lock an author out of editing a test they own, with deleting the reference as
     // the only way to save.
     let stored = match existing_id {
-        Some(id) => openobserve_synthetics::service::get_synthetic(org_id, id)
-            .await?
-            .map(|c| infra::table::synthetics_refs::refs_of(&c))
-            .unwrap_or_default(),
+        Some(id) => infra::table::synthetics_refs::refs_for_parents(
+            infra::db::get_orm_client_ro().await,
+            org_id,
+            &[id.to_owned()],
+        )
+        .await?
+        .remove(id)
+        .unwrap_or_default(),
         None => Vec::new(),
     };
-    for child_id in added_references(&stored, &incoming) {
-        let Some(child) = openobserve_synthetics::service::get_synthetic(org_id, &child_id).await?
+    for child_id in config::meta::synthetics_composition::added_references(&stored, &incoming) {
+        // A missing child is left to the service validation, which answers 400.
+        let Some(folder) = openobserve_synthetics::service::folder_of(org_id, &child_id).await?
         else {
-            return Ok(Some(child_id));
+            continue;
         };
         if !check_permissions(
             &child_id,
@@ -488,7 +471,7 @@ async fn caller_can_read_children(
             user_id,
             "synthetics",
             "GET",
-            Some(&child.folder_id),
+            Some(&folder),
             false,
             true,
             false,
@@ -571,17 +554,9 @@ async fn composition_error_response(
     };
     Ok(match ce {
         CE::WritesDisabled => (
-            StatusCode::SERVICE_UNAVAILABLE,
-            Json(serde_json::json!({
-                "code": "subtests_disabled",
-                "message": ce.to_string(),
-            })),
-        )
-            .into_response(),
-        CE::SuperClusterUnsupported => (
             StatusCode::CONFLICT,
             Json(serde_json::json!({
-                "code": "composition_super_cluster_unsupported",
+                "code": "subtests_disabled",
                 "message": ce.to_string(),
             })),
         )
@@ -1287,7 +1262,7 @@ async fn settle_config_error(
         status: "error".to_owned(),
         response_time_ms: 0.0,
         error: Some(err.message.clone()),
-        trigger_type: "scheduled".to_owned(),
+        trigger_type: openobserve_synthetics::job_api::job_trigger_type(job_id).await,
         status_reason: Some(err.status_reason.to_owned()),
         attempts: 0,
         error_source: openobserve_synthetics::alerting::ERROR_SOURCE_CONFIG.to_owned(),
@@ -2180,27 +2155,53 @@ pub async fn list_locations(Path(_org_id): Path<String>) -> Response {
 #[cfg(test)]
 mod tests {
     use config::meta::self_reporting::usage::{UsageData, UsageEvent};
-    use openobserve_synthetics::job_api::{AckResponse, AlertDecision};
+    use openobserve_synthetics::{
+        job_api::{AckResponse, AlertDecision},
+        service::composition::CompositionError as CE,
+    };
 
-    use super::added_references;
+    use super::composition_error_response;
 
-    /// §5.7, settled 2026-09-09: only an ADDED reference is gated. An unchanged set must not be,
-    /// or an author who cannot read the child is locked out of editing a test they own.
-    #[test]
-    fn only_newly_added_references_are_permission_checked() {
-        let stored = ["login".to_string(), "goto".to_string()];
-        let incoming = [
-            "login".to_string(),
-            "goto".to_string(),
-            "checkout".to_string(),
-        ];
+    async fn mapped(e: CE) -> (u16, serde_json::Value) {
+        let resp = composition_error_response("acme", "u@x", anyhow::Error::new(e))
+            .await
+            .expect("a CompositionError always maps");
+        let status = resp.status().as_u16();
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap_or_default())
+    }
+
+    #[tokio::test]
+    async fn every_composition_error_maps_to_its_status_and_code() {
+        let (status, body) = mapped(CE::WritesDisabled).await;
         assert_eq!(
-            added_references(&stored, &incoming),
-            vec!["checkout".to_string()]
+            (status, body["code"].as_str()),
+            (409, Some("subtests_disabled"))
         );
-        assert!(added_references(&stored, &stored).is_empty());
-        // Removing one is not an addition, so it is not gated either.
-        assert!(added_references(&stored, &["login".to_string()]).is_empty());
+        let (status, body) = mapped(CE::Lock("down".into())).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (503, Some("composition_lock_unavailable"))
+        );
+        let (status, _) = mapped(CE::Invalid("bad".into())).await;
+        assert_eq!(status, 400);
+        let (status, body) = mapped(CE::ReferencedBy(Vec::new())).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (409, Some("child_referenced"))
+        );
+        let (status, body) = mapped(CE::ReferencedCannotHoldSubtest(Vec::new())).await;
+        assert_eq!(
+            (status, body["code"].as_str()),
+            (409, Some("referenced_check_cannot_hold_subtest"))
+        );
+        assert!(
+            composition_error_response("acme", "u@x", anyhow::anyhow!("other"))
+                .await
+                .is_err()
+        );
     }
 
     fn ack_response(usage_events: Vec<UsageData>) -> AckResponse {

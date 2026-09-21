@@ -691,7 +691,7 @@ async fn delete_synthetic_under_lock(
 }
 
 /// The bulk-delete mutation run under the composition lock: refuse the batch if any id is
-/// still referenced, then drain and delete each one.
+/// still referenced, then drain and delete each one, parents first.
 async fn delete_synthetics_bulk_under_lock(
     conn: &DatabaseConnection,
     org_id: &str,
@@ -703,7 +703,13 @@ async fn delete_synthetics_bulk_under_lock(
         .await
         .map_err(anyhow::Error::new)?;
 
-    for id in ids {
+    // Parents go first, so a failure part-way never leaves a parent whose child is gone.
+    let parents = synthetics_refs::refs_for_parents(conn, org_id, ids)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let (first, last): (Vec<&String>, Vec<&String>) =
+        ids.iter().partition(|id| parents.contains_key(*id));
+    for id in first.into_iter().chain(last) {
         synthetics_jobs::drain_check(conn, id)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;

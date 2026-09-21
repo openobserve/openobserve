@@ -75,6 +75,20 @@ pub fn subtest_refs(steps: &[Value]) -> Vec<String> {
         .collect()
 }
 
+/// Child ids in `incoming` that `stored` lacks, sorted and deduplicated; only these gate a save.
+pub fn added_references(stored: &[String], incoming: &[String]) -> Vec<String> {
+    let had: HashSet<&str> = stored.iter().map(String::as_str).collect();
+    let mut added: Vec<String> = incoming
+        .iter()
+        .filter(|id| !had.contains(id.as_str()))
+        .cloned()
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    added.sort();
+    added
+}
+
 pub fn expanded_step_count(
     own: usize,
     refs: &[String],
@@ -234,6 +248,23 @@ mod tests {
 
     fn children() -> HashMap<String, ChildJourney> {
         HashMap::from([("login-test".to_string(), login())])
+    }
+
+    #[test]
+    fn only_newly_added_references_are_gated() {
+        let stored = ["login".to_string(), "goto".to_string()];
+        let incoming = [
+            "login".to_string(),
+            "goto".to_string(),
+            "checkout".to_string(),
+        ];
+        assert_eq!(
+            added_references(&stored, &incoming),
+            vec!["checkout".to_string()]
+        );
+        assert!(added_references(&stored, &stored).is_empty());
+        assert!(added_references(&stored, &["login".to_string()]).is_empty());
+        assert!(added_references(&stored, &["login".to_string(), "login".to_string()]).is_empty());
     }
 
     #[test]

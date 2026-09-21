@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use config::meta::{
     synthetics::{BrowserConfig, Synthetic, SyntheticType, validate_expanded_steps},
     synthetics_composition::{
-        ChildJourney, ExpansionError, expand_steps, placeholders_in, subtest_refs,
+        ChildJourney, ExpansionError, added_references, expand_steps, placeholders_in, subtest_refs,
     },
 };
 use infra::table::{
@@ -33,8 +33,6 @@ use sea_orm::ConnectionTrait;
 pub enum CompositionError {
     #[error("composition writes are disabled (ZO_SYNTHETICS_SUBTESTS_ENABLED=false)")]
     WritesDisabled,
-    #[error("subtest references are unsupported in super-cluster mode")]
-    SuperClusterUnsupported,
     #[error("validation: {0}")]
     Invalid(String),
     #[error("this check is referenced by other checks")]
@@ -45,15 +43,8 @@ pub enum CompositionError {
     Lock(String),
 }
 
-/// The write gate (§5.9): refuses a reference while the flag is off or super-cluster is on.
+/// The write gate (§5.9): refuses a new reference while the flag is off.
 pub(crate) fn ensure_composition_writes_allowed() -> Result<(), CompositionError> {
-    #[cfg(feature = "enterprise")]
-    if o2_enterprise::enterprise::common::config::get_config()
-        .super_cluster
-        .enabled
-    {
-        return Err(CompositionError::SuperClusterUnsupported);
-    }
     if config::get_config().synthetics.subtests_enabled {
         Ok(())
     } else {
@@ -71,7 +62,17 @@ pub(crate) async fn validate_for_save<C: ConnectionTrait>(
     // The gate lives here, not in `check_rules`: the rules must stay pure and testable
     // with the flag at its default `false`.
     if !refs.is_empty() {
-        ensure_composition_writes_allowed()?;
+        let stored = match own_id {
+            Some(id) => synthetics_refs::refs_for_parents(conn, org_id, &[id.to_owned()])
+                .await
+                .map_err(|e| CompositionError::Invalid(e.to_string()))?
+                .remove(id)
+                .unwrap_or_default(),
+            None => Vec::new(),
+        };
+        if !added_references(&stored, &refs).is_empty() {
+            ensure_composition_writes_allowed()?;
+        }
     }
     let parents = match own_id {
         Some(id) if !refs.is_empty() => synthetics_refs::list_parents(conn, org_id, id)
@@ -167,14 +168,14 @@ fn check_rules(
     if refs.is_empty() {
         return Ok(());
     }
-    if !parents.is_empty() {
-        return Err(CompositionError::ReferencedCannotHoldSubtest(
-            parents.to_vec(),
-        ));
-    }
     if own_id.is_some_and(|id| refs.iter().any(|r| r == id)) {
         return Err(CompositionError::Invalid(
             "config.steps: a check cannot reference itself as a subtest".into(),
+        ));
+    }
+    if !parents.is_empty() {
+        return Err(CompositionError::ReferencedCannotHoldSubtest(
+            parents.to_vec(),
         ));
     }
     if let Some(missing) = refs.iter().find(|r| !children.contains_key(*r)) {
@@ -184,11 +185,7 @@ fn check_rules(
     }
     let expanded = expand_steps(&cfg.steps, children).map_err(|e| match e {
         ExpansionError::ChildHoldsReference { child, .. } => CompositionError::Invalid(format!(
-            "config.steps: '{}' contains a subtest of its own; nesting is limited to one level",
-            children
-                .get(&child)
-                .map(|c| c.name.as_str())
-                .unwrap_or(&child)
+            "config.steps: '{child}' contains a subtest of its own; nesting is limited to one level"
         )),
         other => CompositionError::Invalid(format!("config.steps: {other}")),
     })?;
@@ -219,8 +216,7 @@ fn check_rules(
         let child = &children[child_id];
         if serde_json::to_string(&child.steps).is_ok_and(|s| s.contains("AESenc:")) {
             return Err(CompositionError::Invalid(format!(
-                "config.steps: '{}' stores encrypted values inside its steps and cannot be used as a subtest; re-save it first",
-                child.name
+                "config.steps: '{child_id}' stores encrypted values inside its steps and cannot be used as a subtest; re-save it first"
             )));
         }
     }
@@ -238,8 +234,7 @@ fn check_rules(
             .find(|p| !defined.contains(p.as_str()))
         {
             return Err(CompositionError::Invalid(format!(
-                "variables: '{}' uses {{{{{var}}}}}, which this test does not define",
-                child.name
+                "variables: '{child_id}' uses {{{{{var}}}}}, which this test does not define"
             )));
         }
     }
@@ -341,7 +336,7 @@ mod tests {
         let mut body = parent_with(&["login"], 0);
         let err = check_rules(Some("p"), &body, &children, &[]).unwrap_err();
         assert!(
-            matches!(err, CompositionError::Invalid(m) if m.contains("PASSWORD") && m.contains("Login"))
+            matches!(err, CompositionError::Invalid(m) if m.contains("PASSWORD") && m.contains("'login'") && !m.contains("Login"))
         );
         body.variables = vec![SyntheticVariable {
             name: "PASSWORD".into(),
@@ -558,5 +553,86 @@ mod tests {
         ensure_not_referenced(&db, "org1", &["lonely".to_string()])
             .await
             .unwrap();
+    }
+
+    #[test]
+    fn self_reference_is_reported_before_the_referenced_rule() {
+        let body = parent_with(&["p"], 0);
+        let parents = vec![ParentRef {
+            id: "q".into(),
+            name: "checkout".into(),
+            folder_id: "f".into(),
+        }];
+        let err = check_rules(Some("p"), &body, &HashMap::new(), &parents).unwrap_err();
+        assert!(matches!(err, CompositionError::Invalid(m) if m.contains("itself")));
+    }
+
+    #[test]
+    fn a_nested_child_is_named_by_id_not_by_name() {
+        let mut child = login(2);
+        child
+            .steps
+            .push(json!({ "id": "cx", "action": "subtest", "subtest": { "id": "other" } }));
+        let children = HashMap::from([("login".to_string(), child)]);
+        let err = check_rules(Some("p"), &parent_with(&["login"], 0), &children, &[]).unwrap_err();
+        assert!(
+            matches!(err, CompositionError::Invalid(m) if m.contains("'login'") && !m.contains("Login"))
+        );
+    }
+
+    fn child_row(id: &str) -> Synthetic {
+        Synthetic {
+            id: id.into(),
+            org_id: "org1".into(),
+            name: id.into(),
+            check_type: SyntheticType::Browser,
+            config: json!({ "steps": [ { "id": "c0", "action": "navigate", "url": "https://x/login" } ] }),
+            ..Synthetic::default()
+        }
+    }
+
+    // Runs with the flag at its default `false`.
+    #[tokio::test]
+    async fn the_disabled_flag_gates_only_an_added_reference() {
+        assert!(!config::get_config().synthetics.subtests_enabled);
+        let db = db_with_synthetics_defaults().await;
+        for id in ["login", "logout"] {
+            synthetics_checks::create(&db, "org1", child_row(id), true)
+                .await
+                .unwrap();
+        }
+        let mut parent = parent_with(&["login"], 0);
+        parent.org_id = "org1".into();
+        parent.name = "before".into();
+        synthetics_checks::create(&db, "org1", parent.clone(), true)
+            .await
+            .unwrap();
+
+        parent.name = "after".into();
+        validate_for_save(&db, "org1", Some("p"), &parent)
+            .await
+            .unwrap();
+
+        let mut repeated = parent_with(&["login", "login"], 0);
+        repeated.org_id = "org1".into();
+        validate_for_save(&db, "org1", Some("p"), &repeated)
+            .await
+            .unwrap();
+
+        validate_for_save(&db, "org1", Some("p"), &child_row("p"))
+            .await
+            .unwrap();
+
+        let mut added = parent_with(&["login", "logout"], 0);
+        added.org_id = "org1".into();
+        let err = validate_for_save(&db, "org1", Some("p"), &added)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
+
+        let err = validate_for_save(&db, "org1", None, &parent)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, CompositionError::WritesDisabled), "{err:?}");
     }
 }

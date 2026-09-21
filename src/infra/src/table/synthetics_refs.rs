@@ -192,7 +192,10 @@ pub async fn child_step_counts<C: ConnectionTrait>(
 // differently.
 fn step_length_expr(backend: sea_orm::DatabaseBackend) -> &'static str {
     match backend {
-        sea_orm::DatabaseBackend::Postgres => "json_array_length(config->'steps')",
+        // json_array_length raises on a non-array, which would fail the whole org's query.
+        sea_orm::DatabaseBackend::Postgres => {
+            "CASE WHEN json_typeof(config->'steps') = 'array' THEN json_array_length(config->'steps') END"
+        }
         sea_orm::DatabaseBackend::MySql => "JSON_LENGTH(config, '$.steps')",
         sea_orm::DatabaseBackend::Sqlite => "json_array_length(json_extract(config, '$.steps'))",
     }
@@ -433,7 +436,7 @@ mod tests {
     fn step_length_expr_names_the_right_function_per_backend() {
         assert_eq!(
             step_length_expr(sea_orm::DatabaseBackend::Postgres),
-            "json_array_length(config->'steps')"
+            "CASE WHEN json_typeof(config->'steps') = 'array' THEN json_array_length(config->'steps') END"
         );
         assert_eq!(
             step_length_expr(sea_orm::DatabaseBackend::MySql),
