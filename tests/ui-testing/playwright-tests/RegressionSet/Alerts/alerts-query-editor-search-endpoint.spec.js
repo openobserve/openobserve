@@ -55,7 +55,7 @@ test.describe('Alerts query editor picks the right search endpoint', () => {
     await pm.alertsPage.typeSqlInEditor(`SELECT COUNT(*) as cnt FROM "${STREAM}"`);
     await pm.alertsPage.clickRunQueryAndWait();
 
-    await expect(pm.alertsPage.getMultiWindowBadge()).toHaveCount(0);
+    await pm.alertsPage.expectNoMultiWindowBadge();
     testLogger.info('Multi-window badge correctly absent');
   });
 });

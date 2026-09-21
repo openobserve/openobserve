@@ -78,6 +78,9 @@ export class AlertsPage {
             streamTypePopover: '[data-test="add-alert-stream-type-select-dropdown-popover"]',
             streamTypeOption: '[data-test="add-alert-stream-type-select-dropdown-option"]',
             streamNameDropdown: '[data-test="add-alert-stream-name-select-dropdown"]',
+            queryEditorDialog: '[data-test="query-editor-dialog"]',
+            queryResultLabel: 'Query Result',
+            multiWindowBadgeText: 'results across all time windows',
             streamNamePopover: '[data-test="add-alert-stream-name-select-dropdown-popover"]',
             streamNameOption: '[data-test="add-alert-stream-name-select-dropdown-option"]',
             alertTypeSelect: '[data-test="add-alert-type-tabs"]',
@@ -4227,9 +4230,20 @@ export class AlertsPage {
         );
     }
 
-    /** The "results across all time windows" chip on the Query Result pane. */
-    getMultiWindowBadge() {
-        return this.page.locator('.multi-window-badge');
+    /**
+     * The Query Result pane shows no all-windows chip.
+     *
+     * Asserted on the rendered copy, not on a styling class — the chip carries
+     * only Tailwind utilities, so a class-based locator silently matches nothing
+     * and an absence assertion passes without ever rendering the pane. The pane
+     * header is asserted present first so the absence means something.
+     */
+    async expectNoMultiWindowBadge() {
+        const dialog = this.page.locator(this.locators.queryEditorDialog).first();
+        await expect(dialog).toBeVisible({ timeout: 10000 });
+        await expect(dialog).toContainText(this.locators.queryResultLabel);
+        await expect(dialog).not.toContainText(this.locators.multiWindowBadgeText);
+        testLogger.info('Query Result pane rendered without the all-windows chip');
     }
 
     /**
