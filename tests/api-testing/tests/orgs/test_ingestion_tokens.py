@@ -25,6 +25,7 @@ import pytest
 
 from support.client import OpenObserveClient
 from support.factories import unique_name
+from support.wait import WaitTimeout, wait_until
 
 logger = logging.getLogger(__name__)
 
@@ -316,12 +317,34 @@ def test_ingest_with_disabled_token_fails(
         json={"enabled": False},
     )
     tc = _token_client(ORG_ID, temp_token["token"])
-    resp = tc.post(
-        "disabled_test/_json",
-        json=[{"ts": 0, "message": "should fail"}],
-    )
-    assert resp.status_code == HTTPStatus.UNAUTHORIZED, \
-        f"expected 401, got {resp.status_code}: {resp.text}"
+
+    # Disabling is not synchronous. set_enabled updates the row and then emits a
+    # coordinator watch event (delete_from_db_coordinator(.., need_watch=true)); the
+    # in-memory token cache is dropped only when the watcher handles that event, so
+    # the PATCH can return before an ingest starts being refused. Assert the token
+    # STOPS being accepted. The bound sits past the server's own 60s reload
+    # backstop, so this fails only if disabling was never enforced at all.
+    last: dict[str, object] = {}
+
+    def _rejected() -> bool:
+        r = tc.post("disabled_test/_json", json=[{"ts": 0, "message": "should fail"}])
+        last["status"] = r.status_code
+        last["body"] = r.text
+        return r.status_code == HTTPStatus.UNAUTHORIZED
+
+    try:
+        wait_until(
+            _rejected,
+            timeout=75,
+            interval=1.0,
+            msg="a disabled token kept being accepted for ingestion",
+        )
+    except WaitTimeout as exc:
+        # wait_until formats msg at call time, so the last response has to be
+        # attached here or the failure reports None.
+        raise AssertionError(
+            f"{exc}; last response {last.get('status')}: {last.get('body')}"
+        ) from exc
 
     # Re-enable to leave the token in its original state
     client.patch(
