@@ -34,6 +34,7 @@ use config::{
         self_reporting::usage::{RequestStats, USAGE_STREAM, UsageType},
         sql::{extract_where, resolve_stream_names},
         stream::StreamType,
+        traces::session::{key_in_predicate, quote_identifier, quote_sql_string},
     },
     utils::{base64, json, time::now_micros},
 };
@@ -867,12 +868,8 @@ pub async fn build_search_request_per_field(
             if v.is_empty() {
                 "".to_string()
             } else {
-                let columns = v.splitn(2, '=').collect::<Vec<_>>();
-                if columns.len() < 2 {
-                    return Err(Error::other("Invalid filter format"));
-                }
-                let vals = columns[1].split(',').collect::<Vec<_>>().join("','");
-                format!("WHERE {} IN ('{vals}')", columns[0])
+                let predicate = values_filter_predicate(v, &schema).map_err(Error::other)?;
+                format!("WHERE {predicate}")
             }
         }
     };
@@ -894,24 +891,18 @@ pub async fn build_search_request_per_field(
     };
 
     let size = req.query.size;
-    // Escape single quotes so the keyword can't break out of the SQL string literal.
-    let keyword = keyword.replace('\'', "''");
+    let stream = quote_identifier(stream_name);
     let mut requests = Vec::new();
     for field in fields {
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
-        } else if !keyword.is_empty() {
-            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
-        } else {
-            sql_where.clone()
-        };
+        let column = quote_identifier(&field);
+        let sql_where = values_field_where(&sql_where, &column, keyword);
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
+                "SELECT {column} AS zo_sql_key FROM {stream} {sql_where} GROUP BY zo_sql_key order by zo_sql_key asc limit {size}"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
+                "SELECT {column} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM {stream} {sql_where} GROUP BY zo_sql_key order by zo_sql_num desc limit {size}"
             )
         };
 
@@ -955,50 +946,23 @@ async fn values_inner(
             }
         });
 
-    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM \"{stream_name}\"");
-    let mut query_sql = match query.get("filter") {
+    let schema = infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .unwrap_or_else(|_| Schema::empty());
+    let stream = quote_identifier(stream_name);
+    let default_sql = format!("SELECT {TIMESTAMP_COL_NAME} FROM {stream}");
+    let mut query_sql = match query.get("filter").filter(|v| !v.is_empty()) {
         None => default_sql,
-        Some(v) => {
-            if v.is_empty() {
-                default_sql
-            } else {
-                let columns = v.splitn(2, '=').collect::<Vec<_>>();
-                if columns.len() < 2 {
-                    return MetaHttpResponse::bad_request("Invalid filter format");
-                }
-                let col = columns[0];
-                // Validate that the column name exists in the stream schema to
-                // prevent SQL injection via identifier injection.
-                let schema = match infra::schema::get(org_id, stream_name, stream_type).await {
-                    Ok(s) => s,
-                    Err(_) => {
-                        return MetaHttpResponse::bad_request("Failed to load stream schema");
-                    }
-                };
-                if !schema.fields().iter().any(|f| f.name() == col) {
-                    return MetaHttpResponse::bad_request("Unknown filter column");
-                }
-                // Quote the column identifier (DataFusion style: double-quote, doubling any
-                // embedded double-quotes) and escape single-quotes in each value.
-                let quoted_col = format!("\"{}\"", col.replace('"', "\"\""));
-                let vals = columns[1]
-                    .split(',')
-                    .map(|val| val.replace('\'', "''"))
-                    .collect::<Vec<_>>()
-                    .join("','");
-                format!("{default_sql} WHERE {quoted_col} IN ('{vals}')")
-            }
-        }
+        Some(v) => match values_filter_predicate(v, &schema) {
+            Ok(predicate) => format!("{default_sql} WHERE {predicate}"),
+            Err(e) => return MetaHttpResponse::bad_request(e),
+        },
     };
     if let Ok(sql) = config::utils::query_select_utils::replace_o2_custom_patterns(&query_sql) {
         query_sql = sql;
     }
 
-    // Escape single quotes so the keyword can't break out of the SQL string literal.
-    let keyword = match query.get("keyword") {
-        None => "".to_string(),
-        Some(v) => v.trim().replace('\'', "''"),
-    };
+    let keyword = query.get("keyword").map_or("", |v| v.trim());
     let no_count = match query.get("no_count") {
         None => false,
         Some(v) => {
@@ -1111,11 +1075,6 @@ async fn values_inner(
 
     req.use_cache = get_use_cache_from_request(query);
 
-    // skip fields which aren't part of the schema
-    let schema = infra::schema::get(org_id, stream_name, stream_type)
-        .await
-        .unwrap_or_else(|_| Schema::empty());
-
     let mut query_results = Vec::with_capacity(fields.len());
     let sql_where = if where_str.is_empty() {
         "".to_string()
@@ -1128,21 +1087,15 @@ async fn values_inner(
         if schema.field_with_name(field).is_err() {
             continue;
         }
-        let sql_where = if !sql_where.is_empty() && !keyword.is_empty() {
-            format!("{sql_where} AND str_match_ignore_case({field}, '{keyword}')")
-        } else if !keyword.is_empty() {
-            format!("WHERE str_match_ignore_case({field}, '{keyword}')")
-        } else {
-            sql_where.clone()
-        };
-
+        let column = quote_identifier(field);
+        let sql_where = values_field_where(&sql_where, &column, keyword);
         let sql = if no_count {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
+                "SELECT {column} AS zo_sql_key FROM {stream} {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_key ASC"
             )
         } else {
             format!(
-                "SELECT \"{field}\" AS zo_sql_key, COUNT(*) AS zo_sql_num FROM \"{stream_name}\" {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
+                "SELECT {column} AS zo_sql_key, COUNT(*) AS zo_sql_num FROM {stream} {sql_where} GROUP BY zo_sql_key ORDER BY zo_sql_num DESC, zo_sql_key ASC"
             )
         };
         let mut req = req.clone();
@@ -1265,6 +1218,33 @@ async fn values_inner(
     .await;
 
     Json(resp).into_response()
+}
+
+/// Builds `"col" IN ('v1','v2')` from a `col=v1,v2` filter whose column must be in `schema`.
+fn values_filter_predicate(filter: &str, schema: &Schema) -> Result<String, &'static str> {
+    let Some((col, vals)) = filter.split_once('=') else {
+        return Err("Invalid filter format");
+    };
+    if schema.field_with_name(col).is_err() {
+        return Err("Unknown filter column");
+    }
+    Ok(key_in_predicate(col, vals.split(',')))
+}
+
+/// Appends the case-insensitive `keyword` match on the already-quoted `column` to `sql_where`.
+fn values_field_where(sql_where: &str, column: &str, keyword: &str) -> String {
+    if keyword.is_empty() {
+        return sql_where.to_string();
+    }
+    let matcher = format!(
+        "str_match_ignore_case({column}, {})",
+        quote_sql_string(keyword)
+    );
+    if sql_where.is_empty() {
+        format!("WHERE {matcher}")
+    } else {
+        format!("{sql_where} AND {matcher}")
+    }
 }
 
 /// SearchStreamPartition
@@ -1887,4 +1867,63 @@ pub async fn result_schema(
         cross_links,
     })
     .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use arrow_schema::{DataType, Field};
+
+    use super::*;
+
+    fn schema() -> Schema {
+        Schema::new(vec![
+            Field::new("level", DataType::Utf8, true),
+            Field::new("we\"ird", DataType::Utf8, true),
+        ])
+    }
+
+    #[test]
+    fn test_values_filter_predicate_quotes_column_and_values() {
+        assert_eq!(
+            values_filter_predicate("level=error,o'brien", &schema()).unwrap(),
+            "\"level\" IN ('error', 'o''brien')"
+        );
+        assert_eq!(
+            values_filter_predicate("we\"ird=a", &schema()).unwrap(),
+            "\"we\"\"ird\" IN ('a')"
+        );
+    }
+
+    #[test]
+    fn test_values_filter_predicate_rejects_bad_input() {
+        assert_eq!(
+            values_filter_predicate("level", &schema()),
+            Err("Invalid filter format")
+        );
+        assert_eq!(
+            values_filter_predicate("level) OR (1=1", &schema()),
+            Err("Unknown filter column")
+        );
+        assert_eq!(
+            values_filter_predicate("missing=a", &schema()),
+            Err("Unknown filter column")
+        );
+    }
+
+    #[test]
+    fn test_values_field_where() {
+        assert_eq!(values_field_where("", "\"level\"", ""), "");
+        assert_eq!(
+            values_field_where("WHERE a = 1", "\"level\"", ""),
+            "WHERE a = 1"
+        );
+        assert_eq!(
+            values_field_where("", "\"level\"", "it's"),
+            "WHERE str_match_ignore_case(\"level\", 'it''s')"
+        );
+        assert_eq!(
+            values_field_where("WHERE a = 1", "\"level\"", "err"),
+            "WHERE a = 1 AND str_match_ignore_case(\"level\", 'err')"
+        );
+    }
 }
