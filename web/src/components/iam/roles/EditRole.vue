@@ -266,6 +266,7 @@ import { useModuleNavigation } from "@/composables/iam/useModuleNavigation";
 import { useRoleSummary } from "@/composables/iam/useRoleSummary";
 import { useRolePresets } from "@/composables/iam/useRolePresets";
 import { useRoleJsonView } from "@/composables/iam/useRoleJsonView";
+import { useRoleSave } from "@/composables/iam/useRoleSave";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -901,81 +902,6 @@ const { updateRolePermissions } = useSavedGrantExpansion({
   getOrgId,
 });
 
-const saveRole = () => {
-  if (permissionsUiType.value === "json") updateJsonInTable();
-
-  // Users and service accounts are both sent as users; merge the two staging
-  // sets (dedup via Set) for the request payload.
-  const payload = {
-    ...grants.payload(),
-    add_users: Array.from(
-      new Set([...addedUsers.value, ...addedServiceAccounts.value]),
-    ) as string[],
-    remove_users: Array.from(
-      new Set([...removedUsers.value, ...removedServiceAccounts.value]),
-    ) as string[],
-  };
-
-  if (!(
-    payload.add.length ||
-    payload.remove.length ||
-    payload.add_users.length ||
-    payload.remove_users.length
-  )) {
-    toast({
-      variant: "info",
-      message: t("iam.editRole.noUpdatesDetected"),
-    });
-
-    return;
-  }
-
-  // Was: invalidate, then update — the refetch raced the write.
-  updateRoleOne
-    .mutateAsync({ role_id: editingRole.value, payload })
-    .then(async () => {
-      // combine permissionsHash and selectedPermissionsHash
-
-      toast({
-        variant: "success",
-        message: t("iam.editRole.updateSuccess"),
-      });
-
-      // Resetting permissions state on save
-
-      grants.commit();
-
-      roleUsers.value = roleUsers.value.filter(
-        (user) => !removedUsers.value.has(user) && !removedServiceAccounts.value.has(user),
-      );
-
-      addedUsers.value.forEach((value: any) => {
-        roleUsers.value.push(value);
-      });
-
-      addedServiceAccounts.value.forEach((value: any) => {
-        roleUsers.value.push(value);
-      });
-
-      addedUsers.value = new Set([]);
-
-      removedUsers.value = new Set([]);
-
-      addedServiceAccounts.value = new Set([]);
-
-      removedServiceAccounts.value = new Set([]);
-    })
-    .catch((err) => {
-      if (err.response.status != 403) {
-        toast({
-          variant: "error",
-          message: t("iam.editRole.updateError"),
-        });
-      }
-      console.log(err);
-    });
-};
-
 const updateEntityPermission = (
   resource: Resource | Entity,
   resourceName: string,
@@ -1004,6 +930,21 @@ const { updatePermissionsUi, updateJsonInTable } = useRoleJsonView({
   updateRolePermissions,
   getPermissionHash,
   getOrgId,
+});
+
+// Sending the changes lives in its own file; it reads the grant store and the member staging.
+const { saveRole } = useRoleSave({
+  editingRole,
+  permissionsUiType,
+  updateJsonInTable,
+  grants,
+  addedUsers,
+  removedUsers,
+  addedServiceAccounts,
+  removedServiceAccounts,
+  roleUsers,
+  updateRoleOne,
+  t,
 });
 
 const toggleHelpSection = async () => {

@@ -579,6 +579,29 @@ describe("EditRole - tabs and dirty state [characterization]", () => {
   });
 });
 
+describe("EditRole - save failures", () => {
+  const failSave = async (status: number) => {
+    const { updateRole } = await import("@/services/iam");
+    const vm = await mountEditRole();
+    vi.mocked(updateRole).mockRejectedValueOnce({ response: { status } });
+    vm.updatePermissionMappings("logs:app:AllowPut");
+    mockToast.mockClear();
+
+    await vm.saveRole();
+    await flushPromises();
+    return mockToast.mock.calls.map(([arg]: any[]) => arg?.variant);
+  };
+
+  // A 403 is already reported by the global forbidden handler, so the page must not add a second message.
+  it("stays quiet on a 403", async () => {
+    expect(await failSave(403)).not.toContain("error");
+  });
+
+  it("reports any other failure", async () => {
+    expect(await failSave(500)).toContain("error");
+  });
+});
+
 describe("EditRole - save payload [characterization]", () => {
   it("sends permissions and both kinds of principal in one payload", async () => {
     const { updateRole } = await import("@/services/iam");
