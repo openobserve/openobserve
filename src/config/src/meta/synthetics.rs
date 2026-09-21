@@ -581,6 +581,20 @@ pub struct SyntheticListItem {
     pub referenced_by: i32,
     /// Subtest steps this browser check holds; None for protocol checks.
     pub references: Option<i32>,
+    /// Omitted for a check that holds no subtest reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reference_state: Option<ReferenceState>,
+}
+
+/// Whether a parent's subtest references can run as stored.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ReferenceState {
+    Ok,
+    /// A referenced child has no row in this region.
+    Missing,
+    /// A referenced child holds a subtest of its own.
+    Nested,
 }
 
 // ── Query params / responses ──────────────────────────────────────────────────
@@ -4619,5 +4633,54 @@ mod tests {
         s.check_type = SyntheticType::Http;
         s.config = serde_json::json!({ "method": "GET" });
         assert!(s.validate(&locs, &brs, &devs, true).is_ok());
+    }
+
+    #[test]
+    fn reference_state_is_snake_case_and_omitted_without_a_reference() {
+        assert_eq!(
+            serde_json::to_value([
+                ReferenceState::Ok,
+                ReferenceState::Missing,
+                ReferenceState::Nested
+            ])
+            .unwrap(),
+            serde_json::json!(["ok", "missing", "nested"])
+        );
+        let item = SyntheticListItem {
+            id: "c".into(),
+            org_id: "o".into(),
+            folder_id: "default".into(),
+            name: "c".into(),
+            description: String::new(),
+            tags: vec![],
+            check_type: SyntheticType::Browser,
+            target: String::new(),
+            frequency: SyntheticFrequency {
+                frequency_type: SyntheticFrequencyType::Minutes,
+                interval: 5,
+                cron: String::new(),
+                timezone: None,
+            },
+            locations: vec![],
+            enabled: true,
+            created_at: 0,
+            updated_at: 0,
+            last_triggered_at: 0,
+            status: SyntheticStatus::Unknown,
+            last_check_at: None,
+            last_response_ms: None,
+            steps: Some(1),
+            referenced_by: 0,
+            references: Some(0),
+            reference_state: None,
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert!(json.get("reference_state").is_none(), "{json}");
+        let json = serde_json::to_value(SyntheticListItem {
+            reference_state: Some(ReferenceState::Missing),
+            ..item
+        })
+        .unwrap();
+        assert_eq!(json["reference_state"], "missing");
     }
 }

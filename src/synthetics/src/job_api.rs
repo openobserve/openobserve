@@ -1061,6 +1061,8 @@ pub enum AlertDecision {
 
 pub const REASON_CONFIG_STEPS_EXCEEDED: &str = "config_steps_exceeded";
 pub const REASON_CONFIG_REFERENCE_MISSING: &str = "config_reference_missing";
+/// A super-cluster parent references a child that has not replicated to this region yet.
+pub const REASON_CONFIG_REFERENCE_PENDING: &str = "config_reference_pending";
 pub const REASON_CONFIG_REFERENCE_INVALID: &str = "config_reference_invalid";
 pub const REASON_CONFIG_VARIABLE_UNDEFINED: &str = "config_variable_undefined";
 
@@ -1400,6 +1402,8 @@ fn expand_journey(
     parent_steps: &[serde_json::Value],
     children: &HashMap<String, config::meta::synthetics_composition::ChildJourney>,
     defined: &HashSet<String>,
+    parent_updated_at: i64,
+    super_cluster: bool,
 ) -> Result<Vec<serde_json::Value>, ConfigError> {
     use config::meta::{
         synthetics::is_composition_action,
@@ -1439,13 +1443,26 @@ fn expand_journey(
     if !has_reference {
         return Ok(parent_steps.to_vec());
     }
-    let expanded = expand_steps(parent_steps, children).map_err(|e| ConfigError {
-        status_reason: match e {
-            ExpansionError::MissingChild(_) => REASON_CONFIG_REFERENCE_MISSING,
-            _ => REASON_CONFIG_REFERENCE_INVALID,
+    let expanded = expand_steps(parent_steps, children).map_err(|e| match e {
+        ExpansionError::MissingChild(_)
+            if super_cluster && within_replication_grace(parent_updated_at) =>
+        {
+            ConfigError {
+                status_reason: REASON_CONFIG_REFERENCE_PENDING,
+                message: e.to_string(),
+                guard_failure: false,
+            }
+        }
+        ExpansionError::MissingChild(_) => ConfigError {
+            status_reason: REASON_CONFIG_REFERENCE_MISSING,
+            message: e.to_string(),
+            guard_failure: true,
         },
-        message: e.to_string(),
-        guard_failure: true,
+        _ => ConfigError {
+            status_reason: REASON_CONFIG_REFERENCE_INVALID,
+            message: e.to_string(),
+            guard_failure: true,
+        },
     })?;
     let max_steps = config::get_config().synthetics.browser_max_steps;
     if expanded.len() > max_steps {
@@ -1479,6 +1496,16 @@ fn expand_journey(
         }
     }
     Ok(expanded)
+}
+
+fn within_replication_grace(parent_updated_at: i64) -> bool {
+    let grace_secs = config::get_config()
+        .synthetics
+        .subtests_replication_grace_secs;
+    let grace_us = i64::try_from(grace_secs)
+        .unwrap_or(i64::MAX)
+        .saturating_mul(1_000_000);
+    config::utils::time::now_micros().saturating_sub(parent_updated_at) < grace_us
 }
 
 /// Splices every referenced child's stored steps into the parent's config, or says why it cannot.
@@ -1541,13 +1568,25 @@ async fn expand_for_resolve<C: sea_orm::ConnectionTrait>(
             );
         }
     }
-    let expanded =
-        expand_journey(&steps, &children, &resolvable_names(synthetic)).map_err(|e| {
-            if e.guard_failure {
-                config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
-            }
-            anyhow::Error::new(e)
-        })?;
+    #[cfg(feature = "enterprise")]
+    let super_cluster = o2_enterprise::enterprise::common::config::get_config()
+        .super_cluster
+        .enabled;
+    #[cfg(not(feature = "enterprise"))]
+    let super_cluster = false;
+    let expanded = expand_journey(
+        &steps,
+        &children,
+        &resolvable_names(synthetic),
+        synthetic.updated_at,
+        super_cluster,
+    )
+    .map_err(|e| {
+        if e.guard_failure {
+            config::metrics::SYNTHETICS_COMPOSITION_GUARD_FAILURES_TOTAL.inc();
+        }
+        anyhow::Error::new(e)
+    })?;
     synthetic.config["steps"] = serde_json::Value::Array(expanded);
     Ok(())
 }
@@ -3266,7 +3305,7 @@ mod tests {
         fn a_plain_journey_passes_through_untouched() {
             let steps = parent(&[], 3);
             assert_eq!(
-                expand_journey(&steps, &HashMap::new(), &HashSet::new()).unwrap(),
+                expand_journey(&steps, &HashMap::new(), &HashSet::new(), 0, false).unwrap(),
                 steps
             );
         }
@@ -3274,10 +3313,9 @@ mod tests {
         #[test]
         fn over_the_cap_is_a_customer_fixable_config_error() {
             let children = HashMap::from([("big".to_string(), child("big", 40))]);
-            // `parent`'s `own` count EXCLUDES the reference it appends, so this is
-            // 11 own steps + 40 child steps = 51 executed: exactly one over the cap.
-            let err =
-                expand_journey(&parent(&["big"], 11), &children, &HashSet::new()).unwrap_err();
+            // `own` excludes the appended reference: 11 + 40 = 51 executed, one over the cap.
+            let err = expand_journey(&parent(&["big"], 11), &children, &HashSet::new(), 0, false)
+                .unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_STEPS_EXCEEDED);
             assert!(!err.guard_failure);
             assert!(err.message.contains("51"), "{}", err.message);
@@ -3287,17 +3325,75 @@ mod tests {
         fn a_malformed_reference_never_reaches_a_browser() {
             // No `subtest.id`, so it yields no ref — the early return must still catch it.
             let steps = vec![nav("s0"), json!({ "id": "r0", "action": "subtest" })];
-            let err = expand_journey(&steps, &HashMap::new(), &HashSet::new()).unwrap_err();
+            let err =
+                expand_journey(&steps, &HashMap::new(), &HashSet::new(), 0, false).unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }
 
         #[test]
         fn a_missing_child_is_our_guard_failure() {
-            let err = expand_journey(&parent(&["gone"], 1), &HashMap::new(), &HashSet::new())
-                .unwrap_err();
+            let err = expand_journey(
+                &parent(&["gone"], 1),
+                &HashMap::new(),
+                &HashSet::new(),
+                0,
+                false,
+            )
+            .unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
             assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_fresh_super_cluster_parent_waits_for_its_child_to_replicate() {
+            let now = config::utils::time::now_micros();
+            let err = expand_journey(
+                &parent(&["gone"], 1),
+                &HashMap::new(),
+                &HashSet::new(),
+                now,
+                true,
+            )
+            .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_PENDING);
+            assert!(!err.guard_failure);
+        }
+
+        #[test]
+        fn a_super_cluster_parent_past_the_grace_period_reports_the_child_missing() {
+            let grace_us = i64::try_from(
+                config::get_config()
+                    .synthetics
+                    .subtests_replication_grace_secs,
+            )
+            .unwrap()
+                * 1_000_000;
+            let stale = config::utils::time::now_micros() - grace_us - 1_000_000;
+            let err = expand_journey(
+                &parent(&["gone"], 1),
+                &HashMap::new(),
+                &HashSet::new(),
+                stale,
+                true,
+            )
+            .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
+            assert!(err.guard_failure);
+        }
+
+        #[test]
+        fn a_fresh_parent_without_super_cluster_reports_the_child_missing() {
+            let now = config::utils::time::now_micros();
+            let err = expand_journey(
+                &parent(&["gone"], 1),
+                &HashMap::new(),
+                &HashSet::new(),
+                now,
+                false,
+            )
+            .unwrap_err();
+            assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_MISSING);
         }
 
         fn defined(name: &str) -> HashSet<String> {
@@ -3323,8 +3419,17 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            assert!(expand_journey(&parent(&["login"], 1), &children, &names).is_ok());
-            assert!(expand_journey(&parent(&["login"], 1), &children, &defined("sekret")).is_err());
+            assert!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).is_ok());
+            assert!(
+                expand_journey(
+                    &parent(&["login"], 1),
+                    &children,
+                    &defined("sekret"),
+                    0,
+                    false
+                )
+                .is_err()
+            );
         }
 
         // A {{NAME}} defined only as a browser secret resolves: the guard accepts it and env_inject
@@ -3344,7 +3449,7 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{PASSWORD}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            assert!(expand_journey(&parent(&["login"], 1), &children, &names).is_ok());
+            assert!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).is_ok());
 
             // Plain config: the (already decrypted) secret value joins env_inject.
             let mut env_inject = HashMap::new();
@@ -3357,7 +3462,7 @@ mod tests {
             // Expanded config: expansion splices steps and leaves `secrets` untouched.
             let mut expanded_config = synthetic.config.clone();
             expanded_config["steps"] =
-                json!(expand_journey(&parent(&["login"], 1), &children, &names).unwrap());
+                json!(expand_journey(&parent(&["login"], 1), &children, &names, 0, false).unwrap());
             let mut env_inject = HashMap::new();
             inject_browser_secrets(&expanded_config, &mut env_inject);
             assert_eq!(
@@ -3373,8 +3478,14 @@ mod tests {
             let mut b = child("b", 1);
             b.steps[0]["url"] = json!("https://x/{{BBB}}");
             let children = HashMap::from([("a".to_string(), a), ("b".to_string(), b)]);
-            let err =
-                expand_journey(&parent(&["a", "b"], 1), &children, &HashSet::new()).unwrap_err();
+            let err = expand_journey(
+                &parent(&["a", "b"], 1),
+                &children,
+                &HashSet::new(),
+                0,
+                false,
+            )
+            .unwrap_err();
             assert!(err.message.contains("AAA"), "{}", err.message);
         }
 
@@ -3383,8 +3494,8 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            let err =
-                expand_journey(&parent(&["login"], 1), &children, &HashSet::new()).unwrap_err();
+            let err = expand_journey(&parent(&["login"], 1), &children, &HashSet::new(), 0, false)
+                .unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_VARIABLE_UNDEFINED);
             // Customer-fixable, so it must not be counted as one of our guards failing.
             assert!(!err.guard_failure);
@@ -3396,7 +3507,14 @@ mod tests {
             let mut c = child("login", 1);
             c.steps[0]["url"] = json!("https://x/{{TOKEN}}");
             let children = HashMap::from([("login".to_string(), c)]);
-            let out = expand_journey(&parent(&["login"], 1), &children, &defined("TOKEN")).unwrap();
+            let out = expand_journey(
+                &parent(&["login"], 1),
+                &children,
+                &defined("TOKEN"),
+                0,
+                false,
+            )
+            .unwrap();
             assert_eq!(out.len(), 2);
         }
 
@@ -3407,8 +3525,14 @@ mod tests {
                 .steps
                 .push(json!({ "id": "z", "action": "subtest", "subtest": { "id": "other" } }));
             let children = HashMap::from([("nested".to_string(), nested)]);
-            let err =
-                expand_journey(&parent(&["nested"], 1), &children, &HashSet::new()).unwrap_err();
+            let err = expand_journey(
+                &parent(&["nested"], 1),
+                &children,
+                &HashSet::new(),
+                0,
+                false,
+            )
+            .unwrap_err();
             assert_eq!(err.status_reason, REASON_CONFIG_REFERENCE_INVALID);
             assert!(err.guard_failure);
         }

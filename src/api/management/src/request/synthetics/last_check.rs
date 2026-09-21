@@ -193,6 +193,7 @@ mod tests {
             steps: None,
             referenced_by: 0,
             references: None,
+            reference_state: None,
         }
     }
 

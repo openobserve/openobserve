@@ -86,6 +86,12 @@ pub fn classify(
     if error_source == ERROR_SOURCE_QUEUE {
         return RunClass::NotMeasured;
     }
+    // A child still replicating to this region is lag of ours, like a queue drop.
+    if error_source == ERROR_SOURCE_CONFIG
+        && status_reason == Some(crate::job_api::REASON_CONFIG_REFERENCE_PENDING)
+    {
+        return RunClass::NotMeasured;
+    }
     match run_status {
         Some("passed") => RunClass::Healthy,
         Some("warning") => match status_reason {
@@ -420,6 +426,28 @@ mod tests {
                 1,
                 ERROR_SOURCE_CONFIG,
                 Some("config_steps_exceeded")
+            ),
+            RunClass::Failing
+        );
+    }
+
+    #[test]
+    fn a_pending_replication_is_not_measured() {
+        assert_eq!(
+            classify(
+                Some("error"),
+                1,
+                ERROR_SOURCE_CONFIG,
+                Some(crate::job_api::REASON_CONFIG_REFERENCE_PENDING)
+            ),
+            RunClass::NotMeasured
+        );
+        assert_eq!(
+            classify(
+                Some("error"),
+                1,
+                ERROR_SOURCE_CONFIG,
+                Some(crate::job_api::REASON_CONFIG_REFERENCE_MISSING)
             ),
             RunClass::Failing
         );

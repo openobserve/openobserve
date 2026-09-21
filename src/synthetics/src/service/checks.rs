@@ -1,3 +1,4 @@
+use config::meta::synthetics::ReferenceState;
 use infra::db::{get_orm_client_ro, get_orm_client_rw};
 use sea_orm::DatabaseConnection;
 
@@ -321,6 +322,12 @@ pub async fn list_synthetics(
     let counts = synthetics_refs::child_step_counts(conn, org_id, &child_ids)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    // Its own call: a child in another folder is not on this page, so `refs` has no entry for it.
+    let nested: HashSet<String> = synthetics_refs::refs_for_parents(conn, org_id, &child_ids)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .into_keys()
+        .collect();
     let used_by: HashMap<String, i32> = synthetics_refs::list_parents_for_many(conn, org_id, &ids)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
@@ -361,13 +368,14 @@ pub async fn list_synthetics(
                 slug
             }
         };
-        let (steps, referenced_by, references) = composition_fields(
+        let (steps, referenced_by, references, reference_state) = composition_fields(
             &m.id,
             m.check_type == SyntheticType::Browser,
             &own,
             &refs,
             &counts,
             &used_by,
+            &nested,
         );
         items.push(SyntheticListItem {
             id: m.id,
@@ -390,6 +398,7 @@ pub async fn list_synthetics(
             steps,
             referenced_by,
             references,
+            reference_state,
         });
     }
 
@@ -771,8 +780,7 @@ async fn delete_each_parents_first(
     Ok(())
 }
 
-/// A row's expanded steps (browser only, §5.11), its embed count, and the subtest steps it holds
-/// (browser only).
+/// Returns (expanded steps, referenced-by count, references held, reference state) for a row.
 fn composition_fields(
     id: &str,
     is_browser: bool,
@@ -780,10 +788,11 @@ fn composition_fields(
     refs: &HashMap<String, Vec<String>>,
     counts: &HashMap<String, usize>,
     used_by: &HashMap<String, i32>,
-) -> (Option<i32>, i32, Option<i32>) {
+    nested: &HashSet<String>,
+) -> (Option<i32>, i32, Option<i32>, Option<ReferenceState>) {
     let referenced_by = used_by.get(id).copied().unwrap_or(0);
     if !is_browser {
-        return (None, referenced_by, None);
+        return (None, referenced_by, None, None);
     }
     let own_steps = own.get(id).copied().unwrap_or(0);
     let expanded = match refs.get(id) {
@@ -795,24 +804,34 @@ fn composition_fields(
     let references = refs
         .get(id)
         .map_or(0, |c| i32::try_from(c.len()).unwrap_or(i32::MAX));
+    let reference_state = refs.get(id).filter(|c| !c.is_empty()).map(|children| {
+        if children.iter().any(|c| !counts.contains_key(c)) {
+            ReferenceState::Missing
+        } else if children.iter().any(|c| nested.contains(c)) {
+            ReferenceState::Nested
+        } else {
+            ReferenceState::Ok
+        }
+    });
     (
         Some(i32::try_from(expanded).unwrap_or(i32::MAX)),
         referenced_by,
         Some(references),
+        reference_state,
     )
 }
 
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashMap,
+        collections::{HashMap, HashSet},
         sync::{
             Arc,
             atomic::{AtomicBool, Ordering},
         },
     };
 
-    use config::meta::synthetics::{Synthetic, SyntheticType};
+    use config::meta::synthetics::{ReferenceState, Synthetic, SyntheticType};
     use infra::table::synthetics_checks;
 
     use super::{
@@ -913,27 +932,43 @@ mod tests {
             ("p".to_string(), 4usize),
             ("a".to_string(), 13usize),
             ("q".to_string(), 4usize),
+            ("m".to_string(), 2usize),
+            ("n".to_string(), 2usize),
+            ("b".to_string(), 2usize),
         ]);
         // `refs` holds one entry per occurrence, so `q` referencing `a` twice lists it twice.
         let refs = HashMap::from([
             ("p".to_string(), vec!["a".to_string()]),
             ("q".to_string(), vec!["a".to_string(), "a".to_string()]),
+            ("m".to_string(), vec!["gone".to_string()]),
+            ("n".to_string(), vec!["elsewhere".to_string()]),
+            (
+                "b".to_string(),
+                vec!["gone".to_string(), "elsewhere".to_string()],
+            ),
         ]);
-        let counts = HashMap::from([("a".to_string(), 13usize)]);
+        let counts = HashMap::from([
+            ("a".to_string(), 13usize),
+            ("elsewhere".to_string(), 3usize),
+        ]);
         let used_by = HashMap::from([("a".to_string(), 2i32)]);
-        let (p_steps, p_used, p_refs) =
-            composition_fields("p", true, &own, &refs, &counts, &used_by);
-        assert_eq!((p_steps, p_used, p_refs), (Some(16), 0, Some(1)));
-        let (a_steps, a_used, a_refs) =
-            composition_fields("a", true, &own, &refs, &counts, &used_by);
-        assert_eq!((a_steps, a_used, a_refs), (Some(13), 2, Some(0)));
+        // `elsewhere` is not on this page, so only the second refs call knows it holds a subtest.
+        let nested = HashSet::from(["elsewhere".to_string()]);
+        let row = |id: &str, browser: bool| {
+            composition_fields(id, browser, &own, &refs, &counts, &used_by, &nested)
+        };
         assert_eq!(
-            composition_fields("q", true, &own, &refs, &counts, &used_by),
-            (Some(28), 0, Some(2))
+            row("p", true),
+            (Some(16), 0, Some(1), Some(ReferenceState::Ok))
         );
+        assert_eq!(row("a", true), (Some(13), 2, Some(0), None));
         assert_eq!(
-            composition_fields("h", false, &own, &refs, &counts, &used_by),
-            (None, 0, None)
+            row("q", true),
+            (Some(28), 0, Some(2), Some(ReferenceState::Ok))
         );
+        assert_eq!(row("h", false), (None, 0, None, None));
+        assert_eq!(row("m", true).3, Some(ReferenceState::Missing));
+        assert_eq!(row("n", true).3, Some(ReferenceState::Nested));
+        assert_eq!(row("b", true).3, Some(ReferenceState::Missing));
     }
 }

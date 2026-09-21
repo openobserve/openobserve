@@ -442,6 +442,10 @@ pub const SYNTHETICS_RELOAD_CLASSES: &[(&str, SyntheticsReloadClass)] = &[
         SyntheticsReloadClass::RestartRequired,
     ),
     ("ZO_SYNTHETICS_SUBTESTS_ENABLED", SyntheticsReloadClass::Hot),
+    (
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        SyntheticsReloadClass::Hot,
+    ),
     ("ZO_SYNTHETICS_LAMBDA_BROWSER", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_LAMBDA_NET", SyntheticsReloadClass::Hot),
     ("ZO_SYNTHETICS_API_ENDPOINT", SyntheticsReloadClass::Hot),
@@ -501,6 +505,7 @@ pub(crate) fn synthetics_restart_required_changes(
     let Synthetics {
         enabled,
         subtests_enabled: _,
+        subtests_replication_grace_secs: _,
         status_page_rebuild_interval,
         status_page_domain_verify_interval,
         status_page_public_rpm,
@@ -1034,6 +1039,13 @@ pub struct Synthetics {
         help = "Enables subtest references in browser checks. Off by default; while false the server refuses composition writes and the UI hides Insert subtest."
     )]
     pub subtests_enabled: bool,
+    /// Super-cluster only: how long a parent may reference a child that has not replicated yet.
+    #[env_config(
+        name = "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
+        default = 300,
+        help = "Super-cluster only. Seconds after a parent's last change during which a missing subtest is reported as pending replication, not as missing."
+    )]
+    pub subtests_replication_grace_secs: u64,
     /// Seconds between status-page snapshot rebuild ticks.
     #[env_config(
         name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
@@ -4855,6 +4867,7 @@ mod tests {
     const ALL_SYNTHETICS_ENV_VARS: &[&str] = &[
         "ZO_SYNTHETICS_ENABLED",
         "ZO_SYNTHETICS_SUBTESTS_ENABLED",
+        "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
         "ZO_SYNTHETICS_LAMBDA_BROWSER",
         "ZO_SYNTHETICS_LAMBDA_NET",
         "ZO_SYNTHETICS_API_ENDPOINT",
@@ -4888,8 +4901,8 @@ mod tests {
     fn synthetics_reload_classification_is_pinned() {
         assert_eq!(
             SYNTHETICS_RELOAD_CLASSES.len(),
-            16,
-            "Synthetics has 16 keys; every one needs a reload class"
+            17,
+            "Synthetics has 17 keys; every one needs a reload class"
         );
 
         let mut classified: Vec<&str> = SYNTHETICS_RELOAD_CLASSES
@@ -4927,6 +4940,7 @@ mod tests {
                 "ZO_SYNTHETICS_RECORDER_EXTENSION_URL",
                 "ZO_SYNTHETICS_SCHEDULER_JITTER_ENABLED",
                 "ZO_SYNTHETICS_SUBTESTS_ENABLED",
+                "ZO_SYNTHETICS_SUBTESTS_REPLICATION_GRACE_SECS",
             ]
         );
 
@@ -4979,6 +4993,7 @@ mod tests {
     fn mutate_every_synthetics_field(cfg: &mut Synthetics) {
         cfg.enabled = !cfg.enabled;
         cfg.subtests_enabled = !cfg.subtests_enabled;
+        cfg.subtests_replication_grace_secs += 1;
         cfg.lambda_browser.push_str("-changed");
         cfg.lambda_net.push_str("-changed");
         cfg.api_endpoint = "https://example.invalid".to_string();
