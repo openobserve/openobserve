@@ -105,7 +105,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { updateOrgSettingsMutation } from "@/services/organizations.queries";
 import { useMutation } from "@tanstack/vue-query";
 import { useOrgId } from "@/composables/query";
@@ -219,7 +219,10 @@ const saveOrgSettings = async (value: OrganizationSettingsForm) => {
     });
   } catch (e: any) {
     toast({
-      message: e?.message || t("settings.organizationSettings.settingsSaveError"),
+      message:
+        raw(e?.response?.data?.message) ||
+        raw(e?.message) ||
+        t("settings.organizationSettings.settingsSaveError"),
       variant: "error",
     });
   }
