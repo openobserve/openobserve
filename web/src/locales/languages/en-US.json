@@ -15898,7 +15898,8 @@
       "oncallAck": "Acknowledge",
       "oncallEscalate": "Escalate",
       "oncallSnooze": "Snooze",
-      "oncallResolve": "Resolve"
+      "oncallResolve": "Resolve",
+      "functionsImport": "Import function"
     }
   },
   "components": {

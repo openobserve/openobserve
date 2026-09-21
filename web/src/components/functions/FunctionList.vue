@@ -136,16 +136,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="edit"
                 />
                 <OButton
-                  variant="ghost-destructive"
-                  size="icon-sm"
-                  :title="t('function.delete')"
-                  data-test="function-list-delete-function-btn"
-                  data-row-action="delete"
-                  class="max-md:hidden"
-                  @click="showDeleteDialogFn({ row })"
-                  icon-left="delete"
-                />
-                <OButton
                   variant="ghost"
                   size="icon-sm"
                   icon-left="download"
@@ -163,6 +153,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   data-row-action="view"
                   class="max-md:hidden"
                   @click="getAssociatedPipelines({ row })"
+                />
+                <OButton
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('function.delete')"
+                  data-test="function-list-delete-function-btn"
+                  data-row-action="delete"
+                  class="max-md:hidden"
+                  @click="showDeleteDialogFn({ row })"
+                  icon-left="delete"
                 />
                 <ODropdown side="bottom" align="end">
                   <template #trigger>
@@ -184,15 +184,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <span>{{ t("function.updateTitle") }}</span>
                   </ODropdownItem>
                   <ODropdownItem
-                    icon-left="delete"
-                    variant="destructive"
-                    class="md:hidden"
-                    data-test="function-list-delete-function-btn-menu"
-                    @select="showDeleteDialogFn({ row })"
-                  >
-                    <span>{{ t("function.delete") }}</span>
-                  </ODropdownItem>
-                  <ODropdownItem
                     icon-left="download"
                     class="md:hidden"
                     data-test="function-list-export-function-btn-menu"
@@ -207,6 +198,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @select="getAssociatedPipelines({ row })"
                   >
                     <span>{{ t("function.associatedPipelines") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    data-test="function-list-delete-function-btn-menu"
+                    @select="showDeleteDialogFn({ row })"
+                  >
+                    <span>{{ t("function.delete") }}</span>
                   </ODropdownItem>
                 </ODropdown>
               </div>
@@ -910,6 +910,12 @@ export default defineComponent({
         id: "functionsAdd",
         handler: () => {
           if (!isInputFocused()) showAddUpdateFn({});
+        },
+      },
+      {
+        id: "functionsImport",
+        handler: () => {
+          if (!isInputFocused()) goToImportFunction();
         },
       },
       {
