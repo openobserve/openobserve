@@ -179,6 +179,9 @@ jobs:
         # api_regression_tests job below — they now run in parallel
         # with this default-set job instead of sequentially within it.
         # Cuts ~8 min off CI wall time at the cost of more runner minutes.
+        # tests/alerts is out for the same reason (api_alerts_tests below): it
+        # was 676s of this job's 1140s, and 602s of that was four wall-clock
+        # pending-window tests that no amount of CPU makes faster.
         # NB: --force-sugar is intentionally omitted. pytest-sugar is already
         # auto-loaded via the entry point; passing --force-sugar registers it
         # a second time, which inflates the progress counter (CI displayed
@@ -194,7 +197,7 @@ jobs:
             fi
             sleep 1
           done
-          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --junitxml=junit-integration.xml
+          rye run pytest --ignore=tests/regression --ignore=tests/query_agent --ignore=tests/vortex --ignore=tests/alerts --junitxml=junit-integration.xml
           kill $SERVER_PID_DEFAULT || true
         working-directory: tests/api-testing/
 
@@ -216,6 +219,99 @@ jobs:
         with:
           name: openobserve-server-logs
           path: tests/api-testing/o2_*.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The alerts suite is wall-clock bound, not CPU bound: the pending ('for')
+  # window and the 1-minute minimum alert frequency are real seconds the tests
+  # have to sit through. Serially inside api_integration_tests it was 676s of a
+  # 1140s step. Here it runs in parallel with the other suites AND with itself —
+  # -n 4 overlaps the waits, which is the only thing that shortens them.
+  api_alerts_tests:
+    name: api_alerts_tests
+    needs: [check_changes, build_api_binary]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubicloud-standard-4
+    permissions:
+      actions: read
+      contents: read  # only need to checkout the repo
+    steps:
+      - name: Checkout git repo
+        uses: actions/checkout@v5
+
+      - name: Download OpenObserve debug binary
+        uses: actions/download-artifact@v5
+        with:
+          name: openobserve-api-debug-${{ github.sha }}
+          path: api-binary-artifact
+
+      - name: Extract OpenObserve debug binary
+        run: |
+          mkdir -p target/debug
+          tar -xzf api-binary-artifact/openobserve-api-debug.tar.gz -C target/debug
+          chmod +x target/debug/openobserve
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        id: setup-python
+        with:
+          python-version: "3.11.6"
+
+      - name: Setup rye
+        uses: eifinger/setup-rye@c694239a43768373e87d0103d7f547027a23f3c8 # v4.2.9
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
+        with:
+          enable-cache: true
+          working-directory: "tests/api-testing/"
+          version: "0.27.0"
+
+      - name: Pin cpython
+        run: rye pin cpython@3.11.6
+        working-directory: tests/api-testing/
+
+      - name: Rye sync
+        run: rye sync
+        working-directory: tests/api-testing/
+
+      - name: Run alerts tests
+        # Safe to run test-parallel: every alert, stream and destination name
+        # comes from uniq() (ms timestamp + 4 random hex), the shared template /
+        # destination / seed-stream provisioning is idempotent create-then-PUT,
+        # and no test asserts on the shared delivery sink's contents.
+        run: |
+          ${{ github.workspace }}/target/debug/openobserve > o2_alerts.log 2>&1 &
+          SERVER_PID_ALERTS=$!
+          echo "OpenObserve PID for alerts tests: $SERVER_PID_ALERTS"
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5080/healthz > /dev/null 2>&1; then
+              echo "Server ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          rye run pytest tests/alerts -n 4 --junitxml=junit-alerts.xml
+          kill $SERVER_PID_ALERTS || true
+        working-directory: tests/api-testing/
+
+      # Folded into the api_integration_tests metrics category on purpose: the
+      # alerts tests did not become new tests by moving to their own runner, and
+      # the category's legs are deduped by test identity.
+      - name: Upload API junit (alerts)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-junit__api_integration_tests__alerts
+          path: tests/api-testing/junit-alerts.xml
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Upload OpenObserve server logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openobserve-alerts-server-logs
+          path: tests/api-testing/o2_alerts.log
           if-no-files-found: warn
           retention-days: 14
 
@@ -552,7 +648,7 @@ jobs:
   api_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, build_api_binary, api_integration_tests, api_query_agent_tests, api_regression_tests]
+    needs: [check_changes, build_api_binary, api_integration_tests, api_alerts_tests, api_query_agent_tests, api_regression_tests]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
@@ -573,12 +669,13 @@ jobs:
           #    test jobs must have succeeded.
           if [ "${{ needs.build_api_binary.result }}" == "success" ] && \
              [ "${{ needs.api_integration_tests.result }}" == "success" ] && \
+             [ "${{ needs.api_alerts_tests.result }}" == "success" ] && \
              [ "${{ needs.api_query_agent_tests.result }}" == "success" ] && \
              [ "${{ needs.api_regression_tests.result }}" == "success" ]; then
             echo "All API test jobs passed"
             exit 0
           else
-            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
+            echo "API tests failed: build=${{ needs.build_api_binary.result }}, integration=${{ needs.api_integration_tests.result }}, alerts=${{ needs.api_alerts_tests.result }}, query_agent=${{ needs.api_query_agent_tests.result }}, regression=${{ needs.api_regression_tests.result }}"
             exit 1
           fi
 
@@ -586,7 +683,7 @@ jobs:
   # suite=api). Re-runs append one doc per attempt; the dashboard keeps the latest attempt per run_id.
   report_to_openobserve:
     name: Report run metrics to OpenObserve
-    needs: [check_changes, api_integration_tests, api_query_agent_tests, api_regression_tests]
+    needs: [check_changes, api_integration_tests, api_alerts_tests, api_query_agent_tests, api_regression_tests]
     if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     permissions:
@@ -613,14 +710,15 @@ jobs:
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
           INTEG: ${{ needs.api_integration_tests.result }}
+          ALERTS: ${{ needs.api_alerts_tests.result }}
           AGENT: ${{ needs.api_query_agent_tests.result }}
           REG: ${{ needs.api_regression_tests.result }}
         run: |
-          if [ "$INTEG" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ]; then
+          if [ "$INTEG" = "skipped" ] && [ "$ALERTS" = "skipped" ] && [ "$AGENT" = "skipped" ] && [ "$REG" = "skipped" ]; then
             echo "::notice::no API tests ran (no relevant changes) — skipping metrics"; exit 0
           fi
-          if [ "$INTEG" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ]; then CONCLUSION=failure
-          elif [ "$INTEG" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
+          if [ "$INTEG" = "failure" ] || [ "$ALERTS" = "failure" ] || [ "$AGENT" = "failure" ] || [ "$REG" = "failure" ]; then CONCLUSION=failure
+          elif [ "$INTEG" = "cancelled" ] || [ "$ALERTS" = "cancelled" ] || [ "$AGENT" = "cancelled" ] || [ "$REG" = "cancelled" ]; then CONCLUSION=cancelled
           else CONCLUSION=success; fi
           export CONCLUSION STREAM=ci_test_runs SUITE=api
           # Parse junit into per-category + total counts. The TOTAL folds into the

@@ -8,8 +8,8 @@ The API suite is grouped into test CATEGORIES (set by the upload-artifact name
 (query_agent is split by phase — see PHASE_RE below.)
 Several jobs/shards fold into one category (their test sets are DISJOINT, so the
 dedup below makes "within-category dedup" == sum):
-  api_integration_tests = the integration default-set + regression (+ ENT's
-                          oss_in_ent / ent_top / ent_rbac shards)
+  api_integration_tests = the integration default-set + alerts + regression
+                          (+ ENT's oss_in_ent / alerts / ent_top / ent_rbac shards)
   vortex                = tests/vortex/* + test_3_vortex.py
 Other jobs re-run the SAME tests under several env-flag matrix legs (query_agent
 opt true|false; regression utf8/join combos) — those legs must collapse, not
