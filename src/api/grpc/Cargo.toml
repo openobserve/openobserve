@@ -58,8 +58,10 @@ search_service.workspace = true
 tokio.workspace = true
 tokio-stream.workspace = true
 tonic.workspace = true
+tonic-tracing-opentelemetry.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 
 [dev-dependencies]
 arrow-schema.workspace = true
+tracing-subscriber.workspace = true
