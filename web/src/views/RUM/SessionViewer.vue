@@ -77,7 +77,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="icon-toolbar"
       />
     </template>
-    <div class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden">
+    <OEmptyState
+      v-if="sessionNotFound"
+      size="hero"
+      illustration="no-results"
+      :title="t('rum.noReplayRecordedTitle')"
+      :description="t('rum.noReplayRecordedMessage', { id: sessionId })"
+      data-test="session-viewer-no-replay"
+    />
+    <div
+      v-else
+      class="bg-card-glass-bg flex h-[calc(100%-3.125)]! min-h-0 w-full flex-1 overflow-hidden"
+    >
       <OSplitter
         v-model="splitterSize"
         :limits="[200, 1400]"
@@ -148,6 +159,7 @@ import usePerformance from "@/composables/rum/usePerformance";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ShareButton from "@/components/common/ShareButton.vue";
 import useRum from "@/composables/rum/useRum";
 
@@ -186,6 +198,8 @@ const segmentEvents = ref<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
+// Set when _sessionreplay has no rows for the id, so the page says so instead of mounting a player.
+const sessionNotFound = ref(false);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the
 // wireframe player; browser sessions use the rrweb VideoPlayer.
@@ -247,6 +261,7 @@ const rawEventsMap = ref<Map<string, any>>(new Map());
 onBeforeMount(async () => {
   sessionId.value = router.currentRoute.value.params.id as string;
   await getSession();
+  if (sessionNotFound.value) return;
   getSessionSegments();
   getSessionEvents();
 });
@@ -345,6 +360,8 @@ const getSession = () => {
       )
       .then((res) => {
         if (res.data.hits.length === 0) {
+          sessionNotFound.value = true;
+          segmentsLoading.value = false;
           return;
         }
 

@@ -69,10 +69,24 @@ vi.mock("@/composables/rum/usePerformance", () => ({
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  // The session lookup aggregates over _sessionreplay; it finds a row unless a test says otherwise.
+  const sessionRow = {
+    zo_sql_timestamp: 1692884313968000,
+    start_time: 1692884313968,
+    end_time: 1692884769270,
+    browser: "Chrome",
+    os: "macOS",
+    ip: "1.2.3.4",
+    source: "browser",
+    city: "San Francisco",
+    country: "US",
+    session_id: "session-abc",
+  };
   return overlayServiceMock(await importOriginal(), {
     default: {
-      search: vi.fn().mockResolvedValue({
-        data: { hits: [] },
+      search: vi.fn().mockImplementation(async (params: any) => {
+        const sql: string = params?.query?.query?.sql ?? "";
+        return { data: { hits: sql.includes("min(start)") ? [sessionRow] : [] } };
       }),
     },
   });
@@ -178,7 +192,10 @@ describe("SessionViewer.vue", () => {
 
     it("should show Unknown User when session has no user email initially", () => {
       // Default sessionDetails.user_email starts as "" before session load
-      expect(wrapper.text()).toContain("Unknown User");
+      vi.mocked(searchService.search).mockReturnValueOnce(new Promise(() => {}));
+      const pending = mountSessionViewer(router);
+      expect(pending.text()).toContain("Unknown User");
+      pending.unmount();
     });
   });
 
@@ -666,6 +683,81 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
       expect(sql).toContain("session_id='session''x'");
     }
 
+    wrapper.unmount();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A session id with no rows in _sessionreplay (never recorded, or aged out)
+// must say so instead of mounting an empty player.
+// ---------------------------------------------------------------------------
+describe("SessionViewer.vue — no replay recorded", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  async function mountUnrecorded() {
+    vi.clearAllMocks();
+    // Only the first call is the lookup; a persistent override would leak into later tests.
+    vi.mocked(searchService.search).mockResolvedValueOnce({ data: { hits: [] } } as any);
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-unrecorded",
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    await flush();
+    await flush();
+    return wrapper;
+  }
+
+  it("shows the no-replay state naming the session id", async () => {
+    const wrapper = await mountUnrecorded();
+
+    const empty = wrapper.find('[data-test="session-viewer-no-replay"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.text()).toContain("No replay was recorded for this session");
+    expect(empty.text()).toContain("session-unrecorded");
+    wrapper.unmount();
+  });
+
+  it("does not mount the player or the events sidebar", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="stub-player-events-sidebar"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("issues only the session lookup, not the segment or event fetches", async () => {
+    const wrapper = await mountUnrecorded();
+
+    const sqlCalls = vi
+      .mocked(searchService.search)
+      .mock.calls.map((call) => (call[0] as any).query.query.sql as string);
+    expect(sqlCalls).toHaveLength(1);
+    expect(sqlCalls[0]).toContain("min(start)");
+    wrapper.unmount();
+  });
+
+  it("keeps the Go Back navigation", async () => {
+    const wrapper = await mountUnrecorded();
+
+    expect(wrapper.find('[data-test="session-viewer-back-btn"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("mounts the player when the session lookup finds a row", async () => {
+    vi.clearAllMocks();
+    const router = createTestRouter();
+    await router.push({
+      path: "/rum/sessions/session-abc",
+      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
+    });
+    const wrapper = mountSessionViewer(router);
+    await flush();
+    await flush();
+
+    expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);
     wrapper.unmount();
   });
 });
