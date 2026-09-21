@@ -14,10 +14,15 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use config::meta::cluster::get_internal_grpc_token;
-use infra::errors::{Error, Result};
+use infra::{
+    client::grpc::MetadataMap,
+    errors::{Error, Result},
+};
 use openobserve_node::grpc::get_ingester_channel;
 use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub async fn ingest(req: cluster_rpc::IngestionRequest) -> Result<cluster_rpc::IngestionResponse> {
     let cfg = config::get_config();
@@ -41,19 +46,35 @@ pub async fn ingest(req: cluster_rpc::IngestionRequest) -> Result<cluster_rpc::I
         cfg.limit.grpc_ingest_timeout,
     ));
 
+    let grpc_span = config::grpc_client_span!(
+        "service:ingestion:grpc_ingest",
+        &addr,
+        "cluster.Ingest",
+        "Ingest",
+    );
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &grpc_span.context(),
+            &mut MetadataMap(request.metadata_mut()),
+        )
+    });
+
     client = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024);
-    let res: cluster_rpc::IngestionResponse = match client.ingest(request).await {
-        Ok(r) => r.into_inner(),
-        Err(e) => {
-            log::error!("[InternalIngestion] export partial_success node: {addr}, response: {e}");
-            return Err(Error::IngestionError(format!(
-                "Ingest node {addr}, response error: {e}"
-            )));
-        }
-    };
+    let res: cluster_rpc::IngestionResponse =
+        match client.ingest(request).instrument(grpc_span).await {
+            Ok(r) => r.into_inner(),
+            Err(e) => {
+                log::error!(
+                    "[InternalIngestion] export partial_success node: {addr}, response: {e}"
+                );
+                return Err(Error::IngestionError(format!(
+                    "Ingest node {addr}, response error: {e}"
+                )));
+            }
+        };
     Ok(res)
 }

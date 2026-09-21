@@ -34,6 +34,8 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::{cache::file_data, cluster};
 
@@ -452,22 +454,35 @@ pub async fn download_from_node(
     if file_size_map.is_empty() {
         return Ok(files.to_vec());
     }
-    let request = tonic::Request::new(SimpleFileList {
+    let mut request = tonic::Request::new(SimpleFileList {
         files: files.iter().map(|(_, _, f, ..)| f.to_string()).collect(),
     });
 
+    let grpc_span = config::grpc_client_span!(
+        "service:file_cache:download:get_files",
+        addr,
+        "cluster.Event",
+        "GetFiles",
+    );
+    opentelemetry::global::get_text_map_propagator(|propagator| {
+        propagator.inject_context(
+            &grpc_span.context(),
+            &mut crate::client::grpc::MetadataMap(request.metadata_mut()),
+        )
+    });
     let resp = client
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
         .get_files(request)
+        .instrument(grpc_span.clone())
         .await
         .map_err(|e| anyhow::anyhow!("Failed to get files from {addr}, {e}"))?;
 
     let mut file_contents = HashMap::new();
     let mut downloaded_files = HashSet::new();
-    let mut resp_stream = resp.into_inner();
+    let mut resp_stream = config::utils::span::SpanBoundStream::new(resp.into_inner(), grpc_span);
     while let Some(resp) = resp_stream.next().await {
         let resp = match resp {
             Ok(resp) => resp,

@@ -257,6 +257,13 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                         .parse::<tonic::metadata::MetadataValue<_>>()
                         .unwrap(),
                 );
+                if let Some(tag) = config::utils::span::self_telemetry_tag()
+                    && let Ok(value) = MetadataValue::from_str(tag)
+                {
+                    grpc_request
+                        .metadata_mut()
+                        .insert(config::utils::span::SELF_TELEMETRY_HEADER, value);
+                }
 
                 match client
                     .send_compressed(CompressionEncoding::Gzip)
@@ -281,6 +288,88 @@ impl opentelemetry_sdk::trace::SpanExporter for MetaOrgTraceExporter {
                 }
             }
         }
+    }
+}
+
+/// OTLP/HTTP exporter that starts sending the self-telemetry tag once the cluster secret exists.
+#[derive(Debug)]
+struct SelfTaggedHttpExporter {
+    endpoint: String,
+    headers: HashMap<String, String>,
+    untagged: opentelemetry_otlp::SpanExporter,
+    tagged: std::sync::OnceLock<opentelemetry_otlp::SpanExporter>,
+    resource: Option<Resource>,
+}
+
+impl SelfTaggedHttpExporter {
+    fn new(endpoint: &str, headers: HashMap<String, String>) -> Result<Self, anyhow::Error> {
+        Ok(Self {
+            untagged: otlp_http_exporter(endpoint, headers.clone())?,
+            endpoint: endpoint.to_string(),
+            headers,
+            tagged: std::sync::OnceLock::new(),
+            resource: None,
+        })
+    }
+
+    // tracing starts before bootstrap caches the instance id, so the tagged exporter comes later
+    fn current(&self) -> &opentelemetry_otlp::SpanExporter {
+        if let Some(tagged) = self.tagged.get() {
+            return tagged;
+        }
+        let Some(tag) = config::utils::span::self_telemetry_tag() else {
+            return &self.untagged;
+        };
+        let mut headers = self.headers.clone();
+        headers.insert(
+            config::utils::span::SELF_TELEMETRY_HEADER.to_string(),
+            tag.to_string(),
+        );
+        match otlp_http_exporter(&self.endpoint, headers) {
+            Ok(mut tagged) => {
+                if let Some(resource) = &self.resource {
+                    opentelemetry_sdk::trace::SpanExporter::set_resource(&mut tagged, resource);
+                }
+                self.tagged.get_or_init(|| tagged)
+            }
+            Err(e) => {
+                log::error!("[TRACING] failed to build the tagged OTLP exporter: {e}");
+                &self.untagged
+            }
+        }
+    }
+}
+
+impl opentelemetry_sdk::trace::SpanExporter for SelfTaggedHttpExporter {
+    fn export(
+        &self,
+        batch: Vec<opentelemetry_sdk::trace::SpanData>,
+    ) -> impl std::future::Future<Output = opentelemetry_sdk::error::OTelSdkResult> + Send {
+        self.current().export(batch)
+    }
+
+    fn shutdown_with_timeout(&self, timeout: Duration) -> opentelemetry_sdk::error::OTelSdkResult {
+        let untagged = self.untagged.shutdown_with_timeout(timeout);
+        match self.tagged.get() {
+            Some(tagged) => untagged.and(tagged.shutdown_with_timeout(timeout)),
+            None => untagged,
+        }
+    }
+
+    fn force_flush(&self) -> opentelemetry_sdk::error::OTelSdkResult {
+        let untagged = self.untagged.force_flush();
+        match self.tagged.get() {
+            Some(tagged) => untagged.and(tagged.force_flush()),
+            None => untagged,
+        }
+    }
+
+    fn set_resource(&mut self, resource: &Resource) {
+        self.untagged.set_resource(resource);
+        if let Some(tagged) = self.tagged.get_mut() {
+            tagged.set_resource(resource);
+        }
+        self.resource = Some(resource.clone());
     }
 }
 
@@ -317,20 +406,7 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                         cfg.common.tracing_header_key.clone(),
                         cfg.common.tracing_header_value.clone(),
                     );
-                    opentelemetry_otlp::SpanExporter::builder()
-                        .with_http()
-                        .with_http_client(
-                            reqwest::Client::builder()
-                        .danger_accept_invalid_certs(true)
-                        .timeout(Duration::from_secs(10))           // Overall request timeout
-                        .connect_timeout(Duration::from_secs(5))    // Connection establishment timeout
-                        .pool_idle_timeout(Duration::from_secs(60)) // How long to keep idle connections
-                        .pool_max_idle_per_host(10) // How many idle connections to keep per host
-                        .build()?,
-                        )
-                        .with_endpoint(&cfg.common.otel_otlp_url)
-                        .with_headers(headers)
-                        .build()?
+                    SelfTaggedHttpExporter::new(&cfg.common.otel_otlp_url, headers)?
                 },
                 opentelemetry_sdk::runtime::Tokio,
             )
@@ -358,6 +434,7 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                         .with_tonic()
                         .with_endpoint(&cfg.common.otel_otlp_grpc_url)
                         .with_metadata(metadata)
+                        .with_interceptor(tag_self_telemetry)
                         .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                         .build()?
                 },
@@ -391,20 +468,7 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                     cfg.common.tracing_header_value.clone(),
                 );
 
-                let oo_exporter = opentelemetry_otlp::SpanExporter::builder()
-                    .with_http()
-                    .with_http_client(
-                        reqwest::Client::builder()
-                            .danger_accept_invalid_certs(true)
-                            .timeout(Duration::from_secs(10))
-                            .connect_timeout(Duration::from_secs(5))
-                            .pool_idle_timeout(Duration::from_secs(60))
-                            .pool_max_idle_per_host(10)
-                            .build()?,
-                    )
-                    .with_endpoint(&cfg.common.otel_otlp_url)
-                    .with_headers(headers)
-                    .build()?;
+                let oo_exporter = SelfTaggedHttpExporter::new(&cfg.common.otel_otlp_url, headers)?;
 
                 let oo_processor = opentelemetry_sdk::trace::span_processor_with_async_runtime::BatchSpanProcessor::builder(
                     oo_exporter,
@@ -434,6 +498,7 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
                     .with_tonic()
                     .with_endpoint(&cfg.common.otel_otlp_grpc_url)
                     .with_metadata(metadata)
+                    .with_interceptor(tag_self_telemetry)
                     .with_protocol(opentelemetry_otlp::Protocol::Grpc)
                     .build()?;
 
@@ -586,4 +651,38 @@ pub fn enable_tracing() -> Result<opentelemetry_sdk::trace::SdkTracerProvider, a
 
     // Return the tracer provider
     Ok(tracer)
+}
+
+fn otlp_http_exporter(
+    endpoint: &str,
+    headers: HashMap<String, String>,
+) -> Result<opentelemetry_otlp::SpanExporter, anyhow::Error> {
+    Ok(opentelemetry_otlp::SpanExporter::builder()
+        .with_http()
+        .with_http_client(
+            reqwest::Client::builder()
+                .danger_accept_invalid_certs(true)
+                .timeout(Duration::from_secs(10))
+                .connect_timeout(Duration::from_secs(5))
+                .pool_idle_timeout(Duration::from_secs(60))
+                .pool_max_idle_per_host(10)
+                .build()?,
+        )
+        .with_endpoint(endpoint)
+        .with_headers(headers)
+        .build()?)
+}
+
+// added per request: tracing starts before bootstrap caches the instance id the tag derives from
+fn tag_self_telemetry(
+    mut request: tonic::Request<()>,
+) -> Result<tonic::Request<()>, tonic::Status> {
+    if let Some(tag) = config::utils::span::self_telemetry_tag()
+        && let Ok(value) = MetadataValue::from_str(tag)
+    {
+        request
+            .metadata_mut()
+            .insert(config::utils::span::SELF_TELEMETRY_HEADER, value);
+    }
+    Ok(request)
 }

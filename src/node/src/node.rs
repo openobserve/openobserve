@@ -15,6 +15,7 @@
 
 use std::sync::Arc;
 
+use common::meta::grpc::MetadataMap;
 use config::meta::cluster::{Node as ConfigNode, NodeInfo, NodeStatus, Role, RoleGroup};
 use infra::cluster::get_cached_nodes;
 use proto::cluster_rpc::{
@@ -22,6 +23,8 @@ use proto::cluster_rpc::{
     NodeStatus as ProtoNodeStatus, Role as ProtoRole, RoleGroup as ProtoRoleGroup,
 };
 use tonic::{Request, Response, Status};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub struct NodeService;
 
@@ -150,10 +153,15 @@ pub fn proto_node_to_config(node: NodeDetails) -> ConfigNode {
 
 #[tonic::async_trait]
 impl proto::cluster_rpc::node_service_server::NodeService for NodeService {
+    #[tracing::instrument(name = "grpc:node:get_nodes", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.NodeService", rpc.method = "GetNodes", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_nodes(
         &self,
-        _request: Request<EmptyRequest>,
+        request: Request<EmptyRequest>,
     ) -> Result<Response<GetNodesResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         // Get all nodes from cache
         let nodes = get_cached_nodes(|_| true).await.unwrap_or_default();
 
@@ -175,25 +183,35 @@ pub async fn get_node_list(
 
     // Create a task to fetch nodes from this cluster node
     let trace_id = trace_id.to_string();
+    let grpc_span = config::grpc_client_span!(
+        "service:node:grpc_get_nodes",
+        &node.get_grpc_addr(),
+        "cluster.NodeService",
+        "GetNodes",
+    );
     let task: tokio::task::JoinHandle<Result<Vec<NodeDetails>, infra::errors::Error>> =
-        tokio::task::spawn(async move {
-            let empty_request = EmptyRequest {};
-            let mut request = Request::new(empty_request);
-            let mut client =
-                infra::client::grpc::make_grpc_node_client(&trace_id, &mut request, &node).await?;
-            let nodes = match client.get_nodes(Request::new(empty_request)).await {
-                Ok(remote_nodes) => remote_nodes.into_inner().nodes,
-                Err(err) => {
-                    log::error!(
-                        "Failed to get nodes from cluster node {}: {:?}",
-                        node.get_grpc_addr(),
-                        err
-                    );
-                    Vec::new()
-                }
-            };
-            Ok(nodes)
-        });
+        tokio::task::spawn(
+            async move {
+                let empty_request = EmptyRequest {};
+                let mut request = Request::new(empty_request);
+                let mut client =
+                    infra::client::grpc::make_grpc_node_client(&trace_id, &mut request, &node)
+                        .await?;
+                let nodes = match client.get_nodes(request).await {
+                    Ok(remote_nodes) => remote_nodes.into_inner().nodes,
+                    Err(err) => {
+                        log::error!(
+                            "Failed to get nodes from cluster node {}: {:?}",
+                            node.get_grpc_addr(),
+                            err
+                        );
+                        Vec::new()
+                    }
+                };
+                Ok(nodes)
+            }
+            .instrument(grpc_span),
+        );
 
     // Wait for the task and handle the result
     match task.await {

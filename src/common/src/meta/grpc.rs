@@ -16,6 +16,24 @@
 use opentelemetry::{propagation::Extractor, trace::TraceContextExt};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
+/// SERVER span for an incoming OTLP export; OpenObserve's own exports get no span at all.
+#[macro_export]
+macro_rules! otlp_server_span {
+    ($metadata:expr, $name:expr, $service:expr, $method:expr) => {{
+        let metadata: &::tonic::metadata::MetadataMap = $metadata;
+        if $crate::meta::grpc::is_self_telemetry_export(metadata) {
+            ::tracing::Span::none()
+        } else {
+            let span = ::config::grpc_server_span!($name, $service, $method);
+            let parent_cx = ::opentelemetry::global::get_text_map_propagator(|prop| {
+                prop.extract(&$crate::meta::grpc::MetadataMap(metadata))
+            });
+            $crate::meta::grpc::set_remote_parent(&span, parent_cx);
+            span
+        }
+    }};
+}
+
 pub struct MetadataMap<'a>(pub &'a tonic::metadata::MetadataMap);
 
 impl Extractor for MetadataMap<'_> {
@@ -32,6 +50,19 @@ impl Extractor for MetadataMap<'_> {
             })
             .collect()
     }
+}
+
+/// Whether the request carries this cluster's self-telemetry tag, so it must not be traced.
+pub fn is_self_telemetry_export(metadata: &tonic::metadata::MetadataMap) -> bool {
+    config::utils::span::is_self_telemetry(
+        metadata
+            .get(config::utils::span::SELF_TELEMETRY_HEADER)
+            .and_then(|tag| tag.to_str().ok()),
+    )
+}
+
+pub fn set_remote_parent(span: &tracing::Span, parent_cx: opentelemetry::Context) {
+    let _ = span.set_parent(parent_cx);
 }
 
 /// Attach `parent_cx` to `span`, falling back to a remote parent built from the logical `trace_id`.
@@ -93,5 +124,21 @@ mod tests {
             logical_trace_id_base("01a05c4446cc71ac872a7b594bcdc88z"),
             None
         );
+    }
+
+    #[test]
+    fn test_is_self_telemetry_export() {
+        let header = config::utils::span::SELF_TELEMETRY_HEADER;
+        let mut metadata = tonic::metadata::MetadataMap::new();
+        assert!(!is_self_telemetry_export(&metadata));
+
+        metadata.insert(header, "1".parse().unwrap());
+        assert!(!is_self_telemetry_export(&metadata));
+
+        // other tests in this binary cache the same instance id, so the derived tag is stable
+        config::cache_instance_id("instance");
+        let tag = config::utils::span::self_telemetry_tag().unwrap();
+        metadata.insert(header, tag.parse().unwrap());
+        assert!(is_self_telemetry_export(&metadata));
     }
 }

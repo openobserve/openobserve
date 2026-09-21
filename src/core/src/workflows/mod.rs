@@ -117,6 +117,7 @@ async fn get_trigger_run_data(
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         use o2_enterprise::enterprise::super_cluster::search::get_cluster_node_by_name;
+        use tracing::Instrument;
 
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(source_cluster).await?;
@@ -129,34 +130,43 @@ async fn get_trigger_run_data(
 
         log::info!("getting run data for {org_id}/{workflow_id}/{run_id} from cluster {cluster}");
 
-        let task = tokio::task::spawn(async move {
-            use infra::client::grpc::make_grpc_search_client;
-            let info_str = format!("{org}/{wid}/{rid}");
+        let grpc_span = config::grpc_client_span!(
+            "service:workflows:grpc_get_workflow_inputs",
+            &node.get_grpc_addr(),
+            "cluster.Search",
+            "GetWorkflowInputs",
+        );
+        let task = tokio::task::spawn(
+            async move {
+                use infra::client::grpc::make_grpc_search_client;
+                let info_str = format!("{org}/{wid}/{rid}");
 
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
-                org_id: org,
-                workflow_id: wid,
-                run_id: rid,
-                is_error_data: false,
-            });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            match client.get_workflow_inputs(request).await {
-                Ok(res) => {
-                    let response = res.into_inner();
-                    Ok(response.data)
-                }
-                Err(err) => {
-                    log::error!(
-                        "[trace_id: {trace_id}] error getting run data from cluster {cluster} for {info_str} from node {}: {err:?}",
-                        node.get_grpc_addr(),
-                    );
-                    let err = infra::errors::ErrorCodes::from_json(err.message())?;
-                    Err(anyhow::anyhow!(
-                        "error getting data from other cluster {cluster} : {err}",
-                    ))
+                let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
+                    org_id: org,
+                    workflow_id: wid,
+                    run_id: rid,
+                    is_error_data: false,
+                });
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+                match client.get_workflow_inputs(request).await {
+                    Ok(res) => {
+                        let response = res.into_inner();
+                        Ok(response.data)
+                    }
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id: {trace_id}] error getting run data from cluster {cluster} for {info_str} from node {}: {err:?}",
+                            node.get_grpc_addr(),
+                        );
+                        let err = infra::errors::ErrorCodes::from_json(err.message())?;
+                        Err(anyhow::anyhow!(
+                            "error getting data from other cluster {cluster} : {err}",
+                        ))
+                    }
                 }
             }
-        });
+            .instrument(grpc_span),
+        );
         let response = task
             .await
             .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;
@@ -194,6 +204,7 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
         use o2_enterprise::enterprise::super_cluster::search::get_cluster_node_by_name;
+        use tracing::Instrument;
 
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(&errors.cluster).await?;
@@ -206,34 +217,43 @@ pub async fn get_error_input_data(errors: &WorkflowRunErrors) -> Result<String, 
 
         log::info!("getting workflow errors inputs file for {info_str} from cluster {cluster}");
 
-        let task = tokio::task::spawn(async move {
-            use infra::client::grpc::make_grpc_search_client;
+        let grpc_span = config::grpc_client_span!(
+            "service:workflows:grpc_get_workflow_error_inputs",
+            &node.get_grpc_addr(),
+            "cluster.Search",
+            "GetWorkflowInputs",
+        );
+        let task = tokio::task::spawn(
+            async move {
+                use infra::client::grpc::make_grpc_search_client;
 
-            let info_str = format!("{org}/{wid}/{rid}");
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
-                org_id: org,
-                workflow_id: wid,
-                run_id: rid,
-                is_error_data: true,
-            });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            match client.get_workflow_inputs(request).await {
-                Ok(res) => {
-                    let response = res.into_inner();
-                    Ok(response.data)
-                }
-                Err(err) => {
-                    log::error!(
-                        "[trace_id: {trace_id}] error getting workflow errors inputs data from cluster {cluster} node {} for {info_str} : {err:?}",
-                        node.get_grpc_addr(),
-                    );
-                    let err = infra::errors::ErrorCodes::from_json(err.message())?;
-                    Err(anyhow::anyhow!(
-                        "error getting file from other cluster {cluster} : {err}",
-                    ))
+                let info_str = format!("{org}/{wid}/{rid}");
+                let mut request = tonic::Request::new(proto::cluster_rpc::GetWorkflowInputsRequest {
+                    org_id: org,
+                    workflow_id: wid,
+                    run_id: rid,
+                    is_error_data: true,
+                });
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+                match client.get_workflow_inputs(request).await {
+                    Ok(res) => {
+                        let response = res.into_inner();
+                        Ok(response.data)
+                    }
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id: {trace_id}] error getting workflow errors inputs data from cluster {cluster} node {} for {info_str} : {err:?}",
+                            node.get_grpc_addr(),
+                        );
+                        let err = infra::errors::ErrorCodes::from_json(err.message())?;
+                        Err(anyhow::anyhow!(
+                            "error getting file from other cluster {cluster} : {err}",
+                        ))
+                    }
                 }
             }
-        });
+            .instrument(grpc_span),
+        );
         let response = task
             .await
             .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;

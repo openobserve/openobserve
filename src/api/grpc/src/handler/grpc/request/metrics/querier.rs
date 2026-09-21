@@ -15,7 +15,7 @@
 
 use std::pin::Pin;
 
-use config::{meta::stream::StreamType, metrics};
+use config::{meta::stream::StreamType, metrics, utils::span::SpanBoundStream};
 use futures::Stream;
 use infra::errors;
 use opentelemetry::global;
@@ -39,7 +39,7 @@ impl Metrics for MetricsQuerier {
     type DataStream =
         Pin<Box<dyn Stream<Item = Result<MetricsQueryResponse, Status>> + Send + 'static>>;
 
-    #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:metrics:query", skip_all, fields(org_id = req.get_ref().org_id, otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Metrics", rpc.method = "Query", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn query(
         &self,
         req: Request<MetricsQueryRequest>,
@@ -97,11 +97,14 @@ impl Metrics for MetricsQuerier {
         Ok(Response::new(result))
     }
 
-    #[tracing::instrument(name = "grpc:metrics:data", skip_all, fields(org_id = req.get_ref().org_id))]
+    #[tracing::instrument(name = "grpc:metrics:data", skip_all, fields(org_id = req.get_ref().org_id, otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Metrics", rpc.method = "Data", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn data(
         &self,
         req: Request<MetricsQueryRequest>,
     ) -> Result<Response<Self::DataStream>, Status> {
+        let parent_cx =
+            global::get_text_map_propagator(|prop| prop.extract(&MetadataMap(req.metadata())));
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let cap = std::cmp::max(2, config::get_config().limit.cpu_num);
         let (tx, rx) = mpsc::channel::<Result<MetricsQueryResponse, Status>>(cap);
         let mut req: MetricsQueryRequest = req.into_inner();
@@ -143,7 +146,7 @@ impl Metrics for MetricsQuerier {
             }
         });
 
-        let out_stream = ReceiverStream::new(rx);
+        let out_stream = SpanBoundStream::new(ReceiverStream::new(rx), tracing::Span::current());
         Ok(Response::new(Box::pin(out_stream) as Self::DataStream))
     }
 }

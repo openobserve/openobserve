@@ -3282,4 +3282,35 @@ mod tests {
             assert!(super::derive_service_graph_fields(kind, lookup).is_empty());
         }
     }
+
+    #[test]
+    fn test_client_and_server_span_attributes_feed_the_join_keys() {
+        use config::utils::span::{
+            ATTR_SERVER_ADDRESS, ATTR_SERVER_PORT, KIND_CLIENT, KIND_SERVER, split_host_port,
+        };
+
+        // the two kinds the spans declare, as `tracing-opentelemetry` spells them
+        assert_eq!((KIND_CLIENT, KIND_SERVER), ("client", "server"));
+
+        let (host, port) = split_host_port("http://10.1.4.66:5081");
+        let attrs = std::collections::HashMap::from([
+            (ATTR_SERVER_ADDRESS.to_string(), host),
+            (ATTR_SERVER_PORT.to_string(), port.to_string()),
+        ]);
+        let lookup = |key: &str| attrs.get(key).cloned();
+
+        let client: std::collections::HashMap<&str, config::utils::json::Value> =
+            super::derive_service_graph_fields(3, lookup)
+                .into_iter()
+                .collect();
+        assert_eq!(client.get("infer_peer_key"), Some(&json!("10.1.4.66")));
+        assert_eq!(client.get("infer_peer_port"), Some(&json!(5081)));
+
+        let server: std::collections::HashMap<&str, config::utils::json::Value> =
+            super::derive_service_graph_fields(2, lookup)
+                .into_iter()
+                .collect();
+        assert_eq!(server.get("infer_self_key"), Some(&json!("10.1.4.66")));
+        assert_eq!(server.get("infer_self_port"), Some(&json!(5081)));
+    }
 }

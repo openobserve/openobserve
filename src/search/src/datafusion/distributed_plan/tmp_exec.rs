@@ -183,6 +183,8 @@ async fn fetch_data(
     } else {
         #[cfg(feature = "enterprise")]
         {
+            use tracing::Instrument;
+
             if !get_o2_config().super_cluster.enabled {
                 return internal_err!(
                     "cluster: {cluster}'s left data result is in other cluster: {}",
@@ -195,19 +197,32 @@ async fn fetch_data(
             };
             let grpc_addr = node.get_grpc_addr();
             let path = path.to_string();
-            let task = tokio::task::spawn(async move {
-                let mut request = tonic::Request::new(proto::cluster_rpc::GetTableRequest { path });
-                match make_grpc_search_client(&trace_id, &mut request, &node, 0).await {
-                    Ok(mut client) => match client.get_table(request).await {
-                        Ok(res) => Ok(res.into_inner()),
-                        Err(err) => {
-                            log::error!("search->grpc: node: {grpc_addr}, search err: {err:?}",);
-                            Err(format!("{err:?}"))
+            let grpc_span = config::grpc_client_span!(
+                "service:search:grpc_get_table",
+                &grpc_addr,
+                "cluster.Search",
+                "GetTable",
+            );
+            let task =
+                tokio::task::spawn(
+                    async move {
+                        let mut request =
+                            tonic::Request::new(proto::cluster_rpc::GetTableRequest { path });
+                        match make_grpc_search_client(&trace_id, &mut request, &node, 0).await {
+                            Ok(mut client) => match client.get_table(request).await {
+                                Ok(res) => Ok(res.into_inner()),
+                                Err(err) => {
+                                    log::error!(
+                                        "search->grpc: node: {grpc_addr}, search err: {err:?}",
+                                    );
+                                    Err(format!("{err:?}"))
+                                }
+                            },
+                            Err(e) => Err(format!("{e:?}")),
                         }
-                    },
-                    Err(e) => Err(format!("{e:?}")),
-                }
-            });
+                    }
+                    .instrument(grpc_span),
+                );
 
             let response = match task.await {
                 Ok(Ok(response)) => response,

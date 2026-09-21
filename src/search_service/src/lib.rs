@@ -49,7 +49,6 @@ use {
     infra::{client::grpc::make_grpc_search_client, cluster::get_cached_online_query_nodes},
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
     std::collections::HashSet,
-    tracing::info_span,
 };
 
 use crate::{
@@ -701,8 +700,11 @@ pub async fn query_status() -> Result<search::QueryStatusResponse, Error> {
     let mut tasks = Vec::with_capacity(nodes.len());
     for node in nodes {
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!(
+        let grpc_span = config::grpc_client_span!(
             "service:search:cluster:grpc_query_status",
+            &node_addr,
+            "cluster.Search",
+            "QueryStatus",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
@@ -829,8 +831,11 @@ pub async fn cancel_query(
     let mut tasks = Vec::new();
     for node in nodes.iter().cloned() {
         let node_addr = node.grpc_addr.clone();
-        let grpc_span = info_span!(
+        let grpc_span = config::grpc_client_span!(
             "service:search:cluster:grpc_cancel_query",
+            &node_addr,
+            "cluster.Search",
+            "CancelQuery",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );

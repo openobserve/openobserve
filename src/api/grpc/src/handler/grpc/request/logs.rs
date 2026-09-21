@@ -18,6 +18,7 @@ use opentelemetry_proto::tonic::collector::logs::v1::{
     ExportLogsServiceRequest, ExportLogsServiceResponse, logs_service_server::LogsService,
 };
 use tonic::{Response, Status};
+use tracing::Instrument;
 
 use crate::handler::grpc::request::otlp::{error_status, export_reply, observe_ok};
 
@@ -30,48 +31,58 @@ impl LogsService for LogsServer {
         &self,
         request: tonic::Request<ExportLogsServiceRequest>,
     ) -> Result<tonic::Response<ExportLogsServiceResponse>, tonic::Status> {
-        let start = std::time::Instant::now();
-        let cfg = config::get_config();
-
-        let metadata = request.metadata().clone();
-        let msg = format!(
-            "Please specify organization id with header key '{}' ",
-            cfg.grpc.org_header_key
+        let span = common::otlp_server_span!(
+            request.metadata(),
+            "grpc:otlp:logs:export",
+            "opentelemetry.proto.collector.logs.v1.LogsService",
+            "Export"
         );
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
-            return Err(Status::invalid_argument(msg));
+        async move {
+            let start = std::time::Instant::now();
+            let cfg = config::get_config();
+
+            let metadata = request.metadata().clone();
+            let msg = format!(
+                "Please specify organization id with header key '{}' ",
+                cfg.grpc.org_header_key
+            );
+            if !metadata.contains_key(&cfg.grpc.org_header_key) {
+                return Err(Status::invalid_argument(msg));
+            }
+
+            let in_req = request.into_inner();
+            let org_id = metadata.get(&cfg.grpc.org_header_key);
+            if org_id.is_none() {
+                return Err(Status::invalid_argument(msg));
+            }
+            let stream_name = metadata.get(&cfg.grpc.stream_header_key);
+            let mut in_stream_name: Option<&str> = None;
+            if let Some(stream_name) = stream_name {
+                in_stream_name = Some(stream_name.to_str().unwrap());
+            };
+
+            let user_id = metadata.get("user_id");
+            let mut user_email: &str = "";
+            if let Some(user_id) = user_id {
+                user_email = user_id.to_str().unwrap();
+            };
+
+            let resp = openobserve_core::logs::otlp::handle_request(
+                0,
+                org_id.unwrap().to_str().unwrap(),
+                in_req,
+                in_stream_name,
+                user_email,
+                OtlpRequestType::Grpc,
+            )
+            .await
+            .map_err(|e| error_status(&e))?;
+            let reply = export_reply(resp).await?;
+            observe_ok("/otlp/v1/logs", start);
+            Ok(Response::new(reply))
         }
-
-        let in_req = request.into_inner();
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(msg));
-        }
-        let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
-
-        let user_id = metadata.get("user_id");
-        let mut user_email: &str = "";
-        if let Some(user_id) = user_id {
-            user_email = user_id.to_str().unwrap();
-        };
-
-        let resp = openobserve_core::logs::otlp::handle_request(
-            0,
-            org_id.unwrap().to_str().unwrap(),
-            in_req,
-            in_stream_name,
-            user_email,
-            OtlpRequestType::Grpc,
-        )
+        .instrument(span)
         .await
-        .map_err(|e| error_status(&e))?;
-        let reply = export_reply(resp).await?;
-        observe_ok("/otlp/v1/logs", start);
-        Ok(Response::new(reply))
     }
 }
 

@@ -42,7 +42,7 @@ use infra::{
 use promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
 use proto::cluster_rpc;
 use search_service::server_internal_error;
-use tracing::{Instrument, info_span};
+use tracing::Instrument;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::common::config::get_config as get_o2_config,
@@ -405,7 +405,13 @@ async fn search_in_cluster(
         );
 
         let trace_id = trace_id.to_string();
-        let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
+        let grpc_span = config::grpc_client_span!(
+            "promql:search:cluster:grpc_search",
+            &node.grpc_addr,
+            "cluster.Metrics",
+            "Query",
+            org_id = req.org_id,
+        );
         let task = tokio::task::spawn(
             async move {
                 let node = Arc::new(node) as _;

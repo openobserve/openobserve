@@ -333,6 +333,8 @@ async fn get_sourcemap_file_data(
     // super cluster
     #[cfg(feature = "enterprise")]
     if get_o2_config().super_cluster.enabled {
+        use tracing::Instrument;
+
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(&smap_file.cluster).await?;
         let file_path = path.clone();
@@ -342,30 +344,39 @@ async fn get_sourcemap_file_data(
 
         log::info!("getting sourcemap file for org_id {org} path {path} from cluster {cluster}");
 
-        let task = tokio::task::spawn(async move {
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetSourcemapFileRequest {
-                org_id: org.clone(),
-                path: file_path.clone(),
-                original_name,
-            });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            match client.get_sourcemap_file(request).await {
-                Ok(res) => {
-                    let response = res.into_inner();
-                    Ok(response.file_data)
-                }
-                Err(err) => {
-                    log::error!(
-                        "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org} path {file_path} : {err:?}",
-                        node.get_grpc_addr(),
-                    );
-                    let err = ErrorCodes::from_json(err.message())?;
-                    Err(anyhow::anyhow!(
-                        "error getting file from other cluster : {err}",
-                    ))
+        let grpc_span = config::grpc_client_span!(
+            "service:sourcemaps:grpc_get_sourcemap_file",
+            &node.get_grpc_addr(),
+            "cluster.Search",
+            "GetSourcemapFile",
+        );
+        let task = tokio::task::spawn(
+            async move {
+                let mut request = tonic::Request::new(proto::cluster_rpc::GetSourcemapFileRequest {
+                    org_id: org.clone(),
+                    path: file_path.clone(),
+                    original_name,
+                });
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+                match client.get_sourcemap_file(request).await {
+                    Ok(res) => {
+                        let response = res.into_inner();
+                        Ok(response.file_data)
+                    }
+                    Err(err) => {
+                        log::error!(
+                            "[trace_id: {trace_id}] error getting sourcemap file from cluster {cluster} node {} for org_id {org} path {file_path} : {err:?}",
+                            node.get_grpc_addr(),
+                        );
+                        let err = ErrorCodes::from_json(err.message())?;
+                        Err(anyhow::anyhow!(
+                            "error getting file from other cluster : {err}",
+                        ))
+                    }
                 }
             }
-        });
+            .instrument(grpc_span),
+        );
         let response = task
             .await
             .map_err(|e| anyhow::anyhow!("internal error : {e}"))?;

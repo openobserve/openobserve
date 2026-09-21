@@ -38,6 +38,7 @@ pub mod schema;
 pub mod schema_ext;
 pub mod size;
 pub mod sort;
+pub mod span;
 pub mod sql;
 pub mod ssrf_guard;
 pub mod str;

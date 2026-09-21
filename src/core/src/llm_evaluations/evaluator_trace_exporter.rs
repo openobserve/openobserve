@@ -112,6 +112,13 @@ impl EvaluatorTraceExporter {
         grpc_request
             .metadata_mut()
             .insert(stream_header_key, stream_header_value);
+        if let Some(tag) = config::utils::span::self_telemetry_tag()
+            && let Ok(value) = tag.parse::<MetadataValue<_>>()
+        {
+            grpc_request
+                .metadata_mut()
+                .insert(config::utils::span::SELF_TELEMETRY_HEADER, value);
+        }
 
         match client
             .send_compressed(CompressionEncoding::Gzip)

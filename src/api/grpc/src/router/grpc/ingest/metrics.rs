@@ -21,6 +21,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_client::MetricsServiceClient, metrics_service_server::MetricsService,
 };
 use tonic::{Request, Response, Status, codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::Instrument;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Default)]
@@ -32,58 +33,83 @@ impl MetricsService for MetricsServer {
         &self,
         request: Request<ExportMetricsServiceRequest>,
     ) -> Result<Response<ExportMetricsServiceResponse>, Status> {
-        let start = std::time::Instant::now();
-        let cfg = config::get_config();
-        let (mut metadata, extensions, message) = request.into_parts();
-        super::strip_http_framing_headers(&mut metadata);
+        let self_export = common::meta::grpc::is_self_telemetry_export(request.metadata());
+        let span = common::otlp_server_span!(
+            request.metadata(),
+            "grpc:router:metrics:export",
+            "opentelemetry.proto.collector.metrics.v1.MetricsService",
+            "Export"
+        );
+        async move {
+            let start = std::time::Instant::now();
+            let cfg = config::get_config();
+            let (mut metadata, extensions, message) = request.into_parts();
+            super::strip_http_framing_headers(&mut metadata);
 
-        // basic validation
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
-            return Err(Status::invalid_argument(format!(
-                "Please specify organization id with header key '{}' ",
-                cfg.grpc.org_header_key
-            )));
-        }
+            // basic validation
+            if !metadata.contains_key(&cfg.grpc.org_header_key) {
+                return Err(Status::invalid_argument(format!(
+                    "Please specify organization id with header key '{}' ",
+                    cfg.grpc.org_header_key
+                )));
+            }
 
-        // call ingester
-        let mut request = Request::from_parts(metadata, extensions, message);
-        opentelemetry::global::get_text_map_propagator(|propagator| {
-            propagator.inject_context(
-                &tracing::Span::current().context(),
-                &mut MetadataMap(request.metadata_mut()),
-            )
-        });
-        let token: MetadataValue<_> = get_internal_grpc_token()
-            .parse()
-            .map_err(|_| Status::internal("invalid token".to_string()))?;
-        let (addr, channel) = get_ingester_channel().await?;
-        let client = MetricsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
-            req.metadata_mut().insert("authorization", token.clone());
-            Ok(req)
-        });
-        match client
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-            .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-            .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
-            .export(request)
-            .await
-        {
-            Ok(res) => {
-                if res.get_ref().partial_success.is_some() {
-                    log::error!(
-                        "[Router:METRICS] export partial_success node: {addr}, response: {:?}",
-                        res.get_ref()
-                    );
+            // call ingester
+            let mut request = Request::from_parts(metadata, extensions, message);
+            let token: MetadataValue<_> = get_internal_grpc_token()
+                .parse()
+                .map_err(|_| Status::internal("invalid token".to_string()))?;
+            let (addr, channel) = get_ingester_channel().await?;
+            let grpc_span = if self_export {
+                tracing::Span::none()
+            } else {
+                config::grpc_client_span!(
+                    "grpc:router:metrics:forward",
+                    &addr,
+                    "opentelemetry.proto.collector.metrics.v1.MetricsService",
+                    "Export",
+                )
+            };
+            opentelemetry::global::get_text_map_propagator(|propagator| {
+                propagator.inject_context(
+                    &grpc_span.context(),
+                    &mut MetadataMap(request.metadata_mut()),
+                )
+            });
+            let client =
+                MetricsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
+                    req.metadata_mut().insert("authorization", token.clone());
+                    Ok(req)
+                });
+            match client
+                .send_compressed(CompressionEncoding::Gzip)
+                .accept_compressed(CompressionEncoding::Gzip)
+                .max_decoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024)
+                .export(request)
+                .instrument(grpc_span)
+                .await
+            {
+                Ok(res) => {
+                    if res.get_ref().partial_success.is_some() {
+                        log::error!(
+                            "[Router:METRICS] export partial_success node: {addr}, response: {:?}",
+                            res.get_ref()
+                        );
+                    }
+                    Ok(res)
                 }
-                Ok(res)
-            }
-            Err(e) => {
-                let time = start.elapsed().as_millis() as usize;
-                log::error!("[Router:METRICS] export node: {addr}, status: {e}, took: {time} ms");
-                Err(e)
+                Err(e) => {
+                    let time = start.elapsed().as_millis() as usize;
+                    log::error!(
+                        "[Router:METRICS] export node: {addr}, status: {e}, took: {time} ms"
+                    );
+                    Err(e)
+                }
             }
         }
+        .instrument(span)
+        .await
     }
 }
 

@@ -16,6 +16,7 @@
 use std::{cmp::max, net::SocketAddr, time::Duration};
 
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::handler::http::router::create_app_router;
 
@@ -42,7 +43,7 @@ pub async fn run(ui_routes: fn(&str) -> axum::Router) -> Result<(), anyhow::Erro
     {
         app
     } else {
-        app.layer(TraceLayer::new_for_http())
+        app.layer(TraceLayer::new_for_http().make_span_with(http_server_span))
     };
 
     serve(haddr, app).await
@@ -117,6 +118,38 @@ pub async fn serve(haddr: SocketAddr, app: axum::Router) -> Result<(), anyhow::E
     }
 
     Ok(())
+}
+
+/// SERVER span for an incoming HTTP request, parented to the caller's `traceparent` when present.
+fn http_server_span<B>(request: &http::Request<B>) -> tracing::Span {
+    // a span for our own export would itself be exported, one per batch, forever
+    if config::utils::span::is_self_telemetry(
+        request
+            .headers()
+            .get(config::utils::span::SELF_TELEMETRY_HEADER)
+            .and_then(|tag| tag.to_str().ok()),
+    ) {
+        return tracing::Span::none();
+    }
+    let span = tracing::info_span!(
+        "http:request",
+        otel.kind = "server",
+        http.request.method = request.method().as_str(),
+        url.path = request.uri().path(),
+        http.route = tracing::field::Empty,
+        server.address = config::utils::span::local_http_host(),
+        server.port = config::utils::span::local_http_port(),
+    );
+    if let Some(route) = request.extensions().get::<axum::extract::MatchedPath>() {
+        span.record("http.route", route.as_str());
+    }
+    let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+        prop.extract(&common::utils::http::RequestHeaderExtractor::new(
+            request.headers(),
+        ))
+    });
+    let _ = span.set_parent(parent_cx);
+    span
 }
 
 async fn shutdown_signal() {

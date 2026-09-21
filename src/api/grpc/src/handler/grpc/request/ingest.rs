@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::grpc::MetadataMap;
 use config::{
     meta::{otlp::OtlpRequestType, stream::StreamType},
     metrics,
@@ -25,6 +26,7 @@ use proto::cluster_rpc::{
     IngestionRequest, IngestionResponse, IngestionType, ingest_server::Ingest,
 };
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::service::ingestion::create_log_ingestion_req;
 
@@ -33,10 +35,15 @@ pub struct Ingester;
 
 #[tonic::async_trait]
 impl Ingest for Ingester {
+    #[tracing::instrument(name = "grpc:ingest:ingest", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Ingest", rpc.method = "Ingest", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn ingest(
         &self,
         request: Request<IngestionRequest>,
     ) -> Result<Response<IngestionResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let start = std::time::Instant::now();
         let req = request.into_inner();
         let org_id = req.org_id;

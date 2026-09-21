@@ -120,7 +120,6 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     Ok(channel)
 }
 
-#[tracing::instrument(name = "grpc:search::make_client", skip_all)]
 pub async fn make_grpc_search_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
@@ -177,7 +176,6 @@ pub async fn make_grpc_search_client<T>(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
 }
 
-#[tracing::instrument(name = "promql:search:grpc:metrics:make_client", skip_all)]
 pub async fn make_grpc_metrics_client<T>(
     trace_id: &str,
     org_id: &str,
@@ -246,14 +244,13 @@ pub async fn make_grpc_metrics_client<T>(
     Ok(client)
 }
 
-#[tracing::instrument(name = "grpc:node:make_client", skip_all)]
 pub async fn make_grpc_node_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
     NodeServiceClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
     >,
     Error,
 > {
@@ -297,14 +294,13 @@ pub async fn make_grpc_node_client<T>(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
 }
 
-#[tracing::instrument(name = "grpc:cluster_info:make_client", skip_all)]
 pub async fn make_grpc_cluster_info_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
     ClusterInfoServiceClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
     >,
     Error,
 > {

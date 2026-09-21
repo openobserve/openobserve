@@ -20,6 +20,7 @@ use opentelemetry_proto::tonic::collector::metrics::v1::{
     metrics_service_server::MetricsService,
 };
 use tonic::{Response, Status};
+use tracing::Instrument;
 
 use crate::handler::grpc::request::otlp::{export_reply, observe_ok};
 
@@ -32,45 +33,55 @@ impl MetricsService for MetricsIngester {
         &self,
         request: tonic::Request<ExportMetricsServiceRequest>,
     ) -> Result<tonic::Response<ExportMetricsServiceResponse>, tonic::Status> {
-        let start = std::time::Instant::now();
-        let cfg = config::get_config();
-
-        let metadata = request.metadata().clone();
-        let msg = format!(
-            "Please specify organization id with header key '{}' ",
-            cfg.grpc.org_header_key
+        let span = common::otlp_server_span!(
+            request.metadata(),
+            "grpc:otlp:metrics:export",
+            "opentelemetry.proto.collector.metrics.v1.MetricsService",
+            "Export"
         );
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
-            return Err(Status::invalid_argument(msg));
+        async move {
+            let start = std::time::Instant::now();
+            let cfg = config::get_config();
+
+            let metadata = request.metadata().clone();
+            let msg = format!(
+                "Please specify organization id with header key '{}' ",
+                cfg.grpc.org_header_key
+            );
+            if !metadata.contains_key(&cfg.grpc.org_header_key) {
+                return Err(Status::invalid_argument(msg));
+            }
+
+            let in_req = request.into_inner();
+            let org_id = metadata.get(&cfg.grpc.org_header_key);
+            if org_id.is_none() {
+                return Err(Status::invalid_argument(msg));
+            }
+
+            let user_email = metadata
+                .get("user_id")
+                .and_then(|id| id.to_str().ok())
+                .unwrap_or_else(|| {
+                    log::warn!("[gRPC Metrics] user_id not found in metadata, using empty string");
+                    ""
+                });
+
+            let user = IngestUser::from_user_email(user_email);
+
+            let resp = openobserve_core::metrics::otlp::handle_otlp_request(
+                org_id.unwrap().to_str().unwrap(),
+                in_req,
+                OtlpRequestType::Grpc,
+                user,
+            )
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+            let reply = export_reply(resp).await?;
+            observe_ok("/otlp/v1/metrics", start);
+            Ok(Response::new(reply))
         }
-
-        let in_req = request.into_inner();
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(msg));
-        }
-
-        let user_email = metadata
-            .get("user_id")
-            .and_then(|id| id.to_str().ok())
-            .unwrap_or_else(|| {
-                log::warn!("[gRPC Metrics] user_id not found in metadata, using empty string");
-                ""
-            });
-
-        let user = IngestUser::from_user_email(user_email);
-
-        let resp = openobserve_core::metrics::otlp::handle_otlp_request(
-            org_id.unwrap().to_str().unwrap(),
-            in_req,
-            OtlpRequestType::Grpc,
-            user,
-        )
+        .instrument(span)
         .await
-        .map_err(|e| Status::internal(e.to_string()))?;
-        let reply = export_reply(resp).await?;
-        observe_ok("/otlp/v1/metrics", start);
-        Ok(Response::new(reply))
     }
 }
 

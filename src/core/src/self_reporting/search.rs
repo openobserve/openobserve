@@ -28,6 +28,7 @@ use config::{
 };
 use infra::{client::grpc::make_grpc_search_client, cluster::get_node_by_uuid, errors::ErrorCodes};
 use proto::cluster_rpc::GetLicenseUsageResponse;
+use tracing::Instrument;
 
 use crate::search as SearchService;
 
@@ -107,25 +108,35 @@ pub async fn get_license_usage_data_from_node(node_id: String) -> Result<GetLice
         .ok_or_else(|| anyhow::anyhow!("node {node_id} not found"))?;
     let node = std::sync::Arc::new(node) as std::sync::Arc<dyn NodeInfo>;
 
-    let task = tokio::task::spawn(async move {
-        let mut request = tonic::Request::new(proto::cluster_rpc::GetLicenseUsageRequest {});
-        let mut client =
-            make_grpc_search_client("license-usage-grpc-request", &mut request, &node, 0).await?;
-        match client.get_license_usage_info(request).await {
-            Ok(res) => {
-                let response = res.into_inner();
-                Ok(response)
-            }
-            Err(err) => {
-                log::error!(
-                    "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
-                    node.get_grpc_addr(),
-                );
-                let err = ErrorCodes::from_json(err.message())?;
-                Err(anyhow::anyhow!("error getting license usage info : {err}"))
+    let grpc_span = config::grpc_client_span!(
+        "service:self_reporting:grpc_get_license_usage",
+        &node.get_grpc_addr(),
+        "cluster.Search",
+        "GetLicenseUsageInfo",
+    );
+    let task = tokio::task::spawn(
+        async move {
+            let mut request = tonic::Request::new(proto::cluster_rpc::GetLicenseUsageRequest {});
+            let mut client =
+                make_grpc_search_client("license-usage-grpc-request", &mut request, &node, 0)
+                    .await?;
+            match client.get_license_usage_info(request).await {
+                Ok(res) => {
+                    let response = res.into_inner();
+                    Ok(response)
+                }
+                Err(err) => {
+                    log::error!(
+                        "[trace_id: license-usage-grpc-request] error getting license usage info node {} : {err:?}",
+                        node.get_grpc_addr(),
+                    );
+                    let err = ErrorCodes::from_json(err.message())?;
+                    Err(anyhow::anyhow!("error getting license usage info : {err}"))
+                }
             }
         }
-    });
+        .instrument(grpc_span),
+    );
     task.await
         .map_err(|e| anyhow::anyhow!("internal error : {e}"))?
 }

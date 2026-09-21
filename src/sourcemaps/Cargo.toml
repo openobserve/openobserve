@@ -10,7 +10,7 @@ path = "src/lib.rs"
 
 [features]
 default = []
-enterprise = ["dep:o2_enterprise", "dep:proto", "dep:tonic"]
+enterprise = ["dep:o2_enterprise", "dep:proto", "dep:tonic", "dep:tracing"]
 
 [dependencies]
 anyhow.workspace = true
@@ -27,6 +27,7 @@ serde.workspace = true
 sourcemap.workspace = true
 tokio.workspace = true
 tonic = { workspace = true, optional = true }
+tracing = { workspace = true, optional = true }
 zip.workspace = true
 
 [dev-dependencies]

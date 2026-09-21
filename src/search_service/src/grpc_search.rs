@@ -25,7 +25,7 @@ use infra::{
     errors::{Error, ErrorCodes},
 };
 use rand::{SeedableRng, rngs::StdRng, seq::IndexedRandom};
-use tracing::{Instrument, info_span};
+use tracing::Instrument;
 
 use crate::server_internal_error;
 
@@ -54,8 +54,11 @@ pub async fn grpc_search(
 
     // make cluster request
     let node_addr = node.grpc_addr.clone();
-    let grpc_span = info_span!(
+    let grpc_span = config::grpc_client_span!(
         "service:search:cluster:grpc_search",
+        &node_addr,
+        "cluster.Search",
+        "Search",
         node_id = node.id,
         node_addr = node_addr.as_str(),
     );
@@ -128,8 +131,11 @@ pub async fn grpc_search_multi(
 
     // make cluster request
     let node_addr = node.grpc_addr.clone();
-    let grpc_span = info_span!(
+    let grpc_span = config::grpc_client_span!(
         "service:search:cluster:grpc_search_multi",
+        &node_addr,
+        "cluster.Search",
+        "SearchMulti",
         node_id = node.id,
         node_addr = node_addr.as_str(),
     );
@@ -203,8 +209,11 @@ pub async fn grpc_search_partition(
 
     // make cluster request
     let node_addr = node.grpc_addr.clone();
-    let grpc_span = info_span!(
+    let grpc_span = config::grpc_client_span!(
         "service:search:cluster:grpc_search_partition",
+        &node_addr,
+        "cluster.Search",
+        "SearchPartition",
         node_id = node.id,
         node_addr = node_addr.as_str(),
     );

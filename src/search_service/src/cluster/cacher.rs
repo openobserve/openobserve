@@ -15,13 +15,14 @@
 
 use config::{cluster::LOCAL_NODE, meta::cluster::get_internal_grpc_token};
 use infra::{
-    client::grpc::get_cached_channel,
+    client::grpc::{MetadataMap, get_cached_channel},
     cluster,
     errors::{Error, ErrorCodes},
 };
 use proto::cluster_rpc;
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
-use tracing::{Instrument, info_span};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use crate::server_internal_error;
 
@@ -56,8 +57,11 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
         let cfg = config::get_config();
         let node_addr = node.grpc_addr.clone();
 
-        let grpc_span = info_span!(
+        let grpc_span = config::grpc_client_span!(
             "service:search:cluster:cacher:delete_cached_results",
+            &node_addr,
+            "cluster.QueryCache",
+            "DeleteResultCache",
             node_id = node.id,
             node_addr = node_addr.as_str(),
         );
@@ -71,7 +75,13 @@ pub async fn delete_cached_results(path: String, delete_ts: i64) -> bool {
                    ts: delete_ts,
                 };
 
-                let request = tonic::Request::new(req);
+                let mut request = tonic::Request::new(req);
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &tracing::Span::current().context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
 
                 log::info!(
                     "[trace_id {trace_id}] delete_cached_results->grpc: request node: {}",

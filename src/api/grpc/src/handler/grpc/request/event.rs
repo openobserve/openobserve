@@ -17,8 +17,11 @@ use std::ops::Range;
 
 use anyhow::Result;
 use config::{
-    cluster::LOCAL_NODE, get_config, meta::stream::FileKey, metrics,
-    utils::inverted_index::to_tantivy_name,
+    cluster::LOCAL_NODE,
+    get_config,
+    meta::stream::FileKey,
+    metrics,
+    utils::{inverted_index::to_tantivy_name, span::SpanBoundStream},
 };
 use infra::cache::file_data::{CacheType, TRACE_ID_FOR_CACHE_LATEST_FILE, disk};
 use opentelemetry::global;
@@ -37,8 +40,9 @@ const CHUNK_SIZE: usize = 4 * 1024 * 1024; // 4MB chunks
 
 #[tonic::async_trait]
 impl Event for Eventer {
-    type GetFilesStream = ReceiverStream<Result<FileContentResponse, Status>>;
+    type GetFilesStream = SpanBoundStream<ReceiverStream<Result<FileContentResponse, Status>>>;
 
+    #[tracing::instrument(name = "grpc:event:send_file_list", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Event", rpc.method = "SendFileList", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn send_file_list(
         &self,
         req: Request<FileList>,
@@ -195,10 +199,15 @@ impl Event for Eventer {
         Ok(Response::new(EmptyResponse {}))
     }
 
+    #[tracing::instrument(name = "grpc:event:get_files", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Event", rpc.method = "GetFiles", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_files(
         &self,
         request: Request<SimpleFileList>,
     ) -> Result<Response<Self::GetFilesStream>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let file_list = request.into_inner();
         let (tx, rx) = tokio::sync::mpsc::channel(4);
 
@@ -212,7 +221,10 @@ impl Event for Eventer {
             }
         });
 
-        Ok(Response::new(ReceiverStream::new(rx)))
+        Ok(Response::new(SpanBoundStream::new(
+            ReceiverStream::new(rx),
+            tracing::Span::current(),
+        )))
     }
 }
 
@@ -273,9 +285,26 @@ async fn handle_file_chunked(
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
+
     use proto::cluster_rpc::{FileKey, FileList, FileMeta};
+    use tokio_stream::StreamExt;
+    use tracing_subscriber::{Layer, Registry, layer::SubscriberExt};
 
     use super::*;
+
+    struct ClosedSpans(Arc<Mutex<Vec<&'static str>>>);
+
+    impl<S> Layer<S> for ClosedSpans
+    where
+        S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    {
+        fn on_close(&self, id: tracing::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
+            if let Some(span) = ctx.span(&id) {
+                self.0.lock().unwrap().push(span.name());
+            }
+        }
+    }
 
     #[test]
     fn test_file_content_response_creation() {
@@ -544,5 +573,25 @@ mod tests {
         assert!(log_message.contains(&total_size.to_string()));
         assert!(log_message.contains(&offset.to_string()));
         assert!(log_message.contains(&elapsed_ms.to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_files_server_span_lasts_until_the_stream_is_drained() {
+        let closed = Arc::new(Mutex::new(Vec::new()));
+        let _guard =
+            tracing::subscriber::set_default(Registry::default().with(ClosedSpans(closed.clone())));
+
+        let response = Eventer
+            .get_files(Request::new(SimpleFileList { files: vec![] }))
+            .await
+            .unwrap();
+        assert!(
+            !closed.lock().unwrap().contains(&"grpc:event:get_files"),
+            "the SERVER span must outlive the handler while the body is still to be sent"
+        );
+
+        let mut stream = response.into_inner();
+        while stream.next().await.is_some() {}
+        assert!(closed.lock().unwrap().contains(&"grpc:event:get_files"));
     }
 }

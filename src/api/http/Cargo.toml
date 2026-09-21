@@ -70,6 +70,7 @@ bytes.workspace = true
 futures.workspace = true
 hashbrown.workspace = true
 log.workspace = true
+opentelemetry.workspace = true
 o2_dex = { workspace = true, optional = true }
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_ratelimit = { workspace = true, optional = true }
@@ -80,6 +81,8 @@ serde.workspace = true
 serde_json.workspace = true
 time.workspace = true
 tokio.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
 url.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true

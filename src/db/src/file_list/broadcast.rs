@@ -24,10 +24,15 @@ use config::{
     },
 };
 use hashbrown::HashMap;
-use infra::{client::grpc::get_cached_channel, cluster};
+use infra::{
+    client::grpc::{MetadataMap, get_cached_channel},
+    cluster,
+};
 use proto::cluster_rpc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::{Request, codec::CompressionEncoding, metadata::MetadataValue};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 /// use queue to batch send broadcast to other nodes
 pub static BROADCAST_QUEUE: Lazy<RwLock<Vec<FileKey>>> =
@@ -268,7 +273,19 @@ async fn send_to_node(
                 }
                 let mut request = tonic::Request::new(req_query.clone());
                 request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-                match client.send_file_list(request).await {
+                let grpc_span = config::grpc_client_span!(
+                    "service:file_list:broadcast:send_file_list",
+                    &node.grpc_addr,
+                    "cluster.Event",
+                    "SendFileList",
+                );
+                opentelemetry::global::get_text_map_propagator(|propagator| {
+                    propagator.inject_context(
+                        &grpc_span.context(),
+                        &mut MetadataMap(request.metadata_mut()),
+                    )
+                });
+                match client.send_file_list(request).instrument(grpc_span).await {
                     Ok(_) => break,
                     Err(e) => {
                         if cluster::get_node_by_uuid(&node.uuid).await.is_none() {

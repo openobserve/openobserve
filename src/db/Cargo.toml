@@ -37,6 +37,7 @@ itertools.workspace = true
 log.workspace = true
 o2_enterprise = { workspace = true, optional = true, default-features = false }
 o2_openfga = { workspace = true, optional = true }
+opentelemetry.workspace = true
 parquet.workspace = true
 proto.workspace = true
 rayon.workspace = true
@@ -49,5 +50,6 @@ thiserror.workspace = true
 tokio.workspace = true
 tonic.workspace = true
 tracing.workspace = true
+tracing-opentelemetry.workspace = true
 transform.workspace = true
 vrl.workspace = true

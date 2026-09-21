@@ -37,6 +37,7 @@ use o2_enterprise::enterprise::{
     },
 };
 use tokio::sync::mpsc;
+use tracing::Instrument;
 
 use crate::grpc_search::{grpc_search, grpc_search_partition};
 
@@ -485,22 +486,32 @@ pub async fn get_result(
         let trace_id = config::ider::generate_trace_id();
         let node = get_cluster_node_by_name(cluster).await?;
         let path = path.to_string();
-        let task = tokio::task::spawn(async move {
-            let mut request = tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
-            let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-            let response = match client.get_result(request).await {
-                Ok(res) => res.into_inner(),
-                Err(err) => {
-                    log::error!(
-                        "search->grpc: node: {}, search err: {err:?}",
-                        node.get_grpc_addr(),
-                    );
-                    let err = ErrorCodes::from_json(err.message())?;
-                    return Err(Error::ErrorCode(err));
-                }
-            };
-            Ok(response)
-        });
+        let grpc_span = config::grpc_client_span!(
+            "service:search:job:grpc_get_result",
+            &node.get_grpc_addr(),
+            "cluster.Search",
+            "GetResult",
+        );
+        let task = tokio::task::spawn(
+            async move {
+                let mut request =
+                    tonic::Request::new(proto::cluster_rpc::GetResultRequest { path });
+                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+                let response = match client.get_result(request).await {
+                    Ok(res) => res.into_inner(),
+                    Err(err) => {
+                        log::error!(
+                            "search->grpc: node: {}, search err: {err:?}",
+                            node.get_grpc_addr(),
+                        );
+                        let err = ErrorCodes::from_json(err.message())?;
+                        return Err(Error::ErrorCode(err));
+                    }
+                };
+                Ok(response)
+            }
+            .instrument(grpc_span),
+        );
 
         let response = task
             .await
@@ -531,23 +542,33 @@ pub async fn delete_result(paths: Vec<String>) -> Result<(), anyhow::Error> {
             }
             let paths = paths.clone();
             let trace_id = trace_id.clone();
-            let task = tokio::task::spawn(async move {
-                let mut request =
-                    tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
-                let mut client = make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
-                let response = match client.delete_result(request).await {
-                    Ok(res) => res.into_inner(),
-                    Err(err) => {
-                        log::error!(
-                            "search->grpc: node: {}, search err: {err}",
-                            node.get_grpc_addr(),
-                        );
-                        let err = ErrorCodes::from_json(err.message())?;
-                        return Err(Error::ErrorCode(err));
-                    }
-                };
-                Ok(response)
-            });
+            let grpc_span = config::grpc_client_span!(
+                "service:search:job:grpc_delete_result",
+                &node.get_grpc_addr(),
+                "cluster.Search",
+                "DeleteResult",
+            );
+            let task = tokio::task::spawn(
+                async move {
+                    let mut request =
+                        tonic::Request::new(proto::cluster_rpc::DeleteResultRequest { paths });
+                    let mut client =
+                        make_grpc_search_client(&trace_id, &mut request, &node, 0).await?;
+                    let response = match client.delete_result(request).await {
+                        Ok(res) => res.into_inner(),
+                        Err(err) => {
+                            log::error!(
+                                "search->grpc: node: {}, search err: {err}",
+                                node.get_grpc_addr(),
+                            );
+                            let err = ErrorCodes::from_json(err.message())?;
+                            return Err(Error::ErrorCode(err));
+                        }
+                    };
+                    Ok(response)
+                }
+                .instrument(grpc_span),
+            );
 
             let _ = task
                 .await

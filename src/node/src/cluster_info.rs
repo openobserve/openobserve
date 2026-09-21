@@ -15,7 +15,7 @@
 
 use std::sync::Arc;
 
-use common::meta::organization::ClusterInfo;
+use common::meta::{grpc::MetadataMap, organization::ClusterInfo};
 use config::meta::cluster::NodeInfo;
 use infra::file_list as infra_file_list;
 use proto::cluster_rpc::{
@@ -23,6 +23,8 @@ use proto::cluster_rpc::{
     GetDeleteJobStatusResponse,
 };
 use tonic::{Request, Response, Status};
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 pub struct ClusterInfoService;
 
@@ -38,10 +40,15 @@ pub fn convert_response_to_cluster_info(response: GetClusterInfoResponse) -> Clu
 
 #[tonic::async_trait]
 impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for ClusterInfoService {
+    #[tracing::instrument(name = "grpc:cluster_info:get_cluster_info", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.ClusterInfoService", rpc.method = "GetClusterInfo", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_cluster_info(
         &self,
-        _request: Request<EmptyRequest>,
+        request: Request<EmptyRequest>,
     ) -> Result<Response<GetClusterInfoResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         // Fetch the jobs information from the database
         let jobs = match infra_file_list::get_pending_jobs_count().await {
             Ok(jobs) => jobs,
@@ -62,10 +69,15 @@ impl proto::cluster_rpc::cluster_info_service_server::ClusterInfoService for Clu
         }))
     }
 
+    #[tracing::instrument(name = "grpc:cluster_info:get_delete_job_status", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.ClusterInfoService", rpc.method = "GetDeleteJobStatus", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_delete_job_status(
         &self,
         request: Request<GetDeleteJobStatusRequest>,
     ) -> Result<Response<GetDeleteJobStatusResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let req = request.into_inner();
 
         // Get the key from the database
@@ -92,25 +104,36 @@ pub async fn get_super_cluster_info(
     trace_id: &str,
     node: Arc<dyn NodeInfo>,
 ) -> Result<ClusterInfo, anyhow::Error> {
-    let empty_request = EmptyRequest {};
-    let mut request = Request::new(empty_request);
-    let mut client =
-        infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node).await?;
-    let response = match client.get_cluster_info(Request::new(empty_request)).await {
-        Ok(r) => convert_response_to_cluster_info(r.into_inner()),
-        Err(e) => {
-            log::error!(
-                "Failed to get cluster info from cluster node {}: {:?}",
-                node.get_grpc_addr(),
-                e
-            );
-            return Err(anyhow::anyhow!(
-                "Error getting cluster info from cluster node: {e}"
-            ));
-        }
-    };
+    let grpc_span = config::grpc_client_span!(
+        "service:cluster_info:grpc_get_cluster_info",
+        &node.get_grpc_addr(),
+        "cluster.ClusterInfoService",
+        "GetClusterInfo",
+    );
+    async move {
+        let empty_request = EmptyRequest {};
+        let mut request = Request::new(empty_request);
+        let mut client =
+            infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut request, &node)
+                .await?;
+        let response = match client.get_cluster_info(request).await {
+            Ok(r) => convert_response_to_cluster_info(r.into_inner()),
+            Err(e) => {
+                log::error!(
+                    "Failed to get cluster info from cluster node {}: {:?}",
+                    node.get_grpc_addr(),
+                    e
+                );
+                return Err(anyhow::anyhow!(
+                    "Error getting cluster info from cluster node: {e}"
+                ));
+            }
+        };
 
-    Ok(response)
+        Ok(response)
+    }
+    .instrument(grpc_span)
+    .await
 }
 
 pub async fn get_super_cluster_delete_job_status(
@@ -118,29 +141,39 @@ pub async fn get_super_cluster_delete_job_status(
     node: Arc<dyn NodeInfo>,
     ksuid: &str,
 ) -> Result<GetDeleteJobStatusResponse, anyhow::Error> {
-    let request = GetDeleteJobStatusRequest {
-        ksuid: ksuid.to_string(),
-    };
-    let mut grpc_request = Request::new(request.clone());
-    let mut client =
-        infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut grpc_request, &node)
-            .await?;
-    let response = match client.get_delete_job_status(Request::new(request)).await {
-        Ok(response) => response.into_inner(),
-        Err(err) => {
-            log::error!(
-                "Failed to get delete job status from cluster node {}: {:?}",
-                node.get_grpc_addr(),
-                err
-            );
-            return Err(anyhow::anyhow!(
-                "Error getting delete job status from cluster node: {:?}",
-                err
-            ));
-        }
-    };
+    let grpc_span = config::grpc_client_span!(
+        "service:cluster_info:grpc_get_delete_job_status",
+        &node.get_grpc_addr(),
+        "cluster.ClusterInfoService",
+        "GetDeleteJobStatus",
+    );
+    async move {
+        let request = GetDeleteJobStatusRequest {
+            ksuid: ksuid.to_string(),
+        };
+        let mut grpc_request = Request::new(request);
+        let mut client =
+            infra::client::grpc::make_grpc_cluster_info_client(trace_id, &mut grpc_request, &node)
+                .await?;
+        let response = match client.get_delete_job_status(grpc_request).await {
+            Ok(response) => response.into_inner(),
+            Err(err) => {
+                log::error!(
+                    "Failed to get delete job status from cluster node {}: {:?}",
+                    node.get_grpc_addr(),
+                    err
+                );
+                return Err(anyhow::anyhow!(
+                    "Error getting delete job status from cluster node: {:?}",
+                    err
+                ));
+            }
+        };
 
-    Ok(response)
+        Ok(response)
+    }
+    .instrument(grpc_span)
+    .await
 }
 
 #[cfg(test)]

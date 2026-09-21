@@ -40,6 +40,8 @@ use futures::{StreamExt, TryStreamExt};
 use futures_util::pin_mut;
 use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
+use tracing::Instrument;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 use super::node::RemoteScanNode;
 use crate::datafusion::{
@@ -348,12 +350,21 @@ async fn get_remote_batch(
         request.search_info.file_id_list.len(),
     );
 
+    let grpc_span = config::grpc_client_span!(
+        "service:search:flight:do_get",
+        &grpc_addr,
+        "arrow.flight.protocol.FlightService",
+        "DoGet",
+    );
+    // the callee's SERVER span has to descend from this CLIENT span, not from the plan-time context
+    let _ = grpc_span.set_parent(context);
+    let client_context = grpc_span.context();
     let (mut client, request) = match make_flight_client(
         trace_id.clone(),
         &org_id,
         node.clone(),
         request,
-        &context,
+        &client_context,
         grpc_timeout,
     )
     .await
@@ -368,7 +379,7 @@ async fn get_remote_batch(
         "[trace_id {trace_id}] flight->search: prepare to request node: {grpc_addr}, name: {node_name}, is_super: {is_super}, is_querier: {is_querier}",
     );
 
-    let stream = match client.do_get(request).await {
+    let stream = match client.do_get(request).instrument(grpc_span.clone()).await {
         Ok(stream) => stream,
         Err(e) => {
             if e.code() == tonic::Code::Cancelled || e.code() == tonic::Code::DeadlineExceeded || is_parquet_file_not_found(&e) {
@@ -422,6 +433,8 @@ async fn get_remote_batch(
             }
         }
     };
+
+    let stream = config::utils::span::SpanBoundStream::new(stream, grpc_span);
 
     Ok(Box::pin(RecordBatchStreamAdapter::new(schema, stream)))
 }

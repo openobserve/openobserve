@@ -4066,6 +4066,7 @@ dependencies = [
  "o2_enterprise",
  "o2_openfga",
  "openobserve-cipher",
+ "opentelemetry",
  "parquet",
  "proto",
  "rayon",
@@ -4078,6 +4079,7 @@ dependencies = [
  "tokio",
  "tonic",
  "tracing",
+ "tracing-opentelemetry",
  "transform",
  "vrl",
 ]
@@ -7940,6 +7942,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-opentelemetry",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -7974,6 +7977,7 @@ dependencies = [
  "openobserve-core",
  "openobserve-mcp",
  "openobserve-tls",
+ "opentelemetry",
  "rand 0.10.2",
  "regex",
  "reqwest 0.13.4",
@@ -7985,6 +7989,8 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http",
+ "tracing",
+ "tracing-opentelemetry",
  "url",
  "utoipa",
  "utoipa-swagger-ui",
@@ -8353,10 +8359,13 @@ dependencies = [
  "db",
  "infra",
  "log",
+ "opentelemetry",
  "prometheus",
  "proto",
  "tokio",
  "tonic",
+ "tracing",
+ "tracing-opentelemetry",
 ]
 
 [[package]]
@@ -8397,6 +8406,7 @@ dependencies = [
  "sourcemap",
  "tokio",
  "tonic",
+ "tracing",
  "zip 8.6.0",
 ]
 

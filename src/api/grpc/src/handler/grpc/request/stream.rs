@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::grpc::MetadataMap;
 use config::meta::stream::StreamType;
 use db;
 use futures_util::future::try_join_all;
@@ -20,6 +21,7 @@ use proto::cluster_rpc::{
     StreamStats, StreamStatsEntry, StreamStatsRequest, StreamStatsResponse, streams_server::Streams,
 };
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 const BATCH_DELAY_MS: u64 = 100;
 const MAX_CONCURRENT_ORGS: usize = 10;
@@ -84,10 +86,15 @@ impl StreamServiceImpl {
 
 #[tonic::async_trait]
 impl Streams for StreamServiceImpl {
+    #[tracing::instrument(name = "grpc:stream:stream_stats", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Streams", rpc.method = "stream_stats", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn stream_stats(
         &self,
         request: Request<StreamStatsRequest>,
     ) -> Result<Response<StreamStatsResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         // SECURITY (GHSA-5x2v-jg9q-g8qc): user-credential callers must not be
         // able to query other organizations by spoofing `req.org_id`.
         //

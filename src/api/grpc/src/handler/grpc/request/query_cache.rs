@@ -13,21 +13,28 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use common::meta::grpc::MetadataMap;
 use proto::cluster_rpc::{
     DeleteResultCacheRequest, DeleteResultCacheResponse, query_cache_server::QueryCache,
 };
 use search_service::cache::cacher;
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Default)]
 pub struct QueryCacheServerImpl;
 
 #[tonic::async_trait]
 impl QueryCache for QueryCacheServerImpl {
+    #[tracing::instrument(name = "grpc:query_cache:delete_result_cache", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.QueryCache", rpc.method = "DeleteResultCache", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn delete_result_cache(
         &self,
         request: Request<DeleteResultCacheRequest>,
     ) -> Result<Response<DeleteResultCacheResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(request.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let req: DeleteResultCacheRequest = request.into_inner();
         let deleted = cacher::delete_cache(&req.path, req.ts, None, None)
             .await

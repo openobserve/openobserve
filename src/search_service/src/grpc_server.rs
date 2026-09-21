@@ -27,6 +27,7 @@ use proto::cluster_rpc::{
     search_server::Search,
 };
 use tonic::{Request, Response, Status};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     config::metrics,
@@ -43,7 +44,7 @@ use crate::searcher::Searcher;
 
 #[tonic::async_trait]
 impl Search for Searcher {
-    #[tracing::instrument(name = "grpc:search:search", skip_all)]
+    #[tracing::instrument(name = "grpc:search:search", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "Search", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn search(
         &self,
         req: Request<SearchRequest>,
@@ -86,7 +87,7 @@ impl Search for Searcher {
         }
     }
 
-    #[tracing::instrument(name = "grpc:search:search_multi", skip_all)]
+    #[tracing::instrument(name = "grpc:search:search_multi", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "SearchMulti", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn search_multi(
         &self,
         req: Request<SearchRequest>,
@@ -120,10 +121,15 @@ impl Search for Searcher {
         }
     }
 
+    #[tracing::instrument(name = "grpc:search:search_partition", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "SearchPartition", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn search_partition(
         &self,
         req: Request<SearchPartitionRequest>,
     ) -> Result<Response<SearchPartitionResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let req = req.into_inner();
         let request =
             json::from_slice::<search::SearchPartitionRequest>(&req.request).map_err(|e| {
@@ -157,10 +163,15 @@ impl Search for Searcher {
         }
     }
 
+    #[tracing::instrument(name = "grpc:search:get_table", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "GetTable", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_table(
         &self,
         req: Request<GetTableRequest>,
     ) -> Result<Response<GetTableResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let path = req.into_inner().path;
         let res = infra::storage::get_bytes("", &path)
             .await
@@ -169,10 +180,15 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
+    #[tracing::instrument(name = "grpc:search:get_result", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "GetResult", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_result(
         &self,
         req: Request<GetResultRequest>,
     ) -> Result<Response<GetResultResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let path = req.into_inner().path;
         let res = infra::storage::get_bytes("", &path)
             .await
@@ -191,10 +207,15 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
+    #[tracing::instrument(name = "grpc:search:delete_result", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "DeleteResult", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn delete_result(
         &self,
         req: Request<DeleteResultRequest>,
     ) -> Result<Response<DeleteResultResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let paths = req.into_inner().paths;
         let paths = paths
             .iter()
@@ -215,10 +236,15 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
+    #[tracing::instrument(name = "grpc:search:query_status", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "QueryStatus", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn query_status(
         &self,
-        _req: Request<QueryStatusRequest>,
+        req: Request<QueryStatusRequest>,
     ) -> Result<Response<QueryStatusResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let status = self.get_task_status().await;
         Ok(Response::new(QueryStatusResponse { status }))
     }
@@ -232,10 +258,15 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
+    #[tracing::instrument(name = "grpc:search:cancel_query", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "CancelQuery", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn cancel_query(
         &self,
         req: Request<CancelQueryRequest>,
     ) -> Result<Response<CancelQueryResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let trace_id = req.into_inner().trace_id;
         if let Some(cancelled) = self.remove(&trace_id, true).await {
             for (_, senders) in cancelled {
@@ -280,10 +311,15 @@ impl Search for Searcher {
         Err(Status::unimplemented("Not Supported"))
     }
 
+    #[tracing::instrument(name = "grpc:search:get_sourcemap_file", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "GetSourcemapFile", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_sourcemap_file(
         &self,
         req: Request<GetSourcemapFileRequest>,
     ) -> Result<Response<GetSourcemapFileResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let req = req.into_inner();
         log::info!(
             "got get request for sourcemap file : {}/{} at {}",
@@ -304,10 +340,15 @@ impl Search for Searcher {
             file_data: res.to_vec(),
         }))
     }
+    #[tracing::instrument(name = "grpc:search:get_license_usage_info", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "GetLicenseUsageInfo", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_license_usage_info(
         &self,
-        _: Request<GetLicenseUsageRequest>,
+        req: Request<GetLicenseUsageRequest>,
     ) -> Result<Response<GetLicenseUsageResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         #[cfg(not(feature = "enterprise"))]
         let res = GetLicenseUsageResponse {
             search_allowed: true,
@@ -423,10 +464,15 @@ impl Search for Searcher {
     }
 
     #[cfg(feature = "enterprise")]
+    #[tracing::instrument(name = "grpc:search:get_workflow_inputs", skip_all, fields(otel.kind = "server", rpc.system = "grpc", rpc.service = "cluster.Search", rpc.method = "GetWorkflowInputs", server.address = config::utils::span::local_grpc_host(), server.port = config::utils::span::local_grpc_port()))]
     async fn get_workflow_inputs(
         &self,
         req: Request<GetWorkflowInputsRequest>,
     ) -> Result<Response<GetWorkflowInputsResponse>, Status> {
+        let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
+            prop.extract(&MetadataMap(req.metadata()))
+        });
+        let _ = tracing::Span::current().set_parent(parent_cx);
         let req = req.into_inner();
 
         let org_id = req.org_id;

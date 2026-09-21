@@ -19,6 +19,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
     ExportTraceServiceRequest, ExportTraceServiceResponse, trace_service_server::TraceService,
 };
 use tonic::{Response, Status};
+use tracing::Instrument;
 
 use crate::{
     handler::grpc::request::otlp::{export_reply, observe_ok},
@@ -34,55 +35,65 @@ impl TraceService for TraceServer {
         &self,
         request: tonic::Request<ExportTraceServiceRequest>,
     ) -> Result<tonic::Response<ExportTraceServiceResponse>, tonic::Status> {
-        let start = std::time::Instant::now();
-        let cfg = config::get_config();
-
-        let metadata = request.metadata().clone();
-        let msg = format!(
-            "Please specify organization id with header key '{}' ",
-            cfg.grpc.org_header_key
+        let span = common::otlp_server_span!(
+            request.metadata(),
+            "grpc:otlp:traces:export",
+            "opentelemetry.proto.collector.trace.v1.TraceService",
+            "Export"
         );
-        if !metadata.contains_key(&cfg.grpc.org_header_key) {
-            return Err(Status::invalid_argument(msg));
+        async move {
+            let start = std::time::Instant::now();
+            let cfg = config::get_config();
+
+            let metadata = request.metadata().clone();
+            let msg = format!(
+                "Please specify organization id with header key '{}' ",
+                cfg.grpc.org_header_key
+            );
+            if !metadata.contains_key(&cfg.grpc.org_header_key) {
+                return Err(Status::invalid_argument(msg));
+            }
+
+            let in_req = request.into_inner();
+            let org_id = metadata.get(&cfg.grpc.org_header_key);
+            if org_id.is_none() {
+                return Err(Status::invalid_argument(msg));
+            }
+
+            let stream_name = metadata.get(&cfg.grpc.stream_header_key);
+            let mut in_stream_name: Option<&str> = None;
+            if let Some(stream_name) = stream_name {
+                in_stream_name = Some(stream_name.to_str().unwrap());
+            };
+
+            let user_email = metadata
+                .get("user_id")
+                .and_then(|id| id.to_str().ok())
+                .unwrap_or_else(|| {
+                    log::warn!("[gRPC Traces] user_id not found in metadata, using empty string");
+                    ""
+                });
+
+            let user = IngestUser::from_user_email(user_email);
+
+            let resp = handle_otlp_request(
+                org_id.unwrap().to_str().unwrap(),
+                in_req,
+                OtlpRequestType::Grpc,
+                in_stream_name,
+                user,
+            )
+            .await
+            .map_err(|e| {
+                log::error!("handle_trace_request err {e}");
+                Status::internal(e.to_string())
+            })?;
+            let reply = export_reply(resp).await?;
+            observe_ok("/otlp/v1/traces", start);
+            Ok(Response::new(reply))
         }
-
-        let in_req = request.into_inner();
-        let org_id = metadata.get(&cfg.grpc.org_header_key);
-        if org_id.is_none() {
-            return Err(Status::invalid_argument(msg));
-        }
-
-        let stream_name = metadata.get(&cfg.grpc.stream_header_key);
-        let mut in_stream_name: Option<&str> = None;
-        if let Some(stream_name) = stream_name {
-            in_stream_name = Some(stream_name.to_str().unwrap());
-        };
-
-        let user_email = metadata
-            .get("user_id")
-            .and_then(|id| id.to_str().ok())
-            .unwrap_or_else(|| {
-                log::warn!("[gRPC Traces] user_id not found in metadata, using empty string");
-                ""
-            });
-
-        let user = IngestUser::from_user_email(user_email);
-
-        let resp = handle_otlp_request(
-            org_id.unwrap().to_str().unwrap(),
-            in_req,
-            OtlpRequestType::Grpc,
-            in_stream_name,
-            user,
-        )
+        .instrument(span)
         .await
-        .map_err(|e| {
-            log::error!("handle_trace_request err {e}");
-            Status::internal(e.to_string())
-        })?;
-        let reply = export_reply(resp).await?;
-        observe_ok("/otlp/v1/traces", start);
-        Ok(Response::new(reply))
     }
 }
 
