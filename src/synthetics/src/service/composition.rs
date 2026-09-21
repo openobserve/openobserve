@@ -258,7 +258,7 @@ fn blockers_outside(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::collections::HashMap;
 
     use config::meta::{
@@ -451,7 +451,7 @@ mod tests {
 
     /// `create_table_from_entity` omits the migration's column DEFAULTs that
     /// `synthetics_checks::create` relies on.
-    async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
+    pub(crate) async fn db_with_synthetics_defaults() -> sea_orm::DatabaseConnection {
         use sea_orm::{ConnectOptions, ConnectionTrait, Database, Schema};
         let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
         opts.max_connections(1);

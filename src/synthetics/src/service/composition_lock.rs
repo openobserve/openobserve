@@ -16,6 +16,11 @@
 //! Org-scoped serialization for parent-save, child-save and delete, so no interleaving can commit
 //! a dangling reference (§5.5).
 
+#[cfg(test)]
+pub(crate) static LOCK_CALLS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<String, usize>>,
+> = std::sync::LazyLock::new(Default::default);
+
 #[must_use = "the composition guard must be released after the mutation"]
 pub struct CompositionGuard {
     inner: Inner,
@@ -28,6 +33,14 @@ enum Inner {
 
 /// Acquire the one composition lock for `org_id`.
 pub async fn lock(org_id: &str) -> Result<CompositionGuard, infra::errors::Error> {
+    #[cfg(test)]
+    {
+        *LOCK_CALLS
+            .lock()
+            .unwrap()
+            .entry(org_id.to_owned())
+            .or_default() += 1;
+    }
     let key = format!("/synthetics/composition/{org_id}");
     let inner = if config::get_config().common.local_mode {
         let holder = infra::local_lock::lock(&key).await?;

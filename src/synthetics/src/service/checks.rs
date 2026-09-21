@@ -51,15 +51,12 @@ pub async fn create_synthetic(
     // normalisation so membership checks see canonical ids.
     validate_against_capabilities(org_id, "", &body, true).await?;
 
-    let guard = composition_lock::lock(org_id)
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    // The mutation runs to completion — success or error — before the guard is released, so
-    // every exit from the critical section releases the lock exactly once (see
-    // `composite_graph_lock`'s callers in src/core, the precedent this follows).
-    let mutation = create_synthetic_under_lock(org_id, body, created_by).await;
-    release_composition_guard(guard, org_id).await;
-    let mut result = mutation?;
+    let locked = needs_composition_lock(&body.check_type);
+    let (org, by) = (org_id.to_owned(), created_by.to_owned());
+    let mut result = run_composition_mutation(org_id, locked, async move {
+        create_synthetic_under_lock(&org, body, &by).await
+    })
+    .await?;
 
     // The public slug behind the stored PK. Derived from what was written
     // rather than from the request, so a request that named its folder by PK
@@ -174,14 +171,13 @@ pub async fn update_synthetic(
     // `start` freshness check (edits round-trip the original start date).
     validate_against_capabilities(org_id, id, &body, false).await?;
 
-    let guard = composition_lock::lock(org_id)
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
-    // released, so every exit releases the lock exactly once.
-    let mutation = update_synthetic_under_lock(conn, org_id, id, body).await;
-    release_composition_guard(guard, org_id).await;
-    let (old_folder_pk, new_folder_pk, mut check) = mutation?;
+    let locked = holds_browser_check(conn, org_id, std::slice::from_ref(&id.to_owned())).await?;
+    let (org, check_id) = (org_id.to_owned(), id.to_owned());
+    let (old_folder_pk, new_folder_pk, mut check) =
+        run_composition_mutation(org_id, locked, async move {
+            update_synthetic_under_lock(conn, &org, &check_id, body).await
+        })
+        .await?;
 
     // Recompute next_run_at so the scheduler uses the new frequency immediately.
     let now_us = config::utils::time::now_micros();
@@ -256,14 +252,12 @@ pub async fn update_synthetic(
 pub async fn delete_synthetic(org_id: &str, id: &str) -> anyhow::Result<bool> {
     let conn = get_orm_client_rw().await;
 
-    let guard = composition_lock::lock(org_id)
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
-    // released, so every exit releases the lock exactly once.
-    let mutation = delete_synthetic_under_lock(conn, org_id, id).await;
-    release_composition_guard(guard, org_id).await;
-    let deleted = mutation?;
+    let locked = holds_browser_check(conn, org_id, std::slice::from_ref(&id.to_owned())).await?;
+    let (org, check_id) = (org_id.to_owned(), id.to_owned());
+    let deleted = run_composition_mutation(org_id, locked, async move {
+        delete_synthetic_under_lock(conn, &org, &check_id).await
+    })
+    .await?;
     #[cfg(feature = "enterprise")]
     if deleted
         && o2_enterprise::enterprise::common::config::get_config()
@@ -453,30 +447,31 @@ pub async fn delete_synthetics_bulk(
     _folder_id: Option<&str>,
 ) -> anyhow::Result<()> {
     let conn = get_orm_client_rw().await;
-    let ofga = ofga_enabled();
+    let locked = holds_browser_check(conn, org_id, ids).await?;
+    let (org, batch) = (org_id.to_owned(), ids.to_vec());
+    let (deleted, outcome) = run_composition_mutation(org_id, locked, async move {
+        Ok(delete_synthetics_bulk_under_lock(conn, &org, &batch).await)
+    })
+    .await?;
+
     // Hoisted so the loop does not re-read the config per id.
     #[cfg(feature = "enterprise")]
     let replicate = o2_enterprise::enterprise::common::config::get_config()
         .super_cluster
         .enabled;
-
-    let guard = composition_lock::lock(org_id)
-        .await
-        .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
-    // See `create_synthetic_under_lock`: the mutation runs to completion before the guard is
-    // released, so every exit releases the lock exactly once.
-    let mutation = delete_synthetics_bulk_under_lock(
-        conn,
-        org_id,
-        ids,
-        ofga,
+    let ofga = ofga_enabled();
+    for id in &deleted {
         #[cfg(feature = "enterprise")]
-        replicate,
-    )
-    .await;
-    release_composition_guard(guard, org_id).await;
-    mutation?;
-    Ok(())
+        if replicate {
+            o2_enterprise::enterprise::super_cluster::queue::synthetics_check_delete(org_id, id)
+                .await?;
+        }
+        if ofga {
+            let obj = format!("{}:{}", get_ofga_type("synthetics"), id);
+            remove_ownership(org_id, &obj, "", "").await;
+        }
+    }
+    outcome
 }
 
 /// Moves a batch of synthetics to a different folder.
@@ -604,8 +599,54 @@ async fn release_composition_guard(guard: composition_lock::CompositionGuard, or
     }
 }
 
-/// The create mutation run while `checks.rs`'s callers hold the composition lock — kept as
-/// its own `?`-propagating scope so the lock is always released exactly once, win or lose.
+/// When `locked`, lock, mutation and release run in a spawned task a dropped caller cannot cancel.
+async fn run_composition_mutation<T, F>(
+    org_id: &str,
+    locked: bool,
+    mutation: F,
+) -> anyhow::Result<T>
+where
+    T: Send + 'static,
+    F: std::future::Future<Output = anyhow::Result<T>> + Send + 'static,
+{
+    if !locked {
+        return mutation.await;
+    }
+    let org_id = org_id.to_owned();
+    tokio::spawn(async move {
+        let guard = composition_lock::lock(&org_id)
+            .await
+            .map_err(|e| anyhow::Error::new(composition::CompositionError::Lock(e.to_string())))?;
+        let outcome = mutation.await;
+        release_composition_guard(guard, &org_id).await;
+        outcome
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("composition mutation task failed: {e}"))?
+}
+
+// Only a browser check can hold or be a reference, and a check's type never changes.
+fn needs_composition_lock(check_type: &SyntheticType) -> bool {
+    *check_type == SyntheticType::Browser
+}
+
+async fn holds_browser_check(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    ids: &[String],
+) -> anyhow::Result<bool> {
+    for id in ids {
+        let stored = synthetics_checks::get(conn, org_id, id)
+            .await
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        if stored.is_some_and(|c| needs_composition_lock(&c.check_type)) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Its own `?` scope, so the caller releases the lock exactly once on every outcome.
 async fn create_synthetic_under_lock(
     org_id: &str,
     mut body: Synthetic,
@@ -690,20 +731,27 @@ async fn delete_synthetic_under_lock(
         .map_err(|e| anyhow::anyhow!(e.to_string()))
 }
 
-/// The bulk-delete mutation run under the composition lock: refuse the batch if any id is
-/// still referenced, then drain and delete each one, parents first.
+/// Returns the ids the bulk delete removed, plus the error that stopped it part-way, if any.
 async fn delete_synthetics_bulk_under_lock(
     conn: &DatabaseConnection,
     org_id: &str,
     ids: &[String],
-    ofga: bool,
-    #[cfg(feature = "enterprise")] replicate: bool,
+) -> (Vec<String>, anyhow::Result<()>) {
+    let mut deleted = Vec::new();
+    let outcome = delete_each_parents_first(conn, org_id, ids, &mut deleted).await;
+    (deleted, outcome)
+}
+
+// Parents go first, so a failure part-way never leaves a parent whose child is gone.
+async fn delete_each_parents_first(
+    conn: &DatabaseConnection,
+    org_id: &str,
+    ids: &[String],
+    deleted: &mut Vec<String>,
 ) -> anyhow::Result<()> {
     composition::ensure_not_referenced(conn, org_id, ids)
         .await
         .map_err(anyhow::Error::new)?;
-
-    // Parents go first, so a failure part-way never leaves a parent whose child is gone.
     let parents = synthetics_refs::refs_for_parents(conn, org_id, ids)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -713,17 +761,11 @@ async fn delete_synthetics_bulk_under_lock(
         synthetics_jobs::drain_check(conn, id)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        let deleted = synthetics_checks::delete(conn, org_id, id)
+        if synthetics_checks::delete(conn, org_id, id)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        #[cfg(feature = "enterprise")]
-        if deleted && replicate {
-            o2_enterprise::enterprise::super_cluster::queue::synthetics_check_delete(org_id, id)
-                .await?;
-        }
-        if deleted && ofga {
-            let obj = format!("{}:{}", get_ofga_type("synthetics"), id);
-            remove_ownership(org_id, &obj, "", "").await;
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        {
+            deleted.push(id.clone());
         }
     }
     Ok(())
@@ -762,9 +804,108 @@ fn composition_fields(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{
+        collections::HashMap,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+    };
 
-    use super::composition_fields;
+    use config::meta::synthetics::{Synthetic, SyntheticType};
+    use infra::table::synthetics_checks;
+
+    use super::{
+        composition_fields, holds_browser_check, needs_composition_lock, run_composition_mutation,
+    };
+    use crate::service::{composition::tests::db_with_synthetics_defaults, composition_lock};
+
+    fn lock_calls(org_id: &str) -> usize {
+        composition_lock::LOCK_CALLS
+            .lock()
+            .unwrap()
+            .get(org_id)
+            .copied()
+            .unwrap_or(0)
+    }
+
+    fn check(id: &str, check_type: SyntheticType) -> Synthetic {
+        Synthetic {
+            id: id.into(),
+            org_id: "org1".into(),
+            name: id.into(),
+            check_type,
+            config: serde_json::json!({ "steps": [] }),
+            ..Synthetic::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn an_http_save_does_not_take_the_composition_lock() {
+        let org = "org-b5-http";
+        let locked = needs_composition_lock(&SyntheticType::Http);
+        run_composition_mutation(org, locked, async { Ok(()) })
+            .await
+            .unwrap();
+        assert_eq!(lock_calls(org), 0);
+
+        let org = "org-b5-browser";
+        let locked = needs_composition_lock(&SyntheticType::Browser);
+        run_composition_mutation(org, locked, async { Ok(()) })
+            .await
+            .unwrap();
+        assert_eq!(lock_calls(org), 1);
+    }
+
+    #[tokio::test]
+    async fn only_a_stored_browser_check_makes_an_update_or_delete_lock() {
+        let db = db_with_synthetics_defaults().await;
+        synthetics_checks::create(&db, "org1", check("h", SyntheticType::Http), true)
+            .await
+            .unwrap();
+        synthetics_checks::create(&db, "org1", check("b", SyntheticType::Browser), true)
+            .await
+            .unwrap();
+        let ids = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(
+            !holds_browser_check(&db, "org1", &ids(&["h"]))
+                .await
+                .unwrap()
+        );
+        assert!(
+            !holds_browser_check(&db, "org1", &ids(&["gone"]))
+                .await
+                .unwrap()
+        );
+        assert!(
+            holds_browser_check(&db, "org1", &ids(&["h", "b"]))
+                .await
+                .unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_dropped_caller_cannot_cancel_a_locked_mutation() {
+        let org = "org-b5-cancel";
+        let done = Arc::new(AtomicBool::new(false));
+        let flag = done.clone();
+        let caller = run_composition_mutation(org, true, async move {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            flag.store(true, Ordering::SeqCst);
+            Ok(())
+        });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(10), caller)
+                .await
+                .is_err()
+        );
+        let guard = composition_lock::lock(org).await.unwrap();
+        assert!(
+            done.load(Ordering::SeqCst),
+            "the lock was free before the mutation ended"
+        );
+        guard.release().await.unwrap();
+    }
 
     #[test]
     fn expanded_steps_and_referenced_by_are_attached_per_row() {
