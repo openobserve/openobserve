@@ -6,6 +6,17 @@
 //   - OrgStorageEditor     (storage provider connection fields)
 //   - DomainManagement     (domain restriction input)
 
+import { expect } from '@playwright/test';
+
+// Role value → displayed label for the Domain → Organization mapping role select.
+// `allowed_user` is the OpenFGA relation for the User role (DomainOrgMappings.schema.ts).
+const DOMAIN_ORG_ROLE_LABELS = {
+    admin: 'Admin',
+    editor: 'Editor',
+    viewer: 'Viewer',
+    allowed_user: 'User',
+};
+
 export class SettingsFormValidationPage {
     /**
      * @param {import('@playwright/test').Page} page
@@ -94,6 +105,25 @@ export class SettingsFormValidationPage {
         // Action buttons
         this.modelPricingSaveBtn      = '[data-test="model-pricing-editor-save-btn"]';
         this.modelPricingCancelBtn    = '[data-test="model-pricing-editor-cancel-btn"]';
+
+        // ── Domain → Organization Mapping (cloud-gated section) ─────────────
+        // The section renders only when config.isCloud === "true" && isMetaOrg
+        // (OrganizationSettings.vue:146). On OSS it is always absent.
+        this.domainOrgMappingsAddBtn        = '[data-test="settings-domain-org-mappings-add-btn"]';
+        this.domainOrgMappingsList          = '[data-test="settings-domain-org-mappings-list"]';
+        this.domainOrgMappingsEmpty         = '[data-test="settings-domain-org-mappings-empty"]';
+        this.domainOrgMappingDialog         = '[data-test="settings-domain-org-mapping-dialog"]';
+        // ODialog forwards the consumer data-test and names its buttons -primary/-secondary.
+        this.domainOrgMappingPrimaryBtn     = '[data-test="settings-domain-org-mapping-dialog"] [data-test="o-dialog-primary-btn"]';
+        // OFormInput surfaces the native input at -field and the message at -error.
+        this.domainOrgMappingDomainField    = '[data-test="settings-domain-org-mapping-domain-input-field"]';
+        this.domainOrgMappingDomainError    = '[data-test="settings-domain-org-mapping-domain-input-error"]';
+        this.domainOrgMappingOrgField       = '[data-test="settings-domain-org-mapping-org-input-field"]';
+        this.domainOrgMappingGroupField     = '[data-test="settings-domain-org-mapping-group-input-field"]';
+        // OSelect surfaces the clickable trigger at -trigger (not -field).
+        this.domainOrgMappingRoleTrigger    = '[data-test="settings-domain-org-mapping-role-select-trigger"]';
+        // ConfirmDialog (delete) primary button.
+        this.confirmDialogPrimaryBtn        = '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]';
     }
 
     // ── Navigation helpers ────────────────────────────────────────────────────
@@ -442,5 +472,137 @@ export class SettingsFormValidationPage {
 
     getModelPricingCancelBtnLocator() {
         return this.page.locator(this.modelPricingCancelBtn);
+    }
+
+    // ── Domain → Organization Mapping (cloud-gated) helpers ─────────────────
+
+    /**
+     * Navigate to Settings > Organization for the meta org (`_meta`), which is
+     * the only org where the mappings section can render (when cloud-gated).
+     */
+    async navigateToMetaOrgOrganizationSettings() {
+        const base = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${base}/web/settings/organization?org_identifier=_meta`);
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+        await this.page.locator(this.orgSettingsSaveBtn).waitFor({ state: 'visible', timeout: 10000 });
+    }
+
+    /**
+     * Positive-probe for the cloud-gated section: true iff the add button mounts
+     * within ~10s (i.e. the section rendered), else false. On OSS this always
+     * returns false — the section is never rendered (config.isCloud === "false").
+     */
+    async probeDomainOrgMappingsSection() {
+        try {
+            await this.page.locator(this.domainOrgMappingsAddBtn).waitFor({ state: 'visible', timeout: 10000 });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async expectDomainOrgMappingsSectionAbsent() {
+        await expect(this.page.locator(this.domainOrgMappingsAddBtn)).toHaveCount(0);
+        await expect(this.page.locator(this.domainOrgMappingsList)).toHaveCount(0);
+        await expect(this.page.locator(this.domainOrgMappingsEmpty)).toHaveCount(0);
+    }
+
+    async expectDomainOrgMappingsListVisible() {
+        await expect(this.page.locator(this.domainOrgMappingsList)).toBeVisible();
+    }
+
+    async expectDomainOrgMappingsEmptyVisible() {
+        await expect(this.page.locator(this.domainOrgMappingsEmpty)).toBeVisible();
+    }
+
+    async expectDomainOrgMappingsItemDomainVisible(index, text) {
+        await expect(this.page.locator(`[data-test="settings-domain-org-mappings-item-domain-${index}"]`)).toHaveText(text);
+    }
+
+    async expectDomainOrgMappingsItemOrgVisible(index, text) {
+        await expect(this.page.locator(`[data-test="settings-domain-org-mappings-item-org-${index}"]`)).toHaveText(text);
+    }
+
+    async expectDomainOrgMappingsItemGroupAbsent(index) {
+        await expect(this.page.locator(`[data-test="settings-domain-org-mappings-item-group-${index}"]`)).toHaveCount(0);
+    }
+
+    async expectDomainOrgMappingsItemRoleBadge(index, label) {
+        const row = this.page.locator(`[data-test="settings-domain-org-mappings-item-${index}"]`);
+        await expect(row.getByText(label, { exact: true })).toBeVisible();
+    }
+
+    async expectDomainOrgMappingDialogVisible() {
+        await expect(this.page.locator(this.domainOrgMappingDialog)).toBeVisible();
+    }
+
+    async expectDomainOrgMappingDomainError() {
+        await expect(this.page.locator(this.domainOrgMappingDomainError)).toBeVisible({ timeout: 5000 });
+    }
+
+    async expectSuccessToast() {
+        await expect(this.page.locator(this.toastSuccess).first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectErrorToast() {
+        await expect(this.page.locator(this.toastError).first()).toBeVisible({ timeout: 10000 });
+    }
+
+    async clickAddDomainOrgMapping() {
+        await this.page.locator(this.domainOrgMappingsAddBtn).click();
+        await expect(this.page.locator(this.domainOrgMappingDialog)).toBeVisible();
+    }
+
+    async fillDomainOrgMappingDomain(value) {
+        await this.page.locator(this.domainOrgMappingDomainField).fill(value);
+    }
+
+    async fillDomainOrgMappingOrg(value) {
+        await this.page.locator(this.domainOrgMappingOrgField).fill(value);
+    }
+
+    async fillDomainOrgMappingGroup(value) {
+        await this.page.locator(this.domainOrgMappingGroupField).fill(value);
+    }
+
+    async selectDomainOrgMappingRole(role) {
+        const label = DOMAIN_ORG_ROLE_LABELS[role] || role;
+        await this.page.locator(this.domainOrgMappingRoleTrigger).click();
+        await this.page.getByRole('option', { name: label }).first().click();
+    }
+
+    async clickDomainOrgMappingPrimary() {
+        await this.page.locator(this.domainOrgMappingPrimaryBtn).click();
+    }
+
+    async submitDomainOrgMapping() {
+        await this.clickDomainOrgMappingPrimary();
+        await expect(this.page.locator(this.domainOrgMappingDialog)).toBeHidden();
+    }
+
+    async addDomainOrgMapping(domain, org, role, group) {
+        await this.clickAddDomainOrgMapping();
+        await this.fillDomainOrgMappingDomain(domain);
+        await this.fillDomainOrgMappingOrg(org);
+        if (role && role !== 'admin') {
+            await this.selectDomainOrgMappingRole(role);
+        }
+        if (group) {
+            await this.fillDomainOrgMappingGroup(group);
+        }
+        await this.submitDomainOrgMapping();
+    }
+
+    async clickEditDomainOrgMapping(index) {
+        await this.page.locator(`[data-test="settings-domain-org-mappings-edit-${index}"]`).click();
+        await expect(this.page.locator(this.domainOrgMappingDialog)).toBeVisible();
+    }
+
+    async clickDeleteDomainOrgMapping(index) {
+        await this.page.locator(`[data-test="settings-domain-org-mappings-delete-${index}"]`).click();
+    }
+
+    async confirmRemoveDomainOrgMapping() {
+        await this.page.locator(this.confirmDialogPrimaryBtn).click();
     }
 }

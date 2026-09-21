@@ -1,0 +1,29 @@
+{
+  "feature_slug": "domain-org-mapping",
+  "feature_title": "Domain to Organization Mapping",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "domain-org-mapping.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/domain-org-mapping.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/components/settings/DomainOrgMappings.vue",
+    "web/src/components/settings/DomainOrgMappingDialog.vue",
+    "web/src/components/settings/DomainOrgMappings.schema.ts",
+    "web/src/components/settings/OrganizationSettings.vue",
+    "web/src/layouts/MainLayout.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All changed paths are OSS-owned locations (web/src/components/settings/*, web/src/layouts/MainLayout.vue, web/src/locales/*, src/api/common/src/auth/jwt.rs, src/api/management/src/request/organization/settings.rs, src/common/src/meta/organization.rs, src/config/src/meta/user.rs, scripts/translations/*). None live under enterprise/, o2_enterprise/, or src/enterprise/. The backend feature is gated with #[cfg(feature = \"cloud\")] (cloud, not enterprise), and no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management) appear in the paths, so edition is oss.",
+    "skip": "Not skipped. The change is a genuine user-facing feature: a new Domain -> Organization mapping CRUD section in Organization Settings (add/edit/delete via dialogs with domain, org, role, and group inputs plus validation). No skip markers present (feature_hint.txt and trigger_comment.txt are both empty, no tests-added label passed).",
+    "e2e": "E2E is warranted. A meta-org admin can add, edit, and delete domain-to-org mappings in the Organization Settings UI, with required-field validation, duplicate-domain blocking, a role selector, and an optional user group. This is a new, user-exercisable UI flow (web/src/components/settings/DomainOrgMappings.vue + DomainOrgMappingDialog.vue wired into OrganizationSettings.vue) that should be verified in the browser.",
+    "area": "The change is a general org/settings/admin feature with no single product-area home (Logs/Metrics/Traces/etc.). It lives under web/src/components/settings/ and the closest existing sibling specs are in tests/ui-testing/playwright-tests/GeneralTests/ (serviceAccount, theme-management, logoManagement, ingestion-config), so area = GeneralTests.",
+    "group": "playwright_group = GeneralTests because the ci-matrix shard named GeneralTests (actual_folder GeneralTests) already carries cross-cutting settings/admin specs (serviceAccount.spec.js, theme-management.spec.js, ingestion-config.spec.js, logoManagement.spec.js) and is the natural shard for an organization-settings feature.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only test file changed is web/src/components/settings/OrganizationSettings.spec.ts, which is a Vitest unit test, not an E2E spec under tests/ui-testing/playwright-tests/, so existing_tests_in_diff is false and there is no existing E2E coverage to extend."
+  }
+}
