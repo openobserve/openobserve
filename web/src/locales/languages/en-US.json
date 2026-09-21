@@ -2153,7 +2153,7 @@
       "filterModules": "Filter Modules",
       "noModuleMatch": "No Module Matches Your Filter",
       "moduleScopeAll": "All",
-      "moduleScopeGranted": "Granted",
+      "moduleScopeGranted": "Selected",
       "noGrantedModule": "No Module Has Grants Yet",
       "moduleOverviewTitle": "Role Overview",
       "modulesTitle": "Modules",
