@@ -1,0 +1,6 @@
+{
+  "group": "Dashboards-Charts",
+  "spec_filename": "dashboard-zoom-brush.spec.js",
+  "create_group": false,
+  "browser": "chrome"
+}

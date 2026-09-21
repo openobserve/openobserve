@@ -1,0 +1,17 @@
+[
+  {
+    "title": "TC-ZOOM-001: Dragging a brush on a time-series chart switches the dashboard to an absolute range",
+    "action": "new",
+    "verifies": "a brush drag on a line chart flips the dashboard global time from relative to an absolute range and re-queries the panel"
+  },
+  {
+    "title": "TC-DRAG-001: Dragging a panel's header bar repositions it and saves the layout",
+    "action": "new",
+    "verifies": "a header-bar drag moves the panel in the grid and persists the new layout via a dashboard PUT"
+  },
+  {
+    "title": "TC-ZOOM-002: Dragging on a pie chart does not change the global time range",
+    "action": "new",
+    "verifies": "the same drag on a non-time-series pie chart leaves the global time range relative"
+  }
+]
