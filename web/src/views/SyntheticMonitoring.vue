@@ -690,19 +690,29 @@ const privateLocationsEnabled = computed(() =>
   Boolean(store.state.zoConfig?.synthetics_private_locations_enabled),
 );
 
-// Defaults to 'checks', but honors ?section=private / ?section=status-pages so
-// links back from a detail surface land on the tab the user actually came from
-// instead of always resetting to Checks. A ?section for a tab this build does not
-// render falls back to Checks rather than landing on a tab that is not shown.
-const initialSection = ((): SyntheticsSection => {
-  const s = route.query.section;
-  if (s === "private" && privateLocationsEnabled.value) return "private";
-  if (s === "status-pages") return "status-pages";
-  if (s === "variables") return "variables";
+// A ?section for a tab this build does not render falls back to Checks rather than landing on a tab that is not shown.
+const sectionFromQuery = (value: unknown): SyntheticsSection => {
+  if (value === "private" && privateLocationsEnabled.value) return "private";
+  if (value === "status-pages") return "status-pages";
+  if (value === "variables") return "variables";
   return "checks";
-})();
+};
+const initialSection = sectionFromQuery(route.query.section);
 const variablesTabRef = ref<InstanceType<typeof SyntheticsVariablesTab> | null>(null);
 const activeSection = ref<SyntheticsSection>(initialSection);
+// Replace, not push, so a tab click adds no history entry; the key is always written so the URL matches the tab.
+watch(activeSection, (section) => {
+  if (route.query.section !== section) {
+    router.replace({ query: { ...route.query, section } }).catch(() => {});
+  }
+});
+watch(
+  () => route.query.section,
+  (s) => {
+    const next = sectionFromQuery(s);
+    if (activeSection.value !== next) activeSection.value = next;
+  },
+);
 // Private Locations data is never fetched on initial render (only on manual
 // refresh or after a delete) — load it the first time the tab is actually
 // opened, so switching to it isn't silently empty.

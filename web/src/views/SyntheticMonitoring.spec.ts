@@ -35,8 +35,10 @@ const {
   mockServiceCreate,
   mockServiceGetLocations,
   mockServiceGetAgentSetup,
+  mockStatusPagesList,
   mockRouterPush,
-  mockRouteQuery,
+  mockRouterReplace,
+  mockRoute,
 } = vi.hoisted(() => ({
   mockServiceList: vi.fn().mockResolvedValue({ data: { monitors: [] } }),
   mockServiceEnable: vi.fn().mockResolvedValue({}),
@@ -51,8 +53,10 @@ const {
     .mockResolvedValue({ data: { install: "curl ...", token: "abc123" } }),
   // router.push returns a Promise in vue-router; callers here chain .catch() on it.
   mockRouterPush: vi.fn().mockResolvedValue(undefined),
-  // Mutable so a test can drive `?section=private` without remounting the mock.
-  mockRouteQuery: {} as Record<string, string>,
+  mockRouterReplace: vi.fn().mockResolvedValue(undefined),
+  mockStatusPagesList: vi.fn().mockResolvedValue({ data: { pages: [] } }),
+  // `query` is swapped for a reactive proxy by the vue-router mock, so a test can drive `?section=` the way Back/Forward would.
+  mockRoute: { query: {} as Record<string, string> },
 }));
 
 // ── Module mocks ─────────────────────────────────────────────────────────
@@ -60,16 +64,20 @@ vi.mock("vue-i18n", () => ({
   useI18n: vi.fn(() => ({ t: $t })),
 }));
 
-vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    params: {},
-    query: mockRouteQuery,
-  }),
-  useRouter: () => ({
-    push: mockRouterPush,
-    replace: vi.fn(),
-  }),
-}));
+vi.mock("vue-router", async () => {
+  const { reactive } = await import("vue");
+  mockRoute.query = reactive(mockRoute.query);
+  return {
+    useRoute: () => ({
+      params: {},
+      query: mockRoute.query,
+    }),
+    useRouter: () => ({
+      push: mockRouterPush,
+      replace: mockRouterReplace,
+    }),
+  };
+});
 
 vi.mock("@/services/synthetics", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
@@ -86,6 +94,13 @@ vi.mock("@/services/synthetics", async (importOriginal) => {
       getLocations: mockServiceGetLocations,
       getAgentSetup: mockServiceGetAgentSetup,
     },
+  });
+});
+
+vi.mock("@/services/status_pages", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: mockStatusPagesList },
   });
 });
 
@@ -255,7 +270,7 @@ describe("SyntheticMonitoring", () => {
     mockServiceList.mockResolvedValue({ data: { monitors: [] } });
     // Both are process-global and mutated by individual tests, so they are
     // restored here rather than left for the next test to inherit.
-    for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k];
+    for (const k of Object.keys(mockRoute.query)) delete mockRoute.query[k];
     store.state.zoConfig.synthetics_private_locations_enabled = true;
   });
 
@@ -387,7 +402,7 @@ describe("SyntheticMonitoring", () => {
     it("falls back to Checks when ?section=private but private locations are unavailable", () => {
       // Otherwise a deep link from an enterprise deployment lands on a tab that
       // is not rendered, and the page looks empty rather than unavailable.
-      mockRouteQuery.section = "private";
+      mockRoute.query.section = "private";
       wrapper = mountPageWithoutPrivateLocations();
       expect((wrapper.vm as any).activeSection).toBe("checks");
     });
@@ -411,6 +426,123 @@ describe("SyntheticMonitoring", () => {
       (wrapper.vm as any).activeSection = "checks";
       await nextTick();
       expect((wrapper.vm as any).activeSection).toBe("checks");
+    });
+  });
+
+  describe("section query round-trip", () => {
+    const lastReplacedQuery = () =>
+      mockRouterReplace.mock.calls.at(-1)?.[0]?.query as Record<string, string> | undefined;
+
+    it("lands on the Environments & Variables tab when mounted with ?section=variables", () => {
+      mockRoute.query.section = "variables";
+      wrapper = mountPage();
+      expect((wrapper.vm as any).activeSection).toBe("variables");
+      expect(wrapper.find('[data-test="synthetic-monitoring-add-variable-btn"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("writes the new section to the URL with router.replace when the tab changes", async () => {
+      wrapper = mountPage();
+      (wrapper.vm as any).activeSection = "status-pages";
+      await nextTick();
+      expect(lastReplacedQuery()).toMatchObject({ section: "status-pages" });
+    });
+
+    it("keeps the other query keys (folder) when writing the section", async () => {
+      mockRoute.query.folder = "f-ops";
+      wrapper = mountPage();
+      (wrapper.vm as any).activeSection = "variables";
+      await nextTick();
+      expect(lastReplacedQuery()).toEqual({ folder: "f-ops", section: "variables" });
+    });
+
+    it("uses replace rather than push so a tab click adds no history entry", async () => {
+      wrapper = mountPage();
+      (wrapper.vm as any).activeSection = "status-pages";
+      await nextTick();
+      const pushedWithSection = mockRouterPush.mock.calls.some(
+        (call) => call[0]?.query?.section !== undefined,
+      );
+      expect(pushedWithSection).toBe(false);
+      expect(mockRouterReplace).toHaveBeenCalled();
+    });
+
+    it("does not leave a stale section in the URL after returning to Checks", async () => {
+      mockRoute.query.section = "status-pages";
+      wrapper = mountPage();
+      (wrapper.vm as any).activeSection = "checks";
+      await nextTick();
+      // Either `section=checks` or no key is acceptable; a leftover `status-pages` is not.
+      const query = lastReplacedQuery();
+      expect(query).toBeDefined();
+      expect(query!.section ?? "checks").toBe("checks");
+    });
+
+    it("switches the tab when route.query.section changes externally", async () => {
+      wrapper = mountPage();
+      mockRoute.query.section = "status-pages";
+      await nextTick();
+      expect((wrapper.vm as any).activeSection).toBe("status-pages");
+      expect(wrapper.find('[data-test="status-pages-new-btn"]').exists()).toBe(true);
+    });
+
+    it("returns to Checks when the section key disappears from the URL", async () => {
+      mockRoute.query.section = "variables";
+      wrapper = mountPage();
+      expect((wrapper.vm as any).activeSection).toBe("variables");
+      delete mockRoute.query.section;
+      await nextTick();
+      expect((wrapper.vm as any).activeSection).toBe("checks");
+    });
+
+    it("falls back to Checks when the URL changes to a section this build does not render", async () => {
+      mockRoute.query.section = "status-pages";
+      wrapper = mountPageWithoutPrivateLocations();
+      mockRoute.query.section = "private";
+      await nextTick();
+      expect((wrapper.vm as any).activeSection).toBe("checks");
+      expect(wrapper.find('[data-test="synthetic-monitoring-new-check-btn"]').exists()).toBe(true);
+    });
+
+    it("falls back to Checks when the URL changes to an unknown section", async () => {
+      mockRoute.query.section = "variables";
+      wrapper = mountPage();
+      mockRoute.query.section = "nope";
+      await nextTick();
+      expect((wrapper.vm as any).activeSection).toBe("checks");
+    });
+
+    it("lazy-loads private locations when mounted with ?section=private", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      const plainMountCalls = mockServiceGetLocations.mock.calls.length;
+      wrapper.unmount();
+      mockServiceGetLocations.mockClear();
+
+      mockRoute.query.section = "private";
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).activeSection).toBe("private");
+      expect(mockServiceGetLocations.mock.calls.length).toBe(plainMountCalls + 1);
+    });
+
+    it("lazy-loads status pages when mounted with ?section=status-pages", async () => {
+      mockRoute.query.section = "status-pages";
+      wrapper = mountPage();
+      await flushPromises();
+      expect((wrapper.vm as any).activeSection).toBe("status-pages");
+      expect(mockStatusPagesList).toHaveBeenCalledTimes(1);
+    });
+
+    it("lazy-loads private locations when the tab is reached through the URL", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+      const callsBefore = mockServiceGetLocations.mock.calls.length;
+      mockRoute.query.section = "private";
+      await flushPromises();
+      expect((wrapper.vm as any).activeSection).toBe("private");
+      expect(mockServiceGetLocations.mock.calls.length).toBe(callsBefore + 1);
     });
   });
 
