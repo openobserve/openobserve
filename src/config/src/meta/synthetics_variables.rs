@@ -339,6 +339,9 @@ pub fn validate_variable_request(
              may read it, so put the secret in the environment that should guard it"
         ));
     }
+    if req.value.as_deref().is_some_and(|v| v.trim().is_empty()) {
+        return Err("value: must not be empty".to_string());
+    }
     if req.value.is_none() && !has_stored_value {
         return Err("value: must be set when the variable has no stored value".to_string());
     }
@@ -526,6 +529,77 @@ mod tests {
         let stored = Some(SyntheticsVariableKind::Secret);
         assert!(validate_variable_request(&req, false, true, stored).is_ok());
         assert!(validate_variable_request(&req, false, false, stored).is_err());
+    }
+
+    #[test]
+    fn a_create_with_an_empty_value_is_rejected_for_both_kinds() {
+        for kind in [
+            SyntheticsVariableKind::Plain,
+            SyntheticsVariableKind::Secret,
+        ] {
+            let req = SyntheticsVariableRequest {
+                name: "TOKEN".into(),
+                value: Some(String::new()),
+                kind: Some(kind),
+                ..Default::default()
+            };
+            let err = validate_variable_request(&req, false, false, None)
+                .expect_err("an empty value must be rejected on create");
+            assert_eq!(err, "value: must not be empty");
+        }
+    }
+
+    #[test]
+    fn a_whitespace_only_value_is_rejected_on_create_and_update() {
+        for kind in [
+            SyntheticsVariableKind::Plain,
+            SyntheticsVariableKind::Secret,
+        ] {
+            let req = SyntheticsVariableRequest {
+                name: "TOKEN".into(),
+                value: Some("   ".into()),
+                kind: Some(kind),
+                ..Default::default()
+            };
+            let err = validate_variable_request(&req, false, false, None)
+                .expect_err("a whitespace-only value must be rejected on create");
+            assert_eq!(err, "value: must not be empty");
+            let err = validate_variable_request(&req, false, true, Some(kind))
+                .expect_err("a whitespace-only value must be rejected on update");
+            assert_eq!(err, "value: must not be empty");
+        }
+    }
+
+    #[test]
+    fn an_update_with_an_empty_value_is_rejected_even_when_one_is_stored() {
+        for (kind, in_global) in [
+            (SyntheticsVariableKind::Plain, true),
+            (SyntheticsVariableKind::Secret, false),
+        ] {
+            let req = SyntheticsVariableRequest {
+                name: "TOKEN".into(),
+                value: Some(String::new()),
+                kind: Some(kind),
+                ..Default::default()
+            };
+            let err = validate_variable_request(&req, in_global, true, Some(kind))
+                .expect_err("an empty value must be rejected on update");
+            assert_eq!(err, "value: must not be empty");
+        }
+    }
+
+    #[test]
+    fn an_empty_value_on_an_unset_secret_is_called_empty_not_missing() {
+        let req = SyntheticsVariableRequest {
+            name: "TOKEN".into(),
+            value: Some(String::new()),
+            kind: Some(SyntheticsVariableKind::Secret),
+            ..Default::default()
+        };
+        let err =
+            validate_variable_request(&req, false, false, Some(SyntheticsVariableKind::Secret))
+                .expect_err("an empty value must be rejected even when nothing is stored");
+        assert_eq!(err, "value: must not be empty");
     }
 
     fn footprint(name: &str, own: &[&str], envs: &[&str]) -> CheckVariableFootprint {

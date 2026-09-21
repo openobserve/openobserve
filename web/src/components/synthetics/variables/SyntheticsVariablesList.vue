@@ -96,6 +96,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           ••••••
           <span v-if="!row.has_value">{{ t("synthetics.variables.notSet") }}</span>
         </span>
+        <OBadge
+          v-else-if="row.value === ''"
+          variant="warning"
+          data-test="synthetics-variable-value-empty"
+          >{{ t("synthetics.variables.valueEmpty") }}</OBadge
+        >
         <span
           v-else
           class="truncate font-mono"

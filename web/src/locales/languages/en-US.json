@@ -13532,6 +13532,7 @@
       "usedBy": "Used by",
       "usedByChecks": "{n} checks",
       "value": "Value",
+      "valueEmpty": "Empty",
       "valuePlaceholder": "Value",
       "valueRequired": "Value is required",
       "valueSet": "Set · updated {when}"
