@@ -1712,6 +1712,10 @@ pub fn service_routes() -> Router {
                 get(oncall::get_prior_causes),
             )
             .route(
+                "/{org_id}/oncall/responses/{response_id}/report",
+                get(oncall::get_response_report),
+            )
+            .route(
                 "/{org_id}/oncall/responses/{response_id}/acknowledge",
                 post(oncall::acknowledge_response),
             )
