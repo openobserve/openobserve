@@ -576,9 +576,15 @@ export const SHORTCUT_REGISTRY: ShortcutGroup[] = [
     scope: "functions",
     shortcuts: [
       { id: "functionsAdd", key: "n", descriptionKey: "shortcuts.actions.functionsAdd" },
+      { id: "functionsImport", key: "i", descriptionKey: "shortcuts.actions.functionsImport" },
       { id: "functionsRefresh", key: "r", descriptionKey: "shortcuts.actions.functionsRefresh" },
       { id: "functionsFocusSearch", key: "/", descriptionKey: "shortcuts.actions.focusSearch" },
       { id: "functionsRowEdit", display: "e", descriptionKey: "shortcuts.actions.tableRowEdit" },
+      {
+        id: "functionsRowExport",
+        display: "x",
+        descriptionKey: "shortcuts.actions.tableRowExport",
+      },
       {
         id: "functionsRowDelete",
         display: "del / ⌫",
