@@ -608,12 +608,26 @@ describe("Login.vue", () => {
 
     it("should set first time login flag when cloud and new_user_login", async () => {
       config.isCloud = "true";
-      zincutils.checkCallBackValues.mockReturnValue("true");
+      zincutils.checkCallBackValues.mockImplementation((_hash: string, key: string) =>
+        key === "new_user_login" ? "true" : "false",
+      );
 
       await wrapper.vm.getDefaultOrganization();
 
       expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "new_user_login");
       expect(mockLocalStorage.setItem).toHaveBeenCalledWith("isFirstTimeLogin", "true");
+    });
+
+    it("should not set first time login flag for an invited user even when new_user_login is true", async () => {
+      config.isCloud = "true";
+      zincutils.checkCallBackValues.mockImplementation((_hash: string, key: string) =>
+        key === "new_user_login" || key === "pending_invites" ? "true" : "false",
+      );
+
+      await wrapper.vm.getDefaultOrganization();
+
+      expect(zincutils.checkCallBackValues).toHaveBeenCalledWith("", "pending_invites");
+      expect(mockLocalStorage.setItem).not.toHaveBeenCalledWith("isFirstTimeLogin", "true");
     });
 
     it("should not set first time login flag when not cloud", async () => {
