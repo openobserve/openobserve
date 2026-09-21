@@ -388,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
+        @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
@@ -500,6 +501,7 @@ export default defineComponent({
     "onEditLayout",
     "update:runId",
     "contextmenu",
+    "sendToAiChat",
   ],
   props: [
     "data",

@@ -18,12 +18,6 @@ import DateTime from "@/components/DateTime.vue";
 import QueryEditor from "@/components/QueryEditor.vue";
 import TablePaginationControls from "@/components/dashboards/addPanel/TablePaginationControls.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
-import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
-import OTab from "@/lib/navigation/Tabs/OTab.vue";
-import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
-import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import OInput from "@/lib/forms/Input/OInput.vue";
-import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 const JsonPreview = defineAsyncComponent(() => import("@/plugins/logs/JsonPreview.vue"));
@@ -34,6 +28,12 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { b64EncodeUnicode } from "@/utils/formatters";
 import searchService from "@/services/search";
 import patternsService from "@/services/patterns";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { buildChipDimensionsFromFilters } from "@/services/service_streams";
+import { buildWorkloadChipDimensions } from "@/composables/useMetricSubjectButtons";
+import { extractSeverity } from "@/utils/sourceEventSeverity";
+import type { TelemetryContext } from "@/utils/telemetryCorrelation";
+const DetailTable = defineAsyncComponent(() => import("@/plugins/logs/DetailTable.vue"));
 
 const props = defineProps<{
   stream: string;
@@ -44,6 +44,8 @@ const props = defineProps<{
   endTime: number; // microseconds
   baseWhere?: string; // panel's own WHERE, AND-combined with the clicked cell
 }>();
+
+const emit = defineEmits<{ (e: "sendToAiChat", value: unknown, append?: boolean): void }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -126,7 +128,6 @@ function activeSql() {
 // ── Event detail drawer ───────────────────────────────────────────────────────
 const selectedEvent = ref<Record<string, any> | null>(null);
 const detailOpen = computed(() => !!selectedEvent.value);
-const detailTab = ref("insights");
 
 // ── Insights state (loaded when detail drawer opens) ──────────────────────────
 const insightsLoading = ref(false);
@@ -409,7 +410,6 @@ async function loadInsights(ev: Record<string, any>) {
 
 function openEventDetail(ev: Record<string, any>) {
   selectedEvent.value = ev;
-  detailTab.value = "insights";
   router.replace({ query: { ...route.query, cell_event_ts: String(ev._timestamp ?? "") } });
   loadInsights(ev);
 }
@@ -453,36 +453,105 @@ function onDetailKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener("keydown", onDetailKeydown, true));
 onBeforeUnmount(() => window.removeEventListener("keydown", onDetailKeydown, true));
 
-// Details tab: field/value rows, filtered by the search box.
-const detailFilter = ref("");
-const wrapDetailValues = ref(false);
-// Format the timestamp column; pass everything else through for LogsHighLighting.
-function getDetailDisplayValue(field: string, value: any): any {
-  return field === "_timestamp" ? fmtTs(value) : value;
-}
-const detailRows = computed<[string, any][]>(() => {
-  const entries = Object.entries(selectedEvent.value ?? {});
-  const q = detailFilter.value.trim().toLowerCase();
-  if (!q) return entries;
-  return entries.filter(
-    ([k, v]) =>
-      k.toLowerCase().includes(q) ||
-      String(v ?? "")
-        .toLowerCase()
-        .includes(q),
-  );
-});
-// Name/Value grid rendered with OTable (same component as the other tables).
-const detailTableRows = computed(() => detailRows.value.map(([name, value]) => ({ name, value })));
-const detailColumns = computed<OTableColumnDef[]>(() => [
-  { id: "name", header: t("search.sourceName"), accessorKey: "name", size: 220 },
+// ── Source Details (DetailTable) — Insights leading tab + correlation wiring ────
+const detailLeadingTabs = computed(() => [
   {
-    id: "value",
-    header: t("search.sourceValue"),
-    accessorKey: "value",
-    meta: { autoWidth: true, fillRemaining: true },
+    name: "insights",
+    label: t("panel.logExplorer.detail.insights"),
+    dataTest: "log-detail-insights-tab",
+    icon: "insights",
   },
 ]);
+
+const correlationDashboardProps = ref<any>(null);
+const correlationLoading = ref(false);
+const correlationError = ref<string | null>(null);
+const correlationFetchInProgress = ref(false);
+const {
+  findRelatedTelemetry,
+  semanticGroups,
+  noMatch: correlationNoMatch,
+  error: serviceCorrelationError,
+} = useServiceCorrelation();
+
+// Fresh correlation per event (mirrors the Logs page reset on row change).
+watch(selectedEvent, () => {
+  correlationDashboardProps.value = null;
+  correlationLoading.value = false;
+  correlationError.value = null;
+  correlationFetchInProgress.value = false;
+});
+
+// Lazy correlation fetch — replicated from SearchResult.vue's openCorrelationFromLog.
+async function openCorrelationFromLog(logData: any) {
+  if (correlationFetchInProgress.value) return;
+  try {
+    correlationFetchInProgress.value = true;
+    correlationLoading.value = true;
+    correlationError.value = null;
+    const context: TelemetryContext = {
+      timestamp: logData._timestamp || Date.now() * 1000,
+      fields: logData,
+    };
+    const result = await findRelatedTelemetry(context, "logs", 5, props.stream);
+    if (!result) {
+      correlationError.value = correlationNoMatch.value
+        ? t("logs.searchResult.noMatchingService")
+        : serviceCorrelationError.value || t("logs.searchResult.unableToRetrieveCorrelation");
+      return;
+    }
+    if (!result.correlationData) {
+      correlationError.value = t("logs.searchResult.unableToRetrieveCorrelation");
+      return;
+    }
+    const timeWindowMicros = 5 * 60 * 1000000;
+    const startTimeMicros = context.timestamp - timeWindowMicros;
+    let endTimeMicros = context.timestamp + timeWindowMicros;
+    const currentTimeMicros = Date.now() * 1000;
+    if (endTimeMicros > currentTimeMicros) endTimeMicros = currentTimeMicros;
+    const logFilters = result.correlationData.related_streams.logs?.[0]?.filters || {};
+    const actualMatchedDimensions =
+      Object.keys(logFilters).length > 0 ? logFilters : result.correlationData.matched_dimensions;
+    correlationDashboardProps.value = {
+      serviceName: result.correlationData.service_name,
+      matchedDimensions: actualMatchedDimensions,
+      additionalDimensions: {},
+      matchedSetId: result.correlationData.matched_set_id,
+      chipDimensions: {
+        ...buildChipDimensionsFromFilters(result.correlationData, semanticGroups.value),
+        ...buildWorkloadChipDimensions(
+          result.correlationData.matched_set_id,
+          semanticGroups.value,
+          logData,
+        ),
+      },
+      sourceEvent: {
+        timestamp: logData._timestamp,
+        severity: extractSeverity(logData) ?? undefined,
+        message: logData.body || logData.message || logData.log || logData.msg,
+      },
+      metricStreams: result.correlationData.related_streams.metrics || [],
+      logStreams: result.correlationData.related_streams.logs || [],
+      traceStreams: result.correlationData.related_streams.traces || [],
+      sourceStream: props.stream,
+      sourceType: "logs",
+      availableDimensions: { ...logFilters, ...context.fields },
+      semanticGroups: semanticGroups.value,
+      // FTS fields drive full log-body colorization in the correlated logs table;
+      // "body" is the log message field for the default log stream.
+      ftsFields: ["body"],
+      timeRange: { startTime: startTimeMicros, endTime: endTimeMicros },
+    };
+  } catch (err: any) {
+    correlationError.value = t("logs.searchResult.correlationError", {
+      error: err?.message || err,
+    });
+    correlationDashboardProps.value = null;
+  } finally {
+    correlationLoading.value = false;
+    correlationFetchInProgress.value = false;
+  }
+}
 
 // JsonPreview's @copy emits an object; stringify non-strings as pretty JSON.
 function copyToClipboard(value: unknown) {
@@ -620,7 +689,6 @@ async function restoreEventDetail() {
     const found = res.data?.hits?.[0];
     if (found) {
       selectedEvent.value = found;
-      detailTab.value = "insights";
       loadInsights(found);
     }
   } catch {
@@ -864,10 +932,10 @@ function openInLogs() {
       <div v-if="selectedEvent" class="flex h-full min-h-0 flex-col">
         <!-- Push-nav header: back to results · event position · copy link -->
         <div
-          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b px-2 py-2"
+          class="border-border-default bg-surface-panel flex shrink-0 items-center gap-2 border-b px-2 py-1"
         >
           <OButton
-            size="icon-sm"
+            size="icon-xs"
             variant="ghost"
             icon-left="arrow-back"
             :aria-label="t('panel.logExplorer.detail.back')"
@@ -876,15 +944,15 @@ function openInLogs() {
           >
             <OTooltip :content="t('panel.logExplorer.detail.back')" />
           </OButton>
-          <div class="flex min-w-0 flex-1 flex-col">
+          <div class="flex min-w-0 flex-1 items-center gap-2">
             <span class="text-text-heading text-xs font-medium tabular-nums">{{
               fmtTs(selectedEvent["_timestamp"])
             }}</span>
-            <span class="text-text-secondary text-xs">{{ stream }}</span>
+            <span class="text-text-secondary truncate text-xs">{{ stream }}</span>
           </div>
           <div class="flex shrink-0 items-center gap-1">
             <OButton
-              size="icon-sm"
+              size="icon-xs"
               variant="outline"
               icon-left="chevron-left"
               :disabled="!hasPrev"
@@ -897,7 +965,7 @@ function openInLogs() {
               >{{ selectedIndex + 1 }} / {{ events.length }}</span
             >
             <OButton
-              size="icon-sm"
+              size="icon-xs"
               variant="outline"
               icon-left="chevron-right"
               :disabled="!hasNext"
@@ -907,21 +975,30 @@ function openInLogs() {
               <OTooltip :content="t('panel.logExplorer.detail.nextEvent')" />
             </OButton>
           </div>
-          <OButton size="sm" variant="outline" icon-left="link" @click="copyCurrentUrl()">
+          <OButton size="sm-toolbar" variant="outline" icon-left="link" @click="copyCurrentUrl()">
             {{ t("panel.logExplorer.detail.copyLink") }}
           </OButton>
         </div>
 
-        <!-- Tabs -->
-        <OTabs v-model="detailTab" dense bordered class="mb-2 shrink-0 px-2">
-          <OTab name="insights" :label="t('panel.logExplorer.detail.insights')" icon="insights" />
-          <OTab name="details" :label="t('panel.logExplorer.detail.details')" />
-          <OTab name="json" :label="t('panel.logExplorer.detail.json')" />
-        </OTabs>
-
-        <OTabPanels v-model="detailTab" :grow="true" scroll="y" class="min-h-0">
-          <!-- ═══ INSIGHTS TAB ═══════════════════════════════════════ -->
-          <OTabPanel name="insights" class="p-0">
+        <!-- Unified detail bar: Insights (leading) + DetailTable's JSON/Table/correlation tabs -->
+        <DetailTable
+          :model-value="selectedEvent"
+          :stream-type="props.streamType || 'logs'"
+          :current-index="selectedIndex"
+          :total-length="events.length"
+          :correlation-props="correlationDashboardProps"
+          :correlation-loading="correlationLoading"
+          :correlation-error="correlationError ?? undefined"
+          :leading-tabs="detailLeadingTabs"
+          initial-tab="insights"
+          embedded
+          class="min-h-0 flex-1"
+          @load-correlation="openCorrelationFromLog"
+          @showPrevDetail="goPrev"
+          @showNextDetail="goNext"
+          @sendToAiChat="(v: unknown, a?: boolean) => emit('sendToAiChat', v, a)"
+        >
+          <template #panel-insights>
             <!-- Global loading bar -->
             <div v-if="insightsLoading" class="dld-progress shrink-0" />
 
@@ -1248,70 +1325,8 @@ function openInLogs() {
                 </template>
               </div>
             </section>
-          </OTabPanel>
-
-          <!-- ═══ DETAILS TAB (searchable Name/Value table) ═════════════ -->
-          <OTabPanel name="details" class="px-2 pb-2">
-            <div class="mb-2 flex items-center gap-2 px-2">
-              <OInput
-                v-model="detailFilter"
-                size="sm"
-                icon-left="search"
-                :placeholder="t('common.search')"
-                class="flex-1"
-                data-test="log-explorer-detail-search"
-              />
-              <OSwitch
-                v-model="wrapDetailValues"
-                :label="t('common.wrap')"
-                size="md"
-                data-test="log-explorer-detail-wrap"
-              />
-            </div>
-            <OTable
-              :data="detailTableRows"
-              :columns="detailColumns"
-              :default-columns="false"
-              :show-global-filter="false"
-              :bordered="true"
-              :frame="false"
-              pagination="none"
-              sorting="none"
-              :wrap="wrapDetailValues"
-              :row-class="(row: any) => (row.name === field ? 'dld-kv-row--highlight' : '')"
-            >
-              <template #cell-name="{ value }">
-                <span class="log-key font-mono">{{ value }}</span>
-              </template>
-              <template #cell-value="{ row }">
-                <pre
-                  class="m-0 block w-full min-w-0 p-0 font-mono font-normal"
-                  :class="
-                    wrapDetailValues
-                      ? 'break-all whitespace-pre-wrap'
-                      : 'overflow-hidden text-ellipsis whitespace-nowrap'
-                  "
-                ><LogsHighLighting :data="getDetailDisplayValue(row.name, row.value)" :show-braces="false" /></pre>
-              </template>
-            </OTable>
-          </OTabPanel>
-
-          <!-- ═══ JSON TAB (tree — same as Source Details) ═══════════════ -->
-          <OTabPanel name="json" class="px-2 pb-2">
-            <div class="dld-json-preview">
-              <JsonPreview
-                :value="selectedEvent"
-                mode="sidebar"
-                :stream-name="stream"
-                :show-copy-button="true"
-                hide-view-related
-                hide-search-term-actions
-                hide-field-options
-                @copy="copyToClipboard"
-              />
-            </div>
-          </OTabPanel>
-        </OTabPanels>
+          </template>
+        </DetailTable>
       </div>
     </template>
   </div>
