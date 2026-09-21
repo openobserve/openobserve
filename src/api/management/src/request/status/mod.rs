@@ -220,7 +220,7 @@ struct ConfigResponse<'a> {
     /// public/private selector on this rather than on `synthetics_enabled`.
     synthetics_private_locations_enabled: bool,
     /// False under super-cluster regardless of the flag — §5.9 parity with composites.
-    synthetics_composition_enabled: bool,
+    synthetics_subtests_enabled: bool,
     /// Server-side step cap (`ZO_SYNTHETICS_BROWSER_MAX_STEPS`); the UI budget must follow it.
     synthetics_browser_max_steps: usize,
     /// Chrome Web Store URL of the OpenObserve Recorder extension
@@ -481,8 +481,7 @@ pub async fn zo_config(
     // is not running super-cluster mode (§18, §19.2).
     let composite_alerts_available =
         config::get_config().alert_composite.writes_enabled && !super_cluster_enabled;
-    let synthetics_composition_enabled =
-        cfg.synthetics.composition_enabled && !super_cluster_enabled;
+    let synthetics_subtests_enabled = cfg.synthetics.subtests_enabled && !super_cluster_enabled;
     let online_evals_enabled = enterprise_value!(false, o2cfg.llm_eval_config.enabled);
     // Read straight from the config in every build: synthetics is OSS now, and
     // reporting `false` here is what hid the whole feature from the UI.
@@ -610,7 +609,7 @@ pub async fn zo_config(
         synthetics_enabled,
         oncall_enabled,
         synthetics_private_locations_enabled,
-        synthetics_composition_enabled,
+        synthetics_subtests_enabled,
         synthetics_browser_max_steps,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,

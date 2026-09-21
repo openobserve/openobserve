@@ -1230,7 +1230,7 @@ const variablesToggleLabel = computed(() =>
 // ── Subtest composition ──────────────────────────────────────────────────
 // `=== true` so an unknown flag hides the button — the step editor's stance for its Subtest option.
 const isCompositionEnabled = computed(
-  () => store.state.zoConfig?.synthetics_composition_enabled === true,
+  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
 
 // ── Executed step cap ────────────────────────────────────────────────────

@@ -153,7 +153,7 @@ const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { can
 // the route guards take with `=== false`: an unknown flag hides the option.
 const actionSelectOptions = computed(() =>
   actionOptions(t).filter(
-    (o) => o.value !== "subtest" || store?.state?.zoConfig?.synthetics_composition_enabled === true,
+    (o) => o.value !== "subtest" || store?.state?.zoConfig?.synthetics_subtests_enabled === true,
   ),
 );
 

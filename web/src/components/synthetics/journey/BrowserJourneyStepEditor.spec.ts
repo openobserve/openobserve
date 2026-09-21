@@ -653,14 +653,14 @@ describe("BrowserJourneyStepEditor subtest action", () => {
   ])(
     "offers the subtest action only when composition is enabled (flag=%s)",
     async (flag, expected) => {
-      store.state.zoConfig.synthetics_composition_enabled = flag;
+      store.state.zoConfig.synthetics_subtests_enabled = flag;
       const w = render({ action: "click" });
       const values = w
         .findComponent(OSelect)
         .props("options")
         .map((o: { value: string }) => o.value);
       expect(values.includes("subtest")).toBe(expected);
-      store.state.zoConfig.synthetics_composition_enabled = true;
+      store.state.zoConfig.synthetics_subtests_enabled = true;
     },
   );
 

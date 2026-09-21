@@ -573,7 +573,7 @@ async fn composition_error_response(
         CE::WritesDisabled => (
             StatusCode::SERVICE_UNAVAILABLE,
             Json(serde_json::json!({
-                "code": "composition_writes_disabled",
+                "code": "subtests_disabled",
                 "message": ce.to_string(),
             })),
         )

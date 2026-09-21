@@ -1041,7 +1041,7 @@ const showBulkDeleteDialog = ref(false);
 // ── Extract to subtest (§14) ───────────────────────────────────────────────
 // `=== true` so an unknown flag hides the action — the journey editor's stance for its Subtest option.
 const isCompositionEnabled = computed(
-  () => store.state.zoConfig?.synthetics_composition_enabled === true,
+  () => store.state.zoConfig?.synthetics_subtests_enabled === true,
 );
 const maxSteps = computed(() => browserMaxSteps(store.state.zoConfig));
 

@@ -1116,7 +1116,7 @@ describe("CreateBrowserTest", () => {
     }
 
     it("hides the button when composition is disabled", async () => {
-      store.state.zoConfig.synthetics_composition_enabled = false;
+      store.state.zoConfig.synthetics_subtests_enabled = false;
       try {
         wrapper = await mountEdit();
         await selectRange(wrapper, ["s2", "s3"]);
@@ -1127,7 +1127,7 @@ describe("CreateBrowserTest", () => {
         expect(wrapper.find(OPEN_BTN).exists()).toBe(false);
         expect(wrapper.find(REASON).exists()).toBe(false);
       } finally {
-        store.state.zoConfig.synthetics_composition_enabled = true;
+        store.state.zoConfig.synthetics_subtests_enabled = true;
       }
     });
 

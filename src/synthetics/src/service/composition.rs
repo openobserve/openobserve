@@ -31,7 +31,7 @@ use sea_orm::ConnectionTrait;
 
 #[derive(Debug, thiserror::Error)]
 pub enum CompositionError {
-    #[error("composition writes are disabled (ZO_SYNTHETICS_COMPOSITION_ENABLED=false)")]
+    #[error("composition writes are disabled (ZO_SYNTHETICS_SUBTESTS_ENABLED=false)")]
     WritesDisabled,
     #[error("subtest references are unsupported in super-cluster mode")]
     SuperClusterUnsupported,
@@ -54,7 +54,7 @@ pub(crate) fn ensure_composition_writes_allowed() -> Result<(), CompositionError
     {
         return Err(CompositionError::SuperClusterUnsupported);
     }
-    if config::get_config().synthetics.composition_enabled {
+    if config::get_config().synthetics.subtests_enabled {
         Ok(())
     } else {
         Err(CompositionError::WritesDisabled)

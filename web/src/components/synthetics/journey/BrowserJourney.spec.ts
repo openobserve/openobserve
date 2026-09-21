@@ -1026,7 +1026,7 @@ describe("BrowserJourney Add Subtest button", () => {
   const ADD_STEP = '[data-test="synthetics-journey-add-step-btn"]';
 
   beforeEach(() => {
-    mockStoreState.zoConfig = { synthetics_composition_enabled: true };
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
     mockSyntheticsList.mockResolvedValue({ data: { checks: [] } });
     originalScrollIntoView = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = vi.fn();
@@ -1077,7 +1077,7 @@ describe("BrowserJourney Add Subtest button", () => {
   });
 
   it("should not render when composition is disabled", () => {
-    mockStoreState.zoConfig = { synthetics_composition_enabled: false };
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: false };
     wrapper = mountJourney();
 
     expect(wrapper.find(ADD_STEP).exists()).toBe(true);
@@ -3814,7 +3814,7 @@ describe("BrowserJourney — a restore that never reached the recording point", 
   });
 
   it("should not offer Add Subtest while the restore runs", async () => {
-    mockStoreState.zoConfig = { synthetics_composition_enabled: true };
+    mockStoreState.zoConfig = { synthetics_subtests_enabled: true };
     wrapper = mountAnchored();
     await startAnchoredRestore(wrapper);
     respondToLastCommand({ success: true });
