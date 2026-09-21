@@ -39,7 +39,15 @@ use infra::{
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
-use promql::{DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end, micros};
+use promql::{
+    DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
+    ast::{
+        at_modifier::resolve_at_modifiers,
+        selector_window::{SelectorWindow, selector_window},
+    },
+    micros,
+};
+use promql_parser::parser;
 use proto::cluster_rpc;
 use search_service::server_internal_error;
 use tracing::{Instrument, info_span};
@@ -267,7 +275,7 @@ pub async fn search(
 #[tracing::instrument(name = "promql:search:cluster", skip_all, fields(org_id = req.org_id))]
 async fn search_in_cluster(
     trace_id: &str,
-    req: cluster_rpc::MetricsQueryRequest,
+    mut req: cluster_rpc::MetricsQueryRequest,
     user_email: &str,
     nodes: &[Node],
 ) -> Result<Value> {
@@ -275,6 +283,7 @@ async fn search_in_cluster(
     let started_at = now_micros();
     let cfg = get_config();
     let timeout = req.timeout as u64;
+    let window = pin_query(req.query.as_mut().unwrap())?;
 
     let &cluster_rpc::MetricsQueryStmt {
         ref query,
@@ -288,7 +297,11 @@ async fn search_in_cluster(
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
-    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end;
+    // a pin inside the cache delay still receives samples, and its value lands on every step
+    let pin_settled = window
+        .pinned
+        .is_none_or(|at| at < now_micros() - second_micros(cfg.limit.cache_delay_secs));
+    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end && pin_settled;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
@@ -388,9 +401,8 @@ async fn search_in_cluster(
         req_query.start = worker_start;
         req_query.end = min(end, worker_start + worker_dt);
         // if the end time is within the last 3 retention time, we need to fetch wal data
-        if req_query.end
-            >= now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3)
-        {
+        let wal_floor = now_micros() - second_micros(cfg.limit.max_file_retention_time as i64 * 3);
+        if window.reaches(req_query.end, wal_floor) {
             req.need_wal = true;
         }
         let req_need_wal = req.need_wal;
@@ -532,6 +544,7 @@ async fn search_in_cluster(
 
     // cache the result
     if cfg.common.result_cache_enabled
+        && pin_settled
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
@@ -552,6 +565,21 @@ async fn search_in_cluster(
     log::info!("[trace_id {trace_id}] promql->search search finished took: {took} ms",);
 
     Ok(values)
+}
+
+/// Resolves `@ start()` / `@ end()` on the whole range before it is split across workers.
+fn pin_query(stmt: &mut cluster_rpc::MetricsQueryStmt) -> Result<SelectorWindow> {
+    let mut ast =
+        parser::parse(&stmt.query).map_err(|e| Error::ErrorCode(ErrorCodes::InvalidParams(e)))?;
+    // the evaluated grid is the adjusted one, so `end()` is its last step
+    let (start, end) = match stmt.step {
+        0 => (stmt.start, stmt.end),
+        step => adjust_start_end(stmt.start, stmt.end, step),
+    };
+    if resolve_at_modifiers(&mut ast, start, end) {
+        stmt.query = ast.to_string();
+    }
+    Ok(selector_window(&ast))
 }
 
 async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
@@ -832,5 +860,59 @@ mod tests {
 
         // Verify the default is the expected value (40,000)
         assert_eq!(expected_default, 40_000);
+    }
+
+    fn stmt(query: &str, start: i64, end: i64, step: i64) -> cluster_rpc::MetricsQueryStmt {
+        cluster_rpc::MetricsQueryStmt {
+            query: query.to_string(),
+            start,
+            end,
+            step,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_pin_query_resolves_start_and_end_on_the_whole_range() {
+        // both bounds sit on the 60 s grid, so the cache alignment leaves them alone
+        let second = 1_000_000;
+        let mut stmt = stmt(
+            "a and topk(5, rate(a[1h] @ end())) or a @ start()",
+            1_600_000_020 * second,
+            1_600_000_620 * second,
+            60 * second,
+        );
+        let window = pin_query(&mut stmt).unwrap();
+        assert_eq!(
+            stmt.query,
+            "a and topk(5, rate(a[1h] @ 1600000620.000)) or a @ 1600000020.000"
+        );
+        assert_eq!(window.pinned, Some(1_600_000_620 * second));
+        // resolving is stable, so a repeated request keys the cache on the same text
+        let resolved = stmt.query.clone();
+        pin_query(&mut stmt).unwrap();
+        assert_eq!(stmt.query, resolved);
+    }
+
+    #[test]
+    fn test_pin_query_keeps_the_query_text_without_start_or_end() {
+        let query = "sum  by (job) (rate(a[5m]  @ 1600000000))";
+        let mut stmt = stmt(query, 0, 600_000_000, 60_000_000);
+        let window = pin_query(&mut stmt).unwrap();
+        assert_eq!(stmt.query, query);
+        assert_eq!(window.pinned, Some(1_600_000_000_000_000));
+    }
+
+    #[test]
+    fn test_pin_query_on_an_instant_query() {
+        let at = 1_600_000_000_000_000;
+        let mut stmt = stmt("a @ end()", at, at, 0);
+        pin_query(&mut stmt).unwrap();
+        assert_eq!(stmt.query, "a @ 1600000000.000");
+    }
+
+    #[test]
+    fn test_pin_query_rejects_an_unparsable_query() {
+        assert!(pin_query(&mut stmt("a @", 0, 0, 0)).is_err());
     }
 }

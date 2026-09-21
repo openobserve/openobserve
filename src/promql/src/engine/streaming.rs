@@ -1022,4 +1022,116 @@ mod tests {
             "the materializing fallback must reuse the context the streaming attempt created"
         );
     }
+
+    /// Every sample of every series, which the fixture keeps identical across its two series.
+    async fn pinned_values(streams: bool, query: &str) -> Vec<(i64, f64)> {
+        let value = eval_query(provider(streams, false), 30, query)
+            .await
+            .unwrap_or_else(|err| panic!("{query}: {err}"));
+        let series = canonical(value);
+        assert!(!series.is_empty(), "{query}: no series");
+        let samples = series[0].1.clone();
+        for (_, other) in &series {
+            assert_eq!(&samples, other, "{query}: series differ");
+        }
+        samples
+    }
+
+    fn on_every_step(value: f64) -> Vec<(i64, f64)> {
+        [60, 120, 180]
+            .into_iter()
+            .map(|second| (BASE + second * SECOND, value))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_repeats_the_pinned_value_on_every_step() {
+        // the fixture samples `3 * k` at `1000 s + 20 s * k`, so `@ 1100` reads k = 5
+        let cases = [
+            ("m @ 1100", 15.0),
+            ("m @ 1100 offset 20s", 12.0),
+            ("m @ 1110", 15.0),
+            ("sum_over_time(m[1m] @ 1100)", 36.0),
+            ("sum_over_time(((m[1m] @ 1100)))", 36.0),
+            ("sum_over_time(m[1m] @ 1100 offset 20s)", 27.0),
+            ("sum(m @ 1100)", 30.0),
+            ("sum(sum_over_time(m[1m] @ 1100))", 72.0),
+            ("topk(2, m @ 1100) * 2", 30.0),
+            ("max_over_time((m @ 1100)[1m:20s])", 15.0),
+        ];
+        for (query, expected) in cases {
+            for streams in [true, false] {
+                assert_eq!(
+                    pinned_values(streams, query).await,
+                    on_every_step(expected),
+                    "{query}, streams {streams}"
+                );
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_pins_one_side_of_a_binary() {
+        let samples = pinned_values(false, "m - m @ 1100").await;
+        let expected: Vec<_> = [(60, -6.0), (120, 3.0), (180, 12.0)]
+            .into_iter()
+            .map(|(second, value)| (BASE + second * SECOND, value))
+            .collect();
+        assert_eq!(samples, expected);
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_outside_the_data_selects_nothing() {
+        let value = eval_query(provider(false, false), 30, "m @ 100")
+            .await
+            .unwrap();
+        assert!(matches!(value, Value::None), "{}", value.get_type());
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_on_the_root_range_selector_of_an_instant_query() {
+        let exec_instant = async |at: i64, query: &str| {
+            let mut engine = engine_at(provider(false, false), 30, at, 0, None);
+            // `engine_at` ends every range at `BASE + 180 s`
+            engine.eval_ctx.end = at;
+            let mut ctx = (*engine.ctx).clone();
+            ctx.end = at;
+            engine.ctx = Arc::new(ctx);
+            let expr = promql_parser::parser::parse(query).unwrap();
+            engine.exec(&expr).await.unwrap()
+        };
+        let (expected, _) = exec_instant(BASE + 100 * SECOND, "m[1m]").await;
+        let (pinned, result_type) = exec_instant(BASE + 180 * SECOND, "m[1m] @ 1100").await;
+        assert_eq!(result_type.as_deref(), Some("matrix"));
+        let last = canonical(pinned.clone())[0].1.last().copied();
+        assert_eq!(last, Some((BASE + 100 * SECOND, 15.0)));
+        assert_same_matrix(expected, pinned, "m[1m] @ 1100");
+    }
+
+    #[tokio::test]
+    async fn test_at_modifier_fails_loudly_where_it_cannot_pin() {
+        let cases = [
+            (
+                "predict_linear(m[1m] @ 1100, 60)",
+                "@ modifier is not supported",
+            ),
+            ("m[1m] @ 1100", "@ modifier is not supported"),
+            (
+                "predict_linear((m[1m] @ 1100), 60)",
+                "@ modifier is not supported",
+            ),
+            (
+                "max_over_time(m[1m:20s] @ 1100)",
+                "Subquery: @ modifier is not supported",
+            ),
+            ("m @ end()", "must be resolved"),
+        ];
+        for (query, expected) in cases {
+            let err = eval_query(provider(false, false), 30, query)
+                .await
+                .expect_err(query)
+                .to_string();
+            assert!(err.contains(expected), "{query}: {err}");
+        }
+    }
 }

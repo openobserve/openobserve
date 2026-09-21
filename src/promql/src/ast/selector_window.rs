@@ -15,7 +15,9 @@
 
 use std::time::Duration;
 
-use promql_parser::parser::{Expr, Offset};
+use promql_parser::parser::{AtModifier, Expr, Offset, VectorSelector};
+
+use crate::{ast::at_modifier::at_micros, micros};
 
 /// What a query reads beyond its evaluation range.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -24,31 +26,37 @@ pub struct SelectorWindow {
     pub ahead: Duration,
     /// A subquery evaluates its inner expression inside the evaluated range only.
     pub subquery: bool,
+    /// The latest instant an `@` modifier reads, whatever range is evaluated.
+    pub pinned: Option<i64>,
 }
 
 impl SelectorWindow {
+    /// Whether evaluating up to `end` reads at or after `floor`.
+    pub fn reaches(&self, end: i64, floor: i64) -> bool {
+        end + micros(self.ahead) >= floor || self.pinned.is_some_and(|at| at >= floor)
+    }
+
     fn merge(self, other: Self) -> Self {
         Self {
             ahead: self.ahead.max(other.ahead),
             subquery: self.subquery || other.subquery,
+            pinned: self.pinned.max(other.pinned),
         }
     }
 }
 
 pub fn selector_window(expr: &Expr) -> SelectorWindow {
     match expr {
-        Expr::VectorSelector(vs) => SelectorWindow {
-            ahead: negative_offset(&vs.offset),
-            subquery: false,
-        },
-        Expr::MatrixSelector(ms) => SelectorWindow {
-            ahead: negative_offset(&ms.vs.offset),
-            subquery: false,
-        },
-        Expr::Subquery(sq) => SelectorWindow {
-            ahead: selector_window(&sq.expr).ahead + negative_offset(&sq.offset),
-            subquery: true,
-        },
+        Expr::VectorSelector(vs) => vector_selector_window(vs),
+        Expr::MatrixSelector(ms) => vector_selector_window(&ms.vs),
+        Expr::Subquery(sq) => {
+            let inner = selector_window(&sq.expr);
+            SelectorWindow {
+                ahead: inner.ahead + negative_offset(&sq.offset),
+                subquery: true,
+                pinned: inner.pinned,
+            }
+        }
         Expr::Aggregate(agg) => {
             let param = agg
                 .param
@@ -68,6 +76,26 @@ pub fn selector_window(expr: &Expr) -> SelectorWindow {
         Expr::NumberLiteral(_) | Expr::StringLiteral(_) | Expr::Extension(_) => {
             SelectorWindow::default()
         }
+    }
+}
+
+fn vector_selector_window(vs: &VectorSelector) -> SelectorWindow {
+    SelectorWindow {
+        ahead: negative_offset(&vs.offset),
+        subquery: false,
+        pinned: vs.at.as_ref().map(|at| pinned_read_end(at, &vs.offset)),
+    }
+}
+
+fn pinned_read_end(at: &AtModifier, offset: &Option<Offset>) -> i64 {
+    // an unresolved `start()` / `end()` is unknown here, so assume it reaches any floor
+    let Some(at) = at_micros(at) else {
+        return i64::MAX;
+    };
+    match offset {
+        Some(Offset::Pos(offset)) => at - micros(*offset),
+        Some(Offset::Neg(offset)) => at + micros(*offset),
+        None => at,
     }
 }
 
@@ -103,16 +131,45 @@ mod tests {
             window("up offset -10m"),
             SelectorWindow {
                 ahead: minutes(10),
-                subquery: false
+                subquery: false,
+                pinned: None,
             }
         );
         assert_eq!(
             window("topk(3, rate(a[5m] offset -3m)) + rate(b[1h] offset 2m)"),
             SelectorWindow {
                 ahead: minutes(3),
-                subquery: false
+                subquery: false,
+                pinned: None,
             }
         );
+    }
+
+    #[test]
+    fn test_selector_window_tracks_the_latest_pinned_read() {
+        let at = 1_600_000_000_000_000;
+        let pinned = |query: &str| window(query).pinned;
+        assert_eq!(pinned("a @ 1600000000"), Some(at));
+        assert_eq!(pinned("a @ 1600000000 offset 1m"), Some(at - 60_000_000));
+        assert_eq!(
+            pinned("a and topk(5, rate(a[1h] @ 1600000000 offset -1m))"),
+            Some(at + 60_000_000)
+        );
+        assert_eq!(
+            pinned("max_over_time((a @ 1600000000)[1h:1m]) + a @ 1500000000"),
+            Some(at)
+        );
+        assert_eq!(pinned("a @ end()"), Some(i64::MAX));
+    }
+
+    #[test]
+    fn test_reaches_the_floor_through_the_range_or_a_pin() {
+        let floor = 1_600_000_000_000_000;
+        assert!(!window("a").reaches(floor - 1, floor));
+        assert!(window("a").reaches(floor, floor));
+        assert!(window("a offset -1m").reaches(floor - 60_000_000, floor));
+        assert!(window("a @ 1600000000").reaches(0, floor));
+        assert!(!window("a @ 1599999999").reaches(0, floor));
     }
 
     #[test]
@@ -121,14 +178,16 @@ mod tests {
             window("max_over_time(rate(a[5m])[1h:1m])"),
             SelectorWindow {
                 ahead: Duration::ZERO,
-                subquery: true
+                subquery: true,
+                pinned: None,
             }
         );
         assert_eq!(
             window("sum(a) + max_over_time(b[1h:1m] offset -5m)"),
             SelectorWindow {
                 ahead: minutes(5),
-                subquery: true
+                subquery: true,
+                pinned: None,
             }
         );
     }
