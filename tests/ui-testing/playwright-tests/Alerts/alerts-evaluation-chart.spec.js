@@ -203,15 +203,16 @@ test.describe('Alert detail — Evaluation chart query', {
     await pm.alertDetailPage.expectNoChartError();
   });
 
-  // ── Known-open defects ────────────────────────────────────────────────────
-  // Skipped, not deleted: each asserts the behaviour the fix must produce, so
-  // un-skipping is the whole verification step when the issue is closed.
+  // ── Regressions guarded ───────────────────────────────────────────────────
+  // Each of these was an open defect when this file was written and is now
+  // fixed on main. They stay because they are the only end-to-end proof that
+  // the fix holds through the real backend and the real chart.
 
   // o2-enterprise#2631: the chart's alias renames run over the raw query text,
   // so a filter value containing one of those internal names is rewritten
   // inside the user's own literal. The resulting SQL is still valid, so it
   // returns 200 and the chart silently answers a different question.
-  test.skip('aggregation alert: a filter value naming an internal column is not rewritten (o2-enterprise#2631)', async ({ page }) => {
+  test('aggregation alert: a filter value naming an internal column is not rewritten (o2-enterprise#2631)', async ({ page }) => {
     const value = 'value zo_sql_val here';
     const id = await seed(page, aggAlert(uniq('evalchart_alias'), value));
 
@@ -225,7 +226,7 @@ test.describe('Alert detail — Evaluation chart query', {
   // `GROUP BY zo_sql_key` bind to the column instead of the alias, so the time
   // bucket is left ungrouped and the backend rejects the plan — for EVERY
   // aggregation alert on that stream, whatever it filters on.
-  test.skip('aggregation alert: a stream field named zo_sql_key does not break the chart (o2-enterprise#2634)', async ({ page }) => {
+  test('aggregation alert: a stream field named zo_sql_key does not break the chart (o2-enterprise#2634)', async ({ page }) => {
     const stream = uniq('evalchart_collide').toLowerCase();
     await ingest(page, stream, [
       { city: 'bangalore', latency: 890, status: 500, zo_sql_key: 'x' },
@@ -249,7 +250,7 @@ test.describe('Alert detail — Evaluation chart query', {
   // o2-enterprise#2632: the backend pastes a filter value straight into the SQL
   // without escaping, so an apostrophe produces a statement that never parses.
   // The alert saves, looks healthy, and silently never evaluates.
-  test.skip('aggregation alert: an apostrophe in a filter value still yields runnable SQL (o2-enterprise#2632)', async ({ page }) => {
+  test('aggregation alert: an apostrophe in a filter value still yields runnable SQL (o2-enterprise#2632)', async ({ page }) => {
     const value = "it's production";
     const name = uniq('evalchart_apostrophe');
     const id = await seed(page, aggAlert(name, value));
@@ -272,7 +273,7 @@ test.describe('Alert detail — Evaluation chart query', {
 
   // o2-enterprise#2635: SQL comments are not masked, so a comment mentioning
   // "from" is mistaken for the statement's real FROM.
-  test.skip('count alert: a comment mentioning from does not corrupt the query (o2-enterprise#2635)', async ({ page }) => {
+  test('count alert: a comment mentioning from does not corrupt the query (o2-enterprise#2635)', async ({ page }) => {
     const id = await seed(page, sqlAlert(
       uniq('evalchart_comment'),
       `SELECT _timestamp -- pick the from column\nFROM "${STREAM}"`,
@@ -285,7 +286,7 @@ test.describe('Alert detail — Evaluation chart query', {
     // which still "contains" the stream and still balances its parens.
     expect(chartSql).toBe(
       'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_num ' +
-      `FROM "${STREAM}" GROUP BY zo_sql_key`,
+      `FROM "${STREAM}" GROUP BY 1`,
     );
     await pm.alertDetailPage.expectNoChartError();
   });

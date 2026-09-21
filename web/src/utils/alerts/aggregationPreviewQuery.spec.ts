@@ -358,7 +358,7 @@ describe("cleanAggregationQuery — rewrite safety", () => {
   // search would find, and the injected clause lands inside the literal.
   it("injects GROUP BY around, not inside, a literal containing 'group by'", () => {
     const out = cleanAggregationQuery(
-      'SELECT svc, count(*) AS alert_agg_value FROM "default" WHERE msg = \'group by service\' GROUP BY svc',
+      "SELECT svc, count(*) AS alert_agg_value FROM \"default\" WHERE msg = 'group by service' GROUP BY svc",
     );
     expect(quotesBalanced(out)).toBe(true);
     expect(out).toContain("'group by service'");
@@ -387,7 +387,7 @@ describe("withCompositeGroupLabel — rewrite safety", () => {
 
   it("survives a filter value carrying 'having' alongside two group-by columns", () => {
     const cleaned = cleanAggregationQuery(
-      'SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val, service, region FROM "default" WHERE msg = \'alerts having errors\' GROUP BY zo_sql_key, service, region HAVING zo_sql_val >= 10',
+      "SELECT histogram(_timestamp) AS zo_sql_key, count(*) AS zo_sql_val, service, region FROM \"default\" WHERE msg = 'alerts having errors' GROUP BY zo_sql_key, service, region HAVING zo_sql_val >= 10",
     );
     const out = withCompositeGroupLabel(cleaned, ["service", "region"]) as string;
     expect(quotesBalanced(out)).toBe(true);
