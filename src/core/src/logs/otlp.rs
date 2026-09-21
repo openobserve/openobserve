@@ -48,7 +48,7 @@ use transform::TRANSFORM_FAILED;
 
 use super::{bulk::TS_PARSE_FAILED, ingestion_log_enabled, log_failed_record};
 use crate::{
-    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO},
+    common::meta::http::{CONTENT_TYPE_JSON, CONTENT_TYPE_PROTO, HttpResponse as MetaHttpResponse},
     db_monitoring::server_vantage::O2_EVENT_NAME,
     ingestion::{
         check_ingestion_allowed,
@@ -733,50 +733,26 @@ pub async fn handle_request(
             .into_response()); // just return
     }
 
-    let mut status = IngestionStatus::Record(stream_status.status);
-    let (metric_rpt_status_code, response_body) = match super::write_logs_by_stream(
+    // OTLP has no field for a deleting-stream skip, so a skipped stream still answers 200
+    let write_result = super::write_logs_by_stream(
         thread_id,
         org_id,
         user_email,
         (started_at, &start),
         UsageType::Logs,
-        &mut status,
+        &mut IngestionStatus::Record(stream_status.status),
         json_data_by_stream,
         size_by_stream,
         derived_streams,
         None,
     )
-    .await
-    {
-        // A deleting-stream skip is surfaced on IngestionResponse for the HEC
-        // collector; OTLP's protobuf response has no field for it, so it keeps
-        // reporting 200 exactly as before.
-        Ok(_skipped) => {
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("200", out)
-        }
-        Err(e) => {
-            log::error!("Error while writing logs: {e}");
-            stream_status.status = match status {
-                IngestionStatus::Record(status) => status,
-                IngestionStatus::Bulk(_) => unreachable!(),
-            };
-            res.partial_success = Some(ExportLogsPartialSuccess {
-                rejected_log_records: stream_status.status.failed as i64,
-                error_message: stream_status.status.error,
-            });
-            let mut out = BytesMut::with_capacity(res.encoded_len());
-            res.encode(&mut out).expect("Out of memory");
-            ("500", out)
-        }
-    };
+    .await;
 
     // metric + data usage
     let took_time = start.elapsed().as_secs_f64();
     let label_values = [
         endpoint,
-        metric_rpt_status_code,
+        if write_result.is_ok() { "200" } else { "500" },
         org_id,
         StreamType::Logs.as_str(),
         "",
@@ -789,10 +765,20 @@ pub async fn handle_request(
         .with_label_values(&label_values)
         .inc();
 
+    if let Err(e) = write_result {
+        log::error!("Error while writing logs: {e}");
+        return Ok(MetaHttpResponse::error_with_header(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("error while writing log data: {e}"),
+        ));
+    }
+
+    let mut out = BytesMut::with_capacity(res.encoded_len());
+    res.encode(&mut out).expect("Out of memory");
     Ok((
         StatusCode::OK,
         [(header::CONTENT_TYPE, content_type)],
-        response_body.freeze(),
+        out.freeze(),
     )
         .into_response())
 }

@@ -4271,10 +4271,11 @@ fn default_mem_table_bucket_num(
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    std::fs::create_dir_all(&cfg.common.data_cache_dir)
+        .map_err(|e| anyhow::anyhow!("create cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("resolve cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
     let cache_dir = cache_dir_owned.as_str();
 

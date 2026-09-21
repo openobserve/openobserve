@@ -29,6 +29,7 @@ anyhow.workspace = true
 arrow.workspace = true
 arrow-flight.workspace = true
 async-stream.workspace = true
+axum.workspace = true
 bytes.workspace = true
 common.workspace = true
 config.workspace = true

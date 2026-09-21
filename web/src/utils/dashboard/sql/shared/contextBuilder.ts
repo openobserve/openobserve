@@ -36,6 +36,7 @@ import { fillMissingValues } from "../../sqlMissingValueFiller";
 import { buildDataLookupMap, createSeriesBuilders } from "./seriesBuilder";
 import { createTrellisHelpers } from "./trellisConfig";
 import { type SQLContext } from "./types";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Finds the largest label in the given data array.
@@ -572,31 +573,35 @@ export function buildSQLContext(
               // if have than bold it
               if (it?.seriesName == hoveredSeriesState?.value?.hoveredSeriesName)
                 hoverText.push(
-                  `<strong>${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `<strong>${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it.value,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )} </strong>`,
                 );
               // else normal text
               else
                 hoverText.push(
-                  `${it.marker} ${it.seriesName} : ${formatUnitValue(
-                    getUnitValue(
-                      it.value,
-                      panelSchema.config?.unit,
-                      panelSchema.config?.unit_custom,
-                      panelSchema.config?.decimals,
+                  `${it.marker} ${escapeHtml(it.seriesName)} : ${escapeHtml(
+                    formatUnitValue(
+                      getUnitValue(
+                        it.value,
+                        panelSchema.config?.unit,
+                        panelSchema.config?.unit_custom,
+                        panelSchema.config?.decimals,
+                      ),
                     ),
                   )}`,
                 );
             }
           });
 
-          return `${name?.[0]?.name} <br/> ${hoverText.join("<br/>")}`;
+          return `${escapeHtml(name?.[0]?.name)} <br/> ${hoverText.join("<br/>")}`;
         } catch (error) {
           return "";
         }

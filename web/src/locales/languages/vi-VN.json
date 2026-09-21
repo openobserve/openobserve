@@ -3568,6 +3568,12 @@
     "joinSlack": "Tham gia Slack",
     "maybeLater": "Để sau"
   },
+  "connectDataSourcePopup": {
+    "title": "Để bắt đầu, hãy kết nối nguồn dữ liệu đầu tiên của bạn.",
+    "description": "Chúng tôi có rất nhiều điều để cho bạn xem, nhưng trước tiên chúng tôi cần kết nối dữ liệu của bạn. Hầu hết các nhóm thấy nhật ký đầu tiên của họ trong khoảng một phút.",
+    "connectButton": "Kết nối nguồn dữ liệu",
+    "slackLink": "Ngoài ra, hãy tham gia cộng đồng Slack của chúng tôi"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Tiếp tục từ nơi đã tạm dừng",
     "startFromNow": "Bắt đầu từ bây giờ.",
