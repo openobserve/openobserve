@@ -210,6 +210,65 @@ describe("sessionReplayChangeFormat", () => {
     });
   });
 
+  describe("unresolvable node references", () => {
+    // Node ids are positional, so a stream that lost a segment — or that opened without a
+    // FullSnapshot — leaves the counter pointing at the wrong node. The reference then
+    // lands on a text node, which holds no children. That used to throw, and because
+    // VideoPlayer calls setupSession() without awaiting it, the throw took the whole
+    // replay down rather than the single misplaced node.
+    it("keeps converting when an insertion point resolves to a text node", () => {
+      const converter = createRecordConverter();
+      // document(0) > BODY(1) > #text(2)
+      converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "#text", "hello"]]]),
+      );
+
+      // id 3 with insertion point 1 resolves its parent to 3 - 1 = 2, the text node.
+      const out = converter.convert({
+        type: 12,
+        timestamp: 2000,
+        data: [[ADD_NODE, [1, "SPAN"]]],
+      });
+
+      expect(out).toHaveLength(1);
+      expect(out[0].type).toBe(3);
+      expect(out[0].data.adds).toHaveLength(1);
+      expect(out[0].data.adds[0].parentId).toBe(2);
+      expect(out[0].data.adds[0].node.tagName).toBe("span");
+    });
+
+    it("keeps converting when a removed node's parent holds no children", () => {
+      const converter = createRecordConverter();
+      converter.convert(
+        fullSnapshot([[ADD_NODE, [null, "#document"], [1, "BODY"], [1, "#text", "hello"]]]),
+      );
+      converter.convert({ type: 12, timestamp: 2000, data: [[ADD_NODE, [1, "SPAN"]]] });
+
+      const out = converter.convert({
+        type: 12,
+        timestamp: 3000,
+        data: [[REMOVE_NODE, 3]],
+      });
+
+      expect(out).toHaveLength(1);
+      expect(out[0].data.removes).toEqual([{ id: 3, parentId: 2 }]);
+    });
+
+    it("still converts a stream that opens on a mutation instead of a snapshot", () => {
+      // What SessionViewer used to hand the player when the first view lost its
+      // index_in_view 0 segment: mutations decoded against an empty id space.
+      const converter = createRecordConverter();
+      const out = converter.convert({
+        type: 12,
+        timestamp: 1000,
+        data: [[ADD_NODE, [1, "SPAN"]], [REMOVE_NODE, 4], [ATTRIBUTE, [2, ["class", "x"]]]],
+      });
+
+      expect(out).toHaveLength(1);
+      expect(out[0].type).toBe(3);
+    });
+  });
+
   describe("passthrough + helpers", () => {
     it("returns classic records unchanged", () => {
       const meta = { type: 4, timestamp: 1, data: { width: 100, height: 200 } };
