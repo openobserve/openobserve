@@ -2090,3 +2090,435 @@ describe("EditRole - overlapping entity loads", () => {
     expect(resource.entities).toHaveLength(1);
   });
 });
+
+const resourceOf = (wrapper, name) =>
+  wrapper.vm.getResourceByName(wrapper.vm.permissionsState.permissions, name);
+
+// Load a top-level resource's entities the way the tree does, and hand back the resource.
+async function loadResource(wrapper, name) {
+  const resource = resourceOf(wrapper, name);
+  await wrapper.vm.getResourceEntities(resource);
+  return resource;
+}
+
+// Stream types are entities of `stream`, not resources — `logs`/`metrics`/... load off those.
+async function loadStreamType(wrapper, type) {
+  const stream = await loadResource(wrapper, "stream");
+  const typeNode = stream.entities.find((e) => e.name === type);
+  await wrapper.vm.getResourceEntities(typeNode);
+  return typeNode;
+}
+
+describe("EditRole - entity row builders [characterization]", () => {
+  it("updateResourceEntities appends rather than replaces", async () => {
+    const wrapper = await mountEditRole();
+    const resource = resourceOf(wrapper, "role");
+
+    wrapper.vm.updateResourceEntities("role", ["name"], [{ name: "one" }]);
+    wrapper.vm.updateResourceEntities("role", ["name"], [{ name: "two" }]);
+
+    expect(resource.entities.map((e) => e.name)).toEqual(["one", "two"]);
+  });
+
+  it("updateResourceEntities is a no-op for an unknown resource", async () => {
+    const wrapper = await mountEditRole();
+    expect(() =>
+      wrapper.vm.updateResourceEntities("nope", ["name"], [{ name: "x" }]),
+    ).not.toThrow();
+  });
+
+  it("updateResourceEntities joins multiple name keys with a slash and falls back to the key", async () => {
+    const wrapper = await mountEditRole();
+    const resource = resourceOf(wrapper, "role");
+
+    wrapper.vm.updateResourceEntities("role", ["name", "missing"], [{ name: "a" }]);
+
+    expect(resource.entities[0].name).toBe("a/missing");
+  });
+
+  it("updateResourceEntities ticks a permission already in the selected set", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.selectedPermissionsHash = new Set(["role:sel:AllowGet"]);
+    const resource = resourceOf(wrapper, "role");
+
+    wrapper.vm.updateResourceEntities("role", ["name"], [{ name: "sel" }]);
+
+    expect(resource.entities[0].permission.AllowGet.value).toBe(true);
+    expect(resource.entities[0].permission.AllowPut.value).toBe(false);
+  });
+
+  it("updateResourceEntities hides four actions on logs_pattern and logs_insights rows", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.permissionsState.permissions = [
+      {
+        name: "logs_pattern",
+        resourceName: "logs_pattern",
+        entities: [],
+        childs: [],
+        permission: {},
+      },
+      {
+        name: "logs_insights",
+        resourceName: "logs_insights",
+        entities: [],
+        childs: [],
+        permission: {},
+      },
+    ];
+
+    wrapper.vm.updateResourceEntities("logs_pattern", ["name"], [{ name: "app" }]);
+    wrapper.vm.updateResourceEntities("logs_insights", ["name"], [{ name: "app" }]);
+
+    for (const resource of wrapper.vm.permissionsState.permissions) {
+      const row = resource.entities[0];
+      expect(row.name).toBe("app");
+      expect(row.permission.AllowList.show).toBe(false);
+      expect(row.permission.AllowDelete.show).toBe(false);
+      expect(row.permission.AllowPost.show).toBe(false);
+      expect(row.permission.AllowPut.show).toBe(false);
+      expect(row.permission.AllowGet.show).toBe(true);
+      expect(row.permission.AllowAll.show).toBe(true);
+    }
+  });
+
+  it("updateResourceEntities hides AllowGet and keeps AllowDelete on logs_cache rows", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.permissionsState.permissions = [
+      { name: "logs_cache", resourceName: "logs_cache", entities: [], childs: [], permission: {} },
+    ];
+
+    wrapper.vm.updateResourceEntities("logs_cache", ["name"], [{ name: "app" }]);
+
+    const row = wrapper.vm.permissionsState.permissions[0].entities[0];
+    expect(row.resourceName).toBe("logs_cache");
+    expect(row.permission.AllowGet.show).toBe(false);
+    expect(row.permission.AllowList.show).toBe(false);
+    expect(row.permission.AllowPost.show).toBe(false);
+    expect(row.permission.AllowPut.show).toBe(false);
+    expect(row.permission.AllowDelete.show).toBe(true);
+    expect(row.permission.AllowAll.show).toBe(true);
+  });
+
+  it("updateEntityEntities takes strings as-is and returns early without an entity", async () => {
+    const wrapper = await mountEditRole();
+    const entity = { name: "x", childName: "function", entities: [] };
+
+    wrapper.vm.updateEntityEntities(entity, ["name"], ["plain"]);
+
+    expect(entity.entities[0]).toMatchObject({
+      name: "plain",
+      display_name: "plain",
+      resourceName: "function",
+      type: "Resource",
+      top_level: false,
+    });
+    expect(() => wrapper.vm.updateEntityEntities(null, ["name"], ["plain"])).not.toThrow();
+  });
+
+  it("updateEntityEntities shows AllowList and AllowPost only when hasEntities is true", async () => {
+    const wrapper = await mountEditRole();
+    const entity = { name: "x", childName: "function", entities: [] };
+
+    wrapper.vm.updateEntityEntities(entity, ["name"], [{ name: "a" }], true);
+
+    expect(entity.entities[0].permission.AllowList.show).toBe(true);
+    expect(entity.entities[0].permission.AllowPost.show).toBe(true);
+    expect(entity.entities[0].has_entities).toBe(true);
+  });
+
+  // BUG pinned, not fixed: alert rows are keyed off `alert_id` while the list
+  // API returns `alertId`, so every alert row's name ends in "/undefined".
+  it("updateEntityEntities keys alert rows off alert_id even though the row carries alertId", async () => {
+    const wrapper = await mountEditRole();
+    const folder = { name: "f9", childName: "alert", entities: [] };
+
+    wrapper.vm.updateEntityEntities(
+      folder,
+      ["alertId"],
+      [{ alertId: "a1", name: "A1" }],
+      false,
+      "name",
+    );
+
+    expect(folder.entities[0]).toMatchObject({
+      name: "f9/undefined",
+      display_name: "A1",
+      resourceName: "alert",
+    });
+  });
+
+  it("updateResourceResource pushes a Type row whose checkboxes read the org wildcard", async () => {
+    const wrapper = await mountEditRole();
+    const org = store.state.selectedOrganization.identifier;
+    wrapper.vm.selectedPermissionsHash = new Set([`logs:_all_${org}:AllowList`]);
+    const stream = resourceOf(wrapper, "stream");
+    stream.entities.length = 0;
+
+    wrapper.vm.updateResourceResource(
+      "logs",
+      "stream",
+      ["stream_type"],
+      [{ stream_type: "logs", name: "Logs" }],
+      true,
+      "name",
+    );
+
+    expect(stream.entities[0]).toMatchObject({
+      name: "logs",
+      display_name: "Logs",
+      type: "Type",
+      resourceName: "logs",
+      childName: "logs",
+      has_entities: true,
+      top_level: true,
+    });
+    expect(stream.entities[0].permission.AllowList.value).toBe(true);
+    expect(stream.entities[0].permission.AllowGet.value).toBe(false);
+  });
+
+  it("updateResourceResource is a no-op for an unknown parent", async () => {
+    const wrapper = await mountEditRole();
+    expect(() =>
+      wrapper.vm.updateResourceResource("logs", "nope", ["stream_type"], [{ stream_type: "logs" }]),
+    ).not.toThrow();
+  });
+});
+
+describe("EditRole - loaded rows through the tree [characterization]", () => {
+  it("getStreamsTypes builds four type rows", async () => {
+    const wrapper = await mountEditRole();
+    const stream = await loadResource(wrapper, "stream");
+
+    expect(stream.entities.map((e) => e.name)).toEqual(["logs", "traces", "metrics", "index"]);
+    expect(stream.entities[0]).toMatchObject({
+      name: "logs",
+      type: "Type",
+      resourceName: "logs",
+      childName: "logs",
+      has_entities: true,
+      top_level: true,
+      show: true,
+      entities: [],
+    });
+    expect(stream.entities[0].permission.AllowList.show).toBe(true);
+    expect(stream.entities[0].permission.AllowPost.show).toBe(true);
+  });
+
+  it("getLogs rows are leaf rows mirrored into heavyResourceEntities", async () => {
+    const wrapper = await mountEditRole();
+    const logsNode = await loadStreamType(wrapper, "logs");
+    const row = logsNode.entities[0];
+
+    expect(logsNode.entities.map((e) => e.name)).toEqual(["app", "sys"]);
+    expect(wrapper.vm.heavyResourceEntities.logs.map((e) => e.name)).toEqual(["app", "sys"]);
+    expect(row).toMatchObject({
+      name: "app",
+      display_name: "app",
+      resourceName: "logs",
+      type: "Resource",
+      has_entities: false,
+      top_level: false,
+      show: true,
+    });
+    expect(row.permission.AllowList.show).toBe(false);
+    expect(row.permission.AllowPost.show).toBe(false);
+    expect(row.permission.AllowAll.show).toBe(true);
+    expect(row.permission.AllowGet.show).toBe(true);
+    expect(row.permission.AllowDelete.show).toBe(true);
+    expect(row.permission.AllowPut.show).toBe(true);
+    expect(row.permission.AllowGet.value).toBe(false);
+  });
+
+  it("each stream type keeps its own list in heavyResourceEntities", async () => {
+    const wrapper = await mountEditRole();
+
+    const metrics = await loadStreamType(wrapper, "metrics");
+    const traces = await loadStreamType(wrapper, "traces");
+    const index = await loadStreamType(wrapper, "index");
+
+    expect(traces.entities.map((e) => e.name)).toEqual(["svc-a"]);
+    expect(index.entities.map((e) => e.name)).toEqual(["users"]);
+    expect(Object.keys(wrapper.vm.heavyResourceEntities).sort()).toEqual([
+      "index",
+      "metrics",
+      "traces",
+    ]);
+    expect(wrapper.vm.heavyResourceEntities.metrics.map((e) => e.name)).toEqual(
+      metrics.entities.map((e) => e.name),
+    );
+  });
+
+  it("getFolders rows carry the dashboard child", async () => {
+    const wrapper = await mountEditRole();
+    const dfolder = await loadResource(wrapper, "dfolder");
+
+    expect(dfolder.entities.map((e) => e.name)).toEqual(["default"]);
+    expect(dfolder.entities[0]).toMatchObject({
+      name: "default",
+      display_name: "default",
+      resourceName: "dfolder",
+      childName: "dashboard",
+      type: "Resource",
+      has_entities: true,
+      top_level: false,
+      show: true,
+    });
+    expect(dfolder.entities[0].permission.AllowList.show).toBe(true);
+    expect(dfolder.entities[0].permission.AllowPost.show).toBe(true);
+  });
+
+  it("expandPermission toggles expand and loads only on the way open", async () => {
+    const wrapper = await mountEditRole();
+    const resource = resourceOf(wrapper, "provider");
+    onlineEvalsService.providers.list.mockClear();
+
+    await wrapper.vm.expandPermission(resource);
+    expect(resource.expand).toBe(true);
+    expect(onlineEvalsService.providers.list).toHaveBeenCalledTimes(1);
+
+    await wrapper.vm.expandPermission(resource);
+    expect(resource.expand).toBe(false);
+    expect(onlineEvalsService.providers.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("expandPermission swallows a loader rejection", async () => {
+    const wrapper = await mountEditRole();
+    const resource = resourceOf(wrapper, "provider");
+    onlineEvalsService.providers.list.mockRejectedValueOnce(new Error("boom"));
+
+    await expect(wrapper.vm.expandPermission(resource)).resolves.toBeUndefined();
+    expect(resource.expand).toBe(true);
+    expect(resource.entities).toEqual([]);
+  });
+});
+
+describe("EditRole - tree builders [characterization]", () => {
+  it("getDefaultResource returns a blank top-level Type with every action shown", async () => {
+    const wrapper = await mountEditRole();
+    const resource = wrapper.vm.getDefaultResource();
+
+    expect(resource).toEqual({
+      name: "",
+      permission: {
+        AllowAll: { show: true, value: false },
+        AllowList: { show: true, value: false },
+        AllowGet: { show: true, value: false },
+        AllowDelete: { show: true, value: false },
+        AllowPost: { show: true, value: false },
+        AllowPut: { show: true, value: false },
+      },
+      display_name: "",
+      parent: "",
+      childs: [],
+      type: "Type",
+      resourceName: "",
+      entities: [],
+      has_entities: false,
+      is_loading: false,
+      top_level: true,
+    });
+  });
+
+  it("getResourceByName returns null at the top level and undefined while recursing", async () => {
+    const wrapper = await mountEditRole();
+    const permissions = [
+      { resourceName: "stream", childs: [{ resourceName: "logs", childs: [] }] },
+    ];
+
+    expect(wrapper.vm.getResourceByName(permissions, "logs")?.resourceName).toBe("logs");
+    expect(wrapper.vm.getResourceByName(permissions, "nope")).toBe(null);
+    expect(wrapper.vm.getResourceByName(permissions[0].childs, "nope", 1)).toBe(undefined);
+  });
+
+  it("setPermission copies the catalog row onto a default resource and registers it", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.permissionsState.permissions = [];
+
+    wrapper.vm.setPermission(
+      { key: "alpha", display_name: "Alpha", top_level: true, has_entities: true, parent: "" },
+      new Set(),
+    );
+
+    const added = wrapper.vm.permissionsState.permissions.at(-1);
+    expect(added).toMatchObject({
+      name: "alpha",
+      resourceName: "alpha",
+      display_name: "Alpha",
+      top_level: true,
+      has_entities: true,
+      parent: "",
+      type: "Type",
+      childs: [],
+      entities: [],
+    });
+    expect(wrapper.vm.resourceMapper.alpha).toBe(added);
+  });
+
+  it("setPermission attaches a child to its parent instead of pushing it to the top level", async () => {
+    const wrapper = await mountEditRole();
+    const before = wrapper.vm.permissionsState.permissions.length;
+
+    wrapper.vm.setPermission(
+      { key: "child", display_name: "Child", top_level: false, parent: "stream" },
+      new Set(),
+    );
+
+    expect(wrapper.vm.permissionsState.permissions.length).toBe(before);
+    expect(resourceOf(wrapper, "stream").childs.some((c) => c.name === "child")).toBe(true);
+  });
+
+  it("setPermission ignores a resource with no key and a resource already visited", async () => {
+    const wrapper = await mountEditRole();
+    const before = wrapper.vm.permissionsState.permissions.length;
+    const visited = new Set(["alpha"]);
+
+    wrapper.vm.setPermission({ display_name: "No key" }, new Set());
+    wrapper.vm.setPermission({ key: "alpha", display_name: "Alpha", top_level: true }, visited);
+
+    expect(wrapper.vm.permissionsState.permissions.length).toBe(before);
+  });
+
+  it("setDefaultPermissions keeps parents at the top level and nests the children", async () => {
+    const wrapper = await mountEditRole();
+    wrapper.vm.permissionsState.permissions = [];
+    wrapper.vm.permissionsState.resources = [
+      { key: "stream", display_name: "Streams", has_entities: true, top_level: true },
+      { key: "logs", display_name: "Logs", has_entities: true, parent: "stream", top_level: false },
+    ];
+
+    wrapper.vm.setDefaultPermissions();
+
+    expect(wrapper.vm.permissionsState.permissions.map((r) => r.resourceName)).toEqual(["stream"]);
+    expect(wrapper.vm.permissionsState.permissions[0].childs.map((c) => c.name)).toEqual(["logs"]);
+  });
+
+  it("modifyResourcePermissions hides actions per resource type and leaves others alone", async () => {
+    const wrapper = await mountEditRole();
+    const make = (resourceName) => ({
+      resourceName,
+      permission: {
+        AllowAll: { show: true },
+        AllowList: { show: true },
+        AllowGet: { show: true },
+        AllowDelete: { show: true },
+        AllowPost: { show: true },
+        AllowPut: { show: true },
+      },
+    });
+    const hidden = (r) =>
+      Object.keys(r.permission)
+        .filter((k) => !r.permission[k].show)
+        .sort();
+
+    const settings = make("settings");
+    const pattern = make("logs_pattern");
+    const cache = make("logs_cache");
+    const other = make("pipeline");
+    [settings, pattern, cache, other].forEach(wrapper.vm.modifyResourcePermissions);
+
+    expect(hidden(settings)).toEqual(["AllowDelete", "AllowList", "AllowPost"]);
+    expect(hidden(pattern)).toEqual(["AllowDelete", "AllowList", "AllowPost", "AllowPut"]);
+    expect(hidden(cache)).toEqual(["AllowGet", "AllowList", "AllowPost", "AllowPut"]);
+    expect(hidden(other)).toEqual([]);
+  });
+});
