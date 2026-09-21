@@ -249,7 +249,7 @@ import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
 import useRoleGrants, { buildGrantKey, splitGrantKey } from "@/composables/iam/useRoleGrants";
 import ModuleRail, { type RailModule } from "@/components/iam/roles/ModuleRail.vue";
-import ModulePane, { type ScopeRow } from "@/components/iam/roles/ModulePane.vue";
+import ModulePane from "@/components/iam/roles/ModulePane.vue";
 import PermissionsViewSwitch from "@/components/iam/roles/PermissionsViewSwitch.vue";
 import UnsavedChangesDrawer, {
   type PendingChange,
@@ -271,6 +271,7 @@ import { useRoleEntityLoaders } from "@/composables/iam/useRoleEntityLoaders";
 import { useRolePermissionRows } from "@/composables/iam/useRolePermissionRows";
 import { useSavedGrantExpansion } from "@/composables/iam/useSavedGrantExpansion";
 import { useRoleScopes } from "@/composables/iam/useRoleScopes";
+import { useModuleNavigation } from "@/composables/iam/useModuleNavigation";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -512,78 +513,6 @@ const { moduleScopes, folderScopes, streamTypeScopes } = useRoleScopes({
   t,
   ACTION_ORDER,
 });
-
-const activeModuleView = computed(() => {
-  const module = moduleOf(activeModule.value);
-  if (!module) return null;
-
-  const title = moduleLabel(module.key);
-
-  // An org-wide resource has no items, so its only row is its own grant.
-  if (!module.hasEntities) {
-    return {
-      trail: [title],
-      scopes: [] as ScopeRow[],
-      entities: [resourceMapper.value[module.key]].filter(Boolean),
-    };
-  }
-
-  const child = openFolder.value;
-  if (child && module.key === STREAM_PARENT_KEY) {
-    return {
-      trail: [title, raw(child.display_name ?? child.name)],
-      scopes: streamTypeScopes(child),
-      entities: heavyResourceEntities.value[child.name] ?? [],
-    };
-  }
-
-  if (child) {
-    return {
-      trail: [title, raw(child.display_name ?? child.name)],
-      scopes: folderScopes(module.key, child),
-      entities: child.entities ?? [],
-    };
-  }
-
-  return {
-    trail: [title],
-    scopes: moduleScopes(module.key),
-    entities: resourceMapper.value[module.key]?.entities ?? [],
-  };
-});
-
-const openModule = async (moduleKey: string) => {
-  openFolder.value = null;
-  const module = moduleOf(moduleKey);
-  if (!module || !module.hasEntities) return;
-
-  loadingFor.value = moduleKey;
-  try {
-    await getResourceEntities(resourceMapper.value[module.key]);
-  } finally {
-    // Only the newest open clears the flag, or a slower module would hide the one on screen.
-    if (loadingFor.value === moduleKey) loadingFor.value = "";
-  }
-};
-
-watch(activeModule, openModule);
-
-const openFolderRow = async (child: any) => {
-  openFolder.value = child;
-  // A stream type keeps its full list in heavyResourceEntities; its own `entities` is filter-shaped.
-  if (activeModule.value === STREAM_PARENT_KEY && heavyResourceEntities.value[child.name]) return;
-
-  loadingFor.value = child.name;
-  try {
-    await getResourceEntities(child);
-  } finally {
-    if (loadingFor.value === child.name) loadingFor.value = "";
-  }
-};
-
-const navigateTrail = (index: number) => {
-  if (index === 0) openFolder.value = null;
-};
 
 const resourceParent = (resource: string) =>
   permissionsState.resources.find((candidate: any) => candidate.key === resource)?.parent;
@@ -1375,6 +1304,21 @@ const { getResourceEntities } = useRoleEntityLoaders({
   updateResourceEntities,
   updateEntityEntities,
   updateResourceResource,
+});
+
+// The view of the open module and folder lives in its own file, with the moves that change it.
+const { activeModuleView, openFolderRow, navigateTrail } = useModuleNavigation({
+  activeModule,
+  openFolder,
+  loadingFor,
+  resourceMapper,
+  heavyResourceEntities,
+  moduleOf,
+  moduleLabel,
+  moduleScopes,
+  folderScopes,
+  streamTypeScopes,
+  getResourceEntities,
 });
 
 // Expanding saved grants onto the tree lives in its own file; it may fetch rows to do it.

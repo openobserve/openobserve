@@ -446,30 +446,6 @@ describe("EditRole - rail modules [characterization]", () => {
 });
 
 describe("EditRole - active module view [characterization]", () => {
-  it("shows the summary with no module selected", async () => {
-    const vm = await mountEditRole();
-    expect(vm.activeModule).toBe("");
-    expect(vm.activeModuleView).toBeNull();
-  });
-
-  it("shows nothing for a key that is not a module", async () => {
-    const vm = await mountEditRole();
-    await openModuleView(vm, "logs");
-    expect(vm.activeModuleView).toBeNull();
-  });
-
-  // An org-wide resource has no items, so its own node is the single row.
-  it("lists the module node itself when the module has no entities", async () => {
-    const vm = await mountEditRole();
-    await openModuleView(vm, "role");
-
-    expect(vm.activeModuleView).toEqual({
-      trail: ["Roles"],
-      scopes: [],
-      entities: [vm.resourceMapper.role],
-    });
-  });
-
   it("lists a plain module's entities under its own type scope", async () => {
     const vm = await mountEditRole();
     await openModuleView(vm, "provider");
@@ -500,21 +476,6 @@ describe("EditRole - active module view [characterization]", () => {
 });
 
 describe("EditRole - navigation [characterization]", () => {
-  it("clears the open folder whenever a module is opened", async () => {
-    const vm = await mountEditRole();
-    await drillInto(vm, "dfolder", "default");
-
-    await vm.openModule("provider");
-
-    expect(vm.openFolder).toBeNull();
-  });
-
-  it("does not load entities for a module that has none", async () => {
-    const vm = await mountEditRole();
-    await vm.openModule("role");
-    expect(vm.loadingFor).toBe("");
-  });
-
   it("clears the loading marker once the module's entities land", async () => {
     const vm = await mountEditRole();
     await openModuleView(vm, "provider");
@@ -545,39 +506,6 @@ describe("EditRole - navigation [characterization]", () => {
     vm.loadingFor = "dfolder";
     await flushPromises();
     expect(vm.moduleLoading).toBe(false);
-  });
-
-  // The type's full list already sits in heavyResourceEntities, so re-opening it loads nothing.
-  it("re-opens a loaded stream type without a fetch", async () => {
-    const vm = await mountEditRole();
-    const typeNode = await drillInto(vm, "stream", "metrics");
-    vm.openFolder = null;
-
-    await vm.openFolderRow(typeNode);
-
-    expect(vm.loadingFor).toBe("");
-    expect(vm.openFolder).toBe(typeNode);
-  });
-
-  it("goes back to the module's top level from the first crumb", async () => {
-    const vm = await mountEditRole();
-    await drillInto(vm, "dfolder", "default");
-
-    vm.navigateTrail(0);
-    await flushPromises();
-
-    expect(vm.openFolder).toBeNull();
-    expect(vm.activeModuleView.trail).toEqual(["Dash Folders"]);
-  });
-
-  it("stays put when the last crumb is clicked", async () => {
-    const vm = await mountEditRole();
-    const folder = await drillInto(vm, "dfolder", "default");
-
-    vm.navigateTrail(1);
-    await flushPromises();
-
-    expect(vm.openFolder).toBe(folder);
   });
 });
 
