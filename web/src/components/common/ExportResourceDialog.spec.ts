@@ -104,6 +104,20 @@ describe("ExportResourceDialog", () => {
     expect(editor(wrapper).text()).toContain('"name": "high error rate"');
   });
 
+  // Functions have no resource in the provider, so their export is JSON-only
+  // rather than a tab that could never hold anything.
+  it("hides the Terraform tab, and stays on JSON, when the resource has no provider type", async () => {
+    const wrapper = mountDialog({ showTerraform: false });
+
+    expect(wrapper.find('[data-test="export-resource-dialog-tabs"]').exists()).toBe(false);
+
+    (wrapper.vm as any).format = "terraform";
+    await wrapper.vm.$nextTick();
+
+    expect(editor(wrapper).attributes("data-language")).toBe("json");
+    expect(editor(wrapper).text()).toContain('"name": "high error rate"');
+  });
+
   it("switches the editor to hcl on the Terraform tab", async () => {
     const wrapper = mountDialog();
     (wrapper.vm as any).format = "terraform";

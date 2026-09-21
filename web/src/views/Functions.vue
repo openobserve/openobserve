@@ -238,7 +238,10 @@ export default defineComponent({
     // Tables). They're rendered directly instead of nested inside the shell's
     // OPageLayout, so their header sits flush at the top like any normal page.
     const sectionOwnsHeader = computed(
-      () => routeName.value === "functionList" || routeName.value === "enrichmentTables",
+      () =>
+        routeName.value === "functionList" ||
+        routeName.value === "enrichmentTables" ||
+        routeName.value === "importFunction",
     );
 
     // Responsive: collapse secondary actions into an overflow menu when narrow.

@@ -58,9 +58,11 @@ const props = withDefaults(
     subTitle: I18nText;
     /** Filename stem for a multi-item export, e.g. "alerts". */
     filePrefix?: string;
+    /** Off for a resource the provider has no Terraform type for — the tab would never have content. */
+    showTerraform?: boolean;
     dataTest?: string;
   }>(),
-  { filePrefix: "export", dataTest: "export-resource-dialog" },
+  { filePrefix: "export", showTerraform: true, dataTest: "export-resource-dialog" },
 );
 
 const emit = defineEmits<{
@@ -85,7 +87,7 @@ watch(
   },
 );
 
-const isTerraform = computed(() => format.value === "terraform");
+const isTerraform = computed(() => props.showTerraform && format.value === "terraform");
 
 const json = computed(() =>
   JSON.stringify(props.items.length === 1 ? props.items[0] : props.items, null, 2),
@@ -147,7 +149,7 @@ function download() {
     @click:neutral="emit('update:open', false)"
   >
     <div class="flex flex-col gap-3">
-      <OTabs v-model="format" dense bordered :data-test="`${dataTest}-tabs`">
+      <OTabs v-if="showTerraform" v-model="format" dense bordered :data-test="`${dataTest}-tabs`">
         <OTab
           name="json"
           :label="raw('JSON')"
