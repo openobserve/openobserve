@@ -69,7 +69,7 @@ vi.mock("@/composables/rum/usePerformance", () => ({
 
 vi.mock("@/services/search", async (importOriginal) => {
   const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
-  // The session lookup aggregates over _sessionreplay; it finds a row unless a test says otherwise.
+  // Existing tests need the lookup to find a row; the no-replay tests override the first call.
   const sessionRow = {
     zo_sql_timestamp: 1692884313968000,
     start_time: 1692884313968,
@@ -687,26 +687,26 @@ describe("SessionViewer.vue — session id with an embedded single quote", () =>
   });
 });
 
-// ---------------------------------------------------------------------------
-// A session id with no rows in _sessionreplay (never recorded, or aged out)
-// must say so instead of mounting an empty player.
-// ---------------------------------------------------------------------------
 describe("SessionViewer.vue — no replay recorded", () => {
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-  async function mountUnrecorded() {
+  async function mountAt(id: string) {
     vi.clearAllMocks();
-    // Only the first call is the lookup; a persistent override would leak into later tests.
-    vi.mocked(searchService.search).mockResolvedValueOnce({ data: { hits: [] } } as any);
     const router = createTestRouter();
     await router.push({
-      path: "/rum/sessions/session-unrecorded",
+      path: `/rum/sessions/${id}`,
       query: { start_time: "1692884313968000", end_time: "1692884769270000" },
     });
     const wrapper = mountSessionViewer(router);
     await flush();
     await flush();
     return wrapper;
+  }
+
+  function mountUnrecorded() {
+    // Only the first call is the lookup; a persistent override would leak into later tests.
+    vi.mocked(searchService.search).mockResolvedValueOnce({ data: { hits: [] } } as any);
+    return mountAt("session-unrecorded");
   }
 
   it("shows the no-replay state naming the session id", async () => {
@@ -746,15 +746,7 @@ describe("SessionViewer.vue — no replay recorded", () => {
   });
 
   it("mounts the player when the session lookup finds a row", async () => {
-    vi.clearAllMocks();
-    const router = createTestRouter();
-    await router.push({
-      path: "/rum/sessions/session-abc",
-      query: { start_time: "1692884313968000", end_time: "1692884769270000" },
-    });
-    const wrapper = mountSessionViewer(router);
-    await flush();
-    await flush();
+    const wrapper = await mountAt("session-abc");
 
     expect(wrapper.find('[data-test="session-viewer-no-replay"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="stub-video-player"]').exists()).toBe(true);

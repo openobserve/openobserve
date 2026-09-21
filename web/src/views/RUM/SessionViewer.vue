@@ -198,7 +198,6 @@ const segmentEvents = ref<any[]>([]);
 // starting, which is exactly the moment the mobile player mounts — that dip is what let
 // the "No session replay available" empty state flash before the segments arrived.
 const segmentsLoading = ref(true);
-// Set when _sessionreplay has no rows for the id, so the page says so instead of mounting a player.
 const sessionNotFound = ref(false);
 
 // Mobile sessions carry wireframe records (source: react-native/ios/android) → the

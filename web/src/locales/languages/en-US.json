@@ -1475,7 +1475,7 @@
     "viewSessionReplay": "View Session Replay",
     "playSessionReplay": "Play Session Replay",
     "noReplayRecordedTitle": "No replay was recorded for this session",
-    "noReplayRecordedMessage": "Session {id} has no replay segments. Replay recording was not enabled for it, or its recording has expired.",
+    "noReplayRecordedMessage": "Session {id} has no replay segments to play.",
     "discoverSessionTitle": "Discover Session Replay to Understand User Interactions in Detail",
     "discoverSessionMessage": "Session Replay captures and replays user interactions on your website or application. This allows you to visually review how users navigate, where they click, what they type, and how they engage with your content",
     "loadingErrorDetails": "Hold on tight, we're fetching error details.",

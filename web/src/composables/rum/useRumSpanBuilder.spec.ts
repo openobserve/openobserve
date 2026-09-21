@@ -1497,10 +1497,6 @@ describe("useRumSpanBuilder", () => {
     });
   });
 
-  // =========================================================================
-  // formatRumEventsAsSpans — replay flag
-  // =========================================================================
-
   describe("formatRumEventsAsSpans — replay flag", () => {
     const withReplay = { session_has_replay: true };
 

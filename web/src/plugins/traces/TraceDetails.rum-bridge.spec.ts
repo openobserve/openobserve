@@ -114,7 +114,6 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
   let wrapper: any;
   let rumRequests: any[];
 
-  // Answers the builder's _rumdata searches by the row type each one asks for.
   function answerRumSearch(sql: string, rumRows: any[]) {
     if (sql.includes("type = 'view'")) return rumRows.filter((r) => r.type === "view");
     if (sql.includes("type='action'")) return rumRows.filter((r) => r.type === "action");
@@ -151,9 +150,9 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
   }
 
   const RUM_SESSION_ID = "bf9f9e4f-34e8-4c4f-b43f-f27c17769d93";
+  const AI_CONVERSATION_ID = "01a0bb13-c247-707a-9b90-26610d52030b";
   const REPLAY_BUTTON = '[data-test="trace-details-view-session-replay-btn"]';
 
-  // A browser request that started the trace, plus the page view it came from.
   function makeRumRows(sessionFlags: Record<string, unknown>) {
     const base = {
       session_id: RUM_SESSION_ID,
@@ -176,8 +175,8 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
     ];
   }
 
-  async function mountBridge(rumRows: any[]) {
-    wrapper = mountWithDetails(makeDetailsResponse("d4b07e603e2fa32f"), rumRows);
+  async function mountBridge(rumRows: any[], details = makeDetailsResponse("d4b07e603e2fa32f")) {
+    wrapper = mountWithDetails(details, rumRows);
     await flushPromises();
     await vi.waitFor(() => expect(wrapper.vm.spanList.length).toBeGreaterThan(3), {
       timeout: 5000,
@@ -301,7 +300,10 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
 
   it("opens the RUM session, not the AI conversation, from Play Session Replay", async () => {
     const push = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
-    await mountBridge(makeRumRows({ session_has_replay: true }));
+    const details = makeDetailsResponse("d4b07e603e2fa32f");
+    details.hits[0].session_id = AI_CONVERSATION_ID;
+    details.hits[0].gen_ai_conversation_id = AI_CONVERSATION_ID;
+    await mountBridge(makeRumRows({ session_has_replay: true }), details);
 
     await wrapper.find(REPLAY_BUTTON).trigger("click");
 
@@ -310,5 +312,6 @@ describe("TraceDetails - RUM bridge gate and windows", () => {
       name: "SessionViewer",
       params: { id: RUM_SESSION_ID },
     });
+    expect(push.mock.calls[0][0].params.id).not.toBe(AI_CONVERSATION_ID);
   });
 });

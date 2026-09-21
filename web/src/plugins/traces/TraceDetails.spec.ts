@@ -1620,7 +1620,6 @@ describe("TraceDetails", () => {
       wrapper.vm.searchObj.data.traceDetails.spanList =
         tracesMockData.tracesDetails.traceSpans.hits;
 
-      expect(wrapper.vm.replaySpan).toBeNull();
       expect(() => wrapper.vm.redirectToSessionReplay()).not.toThrow();
       expect(routerPushSpy).not.toHaveBeenCalled();
       routerPushSpy.mockRestore();
@@ -1851,7 +1850,7 @@ describe("TraceDetails", () => {
       ];
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(true);
+      expect(wrapper.vm.hasReplaySession).toBe(true);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(true);
     });
@@ -1861,13 +1860,13 @@ describe("TraceDetails", () => {
         tracesMockData.tracesDetails.traceSpans.hits;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.hasRumSessionId).toBe(false);
+      expect(wrapper.vm.hasReplaySession).toBe(false);
       const replayBtn = wrapper.find('[data-test="trace-details-view-session-replay-btn"]');
       expect(replayBtn.exists()).toBe(false);
     });
 
     it("should hide session replay button when hideSessionReplayButton prop is true", async () => {
-      // The button v-if checks hasRumSessionId && !hideSessionReplayButton
+      // The button v-if checks hasReplaySession && !hideSessionReplayButton
       const hiddenWrapper = mount(TraceDetails, {
         attachTo: "#app",
         props: {

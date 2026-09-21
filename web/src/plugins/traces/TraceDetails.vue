@@ -537,7 +537,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </span>
             </div>
             <OButton
-              v-if="hasRumSessionId && !hideSessionReplayButton"
+              v-if="hasReplaySession && !hideSessionReplayButton"
               data-test="trace-details-view-session-replay-btn"
               variant="outline"
               size="sm"
@@ -1459,7 +1459,7 @@ export default defineComponent({
 
     // Gate and target share one span so the button never links to a session with nothing to play.
     const replaySpan = computed(() => resolveReplaySpan(spanList.value));
-    const hasRumSessionId = computed(() => replaySpan.value !== null);
+    const hasReplaySession = computed(() => replaySpan.value !== null);
 
     // Computed properties for mode-based priority logic
     const effectiveTraceId = computed(() => {
@@ -3067,8 +3067,7 @@ export default defineComponent({
       redirectToLogs,
       handleTreeViewCorrelatedLogs,
       redirectToSessionReplay,
-      hasRumSessionId,
-      replaySpan,
+      hasReplaySession,
       filteredStreamOptions,
       filterStreamFn,
       streamSearchValue,
