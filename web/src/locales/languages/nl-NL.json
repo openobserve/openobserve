@@ -14104,7 +14104,6 @@
         "orphan": "\"{name}\" is aangemaakt maar deze journey kon niet worden bijgewerkt. Open de nieuwe test of verwijder hem.",
         "reason": {
           "contains-subtest": "Een subtest kan geen andere subtest bevatten",
-          "no-navigate-first": "De selectie moet beginnen met een navigatiestap",
           "not-contiguous": "Selecteer stappen die naast elkaar staan",
           "not-contiguous-filtered": "Selecteer stappen die naast elkaar staan — wis het filter om de volledige lijst te zien",
           "referenced": "Deze test wordt als subtest gebruikt door andere tests en kan er zelf geen bevatten",
@@ -14117,6 +14116,7 @@
         "steps": "Stap {first} · begint bij {path} | Stappen {first} – {last} · begint bij {path}",
         "subtitle": "De stappen verhuizen naar een nieuwe browsertest, die nu wordt aangemaakt. Deze journey houdt op hun plaats een subtest-verwijzing — sla deze test op om die te behouden.",
         "thisTest": "{authored} stappen na extractie · voert dezelfde {executed} stappen uit",
+        "thisTestAuthored": "{authored} stappen na extractie",
         "title": "{count} stap naar een nieuwe test extraheren | {count} stappen naar een nieuwe test extraheren",
         "unit": {
           "hours": "uur | uur",
@@ -14133,13 +14133,16 @@
         "capTitle": "Deze test voert {total} stappen uit — de limiet is {limit}.",
         "delta": "Met \"{name}\" gaat deze test van {before} → {after} uitgevoerde stappen. De limiet is {limit}.",
         "deltaUnknown": "Stapimpact onbekend — een gerefereerde test kon niet worden geladen.",
-        "failedAt": "{number} — {child} › {step}",
+        "failedAt": "{number} — {step}",
         "ignoredEnv": "Zijn start-URL, variabelen, authenticatie en cookies worden hier genegeerd — die van de bovenliggende test gelden.",
         "lastRun": "Zijn laatste run duurde {seconds}s van de toegestane {budget}s.",
         "lastRunUnknown": "Tijdimpact onbekend — deze test heeft nog geen run voltooid.",
         "noAccess": "U hebt geen toegang tot \"{name}\", dus de stappen kunnen hier niet worden getoond.",
         "noAccessBadge": "geen toegang",
         "noAccessRemedy": "Vraag leestoegang tot de map, of verwijder de verwijzing.",
+        "disabledTooltip": "Subtests zijn niet ingeschakeld in deze implementatie.",
+        "loadFailed": "Deze subtest kon niet worden geladen, dus de stappen en het aantal stappen zijn onbekend.",
+        "missing": "Deze subtest bestaat niet meer. Verwijder de verwijzing of kies een andere test.",
         "noAccessToast": "U hebt geen toegang tot een van de tests waarnaar deze test verwijst.",
         "notRun": "Niet uitgevoerd",
         "openChild": "\"{name}\" openen",
@@ -14148,12 +14151,15 @@
         "pickLastRun": "{status} {ago}",
         "pickLoadFailed": "Kon de lijst met browsertests niet laden. Probeer het opnieuw.",
         "pickNested": "Bevat al een subtest — nesten is beperkt tot één niveau",
-        "pickSteps": "{count} stappen",
+        "pickGroupUsable": "Kan hier worden gebruikt",
+        "pickGroupBlocked": "Kan hier niet worden gebruikt",
+        "pickSteps": "{count} stap | {count} stappen",
         "pickUsedBy": "Gebruikt door {count} test | Gebruikt door {count} tests",
         "previewLabel": "Stappen die hier draaien",
         "progressAria": "{done} van {total} substappen voltooid",
         "raiseBudget": "Verhoog de toegestane looptijd van deze test als hij wordt afgebroken.",
-        "stepsBadge": "{count} stappen",
+        "stepsBadge": "{count} stap | {count} stappen",
+        "executedBadge": "{count} uitgevoerd",
         "undefinedVariable": "\"{name}\" gebruikt {variable}, die deze test niet definieert.",
         "undefinedVariableAction": "Toevoegen onder Variabelen"
       }
@@ -14709,6 +14715,8 @@
       "statusUp": "✓ Online",
       "steps": "Stappen",
       "stepsCount": "{count} stappen",
+      "subtestMissing": "Subtest ontbreekt",
+      "subtestNested": "Subtest bevat een subtest",
       "testName": "Testnaam",
       "timeout": "Time-out",
       "trigger": "Trigger",
@@ -14884,7 +14892,7 @@
     "save": {
       "blockedBody": "Het opslaan is niet gelukt. Verwijder eerst die verwijzingen en sla opnieuw op.",
       "usedByBody": "Uw wijzigingen gelden voor alle bij hun volgende run.",
-      "usedByTitle": "\"{name}\" wordt gebruikt door {count} andere tests"
+      "usedByTitle": "\"{name}\" wordt gebruikt door {count} andere test | \"{name}\" wordt gebruikt door {count} andere tests"
     }
   },
   "statusPages": {

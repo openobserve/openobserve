@@ -14104,7 +14104,6 @@
         "orphan": "\"{name}\" foi criado mas não foi possível atualizar este percurso. Abra o novo teste ou elimine-o.",
         "reason": {
           "contains-subtest": "Um subteste não pode conter outro subteste",
-          "no-navigate-first": "A seleção deve começar com um passo de navegação",
           "not-contiguous": "Selecione passos contíguos",
           "not-contiguous-filtered": "Selecione passos contíguos — limpe o filtro para ver a lista completa",
           "referenced": "Este teste é usado como subteste por outros testes e não pode conter um",
@@ -14117,6 +14116,7 @@
         "steps": "Passo {first} · começa em {path} | Passos {first} – {last} · começa em {path}",
         "subtitle": "Os passos passam para um novo teste de navegador, criado agora. Este percurso mantém no lugar deles uma referência de subteste — guarde este teste para a manter.",
         "thisTest": "{authored} passos após a extração · executa os mesmos {executed} passos",
+        "thisTestAuthored": "{authored} passos após a extração",
         "title": "Extrair {count} passo para um novo teste | Extrair {count} passos para um novo teste",
         "unit": {
           "hours": "hora | horas",
@@ -14133,13 +14133,16 @@
         "capTitle": "Este teste executa {total} passos — o limite é {limit}.",
         "delta": "Adicionar \"{name}\" leva este teste de {before} → {after} passos executados. O limite é {limit}.",
         "deltaUnknown": "Impacto nos passos desconhecido — não foi possível carregar um teste referenciado.",
-        "failedAt": "{number} — {child} › {step}",
+        "failedAt": "{number} — {step}",
         "ignoredEnv": "O seu URL inicial, variáveis, autenticação e cookies são ignorados aqui — aplicam-se os do teste pai.",
         "lastRun": "A sua última execução demorou {seconds}s dos {budget}s permitidos.",
         "lastRunUnknown": "Impacto no tempo desconhecido — este teste ainda não concluiu uma execução.",
         "noAccess": "Não tem acesso a \"{name}\", por isso os seus passos não podem ser mostrados aqui.",
         "noAccessBadge": "sem acesso",
         "noAccessRemedy": "Peça acesso de leitura à pasta dele, ou remova a referência.",
+        "disabledTooltip": "Os subtestes não estão ativados nesta implementação.",
+        "loadFailed": "Não foi possível carregar este subteste, por isso os passos e o número de passos são desconhecidos.",
+        "missing": "Este subteste já não existe. Remova a referência ou escolha outro teste.",
         "noAccessToast": "Não tem acesso a um dos testes que este teste referencia.",
         "notRun": "Não executado",
         "openChild": "Abrir \"{name}\"",
@@ -14148,12 +14151,15 @@
         "pickLastRun": "{status} {ago}",
         "pickLoadFailed": "Não foi possível carregar a lista de testes de navegador. Tente novamente.",
         "pickNested": "Já contém um subteste — o aninhamento está limitado a um nível",
-        "pickSteps": "{count} passos",
+        "pickGroupUsable": "Pode ser usado aqui",
+        "pickGroupBlocked": "Não pode ser usado aqui",
+        "pickSteps": "{count} passo | {count} passos",
         "pickUsedBy": "Usado por {count} teste | Usado por {count} testes",
         "previewLabel": "Passos que executa aqui",
         "progressAria": "{done} de {total} subpassos concluídos",
         "raiseBudget": "Aumente o tempo de execução permitido deste teste se ele começar a ser interrompido.",
-        "stepsBadge": "{count} passos",
+        "stepsBadge": "{count} passo | {count} passos",
+        "executedBadge": "{count} executados",
         "undefinedVariable": "\"{name}\" usa {variable}, que este teste não define.",
         "undefinedVariableAction": "Adicioná-la em Variáveis"
       }
@@ -14709,6 +14715,8 @@
       "statusUp": "✓ Ativo",
       "steps": "Etapas",
       "stepsCount": "{count} etapas",
+      "subtestMissing": "Subteste em falta",
+      "subtestNested": "O subteste contém um subteste",
       "testName": "Nome do teste",
       "timeout": "Tempo limite",
       "trigger": "Acionar",
@@ -14884,7 +14892,7 @@
     "save": {
       "blockedBody": "Não foi possível guardar. Remova primeiro essas referências e guarde de novo.",
       "usedByBody": "As suas alterações aplicam-se a todos na próxima execução.",
-      "usedByTitle": "\"{name}\" é usado por {count} outros testes"
+      "usedByTitle": "\"{name}\" é usado por {count} outro teste | \"{name}\" é usado por {count} outros testes"
     }
   },
   "statusPages": {

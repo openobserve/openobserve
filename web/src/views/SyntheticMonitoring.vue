@@ -583,6 +583,8 @@ interface ApiMonitor {
   steps: number | null;
   /** How many other checks reference this one as a subtest. */
   referenced_by: number;
+  /** Absent for a check with no subtest reference. */
+  reference_state?: "ok" | "missing" | "nested";
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -635,6 +637,7 @@ function mapMonitor(m: ApiMonitor) {
     lastTriggeredAt: m.last_triggered_at,
     steps: m.steps,
     referencedBy: m.referenced_by,
+    referenceState: m.reference_state,
   };
 }
 

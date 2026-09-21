@@ -668,8 +668,32 @@ describe("MonitorTable", () => {
       expect(wrapper.find('[data-test="monitor-table-cell-referencedBy"]').text()).toBe("—");
     });
 
-    // A journey that could not be read is not the same as a check with zero
-    // steps — null must not render as "0" or "NaN".
+    it.each([
+      ["missing", "Subtest missing"],
+      ["nested", "Subtest holds a subtest"],
+    ])("flags a %s reference with a warning badge beside the steps", (state, text) => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [{ id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: state }],
+      });
+      const badge = wrapper.find('[data-test="monitor-table-reference-state"]');
+      expect(badge.exists()).toBe(true);
+      expect(badge.text()).toBe(text);
+      expect(wrapper.find('[data-test="monitor-table-cell-steps"]').text()).toContain("16");
+    });
+
+    it("renders no reference badge for an ok reference or a check with none", () => {
+      wrapper = mountMonitorTable({
+        mode: "browser",
+        data: [
+          { id: "a", name: "checkout", steps: 16, referencedBy: 0, referenceState: "ok" },
+          { id: "b", name: "plain", steps: 3, referencedBy: 0 },
+        ],
+      });
+      expect(wrapper.find('[data-test="monitor-table-reference-state"]').exists()).toBe(false);
+    });
+
+    // An unreadable journey is not zero steps, so null must not render as "0" or "NaN".
     it("renders a dash, not 0, for a null steps count", () => {
       wrapper = mountMonitorTable({
         mode: "browser",

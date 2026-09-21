@@ -514,6 +514,9 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     } = {},
   ): Promise<void> {
     const targetUrl = resolveTargetUrl(opts.targetUrl, opts.variables);
+    // Also with an empty map, before any state flips: a child's `{{X}}` must stop the restore.
+    const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
+    const resolved = prefixSteps.map((s) => substituteVariables(s, vars));
     error.value = "";
     liveSteps.value = [];
     baselineStepCount.value = null;
@@ -537,15 +540,6 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
       }
       isRecording.value = false;
     };
-
-    // The prefix replays against a real browser, so the same variable substitution
-    // the replay path does has to happen here — otherwise the restore runs with
-    // `{{ VAR }}` typed literally into the page.
-    const vars = Object.fromEntries((opts.variables ?? []).map((v) => [v.name, v.value]));
-    const resolved =
-      Object.keys(vars).length > 0
-        ? prefixSteps.map((s) => substituteVariables(s, vars))
-        : prefixSteps;
 
     // Unwrap Vue reactive proxies before structured clone — see `replay`.
     const plainSteps = JSON.parse(JSON.stringify(resolved)) as WireStep[];
@@ -729,8 +723,8 @@ const useSyntheticsRecorder = (t: TranslateFn) => {
     error.value = "";
     // Resolved before any state flips: an unresolved placeholder must not leave a phantom running replay.
     const vars = Object.fromEntries((variables ?? []).map((v) => [v.name, v.value]));
-    const resolvedSteps =
-      vars && Object.keys(vars).length > 0 ? steps.map((s) => substituteVariables(s, vars)) : steps;
+    // Also with an empty map: a child's `{{X}}` would otherwise be typed into the page literally.
+    const resolvedSteps = steps.map((s) => substituteVariables(s, vars));
     const resolvedTargetUrl = resolveTargetUrl(targetUrl, variables);
     replayResult.value = null;
     stepResults.clear();

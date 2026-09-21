@@ -99,11 +99,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Steps count (Browser mode) — expanded count from the server; null means
          the journey could not be read, which is not the same as zero steps. -->
     <template #cell-steps="{ row }">
-      <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
-        (row as any).steps != null
-          ? t("synthetics.table.stepsCount", { count: (row as any).steps })
-          : "—"
-      }}</span>
+      <span class="flex min-w-0 items-center gap-2">
+        <span class="truncate" :data-test="`${dataTest}-cell-steps`">{{
+          (row as any).steps != null
+            ? t("synthetics.table.stepsCount", { count: (row as any).steps })
+            : "—"
+        }}</span>
+        <OBadge
+          v-if="brokenReferenceLabel((row as any).referenceState)"
+          variant="warning-soft"
+          size="sm"
+          :data-test="`${dataTest}-reference-state`"
+        >
+          {{ brokenReferenceLabel((row as any).referenceState) }}
+        </OBadge>
+      </span>
     </template>
 
     <!-- Used-by count (Browser mode) — how many other checks reference this one
@@ -870,6 +880,13 @@ const columns = computed<OTableColumnDef[]>(() => {
 
 function formatLocationsList(locations: string[]): string {
   return locations.map((l) => locationLabel(l)).join("\n");
+}
+
+/** `ok` and an absent state (no reference) render nothing; see `SyntheticListItem.reference_state`. */
+function brokenReferenceLabel(state: string | undefined): I18nText | undefined {
+  if (state === "missing") return t("synthetics.table.subtestMissing");
+  if (state === "nested") return t("synthetics.table.subtestNested");
+  return undefined;
 }
 
 // ── Spark tooltip ─────────────────────────────────────────────────────

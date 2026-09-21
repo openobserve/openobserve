@@ -90,10 +90,11 @@ describe("extractEligibility", () => {
     });
   });
 
-  it("refuses a range that does not start with a navigate step", () => {
+  it("accepts a range that starts with a click", () => {
     expect(extractEligibility(input({ selectedIds: new Set(["s2", "s3"]) }))).toEqual({
-      ok: false,
-      reason: "no-navigate-first",
+      ok: true,
+      range: [journey[1], journey[2]],
+      anchor: 1,
     });
   });
 
@@ -182,26 +183,33 @@ describe("extractEligibility", () => {
     });
   });
 
-  it("does not report a placeholder in an assert, select or upload value", () => {
+  it("does not report a placeholder in an assert or upload value", () => {
     const steps: BrowserStep[] = [
       nav("s1"),
       { id: "s2", action: "assert", name: "Landed", value: "{{TOKEN}}" },
-      { id: "s3", action: "select", name: "Pick plan", value: "{{PLAN}}" },
-      { id: "s4", action: "upload", name: "Attach", value: "{{FILE}}" },
+      { id: "s3", action: "upload", name: "Attach", value: "{{FILE}}" },
     ];
-    expect(
-      extractEligibility(input({ steps, selectedIds: new Set(["s1", "s2", "s3", "s4"]) })),
-    ).toEqual({ ok: true, range: steps, anchor: 0 });
+    expect(extractEligibility(input({ steps, selectedIds: new Set(["s1", "s2", "s3"]) }))).toEqual({
+      ok: true,
+      range: steps,
+      anchor: 0,
+    });
+  });
+
+  it("catches a placeholder in a select step's value", () => {
+    const steps: BrowserStep[] = [
+      nav("s1"),
+      { id: "s2", action: "select", name: "Pick plan", value: "{{PLAN}}" },
+    ];
+    expect(extractEligibility(input({ steps, selectedIds: new Set(["s1", "s2"]) }))).toEqual({
+      ok: false,
+      reason: "undefined-placeholder",
+      placeholder: "PLAN",
+    });
   });
 
   it("reports the earlier rule when two rules fail", () => {
-    // navigate-first, contains-subtest and referenced all fail; precedence says the earliest wins.
     const steps = [nav("s1", "{{BASE_URL}}"), click("s2"), subtest("s3")];
-    expect(
-      extractEligibility(
-        input({ steps, selectedIds: new Set(["s2", "s3"]), referencedBy: "some" }),
-      ),
-    ).toEqual({ ok: false, reason: "no-navigate-first" });
     // A gap beats contains-subtest, referenced and the undefined placeholder alike.
     expect(
       extractEligibility(

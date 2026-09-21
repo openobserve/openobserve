@@ -80,8 +80,7 @@ describe("SubtestPicker", () => {
       header?: boolean;
       value?: string;
     }[];
-    expect(options.map((o) => o.value)).toEqual(["login-test"]);
-    expect(options.some((o) => o.header)).toBe(false);
+    expect(options.filter((o) => !o.header).map((o) => o.value)).toEqual(["login-test"]);
   });
 
   it("emits the reference and states the executed-step delta and the run time", async () => {
@@ -293,16 +292,38 @@ describe("SubtestPicker rows", () => {
     vi.useRealTimers();
   });
 
-  it("lists every other browser check flat, in list order, with no header rows", async () => {
+  it("groups usable rows, then blocked rows, each under its header and in list order", async () => {
     const w = await mountWithRows(ROWS);
-    const shape = optionsOf(w).map((o) => ({ value: o.value, disabled: o.disabled === true }));
+    const shape = optionsOf(w).map((o) =>
+      o.header ? { header: o.label } : { value: o.value, disabled: o.disabled === true },
+    );
     expect(shape).toEqual([
+      { header: "Can be used here" },
       { value: "login-test", disabled: false },
       { value: "login-staging", disabled: false },
+      { header: "Can't be used here" },
       { value: "checkout-full", disabled: true },
     ]);
-    expect(optionsOf(w).some((o) => o.header)).toBe(false);
     expect(w.findComponent(OSelect).props("disabled")).toBe(false);
+  });
+
+  it("renders no header for an empty group", async () => {
+    const w = await mountWithRows(ROWS.filter((r) => r.id !== "checkout-full"));
+    expect(optionsOf(w).filter((o) => o.header)).toEqual([
+      expect.objectContaining({ label: "Can be used here" }),
+    ]);
+  });
+
+  it("seeds a saved reference the list lacks inside the usable group, not above its header", async () => {
+    const w = await mountWithRows(ROWS, { modelValue: { id: "gone", name: "Retired" } });
+    expect(optionsOf(w).map((o) => (o.header ? o.label : o.value))).toEqual([
+      "Can be used here",
+      "gone",
+      "login-test",
+      "login-staging",
+      "Can't be used here",
+      "checkout-full",
+    ]);
   });
 
   it("disables a check that already contains a subtest and explains why", async () => {
@@ -321,13 +342,15 @@ describe("SubtestPicker rows", () => {
       r.type === "browser" && r.id !== "self" ? { ...r, references: 1 } : r,
     );
     const w = await mountWithRows(allNested);
-    const shape = optionsOf(w).map((o) => ({ value: o.value, disabled: o.disabled }));
+    const shape = optionsOf(w).map((o) =>
+      o.header ? { header: o.label } : { value: o.value, disabled: o.disabled },
+    );
     expect(shape).toEqual([
+      { header: "Can't be used here" },
       { value: "login-test", disabled: true },
       { value: "login-staging", disabled: true },
       { value: "checkout-full", disabled: true },
     ]);
-    expect(optionsOf(w).some((o) => o.header)).toBe(false);
     expect(w.find('[data-test="synthetics-subtest-empty"]').exists()).toBe(false);
     expect(w.findComponent(OSelect).props("disabled")).toBe(false);
   });
@@ -471,7 +494,9 @@ describe("SubtestPicker load state", () => {
     await flushPromises();
     expect(displayLabel(w)).toBe("Login");
     // The seeded name row is replaced by the real row, not listed twice.
-    const values = (select(w).props("options") as { value?: string }[]).map((o) => o.value);
+    const values = (select(w).props("options") as { value?: string; header?: boolean }[])
+      .filter((o) => !o.header)
+      .map((o) => o.value);
     expect(values.filter((v) => v === "login-test")).toHaveLength(1);
     expect(values).toEqual(["login-test"]);
   });
@@ -532,7 +557,9 @@ describe("SubtestPicker load state", () => {
     list.resolve({ data: { checks: CHECKS } });
     await flushPromises();
     expect(displayLabel(w)).toBe("Login");
-    const values = (select(w).props("options") as { value?: string }[]).map((o) => o.value);
+    const values = (select(w).props("options") as { value?: string; header?: boolean }[])
+      .filter((o) => !o.header)
+      .map((o) => o.value);
     expect(values).toEqual(["login-test"]);
 
     const failed = deferredList();

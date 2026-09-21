@@ -45,12 +45,13 @@ import BrowserJourneyStepEditor from "./BrowserJourneyStepEditor.vue";
 import BrowserJourneyStepError from "./BrowserJourneyStepError.vue";
 import ExtensionSetupDialog from "./ExtensionSetupDialog.vue";
 import { stepIsMissingTarget } from "@/utils/synthetics/stepTarget";
-import { journeyToWireSteps, mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import { classifyPreflightFailure } from "@/utils/synthetics/replayFailure";
 import { browserMaxSteps } from "@/utils/synthetics/runBudget";
-import syntheticsService from "@/services/synthetics";
 import {
   composedStepId,
+  composedStepName,
   translateStepId,
   loadChildren,
   expandJourney,
@@ -129,8 +130,10 @@ const props = defineProps<{
   journeyBudgetMs?: number;
   /** Child ids the host's prefetch was refused (403), so the row can say so without a second GET. */
   refusedChildIds?: Set<string>;
+  /** Child ids the host's prefetch found deleted (404), so the row can say so without a second GET. */
+  missingChildIds?: Set<string>;
   /** Names this check defines, so a child's undefined placeholder can be named before save. */
-  variableNames?: string[];
+  definedNames?: string[];
   /** The check's variables, substituted into the Starting URL before the recorder opens it. */
   variables?: { name: string; value: string }[];
   /**
@@ -328,13 +331,12 @@ function resultFor(stepId: string): StepReplayResult | undefined {
     const authoredIndex = props.modelValue.findIndex((s) => s.id === stepId);
     const row = props.modelValue[authoredIndex];
     const childTestName =
-      childrenCache.value.get(row?.subtest?.id ?? "")?.name ?? row?.subtest?.name ?? row?.name;
+      childrenCache.value.get(row?.subtest?.id ?? "")?.name ?? row?.subtest?.name ?? "";
     return {
       ...failed,
       stepName: t("synthetics.journey.subtest.failedAt", {
         number: `${authoredIndex + 1}.${entry.childIndex + 1}`,
-        child: childTestName,
-        step: entry.childStepName,
+        step: composedStepName(row?.name, childTestName, entry.childStepName),
       }),
     };
   }
@@ -989,9 +991,18 @@ function onRecordButtonClick() {
   }
 }
 
+/** How many authored rows the current replay covers; null is the whole journey. */
+const replayedUpTo = ref<number | null>(null);
+
+function requestReplay(upTo?: number) {
+  replayedUpTo.value = upTo ?? null;
+  if (upTo === undefined) emit("replay");
+  else emit("replay-up-to", upTo);
+}
+
 function onReplayButtonClick() {
   if (props.extensionReady) {
-    emit("replay");
+    requestReplay();
   } else {
     extensionSetup.value = { open: true, action: "replay" };
   }
@@ -999,7 +1010,7 @@ function onReplayButtonClick() {
 
 function onExtensionSetupContinue() {
   if (extensionSetup.value.action === "record") startRecording();
-  else emit("replay");
+  else requestReplay();
 }
 
 const extensionSetupDialog = ref<InstanceType<typeof ExtensionSetupDialog> | null>(null);
@@ -1023,7 +1034,7 @@ watch([() => props.blockedReason, recordingBlockedIncognito], ([reason, recordBl
 
 function onIncognitoRetry() {
   if (recordingBlockedIncognito.value) startRecording();
-  else emit("replay");
+  else requestReplay();
 }
 
 function onIncognitoDismiss() {
@@ -1117,6 +1128,9 @@ function handleToggleExpand(row: BrowserStep) {
 // host owns; this only remembers which ids are in flight or were refused.
 const loadingChildIds = ref<Set<string>>(new Set());
 const localRefusedChildIds = ref<Set<string>>(new Set());
+const localMissingChildIds = ref<Set<string>>(new Set());
+/** A 5xx or network failure: unlike a refusal or a deletion, a retry can succeed. */
+const erroredChildIds = ref<Set<string>>(new Set());
 
 function isChildLoading(row: BrowserStep): boolean {
   return !!row.subtest?.id && loadingChildIds.value.has(row.subtest.id);
@@ -1125,6 +1139,15 @@ function isChildLoading(row: BrowserStep): boolean {
 function isChildRefused(row: BrowserStep): boolean {
   const id = row.subtest?.id;
   return !!id && (localRefusedChildIds.value.has(id) || !!props.refusedChildIds?.has(id));
+}
+
+function isChildMissing(row: BrowserStep): boolean {
+  const id = row.subtest?.id;
+  return !!id && (localMissingChildIds.value.has(id) || !!props.missingChildIds?.has(id));
+}
+
+function isChildErrored(row: BrowserStep): boolean {
+  return !!row.subtest?.id && erroredChildIds.value.has(row.subtest.id);
 }
 
 function childFor(row: BrowserStep) {
@@ -1151,7 +1174,7 @@ function childRowsFor(row: BrowserStep) {
 
 function missingVariablesFor(row: BrowserStep): string[] {
   const child = childFor(row);
-  return child ? undefinedPlaceholders(child, props.variableNames ?? []) : [];
+  return child ? undefinedPlaceholders(child, props.definedNames ?? []) : [];
 }
 
 function stepBadgeForRow(row: BrowserStep): { label: string; variant: "default" | "error" } | null {
@@ -1162,25 +1185,20 @@ function stepBadgeForRow(row: BrowserStep): { label: string; variant: "default" 
   const child = childFor(row);
   if (!child) return null;
   return {
-    label: t("synthetics.journey.subtest.stepsBadge", { count: child.steps.length }),
+    label: t(
+      "synthetics.journey.subtest.stepsBadge",
+      { count: child.steps.length },
+      child.steps.length,
+    ),
     variant: "default",
   };
 }
 
-/** Reuses the shared cache before hitting the network — see `childrenCache` prop doc. */
+/** The restore's `loadChildren` fetcher; a failure aborts the restore with its error. */
 async function fetchChildJourneyForRestore(id: string): Promise<ChildJourney> {
-  const cached = childrenCache.value.get(id);
-  if (cached) return cached;
-  const res = await syntheticsService.get(org.value, id);
-  const data = res.data ?? {};
-  const child: ChildJourney = {
-    id,
-    name: data.name ?? "",
-    folderId: data.folder_id,
-    steps: mapWireSteps(data.config?.steps ?? []),
-  };
-  childrenCache.value.set(id, child);
-  return child;
+  const result = await fetchChildJourney(org.value, id, childrenCache.value);
+  if (!result.ok) throw result.error;
+  return result.child;
 }
 
 async function ensureChildLoaded(row: BrowserStep) {
@@ -1189,36 +1207,36 @@ async function ensureChildLoaded(row: BrowserStep) {
   if (
     childrenCache.value.has(id) ||
     loadingChildIds.value.has(id) ||
-    localRefusedChildIds.value.has(id) ||
-    props.refusedChildIds?.has(id)
+    isChildRefused(row) ||
+    isChildMissing(row) ||
+    erroredChildIds.value.has(id)
   ) {
     return;
   }
   loadingChildIds.value = new Set([...loadingChildIds.value, id]);
-  try {
-    const res = await syntheticsService.get(org.value, id);
-    const data = res.data ?? {};
-    // Same Map instance the host reads — writing into it is what keeps this
-    // the ONE cache rather than a second copy.
-    childrenCache.value.set(id, {
-      id,
-      name: data.name ?? "",
-      folderId: data.folder_id,
-      steps: mapWireSteps(data.config?.steps ?? []),
-    });
-  } catch (err: any) {
-    if (err?.response?.status === 403) {
-      localRefusedChildIds.value = new Set([...localRefusedChildIds.value, id]);
-      toast({ variant: "error", message: t("synthetics.journey.subtest.noAccessToast") });
-    } else {
-      console.error("[synthetics] failed to load subtest reference", err);
-      localRefusedChildIds.value = new Set([...localRefusedChildIds.value, id]);
-    }
-  } finally {
-    const next = new Set(loadingChildIds.value);
-    next.delete(id);
-    loadingChildIds.value = next;
+  const result = await fetchChildJourney(org.value, id, childrenCache.value);
+  const next = new Set(loadingChildIds.value);
+  next.delete(id);
+  loadingChildIds.value = next;
+  if (result.ok) return;
+  if (result.failure === "refused") {
+    localRefusedChildIds.value = new Set([...localRefusedChildIds.value, id]);
+    toast({ variant: "error", message: t("synthetics.journey.subtest.noAccessToast") });
+  } else if (result.failure === "missing") {
+    localMissingChildIds.value = new Set([...localMissingChildIds.value, id]);
+  } else {
+    console.error("[synthetics] failed to load subtest reference", result.error);
+    erroredChildIds.value = new Set([...erroredChildIds.value, id]);
   }
+}
+
+function retryChildLoad(row: BrowserStep) {
+  const id = row.subtest?.id;
+  if (!id) return;
+  const next = new Set(erroredChildIds.value);
+  next.delete(id);
+  erroredChildIds.value = next;
+  void ensureChildLoaded(row);
 }
 
 const variablesToggleLabel = computed(() =>
@@ -1240,6 +1258,7 @@ const overCap = computed(
   () => props.ownStepCount !== undefined && props.ownStepCount > maxSteps.value,
 );
 const ownStepTotal = computed(() => props.modelValue.filter((s) => s.action !== "subtest").length);
+const hasReference = computed(() => props.modelValue.some((s) => s.action === "subtest"));
 /** One entry per reference row in journey order — the same child twice runs twice. */
 const capChildren = computed(() =>
   props.modelValue
@@ -1396,12 +1415,17 @@ function childDotState(composedId: string): StepDotState | undefined {
   return isReplayLocked.value ? "pending" : "skip";
 }
 
-/** What actually runs: the map holds every child step in place of its reference row. */
-const executedTotal = computed(() =>
-  props.expansionMap
-    ? props.modelValue.filter((s) => s.action !== "subtest").length + props.expansionMap.size
-    : props.modelValue.length,
-);
+/** What actually runs: the map holds every child step of the replayed rows in place of their reference rows. */
+const executedTotal = computed(() => {
+  const rows =
+    replayedUpTo.value === null
+      ? props.modelValue
+      : props.modelValue.slice(0, Math.max(1, replayedUpTo.value));
+  if (!props.expansionMap) return rows.length;
+  const replayed = new Set(rows.map((s) => s.id));
+  const children = [...props.expansionMap.values()].filter((e) => replayed.has(e.authoredStepId));
+  return rows.filter((s) => s.action !== "subtest").length + children.length;
+});
 
 /** Row 0 — the Starting URL as a navigate-shaped row — exactly when the run opens it (skip rule A1). */
 const startRow = computed<BrowserStep | null>(() =>
@@ -1465,6 +1489,15 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           {{ t("synthetics.journey.steps") }}
         </h3>
         <OBadge variant="default" size="sm" class="ms-1">{{ modelValue.length }}</OBadge>
+        <OBadge
+          v-if="hasReference && ownStepCount !== undefined"
+          :variant="overCap ? 'error' : 'default'"
+          size="sm"
+          class="ms-1"
+          data-test="synthetics-journey-executed-badge"
+        >
+          {{ t("synthetics.journey.subtest.executedBadge", { count: ownStepCount }) }}
+        </OBadge>
       </div>
 
       <JourneySuggestions
@@ -1491,17 +1524,24 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         >
           {{ t("synthetics.journey.addStep") }}
         </OButton>
-        <OButton
-          v-if="!isRecording && !isReplayLocked && isCompositionEnabled"
-          variant="outline"
-          size="sm"
-          :disabled="readonly || isRecording || isRestoring"
-          data-test="synthetics-journey-add-subtest-btn"
-          @click="addSubtestStep"
-          icon-left="account-tree"
-        >
-          {{ t("synthetics.journey.addSubtest") }}
-        </OButton>
+        <!-- The wrapper carries the tooltip: a disabled button receives no pointer events. -->
+        <span v-if="!isRecording && !isReplayLocked" class="inline-flex">
+          <OButton
+            variant="outline"
+            size="sm"
+            :disabled="!isCompositionEnabled || readonly || isRecording || isRestoring"
+            data-test="synthetics-journey-add-subtest-btn"
+            @click="addSubtestStep"
+            icon-left="account-tree"
+          >
+            {{ t("synthetics.journey.addSubtest") }}
+          </OButton>
+          <OTooltip
+            v-if="!isCompositionEnabled"
+            :content="t('synthetics.journey.subtest.disabledTooltip')"
+            side="bottom"
+          />
+        </span>
 
         <!-- Run replay / Stop / Re-run — positionally stable, same slot -->
         <template v-if="!isRecording">
@@ -1791,7 +1831,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           variant="primary"
           size="sm"
           data-test="synthetics-journey-preflight-retry-btn"
-          @click="emit('replay')"
+          @click="requestReplay()"
         >
           {{ t("synthetics.journey.retry") }}
         </OButton>
@@ -1912,7 +1952,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         variant="outline"
         size="xs"
         data-test="synthetics-journey-stopped-retry-btn"
-        @click="emit('replay')"
+        @click="requestReplay()"
       >
         {{ t("synthetics.journey.reRun") }}
       </OButton>
@@ -2080,7 +2120,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
       :can-record-from="canOfferRecordBefore"
       @record-before="onRecordBefore"
       @insert-below="handleInsertBelow"
-      @retry-replay="emit('replay')"
+      @retry-replay="requestReplay()"
     >
       <!-- Inline editor (expanded content) — the same component the recording
            panel renders, so an author sees the same fields either way -->
@@ -2106,7 +2146,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               ? childFor(row as BrowserStep)?.name
               : undefined
           "
-          @retry-replay="emit('replay-up-to', stepNumberOf(row))"
+          @retry-replay="requestReplay(stepNumberOf(row))"
           @open-child="emit('open-child', childFor(row as BrowserStep)!)"
         />
         <!-- `selector-error-message` is field-scoped, not step-scoped: it renders
@@ -2119,6 +2159,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
           :own-check-id="ownCheckId"
           :own-step-count="ownStepCount"
           :journey-budget-ms="journeyBudgetMs"
+          :child-name="childFor(row as BrowserStep)?.name"
           :action-error-message="fieldError(row.id, 'action')"
           :name-error-message="fieldError(row.id, 'name')"
           :selector-error-message="
@@ -2191,6 +2232,32 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
             <span class="text-xs" data-test="synthetics-journey-subtest-refused-remedy">{{
               t("synthetics.journey.subtest.noAccessRemedy")
             }}</span>
+          </div>
+          <div
+            v-else-if="isChildMissing(row as BrowserStep)"
+            class="rounded-default bg-status-error-bg text-status-error-text flex items-center gap-2 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-missing"
+          >
+            <OIcon name="link-off" size="sm" aria-hidden="true" />
+            <span>{{ t("synthetics.journey.subtest.missing") }}</span>
+          </div>
+          <div
+            v-else-if="isChildErrored(row as BrowserStep)"
+            class="rounded-default bg-status-warning-bg text-status-warning-text flex items-center gap-2 px-3 py-2 text-sm"
+            role="alert"
+            data-test="synthetics-journey-subtest-load-error"
+          >
+            <OIcon name="error-outline" size="sm" aria-hidden="true" />
+            <span class="flex-1">{{ t("synthetics.journey.subtest.loadFailed") }}</span>
+            <OButton
+              variant="ghost"
+              size="xs"
+              data-test="synthetics-journey-subtest-retry"
+              @click="retryChildLoad(row as BrowserStep)"
+            >
+              {{ t("common.retry") }}
+            </OButton>
           </div>
           <template v-else-if="childFor(row as BrowserStep)">
             <div class="flex items-center gap-2">

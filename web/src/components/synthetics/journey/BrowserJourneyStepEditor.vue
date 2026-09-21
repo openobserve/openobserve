@@ -79,6 +79,8 @@ const props = defineProps<{
   ownStepCount?: number;
   /** Configured run-time allowance for this journey, in ms; undefined uses the default. */
   journeyBudgetMs?: number;
+  /** The loaded child's name: a stored reference is `{ id }` only, so it carries no name of its own. */
+  childName?: string;
 }>();
 
 const emit = defineEmits<{
@@ -153,7 +155,11 @@ const effectiveLocator = computed<StepLocator>(() => props.step.locator ?? { can
 // the route guards take with `=== false`: an unknown flag hides the option.
 const actionSelectOptions = computed(() =>
   actionOptions(t).filter(
-    (o) => o.value !== "subtest" || store?.state?.zoConfig?.synthetics_subtests_enabled === true,
+    (o) =>
+      o.value !== "subtest" ||
+      // A row that already holds a reference keeps it: the server lets it save unchanged.
+      props.step.action === "subtest" ||
+      store?.state?.zoConfig?.synthetics_subtests_enabled === true,
   ),
 );
 
@@ -270,6 +276,14 @@ const timeoutBelowDefault = computed(() => {
 // element the v1 way flipped the whole journey to steps_version 1, because
 // isV2Journey reads `locator`, not `selector` (SE-18). No v1 journeys exist, so
 // the fork served no case and is gone. See `showTarget` for the render condition.
+
+/** A name the author never changed still names the old child, so a re-pick replaces it. */
+function onSubtestPicked(picked: { id: string; name: string } | undefined) {
+  const current = props.step.name;
+  const earlier = props.step.subtest?.name ?? props.childName;
+  const keepName = !!current && current !== earlier;
+  update({ subtest: picked, name: keepName ? current : picked?.name });
+}
 
 function updateLocator(locator: StepLocator) {
   update({ locator });
@@ -476,7 +490,7 @@ const hasAdvancedChanges = computed(
         :own-step-count="ownStepCount"
         :journey-budget-ms="journeyBudgetMs"
         data-test="synthetics-journey-step-subtest-picker"
-        @update:model-value="(ref) => update({ subtest: ref, name: props.step.name || ref?.name })"
+        @update:model-value="onSubtestPicked"
       />
 
       <!-- The discard is right; doing it silently was not (D9). -->

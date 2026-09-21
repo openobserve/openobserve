@@ -14104,7 +14104,6 @@
         "orphan": "\"{name}\" è stato creato ma non è stato possibile aggiornare questo percorso. Apri il nuovo test o eliminalo.",
         "reason": {
           "contains-subtest": "Un subtest non può contenere un altro subtest",
-          "no-navigate-first": "La selezione deve iniziare con un passo di navigazione",
           "not-contiguous": "Seleziona passi adiacenti",
           "not-contiguous-filtered": "Seleziona passi adiacenti — rimuovi il filtro per vedere l'elenco completo",
           "referenced": "Questo test è usato come subtest da altri test e non può contenerne uno",
@@ -14117,6 +14116,7 @@
         "steps": "Passo {first} · inizia da {path} | Passi {first} – {last} · inizia da {path}",
         "subtitle": "I passi passano a un nuovo test browser, creato ora. Questo percorso mantiene al loro posto un riferimento di subtest — salva questo test per conservarlo.",
         "thisTest": "{authored} passi dopo l'estrazione · esegue gli stessi {executed} passi",
+        "thisTestAuthored": "{authored} passi dopo l'estrazione",
         "title": "Estrai {count} passo in un nuovo test | Estrai {count} passi in un nuovo test",
         "unit": {
           "hours": "ora | ore",
@@ -14133,13 +14133,16 @@
         "capTitle": "Questo test esegue {total} passi — il limite è {limit}.",
         "delta": "Aggiungendo \"{name}\" questo test passa da {before} → {after} passi eseguiti. Il limite è {limit}.",
         "deltaUnknown": "Impatto sui passi sconosciuto — non è stato possibile caricare un test referenziato.",
-        "failedAt": "{number} — {child} › {step}",
+        "failedAt": "{number} — {step}",
         "ignoredEnv": "Il suo URL iniziale, le variabili, l'autenticazione e i cookie sono ignorati qui — valgono quelli del test padre.",
         "lastRun": "La sua ultima esecuzione ha richiesto {seconds}s dei {budget}s consentiti.",
         "lastRunUnknown": "Impatto sul tempo sconosciuto — questo test non ha ancora completato un'esecuzione.",
         "noAccess": "Non hai accesso a \"{name}\", quindi i suoi passi non possono essere mostrati qui.",
         "noAccessBadge": "nessun accesso",
         "noAccessRemedy": "Chiedi l'accesso in lettura alla sua cartella, o rimuovi il riferimento.",
+        "disabledTooltip": "I subtest non sono abilitati in questa installazione.",
+        "loadFailed": "Impossibile caricare questo subtest, quindi i suoi passi e il loro numero sono sconosciuti.",
+        "missing": "Questo subtest non esiste più. Rimuovi il riferimento o scegli un altro test.",
         "noAccessToast": "Non hai accesso a uno dei test a cui questo test fa riferimento.",
         "notRun": "Non eseguito",
         "openChild": "Apri \"{name}\"",
@@ -14148,12 +14151,15 @@
         "pickLastRun": "{status} {ago}",
         "pickLoadFailed": "Impossibile caricare l'elenco dei test browser. Riprova.",
         "pickNested": "Contiene già un subtest — l'annidamento è limitato a un livello",
-        "pickSteps": "{count} passi",
+        "pickGroupUsable": "Utilizzabile qui",
+        "pickGroupBlocked": "Non utilizzabile qui",
+        "pickSteps": "{count} passo | {count} passi",
         "pickUsedBy": "Usato da {count} test | Usato da {count} test",
         "previewLabel": "Passi eseguiti qui",
         "progressAria": "{done} di {total} sotto-passi completati",
         "raiseBudget": "Aumenta il tempo di esecuzione consentito a questo test se inizia a essere interrotto.",
-        "stepsBadge": "{count} passi",
+        "stepsBadge": "{count} passo | {count} passi",
+        "executedBadge": "{count} eseguiti",
         "undefinedVariable": "\"{name}\" usa {variable}, che questo test non definisce.",
         "undefinedVariableAction": "Aggiungila in Variabili"
       }
@@ -14709,6 +14715,8 @@
       "statusUp": "✓ Su",
       "steps": "Passaggi",
       "stepsCount": "{count} passaggi",
+      "subtestMissing": "Subtest mancante",
+      "subtestNested": "Il subtest contiene un subtest",
       "testName": "Nome test",
       "timeout": "Timeout",
       "trigger": "Attiva",
@@ -14884,7 +14892,7 @@
     "save": {
       "blockedBody": "Il salvataggio non è andato a buon fine. Rimuovi prima quei riferimenti, poi salva di nuovo.",
       "usedByBody": "Le tue modifiche si applicano a tutti alla loro prossima esecuzione.",
-      "usedByTitle": "\"{name}\" è usato da {count} altri test"
+      "usedByTitle": "\"{name}\" è usato da {count} altro test | \"{name}\" è usato da {count} altri test"
     }
   },
   "statusPages": {

@@ -200,6 +200,8 @@ import type { BrowserStep } from "@/types/synthetics";
 import type { ChildJourney } from "@/utils/synthetics/expandJourney";
 import { VARIABLES_SPLITTER_LIMITS } from "@/composables/synthetics/useCheckWizardUi";
 import destinationService from "@/services/alert_destination";
+import { queryClient } from "@/composables/query/queryClient";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
 
 // ── Stubs ────────────────────────────────────────────────────────────────
 // Exposed by the real BrowserJourney; the host calls it after a refused save.
@@ -282,7 +284,7 @@ const baseStubs = {
       "variablesPanelOpen",
       "refusedChildIds",
       "journeyBudgetMs",
-      "variableNames",
+      "definedNames",
       "variables",
       "ownStepCount",
       "class",
@@ -304,6 +306,7 @@ const baseStubs = {
       "authoredCount",
       "executedCount",
       "parentName",
+      "parentStartingUrl",
       "defaultFolder",
       "folders",
       "needsSchedule",
@@ -1033,19 +1036,20 @@ describe("CreateBrowserTest", () => {
       expect(journeyStub(wrapper).props("journeyBudgetMs")).toBe(120_000);
     });
 
-    it("passes the check's variable names to the journey", async () => {
+    it("passes the check's variable and secret names to the journey", async () => {
       mockServiceGet.mockResolvedValue({
         data: loadedCheck({
           variables: [
             { name: " USER ", value: "alice" },
             { name: "PASSWORD", value: "", secure: true },
           ],
+          secrets: [{ name: "API_KEY", value: "k" }],
         }),
       });
       wrapper = mountPage({ editId: "check-123" });
       await flushPromises();
 
-      expect(journeyStub(wrapper).props("variableNames")).toEqual(["USER", "PASSWORD"]);
+      expect(journeyStub(wrapper).props("definedNames")).toEqual(["USER", "PASSWORD", "API_KEY"]);
     });
   });
 
@@ -1103,6 +1107,23 @@ describe("CreateBrowserTest", () => {
       return w;
     }
 
+    const monitorListInvalidations = () =>
+      vi
+        .mocked(queryClient.invalidateQueries)
+        .mock.calls.filter(
+          ([filters]) =>
+            JSON.stringify(filters?.queryKey) ===
+            JSON.stringify(syntheticsKeys.monitorsAll("default")),
+        ).length;
+
+    beforeEach(() => {
+      vi.spyOn(queryClient, "invalidateQueries");
+    });
+
+    afterEach(() => {
+      vi.mocked(queryClient.invalidateQueries).mockRestore();
+    });
+
     async function selectRange(w: VueWrapper, ids: string[]) {
       journeyStub(w).vm.$emit("selection-changed", { count: ids.length, isRecording: false, ids });
       await flushPromises();
@@ -1133,12 +1154,12 @@ describe("CreateBrowserTest", () => {
 
     it("marks the button aria-disabled and says why for an ineligible selection", async () => {
       wrapper = await mountEdit();
-      await selectRange(wrapper, ["s3", "s4"]);
+      await selectRange(wrapper, ["s2", "s4"]);
 
       const btn = wrapper.find(OPEN_BTN);
       expect(btn.attributes("aria-disabled")).toBe("true");
       expect(btn.attributes("disabled")).toBeUndefined();
-      expect(wrapper.find(REASON).text()).toContain("Selection must start with a navigate step");
+      expect(wrapper.find(REASON).text()).toContain("Select steps that are next to each other");
 
       await btn.trigger("click");
       await flushPromises();
@@ -1253,6 +1274,7 @@ describe("CreateBrowserTest", () => {
       await flushPromises();
 
       expect(mockServiceCreate).toHaveBeenCalledTimes(1);
+      expect(monitorListInvalidations()).toBe(1);
       // The payload builder is identity here, so the child check itself is what is posted.
       expect(mockServiceCreate).toHaveBeenCalledWith(
         "default",
@@ -1346,6 +1368,8 @@ describe("CreateBrowserTest", () => {
       expect(mockServiceCreate).toHaveBeenCalledTimes(1);
       expect(mockServiceDelete).toHaveBeenCalledTimes(1);
       expect(mockServiceDelete).toHaveBeenCalledWith("default", "new-check-1", "folder-2");
+      // One from the create mutation, one after the rollback delete.
+      expect(monitorListInvalidations()).toBe(2);
       expect(dialogStub(wrapper).props("open")).toBe(true);
       expect(mockToast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
       expect(mockToast).toHaveBeenCalledWith(

@@ -14104,7 +14104,6 @@
         "orphan": "« {name} » a été créé mais ce parcours n'a pas pu être mis à jour. Ouvrez le nouveau test ou supprimez-le.",
         "reason": {
           "contains-subtest": "Un sous-test ne peut pas contenir un autre sous-test",
-          "no-navigate-first": "La sélection doit commencer par une étape de navigation",
           "not-contiguous": "Sélectionnez des étapes contiguës",
           "not-contiguous-filtered": "Sélectionnez des étapes contiguës — effacez le filtre pour voir la liste complète",
           "referenced": "Ce test est utilisé comme sous-test par d'autres tests et ne peut pas en contenir un",
@@ -14117,6 +14116,7 @@
         "steps": "Étape {first} · commence à {path} | Étapes {first} – {last} · commence à {path}",
         "subtitle": "Les étapes passent dans un nouveau test navigateur, créé maintenant. Ce parcours garde une référence de sous-test à leur place — enregistrez ce test pour la conserver.",
         "thisTest": "{authored} étapes après extraction · exécute les mêmes {executed} étapes",
+        "thisTestAuthored": "{authored} étapes après extraction",
         "title": "Extraire {count} étape vers un nouveau test | Extraire {count} étapes vers un nouveau test",
         "unit": {
           "hours": "heure | heures",
@@ -14133,13 +14133,16 @@
         "capTitle": "Ce test exécute {total} étapes — la limite est {limit}.",
         "delta": "Ajouter « {name} » fait passer ce test de {before} → {after} étapes exécutées. La limite est {limit}.",
         "deltaUnknown": "Impact en étapes inconnu — un test référencé n'a pas pu être chargé.",
-        "failedAt": "{number} — {child} › {step}",
+        "failedAt": "{number} — {step}",
         "ignoredEnv": "Son URL de départ, ses variables, son authentification et ses cookies sont ignorés ici — ceux du parent s'appliquent.",
         "lastRun": "Sa dernière exécution a pris {seconds}s sur les {budget}s alloués.",
         "lastRunUnknown": "Impact en temps inconnu — ce test n'a pas encore terminé d'exécution.",
         "noAccess": "Vous n'avez pas accès à « {name} », ses étapes ne peuvent donc pas être affichées ici.",
         "noAccessBadge": "pas d'accès",
         "noAccessRemedy": "Demandez l'accès en lecture à son dossier, ou supprimez la référence.",
+        "disabledTooltip": "Les sous-tests ne sont pas activés sur ce déploiement.",
+        "loadFailed": "Impossible de charger ce sous-test : ses étapes et leur nombre sont inconnus.",
+        "missing": "Ce sous-test n’existe plus. Supprimez la référence ou choisissez un autre test.",
         "noAccessToast": "Vous n'avez pas accès à l'un des tests que ce test référence.",
         "notRun": "Non exécuté",
         "openChild": "Ouvrir « {name} »",
@@ -14148,12 +14151,15 @@
         "pickLastRun": "{status} {ago}",
         "pickLoadFailed": "Impossible de charger la liste des tests navigateur. Réessayez.",
         "pickNested": "Contient déjà un sous-test — l'imbrication est limitée à un niveau",
-        "pickSteps": "{count} étapes",
+        "pickGroupUsable": "Utilisable ici",
+        "pickGroupBlocked": "Non utilisable ici",
+        "pickSteps": "{count} étape | {count} étapes",
         "pickUsedBy": "Utilisé par {count} test | Utilisé par {count} tests",
         "previewLabel": "Étapes exécutées ici",
         "progressAria": "{done} sous-étapes sur {total} terminées",
         "raiseBudget": "Augmentez le temps d'exécution alloué à ce test s'il commence à être interrompu.",
-        "stepsBadge": "{count} étapes",
+        "stepsBadge": "{count} étape | {count} étapes",
+        "executedBadge": "{count} exécutées",
         "undefinedVariable": "« {name} » utilise {variable}, que ce test ne définit pas.",
         "undefinedVariableAction": "L'ajouter dans Variables"
       }
@@ -14709,6 +14715,8 @@
       "statusUp": "✓ Opérationnel",
       "steps": "Étapes",
       "stepsCount": "{count} étape(s)",
+      "subtestMissing": "Sous-test manquant",
+      "subtestNested": "Le sous-test contient un sous-test",
       "testName": "Nom du test",
       "timeout": "Timeout",
       "trigger": "Déclencher",
@@ -14884,7 +14892,7 @@
     "save": {
       "blockedBody": "L'enregistrement n'a pas abouti. Supprimez d'abord ces références, puis enregistrez à nouveau.",
       "usedByBody": "Vos modifications s'appliquent à tous lors de leur prochaine exécution.",
-      "usedByTitle": "« {name} » est utilisé par {count} autres tests"
+      "usedByTitle": "« {name} » est utilisé par {count} autre test | « {name} » est utilisé par {count} autres tests"
     }
   },
   "statusPages": {

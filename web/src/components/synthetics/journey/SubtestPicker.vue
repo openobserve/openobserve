@@ -18,7 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import { computed, onMounted, ref } from "vue";
 import { useStore } from "vuex";
 import { formatDistanceToNowStrict } from "date-fns";
-import { raw, useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import syntheticsService from "@/services/synthetics";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
@@ -69,7 +69,9 @@ interface ListRow {
   last_check_at?: number | null;
 }
 
-const listOptions = ref<SelectOption[]>([]);
+const usableOptions = ref<SelectOption[]>([]);
+/** Tests that already hold a subtest: listed so the author sees why, never pickable. */
+const blockedOptions = ref<SelectOption[]>([]);
 const isLoading = ref(true);
 /** True only once the list has loaded and holds no other browser test. */
 const isEmpty = ref(false);
@@ -77,10 +79,17 @@ const isEmpty = ref(false);
 const options = computed<SelectOption[]>(() => {
   const saved = props.modelValue;
   const name = saved?.name ?? props.fallbackName;
-  if (!saved || !name || listOptions.value.some((o) => o.value === saved.id)) {
-    return listOptions.value;
-  }
-  return [{ label: raw(name), value: saved.id }, ...listOptions.value];
+  const listed = [...usableOptions.value, ...blockedOptions.value].some(
+    (o) => o.value === saved?.id,
+  );
+  const seeded = saved && name && !listed ? [{ label: raw(name), value: saved.id }] : [];
+  return [
+    ...optionGroup(t("synthetics.journey.subtest.pickGroupUsable"), [
+      ...seeded,
+      ...usableOptions.value,
+    ]),
+    ...optionGroup(t("synthetics.journey.subtest.pickGroupBlocked"), blockedOptions.value),
+  ];
 });
 const childSteps = ref<number | null>(null);
 const lastRunSeconds = ref<number | null>(null);
@@ -89,7 +98,7 @@ const lastRunSeconds = ref<number | null>(null);
 function rowOption(r: ListRow): SelectOption {
   const folders = store.state.organizationData?.foldersByType?.synthetics ?? [];
   const steps =
-    r.steps != null ? t("synthetics.journey.subtest.pickSteps", { count: r.steps }) : "";
+    r.steps != null ? t("synthetics.journey.subtest.pickSteps", { count: r.steps }, r.steps) : "";
   const usedByCount = r.referenced_by ?? 0;
   const usedBy =
     usedByCount > 0
@@ -112,6 +121,11 @@ function rowOption(r: ListRow): SelectOption {
   };
 }
 
+/** A header row, then its rows; an empty group renders nothing, not a lone header. */
+function optionGroup(label: I18nText, rows: SelectOption[]): SelectOption[] {
+  return rows.length ? [{ label, header: true }, ...rows] : [];
+}
+
 onMounted(async () => {
   try {
     // undefined omits ?folder= so every folder is listed: references are cross-folder by design.
@@ -120,11 +134,13 @@ onMounted(async () => {
       (r) => r.type === "browser" && r.id !== props.ownCheckId,
     );
     // Nesting is one level deep, so a check that already holds a reference is shown but not pickable.
-    listOptions.value = rows.map((r) =>
-      (r.references ?? 0) > 0
-        ? { ...rowOption(r), disabled: true, subLabel: t("synthetics.journey.subtest.pickNested") }
-        : rowOption(r),
-    );
+    const holdsSubtest = (r: ListRow) => (r.references ?? 0) > 0;
+    usableOptions.value = rows.filter((r) => !holdsSubtest(r)).map(rowOption);
+    blockedOptions.value = rows.filter(holdsSubtest).map((r) => ({
+      ...rowOption(r),
+      disabled: true,
+      subLabel: t("synthetics.journey.subtest.pickNested"),
+    }));
     isEmpty.value = rows.length === 0;
   } catch (err) {
     console.error("[synthetics] failed to load browser tests for the subtest picker", err);

@@ -664,6 +664,51 @@ describe("BrowserJourneyStepEditor subtest action", () => {
     },
   );
 
+  it("keeps the subtest action for a row that already holds a reference while composition is off", () => {
+    store.state.zoConfig.synthetics_subtests_enabled = false;
+    try {
+      const w = render({ action: "subtest", subtest: { id: "login-test" } });
+      const values = w
+        .findComponent(OSelect)
+        .props("options")
+        .map((o: { value: string }) => o.value);
+      expect(values).toContain("subtest");
+    } finally {
+      store.state.zoConfig.synthetics_subtests_enabled = true;
+    }
+  });
+
+  const pick = async (w: ReturnType<typeof render>, picked: { id: string; name: string }) => {
+    await w.findComponent(SubtestPicker).vm.$emit("update:modelValue", picked);
+    return w.emitted("update:step")!.at(-1)![0] as BrowserStep;
+  };
+
+  it("replaces a name that still names the earlier child on a re-pick", async () => {
+    const w = render({ action: "subtest", name: "Login", subtest: { id: "a", name: "Login" } });
+    const next = await pick(w, { id: "b", name: "Checkout" });
+    expect(next.name).toBe("Checkout");
+    expect(next.subtest).toEqual({ id: "b", name: "Checkout" });
+
+    // A stored `{ id }` reference names its child through the host's cache.
+    const stored = render(
+      { action: "subtest", name: "Login", subtest: { id: "a" } },
+      { childName: "Login" },
+    );
+    expect((await pick(stored, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
+  it("keeps a name the author wrote on a re-pick, and fills an empty one", async () => {
+    const w = render({
+      action: "subtest",
+      name: "Sign in first",
+      subtest: { id: "a", name: "Login" },
+    });
+    expect((await pick(w, { id: "b", name: "Checkout" })).name).toBe("Sign in first");
+
+    const empty = render({ action: "subtest", name: "", subtest: undefined });
+    expect((await pick(empty, { id: "b", name: "Checkout" })).name).toBe("Checkout");
+  });
+
   it("renders the subtest picker only for a subtest step, in place of the target/value/advanced blocks", () => {
     const w = render({ action: "subtest", subtest: { id: "login-test" } });
     expect(w.find(test("synthetics-journey-step-subtest-picker")).exists()).toBe(true);

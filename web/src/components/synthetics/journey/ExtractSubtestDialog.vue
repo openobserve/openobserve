@@ -23,7 +23,11 @@ import type {
   SyntheticsFolder,
   SyntheticsLocation,
 } from "@/types/synthetics";
-import { seedChildName, type ExtractedChildSplit } from "@/utils/synthetics/buildExtractedChild";
+import {
+  extractedStartingUrl,
+  seedChildName,
+  type ExtractedChildSplit,
+} from "@/utils/synthetics/buildExtractedChild";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
 import { useOForm } from "@/lib/forms/Form/useOForm";
@@ -48,6 +52,7 @@ const props = defineProps<{
   authoredCount: number;
   executedCount?: number;
   parentName: string;
+  parentStartingUrl: string;
   defaultFolder: string;
   folders: SyntheticsFolder[];
   needsSchedule: boolean;
@@ -135,7 +140,7 @@ function onUpdateOpen(value: boolean) {
 }
 
 const startPath = computed(() => {
-  const value = props.range[0]?.value ?? "";
+  const value = extractedStartingUrl(props.range, props.parentStartingUrl);
   try {
     return new URL(value).pathname;
   } catch {
@@ -151,12 +156,13 @@ const stepsLine = computed(() =>
   ),
 );
 
-const thisTestLine = computed(() =>
-  t("synthetics.journey.extract.thisTest", {
-    authored: props.authoredCount - count.value + 1,
-    executed: props.executedCount,
-  }),
-);
+const thisTestLine = computed(() => {
+  const authored = props.authoredCount - count.value + 1;
+  if (props.executedCount === undefined) {
+    return t("synthetics.journey.extract.thisTestAuthored", { authored });
+  }
+  return t("synthetics.journey.extract.thisTest", { authored, executed: props.executedCount });
+});
 
 // Only the interval shapes the locale can phrase; a cron or day-based parent shows no row rather than a wrong one.
 const summarisableSchedule = computed(() => {
@@ -231,10 +237,8 @@ const scheduleLine = computed(() => {
       <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
         <dt class="text-text-secondary">{{ t("synthetics.journey.steps") }}</dt>
         <dd class="text-text-body m-0">{{ stepsLine }}</dd>
-        <template v-if="executedCount !== undefined">
-          <dt class="text-text-secondary">{{ t("synthetics.journey.extract.labelThisTest") }}</dt>
-          <dd class="text-text-body m-0">{{ thisTestLine }}</dd>
-        </template>
+        <dt class="text-text-secondary">{{ t("synthetics.journey.extract.labelThisTest") }}</dt>
+        <dd class="text-text-body m-0">{{ thisTestLine }}</dd>
         <template v-if="!needsSchedule && summarisableSchedule">
           <dt class="text-text-secondary">{{ t("synthetics.scheduleAlert.schedule") }}</dt>
           <dd class="text-text-body m-0">{{ scheduleLine }}</dd>

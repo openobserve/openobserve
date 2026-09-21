@@ -109,6 +109,7 @@ function mountDialog(props: Record<string, unknown> = {}) {
       authoredCount: 7,
       executedCount: 11,
       parentName: "Checkout",
+      parentStartingUrl: "https://shop.test/home",
       defaultFolder: "folder-2",
       folders,
       needsSchedule: false,
@@ -281,6 +282,18 @@ describe("ExtractSubtestDialog", () => {
     await nextTick();
     expect(wrapper.emitted("update:open")).toHaveLength(settled + 1);
     expect(wrapper.emitted("update:open")![settled]).toEqual([false]);
+  });
+
+  it("starts a click-first range at the parent's Starting URL", () => {
+    wrapper = mountDialog({ range: [range[1]] });
+    expect(wrapper.text()).toContain("Step 4 · starts at /home");
+  });
+
+  it("omits the executed half of the this-test line while the count is unknown", () => {
+    wrapper = mountDialog({ executedCount: undefined });
+    expect(wrapper.text()).toContain("6 steps after extraction");
+    expect(wrapper.text()).not.toContain("runs the same");
+    expect(wrapper.text()).not.toContain("undefined");
   });
 
   it("uses the singular title for a one-step range", () => {

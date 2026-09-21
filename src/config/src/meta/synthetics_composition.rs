@@ -224,6 +224,53 @@ mod tests {
 
     use super::*;
 
+    // Byte-identical twin of the constant in web `utils/synthetics/compositionContract.spec.ts`.
+    const COMPOSITION_CONTRACT: &str = r##"{
+  "child": [
+    { "id": "c1", "action": "navigate", "name": "Open login", "url": "https://{{HOST}}/login" },
+    { "id": "c2", "action": "fill", "name": "Email", "value": "{{ USER }}", "locator": { "candidates": [{ "kind": "css", "value": "#email" }] } },
+    { "id": "c3", "action": "select", "name": "Region", "value": "{{REGION}}", "locator": { "candidates": [{ "kind": "css", "value": "#region" }] } },
+    { "id": "c4", "action": "press", "name": "Submit key", "key": "{{KEY}}", "locator": { "candidates": [{ "kind": "css", "value": "#password" }] } },
+    { "id": "c5", "action": "click", "locator": { "candidates": [{ "kind": "css", "value": "#go" }] } },
+    { "id": "c6", "action": "hover", "name": "Menu", "locator": { "candidates": [{ "kind": "css", "value": "#menu" }] } },
+    { "id": "c7", "action": "check", "name": "Remember", "locator": { "candidates": [{ "kind": "css", "value": "#remember" }] } },
+    { "id": "c8", "action": "uncheck", "name": "Newsletter", "locator": { "candidates": [{ "kind": "css", "value": "#news" }] } },
+    { "id": "c9", "action": "upload", "name": "Avatar", "files": ["/tmp/{{FILE}}.png"], "locator": { "candidates": [{ "kind": "css", "value": "#avatar" }] } },
+    { "id": "c10", "action": "assert", "name": "{{IGNORED}} banner", "locator": { "candidates": [{ "kind": "css", "value": "#banner" }] }, "assertion": { "kind": "element_visible" } }
+  ],
+  "parent": [
+    { "id": "p1", "action": "navigate", "name": "Home", "url": "https://app.test/" },
+    { "id": "p2", "action": "subtest", "name": "Log in (shared)", "subtest": { "id": "login-test" } },
+    { "id": "p3", "action": "subtest", "subtest": { "id": "login-test" } },
+    { "id": "p4", "action": "click", "name": "Logs", "locator": { "candidates": [{ "kind": "css", "value": "#logs" }] } }
+  ],
+  "placeholders": ["HOST", "KEY", "REGION", "USER"],
+  "expanded": [
+    ["p1", "Home"],
+    ["p2_c1", "Log in (shared) › Open login"],
+    ["p2_c2", "Log in (shared) › Email"],
+    ["p2_c3", "Log in (shared) › Region"],
+    ["p2_c4", "Log in (shared) › Submit key"],
+    ["p2_c5", "Log in (shared) › step"],
+    ["p2_c6", "Log in (shared) › Menu"],
+    ["p2_c7", "Log in (shared) › Remember"],
+    ["p2_c8", "Log in (shared) › Newsletter"],
+    ["p2_c9", "Log in (shared) › Avatar"],
+    ["p2_c10", "Log in (shared) › {{IGNORED}} banner"],
+    ["p3_c1", "Login › Open login"],
+    ["p3_c2", "Login › Email"],
+    ["p3_c3", "Login › Region"],
+    ["p3_c4", "Login › Submit key"],
+    ["p3_c5", "Login › step"],
+    ["p3_c6", "Login › Menu"],
+    ["p3_c7", "Login › Remember"],
+    ["p3_c8", "Login › Newsletter"],
+    ["p3_c9", "Login › Avatar"],
+    ["p3_c10", "Login › {{IGNORED}} banner"],
+    ["p4", "Logs"]
+  ]
+}"##;
+
     fn nav(id: &str) -> serde_json::Value {
         json!({ "id": id, "action": "navigate", "url": "https://example.com" })
     }
@@ -411,5 +458,26 @@ mod tests {
         let steps = [json!({ "id": "a", "action": "fill", "value": "{{x {{HOST}}" })];
         let found: Vec<String> = placeholders_in(&steps).into_iter().collect();
         assert_eq!(found, ["HOST"]);
+    }
+
+    #[test]
+    fn the_web_contract_scans_and_expands_like_the_editor() {
+        let contract: Value = serde_json::from_str(COMPOSITION_CONTRACT).unwrap();
+        let steps = |key: &str| contract[key].as_array().unwrap().clone();
+        let child = steps("child");
+        let found: Vec<String> = placeholders_in(&child).into_iter().collect();
+        assert_eq!(json!(found), contract["placeholders"]);
+        let login = ChildJourney {
+            id: "login-test".into(),
+            name: "Login".into(),
+            steps: child,
+        };
+        let map = HashMap::from([("login-test".to_string(), login)]);
+        let expanded: Vec<Value> = expand_steps(&steps("parent"), &map)
+            .unwrap()
+            .iter()
+            .map(|s| json!([s["id"], s["name"]]))
+            .collect();
+        assert_eq!(Value::Array(expanded), contract["expanded"]);
     }
 }

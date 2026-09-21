@@ -16,6 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { saveMonitorMutation } from "@/services/synthetics.queries";
+import { syntheticsKeys } from "@/services/synthetics.querykeys";
 import { useOrgId } from "@/composables/query/useOrgId";
 import { useMutation } from "@tanstack/vue-query";
 import { destinationsQuery } from "@/services/alert_destination.queries";
@@ -42,7 +43,8 @@ import type {
   ReplayResponse,
 } from "@/types/synthetics";
 import useSyntheticsRecorder from "@/composables/useSyntheticsRecorder";
-import { journeyToWireSteps, mapWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { journeyToWireSteps } from "@/utils/synthetics/mapRecordedStep";
+import { fetchChildJourney } from "@/utils/synthetics/fetchChildJourney";
 import type { WireStep } from "@/types/synthetics";
 import { buildResolvedGrouped } from "@/components/synthetics/variables/resolved";
 import {
@@ -552,10 +554,16 @@ const childrenCache = ref<Map<string, ChildJourney>>(new Map());
 /** Child ids the prefetch was refused (403) — the journey marks them without a second GET. */
 const refusedChildIds = ref<Set<string>>(new Set());
 
+/** Child ids the prefetch found deleted (404), with the same life cycle as `refusedChildIds`. */
+const missingChildIds = ref<Set<string>>(new Set());
+
 /** The saved check's run-time allowance; undefined in create mode means the server default. */
 const journeyBudgetMs = ref<number | undefined>();
 
-const variableNames = computed(() => check.value.variables?.map((v) => v.name.trim()));
+/** Every name a `{{placeholder}}` can resolve to: the server accepts variables and secrets alike. */
+const definedNames = computed(() =>
+  [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
+);
 
 /**
  * Composed-child-id → authored-row map for the run currently on screen — set by
@@ -615,7 +623,7 @@ watch(
   subtestIdsSignature,
   async () => {
     try {
-      const loaded = await loadChildren(check.value.journey, fetchChildJourney);
+      const loaded = await loadChildren(check.value.journey, loadChild);
       for (const [id, child] of loaded) childrenCache.value.set(id, child);
     } catch (err) {
       console.error("[synthetics] failed to load referenced check(s)", err);
@@ -1072,9 +1080,7 @@ const extractEligibilityResult = computed<ExtractEligibility>(() =>
     selectedIds: new Set(journeySelectionState.value.ids),
     filterActive: journeyRef.value?.filterActive ?? false,
     referencedBy: props.editId ? referencedByState.value : "none",
-    definedNames: new Set(
-      [...(check.value.variables ?? []), ...(check.value.secrets ?? [])].map((v) => v.name.trim()),
-    ),
+    definedNames: new Set(definedNames.value),
   }),
 );
 const extractRange = computed(() =>
@@ -1114,11 +1120,10 @@ async function onExtractSubmit(values: ExtractForm) {
   });
   let id: string;
   try {
-    const res = await syntheticsService.create(
-      org,
-      buildCreateBrowserTestPayload(child),
-      values.folder,
-    );
+    const res = await saveMonitor.mutateAsync({
+      payload: buildCreateBrowserTestPayload(child),
+      folderId: values.folder,
+    });
     id = res.data.id;
   } catch (err) {
     throw extractCreateError(err, values.folder);
@@ -1143,6 +1148,8 @@ async function onExtractSubmit(values: ExtractForm) {
         message: t("synthetics.journey.extract.orphan", { name: child.name }),
       });
     });
+    // The create's own invalidation already ran, so the list would keep the deleted child.
+    await queryClient.invalidateQueries({ queryKey: syntheticsKeys.monitorsAll(org) });
     throw err;
   }
   // The length watcher misses a one-step range, whose splice keeps the length.
@@ -1372,7 +1379,7 @@ async function runReplay(journey: BrowserStep[]) {
   let expanded = journey;
   expansionMap.value = undefined;
   try {
-    const children = await loadChildren(journey, fetchChildJourney);
+    const children = await loadChildren(journey, loadChild);
     const result = expandJourney(journey, children);
     expanded = result.steps;
     expansionMap.value = result.map;
@@ -1394,26 +1401,24 @@ function startReplay(steps: WireStep[]) {
     });
 }
 
-/** Reuses the shared cache before hitting the network — see `childrenCache` doc. */
-async function fetchChildJourney(id: string): Promise<ChildJourney> {
-  const cached = childrenCache.value.get(id);
-  if (cached) return cached;
-  const res = await syntheticsService.get(orgIdentifier.value, id).catch((err: any) => {
-    if (err?.response?.status === 403) {
-      refusedChildIds.value = new Set([...refusedChildIds.value, id]);
-    }
-    throw err;
-  });
-  const child: ChildJourney = {
-    id,
-    name: res.data.name ?? "",
-    folderId: res.data.folder_id,
-    steps: mapWireSteps(res.data.config?.steps ?? []),
-  };
-  // A reference re-added after access was granted must not stay "no access".
-  refusedChildIds.value = new Set([...refusedChildIds.value].filter((r) => r !== id));
-  childrenCache.value.set(id, child);
-  return child;
+/** The `loadChildren` fetcher: throws on failure, after recording a refusal or a deletion for the rows. */
+async function loadChild(id: string): Promise<ChildJourney> {
+  const result = await fetchChildJourney(orgIdentifier.value, id, childrenCache.value);
+  const failure = result.ok ? undefined : result.failure;
+  // A reference re-added after access was granted, or the child restored, must not keep its mark.
+  refusedChildIds.value = withMember(refusedChildIds.value, id, failure === "refused");
+  missingChildIds.value = withMember(missingChildIds.value, id, failure === "missing");
+  if (!result.ok) throw result.error;
+  return result.child;
+}
+
+/** The same Set when membership already matches, so no dependent re-renders for nothing. */
+function withMember(set: Set<string>, id: string, member: boolean): Set<string> {
+  if (set.has(id) === member) return set;
+  const next = new Set(set);
+  if (member) next.add(id);
+  else next.delete(id);
+  return next;
 }
 
 function onOpenChild(child: ChildJourney) {
@@ -1645,10 +1650,11 @@ function onClearResults() {
                     :own-check-id="check.id"
                     :own-step-count="executedStepCount"
                     :journey-budget-ms="journeyBudgetMs"
-                    :variable-names="variableNames"
+                    :defined-names="definedNames"
                     :variables="check.variables"
                     :children-cache="childrenCache"
                     :refused-child-ids="refusedChildIds"
+                    :missing-child-ids="missingChildIds"
                     :expansion-map="expansionMap"
                     class="h-full!"
                     @update:start-url="
@@ -1875,6 +1881,7 @@ function onClearResults() {
           :authored-count="check.journey.length"
           :executed-count="executedStepCount"
           :parent-name="check.name"
+          :parent-starting-url="check.url"
           :default-folder="check.folder ?? 'default'"
           :folders="folders"
           :needs-schedule="check.locations.length === 0"

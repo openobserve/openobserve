@@ -14104,7 +14104,6 @@
         "orphan": "\"{name}\" wurde erstellt, aber diese Journey konnte nicht aktualisiert werden. Öffnen Sie den neuen Test oder löschen Sie ihn.",
         "reason": {
           "contains-subtest": "Ein Subtest kann keinen weiteren Subtest enthalten",
-          "no-navigate-first": "Die Auswahl muss mit einem Navigationsschritt beginnen",
           "not-contiguous": "Wählen Sie direkt aufeinanderfolgende Schritte aus",
           "not-contiguous-filtered": "Wählen Sie direkt aufeinanderfolgende Schritte aus — entfernen Sie den Filter, um die vollständige Liste zu sehen",
           "referenced": "Dieser Test wird von anderen Tests als Subtest verwendet und kann selbst keinen enthalten",
@@ -14117,6 +14116,7 @@
         "steps": "Schritt {first} · beginnt bei {path} | Schritte {first} – {last} · beginnt bei {path}",
         "subtitle": "Die Schritte wandern in einen neuen Browser-Test, der jetzt erstellt wird. Diese Journey behält an ihrer Stelle einen Subtest-Verweis — speichern Sie diesen Test, um ihn zu behalten.",
         "thisTest": "{authored} Schritte nach dem Extrahieren · führt dieselben {executed} Schritte aus",
+        "thisTestAuthored": "{authored} Schritte nach dem Extrahieren",
         "title": "{count} Schritt in einen neuen Test extrahieren | {count} Schritte in einen neuen Test extrahieren",
         "unit": {
           "hours": "Stunde | Stunden",
@@ -14133,13 +14133,16 @@
         "capTitle": "Dieser Test führt {total} Schritte aus — das Limit ist {limit}.",
         "delta": "Mit \"{name}\" steigt dieser Test von {before} → {after} ausgeführten Schritten. Das Limit ist {limit}.",
         "deltaUnknown": "Schritt-Auswirkung unbekannt — ein referenzierter Test konnte nicht geladen werden.",
-        "failedAt": "{number} — {child} › {step}",
+        "failedAt": "{number} — {step}",
         "ignoredEnv": "Seine Start-URL, Variablen, Authentifizierung und Cookies werden hier ignoriert — es gelten die des übergeordneten Tests.",
         "lastRun": "Sein letzter Lauf dauerte {seconds}s von den erlaubten {budget}s.",
         "lastRunUnknown": "Zeitliche Auswirkung unbekannt — dieser Test hat noch keinen Lauf abgeschlossen.",
         "noAccess": "Sie haben keinen Zugriff auf \"{name}\", daher können seine Schritte hier nicht angezeigt werden.",
         "noAccessBadge": "kein Zugriff",
         "noAccessRemedy": "Bitten Sie um Lesezugriff auf seinen Ordner, oder entfernen Sie den Verweis.",
+        "disabledTooltip": "Subtests sind in dieser Bereitstellung nicht aktiviert.",
+        "loadFailed": "Dieser Subtest konnte nicht geladen werden, daher sind seine Schritte und die Schrittanzahl unbekannt.",
+        "missing": "Dieser Subtest existiert nicht mehr. Entfernen Sie die Referenz oder wählen Sie einen anderen Test.",
         "noAccessToast": "Sie haben keinen Zugriff auf einen der Tests, auf die dieser Test verweist.",
         "notRun": "Nicht ausgeführt",
         "openChild": "\"{name}\" öffnen",
@@ -14148,12 +14151,15 @@
         "pickLastRun": "{status} {ago}",
         "pickLoadFailed": "Die Liste der Browser-Tests konnte nicht geladen werden. Versuchen Sie es erneut.",
         "pickNested": "Enthält bereits einen Subtest — Verschachtelung ist auf eine Ebene begrenzt",
-        "pickSteps": "{count} Schritte",
+        "pickGroupUsable": "Hier verwendbar",
+        "pickGroupBlocked": "Hier nicht verwendbar",
+        "pickSteps": "{count} Schritt | {count} Schritte",
         "pickUsedBy": "Von {count} Test verwendet | Von {count} Tests verwendet",
         "previewLabel": "Schritte, die hier ausgeführt werden",
         "progressAria": "{done} von {total} Unterschritten abgeschlossen",
         "raiseBudget": "Erhöhen Sie das Laufzeit-Budget dieses Tests, falls er abgebrochen wird.",
-        "stepsBadge": "{count} Schritte",
+        "stepsBadge": "{count} Schritt | {count} Schritte",
+        "executedBadge": "{count} ausgeführt",
         "undefinedVariable": "\"{name}\" verwendet {variable}, das dieser Test nicht definiert.",
         "undefinedVariableAction": "Unter Variablen hinzufügen"
       }
@@ -14709,6 +14715,8 @@
       "statusUp": "✓ Online",
       "steps": "Schritte",
       "stepsCount": "{count} Schritte",
+      "subtestMissing": "Subtest fehlt",
+      "subtestNested": "Subtest enthält einen Subtest",
       "testName": "Testname",
       "timeout": "Zeitüberschreitung",
       "trigger": "Auslösen",
@@ -14884,7 +14892,7 @@
     "save": {
       "blockedBody": "Das Speichern wurde nicht übernommen. Entfernen Sie zuerst diese Verweise und speichern Sie erneut.",
       "usedByBody": "Ihre Änderungen gelten für alle beim nächsten Lauf.",
-      "usedByTitle": "\"{name}\" wird von {count} anderen Tests verwendet"
+      "usedByTitle": "\"{name}\" wird von {count} anderen Test verwendet | \"{name}\" wird von {count} anderen Tests verwendet"
     }
   },
   "statusPages": {

@@ -53,6 +53,12 @@ export function splitVariablesForChild(
   };
 }
 
+/** A navigate-first range opens its own page; any other range starts where the parent starts. */
+export function extractedStartingUrl(range: BrowserStep[], parentUrl: string): string {
+  const first = range[0];
+  return first?.action === "navigate" && first.value ? first.value : parentUrl;
+}
+
 /** Built field by field: `buildCreateBrowserTestPayload` spreads the rest, so a parent spread would leak. */
 export function buildExtractedChildCheck(input: ExtractedChildInput): BrowserCheck {
   const { parent, range, name, folder, locations, schedule } = input;
@@ -63,7 +69,7 @@ export function buildExtractedChildCheck(input: ExtractedChildInput): BrowserChe
     folder,
     locations: [...locations],
     schedule: { ...schedule, startType: "now" },
-    url: range[0]?.value ?? "",
+    url: extractedStartingUrl(range, parent.url),
     journey: range.map((s) => ({ ...s, id: getUUIDv7(true), wire: undefined })),
     enabled: false,
     retries: parent.retries,

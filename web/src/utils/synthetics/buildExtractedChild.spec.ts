@@ -135,6 +135,16 @@ describe("buildExtractedChildCheck", () => {
     expect(config.browser_devices).toEqual([{ browser: "firefox", device: "mobile" }]);
   });
 
+  it("takes the Starting URL from a navigate-first range", () => {
+    expect(buildExtractedChildCheck(input()).url).toBe("https://app.test/login");
+  });
+
+  it("takes the parent's Starting URL for a range that does not start with a navigate", () => {
+    const child = buildExtractedChildCheck(input({ range: range.slice(1) }));
+    expect(child.url).toBe("https://app.test");
+    expect(child.journey.map((s) => s.name)).toEqual(["Email", "Password"]);
+  });
+
   it("gives every copied step a fresh id", () => {
     const child = buildExtractedChildCheck(input());
     const ids = child.journey.map((s) => s.id);

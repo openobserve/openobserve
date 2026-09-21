@@ -27,7 +27,6 @@ const REFERENCED_REASON: Record<Exclude<ReferencedByState, "none">, ExtractReaso
 export type ExtractReason =
   | "not-contiguous"
   | "not-contiguous-filtered"
-  | "no-navigate-first"
   | "contains-subtest"
   | "referenced"
   | "referenced-pending"
@@ -58,7 +57,6 @@ export function extractEligibility(input: ExtractEligibilityInput): ExtractEligi
     return { ok: false, reason: filterActive ? "not-contiguous-filtered" : "not-contiguous" };
   }
   const range = steps.slice(anchor, anchor + indices.length);
-  if (range[0].action !== "navigate") return { ok: false, reason: "no-navigate-first" };
   if (range.some((s) => s.action === "subtest")) return { ok: false, reason: "contains-subtest" };
   if (referencedBy !== "none") return { ok: false, reason: REFERENCED_REASON[referencedBy] };
   const missing = placeholdersIn(range).find((name) => !definedNames.has(name));
