@@ -188,6 +188,15 @@ export class AlertsPage {
             cloneStreamName: '[data-test="to-be-clone-stream-name"]',
             cloneSubmitButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-primary-btn"]',
             cloneCancelButton: '[data-test="alert-list-form-dialog"] [data-test="o-dialog-secondary-btn"]',
+            // Not `cloneDialog`: _exposeLocators() copies every key onto the page
+            // object, so a locator sharing a method's name silently replaces it.
+            cloneFormDialog: '[data-test="alert-list-form-dialog"]',
+            cloneAlertNameField: '[data-test="to-be-clone-alert-name-field"]',
+            cloneStreamTypeOption: '[data-test="to-be-clone-stream-type-option"][data-test-value="{streamType}"]',
+            cloneFolderPicker: '[data-test="alert-list-form-dialog"] [data-test="alerts-index-dropdown-stream_type"]',
+            cloneFolderOption: '[data-test="alerts-index-dropdown-stream_type-option"][data-test-value="{folderId}"]',
+            selectTrigger: '[data-test$="-trigger"]',
+            toastMessage: '[data-test="o-toast-message"]',
             pauseStartAlert: '[data-test="alert-list-{alertName}-pause-start-alert"]',
 
             // Alert management locators
@@ -808,8 +817,44 @@ export class AlertsPage {
         return this.management.updateAlert(alertName);
     }
 
-    async cloneAlert(alertName, streamType, streamName) {
-        return this.management.cloneAlert(alertName, streamType, streamName);
+    async cloneAlert(alertName, streamType, streamName, options = {}) {
+        return this.management.cloneAlert(alertName, streamType, streamName, options);
+    }
+
+    cloneDialog() {
+        return this.management.cloneDialog();
+    }
+
+    async openCloneDialog(alertName) {
+        return this.management.openCloneDialog(alertName);
+    }
+
+    cloneSaveButton() {
+        return this.management.cloneSaveButton();
+    }
+
+    async fillCloneName(name) {
+        return this.management.fillCloneName(name);
+    }
+
+    async submitCloneDialog() {
+        return this.management.submitCloneDialog();
+    }
+
+    async cancelCloneDialog() {
+        return this.management.cancelCloneDialog();
+    }
+
+    async selectCloneStreamType(streamType) {
+        return this.management.selectCloneStreamType(streamType);
+    }
+
+    rowEnableToggle(alertName) {
+        return this.management.rowEnableToggle(alertName);
+    }
+
+    toastWithText(text) {
+        return this.management.toastWithText(text);
     }
 
     async pauseAlert(alertName) {

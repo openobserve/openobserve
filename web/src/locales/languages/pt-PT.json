@@ -3568,6 +3568,12 @@
     "joinSlack": "Participe do Slack",
     "maybeLater": "Talvez mais tarde"
   },
+  "connectDataSourcePopup": {
+    "title": "Para começar, vamos conectar a sua primeira fonte de dados.",
+    "description": "Temos muito para lhe mostrar, mas primeiro precisamos de conectar os seus dados. A maioria das equipas vê os primeiros logs em cerca de um minuto.",
+    "connectButton": "Conectar uma fonte de dados",
+    "slackLink": "Participe também da nossa comunidade no Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continuar de onde pausou",
     "startFromNow": "Começar a partir de agora.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Payload do evento",
       "payloadIndex": "O campo {field} seleciona o stream. Eventos sem ele vão para o stream {stream}.",
       "payloadTime": "O campo {field} está em segundos epoch, e um valor fracionário é aceito. Quando ele está ausente ou não é positivo, o horário de recebimento é usado.",
+      "windowTitle": "Os carimbos de data/hora fora da janela de ingestão são descartados",
+      "windowBody": "Os eventos mais antigos do que {past} (5 horas por predefinição) ou mais à frente do que {future} (24 horas por predefinição) são descartados, e o pedido responde mesmo assim com o código 0, porque um cliente Splunk não repete após um erro. Um carimbo de data/hora fixo ou desatualizado parece, assim, um envio bem-sucedido que não armazena nada.",
       "payloadMetadata": "Os campos {fields} são armazenados como colunas no evento.",
       "healthTitle": "Verificação de integridade",
       "healthBody": "Uma requisição GET não exige autenticação e responde {response}.",
@@ -16467,13 +16475,10 @@
       "columnMemory": "Memória (atual)",
       "columnDisk": "Disco % (atual)",
       "columnLoad": "Carga 15m (atual)",
+      "columnCores": "Núcleos",
       "columnLastSeen": "Visto por último",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Painel Host Metrics",
-      "importConfirmTitle": "Adicionar o painel Host Metrics?",
-      "importConfirmMessage": "Você ainda não tem este painel. Ao adicioná-lo, será criado um painel chamado 'Host Metrics' na sua pasta Padrão, que será aberto para este host.",
-      "importConfirmOk": "Adicionar e abrir",
-      "importConfirmCancel": "Cancelar",
+      "loadPerCore": "({value}/núcleo)",
       "windowsLivenessNote": "Os hosts Windows aparecem nesta lista apenas quando o agente reporta a métrica de carga (system_cpu_load_average_15m) — se seus agentes Windows estão em execução mas ausentes aqui, habilite o scraper de carga na configuração do coletor ou atualize o agente.",
       "panel": {
         "cpuBusy": "CPU ocupada",

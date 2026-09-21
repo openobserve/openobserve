@@ -3568,6 +3568,12 @@
     "joinSlack": "Sluit je aan bij de Slack",
     "maybeLater": "Misschien later"
   },
+  "connectDataSourcePopup": {
+    "title": "Laten we om te beginnen je eerste gegevensbron verbinden.",
+    "description": "We hebben veel te laten zien, maar eerst moeten we je gegevens verbinden. De meeste teams zien hun eerste logs binnen ongeveer een minuut.",
+    "connectButton": "Een gegevensbron verbinden",
+    "slackLink": "Sluit je ook aan bij onze Slack-community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Doorgaan vanaf waar het pauzeerde",
     "startFromNow": "Vanaf nu starten.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Gebeurtenis-payload",
       "payloadIndex": "Het veld {field} selecteert de stream. Gebeurtenissen zonder dit veld gaan naar de stream {stream}.",
       "payloadTime": "Het veld {field} is epochseconden, en een fractionele waarde wordt geaccepteerd. Als het ontbreekt of niet positief is, wordt de ontvangsttijd gebruikt.",
+      "windowTitle": "Tijdstempels buiten het inname-venster worden verwijderd",
+      "windowBody": "Gebeurtenissen ouder dan {past} (standaard 5 uur) of verder vooruit dan {future} (standaard 24 uur) worden verwijderd, en het verzoek antwoordt toch met code 0 omdat een Splunk-client een fout niet opnieuw probeert. Een hardcoded of verouderd tijdstempel lijkt daardoor op een geslaagde verzending die niets opslaat.",
       "payloadMetadata": "De velden {fields} worden als kolommen op de gebeurtenis opgeslagen.",
       "healthTitle": "Healthcheck",
       "healthBody": "Een GET-verzoek vereist geen authenticatie en antwoordt met {response}.",
@@ -16467,13 +16475,10 @@
       "columnMemory": "Geheugen (huidig)",
       "columnDisk": "Schijf % (huidig)",
       "columnLoad": "Load 15m (huidig)",
+      "columnCores": "Kernen",
       "columnLastSeen": "Laatst gezien",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Dashboard Hostmetrieken",
-      "importConfirmTitle": "Het dashboard Hostmetrieken toevoegen?",
-      "importConfirmMessage": "Je hebt dit dashboard nog niet. Als je het toevoegt, wordt een dashboard met de naam 'Host Metrics' aangemaakt in je map Default en daarna voor deze host geopend.",
-      "importConfirmOk": "Toevoegen en openen",
-      "importConfirmCancel": "Annuleren",
+      "loadPerCore": "({value}/kern)",
       "windowsLivenessNote": "Windows-hosts verschijnen alleen in deze lijst wanneer de agent de loadmetriek (system_cpu_load_average_15m) rapporteert — als je Windows-agents draaien maar hier ontbreken, schakel dan de load-scraper in de collectorconfiguratie in of werk de agent bij.",
       "panel": {
         "cpuBusy": "CPU bezet",
