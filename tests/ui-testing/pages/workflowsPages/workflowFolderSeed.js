@@ -66,8 +66,7 @@ async function deleteDestination(page, name) {
 function workflowPayload(
   name,
   destName,
-  description = 'folder automation workflow',
-  triggerKind = 'alert_fired',
+  { description = 'folder automation workflow', triggerKind = 'alert_fired' } = {},
 ) {
   const triggerType = TRIGGER_TYPE_BY_KIND[triggerKind];
   if (!triggerType) {
@@ -118,7 +117,7 @@ async function createWorkflow(
   const qs = params.toString() ? `?${params}` : '';
   const resp = await page.request.post(`${api()}/${getOrgIdentifier()}/workflows${qs}`, {
     headers: getAuthHeaders(),
-    data: workflowPayload(name, destName, 'folder automation workflow', triggerKind),
+    data: workflowPayload(name, destName, { triggerKind }),
   });
   const body = await jsonOrThrow(resp, `create workflow "${name}"`);
   return { id: body.id, name: name.trim().toLowerCase() };
