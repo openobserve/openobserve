@@ -16,6 +16,7 @@
 use std::fmt;
 
 use error::ErrorData;
+use redaction::RedactionEvidence;
 use tokio::{
     sync::{mpsc, oneshot},
     time,
@@ -26,6 +27,7 @@ pub mod error;
 pub mod evaluator;
 pub mod llm_experiments;
 pub mod llm_scores;
+pub mod redaction;
 pub mod usage;
 
 #[derive(Debug)]
@@ -45,6 +47,7 @@ pub enum ReportingData {
     Usage(Box<UsageData>),
     Trigger(Box<TriggerData>),
     Error(Box<ErrorData>),
+    Redaction(Box<RedactionEvidence>),
 }
 
 /// Error type for enqueue operations with timeout
@@ -92,6 +95,7 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
         };
 
         log::trace!(
@@ -133,6 +137,7 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
         };
 
         match self
@@ -176,6 +181,7 @@ impl ReportingQueue {
             ReportingData::Usage(_) => "Usage",
             ReportingData::Trigger(_) => "Trigger",
             ReportingData::Error(_) => "Error",
+            ReportingData::Redaction(_) => "Redaction",
         };
 
         log::trace!(
@@ -951,28 +957,34 @@ mod tests {
         runner.push(ReportingData::Usage(Box::new(usage_data)));
         runner.push(ReportingData::Trigger(Box::new(trigger_data)));
         runner.push(ReportingData::Error(Box::new(error_data)));
+        runner.push(ReportingData::Redaction(Box::new(
+            RedactionEvidence::init_for_reflection(),
+        )));
 
-        assert_eq!(runner.pending.len(), 3);
+        assert_eq!(runner.pending.len(), 4);
 
         let batch = runner.take_batch();
-        assert_eq!(batch.len(), 3);
+        assert_eq!(batch.len(), 4);
 
-        // Verify we have all three types
+        // Verify we have all four types
         let mut usage_count = 0;
         let mut trigger_count = 0;
         let mut error_count = 0;
+        let mut redaction_count = 0;
 
         for data in batch {
             match data {
                 ReportingData::Usage(_) => usage_count += 1,
                 ReportingData::Trigger(_) => trigger_count += 1,
                 ReportingData::Error(_) => error_count += 1,
+                ReportingData::Redaction(_) => redaction_count += 1,
             }
         }
 
         assert_eq!(usage_count, 1);
         assert_eq!(trigger_count, 1);
         assert_eq!(error_count, 1);
+        assert_eq!(redaction_count, 1);
     }
 
     #[tokio::test]

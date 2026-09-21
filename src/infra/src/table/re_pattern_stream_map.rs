@@ -28,6 +28,40 @@ pub enum PatternPolicy {
     DropField,
     Redact,
     Hash,
+    Detect,
+}
+
+impl PatternPolicy {
+    /// Strict parse for write paths; the lossy `From` stays for reads of existing rows.
+    pub fn parse_strict(value: &str) -> Result<Self, UnknownPolicy> {
+        Self::parse_strict_with(value, config::get_config().common.sdr_detect_policy_enabled)
+    }
+
+    /// False means the lossy read silently coerced this stored value to `Redact`.
+    pub fn is_recognised(value: &str) -> bool {
+        matches!(value, "DropField" | "Redact" | "Hash" | "Detect")
+    }
+
+    fn parse_strict_with(value: &str, detect_enabled: bool) -> Result<Self, UnknownPolicy> {
+        match value {
+            "DropField" => Ok(Self::DropField),
+            "Redact" => Ok(Self::Redact),
+            "Hash" => Ok(Self::Hash),
+            // The gate is advisory: propagation to other nodes bypasses this check entirely.
+            "Detect" if detect_enabled => Ok(Self::Detect),
+            "Detect" => Err(UnknownPolicy {
+                value: value.to_string(),
+                hint: Some(
+                    "the Detect policy requires ZO_SDR_DETECT_POLICY_ENABLED=true on every node"
+                        .to_string(),
+                ),
+            }),
+            _ => Err(UnknownPolicy {
+                value: value.to_string(),
+                hint: None,
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -35,6 +69,21 @@ pub enum ApplyPolicy {
     AtIngestion,
     AtSearch,
     Both,
+}
+
+impl ApplyPolicy {
+    /// Strict parse for write paths; the lossy `From` stays for reads of existing rows.
+    pub fn parse_strict(value: &str) -> Result<Self, UnknownPolicy> {
+        match value {
+            "AtIngestion" => Ok(Self::AtIngestion),
+            "AtSearch" => Ok(Self::AtSearch),
+            "Both" => Ok(Self::Both),
+            _ => Err(UnknownPolicy {
+                value: value.to_string(),
+                hint: None,
+            }),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,9 +118,27 @@ impl std::fmt::Display for PatternPolicy {
             Self::DropField => write!(f, "DropField"),
             Self::Redact => write!(f, "Redact"),
             Self::Hash => write!(f, "Hash"),
+            Self::Detect => write!(f, "Detect"),
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownPolicy {
+    pub value: String,
+    pub hint: Option<String>,
+}
+
+impl std::fmt::Display for UnknownPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.hint {
+            Some(hint) => write!(f, "unsupported value {:?}: {hint}", self.value),
+            None => write!(f, "unsupported value {:?}", self.value),
+        }
+    }
+}
+
+impl std::error::Error for UnknownPolicy {}
 
 impl<T> From<T> for ApplyPolicy
 where
@@ -215,6 +282,8 @@ pub async fn list_all() -> Result<Vec<PatternAssociationEntry>, errors::Error> {
 
     let records = Entity::find().into_model::<Model>().all(client).await?;
 
+    log_unrecognised_policies(&records);
+
     let records = records
         .into_iter()
         .map(<Model as Into<PatternAssociationEntry>>::into)
@@ -253,6 +322,33 @@ pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
         .exec(client)
         .await?;
     Ok(())
+}
+
+/// A downgrade silently applies an unknown policy as `Redact` and rewrites live data,
+/// so the load says so loudly. Returns the number of rows affected.
+fn log_unrecognised_policies(records: &[Model]) -> usize {
+    let unrecognised: Vec<&Model> = records
+        .iter()
+        .filter(|record| !PatternPolicy::is_recognised(&record.policy))
+        .collect();
+    if unrecognised.is_empty() {
+        return 0;
+    }
+    for record in &unrecognised {
+        log::error!(
+            "[SDR] association {}/{}/{} field {} has policy {:?}, which this build does not recognise; it is being applied as Redact and will rewrite data",
+            record.org,
+            record.stream_type,
+            record.stream,
+            record.field,
+            record.policy
+        );
+    }
+    log::error!(
+        "[SDR] {} pattern association(s) carry an unrecognised policy; delete or convert them before running this build",
+        unrecognised.len()
+    );
+    unrecognised.len()
 }
 
 #[cfg(test)]
@@ -359,5 +455,102 @@ mod tests {
         let entry = PatternAssociationEntry::from(model);
         assert_eq!(entry.policy, PatternPolicy::DropField);
         assert_eq!(entry.apply_at, ApplyPolicy::Both);
+    }
+
+    #[test]
+    fn test_pattern_policy_parse_strict_accepts_known_values() {
+        for policy in [
+            PatternPolicy::DropField,
+            PatternPolicy::Redact,
+            PatternPolicy::Hash,
+        ] {
+            assert_eq!(
+                PatternPolicy::parse_strict(&policy.to_string()).unwrap(),
+                policy
+            );
+        }
+    }
+
+    #[test]
+    fn test_pattern_policy_parse_strict_rejects_typos_and_wrong_case() {
+        for value in ["Hashh", "", "redact", "DROPFIELD", "Unknown"] {
+            assert!(PatternPolicy::parse_strict(value).is_err(), "{value}");
+        }
+    }
+
+    #[test]
+    fn test_pattern_policy_parse_strict_detect_follows_the_flag() {
+        assert_eq!(
+            PatternPolicy::parse_strict_with("Detect", true).unwrap(),
+            PatternPolicy::Detect
+        );
+        let err = PatternPolicy::parse_strict_with("Detect", false).unwrap_err();
+        assert!(err.to_string().contains("ZO_SDR_DETECT_POLICY_ENABLED"));
+    }
+
+    #[test]
+    fn test_pattern_policy_from_detect_is_lossy_and_config_independent() {
+        assert_eq!(PatternPolicy::from("Detect"), PatternPolicy::Redact);
+    }
+
+    #[test]
+    fn test_pattern_policy_display_detect() {
+        assert_eq!(PatternPolicy::Detect.to_string(), "Detect");
+    }
+
+    #[test]
+    fn test_pattern_policy_is_recognised() {
+        for value in ["DropField", "Redact", "Hash", "Detect"] {
+            assert!(PatternPolicy::is_recognised(value), "{value}");
+        }
+        for value in ["", "redact", "Hashh"] {
+            assert!(!PatternPolicy::is_recognised(value), "{value}");
+        }
+    }
+
+    #[test]
+    fn test_unrecognised_policies_are_counted_on_load() {
+        let row = |policy: &str| Model {
+            id: 1,
+            org: "org".to_string(),
+            stream: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            field: "message".to_string(),
+            pattern_id: "p1".to_string(),
+            policy: policy.to_string(),
+            apply_at: "AtIngestion".to_string(),
+        };
+
+        assert_eq!(log_unrecognised_policies(&[]), 0);
+        assert_eq!(
+            log_unrecognised_policies(&[row("Redact"), row("Hash"), row("Detect")]),
+            0
+        );
+        // A build without the Detect variant sees exactly this shape.
+        assert_eq!(
+            log_unrecognised_policies(&[row("Redact"), row("SomeFuturePolicy")]),
+            1
+        );
+        assert_eq!(
+            log_unrecognised_policies(&[row("SomeFuturePolicy"), row("AnotherOne")]),
+            2
+        );
+    }
+
+    #[test]
+    fn test_apply_policy_parse_strict() {
+        for policy in [
+            ApplyPolicy::AtIngestion,
+            ApplyPolicy::AtSearch,
+            ApplyPolicy::Both,
+        ] {
+            assert_eq!(
+                ApplyPolicy::parse_strict(&policy.to_string()).unwrap(),
+                policy
+            );
+        }
+        for value in ["", "atingestion", "AtIngestionn"] {
+            assert!(ApplyPolicy::parse_strict(value).is_err(), "{value}");
+        }
     }
 }

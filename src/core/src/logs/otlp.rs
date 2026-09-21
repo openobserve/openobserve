@@ -746,6 +746,15 @@ pub async fn handle_request(
             }
             Err(e) => {
                 log::error!("[LOGS:OTLP] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Logs,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
             }
         }
     }

@@ -123,6 +123,17 @@ pub(crate) async fn process(msg: Message) -> Result<()> {
                         return Ok(());
                     }
 
+                    // Node-to-node, not user input: rejecting here would wedge the queue.
+                    for item in update.add.iter() {
+                        if !PatternPolicy::is_recognised(&item.policy) {
+                            log::warn!(
+                                "[SUPER_CLUSTER:DB] unrecognised policy {:?} for {org}/{stype}/{stream} field {}; applying it as Redact",
+                                item.policy,
+                                item.field
+                            );
+                        }
+                    }
+
                     let added = update
                         .add
                         .clone()

@@ -167,6 +167,8 @@ pub async fn process_association_changes(
         return Ok(());
     }
 
+    validate_associations_to_add(org, stream, stype, &update.add)?;
+
     let mgr = get_pattern_manager().await?;
 
     // An unknown id is caller input, so it must not surface as a server error.
@@ -391,6 +393,38 @@ pub async fn watch_pattern_associations() -> Result<(), anyhow::Error> {
             _ => {}
         }
     }
+}
+
+/// Validates only the add list: rejecting a bad value on the remove list would make an
+/// existing bad row undeletable, and an edit arrives as old-in-remove plus new-in-add.
+fn validate_associations_to_add(
+    org: &str,
+    stream: &str,
+    stype: StreamType,
+    add: &[PatternAssociation],
+) -> Result<(), errors::Error> {
+    for item in add.iter() {
+        let policy = PatternPolicy::parse_strict(&item.policy).map_err(|e| {
+            errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams(format!(
+                "invalid policy for field {}: {e}",
+                item.field
+            )))
+        })?;
+        ApplyPolicy::parse_strict(&item.apply_at).map_err(|e| {
+            errors::Error::ErrorCode(errors::ErrorCodes::InvalidParams(format!(
+                "invalid apply_at for field {}: {e}",
+                item.field
+            )))
+        })?;
+        if policy == PatternPolicy::Detect {
+            log::warn!(
+                "[SDR] accepting Detect association for {org}/{stype}/{stream} field {} pattern {}; this propagates cluster-wide and a node without Detect support coerces it to Redact",
+                item.field,
+                item.pattern_id
+            );
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

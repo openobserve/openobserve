@@ -112,6 +112,13 @@ fn is_blocked_internal_rollup_write(
     is_internal_rollup_stream(stream_name) && !is_derived && matches!(user, IngestUser::User(_))
 }
 
+/// False for every system-job write, not just self-reporting: gRPC relabels a
+/// self-reporting ingest as `InternalGrpc`, so a narrower guard never fires on a router.
+#[cfg(any(feature = "vectorscan", test))]
+fn should_apply_sdr(user: &IngestUser) -> bool {
+    !matches!(user, IngestUser::SystemJob(_))
+}
+
 pub async fn ingest(
     thread_id: usize,
     org_id: &str,
@@ -126,8 +133,27 @@ pub async fn ingest(
     let cfg = config::get_config();
     let need_usage_report = in_req.should_report_usage();
     let log_ingestion_errors = ingestion_log_enabled().await;
+    // This path fails closed, unlike the OTLP and traces sites; the row says which applied.
     #[cfg(feature = "vectorscan")]
-    let pattern_manager = get_pattern_manager().await?;
+    let pattern_manager = match get_pattern_manager().await {
+        Ok(manager) => manager,
+        // A system-job write emitting its own evidence here would feed itself forever.
+        Err(e) if !should_apply_sdr(&user) => return Err(e.into()),
+        Err(e) => {
+            crate::self_reporting::redaction_evidence::publish_scan_unavailable(
+                &config::meta::self_reporting::redaction::EvidenceScope::new(
+                    org_id,
+                    in_stream_name,
+                    StreamType::Logs,
+                ),
+                config::meta::self_reporting::redaction::FailPosture::Closed,
+                0,
+                config::meta::self_reporting::redaction::DataWindow::default(),
+            )
+            .await;
+            return Err(e.into());
+        }
+    };
     let stream_type = StreamType::Logs;
 
     // check stream
@@ -617,7 +643,7 @@ pub async fn ingest(
     drop(user_defined_schema_map);
 
     #[cfg(feature = "vectorscan")]
-    {
+    if should_apply_sdr(&user) {
         for (stream, data) in json_data_by_stream.iter_mut() {
             match pattern_manager.process_at_ingestion(
                 org_id,
@@ -1496,6 +1522,28 @@ mod tests {
             &user,
             true
         ));
+    }
+
+    #[test]
+    fn test_should_apply_sdr_exempts_every_system_job() {
+        // InternalGrpc is the case a SelfReporting-only guard would miss, because
+        // the gRPC handler relabels a self-reporting write with that identity.
+        for job in [
+            SystemJobType::InternalGrpc,
+            SystemJobType::SelfReporting,
+            SystemJobType::SelfMetricsPromql,
+            SystemJobType::ServiceGraph,
+            SystemJobType::AnomalyDetection,
+        ] {
+            assert!(!should_apply_sdr(&IngestUser::SystemJob(job)));
+        }
+    }
+
+    #[test]
+    fn test_should_apply_sdr_scans_user_writes() {
+        assert!(should_apply_sdr(&IngestUser::User(
+            "someone@example.com".to_string()
+        )));
     }
 
     #[test]

@@ -2260,6 +2260,18 @@ pub struct Common {
     )]
     pub regex_patterns_source_url: String,
     #[env_config(
+        name = "ZO_SDR_DETECT_POLICY_ENABLED",
+        default = false,
+        help = "Allow the Detect (count-only) redaction policy. EVERY node in the cluster must ALREADY run a build that understands Detect before enabling this. An older node coerces Detect to Redact and rewrites data irreversibly, and the coercion propagates cluster-wide within seconds. Before rolling back to a build without Detect, delete or convert every Detect association first."
+    )]
+    pub sdr_detect_policy_enabled: bool,
+    #[env_config(
+        name = "ZO_SDR_EVIDENCE_HEARTBEAT_INTERVAL",
+        default = 300,
+        help = "Seconds between redaction-evidence heartbeat rows per (org, stream). A heartbeat records that scanning was active even when nothing matched."
+    )]
+    pub sdr_evidence_heartbeat_interval: u64,
+    #[env_config(
         name = "ZO_MODEL_PRICING_ENABLED",
         default = true,
         help = "Enable user-defined model pricing. When true, uses DB pricing definitions and syncs from GitHub. When false, falls back to hardcoded built-in pricing only."

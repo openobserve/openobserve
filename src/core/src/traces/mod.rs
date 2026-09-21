@@ -1124,6 +1124,15 @@ pub async fn handle_otlp_request(
             }
             Err(e) => {
                 log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
             }
         }
     }
@@ -1479,6 +1488,15 @@ pub async fn ingest_json(
             }
             Err(e) => {
                 log::error!("[TRACES] failed to get pattern manager for SDR redaction: {e}");
+                crate::self_reporting::redaction_evidence::publish_scan_unavailable_for_streams(
+                    org_id,
+                    StreamType::Traces,
+                    json_data_by_stream
+                        .iter()
+                        .map(|(stream, data)| (stream.as_str(), data.0.as_slice())),
+                    config::meta::self_reporting::redaction::FailPosture::Open,
+                )
+                .await;
             }
         }
     }
