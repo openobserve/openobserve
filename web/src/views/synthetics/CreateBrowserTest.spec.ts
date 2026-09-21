@@ -418,6 +418,17 @@ describe("CreateBrowserTest", () => {
 
       expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
+
+    // Stored names are always upper-case, so a camelCase example can never resolve.
+    it("should show an upper-case placeholder example under the Starting URL", async () => {
+      wrapper = mountPage();
+      await flushPromises();
+
+      const hint = wrapper.find('[data-test="synthetics-create-url-hint"]').text();
+      expect(hint).toContain("{{variables}}");
+      expect(hint).toContain("{{BASE_URL}}");
+      expect(hint).not.toContain("{{baseUrl}}");
+    });
   });
 
   describe("extension setup phase", () => {

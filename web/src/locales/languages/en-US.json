@@ -13482,7 +13482,7 @@
     "variables": {
       "newButton": "New Variable",
       "createTitle": "Add Variable",
-      "created": "Variable created",
+      "created": "Variable {name} created",
       "deleteConfirm": "Delete {name}?",
       "deleteFailed": "Could not delete the variable",
       "deleteTitle": "Delete variable",

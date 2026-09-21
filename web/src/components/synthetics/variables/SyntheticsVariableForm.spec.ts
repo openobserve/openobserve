@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { shallowMount, VueWrapper } from "@vue/test-utils";
+import { flushPromises, mount, shallowMount, VueWrapper } from "@vue/test-utils";
 import i18n from "@/locales";
 
 const confirmMock = vi.fn();
@@ -37,6 +37,7 @@ vi.mock("@/services/synthetics", () => ({
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 import { nextTick } from "vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
@@ -51,6 +52,22 @@ function mountForm(props: Record<string, unknown> = {}) {
       stubs: {
         ODrawer: { template: "<div><slot /></div>" },
         OForm: { template: "<form><slot /></form>" },
+      },
+    },
+  }) as VueWrapper;
+}
+
+// Real OForm + OFormInput so typing drives the field the way a user does.
+function mountFormWithInputs(props: Record<string, unknown> = {}) {
+  return mount(SyntheticsVariableForm, {
+    props: { open: true, ...props },
+    global: {
+      plugins: [i18n],
+      provide: { store: { state: { selectedOrganization: { identifier: "default" } } } },
+      stubs: {
+        ODrawer: { template: "<div><slot /></div>" },
+        OFormSelect: { template: "<div />", props: ["name", "options", "disabled", "hint"] },
+        OBanner: { template: "<div><slot /></div>", props: ["variant"] },
       },
     },
   }) as VueWrapper;
@@ -236,5 +253,56 @@ describe("SyntheticsVariableForm — saving an edit", () => {
     await (wrapper.vm as any).save({ name: "TOKEN", kind: "secret", value: "" });
 
     expect(updateEnvVar.mock.calls[0][3]).not.toHaveProperty("value");
+  });
+});
+
+describe("SyntheticsVariableForm — the name is upper-case from the first keystroke", () => {
+  let wrapper: VueWrapper;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    confirmMock.mockResolvedValue(true);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const nameInput = () => wrapper.find('[data-test="synthetics-variable-name-input"] input');
+
+  it("shows MY_URL in the Name input after typing my_url", async () => {
+    wrapper = mountFormWithInputs({ environment: "staging" });
+    await nameInput().setValue("my_url");
+    await flushPromises();
+
+    expect((nameInput().element as HTMLInputElement).value).toBe("MY_URL");
+  });
+
+  it("submitting the typed form sends the upper-cased name", async () => {
+    wrapper = mountFormWithInputs({ environment: "staging" });
+    await nameInput().setValue("my_url");
+    await wrapper.find('[data-test="synthetics-variable-value-input"] input').setValue("x");
+    await wrapper.find("form").trigger("submit");
+    await vi.waitFor(() => expect(createEnvVar).toHaveBeenCalledTimes(1));
+
+    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "MY_URL" });
+  });
+
+  it("save() sends the upper-cased name even when handed a lower-case one", async () => {
+    wrapper = mountForm({ environment: "staging" });
+    await (wrapper.vm as any).save({ name: "my_url", kind: "plain", value: "x" });
+
+    expect(createEnvVar).toHaveBeenCalledTimes(1);
+    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "MY_URL" });
+  });
+
+  it("the create toast names the stored (upper-cased) variable", async () => {
+    wrapper = mountForm({ environment: "staging" });
+    await (wrapper.vm as any).save({ name: "my_url", kind: "plain", value: "x" });
+
+    expect(toast).toHaveBeenCalledTimes(1);
+    const message = String(vi.mocked(toast).mock.calls[0][0].message);
+    expect(message).toContain("MY_URL");
+    expect(message).not.toContain("my_url");
   });
 });

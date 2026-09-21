@@ -110,12 +110,9 @@ const journeySplitterLimits = computed<[number, number]>(() =>
   variablesPanelOpen.value ? VARIABLES_SPLITTER_LIMITS : [100, 100],
 );
 
-// Computed literals to avoid `{{` template delimiter conflicts in Vue templates.
-// The i18n message "Supports {variables} like {baseUrl}." uses these params to
-// show literal "{{variables}}" and "{{baseUrl}}" as user-facing syntax examples.
 const variablesHintParams = computed(() => ({
   variables: "{{variables}}",
-  baseUrl: "{{baseUrl}}",
+  baseUrl: "{{BASE_URL}}",
 }));
 
 // Three top-level phases:
@@ -1037,7 +1034,7 @@ function onClearResults() {
               <OIcon name="link" size="sm" />
             </template>
           </OInput>
-          <small class="mt-1 block">{{
+          <small class="mt-1 block" data-test="synthetics-create-url-hint">{{
             t("synthetics.createBrowserTest.variablesHint", variablesHintParams)
           }}</small>
         </div>

@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <OForm
       id="synthetics-variable-form"
+      ref="formRef"
       :schema="schema"
       :default-values="defaults"
       @submit="save"
@@ -52,6 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isEdit"
         required
         data-test="synthetics-variable-name-input"
+        @update:model-value="upperCaseName"
       />
 
       <OFormSelect
@@ -103,7 +105,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch } from "vue";
+import { computed, defineComponent, nextTick, ref, watch } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
@@ -150,6 +152,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
+    const formRef = ref<InstanceType<typeof OForm> | null>(null);
     const replacing = ref(false);
     const kindValue = ref<"plain" | "secret">("plain");
 
@@ -187,6 +190,21 @@ export default defineComponent({
         }
       },
     );
+
+    // The server stores every name upper-cased, so show the stored spelling while typing.
+    async function upperCaseName(value: unknown) {
+      const upper = String(value ?? "").toUpperCase();
+      if (upper === value) return;
+      const el = document.activeElement;
+      const focused = el instanceof HTMLInputElement && el.name === "name" ? el : null;
+      const caret = [focused?.selectionStart ?? null, focused?.selectionEnd ?? null] as const;
+      // The field's own change handler runs after this listener, so defer past it.
+      await nextTick();
+      formRef.value?.form.setFieldValue("name", upper);
+      await nextTick();
+      // Rewriting the value drops the caret to the end, so put it back where the user was.
+      if (focused && caret[0] !== null) focused.setSelectionRange(caret[0], caret[1]);
+    }
 
     function onKindChange(kind: unknown) {
       kindValue.value = kind === "secret" ? "secret" : "plain";
@@ -229,7 +247,7 @@ export default defineComponent({
         .toUpperCase();
       if (!(await acknowledgeShadow(normalized))) return;
       const payload: SyntheticsVariablePayload = {
-        name: String(values.name ?? ""),
+        name: normalized,
         kind: (values.kind as "plain" | "secret") ?? "plain",
         example: String(values.example ?? ""),
         description: String(values.description ?? ""),
@@ -257,7 +275,7 @@ export default defineComponent({
           variant: "success",
           message: props.isEdit
             ? t("synthetics.variables.updated")
-            : t("synthetics.variables.created"),
+            : t("synthetics.variables.created", { name: normalized }),
         });
       } catch (error: unknown) {
         toast({
@@ -269,6 +287,7 @@ export default defineComponent({
 
     return {
       t,
+      formRef,
       schema,
       defaults,
       kindOptions,
@@ -277,6 +296,7 @@ export default defineComponent({
       updatedRelative,
       handleClose,
       onKindChange,
+      upperCaseName,
       save,
     };
   },
