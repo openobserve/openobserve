@@ -960,11 +960,6 @@ export default defineComponent({
         if (response.list.length == 0) {
           store.dispatch("setIsDataIngested", false);
           if (isEmptyDataExempt(router.currentRoute.value)) return;
-          toast({
-            variant: "warning",
-            message: t("toastMessages.layouts.ingestionNotStarted"),
-            timeout: 5000,
-          });
           router.push({ name: "ingestion" });
         } else {
           store.dispatch("setIsDataIngested", true);
