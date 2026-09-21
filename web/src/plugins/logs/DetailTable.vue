@@ -20,6 +20,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex shrink-0 items-center justify-between">
       <div class="-mb-0.75 flex items-center gap-2">
         <OTabs v-model="tab" align="left" reorderable @reorder="onTabReorder">
+          <!-- Host-injected leading tabs (e.g. Insights) shown before the built-in tabs. -->
+          <OTab
+            v-for="lt in leadingTabs"
+            :key="lt.name"
+            :data-test="lt.dataTest"
+            :name="lt.name"
+            :label="lt.label"
+            :icon="lt.icon"
+          />
           <!-- Correlation tabs are only present when service streams are enabled
                and an enterprise license is active; see availableTabs. -->
           <OTab
@@ -87,6 +96,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         grow
         :class="tab.startsWith('correlated-') ? 'overflow-hidden!' : 'overflow-y-auto!'"
       >
+        <OTabPanel v-for="lt in leadingTabs" :key="lt.name" :name="lt.name">
+          <slot :name="`panel-${lt.name}`" />
+        </OTabPanel>
         <OTabPanel name="json">
           <OCardSection data-test="log-detail-json-content" class="px-page-edge mb-6 pt-2">
             <JsonPreview
@@ -95,6 +107,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               mode="sidebar"
               hide-view-related
               hide-view-trace
+              :hide-search-term-actions="embedded"
+              :hide-add-field-to-table="embedded"
               :highlight-query="highlightQuery"
               :should-wrap-values="shouldWrapValues"
               @copy="copyContentToClipboard"
@@ -192,7 +206,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <template #icon-left><NotEqualIcon class="size-2.5" /></template>
                         {{ t("common.excludeSearchTerm") }}
                       </ODropdownItem>
-                      <template v-if="row.field !== store.state.zoConfig.timestamp_column">
+                      <template
+                        v-if="row.field !== store.state.zoConfig.timestamp_column && !embedded"
+                      >
                         <ODropdownItem
                           v-if="
                             !searchObj.data.stream.selectedFields.includes(row.field.toString())
@@ -402,10 +418,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OTabPanels>
     </div>
 
-    <!-- Navigation buttons for log details (show only on JSON/Table tabs) -->
-    <OSeparator v-if="tab === 'json' || tab === 'table'" />
+    <!-- Navigation buttons for log details (show only on JSON/Table tabs; hidden when embedded) -->
+    <OSeparator v-if="!embedded && (tab === 'json' || tab === 'table')" />
     <OCardSection
-      v-if="tab === 'json' || tab === 'table'"
+      v-if="!embedded && (tab === 'json' || tab === 'table')"
       class="px-page-edge bg-dialog-bg sticky bottom-0 z-10 py-4"
     >
       <div class="flex flex-nowrap items-center justify-between max-md:flex-wrap max-md:gap-2">
@@ -465,7 +481,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { defineComponent, ref, reactive, onBeforeMount, computed, watch } from "vue";
+import { defineComponent, ref, reactive, onBeforeMount, computed, watch, type PropType } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -582,6 +598,19 @@ export default defineComponent({
     initialTab: {
       type: String,
       default: "json",
+    },
+    // Host-injected leading tabs (e.g. an Insights tab) rendered before JSON via a
+    // `#panel-<name>` slot; lets a consumer present one unified tab bar when embedded.
+    leadingTabs: {
+      type: Array as PropType<
+        Array<{ name: string; label: any; dataTest?: string; icon?: string }>
+      >,
+      default: () => [],
+    },
+    // Embedded mode: the host owns navigation, so hide the built-in prev/next footer.
+    embedded: {
+      type: Boolean,
+      default: false,
     },
   },
   methods: {

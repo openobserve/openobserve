@@ -130,7 +130,7 @@
             {{ t("common.excludeSearchTerm") }}
           </ODropdownItem>
           <ODropdownItem
-            v-if="key !== store.state.zoConfig.timestamp_column"
+            v-if="key !== store.state.zoConfig.timestamp_column && !hideAddFieldToTable"
             data-test="log-details-add-field-btn"
             @select.stop="addFieldToTable(key)"
             icon-left="visibility"
@@ -325,6 +325,12 @@ export default {
       default: false,
     },
     hideFieldOptions: {
+      type: Boolean,
+      default: false,
+    },
+    // Hide only the "Add field to the table" action (not the whole field menu) —
+    // used where there is no logs results table to add columns to.
+    hideAddFieldToTable: {
       type: Boolean,
       default: false,
     },
