@@ -245,6 +245,7 @@
       "rum-form-validation.spec.js",
       "login-form-validation.spec.js",
       "datetime-picker-copy-paste.spec.js",
+      "splunk-hec-ingestion-window.spec.js",
       "connectDataSourcePopup.spec.js"
     ],
     "disabled": []
