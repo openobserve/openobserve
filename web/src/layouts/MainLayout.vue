@@ -1159,6 +1159,7 @@ export default defineComponent({
         dark_mode_theme_color: undefined,
         claim_parser_function: "",
         org_storage_enabled: false,
+        domain_org_mappings: [],
       };
 
       try {
@@ -1202,6 +1203,7 @@ export default defineComponent({
           cross_links: orgSettings?.data?.data?.cross_links ?? [],
           org_storage_enabled:
             orgSettings?.data?.data?.org_storage_enabled ?? defaultSettings.org_storage_enabled,
+          domain_org_mappings: orgSettings?.data?.data?.domain_org_mappings ?? [],
         });
 
         // Load the org's home dashboard (settings/v2 KV) alongside the legacy org
