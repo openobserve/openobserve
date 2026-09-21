@@ -1416,14 +1416,34 @@ async fn handle_anomaly_detection_triggers(
     if matches!(trigger_status, RunOutcome::Firing | RunOutcome::Normal) && config.is_trained {
         use o2_enterprise::enterprise::anomaly_detection::types::Status as AnomalyStatus;
         if config.status != AnomalyStatus::Active.to_i32() {
-            use sea_orm::{ActiveModelTrait, IntoActiveModel, Set};
+            use infra::table::entity::anomaly_detection_config as anomaly_entity;
+            use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
+
             let mut active = config.into_active_model();
             active.status = Set(AnomalyStatus::Active.to_i32());
             active.updated_at = Set(run_end_us);
-            if let Err(e) = active.update(db).await {
-                log::warn!(
+            // `config` was read before an arbitrarily long detection search, so a training claim
+            // (ENT scheduler `claim_for_training_inner`) may have taken the row meanwhile; without
+            // this predicate the stale Active write clears Training while the job still runs,
+            // which permanently disqualifies the row from stuck-training recovery and re-admits it
+            // to the training selection query, spawning a second concurrent training.
+            match anomaly_entity::Entity::update_many()
+                .set(active)
+                .filter(anomaly_entity::Column::AnomalyId.eq(anomaly_id.as_str()))
+                .filter(anomaly_entity::Column::Status.ne(AnomalyStatus::Training.to_i32()))
+                .exec(db)
+                .await
+            {
+                // Losing the CAS means a training holds the row; that training's own terminal
+                // transition writes the real status, and the next detect tick re-drives this.
+                Ok(res) if res.rows_affected == 0 => log::debug!(
+                    "[anomaly_detection] status not reset to Active for {anomaly_id}: a training \
+                     claim holds the row"
+                ),
+                Ok(_) => {}
+                Err(e) => log::warn!(
                     "[anomaly_detection] failed to reset status to Active for {anomaly_id}: {e}"
-                );
+                ),
             }
         }
     }
