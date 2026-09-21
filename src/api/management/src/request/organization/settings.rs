@@ -19,6 +19,7 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
+#[cfg(feature = "cloud")]
 use config::META_ORG_ID;
 use db::organization::{get_org_setting, set_org_setting};
 use infra::errors::{DbError, Error};

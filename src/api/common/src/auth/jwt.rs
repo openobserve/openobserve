@@ -834,6 +834,7 @@ async fn publish_org_not_found_error(org_id: &str, user_email: &str) {
     usage_reporting::publish_error(error_data).await;
 }
 
+#[cfg(feature = "cloud")]
 pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow::Error> {
     let meta_settings = get_org_setting(META_ORG_ID).await?;
     let mappings = meta_settings.domain_org_mappings;

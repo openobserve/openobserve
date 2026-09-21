@@ -586,6 +586,7 @@ impl Default for OrganizationSetting {
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: Vec::new(),
         }
     }
@@ -1533,6 +1534,7 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
@@ -1562,6 +1564,7 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
             domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
