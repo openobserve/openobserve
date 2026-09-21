@@ -9362,7 +9362,28 @@
     "listConjunctionAnd": "{list} 和 {last}",
     "runsIn": "运行于",
     "recommendedByFieldCoverage": "根据您的数据流中的字段覆盖率推荐。",
-    "listConjunctionAndTwo": "{first} 和 {last}"
+    "listConjunctionAndTwo": "{first} 和 {last}",
+    "domainOrgMappings": {
+      "title": "域名到组织映射",
+      "subtitle": "使用匹配邮箱域名登录的新用户将自动加入该组织。",
+      "addMapping": "添加映射",
+      "editMapping": "编辑映射",
+      "empty": "暂无映射。使用“{addLabel}”添加一个。",
+      "domain": "邮箱域名",
+      "domainHelp": "用户邮箱地址中 {at_sign} 之后的部分。",
+      "organization": "组织",
+      "organizationPlaceholder": "组织标识符",
+      "organizationHelp": "匹配用户所加入组织的标识符。",
+      "organizationRequired": "组织为必填项",
+      "baseRole": "基础角色",
+      "baseRoleHelp": "匹配用户在该组织中被赋予的角色。",
+      "userGroup": "用户组",
+      "userGroupPlaceholder": "组名称",
+      "userGroupHelp": "可选。匹配用户还会加入该组织中的此组。",
+      "duplicateDomain": "该域名的映射已存在",
+      "confirmRemove": "确定要删除 {domain} 的映射吗？",
+      "deleteTitle": "删除映射"
+    }
   },
   "reports": {
     "frequencyUnits": {

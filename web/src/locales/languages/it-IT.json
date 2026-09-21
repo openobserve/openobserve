@@ -9362,7 +9362,28 @@
     "listConjunctionAnd": "{list} e {last}",
     "runsIn": "Esecuzione in",
     "recommendedByFieldCoverage": "Consigliato in base alla copertura dei campi nei tuoi stream.",
-    "listConjunctionAndTwo": "{first} e {last}"
+    "listConjunctionAndTwo": "{first} e {last}",
+    "domainOrgMappings": {
+      "title": "Mappature da dominio a organizzazione",
+      "subtitle": "I nuovi utenti che accedono con un dominio email corrispondente vengono aggiunti automaticamente all'organizzazione.",
+      "addMapping": "Aggiungi mappatura",
+      "editMapping": "Modifica mappatura",
+      "empty": "Nessuna mappatura. Usa “{addLabel}” per aggiungerne una.",
+      "domain": "Dominio email",
+      "domainHelp": "La parte dopo {at_sign} nell'indirizzo email dell'utente.",
+      "organization": "Organizzazione",
+      "organizationPlaceholder": "Identificatore dell'organizzazione",
+      "organizationHelp": "L'identificatore dell'organizzazione a cui vengono aggiunti gli utenti corrispondenti.",
+      "organizationRequired": "L'organizzazione è obbligatoria",
+      "baseRole": "Ruolo di base",
+      "baseRoleHelp": "Il ruolo assegnato agli utenti corrispondenti in tale organizzazione.",
+      "userGroup": "Gruppo di utenti",
+      "userGroupPlaceholder": "Nome del gruppo",
+      "userGroupHelp": "Facoltativo. Gli utenti corrispondenti vengono aggiunti anche a questo gruppo in tale organizzazione.",
+      "duplicateDomain": "Esiste già una mappatura per questo dominio",
+      "confirmRemove": "Sei sicuro di voler eliminare la mappatura per {domain}?",
+      "deleteTitle": "Elimina mappatura"
+    }
   },
   "reports": {
     "frequencyUnits": {

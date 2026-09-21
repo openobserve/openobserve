@@ -9362,7 +9362,28 @@
     "listConjunctionAnd": "{list} und {last}",
     "runsIn": "Läuft in",
     "recommendedByFieldCoverage": "Empfohlen basierend auf der Feldabdeckung in Ihren Streams.",
-    "listConjunctionAndTwo": "{first} und {last}"
+    "listConjunctionAndTwo": "{first} und {last}",
+    "domainOrgMappings": {
+      "title": "Zuordnungen von Domänen zu Organisationen",
+      "subtitle": "Neue Benutzer, die sich mit einer passenden E-Mail-Domain anmelden, werden automatisch zur Organisation hinzugefügt.",
+      "addMapping": "Zuordnung hinzufügen",
+      "editMapping": "Zuordnung bearbeiten",
+      "empty": "Noch keine Zuordnungen. Verwenden Sie „{addLabel}“, um eine hinzuzufügen.",
+      "domain": "E-Mail-Domain",
+      "domainHelp": "Der Teil nach {at_sign} in der E-Mail-Adresse des Benutzers.",
+      "organization": "Organisation",
+      "organizationPlaceholder": "Organisationskennung",
+      "organizationHelp": "Die Kennung der Organisation, zu der passende Benutzer hinzugefügt werden.",
+      "organizationRequired": "Organisation ist erforderlich",
+      "baseRole": "Basisrolle",
+      "baseRoleHelp": "Die Rolle, die passende Benutzer in dieser Organisation erhalten.",
+      "userGroup": "Benutzergruppe",
+      "userGroupPlaceholder": "Gruppenname",
+      "userGroupHelp": "Optional. Passende Benutzer treten in dieser Organisation auch dieser Gruppe bei.",
+      "duplicateDomain": "Für diese Domain existiert bereits eine Zuordnung",
+      "confirmRemove": "Sind Sie sicher, dass Sie die Zuordnung für {domain} löschen möchten?",
+      "deleteTitle": "Zuordnung löschen"
+    }
   },
   "reports": {
     "frequencyUnits": {
