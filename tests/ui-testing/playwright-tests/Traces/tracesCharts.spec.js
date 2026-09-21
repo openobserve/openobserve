@@ -383,9 +383,11 @@ test.describe("Traces Charts testcases", () => {
     expect(scriptErrors, `Uncaught script errors: ${scriptErrors.join(' | ')}`).toHaveLength(0);
   });
 
-  // Skipped until o2-enterprise#2643 lands — a rejected query leaves the charts
-  // unmounted even after the editor is emptied and the search succeeds again.
-  test.skip("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
+  // Regression guard for o2-enterprise#2643: a cancelled search's late error
+  // callback used to overwrite errorMsg after a newer search already
+  // succeeded, leaving the charts unmounted forever. Fixed by guarding the
+  // error handler with the same staleness check the data handler already had.
+  test("P0: Charts return once a rejected query is cleared (o2-enterprise#2643)", {
     tag: ['@tracesCharts', '@traces', '@regression', '@P0', '@all']
   }, async ({ page }) => {
 
