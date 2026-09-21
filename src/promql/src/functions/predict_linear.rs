@@ -21,8 +21,13 @@ use datafusion::error::Result;
 use crate::{common::linear_regression, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
-pub(crate) fn predict_linear(data: Value, duration: f64, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, PredictLinearFunc::new(duration), eval_ctx)
+pub(crate) fn predict_linear(
+    data: Value,
+    duration: f64,
+    eval_ctx: &EvalContext,
+    pinned: Option<i64>,
+) -> Result<Value> {
+    super::eval_range_at(data, PredictLinearFunc::new(duration), eval_ctx, pinned)
 }
 
 pub struct PredictLinearFunc {
@@ -41,6 +46,12 @@ impl RangeFunc for PredictLinearFunc {
     }
 
     fn exec(&self, samples: &[Sample], eval_ts: i64, _range: &Duration) -> Option<f64> {
+        // Two points are the fewest a trend can be read from. One would otherwise take
+        // linear_regression's constant branch and predict a flat line from a single reading,
+        // which reads as a confident forecast rather than the absence of one.
+        if samples.len() < 2 {
+            return None;
+        }
         let (slope, intercept) = linear_regression(samples, eval_ts / 1000)?;
         Some(slope * self.duration + intercept)
     }
@@ -57,7 +68,7 @@ mod tests {
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        predict_linear(data, duration, &eval_ctx)
+        predict_linear(data, duration, &eval_ctx, None)
     }
 
     #[test]
@@ -70,6 +81,49 @@ mod tests {
     fn test_predict_linear_invalid_input_returns_err() {
         let result = predict_linear_test_helper(Value::Float(1.0), 10.0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_predict_linear_needs_two_samples_to_predict() {
+        let one_sample = RangeValue {
+            labels: Labels::default(),
+            samples: vec![Sample::new(3000, 10.0)],
+            exemplars: None,
+            time_window: Some(TimeWindow {
+                range: Duration::from_secs(2),
+                offset: Duration::ZERO,
+            }),
+        };
+        let result = predict_linear_test_helper(Value::Matrix(vec![one_sample]), 10.0).unwrap();
+
+        match result {
+            Value::Matrix(m) => assert!(
+                m.is_empty(),
+                "one reading is no trend, so there is nothing to predict"
+            ),
+            _ => panic!("Expected Matrix result"),
+        }
+    }
+
+    #[test]
+    fn test_predict_linear_describes_the_same_series_as_deriv() {
+        // Both read a trend out of the same regression, so they must agree on which series
+        // they can read one from.
+        let predict = PredictLinearFunc::new(10.0);
+        let derive = crate::functions::deriv::DerivFunc;
+        let describes = |samples: &[Sample]| {
+            (
+                predict.exec(samples, 3000, &Duration::ZERO).is_some(),
+                derive.exec(samples, 3000, &Duration::ZERO).is_some(),
+            )
+        };
+
+        assert_eq!(describes(&[]), (false, false));
+        assert_eq!(describes(&[Sample::new(3000, 10.0)]), (false, false));
+        assert_eq!(
+            describes(&[Sample::new(2000, 10.0), Sample::new(3000, 20.0)]),
+            (true, true)
+        );
     }
 
     #[test]

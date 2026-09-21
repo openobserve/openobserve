@@ -418,16 +418,28 @@ impl VarValue<'_> {
             self.len()
         };
         match self {
-            VarValue::Str(v) => format_variable_value(v.chars().take(n).collect()),
+            VarValue::Str(v) => {
+                let s = v.chars().take(n).collect::<String>();
+                if is_email {
+                    s
+                } else {
+                    format_variable_value(s)
+                }
+            }
             VarValue::JsonArray(v) => {
                 // Convert JSON values to strings
                 let strings: Vec<String> = v[0..n]
                     .iter()
                     .map(|val| {
-                        if val.is_string() {
-                            format_variable_value(val.as_str().unwrap_or("").to_string())
+                        let s = if val.is_string() {
+                            val.as_str().unwrap_or("").to_string()
                         } else {
-                            format_variable_value(val.to_string())
+                            val.to_string()
+                        };
+                        if is_email {
+                            s
+                        } else {
+                            format_variable_value(s)
                         }
                     })
                     .collect();
@@ -617,6 +629,15 @@ mod golden {
         ctx.row_columns = vec![("host".into(), vec!["web\"1".into()])];
         let out = apply_custom_template(r#"{"hosts":"{host}"}"#, &ctx, false);
         assert_eq!(out, GOLDEN_ESCAPE);
+    }
+
+    /// Email templates do not JSON-escape values: a raw quote lands literally.
+    #[test]
+    fn golden_email_escaping_not_applied_to_process_variable_replace_path() {
+        let mut ctx = fixture_ctx();
+        ctx.row_columns = vec![("host".into(), vec!["web\"1".into()])];
+        let out = apply_custom_template(r#"{"hosts":"{host}"}"#, &ctx, true);
+        assert_eq!(out, r#"{"hosts":"web"1"}"#);
     }
 
     /// The builder→renderer seam, end to end.

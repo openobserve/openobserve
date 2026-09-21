@@ -23,6 +23,7 @@ import {
 } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getCountryName } from "../countryMappings";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Converter for maps charts (location-based visualization)
@@ -127,7 +128,7 @@ export class MapsConverter implements PromQLChartConverter {
           if (formattedValue === "-" || Number.isNaN(formattedValue)) {
             formattedValue = "-";
           }
-          return `${params.name}: ${formattedValue}`;
+          return `${escapeHtml(params.name)}: ${escapeHtml(formattedValue)}`;
         },
       },
       toolbox: {

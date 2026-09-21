@@ -31,6 +31,7 @@ import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
+import { IncidentsPage } from "./alertsPages/incidentsPage.js";
 import { SloListPage } from "./sloPages/sloListPage.js";
 import { SloFormPage } from "./sloPages/sloFormPage.js";
 import { SloDetailPage } from "./sloPages/sloDetailPage.js";
@@ -48,6 +49,7 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -91,6 +93,7 @@ import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
+import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
@@ -165,6 +168,7 @@ class PageManager {
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
+    this.incidentsPage = new IncidentsPage(page);
 
     // ===== SLO PAGE OBJECTS =====
     this.sloListPage = new SloListPage(page);
@@ -190,6 +194,7 @@ class PageManager {
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
+    this.splunkHecPage = new SplunkHecPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
@@ -229,6 +234,7 @@ class PageManager {
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
+    this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);

@@ -386,11 +386,18 @@ export function describeTarget(
 ): string {
   if (target.kind === "user") return target.email;
   if (target.kind === "whole_team") return t("oncall.target_whole_team");
+  // A mixed-version deployment or an unmigrated policy can still carry one of
+  // the six retired kinds this build no longer types. That is not a deleted
+  // rotation — it is a kind this screen was never taught to read.
+  if (target.kind !== "rotation") return t("oncall.target_unrecognized");
   if (!rotationName) return t("oncall.target_rotation_deleted");
   return target.mode === "all"
     ? t("oncall.target_rotation_all", { rotation: rotationName })
     : t("oncall.target_rotation_on_call", { rotation: rotationName });
 }
+
+// Zones IANA renamed; `Intl.supportedValuesOf` still only surfaces the pre-rename id.
+const RENAMED_TIMEZONES = ["Asia/Kolkata", "Asia/Ho_Chi_Minh", "Europe/Kyiv", "America/Nuuk"];
 
 /**
  * The zones this runtime can actually resolve, UTC first.
@@ -408,7 +415,7 @@ export function describeTarget(
 export function resolvableTimezones(preferred?: string): string[] {
   const canonical =
     typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
-  const wanted = ["UTC", ...canonical, ...(preferred ? [preferred] : [])];
+  const wanted = ["UTC", ...canonical, ...RENAMED_TIMEZONES, ...(preferred ? [preferred] : [])];
   const seen = new Set<string>();
   return wanted.filter((zone) => {
     if (!zone || seen.has(zone)) return false;
