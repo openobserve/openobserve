@@ -41,7 +41,10 @@ use infra::{
 };
 use promql::{
     DEFAULT_LOOKBACK, DEFAULT_MAX_POINTS_PER_SERIES, adjust_start_end,
-    ast::{at_modifier::resolve_query, selector_window::selector_window},
+    ast::{
+        at_modifier::resolve_query, result_order::top_level_sort_descending,
+        selector_window::selector_window,
+    },
     micros,
 };
 use promql_parser::parser;
@@ -506,7 +509,7 @@ async fn search_in_cluster(
     let values = if result_type == "matrix" {
         merge_matrix_query(&series_data, &req.org_id).await?
     } else if result_type == "vector" {
-        merge_vector_query(&series_data, &req.org_id).await?
+        merge_vector_query(&series_data, &req.org_id, query).await?
     } else if result_type == "scalar" {
         merge_scalar_query(&series_data)
     } else if result_type == "exemplars" {
@@ -615,7 +618,11 @@ async fn merge_matrix_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
     Ok(value)
 }
 
-async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Result<Value> {
+async fn merge_vector_query(
+    series: &[cluster_rpc::Series],
+    org_id: &str,
+    query: &str,
+) -> Result<Value> {
     let mut merged_data = HashMap::new();
     let mut merged_metrics: HashMap<u64, Vec<Arc<Label>>> = HashMap::new();
     for ser in series {
@@ -645,7 +652,13 @@ async fn merge_vector_query(series: &[cluster_rpc::Series], org_id: &str) -> Res
     }
 
     let mut value = Value::Vector(merged_data);
-    value.sort();
+    let sort_descending = promql_parser::parser::parse(query)
+        .ok()
+        .and_then(|expr| top_level_sort_descending(&expr));
+    match sort_descending {
+        Some(descending) => value.sort_by_value(descending),
+        None => value.sort(),
+    }
     Ok(value)
 }
 
