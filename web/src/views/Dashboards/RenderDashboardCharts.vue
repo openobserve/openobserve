@@ -122,6 +122,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:initial-variable-values="updateInitialVariableValues"
             @onEditLayout="openEditLayout"
             @contextmenu="$emit('chart:contextmenu', $event)"
+            @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
           />
         </div>
         <div
@@ -211,6 +212,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @onEditLayout="openEditLayout"
                   @update:runId="updateRunId"
                   @contextmenu="$emit('chart:contextmenu', $event)"
+                  @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
                 >
                   <!-- Panel-Level Variables (shown below drag-allow section) -->
                   <template #panel-variables>
@@ -349,6 +351,7 @@ export default defineComponent({
     "panelsValues",
     "searchRequestTraceIds",
     "variablesManagerReady",
+    "sendToAiChat",
   ],
   props: {
     viewOnly: {},
