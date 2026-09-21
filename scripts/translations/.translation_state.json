@@ -5098,6 +5098,12 @@
     "ok": "565339bc4d33d728",
     "startFromNow": "b51cf273d8b6649a"
   },
+  "connectDataSourcePopup": {
+    "connectButton": "6f9ce9f34879bb33",
+    "description": "e3bfcb60996b7b1d",
+    "slackLink": "3a37b5feb4984ec3",
+    "title": "9c5541789be6984d"
+  },
   "correlation": {
     "addCustomGroup": "460770f6d1bdad26",
     "alertDeduplicationMessage": "bc755a6265e8c4a9",
@@ -8833,6 +8839,7 @@
       }
     },
     "hosts": {
+      "columnCores": "7bff6181add2231b",
       "columnCpu": "fe858be36df341a8",
       "columnDisk": "8739c0da5fbabb17",
       "columnHost": "4a823118b9ba8baa",
@@ -8850,14 +8857,10 @@
         "hostMetricsCap": "1edb000e9d946c58",
         "hostMetricsHint": "83cfa9518d95cce9"
       },
-      "importConfirmCancel": "19766ed6ccb2f4a3",
-      "importConfirmMessage": "eb8d9fe902645051",
-      "importConfirmOk": "b37158e750c360ef",
-      "importConfirmTitle": "4b4341287db1c84c",
       "lastSeenBanner": "1af912a3e3a19bdc",
       "livenessBanner": "40a4687718a50c59",
+      "loadPerCore": "4eb5405259fc817c",
       "memoryAbsolute": "d77a43cd175edfef",
-      "openDashboard": "6963894ac86971e3",
       "osFacet": "343d012d58b2e98f",
       "pageError": "1bdf7b1b1497073b",
       "panel": {
@@ -9837,7 +9840,9 @@
       "tlsTitle": "0029bc25af318a4f",
       "tokenPageName": "759b4b3e31901744",
       "tokenWhere": "d6f5666b805c2e36",
-      "tokenWhereSuffix": "7fb346521d5bfb41"
+      "tokenWhereSuffix": "7fb346521d5bfb41",
+      "windowBody": "38d66efc5808226e",
+      "windowTitle": "309255973d9f0279"
     },
     "splunkHecTab": "d31533a68927505f",
     "splunkHecUrlHelp": "22d5a113a0b4745e",
@@ -12078,6 +12083,7 @@
     "target_rotation_everyone": "dafdb710c5de874e",
     "target_rotation_legacy": "76bd2aa23090f2bb",
     "target_rotation_on_call": "8a61c67a8ea27cf5",
+    "target_unrecognized": "66e648461a86c5d9",
     "target_user": "232709417a644e56",
     "target_whole_team": "f73315fde5db9e11",
     "team": "5985039f106df054",

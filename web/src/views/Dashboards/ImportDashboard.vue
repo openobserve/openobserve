@@ -267,7 +267,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { computed, defineComponent, ref, onMounted, reactive, watch } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onMounted,
+  reactive,
+  watch,
+  defineAsyncComponent,
+} from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
@@ -292,7 +300,6 @@ import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDash
 import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
-import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 export default defineComponent({
   name: "Import Dashboard",
@@ -503,7 +510,7 @@ export default defineComponent({
       );
 
       //update store
-      await getAllDashboards(store, selectedFolder.value);
+      await getAllDashboards(store, selectedFolder.value, true);
 
       //return new dashboard
       return newDashboard;

@@ -14,14 +14,17 @@ vi.mock("@/aws-exports", () => ({
 }));
 
 // Mock the search service with proper error handling
-vi.mock("@/services/search", () => ({
-  default: {
-    get_scheduled_search_list: vi.fn(),
-    cancel_scheduled_search: vi.fn(),
-    retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn(),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      get_scheduled_search_list: vi.fn(),
+      cancel_scheduled_search: vi.fn(),
+      retry_scheduled_search: vi.fn(),
+      delete_scheduled_search: vi.fn(),
+    },
+  });
+});
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({

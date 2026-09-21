@@ -23,21 +23,27 @@ import i18n from "@/locales";
 // Mock search service
 // ---------------------------------------------------------------------------
 const mockSearchFn = vi.fn().mockResolvedValue({ data: {} });
-vi.mock("@/services/search", () => ({
-  default: {
-    search: (...args: any[]) => mockSearchFn(...args),
-  },
-}));
+vi.mock("@/services/search", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      search: (...args: any[]) => mockSearchFn(...args),
+    },
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Mock stream service
 // ---------------------------------------------------------------------------
 const mockStreamSchema = vi.fn().mockResolvedValue({ data: { schema: [] } });
-vi.mock("@/services/stream", () => ({
-  default: {
-    schema: (...args: any[]) => mockStreamSchema(...args),
-  },
-}));
+vi.mock("@/services/stream", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      schema: (...args: any[]) => mockStreamSchema(...args),
+    },
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Shared reactive searchObj

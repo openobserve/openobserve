@@ -43,6 +43,7 @@ mod math_operations;
 mod max_over_time;
 mod min_over_time;
 mod predict_linear;
+mod present_over_time;
 mod quantile_over_time;
 mod resets;
 mod scalar;
@@ -110,6 +111,7 @@ pub(crate) enum Func {
     Minute,
     Month,
     PredictLinear,
+    PresentOverTime,
     QuantileOverTime,
     Rate,
     Resets,
@@ -186,6 +188,7 @@ impl Func {
             Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc),
             Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc),
             Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc),
+            Func::PresentOverTime => Box::new(present_over_time::PresentOverTimeFunc),
             Func::Rate => Box::new(ExtrapolationKind::Rate),
             Func::Resets => Box::new(resets::ResetsFunc),
             Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc),
@@ -228,7 +231,7 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
 ///
 /// This trait defines the interface for range functions that operate on time series data
 /// within a specified time window. Range functions (e.g., `rate()`, `increase()`,
-/// `avg_over_time()`) compute values based on samples within a sliding time window `[eval_ts -
+/// `avg_over_time()`) compute values based on samples within a sliding time window `(eval_ts -
 /// range, eval_ts]`.
 ///
 /// Range functions are typically used with range vector selectors like `http_requests_total[5m]`,
@@ -237,7 +240,7 @@ impl<T: RangeFunc + ?Sized> RangeFunc for std::sync::Arc<T> {
 /// # Evaluation Model
 ///
 /// For each evaluation timestamp:
-/// 1. A time window is determined: `[eval_ts - range, eval_ts]`
+/// 1. A time window is determined: `(eval_ts - range, eval_ts]`
 /// 2. Samples within this window are extracted from the time series
 /// 3. The `exec()` method processes these samples to compute a single value
 /// 4. The result becomes a sample at the evaluation timestamp
@@ -270,7 +273,7 @@ pub trait RangeFunc: Send + Sync {
     /// Executes the range function on samples within a time window.
     ///
     /// This method processes samples from a single time series that fall within the window
-    /// `[eval_ts - range, eval_ts]` and computes a single aggregated value.
+    /// `(eval_ts - range, eval_ts]` and computes a single aggregated value.
     ///
     /// # Parameters
     ///
@@ -278,8 +281,8 @@ pub trait RangeFunc: Send + Sync {
     ///   empty if no samples exist in the window.
     /// * `eval_ts` - The evaluation timestamp (in microseconds) for which to compute the result.
     ///   This is the right endpoint of the time window.
-    /// * `range` - The duration of the lookback window. The window spans from `eval_ts - range` to
-    ///   `eval_ts`.
+    /// * `range` - The duration of the lookback window. The window spans from `eval_ts - range`,
+    ///   exclusive, to `eval_ts`, inclusive.
     ///
     /// # Returns
     ///
@@ -444,10 +447,8 @@ where
     Ok(Value::Matrix(results))
 }
 
-/// Advance two indices through sorted samples for monotonically increasing
-/// evaluation windows. This preserves the inclusive `[window_start,
-/// window_end]` bounds previously implemented with two `partition_point`
-/// calls per window.
+/// Selects `(window_start, window_end]`, so a sample landing exactly on the left boundary belongs
+/// to the previous window only.
 pub(crate) fn advance_sample_window<'a>(
     samples: &'a [Sample],
     window_start: i64,
@@ -455,7 +456,7 @@ pub(crate) fn advance_sample_window<'a>(
     start_index: &mut usize,
     end_index: &mut usize,
 ) -> &'a [Sample] {
-    while *start_index < samples.len() && samples[*start_index].timestamp < window_start {
+    while *start_index < samples.len() && samples[*start_index].timestamp <= window_start {
         *start_index += 1;
     }
     if *end_index < *start_index {
@@ -519,7 +520,7 @@ mod tests {
                         .iter()
                         .copied()
                         .filter(|sample| {
-                            sample.timestamp >= ts - micros(range) && sample.timestamp <= ts
+                            sample.timestamp > ts - micros(range) && sample.timestamp <= ts
                         })
                         .collect();
                     if window.is_empty() {
@@ -575,14 +576,14 @@ mod tests {
             Sample::new(10, 3.0),
             Sample::new(20, 4.0),
         ];
-        // Monotonic windows cover inclusive boundaries, overlap, a gap with no
+        // Monotonic windows cover both boundaries, overlap, a gap with no
         // samples, and recovery after the gap.
         let windows = [(-5, 0), (0, 5), (4, 10), (11, 15), (15, 20)];
         let mut start_index = 0;
         let mut end_index = 0;
 
         for (window_start, window_end) in windows {
-            let expected_start = samples.partition_point(|s| s.timestamp < window_start);
+            let expected_start = samples.partition_point(|s| s.timestamp <= window_start);
             let expected_end = samples.partition_point(|s| s.timestamp <= window_end);
             let expected = &samples[expected_start..expected_end];
             let actual = advance_sample_window(
@@ -632,7 +633,7 @@ mod tests {
                     for window_end in (0_i64..100).step_by(eval_step as usize) {
                         let window_start = window_end - range;
                         let expected_start =
-                            samples.partition_point(|sample| sample.timestamp < window_start);
+                            samples.partition_point(|sample| sample.timestamp <= window_start);
                         let expected_end =
                             samples.partition_point(|sample| sample.timestamp <= window_end);
                         let actual = advance_sample_window(
@@ -655,6 +656,50 @@ mod tests {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn test_advance_sample_window_excludes_left_boundary_sample() {
+        let samples = vec![Sample::new(10, 1.0), Sample::new(20, 2.0)];
+        let mut start_index = 0;
+        let mut end_index = 0;
+
+        let window = advance_sample_window(&samples, 10, 20, &mut start_index, &mut end_index);
+
+        assert_eq!(
+            window
+                .iter()
+                .map(|sample| sample.timestamp)
+                .collect::<Vec<_>>(),
+            vec![20]
+        );
+    }
+
+    #[test]
+    fn test_advance_sample_window_count_is_alignment_independent() {
+        // Prometheus 3 returns 5 samples for a 5m range over 1m-spaced samples at any alignment.
+        let spacing = micros(Duration::from_secs(60));
+        let samples: Vec<Sample> = (0..20)
+            .map(|i| Sample::new(i * spacing, i as f64))
+            .collect();
+        let range = micros(Duration::from_secs(300));
+
+        for offset in [0, spacing / 6, spacing / 2] {
+            let mut start_index = 0;
+            let mut end_index = 0;
+            for i in 10..20 {
+                let window_end = i * spacing + offset;
+                let window = advance_sample_window(
+                    &samples,
+                    window_end - range,
+                    window_end,
+                    &mut start_index,
+                    &mut end_index,
+                );
+
+                assert_eq!(window.len(), 5, "offset {offset}, window_end {window_end}");
             }
         }
     }

@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
           :style="{
             width:
-              !store.state.isAiChatEnabled || isMobile
+              !store.state.isAiChatEnabled || isChatOverlay
                 ? '100%'
                 : store.state.isAiChatExpanded
                   ? '50%'
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
             'pe-2 pb-2',
-            isMobile
+            isChatOverlay
               ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
           ]"
@@ -181,7 +181,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               height: 'calc(100vh - var(--navbar-height, 2.25rem))',
               maxWidth: '100%',
             },
-            isMobile
+            isChatOverlay
               ? { width: '100%', top: 'var(--navbar-height, 2.25rem)' }
               : // Full-screen just widens the panel (25% → 50%) beside the content —
                 // same top position + height, so the main header stays visible.
@@ -210,6 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
     </ODialog>
+    <ConnectDataSourcePopup />
     <CommunitySlackInvite />
     <PredefinedThemes />
     <ShortcutCheatsheet v-model:open="showShortcuts" />
@@ -217,6 +218,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { configFullQuery } from "@/services/config.queries";
+import { orgSettingsQuery } from "@/services/organizations.queries";
 import ONavbar from "@/lib/core/Navbar/ONavbar.vue";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import AppHeader from "../components/Header.vue";
@@ -254,19 +257,18 @@ import { getLocale } from "../locales";
 import MainLayoutOpenSourceMixin from "@/mixins/mainLayout.mixin";
 import MainLayoutCloudMixin from "@/enterprise/mixins/mainLayout.mixin";
 
-import configService from "@/services/config";
 import ThemeSwitcher from "../components/ThemeSwitcher.vue";
 import PredefinedThemes from "../components/PredefinedThemes.vue";
 import { usePredefinedThemes } from "@/composables/usePredefinedThemes";
 import GetStarted from "@/components/login/GetStarted.vue";
 import CommunitySlackInvite from "@/components/CommunitySlackInvite.vue";
+import ConnectDataSourcePopup from "@/components/ConnectDataSourcePopup.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import useBreakpoint from "@/composables/useBreakpoint";
 import SlackIcon from "@/components/icons/SlackIcon.vue";
 import ManagementIcon from "@/components/icons/ManagementIcon.vue";
-import organizations from "@/services/organizations";
 import useStreams from "@/composables/useStreams";
 import { openobserveRum } from "@openobserve/browser-rum";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -275,8 +277,8 @@ import WebinarBanner from "@/components/WebinarBanner.vue";
 import AnnouncementBanner from "@/components/announcements/AnnouncementBanner.vue";
 import useRoutePrefetch from "@/composables/useRoutePrefetch";
 import { toast, dismissAll } from "@/lib/feedback/Toast/useToast";
-import { useShortcuts } from "@/lib/vue-shortcut-manager";
-import { ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
+import { purgeOrgQueries, queryClient } from "@/composables/query/queryClient";
+import { useShortcuts, ShortcutCheatsheet } from "@/lib/vue-shortcut-manager";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
 
 let mainLayoutMixin: any = null;
@@ -304,6 +306,7 @@ export default defineComponent({
     ShortcutCheatsheet,
     GetStarted,
     CommunitySlackInvite,
+    ConnectDataSourcePopup,
     ODialog,
     ODrawer,
     OButton,
@@ -374,7 +377,9 @@ export default defineComponent({
     const router: any = useRouter();
     const { t } = useI18nTyped();
     const miniMode = ref(false);
-    const { isMobile } = useBreakpoint();
+    const { isMobile, lgUp } = useBreakpoint();
+    // Below lg no split leaves room for pages with a folder rail, so the chat overlays instead.
+    const isChatOverlay = computed(() => !lgUp.value);
     const zoBackendUrl = store.state.API_ENDPOINT;
     const isLoading = ref(false);
 
@@ -1163,9 +1168,13 @@ export default defineComponent({
 
       try {
         //get organizations settings
-        const orgSettings: any = await organizations.get_organization_settings(
-          store.state?.selectedOrganization?.identifier,
-        );
+        // Cached: MainLayout re-reads this on every org switch, and the
+        // settings pages read it again on mount.
+        const orgSettings: any = {
+          data: await queryClient.fetchQuery(
+            orgSettingsQuery(store.state?.selectedOrganization?.identifier),
+          ),
+        };
 
         //set settings in store
         //scrape interval will be in number
@@ -1250,9 +1259,21 @@ export default defineComponent({
         menuReady.value = true;
         return;
       }
-      await configService
-        .get_config_full(orgIdentifier)
-        .then(async (res: any) => {
+      // Cached per org, so a return to the shell inside the session does not
+      // re-download the config the menu is already filtered from. The retry
+      // below forces a real fetch, since the failure it recovers from is the
+      // reason there is nothing cached to serve.
+      if (attempt > 0) {
+        await queryClient.invalidateQueries({
+          queryKey: configFullQuery(orgIdentifier).queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      await queryClient
+        .fetchQuery(configFullQuery(orgIdentifier))
+        .then(async (data: any) => {
+          const res = { data };
           if (config.isCloud == "false") {
             linksList.value = mainLayoutMixin.setup().leftNavigationLinks(linksList, t);
           }
@@ -1478,6 +1499,7 @@ export default defineComponent({
       selectedOrg,
       orgOptions,
       isMobile,
+      isChatOverlay,
       miniMode,
       mobileNavOpen,
       user,
@@ -1542,9 +1564,13 @@ export default defineComponent({
       deep: true,
       immediate: true,
     },
-    async changeOrganizationIdentifier() {
+    async changeOrganizationIdentifier(_next: string, previous: string) {
       this.isLoading = false;
       this.resetStreams();
+      // Drops the previous org's persisted entries (plus any older session's
+      // other-org residue); in-memory ones stay, so switching back is free.
+      // Keys are org-rooted, so nothing can cross over.
+      if (previous) purgeOrgQueries(previous, _next);
       // Clear notifications from the previous org — they no longer apply.
       dismissAll();
       this.store.dispatch("setOrganizationPasscode", "");

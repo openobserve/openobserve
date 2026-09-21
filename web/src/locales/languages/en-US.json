@@ -3568,6 +3568,12 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
+  "connectDataSourcePopup": {
+    "title": "To get started, let's connect your first data source.",
+    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
+    "connectButton": "Connect a data source",
+    "slackLink": "Also join our Slack community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "Event payload",
       "payloadIndex": "The {field} field selects the stream. Events without it go to the {stream} stream.",
       "payloadTime": "The {field} field is epoch seconds, and a fractional value is accepted. When it is missing or not positive, the receipt time is used.",
+      "windowTitle": "Timestamps outside the ingestion window are discarded",
+      "windowBody": "Events older than {past} (5 hours by default) or further ahead than {future} (24 hours by default) are dropped, and the request still answers code 0 because a Splunk client does not retry an error. A hardcoded or stale timestamp therefore looks like a successful send that stores nothing.",
       "payloadMetadata": "The {fields} fields are stored as columns on the event.",
       "healthTitle": "Health check",
       "healthBody": "A GET request needs no authentication and answers {response}.",
@@ -16465,13 +16473,10 @@
       "columnMemory": "Memory (current)",
       "columnDisk": "Disk % (current)",
       "columnLoad": "Load 15m (current)",
+      "columnCores": "Cores",
       "columnLastSeen": "Last seen",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "Host Metrics dashboard",
-      "importConfirmTitle": "Add the Host Metrics dashboard?",
-      "importConfirmMessage": "You don't have this dashboard yet. Adding it creates a dashboard named 'Host Metrics' in your Default folder, then opens it for this host.",
-      "importConfirmOk": "Add and open",
-      "importConfirmCancel": "Cancel",
+      "loadPerCore": "({value}/core)",
       "windowsLivenessNote": "Windows hosts appear in this list only when the agent reports the load metric (system_cpu_load_average_15m) — if your Windows agents are running but missing here, enable the load scraper in the collector config or update the agent.",
       "panel": {
         "cpuBusy": "CPU busy",
@@ -17881,6 +17886,7 @@
     "target_rotation_all": "Everyone on {rotation}",
     "target_rotation_deleted": "A rotation this team no longer has",
     "target_rotation_legacy": "Whoever is on call",
+    "target_unrecognized": "A target this screen doesn't recognise",
     "ladderPoolEveryone": "everyone on {rotation}",
     "target_user": "A specific person",
     "target_whole_team": "The whole team",

@@ -70,7 +70,7 @@
       @update:current-page="onPageChange"
     >
       <template #toolbar>
-        <div class="flex w-full items-center gap-2 max-lg:min-w-0 max-md:contents">
+        <div class="flex w-full min-w-0 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents">
           <OButton
             v-if="selectedIds.length"
             variant="outline"
@@ -127,16 +127,14 @@
            (OTable renders toolbar → column toggle → toolbar-trailing). Inside
            #toolbar it sat before the toggle and the two pages disagreed. -->
       <template #toolbar-trailing>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
-          :loading="loading"
+          :last-run-at="lastUpdatedAt"
+          :loading="fetching"
           data-test="slos-slolist-refresh"
-          @click="() => load()"
-        >
-          <OTooltip side="bottom" :content="t('slos.refresh')" />
-        </OButton>
+          @click="refresh"
+        />
       </template>
 
       <!-- Health tiles sit in #subheader so search and the type filter stay
@@ -459,7 +457,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { sloKeys } from "@/services/slos.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { useQuery } from "@tanstack/vue-query";
+import {
+  moveSlosMutation,
+  setSloEnabledMutation,
+  deleteSloMutation,
+} from "@/services/slos.queries";
+import { useMutation } from "@tanstack/vue-query";
+import { slosQuery } from "@/services/slos.queries";
+// The export reads one SLO's definition on demand and never re-reads it, so it
+// stays off the query layer and calls the endpoint directly.
+import sloService from "@/services/slos";
+import { computed, onMounted, ref, nextTick, watch } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
@@ -477,7 +488,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -490,7 +501,6 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import type { SloListItem } from "@/ts/interfaces/slo";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import sloService from "@/services/slos";
 import useBreakpoint from "@/composables/useBreakpoint";
 import alertsService from "@/services/alerts";
 import { sloDetailRoute } from "@/utils/alerts/sloAlertRouting";
@@ -515,10 +525,40 @@ const router = useRouter();
 const route = useRoute();
 const store = useStore();
 
-const rows = ref<SloListItem[]>([]);
-// Starts true: shows the skeleton instead of flashing empty on first render, and keeps the page-restore watch's `{once:true}` from firing on a spurious false→true edge before the real load ever settles.
-const loading = ref(true);
-const error = ref<string | null>(null);
+// The org/folder a read is *currently* aimed at. `load()` may be handed a
+// folder the route refs have not caught up with yet, so the key tracks these
+// rather than `activeFolderId` directly.
+const readOrg = ref<string>(store.state.selectedOrganization?.identifier ?? "");
+const readFolder = ref<string | undefined>(undefined);
+
+const slosList = useQuery(() =>
+  // Held until the folder resolves: the reactive key would otherwise fetch an unscoped list first.
+  Object.assign(slosQuery(readOrg.value, readFolder.value), {
+    enabled: !!readOrg.value && readFolder.value !== undefined,
+  }),
+);
+
+// The list is the query, not a copy of it: a write that invalidates the SLO
+// scope repaints these rows with no wiring here.
+const rows = computed<SloListItem[]>(() => (slosList.data.value ?? []) as SloListItem[]);
+
+const loading = slosList.isPending;
+// A request in flight while rows stay on screen — the refresh button's spinner.
+// `loading` is the skeleton, which only a cold read wants.
+const fetching = slosList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = slosList.dataUpdatedAt;
+// A failed read has to reach the table. `loadError` is only for the imperative
+// refresh path; a mount read that fails (a disabled-feature 501, say) sets the
+// query's error and nothing else, so the table used to render an empty list
+// with no explanation.
+const loadError = ref<string | null>(null);
+const error = computed<string | null>(() => {
+  if (loadError.value) return loadError.value;
+  const e = slosList.error.value as any;
+  if (!e) return null;
+  return e?.response?.data?.message || e?.message || t("slos.loadFailed");
+});
 const search = ref("");
 const typeFilter = ref("all");
 const healthFilter = ref<string | null>(null);
@@ -543,6 +583,10 @@ const onPageChange = (page: number) => {
 const activeFolderId = computed(() => (route.query.folder as string) || "default");
 
 const org = computed(() => store.state.selectedOrganization?.identifier);
+
+const moveSlos = useMutation(() => moveSlosMutation(org.value));
+const setSloEnabled = useMutation(() => setSloEnabledMutation(org.value));
+const deleteSlo = useMutation(() => deleteSloMutation(org.value));
 
 const selectedRows = computed(() => rows.value.filter((r) => selectedIds.value.includes(r.id)));
 
@@ -838,27 +882,28 @@ watch(
   { once: true },
 );
 
-// Both optional: refresh calls `load()` bare and falls back to the current org
-// and active folder — the folder-change path is the only caller that passes a
-// folder the refs have not caught up with yet.
-async function load(orgId?: string | null, folderId?: string) {
+// Bound to the refresh button: always hits the server.
+const refresh = () => load(null, undefined, true);
+
+// org and folder are both optional: mount and refresh call `load()` bare and
+// fall back to the current org and active folder — the folder-change path is the
+// only caller that passes a folder the refs have not caught up with yet.
+async function load(orgId?: string | null, folderId?: string, force = false) {
   if (!org.value) return;
-  loading.value = true;
-  error.value = null;
+  loadError.value = null;
   // sometimes the folder id might not be updated so passed via
   // query params.
-  const currentOrg = orgId ?? org.value;
-  const folder = folderId ?? activeFolderId.value;
+  readOrg.value = orgId ?? org.value;
+  readFolder.value = folderId ?? activeFolderId.value;
+  // Let the key pick up the new org/folder before asking for the data.
+  await nextTick();
   try {
-    const res = await sloService.list(currentOrg, folder);
-    rows.value = res.data?.list ?? [];
+    if (force) await slosList.refetch();
     // Selection is per-folder; carrying ids across a folder switch would let a
     // bulk move act on rows no longer on screen.
     selectedIds.value = [];
   } catch (e: any) {
-    error.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
-  } finally {
-    loading.value = false;
+    loadError.value = e?.response?.data?.message || e?.message || t("slos.loadFailed");
   }
 }
 
@@ -888,14 +933,13 @@ async function doMove() {
   moveDialog.value = false;
   if (!targets.length || !dst) return;
   try {
-    await sloService.move(
-      org.value,
-      targets.map((r) => r.id),
-      dst,
-    );
-    // They left the folder being shown, so drop them rather than re-fetching.
+    await moveSlos.mutateAsync({ ids: targets.map((r) => r.id), dstFolderId: dst });
+    // They left the folder being shown, so drop them from the cached entry
+    // rather than waiting for the invalidation's refetch to repaint.
     const moved = new Set(targets.map((r) => r.id));
-    rows.value = rows.value.filter((r) => !moved.has(r.id));
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => !moved.has(r.id)),
+    );
     selectedIds.value = selectedIds.value.filter((id) => !moved.has(id));
     toast({
       variant: "success",
@@ -926,7 +970,7 @@ function onRowClick(row: SloListItem) {
 
 async function toggleEnabled(row: SloListItem) {
   try {
-    await sloService.setEnabled(org.value, row.id, !row.enabled);
+    await setSloEnabled.mutateAsync({ id: row.id, enabled: !row.enabled });
     row.enabled = !row.enabled;
     toast({
       variant: "success",
@@ -976,8 +1020,10 @@ async function doDelete() {
   deleteDialog.value = false;
   if (!row) return;
   try {
-    await sloService.delete(org.value, row.id);
-    rows.value = rows.value.filter((r) => r.id !== row.id);
+    await deleteSlo.mutateAsync(row.id);
+    queryClient.setQueryData<SloListItem[]>(sloKeys.list(readOrg.value, readFolder.value), (old) =>
+      (old ?? []).filter((r) => r.id !== row.id),
+    );
     toast({ variant: "success", message: t("slos.deleted") });
   } catch (e: any) {
     toast({ variant: "error", message: e?.response?.data?.message || t("slos.deleteFailed") });

@@ -787,6 +787,32 @@ describe("HeatmapConverter", () => {
         expect(formatted).toContain("75.00");
       });
 
+      it("should escape HTML in the series name", () => {
+        const processedData: ProcessedPromQLData[] = [
+          {
+            series: [{ name: "<img src=x onerror=alert(1)>", values: [], data: { "1": "1" } }],
+            timestamps: [[1, "00:00:00"]],
+            queryIndex: 0,
+          },
+        ];
+
+        const result = converter.convert(
+          processedData,
+          { type: "heatmap", config: {} },
+          mockStore,
+          mockExtras,
+        );
+        const formatted = result.tooltip.formatter({
+          value: [0, 0, 1],
+          name: "00:00:00",
+          marker: "",
+          seriesName: "<img src=x onerror=alert(1)>",
+        });
+
+        expect(formatted).not.toContain("<img");
+        expect(formatted).toContain("&lt;img src=x onerror=alert(1)&gt;");
+      });
+
       it("should format tooltip with unit", () => {
         const processedData: ProcessedPromQLData[] = [
           {

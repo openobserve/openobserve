@@ -4,12 +4,12 @@ Keyboard shortcuts are **registry-driven**. There is one system with three
 coordinated parts — don't hand-roll `window.addEventListener("keydown", …)` or
 scatter raw key combos through templates:
 
-| Part | Where | Job |
-| --- | --- | --- |
-| **Registry** | `@/lib/vue-shortcut-manager` → `shortcutRegistry.ts` | Declares every shortcut once by `id`: its key(s), platform variants, i18n description, grouped by module. |
-| **Binding** | `useShortcut` / `useShortcuts` composables | Attach behavior to a registered `id` in a component's `setup()`. |
-| **Display** | `OShortcut`, and `shortcut-id` on `ODropdownItem` / `OTooltip` | Render the keycaps, resolved from the same registry (platform-aware). |
-| **Cheatsheet** | `ShortcutCheatsheet` (mounted once in `MainLayout`) | The global "?" overlay listing all shortcuts. New registry entries appear automatically. |
+| Part           | Where                                                          | Job                                                                                                       |
+| -------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| **Registry**   | `@/lib/vue-shortcut-manager` → `shortcutRegistry.ts`           | Declares every shortcut once by `id`: its key(s), platform variants, i18n description, grouped by module. |
+| **Binding**    | `useShortcut` / `useShortcuts` composables                     | Attach behavior to a registered `id` in a component's `setup()`.                                          |
+| **Display**    | `OShortcut`, and `shortcut-id` on `ODropdownItem` / `OTooltip` | Render the keycaps, resolved from the same registry (platform-aware).                                     |
+| **Cheatsheet** | `ShortcutCheatsheet` (mounted once in `MainLayout`)            | The global "?" overlay listing all shortcuts. New registry entries appear automatically.                  |
 
 Because all four read the one registry, a shortcut's key, its label, its keycap
 display, and its cheatsheet row never drift apart.
@@ -39,8 +39,18 @@ supply the handler:
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 
 useShortcuts([
-  { id: "streamsListAdd",     handler: () => { if (!isInputFocused()) addStream(); } },
-  { id: "streamsListRefresh", handler: () => { if (!isInputFocused()) refresh(); } },
+  {
+    id: "streamsListAdd",
+    handler: () => {
+      if (!isInputFocused()) addStream();
+    },
+  },
+  {
+    id: "streamsListRefresh",
+    handler: () => {
+      if (!isInputFocused()) refresh();
+    },
+  },
 ]);
 ```
 
@@ -61,8 +71,12 @@ Never hardcode `⌘N` text — render from the registry so it stays platform-awa
 and in sync:
 
 ```vue
-<OShortcut id="streamsListAdd" />                  <!-- resolves keys from the registry -->
-<ODropdownItem shortcut-id="streamsListAdd" @select="addStream">Add stream</ODropdownItem>
+<OShortcut id="streamsListAdd" />
+<!-- resolves keys from the registry -->
+<ODropdownItem
+  shortcut-id="streamsListAdd"
+  @select="addStream"
+>Add stream</ODropdownItem>
 <OTooltip content="Refresh" shortcut-id="streamsListRefresh">…</OTooltip>
 ```
 

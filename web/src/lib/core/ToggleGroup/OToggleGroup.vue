@@ -377,7 +377,8 @@ provide(TOGGLE_GROUP_CONTEXT_KEY, context);
       'bg-toggle-track-bg rounded-default p-0.5',
       'border-toggle-border border',
       // Wrapped toggle chips read as two unrelated controls, so the strip scrolls within its track.
-      orientation !== 'vertical' && 'max-md:max-w-full max-md:overflow-x-auto',
+      orientation !== 'vertical' &&
+        'max-md:max-w-full max-md:overflow-x-auto @max-4xl/page:max-w-full @max-4xl/page:overflow-x-auto',
     ]"
     v-bind="dragListeners"
     @update:model-value="

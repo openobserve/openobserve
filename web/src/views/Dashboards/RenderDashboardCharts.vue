@@ -308,11 +308,12 @@ import {
   ref,
   watch,
   nextTick,
+  reactive,
+  inject,
 } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
-import { reactive } from "vue";
 import PanelContainer from "../../components/dashboards/PanelContainer.vue";
 import DateTimePickerDashboard from "../../components/DateTimePickerDashboard.vue";
 import { useRoute } from "vue-router";
@@ -321,7 +322,6 @@ import { useCustomDebouncer } from "../../utils/dashboard/useCustomDebouncer";
 import NoPanel from "../../components/shared/grid/NoPanel.vue";
 import VariablesValueSelector from "../../components/dashboards/VariablesValueSelector.vue";
 import TabList from "@/components/dashboards/tabs/TabList.vue";
-import { inject } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { useLoading } from "@/composables/useLoading";
@@ -1035,6 +1035,58 @@ export default defineComponent({
       return 0;
     };
 
+    // Print keeps GridStack's exact on-screen grid (no reflow, no resize — so charts, legends and all, render identically); it only pushes a panel that would straddle a page break onto the next page by overriding its top, and sizes the print page to the grid width so the column-width var never changes.
+    let printLayoutPanels: { el: HTMLElement; gsY: number }[] | null = null;
+    const clearPrintLayout = () => {
+      if (printLayoutPanels) {
+        // Restore GridStack's own top formula (it is deterministic in gs-y), so screen layout resumes exactly.
+        printLayoutPanels.forEach(({ el, gsY }) => {
+          if (gsY > 0) el.style.top = `calc(${gsY} * var(--gs-cell-height))`;
+          else el.style.removeProperty("top");
+        });
+        const grid = gridStackContainer.value;
+        if (grid instanceof HTMLElement) grid.style.removeProperty("height");
+        printLayoutPanels = null;
+      }
+      document.getElementById("o2-print-page")?.remove();
+    };
+    const preparePrintLayout = () => {
+      const grid = gridStackContainer.value;
+      if (!(grid instanceof HTMLElement)) return;
+      clearPrintLayout();
+      const cell = parseFloat(getComputedStyle(grid).getPropertyValue("--gs-cell-height")) || 17;
+      const rows = Array.from(grid.querySelectorAll(".grid-stack-item"))
+        .filter((el): el is HTMLElement => el instanceof HTMLElement)
+        .map((el) => {
+          const gsY = Number(el.getAttribute("gs-y")) || 0;
+          return { el, gsY, top: gsY * cell, h: (Number(el.getAttribute("gs-h")) || 18) * cell };
+        })
+        .sort((a, b) => a.top - b.top);
+      if (!rows.length) return;
+      const gridWidth = Math.round(grid.clientWidth);
+      const headerOffset = Math.max(0, Math.round(grid.getBoundingClientRect().top));
+      const pageH = Math.round(gridWidth * (7.7 / 10.2));
+      let extra = 0;
+      let maxBottom = 0;
+      for (const r of rows) {
+        const docTop = headerOffset + r.top + extra;
+        const pageStart = Math.floor(docTop / pageH) * pageH;
+        if (r.h <= pageH && docTop + r.h > pageStart + pageH) {
+          extra += pageStart + pageH - docTop;
+        }
+        const finalTop = r.top + extra;
+        r.el.style.top = `${finalTop}px`;
+        maxBottom = Math.max(maxBottom, finalTop + r.h);
+      }
+      grid.style.height = `${maxBottom}px`;
+      printLayoutPanels = rows.map((r) => ({ el: r.el, gsY: r.gsY }));
+      const margin = 24;
+      const style = document.createElement("style");
+      style.id = "o2-print-page";
+      style.textContent = `@page { size: ${gridWidth + 2 * margin}px ${pageH + 2 * margin}px; margin: ${margin}px; }`;
+      document.head.appendChild(style);
+    };
+
     /**
      * True for panels authored as section headings — a full-width label that groups the
      * panels beneath it (see the `o2SectionHeader` flag in the RUM Performance dashboard
@@ -1125,7 +1177,36 @@ export default defineComponent({
 
       // Set up IntersectionObserver for panel visibility (for lazy loading panel-scoped variables)
       await setupPanelObservers();
+
+      window.addEventListener("beforeprint", onBeforePrint);
+      window.addEventListener("afterprint", onAfterPrint);
+
+      if (store.state.printMode) {
+        await nextTick();
+        preparePrintLayout();
+      }
     });
+
+    // Only the dashboard print feature (print mode) reflows the page layout; a plain Ctrl+P elsewhere is left untouched.
+    const onBeforePrint = () => {
+      if (store.state.printMode) preparePrintLayout();
+    };
+    const onAfterPrint = () => {
+      if (!store.state.printMode) clearPrintLayout();
+    };
+
+    // Headless report capture emulates print media without a beforeprint event, so lay out the print pages whenever print mode is on; clear it when print mode turns off.
+    watch(
+      () => [store.state.printMode, panels.value.length, selectedTabId.value],
+      async () => {
+        if (!store.state.printMode) {
+          clearPrintLayout();
+          return;
+        }
+        await nextTick();
+        preparePrintLayout();
+      },
+    );
 
     // Initialize variables manager when dashboard data changes
     watch(
@@ -1258,6 +1339,9 @@ export default defineComponent({
 
     // Clean up GridStack instance before component unmounts to prevent memory leaks
     onBeforeUnmount(() => {
+      window.removeEventListener("beforeprint", onBeforePrint);
+      window.removeEventListener("afterprint", onAfterPrint);
+
       // Clean up IntersectionObserver
       if (panelObserver.value) {
         panelObserver.value.disconnect();
@@ -1823,7 +1907,7 @@ export default defineComponent({
 }
 
 /* CSS-only stack: GridStack's oneColumnMode stays off because the change handler would persist it. */
-@media (max-width: 47.99rem) {
+@media screen and (max-width: 47.99rem) {
   .displayDiv :deep(.grid-stack) {
     display: flex;
     flex-wrap: wrap;
@@ -1852,6 +1936,20 @@ export default defineComponent({
   }
   .displayDiv :deep(.grid-stack > .grid-stack-item > .ui-resizable-handle) {
     display: none !important;
+  }
+  /* A fixed-height strip host cannot grow, so its panels swipe sideways instead of stacking. */
+  .dashboard-strip .displayDiv :deep(.grid-stack) {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    height: 9.5rem !important;
+    scroll-snap-type: x mandatory;
+  }
+  .dashboard-strip .displayDiv :deep(.grid-stack > .grid-stack-item) {
+    width: 85% !important;
+    min-width: 85% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    scroll-snap-align: start;
   }
 }
 
@@ -1897,38 +1995,14 @@ export default defineComponent({
 }
 
 @media print {
-  /* Multi-page print at the EXACT layout the dashboard renders on screen.
-   *
-   * GridStack writes inline `position: absolute; top/left/width/height; px`
-   * onto every `.grid-stack-item` and an explicit `height` onto `.grid-stack`
-   * equal to the lowest panel bottom. Browsers paginate absolutely-positioned
-   * content correctly when the containing block has a real height and no
-   * ancestor clips with `overflow: hidden|auto|scroll` or a viewport-locked
-   * height — so all we do here is keep the grid intact and clear those clips.
-   *
-   * (Do NOT convert panels to `position: static` — that changes the visual
-   * layout to a single-column stack.) */
+  /* Keep GridStack's exact on-screen grid — preparePrintLayout only shifts panel tops so none straddles a page break, and injects the @page size to match the grid width, so nothing resizes and every chart renders as it does on screen. */
   .displayDiv :deep(.grid-stack) {
-    /* keep GridStack's inline height — it's the true content height */
     overflow: visible !important;
-  }
-
-  .displayDiv :deep(.grid-stack-item) {
-    /* keep absolute positioning + computed top/left/width/height */
-    page-break-inside: avoid;
-    break-inside: avoid;
   }
 
   .displayDiv :deep(.grid-stack-item-content) {
     overflow: hidden !important;
   }
-}
-
-/* Print page setup — landscape A4 fits the dashboard width better than
- * portrait, with a small margin so charts don't bleed to the edge. */
-@page {
-  size: A4 landscape;
-  margin: 10mm;
 }
 </style>
 

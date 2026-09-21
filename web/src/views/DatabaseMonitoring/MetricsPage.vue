@@ -42,12 +42,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :range="range"
     @date-change="onDateChange"
   >
-    <div class="flex min-h-0 flex-1">
+    <div class="flex min-h-0 flex-1 max-md:flex-col">
       <!-- The metrics-explorer geometry: a slim jump rail beside the page's own
            scroll column, so any section is one click away instead of a scroll. -->
       <aside
         v-if="railItems.length >= 3"
-        class="border-border-default w-44 shrink-0 overflow-y-auto border-e"
+        class="border-border-default w-44 shrink-0 overflow-y-auto border-e max-md:w-full max-md:overflow-visible max-md:border-e-0 max-md:border-b"
       >
         <DbmMetricsRail
           :items="railItems"
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div
               v-else
-              class="grid gap-2.5 p-3 pt-1"
+              class="grid grid-cols-1 gap-2.5 p-3 pt-1"
               :class="sectionGridClass((catalogPanelsBySection[section.key] ?? []).length)"
             >
               <DbmMetricPanel
@@ -190,7 +190,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template v-if="loading && !hasMetricStreams">
             <div
-              class="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
+              class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
               data-test="dbm-metrics-skeleton"
             >
               <OSkeleton v-for="n in 6" :key="n" type="rect" class="rounded-surface h-55 w-full" />

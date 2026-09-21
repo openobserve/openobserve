@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::LazyLock as Lazy;
+use std::{
+    future::Future,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use anyhow::Result;
 use config::{
@@ -23,57 +26,61 @@ use config::{
     },
     utils::{schema::schema_eq, time::now_micros},
 };
-use dashmap::DashSet;
+use dashmap::DashMap;
+use tokio::sync::OnceCell;
 
-static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
+// Stable org cells keep failures retryable and make success a node-lifetime no-op.
+static INITIALIZATION_CACHE: Lazy<InitializationCache> = Lazy::new(InitializationCache::default);
+
+#[derive(Default)]
+struct InitializationCache {
+    orgs: DashMap<String, Arc<OnceCell<()>>>,
+}
+
+impl InitializationCache {
+    async fn run<Initialize, InitializeFuture>(
+        &self,
+        org_id: &str,
+        initialize: Initialize,
+    ) -> Result<()>
+    where
+        Initialize: FnOnce() -> InitializeFuture,
+        InitializeFuture: Future<Output = Result<()>>,
+    {
+        let initialization = self
+            .orgs
+            .entry(org_id.to_string())
+            .or_insert_with(|| Arc::new(OnceCell::new()))
+            .clone();
+        initialization.get_or_try_init(initialize).await.map(|_| ())
+    }
+}
 
 fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
-    let sample = config::utils::json::to_value(LlmScoreRecord::init_for_reflection())?;
-    // Log ingestion flattens nested values before schema inference. Mirror that
-    // here so optional scalar fields are initialized even when metadata is JSON.
-    let sample = config::utils::flatten::flatten(sample)?;
-    let sample = sample
-        .as_object()
-        .ok_or_else(|| anyhow::anyhow!("Failed to convert LlmScoreRecord to JSON object"))?;
-
-    Ok(config::utils::schema::infer_json_schema_from_map(
-        llm_scores::LLM_SCORES_STREAM,
-        StreamType::Logs,
-        std::iter::once(sample),
-    )?)
+    LlmScoreRecord::schema_for_reflection()
 }
 
+/// Initialize the canonical `_llm_scores` schema once per org; the watcher converges caches.
 pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
-    if !INITIALIZED_ORGS.insert(org_id.to_string()) {
-        return Ok(());
-    }
-
-    let schema_initialized = initialize_llm_scores_stream_schema(org_id)
-        .await
-        .inspect_err(|e| {
-            log::warn!(
-                "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
-            );
+    INITIALIZATION_CACHE
+        .run(org_id, || async {
+            initialize_llm_scores_stream_schema(org_id)
+                .await
+                .inspect_err(|e| {
+                    log::warn!(
+                        "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
+                    );
+                })?;
+            initialize_experiment_id_index(org_id)
+                .await
+                .inspect_err(|e| {
+                    log::warn!(
+                        "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
+                    );
+                })?;
+            Ok(())
         })
-        .is_ok();
-    let experiment_index_initialized = initialize_experiment_id_index(org_id)
         .await
-        .inspect_err(|e| {
-            log::warn!(
-                "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
-            );
-        })
-        .is_ok();
-
-    retain_initialization_marker(org_id, schema_initialized && experiment_index_initialized);
-
-    Ok(())
-}
-
-fn retain_initialization_marker(org_id: &str, initialized: bool) {
-    if !initialized {
-        INITIALIZED_ORGS.remove(org_id);
-    }
 }
 
 async fn initialize_experiment_id_index(org_id: &str) -> Result<()> {
@@ -152,25 +159,91 @@ async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+        time::Duration,
+    };
+
+    use tokio::sync::Notify;
+
     use super::*;
 
     #[tokio::test]
-    async fn test_ensure_llm_scores_stream_initialized_returns_ok() {
-        let test_org = "test_llm_scores_org_1";
-        let result = ensure_llm_scores_stream_initialized(test_org).await;
-        assert!(result.is_ok());
-        INITIALIZED_ORGS.remove(test_org);
+    async fn concurrent_callers_wait_for_the_same_initialization() {
+        let cache = Arc::new(InitializationCache::default());
+        let started = Arc::new(Notify::new());
+        let release = Arc::new(Notify::new());
+        let attempts = Arc::new(AtomicUsize::new(0));
+
+        let first = {
+            let cache = Arc::clone(&cache);
+            let started = Arc::clone(&started);
+            let release = Arc::clone(&release);
+            let attempts = Arc::clone(&attempts);
+            tokio::spawn(async move {
+                cache
+                    .run("legacy-org", || async move {
+                        attempts.fetch_add(1, Ordering::SeqCst);
+                        started.notify_one();
+                        release.notified().await;
+                        Ok(())
+                    })
+                    .await
+            })
+        };
+        started.notified().await;
+
+        let mut second = {
+            let cache = Arc::clone(&cache);
+            let attempts = Arc::clone(&attempts);
+            tokio::spawn(async move {
+                cache
+                    .run("legacy-org", || async move {
+                        attempts.fetch_add(1, Ordering::SeqCst);
+                        Ok(())
+                    })
+                    .await
+            })
+        };
+
+        assert!(
+            tokio::time::timeout(Duration::from_millis(25), &mut second)
+                .await
+                .is_err(),
+            "a concurrent caller returned before schema initialization completed"
+        );
+        release.notify_one();
+        first.await.unwrap().unwrap();
+        second.await.unwrap().unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
-    async fn test_ensure_llm_scores_stream_initialized_idempotent() {
-        let test_org = "test_llm_scores_org_2";
-        let r1 = ensure_llm_scores_stream_initialized(test_org).await;
-        let r2 = ensure_llm_scores_stream_initialized(test_org).await;
-        assert!(r1.is_ok());
-        assert!(r2.is_ok());
-    }
+    async fn failed_initialization_is_returned_and_retried() {
+        let cache = InitializationCache::default();
+        let attempts = AtomicUsize::new(0);
 
+        let error = cache
+            .run("retry-org", || async {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                anyhow::bail!("transient failure")
+            })
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), "transient failure");
+
+        cache
+            .run("retry-org", || async {
+                attempts.fetch_add(1, Ordering::SeqCst);
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(attempts.load(Ordering::SeqCst), 2);
+    }
     #[test]
     fn test_llm_score_reflection_has_all_fields() {
         let sample = LlmScoreRecord::init_for_reflection();
@@ -255,19 +328,5 @@ mod tests {
             settings.index_fields_updated_at.get("experiment_id"),
             Some(&123)
         );
-    }
-
-    #[test]
-    fn failed_initialization_releases_the_org_for_retry() {
-        let org_id = "retry-llm-score-initialization";
-        INITIALIZED_ORGS.insert(org_id.to_string());
-
-        retain_initialization_marker(org_id, false);
-
-        assert!(!INITIALIZED_ORGS.contains(org_id));
-        assert!(INITIALIZED_ORGS.insert(org_id.to_string()));
-        retain_initialization_marker(org_id, true);
-        assert!(INITIALIZED_ORGS.contains(org_id));
-        INITIALIZED_ORGS.remove(org_id);
     }
 }
