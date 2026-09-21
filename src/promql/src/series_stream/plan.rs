@@ -243,7 +243,7 @@ async fn build_partition_inputs(
             Ok(PlannedPartition { plan, task_ctx })
         }
     });
-    let plans = collect_plans(plans, config::get_config().limit.cpu_num.max(1)).await?;
+    let plans = collect_plans(plans, partitions).await?;
     execute_planned_partitions(plans, trace_id)
 }
 
