@@ -50,12 +50,15 @@ impl opentelemetry::propagation::Injector for MetadataMap<'_> {
     }
 }
 
+/// Response gzip policy shared by gRPC clients.
+///
+/// Defaults to gzip; matching node identity and address disable it for that endpoint.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct MetricsResponseCompression {
-    verified_loopback_addr: Option<String>,
+pub struct ResponseCompression {
+    local_addr: Option<String>,
 }
 
-impl MetricsResponseCompression {
+impl ResponseCompression {
     pub fn for_node(node: &Node) -> Self {
         Self::for_identity(
             &node.uuid,
@@ -66,24 +69,14 @@ impl MetricsResponseCompression {
     }
 
     fn for_identity(peer_uuid: &str, peer_addr: &str, local_uuid: &str, local_addr: &str) -> Self {
-        let verified = !peer_uuid.is_empty()
-            && peer_uuid == local_uuid
-            && peer_addr == local_addr
-            && url::Url::parse(peer_addr).ok().is_some_and(|url| {
-                matches!(url.scheme(), "http" | "https")
-                    && match url.host() {
-                        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
-                        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
-                        _ => false,
-                    }
-            });
+        let is_local = peer_uuid == local_uuid && peer_addr == local_addr;
         Self {
-            verified_loopback_addr: verified.then(|| peer_addr.to_owned()),
+            local_addr: is_local.then(|| peer_addr.to_owned()),
         }
     }
 
     fn accepts_gzip_for(&self, actual_addr: &str) -> bool {
-        self.verified_loopback_addr.as_deref() != Some(actual_addr)
+        self.local_addr.as_deref() != Some(actual_addr)
     }
 }
 
@@ -236,7 +229,7 @@ pub async fn make_grpc_metrics_client<T>(
         request,
         node,
         timeout,
-        MetricsResponseCompression::default(),
+        ResponseCompression::default(),
     )
     .await
 }
@@ -248,7 +241,7 @@ pub async fn make_grpc_metrics_client_with_response_compression<T>(
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
     timeout: u64,
-    response_compression: MetricsResponseCompression,
+    response_compression: ResponseCompression,
 ) -> Result<
     MetricsClient<
         InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
@@ -459,13 +452,17 @@ mod tests {
     }
 
     #[test]
-    fn test_metrics_compression_requires_matching_identity_and_numeric_loopback() {
-        use super::MetricsResponseCompression as Policy;
+    fn test_response_compression_requires_matching_identity_and_address() {
+        use super::ResponseCompression as Policy;
 
         for addr in [
             "http://127.0.0.1:5081",
             "https://127.1.2.3:5081",
             "http://[::1]:5081",
+            "http://10.0.0.1:5081",
+            "http://[2001:db8::1]:5081",
+            "http://localhost:5081",
+            "https://querier-0.internal:5081",
         ] {
             assert!(
                 !Policy::for_identity("local-id", addr, "local-id", addr).accepts_gzip_for(addr)
@@ -478,7 +475,6 @@ mod tests {
                 "local-id",
                 "http://127.0.0.1:5081",
             ),
-            ("", "http://127.0.0.1:5081", "", "http://127.0.0.1:5081"),
             (
                 "local-id",
                 "http://127.0.0.1:5082",
@@ -497,37 +493,6 @@ mod tests {
                 "local-id",
                 "http://127.0.0.1:5081",
             ),
-            (
-                "local-id",
-                "http://localhost:5081",
-                "local-id",
-                "http://localhost:5081",
-            ),
-            (
-                "local-id",
-                "http://127.0.0.1.example.com:5081",
-                "local-id",
-                "http://127.0.0.1.example.com:5081",
-            ),
-            (
-                "local-id",
-                "http://10.0.0.1:5081",
-                "local-id",
-                "http://10.0.0.1:5081",
-            ),
-            (
-                "local-id",
-                "http://[2001:db8::1]:5081",
-                "local-id",
-                "http://[2001:db8::1]:5081",
-            ),
-            (
-                "local-id",
-                "grpc://127.0.0.1:5081",
-                "local-id",
-                "grpc://127.0.0.1:5081",
-            ),
-            ("local-id", "not-a-url", "local-id", "not-a-url"),
         ] {
             assert!(
                 Policy::for_identity(peer, addr, local, local_addr).accepts_gzip_for(addr),
@@ -566,7 +531,7 @@ mod tests {
         use tonic::{Request, Response, Status, codec::CompressionEncoding, transport::Server};
 
         use super::{
-            MetricsResponseCompression, make_grpc_metrics_client,
+            ResponseCompression, make_grpc_metrics_client,
             make_grpc_metrics_client_with_response_compression,
         };
 
@@ -692,14 +657,12 @@ mod tests {
         );
         let _server_guard = AbortServer(server.abort_handle());
         let peer: Arc<dyn NodeInfo> = Arc::new(Peer(addr.clone()));
-        let local =
-            MetricsResponseCompression::for_identity("verified-id", &addr, "verified-id", &addr);
-        let remote =
-            MetricsResponseCompression::for_identity("different-id", &addr, "verified-id", &addr);
+        let local = ResponseCompression::for_identity("verified-id", &addr, "verified-id", &addr);
+        let remote = ResponseCompression::for_identity("different-id", &addr, "verified-id", &addr);
         let traceparent = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01";
         let mut received = Vec::new();
         let different_endpoint = "http://127.0.0.1:1";
-        let mismatched = MetricsResponseCompression::for_identity(
+        let mismatched = ResponseCompression::for_identity(
             "verified-id",
             different_endpoint,
             "verified-id",

@@ -35,9 +35,7 @@ use config::{
 use futures::future::try_join_all;
 use hashbrown::HashMap;
 use infra::{
-    client::grpc::{
-        MetricsResponseCompression, make_grpc_metrics_client_with_response_compression,
-    },
+    client::grpc::{ResponseCompression, make_grpc_metrics_client_with_response_compression},
     errors::{Error, ErrorCodes, Result},
     runtime::DATAFUSION_RUNTIME,
 };
@@ -410,7 +408,7 @@ async fn search_in_cluster(
         let grpc_span = info_span!("promql:search:cluster:grpc_search", org_id = req.org_id);
         let task = tokio::task::spawn(
             async move {
-                let response_compression = MetricsResponseCompression::for_node(&node);
+                let response_compression = ResponseCompression::for_node(&node);
                 let node = Arc::new(node) as _;
                 let org_id = req.org_id.clone();
                 let mut request = tonic::Request::new(req);
