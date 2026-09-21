@@ -68,8 +68,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex min-h-0 min-w-0 flex-1 flex-col">
           <div
             v-if="permissionsUiType === 'json'"
-            class="bg-surface-base flex flex-shrink-0 items-center justify-end px-3 pt-3 pb-2"
+            class="bg-surface-base flex flex-shrink-0 items-center justify-end gap-2 px-3 pt-3 pb-2"
           >
+            <OButton
+              variant="ghost"
+              size="sm"
+              icon-left="help"
+              data-test="edit-role-json-help-btn"
+              @click="toggleHelpSection"
+            >
+              {{ t("iam.editRole.help") }}
+            </OButton>
             <PermissionsViewSwitch
               :count="selectedPermissionsHash.size"
               :model-value="permissionsUiType"
@@ -122,23 +131,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </RoleSummary>
             <div v-show="permissionsUiType === 'json'">
-              <div class="flex items-center justify-between">
-                <div class="mb-3 font-bold">
-                  {{
-                    t("iam.editRole.permissionCountSingular", {
-                      count: selectedPermissionsHash.size,
-                    })
-                  }}
-                </div>
-                <div
-                  class="flex cursor-pointer items-center"
-                  :title="t('menu.help')"
-                  @click="toggleHelpSection"
-                >
-                  <OIcon name="help" size="sm" />
-                  <span class="ms-1"> {{ t("iam.editRole.help") }} </span>
-                </div>
-              </div>
               <div class="flex flex-nowrap">
                 <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
                   <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
