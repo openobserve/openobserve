@@ -877,7 +877,7 @@ function openInLogs() {
                 <LogsHighLighting :data="ev" :show-braces="true" />
               </span>
               <span
-                class="text-text-secondary hover:text-accent flex shrink-0 cursor-pointer"
+                class="text-text-secondary hover:text-accent flex w-8 shrink-0 cursor-pointer items-center justify-center"
                 data-test="log-explorer-row-open"
                 @click.stop="openEventDetail(ev)"
               >
