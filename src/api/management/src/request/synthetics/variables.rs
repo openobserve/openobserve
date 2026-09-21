@@ -33,7 +33,7 @@ use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
 use openobserve_core::auth::UserEmail;
 use openobserve_synthetics::service::{
-    ResyncUnavailable, SyntheticsEnvironmentRecord, UsageConflict,
+    NameConflict, ResyncUnavailable, SyntheticsEnvironmentRecord, UsageConflict,
 };
 
 /// Confirmation that the caller has seen the deletion guard's list.
@@ -121,6 +121,7 @@ pub async fn list_synthetics_variables(
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn create_synthetics_variable(
@@ -135,7 +136,7 @@ pub async fn create_synthetics_variable(
     let created_by = String::new();
     match openobserve_synthetics::service::create_variable(&org_id, None, body, &created_by).await {
         Ok(view) => MetaHttpResponse::json(view),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -156,7 +157,7 @@ pub async fn create_synthetics_variable(
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
+        (status = 409, description = "The new name is already taken, or checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn update_synthetics_variable(
@@ -257,6 +258,7 @@ pub async fn list_synthetics_environments(
     responses(
         (status = 200, description = "Created", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn create_synthetics_environment(
@@ -271,7 +273,7 @@ pub async fn create_synthetics_environment(
     let created_by = String::new();
     match openobserve_synthetics::service::create_environment(&org_id, body, &created_by).await {
         Ok(view) => MetaHttpResponse::json(view),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -291,6 +293,7 @@ pub async fn create_synthetics_environment(
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn update_synthetics_environment(
@@ -300,7 +303,7 @@ pub async fn update_synthetics_environment(
     match openobserve_synthetics::service::update_environment(&org_id, &env, body).await {
         Ok(Some(view)) => MetaHttpResponse::json(view),
         Ok(None) => MetaHttpResponse::not_found("environment not found"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -387,6 +390,7 @@ pub async fn list_synthetics_environment_variables(
     responses(
         (status = 200, description = "Created",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn create_synthetics_environment_variable(
@@ -413,7 +417,7 @@ pub async fn create_synthetics_environment_variable(
     .await
     {
         Ok(view) => MetaHttpResponse::json(view),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -435,7 +439,7 @@ pub async fn create_synthetics_environment_variable(
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = Object),
         (status = 404, description = "Not found", content_type = "application/json", body = Object),
-        (status = 409, description = "Checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
+        (status = 409, description = "The new name is already taken, or checks still reference the old name; re-send with force=true", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn update_synthetics_environment_variable(
@@ -570,9 +574,11 @@ async fn resolve_environment(
         .map_err(|e| variables_error("get_environment", e))
 }
 
-/// 409 for the reference guard, like a delete, so the client can confirm and re-send with force.
+/// 409 for a taken name or the reference guard, like a delete, so the client can confirm or rename.
 fn update_error(error: anyhow::Error) -> Response {
-    if error.downcast_ref::<UsageConflict>().is_some() {
+    if error.downcast_ref::<UsageConflict>().is_some()
+        || error.downcast_ref::<NameConflict>().is_some()
+    {
         MetaHttpResponse::conflict(error)
     } else {
         MetaHttpResponse::bad_request(error)
@@ -661,6 +667,7 @@ pub async fn get_synthetic_resolved_variables(
     responses(
         (status = 200, description = "Promoted", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn promote_synthetic_variable(
@@ -700,7 +707,7 @@ pub async fn promote_synthetic_variable(
     .await
     {
         Ok(view) => MetaHttpResponse::json(view),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -720,6 +727,7 @@ pub async fn promote_synthetic_variable(
     responses(
         (status = 200, description = "Promoted", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid",  content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn promote_environment_variable(
@@ -746,7 +754,7 @@ pub async fn promote_environment_variable(
     match openobserve_synthetics::service::promote_to_global(&org_id, &record, &id).await {
         Ok(Some(view)) => MetaHttpResponse::json(view),
         Ok(None) => MetaHttpResponse::not_found("variable not found"),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -766,6 +774,7 @@ pub async fn promote_environment_variable(
     responses(
         (status = 200, description = "Split",   content_type = "application/json", body = Object),
         (status = 400, description = "Invalid", content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn split_synthetics_variable(
@@ -802,7 +811,7 @@ pub async fn split_synthetics_variable(
     .await
     {
         Ok(views) => MetaHttpResponse::json(views),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -855,6 +864,7 @@ pub struct DuplicateEnvironmentBody {
     responses(
         (status = 200, description = "Duplicated", content_type = "application/json", body = Object),
         (status = 400, description = "Invalid",    content_type = "application/json", body = Object),
+        (status = 409, description = "A variable or environment with that name already exists", content_type = "application/json", body = Object),
     ),
 )]
 pub async fn duplicate_synthetics_environment(
@@ -895,7 +905,7 @@ pub async fn duplicate_synthetics_environment(
     .await
     {
         Ok(view) => MetaHttpResponse::json(view),
-        Err(e) => MetaHttpResponse::bad_request(e),
+        Err(e) => update_error(e),
     }
 }
 
@@ -944,10 +954,20 @@ mod tests {
 
     #[test]
     fn a_rename_blocked_by_references_is_a_conflict_like_a_delete() {
-        let conflict = update_error(UsageConflict("referenced".to_string()).into());
-        assert_eq!(conflict.status(), StatusCode::CONFLICT);
+        let in_use = update_error(UsageConflict("referenced".to_string()).into());
+        assert_eq!(in_use.status(), StatusCode::CONFLICT);
+        let taken = update_error(NameConflict("variable 'URL' already exists".to_string()).into());
+        assert_eq!(taken.status(), StatusCode::CONFLICT);
         let invalid = update_error(anyhow::anyhow!("name: invalid"));
         assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn every_write_handler_routes_errors_through_the_shared_mapper() {
+        let source = include_str!("variables.rs");
+        let tests = source.find("#[cfg(test)]").unwrap();
+        let inline = source[..tests].matches("bad_request(e)").count();
+        assert_eq!(inline, 0, "{inline} handler(s) still map errors inline");
     }
 
     #[test]

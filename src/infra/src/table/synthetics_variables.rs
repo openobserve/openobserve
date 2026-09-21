@@ -247,7 +247,7 @@ pub async fn set_env<C: ConnectionTrait>(
             Ok(true)
         }
         Err(e) => match e.sql_err() {
-            Some(SqlErr::UniqueConstraintViolation(_)) => Err(Error::Message(
+            Some(SqlErr::UniqueConstraintViolation(_)) => Err(Error::DuplicateName(
                 "a variable with that name already exists in the destination scope".to_string(),
             )),
             _ => Err(Error::DbError(DbError::SeaORMError(e.to_string()))),
@@ -362,7 +362,7 @@ fn incoming_wins(incoming: &SyntheticsVariableRecord, stored: &SyntheticsVariabl
 
 /// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
-    Error::Message(format!("variable '{name}' already exists in this scope"))
+    Error::DuplicateName(format!("variable '{name}' already exists in this scope"))
 }
 
 #[cfg(test)]

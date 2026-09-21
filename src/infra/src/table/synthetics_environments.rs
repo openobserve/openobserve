@@ -236,7 +236,7 @@ pub async fn delete<C: TransactionTrait>(
 
 /// Written to be shown: `DbError` would prefix it with its own type names.
 fn duplicate_name(name: &str) -> Error {
-    Error::Message(format!("environment '{name}' already exists in this org"))
+    Error::DuplicateName(format!("environment '{name}' already exists in this org"))
 }
 
 #[cfg(test)]

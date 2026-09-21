@@ -98,6 +98,18 @@ impl std::fmt::Display for UsageConflict {
 
 impl std::error::Error for UsageConflict {}
 
+/// The name is already taken in that scope; a client picks another name.
+#[derive(Debug)]
+pub struct NameConflict(pub String);
+
+impl std::fmt::Display for NameConflict {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for NameConflict {}
+
 /// What `_resync` actually enqueued, and the environments whose batch could not be built.
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ResyncSummary {
@@ -193,7 +205,7 @@ pub async fn get_environment(
     let conn = get_orm_client_ro().await;
     synthetics_environments::get_by_name(conn, org_id, name)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))
+        .map_err(infra_message)
 }
 
 /// The name a grant is written against, for an environment held by id.
@@ -201,7 +213,7 @@ pub async fn get_environment_name(org_id: &str, id: &str) -> anyhow::Result<Opti
     let conn = get_orm_client_ro().await;
     Ok(synthetics_environments::get_by_id(conn, org_id, id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
         .map(|env| env.name))
 }
 
@@ -210,7 +222,7 @@ pub async fn global_environment(org_id: &str) -> anyhow::Result<SyntheticsEnviro
     let conn = get_orm_client_rw().await;
     let (record, created) = synthetics_environments::get_or_create_global(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     // Not published: every region mints its own row under the same id.
     if created && ofga_enabled() {
         set_ownership(org_id, &environment_object(&record.name), "", "").await;
@@ -231,11 +243,11 @@ where
     let conn = get_orm_client_rw().await;
     let mut envs = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     envs.sort_by_key(|env| !env.is_global);
     let counts = synthetics_checks::count_by_environment(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let scan = usage_scan(conn, org_id).await?;
     let rows: Vec<&SyntheticsVariableRecord> = scan.shared.iter().collect();
     let views = usage_views(org_id, &rows, &scan, readable_checks).await?;
@@ -282,7 +294,7 @@ pub async fn create_environment(
     let conn = get_orm_client_rw().await;
     synthetics_environments::add(conn, &record)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
 
     publish_environment_put(&record).await;
     grant_new_environment(org_id, &record.name).await;
@@ -304,12 +316,12 @@ pub async fn duplicate_environment(
     let conn = get_orm_client_rw().await;
     let source = synthetics_environments::get_by_name(conn, org_id, source)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
         .ok_or_else(|| anyhow::anyhow!("environment '{source}' not found"))?;
 
     let rows: Vec<_> = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
         .into_iter()
         .filter(|v| v.env == source.id)
         .collect();
@@ -320,7 +332,7 @@ pub async fn duplicate_environment(
     let txn = conn.begin().await?;
     synthetics_environments::add(&txn, &target)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let mut copies = Vec::with_capacity(rows.len());
     for row in &rows {
         let copy = SyntheticsVariableRecord {
@@ -343,7 +355,7 @@ pub async fn duplicate_environment(
         };
         synthetics_variables::insert_row(&txn, &copy)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            .map_err(infra_message)?;
         copies.push(copy);
     }
     txn.commit().await?;
@@ -361,7 +373,7 @@ pub async fn update_environment(
     let conn = get_orm_client_rw().await;
     let Some(mut record) = synthetics_environments::get_by_name(conn, org_id, name)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     else {
         return Ok(None);
     };
@@ -379,7 +391,7 @@ pub async fn update_environment(
         record.updated_at,
     )
     .await
-    .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    .map_err(infra_message)?;
     if !updated {
         return Ok(None);
     }
@@ -392,16 +404,16 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
     let conn = get_orm_client_rw().await;
     let Some(record) = synthetics_environments::get_by_name(conn, org_id, name)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     else {
         return Ok(false);
     };
     let counts = synthetics_checks::count_by_environment(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let scoped: Vec<_> = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
         .into_iter()
         .filter(|v| v.env == record.id)
         .collect();
@@ -416,7 +428,7 @@ pub async fn delete_environment(org_id: &str, name: &str, force: bool) -> anyhow
 
     let deleted = synthetics_environments::delete(conn, org_id, &record.id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     if deleted {
         synthetics_variables::invalidate_and_publish(org_id).await;
         publish_environment_delete(&record).await;
@@ -443,7 +455,7 @@ where
     let global_id = synthetics_environments::global_environment_id(org_id);
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     if !shared.iter().any(|v| v.env == global_id) {
         return Ok(Vec::new());
     }
@@ -470,7 +482,7 @@ where
     let conn = get_orm_client_ro().await;
     let Some(env) = synthetics_environments::get_by_name(conn, org_id, env_name)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     else {
         return Ok(None);
     };
@@ -490,7 +502,7 @@ pub async fn validate_environments(org_id: &str, ids: &[String]) -> anyhow::Resu
     let conn = get_orm_client_ro().await;
     let known = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     match check_environments_error(&known, ids) {
         Some(err) => anyhow::bail!(err),
         None => Ok(()),
@@ -538,7 +550,7 @@ pub async fn create_variable(
     };
     synthetics_variables::add(conn, &record)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     publish_batch(org_id, &[&env], std::slice::from_ref(&record), &[]).await;
     project_view(org_id, &record).await
 }
@@ -599,7 +611,7 @@ pub async fn update_variable(
     // A delete that landed since the read leaves nothing to update, and nothing to publish.
     if !synthetics_variables::update(conn, &record)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     {
         return Ok(None);
     }
@@ -627,7 +639,7 @@ pub async fn delete_variable(
     }
     let deleted = synthetics_variables::delete(conn, org_id, id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     if deleted {
         publish_variable_delete(org_id, id).await;
     }
@@ -647,16 +659,16 @@ where
     let conn = get_orm_client_ro().await;
     let Some(check) = synthetics_checks::get(conn, org_id, check_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     else {
         return Ok(None);
     };
     let envs = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let first = check
         .environments
         .first()
@@ -690,16 +702,16 @@ where
     let conn = get_orm_client_ro().await;
     let Some(check) = synthetics_checks::get(conn, org_id, check_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     else {
         return Ok(None);
     };
     let envs = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
 
     let global_id = synthetics_environments::global_environment_id(org_id);
     let named: Vec<&SyntheticsEnvironmentRecord> = check
@@ -784,7 +796,7 @@ pub async fn promote_to_global(
     record.updated_at = next_updated_at(record.updated_at);
     if !synthetics_variables::set_env(conn, org_id, id, &global.id, record.updated_at)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
     {
         return Ok(None);
     }
@@ -842,10 +854,10 @@ pub async fn resync_environments(org_id: &str) -> anyhow::Result<ResyncSummary> 
     let conn = get_orm_client_ro().await;
     let envs = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let rows = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let mut summary = ResyncSummary::default();
     for env in &envs {
         let puts: Vec<SyntheticsVariableRecord> =
@@ -897,10 +909,10 @@ async fn org_variable_state_in<C: sea_orm::ConnectionTrait>(
 ) -> anyhow::Result<OrgVariableState> {
     let checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let global_id = synthetics_environments::global_environment_id(org_id);
     Ok(OrgVariableState {
         checks: checks.iter().map(|c| check_footprint(&c.id, c)).collect(),
@@ -925,7 +937,7 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
 ) -> anyhow::Result<(SyntheticsVariableRecord, Synthetic)> {
     let mut check = synthetics_checks::get(conn, org_id, check_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        .map_err(infra_message)?
         .ok_or_else(|| anyhow::anyhow!("check not found: {check_id}"))?;
 
     let normalized = normalize_variable_name(name);
@@ -942,10 +954,10 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
     if env.is_global {
         let shared = synthetics_variables::list(conn, org_id)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            .map_err(infra_message)?;
         let envs = synthetics_environments::list(conn, org_id)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            .map_err(infra_message)?;
         if let Some(refusal) =
             shadowing_environment_refusal(&normalized, &check.environments, &shared, &envs)
         {
@@ -983,10 +995,10 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
     let txn = conn.begin().await?;
     synthetics_variables::insert_row(&txn, &record)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let check = synthetics_checks::update_row(&txn, org_id, check_id, &check)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     txn.commit().await?;
     Ok((record, check))
 }
@@ -1010,7 +1022,7 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
 
     let known = synthetics_environments::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let mut resolved = Vec::with_capacity(targets.len());
     for target in targets {
         let env = known
@@ -1022,7 +1034,7 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
 
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let checks = checks_with_secret_slots(conn, org_id).await?;
     let covered: HashSet<&str> = resolved
         .iter()
@@ -1077,11 +1089,11 @@ async fn split_to_environments_in<C: sea_orm::ConnectionTrait + TransactionTrait
     for record in &created {
         synthetics_variables::insert_row(&txn, record)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+            .map_err(infra_message)?;
     }
     synthetics_variables::delete_row(&txn, org_id, id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     txn.commit().await?;
     Ok((resolved.into_iter().map(|(env, _)| env).collect(), created))
 }
@@ -1095,7 +1107,7 @@ async fn resolve_shared_variables_in<C: sea_orm::ConnectionTrait>(
 ) -> anyhow::Result<Vec<(String, String)>> {
     let rows = synthetics_variables::list_cached(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     let global_id = synthetics_environments::global_environment_id(org_id);
     let referenced = placeholder_names(&check_placeholder_text(check));
     // Only what the check names reaches the probe, which also redacts every value it is sent.
@@ -1132,7 +1144,7 @@ async fn usage_scan<C: sea_orm::ConnectionTrait>(
 ) -> anyhow::Result<UsageScan> {
     let shared = synthetics_variables::list(conn, org_id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     Ok(UsageScan::new(
         checks_with_secret_slots(conn, org_id).await?,
         shared,
@@ -1173,7 +1185,7 @@ async fn checks_with_secret_slots<C: sea_orm::ConnectionTrait>(
 ) -> anyhow::Result<Vec<Synthetic>> {
     let mut checks = synthetics_checks::list(conn, org_id, &ListSyntheticsParams::default())
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     if checks.iter_mut().any(has_encrypted_config) {
         let dek = synthetics_dek(org_id).await?;
         rehydrate_all(&mut checks, &dek);
@@ -1619,6 +1631,15 @@ fn resolved_rows(
     out
 }
 
+/// A table duplicate becomes a typed conflict so the handler answers 409 without sniffing.
+fn infra_message(e: infra::errors::Error) -> anyhow::Error {
+    match e {
+        infra::errors::Error::DuplicateName(m) => anyhow::Error::from(NameConflict(m)),
+        infra::errors::Error::Message(m) => anyhow::anyhow!(m),
+        other => anyhow::anyhow!(other.to_string()),
+    }
+}
+
 /// Why a secret cannot join the global environment.
 fn secret_cannot_be_global(name: &str) -> String {
     format!(
@@ -1965,7 +1986,7 @@ async fn scoped_variable<C: sea_orm::ConnectionTrait>(
 ) -> anyhow::Result<Option<SyntheticsVariableRecord>> {
     let found = synthetics_variables::get(conn, org_id, id)
         .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+        .map_err(infra_message)?;
     Ok(found.filter(|v| in_scope(v, env)))
 }
 
@@ -2921,9 +2942,12 @@ mod tests {
         ] {
             db.execute(backend.build(&table)).await.unwrap();
         }
-        db.execute_unprepared("CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)")
-            .await
-            .unwrap();
+        for index in [
+            "CREATE UNIQUE INDEX u ON synthetics_variables (org_id, env, name)",
+            "CREATE UNIQUE INDEX e ON synthetics_environments (org_id, name)",
+        ] {
+            db.execute_unprepared(index).await.unwrap();
+        }
         db
     }
 
@@ -3128,6 +3152,126 @@ mod tests {
         let rows = synthetics_variables::list(&db, org).await.unwrap();
         assert_eq!(rows.len(), 2);
         assert!(rows.iter().all(|v| v.env != global.id && v.name == "URL"));
+    }
+
+    #[test]
+    fn a_table_message_reaches_the_client_without_the_infra_prefix() {
+        let plain = infra_message(infra::errors::Error::Message("bad value".into()));
+        assert_eq!(plain.to_string(), "bad value");
+        assert!(plain.downcast_ref::<NameConflict>().is_none());
+        let dup = infra_message(infra::errors::Error::DuplicateName("taken".into()));
+        assert_eq!(dup.to_string(), "taken");
+        assert!(dup.downcast_ref::<NameConflict>().is_some());
+    }
+
+    #[test]
+    fn other_infra_errors_keep_their_own_display() {
+        let cases = [
+            infra::errors::Error::NotImplemented,
+            infra::errors::Error::ReadOnly("frozen".into()),
+            infra::errors::Error::DbError(infra::errors::DbError::SeaORMError("down".into())),
+            infra::errors::Error::IngestionError("x".into()),
+        ];
+        for e in cases {
+            let display = e.to_string();
+            let mapped = infra_message(e);
+            assert_eq!(mapped.to_string(), display);
+            assert!(mapped.downcast_ref::<NameConflict>().is_none());
+        }
+        let ingestion = infra_message(infra::errors::Error::IngestionError("x".into()));
+        assert_eq!(ingestion.to_string(), "Error# x");
+    }
+
+    #[test]
+    fn every_table_error_goes_through_infra_message() {
+        let source = include_str!("variables.rs");
+        let code = &source[..source.find("#[cfg(test)]\nmod tests").unwrap()];
+        let inline = code
+            .matches("map_err(|e| anyhow::anyhow!(e.to_string()))")
+            .count();
+        assert_eq!(
+            inline, 0,
+            "{inline} site(s) still stringify infra errors inline"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_variable_name_is_a_name_conflict() {
+        let db = variables_db().await;
+        let org = "f46-dup-var";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let first = stored_var(&db, &global, "URL", "plain", "https://a.test").await;
+        let again = SyntheticsVariableRecord {
+            id: "other-id".into(),
+            ..first
+        };
+        let raw = synthetics_variables::insert_row(&db, &again)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(raw, infra::errors::Error::DuplicateName(_)),
+            "{raw}"
+        );
+        let err = infra_message(raw);
+        assert!(
+            err.downcast_ref::<NameConflict>().is_some(),
+            "expected NameConflict, got: {err}"
+        );
+        assert_eq!(
+            err.to_string(),
+            "variable 'URL' already exists in this scope"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_variable_moved_onto_a_taken_name_is_a_name_conflict() {
+        let db = variables_db().await;
+        let org = "f46-dup-move";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let staging = stored_env(&db, org, "staging").await;
+        stored_var(&db, &global, "URL", "plain", "https://g.test").await;
+        let scoped = stored_var(&db, &staging, "URL", "plain", "https://s.test").await;
+        let raw = synthetics_variables::set_env(&db, org, &scoped.id, &global.id, 2)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(raw, infra::errors::Error::DuplicateName(_)),
+            "{raw}"
+        );
+        let err = infra_message(raw);
+        assert!(
+            err.downcast_ref::<NameConflict>().is_some(),
+            "expected NameConflict, got: {err}"
+        );
+        assert_eq!(
+            err.to_string(),
+            "a variable with that name already exists in the destination scope"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_duplicate_environment_name_is_a_name_conflict() {
+        let db = variables_db().await;
+        let org = "f46-dup-env";
+        let first = stored_env(&db, org, "staging").await;
+        let again = SyntheticsEnvironmentRecord {
+            id: "other-id".into(),
+            ..first
+        };
+        let raw = synthetics_environments::add(&db, &again).await.unwrap_err();
+        assert!(
+            matches!(raw, infra::errors::Error::DuplicateName(_)),
+            "{raw}"
+        );
+        let err = infra_message(raw);
+        assert!(
+            err.downcast_ref::<NameConflict>().is_some(),
+            "expected NameConflict, got: {err}"
+        );
+        assert_eq!(
+            err.to_string(),
+            "environment 'staging' already exists in this org"
+        );
     }
 
     #[test]
