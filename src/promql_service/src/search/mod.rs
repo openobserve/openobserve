@@ -297,11 +297,9 @@ async fn search_in_cluster(
     let nr_queriers = nodes.len() as i64;
 
     // cache enabled if result cache is enabled and use_cache is true and start != end
-    // a pin inside the cache delay still receives samples, and its value lands on every step
-    let pin_settled = window
-        .pinned
-        .is_none_or(|at| at < now_micros() - second_micros(cfg.limit.cache_delay_secs));
-    let use_cache = cfg.common.result_cache_enabled && req.use_cache && start != end && pin_settled;
+    // the cache keys on the output range, but a pinned value follows the data at `T` (#14688)
+    let cacheable = cfg.common.result_cache_enabled && window.pinned.is_none();
+    let use_cache = cacheable && req.use_cache && start != end;
     // adjust start and end time
     let (start, end) = adjust_start_end(start, end, step);
 
@@ -543,8 +541,7 @@ async fn search_in_cluster(
     .await;
 
     // cache the result
-    if cfg.common.result_cache_enabled
-        && pin_settled
+    if cacheable
         && let Some(matrix) = values.get_ref_matrix_values()
         && let Err(err) = cache::set(
             trace_id,
