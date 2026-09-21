@@ -342,10 +342,13 @@ pub fn resolve(
     if key.explicit_peer
         && let Some(server) = key.infer_service_name.as_deref()
     {
+        // an unknown explicit peer keeps its inferred kind (queue, database) over "external"
         let connection_type = if table.is_known_service(server, now) {
             ""
         } else {
-            CONNECTION_EXTERNAL
+            key.infer_service_type
+                .as_deref()
+                .unwrap_or(CONNECTION_EXTERNAL)
         };
         return Outcome::Edge {
             key: SeriesKey::edge(&key.client, server, connection_type),
@@ -551,6 +554,18 @@ mod tests {
             resolve(&key, &t, NOW, false),
             Outcome::Edge {
                 key: SeriesKey::edge("checkout", "stripe", CONNECTION_EXTERNAL),
+                tier: None,
+                ambiguous: false
+            }
+        );
+        let mut r = row("checkout", Some("kafka"));
+        r.explicit_peer = true;
+        r.infer_service_type = Some("queue".to_string());
+        let key = StagingKey::from_row(&r);
+        assert_eq!(
+            resolve(&key, &t, NOW, false),
+            Outcome::Edge {
+                key: SeriesKey::edge("checkout", "kafka", "queue"),
                 tier: None,
                 ambiguous: false
             }

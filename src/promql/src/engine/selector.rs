@@ -389,16 +389,16 @@ impl Engine {
                         for result in ret {
                             match result {
                                 Ok(Ok(data)) => unwrapped_results.push(data),
-                                Ok(Err(_)) => {
+                                Ok(Err(err)) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data error: {err}");
+                                    return Err(err);
+                                }
+                                Err(_) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
                                     return Err(ErrorCodes::SearchTimeout(
                                         "[PromQL] grpc search load data task timeout".to_string(),
                                     )
                                     .into());
-                                }
-                                Err(err) => {
-                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                                    return Err(ErrorCodes::ServerInternalError(err.to_string()).into());
                                 }
                             }
                         }
