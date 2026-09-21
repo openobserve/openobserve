@@ -232,6 +232,12 @@ def test_stale_drop_increments_records_dropped_metric(
 ):
     """Window drops raise zo_ingest_records_dropped_total{reason=ingestion_window}.
 
+    The batch carries one in-window record so it is a PARTIAL drop: a batch with
+    nothing left to write fast-returns before the counting path (ingest.rs "if no
+    data, fast return"), so a wholly-discarded batch increments nothing. The real
+    case this counter is for — a source with clock skew losing some records — is
+    exactly this partial drop.
+
     Skips when Prometheus export is off (ZO_PROMETHEUS_ENABLED), since /metrics
     then serves an empty body and the counter is unobservable over the API.
     """
@@ -245,8 +251,9 @@ def test_stale_drop_increments_records_dropped_metric(
     n = 3
     index = unique_name("hecwin")
     stale = time.time() - STALE_OFFSET_SECONDS
-    body = "\n".join(_event(uuid.uuid4().hex, index=index, time_seconds=stale) for _ in range(n))
-    resp = _collector_post(client, hec_guid, body)
+    events = [_event(uuid.uuid4().hex, index=index, time_seconds=time.time())]
+    events += [_event(uuid.uuid4().hex, index=index, time_seconds=stale) for _ in range(n)]
+    resp = _collector_post(client, hec_guid, "\n".join(events))
     assert resp.status_code == 200, resp.text
     assert resp.json().get("code") == 0, resp.text
 
