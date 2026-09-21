@@ -54,7 +54,7 @@ export default class DashboardCellExplorerPage {
     this.jsonContent = page.locator('[data-test="log-detail-json-content"]');
     this.tableContent = page.locator('[data-test="log-detail-table-content"]');
     this.kvTable = page.locator('[data-test="log-detail-table"]');
-    this.kvSearchInput = page.locator('[data-test="log-detail-table-search-input"]');
+    this.kvSearchInput = page.locator('[data-test="log-detail-table-search-input-field"]');
     // v-show gated on the table tab; present in the DOM on every tab.
     this.wrapToggle = page.locator('[data-test="log-detail-wrap-values-toggle-btn"]');
     this.surroundWindowBtn = page.locator('[data-test="log-explorer-surround-window"]');
@@ -286,11 +286,65 @@ export default class DashboardCellExplorerPage {
     await expect(this.surroundWindowBtn).toBeVisible({ timeout: 15000 });
   }
 
+  /**
+   * Change the surrounding-events window to `value` minutes. Returns the observed
+   * search window span (end_time - start_time, microseconds) of the re-fetch the
+   * change triggered, so the caller can assert the re-fetch actually used the NEW
+   * window rather than the initial ±3 min load.
+   */
   async changeSurroundWindow(value = "5") {
+    const minutes = Number(value);
+    const expectedSpan = 2 * minutes * 60 * 1_000_000;
+    const label = {
+      1: "±1 min",
+      2: "±2 min",
+      3: "±3 min",
+      5: "±5 min",
+      10: "±10 min",
+    }[minutes];
+
+    // Wait for the re-fetch: a surrounding-events search (`ORDER BY _timestamp
+    // ASC`) whose time window spans the NEW value, not the initial ±3 min.
+    const refetch = this.page.waitForResponse(
+      (resp) => {
+        const req = resp.request();
+        if (!req.url().includes("/_search")) return false;
+        let body;
+        try {
+          body = req.postDataJSON();
+        } catch {
+          return false;
+        }
+        if (
+          typeof body?.query?.sql !== "string" ||
+          !body.query.sql.includes("ORDER BY _timestamp ASC")
+        ) {
+          return false;
+        }
+        const span =
+          Number(body.query.end_time) - Number(body.query.start_time);
+        return span === expectedSpan;
+      },
+      { timeout: 30000 }
+    );
+
     await this.surroundWindowBtn.click();
-    await this.page
-      .locator(`[data-test="log-explorer-surround-window-${value}"]`)
-      .click();
+    const option = this.page.locator(
+      `[data-test="log-explorer-surround-window-${value}"]`
+    );
+    // Reka dropdowns re-mount their items during the reveal animation, so a
+    // naive click flakes with "element was detached". Poll the click until it
+    // lands (option selected -> menu closes).
+    await expect(async () => {
+      await option.click({ timeout: 3000 });
+    }).toPass({ timeout: 15000, intervals: [500] });
+    // State guard: confirm the selection actually landed before trusting the
+    // downstream result.
+    await expect(this.surroundWindowBtn).toContainText(label);
+
+    const response = await refetch;
+    const body = response.request().postDataJSON();
+    return Number(body.query.end_time) - Number(body.query.start_time);
   }
 
   /** Surrounding section settled into rows or the (valid) empty state. */

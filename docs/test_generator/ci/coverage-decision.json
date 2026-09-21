@@ -1,9 +1,0 @@
-{
-  "action": "new",
-  "target_spec": "tests/ui-testing/playwright-tests/Dashboards/dashboard-cell-explorer-detail.spec.js",
-  "existing_tests_considered": [
-    "tests/ui-testing/playwright-tests/Dashboards/interactive-dashboard-table.spec.js"
-  ],
-  "needs_registration": true,
-  "rationale": "interactive-dashboard-table.spec.js covers ONLY the cell-drilldown drawer-open path (search icon -> results list -> cell_* URL sync -> close cleanup). This feature is the in-place log-detail surface INSIDE that drawer: open detail (log-explorer-row-open -> log-explorer-detail-back), Insights/JSON/Table tabs, prev/next push-nav, back/Escape, copy-link, and deep-link restore via cell_event_ts. No existing spec asserts any of it, and the cell-explorer page object (dashboard-cell-explorer.js) is list-only. The Analyst's setup contract pre-designated a dedicated spec file, so a new spec is the correct home rather than cramming detail-surface tests into the drawer-open spec. NOTE: register under the Dashboards-Core shard (run-context playwright_group); the sibling interactive-dashboard-table.spec.js lives in Dashboards-Tables, so the Engineer should confirm the intended shard when adding run_files."
-}

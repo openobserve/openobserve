@@ -164,7 +164,9 @@ test.describe("Dashboard Cell Explorer Log Detail", { tag: ["@all", "@dashboard"
     await openDetail(pm);
 
     await pm.dashboardCellExplorer.expectSurroundingSectionVisible();
-    await pm.dashboardCellExplorer.changeSurroundWindow("5");
+    await pm.dashboardCellExplorer.expectSurroundingResolved();
+    const reFetchSpan = await pm.dashboardCellExplorer.changeSurroundWindow("5");
+    expect(reFetchSpan).toBe(2 * 5 * 60 * 1_000_000);
     await pm.dashboardCellExplorer.expectSurroundingResolved();
     testLogger.info("Surrounding events section rendered and re-fetched on window change");
 
@@ -217,10 +219,10 @@ test.describe("Dashboard Cell Explorer Log Detail", { tag: ["@all", "@dashboard"
     await openDetail(pm);
     await pm.dashboardCellExplorer.clickTableTab();
 
-    await pm.dashboardCellExplorer.expectKvKeyVisible("level");
+    await pm.dashboardCellExplorer.expectKvKeyVisible("_timestamp");
     await pm.dashboardCellExplorer.fillKvSearch("kubernetes_namespace_name");
     await pm.dashboardCellExplorer.expectKvKeyVisible("kubernetes_namespace_name");
-    await pm.dashboardCellExplorer.expectKvKeyHidden("level");
+    await pm.dashboardCellExplorer.expectKvKeyHidden("_timestamp");
     testLogger.info("KV table search narrows the field list to matching keys");
 
     await pm.dashboardCellExplorer.closeDrawer();
