@@ -1695,9 +1695,7 @@ impl Synthetic {
                     v.name
                 ));
             }
-            if v.name
-                .starts_with(crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX)
-            {
+            if crate::meta::synthetics_variables::has_reserved_prefix(&v.name) {
                 return Err(format!(
                     "variables: '{}' is reserved for credentials the probe injects itself",
                     crate::meta::synthetics_variables::RESERVED_VARIABLE_PREFIX
@@ -2787,14 +2785,16 @@ mod tests {
     fn the_probes_own_credential_prefix_is_reserved_on_the_check_tier_too() {
         let (locs, brs, devs) = allowed();
         let mut s = valid_tcp_synthetic();
-        s.variables = vec![SyntheticVariable {
-            name: "_AUTH_COOKIES".to_string(),
-            value: "x".to_string(),
-            secure: false,
-            example: String::new(),
-        }];
-        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
-        assert!(err.contains("reserved"), "{err}");
+        for name in ["_AUTH_COOKIES", "_auth_token", "_Auth_Token"] {
+            s.variables = vec![SyntheticVariable {
+                name: name.to_string(),
+                value: "x".to_string(),
+                secure: false,
+                example: String::new(),
+            }];
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+        }
     }
 
     #[test]

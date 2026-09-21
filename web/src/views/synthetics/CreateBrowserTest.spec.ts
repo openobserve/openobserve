@@ -419,8 +419,7 @@ describe("CreateBrowserTest", () => {
       expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
     });
 
-    // Stored names are always upper-case, so a camelCase example can never resolve.
-    it("should show an upper-case placeholder example under the Starting URL", async () => {
+    it("should show a placeholder example under the Starting URL", async () => {
       wrapper = mountPage();
       await flushPromises();
 

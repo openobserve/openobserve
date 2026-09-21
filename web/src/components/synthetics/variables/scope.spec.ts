@@ -142,8 +142,9 @@ describe("duplicateNameFor", () => {
 });
 
 describe("duplicateVariableNameFor", () => {
-  it("suffixes in upper case, because the server normalizes the name anyway", () => {
+  it("appends the _COPY suffix and keeps the source name as is", () => {
     expect(duplicateVariableNameFor("BASE_URL")).toBe("BASE_URL_COPY");
+    expect(duplicateVariableNameFor("base_url")).toBe("base_url_COPY");
   });
 
   it("offers a name the server will accept", () => {

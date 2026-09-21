@@ -940,15 +940,16 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
         .map_err(infra_message)?
         .ok_or_else(|| anyhow::anyhow!("check not found: {check_id}"))?;
 
-    let normalized = normalize_variable_name(name);
+    let name = name.trim();
+    validate_variable_name(name).map_err(|e| anyhow::anyhow!(e))?;
     let position = check
         .variables
         .iter()
-        .position(|v| normalize_variable_name(&v.name) == normalized)
+        .position(|v| v.name == name)
         .ok_or_else(|| anyhow::anyhow!("check has no variable named '{name}'"))?;
 
     let source = check.variables[position].clone();
-    if let Some(refusal) = promote_refusal(&source, &normalized, env, &check.environments) {
+    if let Some(refusal) = promote_refusal(&source, env, &check.environments) {
         anyhow::bail!(refusal);
     }
     if env.is_global {
@@ -959,7 +960,7 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
             .await
             .map_err(infra_message)?;
         if let Some(refusal) =
-            shadowing_environment_refusal(&normalized, &check.environments, &shared, &envs)
+            shadowing_environment_refusal(name, &check.environments, &shared, &envs)
         {
             anyhow::bail!(refusal);
         }
@@ -969,7 +970,7 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
     let before = org_variable_state_in(conn, org_id).await?;
     let mut after = before.clone();
     after.shared.push(SharedVariableScope {
-        name: normalized.clone(),
+        name: name.to_string(),
         env: cap_scope(env),
     });
     if let Some(err) = variable_cap_error(&before, &after) {
@@ -981,7 +982,7 @@ async fn promote_check_variable_in<C: sea_orm::ConnectionTrait + TransactionTrai
         id: config::ider::uuid(),
         org_id: org_id.to_string(),
         env: env.id.clone(),
-        name: normalized,
+        name: name.to_string(),
         value: source.value.clone(),
         kind: promoted_kind(&source).to_string(),
         description: String::new(),
@@ -1676,17 +1677,9 @@ fn rename_refusal(old: &str, new: &str, users: &[String], force: bool) -> Option
 /// Why a check variable cannot move to `env`, if it cannot.
 fn promote_refusal(
     source: &SyntheticVariable,
-    normalized: &str,
     env: &SyntheticsEnvironmentRecord,
     check_environments: &[String],
 ) -> Option<String> {
-    if source.name != normalized {
-        return Some(format!(
-            "shared names are upper case, so '{}' would stop resolving; rename it to {normalized} \
-             in the check first",
-            source.name
-        ));
-    }
     if source.secure && env.is_global {
         return Some("secret values cannot go to global; promote to an environment".to_string());
     }
@@ -2553,15 +2546,15 @@ mod tests {
     #[test]
     fn a_secure_check_variable_cannot_be_promoted_to_global() {
         let global = env_record(GLOBAL, "global");
-        let err = promote_refusal(&check_var("TOKEN"), "TOKEN", &global, &[]).unwrap();
+        let err = promote_refusal(&check_var("TOKEN"), &global, &[]).unwrap();
         assert!(err.contains("promote to an environment"), "{err}");
-        assert!(promote_refusal(&plain_check_var("URL"), "URL", &global, &[]).is_none());
+        assert!(promote_refusal(&plain_check_var("URL"), &global, &[]).is_none());
     }
 
     #[test]
     fn a_secure_check_variable_is_promoted_as_a_secret() {
         let prod = env_record("e-prod", "prod");
-        assert!(promote_refusal(&check_var("TOKEN"), "TOKEN", &prod, &["e-prod".into()]).is_none());
+        assert!(promote_refusal(&check_var("TOKEN"), &prod, &["e-prod".into()]).is_none());
         assert_eq!(
             promoted_kind(&check_var("TOKEN")),
             synthetics_variables::KIND_SECRET
@@ -2573,24 +2566,14 @@ mod tests {
     }
 
     #[test]
-    fn a_promote_that_would_rename_the_variable_is_refused() {
-        let global = env_record(GLOBAL, "global");
-        let err = promote_refusal(&plain_check_var("base_url"), "BASE_URL", &global, &[]).unwrap();
-        assert!(
-            err.contains("rename it to BASE_URL in the check first"),
-            "{err}"
-        );
-    }
-
-    #[test]
     fn a_promote_into_an_environment_the_check_does_not_run_in_is_refused() {
         let prod = env_record("e-prod", "prod");
         let var = plain_check_var("URL");
-        let err = promote_refusal(&var, "URL", &prod, &["e-stg".into()]).unwrap();
+        let err = promote_refusal(&var, &prod, &["e-stg".into()]).unwrap();
         assert!(err.contains("'prod'"), "{err}");
-        assert!(promote_refusal(&var, "URL", &prod, &["e-prod".into()]).is_none());
+        assert!(promote_refusal(&var, &prod, &["e-prod".into()]).is_none());
         let global = env_record(GLOBAL, "global");
-        assert!(promote_refusal(&var, "URL", &global, &["e-stg".into()]).is_none());
+        assert!(promote_refusal(&var, &global, &["e-stg".into()]).is_none());
     }
 
     #[test]
@@ -3045,16 +3028,23 @@ mod tests {
         let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
         let staging = stored_env(&db, org, "staging").await;
         let check = Synthetic {
-            variables: vec![plain_check_var("API_HOST")],
-            ..synthetic("Login", "https://{{API_HOST}}/login", &[&staging.id], &[])
+            variables: vec![plain_check_var("api_host")],
+            ..synthetic("Login", "https://{{api_host}}/login", &[&staging.id], &[])
         };
         stored_check(&db, org, "c1", check).await;
 
+        let err = promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
+            .await
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("no variable named"), "{err}");
+
         let (record, check) =
-            promote_check_variable_in(&db, org, "c1", "API_HOST", &global, "asha@acme.com")
+            promote_check_variable_in(&db, org, "c1", "  api_host ", &global, "asha@acme.com")
                 .await
                 .unwrap();
         assert_eq!(record.env, global.id);
+        assert_eq!(record.name, "api_host");
         assert_eq!(record.value, "y");
         assert!(check.variables.is_empty());
 
@@ -3065,6 +3055,25 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(reread.variables.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_promote_of_a_reserved_name_is_refused() {
+        let db = variables_db().await;
+        let org = "f14-promote-reserved";
+        let global = stored_env(&db, org, GLOBAL_ENVIRONMENT_NAME).await;
+        let check = Synthetic {
+            variables: vec![plain_check_var("_auth_token")],
+            ..synthetic("Login", "https://a.test/login", &[], &[])
+        };
+        stored_check(&db, org, "c1", check).await;
+
+        let err =
+            promote_check_variable_in(&db, org, "c1", "_auth_token", &global, "asha@acme.com")
+                .await
+                .unwrap_err()
+                .to_string();
+        assert!(err.contains("reserved"), "{err}");
     }
 
     #[tokio::test]

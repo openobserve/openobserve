@@ -37,8 +37,8 @@ use config::meta::{
         ResolvedVariablesGrouped, SharedVariableScope, SplitTarget, SyntheticsEnvironmentRequest,
         SyntheticsEnvironmentView, SyntheticsVariableKind, SyntheticsVariableRequest,
         SyntheticsVariableView, normalize_variable_name, placeholder_names,
-        validate_environment_description, validate_environment_request, validate_variable_request,
-        variable_cap_error,
+        validate_environment_description, validate_environment_request, validate_variable_name,
+        validate_variable_request, variable_cap_error,
     },
 };
 pub use infra::table::synthetics_environments::SyntheticsEnvironmentRecord;

@@ -248,9 +248,9 @@ pub fn substitute_placeholders(text: &str, values: &HashMap<String, String>) -> 
     out
 }
 
-/// Upper-cases a variable name, which is how every name is stored.
+/// Trims a variable name; the case the author typed is what gets stored.
 pub fn normalize_variable_name(name: &str) -> String {
-    name.trim().to_ascii_uppercase()
+    name.trim().to_string()
 }
 
 /// Validates an already-normalised variable name.
@@ -274,12 +274,18 @@ pub fn validate_variable_name(name: &str) -> Result<(), String> {
             "name: invalid name '{name}' (must match [A-Za-z_][A-Za-z0-9_]*)"
         ));
     }
-    if name.starts_with(RESERVED_VARIABLE_PREFIX) {
+    if has_reserved_prefix(name) {
         return Err(format!(
             "name: '{RESERVED_VARIABLE_PREFIX}' is reserved for credentials the probe injects itself"
         ));
     }
     Ok(())
+}
+
+/// The probe's credential prefix is reserved in every casing, or `_auth_x` would slip past.
+pub fn has_reserved_prefix(name: &str) -> bool {
+    name.get(..RESERVED_VARIABLE_PREFIX.len())
+        .is_some_and(|p| p.eq_ignore_ascii_case(RESERVED_VARIABLE_PREFIX))
 }
 
 pub fn validate_environment_name(name: &str) -> Result<(), String> {
@@ -450,14 +456,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn names_are_stored_upper_cased() {
-        assert_eq!(normalize_variable_name("  base_url "), "BASE_URL");
+    fn names_are_stored_as_typed_once_trimmed() {
+        assert_eq!(normalize_variable_name("  base_url "), "base_url");
+        assert_eq!(normalize_variable_name("Base_Url"), "Base_Url");
         assert_eq!(normalize_variable_name("BASE_URL"), "BASE_URL");
     }
 
     #[test]
     fn variable_names_follow_the_check_tier_rule() {
         assert!(validate_variable_name("BASE_URL").is_ok());
+        assert!(validate_variable_name("base_url").is_ok());
         assert!(validate_variable_name("_PRIVATE").is_ok());
         assert!(validate_variable_name("1ST").is_err());
         assert!(validate_variable_name("HAS-DASH").is_err());
@@ -465,9 +473,13 @@ mod tests {
     }
 
     #[test]
-    fn the_probes_own_credential_prefix_is_reserved() {
-        assert!(validate_variable_name("_AUTH_COOKIES").is_err());
+    fn the_probes_own_credential_prefix_is_reserved_in_every_casing() {
+        for name in ["_AUTH_COOKIES", "_auth_token", "_Auth_Token"] {
+            let err = validate_variable_name(name).unwrap_err();
+            assert!(err.contains("reserved"), "{name}: {err}");
+        }
         assert!(validate_variable_name("_AUTHENTIC").is_ok());
+        assert!(validate_variable_name("_authentic").is_ok());
     }
 
     #[test]
@@ -492,6 +504,18 @@ mod tests {
         }
         assert!(validate_environment_name("global-eu").is_ok());
         assert!(validate_environment_name("globals").is_ok());
+    }
+
+    #[test]
+    fn a_request_keeps_the_case_the_author_typed() {
+        let req = SyntheticsVariableRequest {
+            name: "base_url".into(),
+            value: Some("https://acme.test".into()),
+            kind: Some(SyntheticsVariableKind::Plain),
+            ..Default::default()
+        };
+        assert!(validate_variable_request(&req, true, false, None).is_ok());
+        assert_eq!(normalize_variable_name(&req.name), "base_url");
     }
 
     #[test]

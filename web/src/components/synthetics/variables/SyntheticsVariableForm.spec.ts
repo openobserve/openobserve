@@ -87,7 +87,7 @@ describe("SyntheticsVariableForm — cross-tier shadow confirms", () => {
 
   it("asks before creating an env variable that shadows a global", async () => {
     wrapper = mountForm({ environment: "staging", otherTierNames: { URL: [] } });
-    await (wrapper.vm as any).save({ name: "url", kind: "plain", value: "x" });
+    await (wrapper.vm as any).save({ name: "URL", kind: "plain", value: "x" });
 
     expect(confirmMock).toHaveBeenCalledTimes(1);
     const message = String(confirmMock.mock.calls[0][0].message);
@@ -256,7 +256,7 @@ describe("SyntheticsVariableForm — saving an edit", () => {
   });
 });
 
-describe("SyntheticsVariableForm — the name is upper-case from the first keystroke", () => {
+describe("SyntheticsVariableForm — the name keeps the case the author typed", () => {
   let wrapper: VueWrapper;
 
   beforeEach(() => {
@@ -270,40 +270,62 @@ describe("SyntheticsVariableForm — the name is upper-case from the first keyst
 
   const nameInput = () => wrapper.find('[data-test="synthetics-variable-name-input"] input');
 
-  it("shows MY_URL in the Name input after typing my_url", async () => {
+  it("leaves my_url in the Name input after typing my_url", async () => {
     wrapper = mountFormWithInputs({ environment: "staging" });
     await nameInput().setValue("my_url");
     await flushPromises();
 
-    expect((nameInput().element as HTMLInputElement).value).toBe("MY_URL");
+    expect((nameInput().element as HTMLInputElement).value).toBe("my_url");
   });
 
-  it("submitting the typed form sends the upper-cased name", async () => {
+  it("submitting the typed form sends the name as typed", async () => {
     wrapper = mountFormWithInputs({ environment: "staging" });
     await nameInput().setValue("my_url");
     await wrapper.find('[data-test="synthetics-variable-value-input"] input').setValue("x");
     await wrapper.find("form").trigger("submit");
     await vi.waitFor(() => expect(createEnvVar).toHaveBeenCalledTimes(1));
 
-    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "MY_URL" });
+    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "my_url" });
   });
 
-  it("save() sends the upper-cased name even when handed a lower-case one", async () => {
+  it("save() trims the name and keeps its case", async () => {
     wrapper = mountForm({ environment: "staging" });
-    await (wrapper.vm as any).save({ name: "my_url", kind: "plain", value: "x" });
+    await (wrapper.vm as any).save({ name: "  Base_Url ", kind: "plain", value: "x" });
 
     expect(createEnvVar).toHaveBeenCalledTimes(1);
-    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "MY_URL" });
+    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "Base_Url" });
   });
 
-  it("the create toast names the stored (upper-cased) variable", async () => {
+  it("the create toast names the variable as typed", async () => {
     wrapper = mountForm({ environment: "staging" });
     await (wrapper.vm as any).save({ name: "my_url", kind: "plain", value: "x" });
 
     expect(toast).toHaveBeenCalledTimes(1);
     const message = String(vi.mocked(toast).mock.calls[0][0].message);
-    expect(message).toContain("MY_URL");
-    expect(message).not.toContain("my_url");
+    expect(message).toContain("my_url");
+    expect(message).not.toContain("MY_URL");
+  });
+
+  it("a differently-cased global is not a shadow", async () => {
+    wrapper = mountForm({ environment: "staging", otherTierNames: { URL: [] } });
+    await (wrapper.vm as any).save({ name: "url", kind: "plain", value: "x" });
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(createEnvVar).toHaveBeenCalledTimes(1);
+    expect(createEnvVar.mock.calls[0][2]).toMatchObject({ name: "url" });
+  });
+
+  it("editing an existing lower-case shadow without renaming does not re-ask", async () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "url", kind: "plain", value: "https://a.test", has_value: true },
+      otherTierNames: { url: [] },
+    });
+    await (wrapper.vm as any).save({ name: "url", kind: "plain", value: "" });
+
+    expect(confirmMock).not.toHaveBeenCalled();
+    expect(updateEnvVar).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -53,7 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :disabled="isEdit"
         required
         data-test="synthetics-variable-name-input"
-        @update:model-value="upperCaseName"
       />
 
       <div class="flex flex-col gap-1">
@@ -116,7 +115,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, nextTick, ref, watch } from "vue";
+import { computed, defineComponent, ref, watch } from "vue";
 import type { PropType } from "vue";
 import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
@@ -202,21 +201,6 @@ export default defineComponent({
       },
     );
 
-    // The server stores every name upper-cased, so show the stored spelling while typing.
-    async function upperCaseName(value: unknown) {
-      const upper = String(value ?? "").toUpperCase();
-      if (upper === value) return;
-      const el = document.activeElement;
-      const focused = el instanceof HTMLInputElement && el.name === "name" ? el : null;
-      const caret = [focused?.selectionStart ?? null, focused?.selectionEnd ?? null] as const;
-      // The field's own change handler runs after this listener, so defer past it.
-      await nextTick();
-      formRef.value?.form.setFieldValue("name", upper);
-      await nextTick();
-      // Rewriting the value drops the caret to the end, so put it back where the user was.
-      if (focused && caret[0] !== null) focused.setSelectionRange(caret[0], caret[1]);
-    }
-
     function onKindChange(kind: unknown) {
       kindValue.value = kind === "secret" ? "secret" : "plain";
     }
@@ -230,7 +214,7 @@ export default defineComponent({
     async function acknowledgeShadow(name: string): Promise<boolean> {
       const envs = props.otherTierNames[name];
       if (envs === undefined) return true;
-      const original = (props.data?.name ?? "").trim().toUpperCase();
+      const original = (props.data?.name ?? "").trim();
       if (props.isEdit && name === original) return true;
       return confirm(
         props.environment
@@ -253,12 +237,10 @@ export default defineComponent({
 
     async function save(values: Record<string, unknown>) {
       const org = store.state.selectedOrganization.identifier;
-      const normalized = String(values.name ?? "")
-        .trim()
-        .toUpperCase();
-      if (!(await acknowledgeShadow(normalized))) return;
+      const name = String(values.name ?? "").trim();
+      if (!(await acknowledgeShadow(name))) return;
       const payload: SyntheticsVariablePayload = {
-        name: normalized,
+        name,
         kind: (values.kind as "plain" | "secret") ?? "plain",
         example: String(values.example ?? ""),
         description: String(values.description ?? ""),
@@ -286,7 +268,7 @@ export default defineComponent({
           variant: "success",
           message: props.isEdit
             ? t("synthetics.variables.updated")
-            : t("synthetics.variables.created", { name: normalized }),
+            : t("synthetics.variables.created", { name }),
         });
       } catch (error: unknown) {
         toast({
@@ -307,7 +289,6 @@ export default defineComponent({
       updatedRelative,
       handleClose,
       onKindChange,
-      upperCaseName,
       save,
     };
   },
