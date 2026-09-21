@@ -265,6 +265,7 @@ import { useRoleScopes } from "@/composables/iam/useRoleScopes";
 import { useModuleNavigation } from "@/composables/iam/useModuleNavigation";
 import { useRoleSummary } from "@/composables/iam/useRoleSummary";
 import { useRolePresets } from "@/composables/iam/useRolePresets";
+import { useRoleJsonView } from "@/composables/iam/useRoleJsonView";
 import useStreams from "@/composables/useStreams";
 import GroupUsers from "../groups/GroupUsers.vue";
 import AppTabs from "@/components/common/AppTabs.vue";
@@ -817,161 +818,6 @@ const handlePermissionBatchChange = (
 
 const updatePermissionMappings = (permissionHash: string) => grants.toggle(permissionHash);
 
-const updatePermissionsUi = async (value: string) => {
-  permissionsUiType.value = value;
-  if (value === "json") {
-    const permissions: {
-      object: string;
-      permission: string;
-    }[] = [];
-    selectedPermissionsHash.value.forEach((permission: any) => {
-      const [resource, entity, _permission] = permission.split(":");
-      permissions.push({
-        object: `${resource}:${entity}`,
-        permission: _permission,
-      });
-    });
-
-    permissionsJsonValue.value = JSON.stringify(permissions);
-    permissionJsonEditorRef.value.setValue(permissionsJsonValue.value);
-    await nextTick();
-    permissionJsonEditorRef.value.formatDocument();
-  } else if (value === "table") {
-    updateJsonInTable();
-  }
-};
-
-const updateJsonInTable = () => {
-  const permissions = JSON.parse(permissionsJsonValue.value);
-
-  const permissionsHash = new Set(permissions.map((p: any) => p.object + ":" + p.permission));
-  let hash = "";
-  let permission;
-  let resource = "";
-  let entity = "";
-  let resourceDetails: Entity | Resource;
-
-  // Update added permissions
-  updateRolePermissions(permissions);
-
-  permissions.forEach((permission: any) => {
-    [resource, entity] = permission.object.split(":");
-    hash = permission.object + ":" + permission.permission;
-    if (!selectedPermissionsHash.value.has(hash)) {
-      updatePermissionMappings(hash);
-
-      resourceDetails = resourceMapper.value[resource];
-
-      if (resource === "dashboard") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (resource === "alert") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["afolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (resource === "report") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["rfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (resource === "synthetics") {
-        // Plain-id entity — locate the folder whose loaded monitors contain it.
-        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
-          (f.entities ?? []).some((e: Entity) => e.name === entity),
-        ) as Entity;
-      } else if (resource === "workflows") {
-        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
-          (f.entities ?? []).some((e: Entity) => e.name === entity),
-        ) as Entity;
-      } else if (entity === "_all_" + getOrgId()) {
-        resourceDetails.permission[permission.permission as "AllowAll"].value =
-          selectedPermissionsHash.value.has(
-            getPermissionHash(resource, permission.permission, entity),
-          );
-      } else if (
-        resource === "logs" ||
-        resource === "metrics" ||
-        resource === "traces" ||
-        resource === "index"
-      ) {
-        resourceDetails = resourceMapper.value["stream"].entities.find(
-          (e: Entity) => e.name === resource,
-        ) as Entity;
-      }
-
-      updateEntityPermission(resourceDetails, resource, entity, permission.permission);
-    }
-  });
-
-  // Update removed permissions
-  selectedPermissionsHash.value.forEach(async (permissionHash: any) => {
-    permission = permissionHash.split(":");
-    resource = permission[0];
-    entity = permission[1];
-    permission = {
-      object: permission[0] + ":" + permission[1],
-      permission: permission[2] as "AllowAll",
-    };
-
-    if (!permissionsHash.has(permissionHash)) {
-      updatePermissionMappings(permissionHash);
-
-      resourceDetails = resourceMapper.value[resource];
-
-      if (resource === "dashboard") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["dfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (resource === "alert") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["afolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (resource === "synthetics") {
-        // Plain-id entity — locate the folder whose loaded monitors contain it.
-        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
-          (f.entities ?? []).some((e: Entity) => e.name === entity),
-        ) as Entity;
-      } else if (resource === "workflows") {
-        resourceDetails = resourceMapper.value["workflow_folder"].entities.find((f: Entity) =>
-          (f.entities ?? []).some((e: Entity) => e.name === entity),
-        ) as Entity;
-      } else if (resource === "report") {
-        const [folderId] = entity.split("/");
-
-        resourceDetails = resourceMapper.value["rfolder"].entities.find(
-          (e: Entity) => e.name === folderId,
-        ) as Entity;
-      } else if (entity === "_all_" + getOrgId()) {
-        resourceDetails.permission[permission.permission as "AllowAll"].value =
-          selectedPermissionsHash.value.has(
-            getPermissionHash(resource, permission.permission, entity),
-          );
-      } else if (
-        resource === "logs" ||
-        resource === "metrics" ||
-        resource === "traces" ||
-        resource === "index"
-      ) {
-        resourceDetails = resourceMapper.value["stream"].entities.find(
-          (e: Entity) => e.name === resource,
-        ) as Entity;
-      }
-
-      updateEntityPermission(resourceDetails, resource, entity, permission.permission);
-    }
-  });
-};
-
 const expandPermission = async (resource: any) => {
   const expand = !resource.expand;
 
@@ -1145,6 +991,20 @@ const updateEntityPermission = (
       }
     });
 };
+
+// Table <-> JSON lives in its own file; the JSON is reconciled through the same staging a click uses.
+const { updatePermissionsUi, updateJsonInTable } = useRoleJsonView({
+  permissionsUiType,
+  permissionsJsonValue,
+  permissionJsonEditorRef,
+  selectedPermissionsHash,
+  resourceMapper,
+  updatePermissionMappings,
+  updateEntityPermission,
+  updateRolePermissions,
+  getPermissionHash,
+  getOrgId,
+});
 
 const toggleHelpSection = async () => {
   isHelpOpen.value = !isHelpOpen.value;
