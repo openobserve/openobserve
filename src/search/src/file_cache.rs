@@ -33,7 +33,7 @@ pub async fn cache_files(
     file_type: &str,
 ) -> (file_data::CacheType, u64, u64) {
     let (cached_files, cache_hits, cache_misses) =
-        inspect_file_cache(trace_id, files, scan_stats, file_type).await;
+        inspect_file_cache(trace_id, files, scan_stats).await;
 
     let files_num = files.len() as i64;
     if files_num == scan_stats.querier_memory_cached_files + scan_stats.querier_disk_cached_files {
@@ -104,13 +104,12 @@ pub async fn inspect_file_cache<'a>(
     trace_id: &str,
     files: &'a [(i64, &String, &String, i64, i64)],
     scan_stats: &mut ScanStats,
-    file_type: &str,
 ) -> (HashSet<&'a String>, u64, u64) {
     let mut cached_files = HashSet::with_capacity(files.len());
     let (mut cache_hits, mut cache_misses) = (0, 0);
 
     let start = std::time::Instant::now();
-    for (_id, _account, file, _size, max_ts) in files.iter() {
+    for (_id, _account, file, _size, _max_ts) in files.iter() {
         if file_data::memory::exist(file).await {
             scan_stats.querier_memory_cached_files += 1;
             cached_files.insert(*file);
@@ -121,28 +120,6 @@ pub async fn inspect_file_cache<'a>(
             cache_hits += 1;
         } else {
             cache_misses += 1;
-        }
-
-        let stream_type = if file_type == "index" || file_type == "midx" {
-            config::meta::stream::StreamType::Index
-        } else if file.contains("/logs/") {
-            config::meta::stream::StreamType::Logs
-        } else if file.contains("/metrics/") {
-            config::meta::stream::StreamType::Metrics
-        } else if file.contains("/traces/") {
-            config::meta::stream::StreamType::Traces
-        } else {
-            config::meta::stream::StreamType::Logs
-        };
-
-        let current_time = chrono::Utc::now().timestamp_micros();
-        let file_age_seconds = (current_time - max_ts) / 1_000_000;
-        let file_age_hours = file_age_seconds as f64 / 3600.0;
-
-        if file_age_hours > 0.0 {
-            config::metrics::FILE_ACCESS_TIME
-                .with_label_values(&[&stream_type.to_string()])
-                .observe(file_age_hours);
         }
     }
 
@@ -307,10 +284,8 @@ mod tests {
                     original_size: 456,
                     ..Default::default()
                 };
-                let ages = config::metrics::FILE_ACCESS_TIME.with_label_values(&["logs"]);
-                let before = ages.get_sample_count();
                 let (cached, hits, misses) =
-                    inspect_file_cache("inspection", &files, &mut stats, "parquet").await;
+                    inspect_file_cache("inspection", &files, &mut stats).await;
                 assert_eq!(cached, [&memory, &disk, &both].into_iter().collect());
                 assert_eq!((hits, misses), (4, 2));
                 assert_eq!(
@@ -321,7 +296,6 @@ mod tests {
                     (8, 8)
                 );
                 assert_eq!((stats.compressed_size, stats.original_size), (123, 456));
-                assert_eq!(ages.get_sample_count(), before + files.len() as u64);
                 assert!(!file_data::memory::exist(&missing).await);
                 assert!(!file_data::disk::exist(&missing).await);
                 assert!(!file_data::memory::exist(&small_missing).await);
@@ -341,8 +315,7 @@ mod tests {
                     querier_memory_cached_files: 2,
                     ..Default::default()
                 };
-                let (cached, hits, misses) =
-                    inspect_file_cache("empty", &[], &mut stats, "parquet").await;
+                let (cached, hits, misses) = inspect_file_cache("empty", &[], &mut stats).await;
                 assert!(cached.is_empty());
                 assert_eq!((hits, misses, stats.querier_memory_cached_files), (0, 0, 2));
                 assert_eq!(
