@@ -1,0 +1,33 @@
+{
+  "feature_slug": "dashboard-cell-explorer-log-detail",
+  "feature_title": "Dashboard Cell Explorer Log Detail",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-cell-explorer-detail.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-cell-explorer-detail.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/components/dashboards/DashboardLogDrawer.vue",
+    "web/src/plugins/logs/DetailTable.vue",
+    "web/src/plugins/logs/JsonPreview.vue",
+    "web/src/components/dashboards/PanelSchemaRenderer.vue",
+    "web/src/components/dashboards/PanelContainer.vue",
+    "web/src/components/dashboards/panels/TableRenderer.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue",
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/plugins/correlation/CorrelatedLogsTable.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ (components/dashboards, plugins/logs, plugins/correlation, views/Dashboards, locales/languages) plus scripts/translations/.translation_state.json. No enterprise/, o2_enterprise/, or src/enterprise/ paths appear in changed_files.txt, so the change is open-source. The only 'enterprise' mention is an inline code comment in DetailTable.vue describing correlation-tab licensing, which is prose and does not make the change enterprise.",
+    "skip": "Not skipped. The diff is a substantial user-facing rework of the dashboard cell explorer's log detail surface (new push-nav detail mode, prev/next event navigation, inline JSON expand, correlation tab, and send-to-AI-chat forwarding), not a docs-only or CI-only change. trigger_comment.txt and feature_hint.txt are both empty, so there is no explicit opt-out label or skip request.",
+    "e2e": "E2E is warranted: DashboardLogDrawer.vue replaces the ODrawer-based event detail with an in-place detail surface that adds back/prev/next navigation (including ArrowLeft/ArrowRight/Escape keyboard handling), per-row inline JSON expansion, correlation wiring, and a wider cell-explorer drawer. ViewDashboard.vue also changes 'Copy link' to preserve cell-explorer deep-link query params. These are all user-exercisable UI flows that need verification from a dashboard.",
+    "area": "The bulk of the change is in web/src/components/dashboards/ (DashboardLogDrawer, PanelContainer, PanelSchemaRenderer, TableRenderer) and web/src/views/Dashboards/ (RenderDashboardCharts, ViewDashboard); the entry point is a dashboard cell click. The existing Dashboards playwright folder under tests/ui-testing/playwright-tests/Dashboards/ is the natural home.",
+    "group": "Dashboards-Core is the closest existing shard group in tests/ui-testing/ci-matrix/ci_matrix_cloud.json for a general dashboard drilldown flow (it already holds dashboard.spec.js, dashboard-share-link.spec.js, etc.). The cell-explorer log detail is a core dashboard interaction rather than a table-formatting or chart-specific concern.",
+    "existing_tests": "No E2E specs in the diff — changed_files.txt contains only .vue components, locale JSON files, and a translation state file; nothing under tests/ui-testing/playwright-tests/ was added or modified, so the new cell-explorer detail behavior has no existing Playwright coverage."
+  }
+}
