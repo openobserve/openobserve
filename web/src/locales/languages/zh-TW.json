@@ -18239,7 +18239,6 @@
     "l0GateSentenceLead": "會暫緩至緩衝時間結束，然後發送",
     "l0GateSentenceBold": "並附帶 AI 見解",
     "l0ParallelSentence": "立即呼叫；AI 代理同時執行",
-    "l0OnlySentence": "AI 代理會調查，且不會呼叫任何人。",
     "l0BudgetLabel": "緩衝時間",
     "l0BudgetRange": "介於 30 至 600 秒 — 伺服器會拒絕此範圍外的數值，而非自動取邊界值。",
     "l0FailOpen": "故障時放行 — 若 AI 代理運作遲緩或無回應，警示會立即發出。",

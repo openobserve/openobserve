@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "vastgehouden gedurende de wachttijd en daarna verzonden",
     "l0GateSentenceBold": "met AI-inzichten",
     "l0ParallelSentence": "onmiddellijk opgeroepen; de agent draait tegelijkertijd mee",
-    "l0OnlySentence": "de agent onderzoekt en niemand wordt opgeroepen",
     "l0BudgetLabel": "Wachttijd",
     "l0BudgetRange": "Tussen 30 en 600 seconden — de server weigert waarden buiten dit bereik in plaats van ze af te kappen.",
     "l0FailOpen": "Fail-open — als de agent traag is of niet reageert, wordt het alarm onmiddellijk verzonden.",

@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "für die Dauer des Haltebudgets zurückgehalten und dann gesendet",
     "l0GateSentenceBold": "mit KI-Erkenntnissen",
     "l0ParallelSentence": "sofort alarmiert; der Agent läuft parallel",
-    "l0OnlySentence": "der Agent untersucht und niemand wird alarmiert",
     "l0BudgetLabel": "Haltebudget",
     "l0BudgetRange": "Zwischen 30 und 600 Sekunden – der Server lehnt Werte außerhalb dieses Bereichs ab, anstatt sie zu begrenzen.",
     "l0FailOpen": "Fail-open – wenn der Agent langsam ist oder nicht reagiert, wird die Warnmeldung sofort gesendet.",

@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "retido pelo tempo de espera e depois enviado",
     "l0GateSentenceBold": "com insights da IA",
     "l0ParallelSentence": "acionado imediatamente; o agente atua em paralelo",
-    "l0OnlySentence": "o agente investiga e ninguém é acionado",
     "l0BudgetLabel": "Tempo de espera",
     "l0BudgetRange": "Entre 30 e 600 segundos — o servidor recusa valores fora desse intervalo em vez de ajustá-los",
     "l0FailOpen": "Fail-open — se o agente estiver lento ou não responder, o alerta é enviado imediatamente.",

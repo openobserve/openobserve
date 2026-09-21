@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "bekletme süresi boyunca tutulur, ardından gönderilir",
     "l0GateSentenceBold": "yapay zeka içgörüleriyle",
     "l0ParallelSentence": "hemen çağrı yapılır; ajan da paralel çalışır",
-    "l0OnlySentence": "ajan araştırır ve kimse çağrılmaz",
     "l0BudgetLabel": "Bekletme süresi",
     "l0BudgetRange": "30 ile 600 saniye arasında — sunucu, bu aralığın dışındaki değerleri sınır değerlerine sabitlemek yerine reddeder",
     "l0FailOpen": "Fail-open — ajan yavaşsa veya yanıt vermezse, uyarı hemen gönderilir.",

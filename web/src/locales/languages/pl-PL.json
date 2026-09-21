@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "wstrzymywany przez czas wstrzymania, a następnie wysyłany",
     "l0GateSentenceBold": "z informacjami od AI",
     "l0ParallelSentence": "wezwanie wysyłane od razu; agent działa równolegle",
-    "l0OnlySentence": "agent analizuje, a nikt nie otrzymuje wezwania",
     "l0BudgetLabel": "Budżet wstrzymania",
     "l0BudgetRange": "Między 30 a 600 sekund — serwer odrzuca wartości spoza tego zakresu, zamiast je przycinać",
     "l0FailOpen": "Fail-open — jeśli agent działa wolno lub nie odpowiada, alert jest wysyłany natychmiast.",

@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "按保留预算暂存，然后发送",
     "l0GateSentenceBold": "附带 AI 洞察",
     "l0ParallelSentence": "立即通知；智能体并行运行",
-    "l0OnlySentence": "智能体进行调查，且不通知任何人",
     "l0BudgetLabel": "保留预算",
     "l0BudgetRange": "介于 30 到 600 秒之间 — 服务器会拒绝此范围之外的值，而不是将其截断。",
     "l0FailOpen": "故障开放 — 如果智能体缓慢或无响应，则立即发送告警。",

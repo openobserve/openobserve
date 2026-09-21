@@ -269,6 +269,9 @@ function optionsFor(field: keyof L0Policy["mode"]) {
   return MODES_FOR_FIELD[field].map((mode) => ({ label: modeLabel(mode), value: mode }));
 }
 
+/// L13: this editor knows the L0 config, not the team's ladder, so the `only`
+/// sentence must not claim nobody is paged — a team with levels at P4/P5 is.
+/// The ladder preview says which, because the server resolved it there.
 function modeSentenceLead(mode: L0Mode): I18nText {
   switch (mode) {
     case "gate":

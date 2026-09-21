@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "conservée pendant le délai d'attente, puis envoyée",
     "l0GateSentenceBold": "avec les analyses de l'IA",
     "l0ParallelSentence": "envoyée immédiatement ; l'agent agit en parallèle",
-    "l0OnlySentence": "l'agent enquête et personne n'est notifié",
     "l0BudgetLabel": "Délai d'attente",
     "l0BudgetRange": "Entre 30 et 600 secondes — le serveur refuse les valeurs en dehors de cet intervalle plutôt que de les borner",
     "l0FailOpen": "Fail-open — si l'agent est lent ou ne répond pas, l'alerte est envoyée immédiatement.",

@@ -18246,7 +18246,7 @@
     "l0GateSentenceLead": "held for the hold budget, then sent",
     "l0GateSentenceBold": "with AI insights",
     "l0ParallelSentence": "paged at once; the agent runs alongside",
-    "l0OnlySentence": "the agent investigates and nobody is paged",
+    "l0OnlySentence": "the agent investigates; this priority pages only if your levels say so",
     "l0OffSentence": "no AI SRE runs; the page behaves exactly as it did before L0",
     "l0BudgetLabel": "Hold budget",
     "l0BudgetRange": "Between 30 and 600 seconds — the server refuses values outside this range rather than clamping",

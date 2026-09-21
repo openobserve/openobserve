@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "trattenuto per il budget di attesa, poi inviato",
     "l0GateSentenceBold": "con gli insight dell'AI",
     "l0ParallelSentence": "avvisato subito; l'agente opera in parallelo",
-    "l0OnlySentence": "l'agente indaga e nessuno viene avvisato",
     "l0BudgetLabel": "Budget di attesa",
     "l0BudgetRange": "Tra 30 e 600 secondi — il server rifiuta i valori al di fuori di questo intervallo, invece di forzarli entro i limiti",
     "l0FailOpen": "Fail-open — se l'agente è lento o non risponde, l'avviso viene inviato immediatamente.",

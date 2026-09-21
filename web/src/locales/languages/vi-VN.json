@@ -18244,7 +18244,6 @@
     "l0GateSentenceLead": "được giữ trong hạn mức chờ, rồi gửi đi",
     "l0GateSentenceBold": "kèm thông tin chi tiết từ AI",
     "l0ParallelSentence": "được thông báo ngay lập tức; agent chạy song song",
-    "l0OnlySentence": "agent điều tra và không ai được thông báo",
     "l0BudgetLabel": "Hạn mức chờ",
     "l0BudgetRange": "Từ 30 đến 600 giây — máy chủ từ chối các giá trị ngoài khoảng này thay vì tự điều chỉnh",
     "l0FailOpen": "Fail-open — nếu agent chậm hoặc không phản hồi, cảnh báo được gửi ngay lập tức.",

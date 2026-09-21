@@ -451,7 +451,7 @@ export type L0Mode =
   | "parallel"
   /** The page is held for the triage budget, or until the verdict lands. */
   | "gate"
-  /** The agent investigates and nobody is paged. */
+  /** The agent investigates; whether the priority also pages is the team's ladder, not this mode. */
   | "only"
   /** The agent never runs; the page behaves exactly as it did before L0. */
   | "off";
