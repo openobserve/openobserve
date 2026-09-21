@@ -865,7 +865,7 @@ pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow
                 update_group(&mapped.org_id, &group, Some(user_set), None, None, None).await?;
             }
             // finally add the org user entry, this is last
-            // because ofga is in a way idenmpotent, so if if it gets retried again, it will work
+            // because ofga is in a way idempotent, so if if it gets retried again, it will work
             // but having org user entry but not ofga mapping can cause a lot of issues with 401s
             // which would be difficult to resolve, so try it the last
             org_users::add(
@@ -952,7 +952,7 @@ pub async fn check_and_add_to_org(
         }
     }
 
-    // if user is a new user, process org mappings for then
+    // if user is a new user, process org mappings for them
     if is_new_user {
         match process_domain_org_mapping(user_email).await {
             Ok(processed) => {
@@ -962,7 +962,7 @@ pub async fn check_and_add_to_org(
                 }
             }
             Err(e) => log::error!(
-                "error processing domain org mapping doe user {user_email}, continnuing normally : {e}"
+                "error processing domain org mapping for user {user_email}, continuing normally : {e}"
             ),
         }
     }
