@@ -839,8 +839,11 @@ pub async fn process_domain_org_mapping(user_email: &str) -> Result<bool, anyhow
     let meta_settings = get_org_setting(META_ORG_ID).await?;
     let mappings = meta_settings.domain_org_mappings;
     // split email to get the domain
-    if let Some((_, domain)) = user_email.split_once("@") {
-        if let Some(mapped) = mappings.into_iter().find(|m| m.domain == domain) {
+    if let Some((_, domain)) = user_email.to_lowercase().split_once("@") {
+        if let Some(mapped) = mappings
+            .into_iter()
+            .find(|m| m.domain.to_lowercase() == domain)
+        {
             log::info!("found domain org mapping for user {user_email}, processing");
             let base_role = UserRole::from_str(&mapped.base_role).map_err(|e| {
                 anyhow::anyhow!(
