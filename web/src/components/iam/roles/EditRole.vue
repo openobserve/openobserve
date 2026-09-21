@@ -377,11 +377,7 @@ const permissionsUiType = ref("table");
 const { getStreams } = useStreams(t);
 
 // Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
-const isPermissionsDirty = computed(
-  () =>
-    Object.keys(addedPermissions.value).length > 0 ||
-    Object.keys(removedPermissions.value).length > 0,
-);
+const isPermissionsDirty = grants.isDirty;
 
 const isUsersDirty = computed(() => addedUsers.value.size > 0 || removedUsers.value.size > 0);
 

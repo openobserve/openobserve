@@ -23,7 +23,7 @@ export type ResourceGrantStat = { granted: number; added: number; removed: numbe
 export const buildGrantKey = (resource: string, permission: string, entity: string) =>
   `${resource}:${entity}:${permission}`;
 
-/** Entity ids can contain "/" (`<folderId>/<id>`), so only the first and last separator split. */
+/** Only the first and last `:` split, since ids contain "/": `dashboard:f1/d1:AllowPut` -> resource `dashboard`, entity `f1/d1`, permission `AllowPut`, object `dashboard:f1/d1`. */
 export const splitGrantKey = (key: string) => {
   const first = key.indexOf(":");
   const last = key.lastIndexOf(":");
@@ -39,9 +39,13 @@ const emptyStat: ResourceGrantStat = { granted: 0, added: 0, removed: 0 };
 
 /** Single source of truth for one role's grants: saved, staged, and the payload between them. */
 export const useRoleGrants = () => {
+  // The grants the role held on load. It only changes on a successful save.
   const saved = ref(new Set<string>()) as Ref<Set<string>>;
+  // What the checkboxes show right now: saved, plus added, minus removed.
   const current = ref(new Set<string>()) as Ref<Set<string>>;
+  // Ticked but never saved. Keyed by grant key, valued as the backend wants it, so the payload needs no re-parsing.
   const added = ref<Record<string, StagedGrant>>({});
+  // Saved but unticked here. It stays out of `current` until the save lands or the user undoes it.
   const removed = ref<Record<string, StagedGrant>>({});
 
   const isDirty = computed(
@@ -50,7 +54,7 @@ export const useRoleGrants = () => {
 
   const grantCount = computed(() => current.value.size);
 
-  // Rebuilt only when a grant actually changes, so rail badges never rescan per render.
+  // One pass per change, so none of the ~50 rail badges ever scans the whole grant set.
   const statsByResource: ComputedRef<Map<string, ResourceGrantStat>> = computed(() => {
     const stats = new Map<string, ResourceGrantStat>();
     const bump = (key: string, field: keyof ResourceGrantStat) => {
@@ -69,16 +73,6 @@ export const useRoleGrants = () => {
 
   const statFor = (resource: string) => statsByResource.value.get(resource) ?? emptyStat;
 
-  /** Actions a type-level grant already covers, so per-entity rows can disable them. */
-  const inheritedActions = (resource: string, orgId: string) => {
-    const prefix = `${resource}:_all_${orgId}:`;
-    const actions = new Set<string>();
-    current.value.forEach((key) => {
-      if (key.startsWith(prefix)) actions.add(key.slice(prefix.length));
-    });
-    return actions;
-  };
-
   const stage = (key: string) => {
     const { object, permission } = splitGrantKey(key);
     return { object, permission };
@@ -92,14 +86,10 @@ export const useRoleGrants = () => {
       return;
     }
 
-    if (removed.value[key] && saved.value.has(key) && !current.value.has(key)) {
-      delete removed.value[key];
-      current.value.add(key);
-      return;
-    }
-
+    // Only a saved key is ever staged for removal, so re-ticking one just undoes that staging.
     if (removed.value[key]) {
       delete removed.value[key];
+      current.value.add(key);
       return;
     }
 
@@ -159,7 +149,6 @@ export const useRoleGrants = () => {
     statsByResource,
     has,
     statFor,
-    inheritedActions,
     toggle,
     seedSaved,
     payload,
