@@ -583,7 +583,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState, cancelPatterns } = usePatterns(t);
+    const { extractPatterns, patternsState, cancelPatterns, clearPatterns } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -843,6 +843,16 @@ export default defineComponent({
     const extractPatternsForCurrentQuery = async (clear_cache = false) => {
       // Clear any stale error from previous logs search
       resetSearchError();
+
+      // Patterns extraction only supports a single stream (dedicated
+      // single-stream API). Reject client-side instead of letting the
+      // request fail server-side and leaving the previous single-stream
+      // result on screen.
+      if (searchObj.data.stream.selectedStream.length > 1) {
+        clearPatterns();
+        showErrorNotification(t("logs.index.patternsUnavailableForMultiStream"));
+        return;
+      }
 
       searchObj.meta.resultGrid.showPagination = false;
       searchObj.loading = true;

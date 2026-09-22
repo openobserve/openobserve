@@ -13383,6 +13383,7 @@
       "searchHistoryNotEnabled": "Search history is not enabled.",
       "enableUsageReporting": "Set ZO_USAGE_REPORTING_ENABLED to true to enable usage reporting.",
       "selectStreamToExtractPatterns": "Please select a stream to extract patterns",
+      "patternsUnavailableForMultiStream": "Patterns are not available when multiple streams are selected. Please select a single stream.",
       "errorExtractingPatterns": "Error extracting patterns. Please try again.",
       "nameOfPanelRequired": "Name of Panel is required",
       "errorsFixAndTryAgain": "There are some errors, please fix them and try again",
