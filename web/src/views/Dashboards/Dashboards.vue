@@ -592,6 +592,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import { useHomeDashboard } from "@/composables/useHomeDashboard";
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import { useFavoriteDashboards, FAVORITES_FOLDER_ID } from "@/composables/useFavoriteDashboards";
 
 const MoveDashboardToAnotherFolder = defineAsyncComponent(() => {
@@ -694,7 +695,6 @@ export default defineComponent({
     const searchAcrossFolders = ref(false);
     const filterQuery = ref("");
     const folderSearchQuery = ref("");
-    const selectedIds = ref<string[]>([]);
     const { track } = useReo();
 
     // URL-synced so returning from a dashboard (Back/Update/Cancel) lands on the same page instead of resetting to page 1.
@@ -945,10 +945,9 @@ export default defineComponent({
 
     watch(
       activeFolderId,
-      async () => {
-        //resetting the selected dashboards if any so that when shifting to another folder and reswitching to same folder
-        //the selected dashboards are not shown
-        selectedIds.value = [];
+      async (_folderId, previousFolderId) => {
+        // The first value is the landing folder, where a selection saved before leaving is restored.
+        if (previousFolderId !== null) selectedIds.value = [];
         // The Favorites pseudo-folder has no backend list. Rows render
         // immediately from the stored favorites; fetch the involved folders'
         // lists in the background purely to enrich them (owner/created/fresh
@@ -1374,14 +1373,22 @@ export default defineComponent({
       }
     });
 
-    // Clear selection whenever the derived list recomputes (favorites toggle,
-    // folder switch, cross-folder search, store list changes). Runs sync so the
-    // selection is cleared in the same tick the list changes, matching the prior
-    // in-computed side effect.
+    const { selectedIds } = usePersistedSelection<any>({
+      tableId: "dashboards-dashboard-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: dashboards,
+      getRowId: (row) => row.id,
+    });
+
+    // A background revalidation re-emits the same rows, so only ids that left the list are dropped.
     watch(
       dashboards,
-      () => {
-        selectedIds.value = [];
+      (rows) => {
+        if (rows.length === 0 || selectedIds.value.length === 0) return;
+        const present = new Set(rows.map((row: any) => row.id));
+        if (selectedIds.value.some((id) => !present.has(id))) {
+          selectedIds.value = selectedIds.value.filter((id) => present.has(id));
+        }
       },
       { flush: "sync" },
     );
