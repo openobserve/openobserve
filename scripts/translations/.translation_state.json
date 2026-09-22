@@ -5098,6 +5098,12 @@
     "ok": "565339bc4d33d728",
     "startFromNow": "b51cf273d8b6649a"
   },
+  "connectDataSourcePopup": {
+    "connectButton": "6f9ce9f34879bb33",
+    "description": "e3bfcb60996b7b1d",
+    "slackLink": "3a37b5feb4984ec3",
+    "title": "9c5541789be6984d"
+  },
   "correlation": {
     "addCustomGroup": "460770f6d1bdad26",
     "alertDeduplicationMessage": "bc755a6265e8c4a9",
@@ -8833,6 +8839,7 @@
       }
     },
     "hosts": {
+      "columnCores": "7bff6181add2231b",
       "columnCpu": "fe858be36df341a8",
       "columnDisk": "8739c0da5fbabb17",
       "columnHost": "4a823118b9ba8baa",
@@ -8850,14 +8857,10 @@
         "hostMetricsCap": "1edb000e9d946c58",
         "hostMetricsHint": "83cfa9518d95cce9"
       },
-      "importConfirmCancel": "19766ed6ccb2f4a3",
-      "importConfirmMessage": "eb8d9fe902645051",
-      "importConfirmOk": "b37158e750c360ef",
-      "importConfirmTitle": "4b4341287db1c84c",
       "lastSeenBanner": "1af912a3e3a19bdc",
       "livenessBanner": "40a4687718a50c59",
+      "loadPerCore": "4eb5405259fc817c",
       "memoryAbsolute": "d77a43cd175edfef",
-      "openDashboard": "6963894ac86971e3",
       "osFacet": "343d012d58b2e98f",
       "pageError": "1bdf7b1b1497073b",
       "panel": {
@@ -9837,7 +9840,9 @@
       "tlsTitle": "0029bc25af318a4f",
       "tokenPageName": "759b4b3e31901744",
       "tokenWhere": "d6f5666b805c2e36",
-      "tokenWhereSuffix": "7fb346521d5bfb41"
+      "tokenWhereSuffix": "7fb346521d5bfb41",
+      "windowBody": "38d66efc5808226e",
+      "windowTitle": "309255973d9f0279"
     },
     "splunkHecTab": "d31533a68927505f",
     "splunkHecUrlHelp": "22d5a113a0b4745e",
@@ -12078,6 +12083,7 @@
     "target_rotation_everyone": "dafdb710c5de874e",
     "target_rotation_legacy": "76bd2aa23090f2bb",
     "target_rotation_on_call": "8a61c67a8ea27cf5",
+    "target_unrecognized": "66e648461a86c5d9",
     "target_user": "232709417a644e56",
     "target_whole_team": "f73315fde5db9e11",
     "team": "5985039f106df054",
@@ -13261,6 +13267,7 @@
     "leftJoin": "94452c5556275890",
     "logExplorer": {
       "detail": {
+        "back": "c7ef0e278b1e08c0",
         "copy": "e21f935f11d7e966",
         "copyLink": "dbf362d4f210c780",
         "copyValue": "c019c0f81132cb82",
@@ -13268,7 +13275,9 @@
         "drawerTitle": "949c28bfe0bb5b04",
         "insights": "2a932f90172e99ea",
         "insightsHint": "50b6f5f008290f78",
-        "json": "db1a21a0bc2ef8fb"
+        "json": "db1a21a0bc2ef8fb",
+        "nextEvent": "880dbf6cdade586c",
+        "prevEvent": "c025f0e0e895f5bb"
       },
       "event": "b8e1f80bd70ae078",
       "events": "862417b9e7c3720b",
@@ -15109,6 +15118,27 @@
     "domainManagementDesc": "88398e3ac40ce4d7",
     "domainNeedsBlockedEmails": "53170f72948b23a8",
     "domainNeedsEmails": "c68d07b51aa28f5a",
+    "domainOrgMappings": {
+      "addMapping": "160cc87a108cd97f",
+      "baseRole": "33551d66efcd283e",
+      "baseRoleHelp": "50482be96fa489a0",
+      "confirmRemove": "f10b126b0e82cab8",
+      "deleteTitle": "06380e0419eca2ef",
+      "domain": "f865f1ee55b26840",
+      "domainHelp": "c927b335c093577b",
+      "duplicateDomain": "197ff12f947386be",
+      "editMapping": "d5ef1883268e1264",
+      "empty": "df0e529517206088",
+      "organization": "d764d42592fc9687",
+      "organizationHelp": "783574eea65c82ad",
+      "organizationPlaceholder": "d7f6cb5385e83aca",
+      "organizationRequired": "7d12b1ae42d8cc36",
+      "subtitle": "031a53b7414811e0",
+      "title": "ac852cfa9baf6fa9",
+      "userGroup": "ccd983e3c5253d45",
+      "userGroupHelp": "30b9ca455711411b",
+      "userGroupPlaceholder": "762ebb70ef0ea2e8"
+    },
     "domainPlaceholder": "cc921aaa05754257",
     "domainRemoved": "2984d48362fadf0b",
     "domainRequired": "025f3d105c5c8f7c",

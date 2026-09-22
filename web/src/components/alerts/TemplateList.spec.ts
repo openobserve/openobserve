@@ -18,6 +18,7 @@ import { mount, flushPromises, DOMWrapper } from "@vue/test-utils";
 import TemplateList from "./TemplateList.vue";
 import { http, HttpResponse } from "msw";
 import templateService from "@/services/alert_templates";
+import alertsFixture from "@/test/unit/mockData/alerts";
 import router from "@/test/unit/helpers/router";
 import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
@@ -105,12 +106,16 @@ describe("Alert List", async () => {
     const listTemplates = vi.spyOn(templateService, "list");
     let listCallsBeforeDelete = 0;
     beforeEach(async () => {
+      const templatesUrl = `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates`;
       global.server.use(
-        http.delete(
-          `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/alerts/templates/${template_name}`,
-          () => {
-            return HttpResponse.json({ code: 200 });
-          },
+        http.delete(`${templatesUrl}/${template_name}`, () => {
+          return HttpResponse.json({ code: 200 });
+        }),
+        // The delete's invalidation refetches the list; the shared fixture would put the row back.
+        http.get(templatesUrl, () =>
+          HttpResponse.json(
+            alertsFixture.templates.get.filter((tpl: any) => tpl.name !== template_name),
+          ),
         ),
       );
       listCallsBeforeDelete = listTemplates.mock.calls.length;
@@ -132,9 +137,8 @@ describe("Alert List", async () => {
     });
 
     it("drops the deleted row in place, leaving the rest of the list alone", () => {
-      // No refetch: reloading the list would blank the table behind its skeleton
-      // and a loading toast for a row the server already confirmed gone.
-      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete);
+      // The mutation's invalidation refetches the mounted list in the background; the splice keeps the row gone meanwhile.
+      expect(listTemplates.mock.calls.length).toBe(listCallsBeforeDelete + 1);
       const body = wrapper
         .find('[data-test="alert-templates-list-table"]')
         .find('[data-test="o2-table-body"]');

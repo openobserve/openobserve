@@ -335,12 +335,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="shrink-0">
+    <div class="drag-cancel shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
     <div
-      class="relative min-h-0 flex-1"
+      class="drag-cancel relative min-h-0 flex-1"
       :class="curatedBadge ? 'opacity-60' : undefined"
       data-test="dashboard-panel-body"
       :data-curated-stale="curatedBadge ? 'true' : 'false'"
@@ -388,6 +388,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @show-legends="showLegendsDialog = true"
         :showLegendsButton="props.showLegendsButton"
         @series-data-update="onCuratedSeriesData"
+        @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
       ></PanelSchemaRenderer>
 
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
@@ -463,7 +464,7 @@ import ConfirmDialog from "../ConfirmDialog.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
+import { getUUID, processQueryMetadataErrors, b64EncodeUnicode } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
@@ -471,7 +472,6 @@ import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
-import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import { useI18nTyped } from "@/types/i18n";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -501,6 +501,7 @@ export default defineComponent({
     "onEditLayout",
     "update:runId",
     "contextmenu",
+    "sendToAiChat",
   ],
   props: [
     "data",

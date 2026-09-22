@@ -3568,6 +3568,12 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "也许以后再说"
   },
+  "connectDataSourcePopup": {
+    "title": "首先，让我们连接您的第一个数据源。",
+    "description": "我们有很多内容想向您展示，但首先需要连接您的数据。大多数团队大约一分钟内就能看到第一批日志。",
+    "connectButton": "连接数据源",
+    "slackLink": "也欢迎加入我们的 Slack 社区"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "从暂停处继续",
     "startFromNow": "从现在开始",
@@ -4484,6 +4490,8 @@
       "payloadTitle": "事件负载",
       "payloadIndex": "{field} 字段选择数据流。没有该字段的事件将进入 {stream} 数据流。",
       "payloadTime": "{field} 字段是 epoch 秒，并且接受小数值。当该字段缺失或不为正数时，将使用接收时间。",
+      "windowTitle": "超出摄取窗口的时间戳将被丢弃",
+      "windowBody": "早于 {past}（默认 5 小时）或晚于 {future}（默认 24 小时）的事件将被丢弃，而请求仍会返回 代码 0，因为 Splunk 客户端不会重试错误。因此，硬编码或过期的时间戳看起来像是发送成功，实际却没有存储任何数据。",
       "payloadMetadata": "{fields} 字段作为事件上的列存储。",
       "healthTitle": "健康检查",
       "healthBody": "GET 请求无需身份验证，并返回 {response}。",
@@ -5902,6 +5910,9 @@
         "details": "详情",
         "json": "JSON",
         "insights": "洞察",
+        "back": "返回结果",
+        "prevEvent": "上一个事件",
+        "nextEvent": "下一个事件",
         "copyLink": "复制链接",
         "copy": "复制",
         "copyValue": "复制值",
@@ -9351,7 +9362,28 @@
     "listConjunctionAnd": "{list} 和 {last}",
     "runsIn": "运行于",
     "recommendedByFieldCoverage": "根据您的数据流中的字段覆盖率推荐。",
-    "listConjunctionAndTwo": "{first} 和 {last}"
+    "listConjunctionAndTwo": "{first} 和 {last}",
+    "domainOrgMappings": {
+      "title": "域名到组织映射",
+      "subtitle": "使用匹配邮箱域名登录的新用户将自动加入该组织。",
+      "addMapping": "添加映射",
+      "editMapping": "编辑映射",
+      "empty": "暂无映射。使用“{addLabel}”添加一个。",
+      "domain": "邮箱域名",
+      "domainHelp": "用户邮箱地址中 {at_sign} 之后的部分。",
+      "organization": "组织",
+      "organizationPlaceholder": "组织标识符",
+      "organizationHelp": "匹配用户所加入组织的标识符。",
+      "organizationRequired": "组织为必填项",
+      "baseRole": "基础角色",
+      "baseRoleHelp": "匹配用户在该组织中被赋予的角色。",
+      "userGroup": "用户组",
+      "userGroupPlaceholder": "组名称",
+      "userGroupHelp": "可选。匹配用户还会加入该组织中的此组。",
+      "duplicateDomain": "该域名的映射已存在",
+      "confirmRemove": "确定要删除 {domain} 的映射吗？",
+      "deleteTitle": "删除映射"
+    }
   },
   "reports": {
     "frequencyUnits": {
@@ -16465,13 +16497,10 @@
       "columnMemory": "内存(当前)",
       "columnDisk": "磁盘 %(当前)",
       "columnLoad": "15 分钟负载（当前）",
+      "columnCores": "核心数",
       "columnLastSeen": "上次出现",
       "memoryAbsolute": "{used} / {total}",
-      "openDashboard": "主机指标仪表盘",
-      "importConfirmTitle": "添加主机指标仪表盘？",
-      "importConfirmMessage": "你还没有此仪表盘。添加后会在你的 Default 文件夹中创建一个名为 \"Host Metrics\" 的仪表盘，然后针对此主机打开它。",
-      "importConfirmOk": "添加并打开",
-      "importConfirmCancel": "取消",
+      "loadPerCore": "({value}/核心)",
       "windowsLivenessNote": "仅当代理上报负载指标（system_cpu_load_average_15m）时，Windows 主机才会出现在此列表中——如果你的 Windows 代理正在运行但此处未显示，请在收集器配置中启用负载抓取器，或更新代理。",
       "panel": {
         "cpuBusy": "CPU 繁忙",
@@ -17881,6 +17910,7 @@
     "target_rotation_all": "{rotation} 中的所有人员",
     "target_rotation_deleted": "该团队已不再拥有的轮班",
     "target_rotation_legacy": "当前值班的人",
+    "target_unrecognized": "此界面无法识别的目标",
     "ladderPoolEveryone": "{rotation} 中的所有人员",
     "target_user": "特定人员",
     "target_whole_team": "整个团队",

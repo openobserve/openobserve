@@ -59,7 +59,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="workflow-editor-folder"
             @update:model-value="activeFolderId = $event"
           />
-          <span v-else class="text-text-body min-w-0 truncate font-medium">
+          <span
+            v-else
+            data-test="workflow-editor-folder-static"
+            class="text-text-body min-w-0 truncate font-medium"
+          >
             {{ activeFolderName }}
           </span>
           <OInlineEdit

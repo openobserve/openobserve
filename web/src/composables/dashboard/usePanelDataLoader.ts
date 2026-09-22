@@ -30,6 +30,7 @@ import { panelIdToBeRefreshed } from "@/utils/dashboard/convertCustomChartData";
 import { usePanelVariableSubstitution } from "./usePanelVariableSubstitution";
 import { usePanelSearchHandlers } from "./usePanelSearchHandlers";
 import { parseSearchError } from "@/utils/query/searchError";
+import { PANEL_KEY_IGNORED_PATHS, normalizeVariablesForCache } from "@/composables/query/panelKey";
 
 /**
  * debounce time in milliseconds for panel data loader
@@ -123,6 +124,7 @@ export const usePanelDataLoader = (
     folderId?.value,
     dashboardId?.value,
     panelSchema.value.id,
+    store.state.selectedOrganization?.identifier ?? "",
   );
 
   const state = reactive({
@@ -184,6 +186,31 @@ export const usePanelDataLoader = (
         end_time: selectedTimeObj?.value?.end_time?.getTime(),
       },
     );
+  };
+
+  // The window the displayed data was produced with — the executed range on a
+  // live run, the entry's range on a cache restore. Can differ from the picker.
+  let renderedTimeRange: { start: number; end: number } | null = null;
+
+  // Refetch annotations alone (after an annotation save/delete) — the panel's
+  // query result is untouched, so re-running loadData would be wasted work.
+  const reloadAnnotations = async () => {
+    const window = renderedTimeRange;
+    if (!shouldFetchAnnotations() || !window) return;
+    try {
+      const annotationList = await refreshAnnotations(window.start, window.end);
+      state.annotations = annotationList || [];
+      // Write through, or the cached panel entry restores the stale list. Keep
+      // the entry's cacheTimeRange as the data's window — the picker may have
+      // moved since the displayed result was produced.
+      await savePanelCache(
+        getCacheKey(),
+        { ...toRaw(state) },
+        { start_time: window.start, end_time: window.end },
+      );
+    } catch (error) {
+      console.error("Failed to refresh annotations:", error);
+    }
   };
 
   // Wire up variable substitution composable
@@ -422,6 +449,8 @@ export const usePanelDataLoader = (
       } else {
         return;
       }
+
+      renderedTimeRange = { start: startISOTimestamp, end: endISOTimestamp };
 
       log("loadData: panelcache: no cache restored, continue firing, runCount ", runCount);
 
@@ -744,7 +773,7 @@ export const usePanelDataLoader = (
   });
 
   const restoreFromCache: () => Promise<boolean> = async () => {
-    const cache = await getPanelCache();
+    const cache = await getPanelCache(getCacheKey());
 
     if (!cache) {
       log("usePanelDataLoader: panelcache: cache is not there");
@@ -757,13 +786,7 @@ export const usePanelDataLoader = (
 
     let isRestoredFromCache = false;
 
-    const keysToIgnore = [
-      "panelSchema.version",
-      "panelSchema.layout",
-      "panelSchema.htmlContent",
-      "panelSchema.markdownContent",
-      "panelSchema.customChartResult", // Ignore computed result field
-    ];
+    const keysToIgnore = PANEL_KEY_IGNORED_PATHS;
 
     log("usePanelDataLoader: panelcache: tempPanelCacheKey", tempPanelCacheKey);
     log("usePanelDataLoader: panelcache: omit(getCacheKey())", omit(getCacheKey(), keysToIgnore));
@@ -771,22 +794,6 @@ export const usePanelDataLoader = (
       "usePanelDataLoader: panelcache: omit(tempPanelCacheKey))",
       omit(tempPanelCacheKey, keysToIgnore),
     );
-
-    // Helper function to normalize variables data for cache comparison
-    // Removes runtime-only fields that don't affect query results
-    const normalizeVariablesForCache = (variables: any[]) => {
-      if (!variables || !Array.isArray(variables)) return variables;
-      return variables.map((v) => ({
-        name: v.name,
-        type: v.type,
-        value: v.value,
-        scope: v.scope,
-        multiSelect: v.multiSelect,
-        query_data: v.query_data,
-        // Exclude: options, isLoading, isVariableLoadingPending, isVariablePartialLoaded
-        // These are runtime state and don't affect the query result
-      }));
-    };
 
     const currentCacheKey = omit(getCacheKey(), keysToIgnore);
     // tempPanelCacheKey is untyped (from the panel cache), so mirror the
@@ -830,6 +837,13 @@ export const usePanelDataLoader = (
       // set that the cache is restored
       isRestoredFromCache = true;
 
+      if (cache?.cacheTimeRange?.start_time && cache?.cacheTimeRange?.end_time) {
+        renderedTimeRange = {
+          start: cache.cacheTimeRange.start_time,
+          end: cache.cacheTimeRange.end_time,
+        };
+      }
+
       // if selected time range is not matched with the cache time range
       if (
         selectedTimeObj?.value?.end_time - selectedTimeObj?.value?.start_time !==
@@ -847,5 +861,6 @@ export const usePanelDataLoader = (
   return {
     ...toRefs(state),
     loadData,
+    reloadAnnotations,
   };
 };

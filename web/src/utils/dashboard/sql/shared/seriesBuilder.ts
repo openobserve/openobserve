@@ -17,7 +17,7 @@ import { getDataValue } from "../../aliasUtils";
 import { getSeriesColor, getAreaStyleOverride } from "../../colorPalette";
 import { getAnnotationsData } from "@/utils/dashboard/getAnnotationsData";
 import { type SeriesObject } from "@/ts/interfaces/dashboard";
-import { chartColor } from "@/utils/chartTheme";
+import { chartColor, CHART_SELECTION_FILL } from "@/utils/chartTheme";
 
 export interface SeriesDeps {
   options: any;
@@ -131,7 +131,7 @@ export function createSeriesBuilders(deps: SeriesDeps) {
   const getSeriesMarkArea = () => {
     return {
       itemStyle: {
-        color: "rgba(0, 191, 255, 0.15)",
+        color: CHART_SELECTION_FILL,
       },
       data: markAreas,
     };
