@@ -277,6 +277,18 @@ const useManagementRoutes = () => {
             routeGuard(to, from, next);
           },
         },
+        {
+          path: "slack_app",
+          name: "slackApp",
+          component: () => import("@/components/settings/SlackAppInstall.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "routeTitles.slackApp",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
       ],
     );
   }

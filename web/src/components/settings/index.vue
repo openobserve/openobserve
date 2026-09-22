@@ -102,6 +102,7 @@ export default defineComponent({
       syntheticsLocations: "synthetics_locations",
       correlationSettings: "correlation_settings",
       genAiAgentMapping: "gen_ai_agent_mapping",
+      slackApp: "slack_app",
     };
 
     const settingsTab = ref(
@@ -118,6 +119,7 @@ export default defineComponent({
       "organization",
       "license",
       "domain_management",
+      "slack_app",
     ]);
     const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
 
@@ -169,6 +171,7 @@ export default defineComponent({
       "Data & AI",
       "Operations",
       "Synthetics",
+      "Integrations",
       "Account",
     ];
 
@@ -329,6 +332,16 @@ export default defineComponent({
           group: "Synthetics",
         },
         {
+          key: "slack_app",
+          label: t("settings.slackApp"),
+          description: t("settings.slackAppDesc"),
+          icon: "chat",
+          to: { name: "slackApp", query: { org_identifier: org } },
+          visible: isCloud,
+          dataTest: "slack-app-tab",
+          group: "Integrations",
+        },
+        {
           key: "license",
           label: t("settings.license"),
           description: t("settings.licenseDesc"),
@@ -379,6 +392,7 @@ export default defineComponent({
         "Data & AI": t("settings.groupDataAI"),
         Operations: t("settings.groupOperations"),
         Synthetics: t("settings.groupSynthetics"),
+        Integrations: t("settings.groupIntegrations"),
         Account: t("settings.groupAccount"),
       };
       return [...buckets.keys()]
