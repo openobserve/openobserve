@@ -1,0 +1,22 @@
+[
+  {
+    "title": "dashboard-wide Refresh Cache & Reload bypasses the cache (clear_cache=true)",
+    "action": "new",
+    "verifies": "the dashboard-level 'Refresh Cache & Reload' item is visible/enabled and fires a _search_stream request with clear_cache=true"
+  },
+  {
+    "title": "panel-level Refresh Cache & Reload bypasses the cache (clear_cache=true)",
+    "action": "new",
+    "verifies": "a panel kebab 'Refresh Cache & Reload' click fires that panel's _search_stream request with clear_cache=true"
+  },
+  {
+    "title": "standard Refresh re-runs panels WITH cache (no clear_cache)",
+    "action": "new",
+    "verifies": "the plain Refresh button re-fires _search_stream without a clear_cache param (no cache-bypass regression)"
+  },
+  {
+    "title": "panel-level cache refresh re-queries only the target panel",
+    "action": "new",
+    "verifies": "refreshing Panel1 without cache re-queries exactly one panel, leaving Panel2 untouched"
+  }
+]

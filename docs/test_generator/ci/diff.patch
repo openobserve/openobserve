@@ -1,0 +1,420 @@
+===== COMPLETE LIST OF CHANGED FILES (19 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/views/Dashboards/RenderDashboardCharts.vue
+web/src/views/Dashboards/ViewDashboard.vue
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 7176f2ea6e2..2845102aa9b 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -6555,11 +6555,13 @@
+       "failedToLoadDashboard": "708b8b8e43c749f0",
+       "failedToSaveChanges": "cd51b3228c7b5196",
+       "failedToUpdateJson": "d562c825eabdca2e",
++      "moreRefreshOptions": "d1859c9c35018ebc",
+       "panelDeleted": "e108e21b8ad710f4",
+       "panelDeletionFailed": "733a3438177ab919",
+       "panelMoveFailed": "91b7ce15ff1ea83f",
+       "panelMoved": "fb36a2c2b83ff138",
+       "refresh": "0e91610117029a62",
++      "refreshCacheReload": "d1ddf06136da9a72",
+       "refreshToApplyVariables": "313f2c3169259c79"
+     },
+     "visibleColumns": "e61dac0a2e409d3f",
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index f384992b443..cd0ca5d095a 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "تحديث لتطبيق أحدث تغييرات المتغيرات",
+       "refresh": "تحديث",
++      "refreshCacheReload": "تحديث ذاكرة التخزين المؤقت وإعادة التحميل",
++      "moreRefreshOptions": "خيارات تحديث إضافية",
+       "dashboard": "لوحة المعلومات",
+       "dashboardNotFound": "لم يتم العثور على لوحة المعلومات أو تم حذفها. إعادة التوجيه إلى قائمة لوحة التحكم.",
+       "failedToLoadDashboard": "فشل تحميل لوحة التحكم. إعادة التوجيه إلى قائمة لوحة التحكم.",
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index d51d9a5e632..9466f477aec 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Aktualisieren, um die neuesten Variablenänderungen zu übernehmen",
+       "refresh": "Aktualisieren",
++      "refreshCacheReload": "Cache aktualisieren & neu laden",
++      "moreRefreshOptions": "Weitere Aktualisierungsoptionen",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard nicht gefunden oder wurde gelöscht. Weiterleitung zur Dashboard-Liste.",
+       "failedToLoadDashboard": "Dashboard konnte nicht geladen werden. Weiterleitung zur Dashboard-Liste.",
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 81cff8086bc..fec03c27628 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Refresh to apply latest variable changes",
+       "refresh": "Refresh",
++      "refreshCacheReload": "Refresh cache & reload",
++      "moreRefreshOptions": "More refresh options",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard not found or has been deleted. Redirecting to dashboard list.",
+       "failedToLoadDashboard": "Failed to load dashboard. Redirecting to dashboard list.",
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 74bad66f547..825a7041938 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Actualizar para aplicar los últimos cambios de variables",
+       "refresh": "Actualizar",
++      "refreshCacheReload": "Actualizar caché y recargar",
++      "moreRefreshOptions": "Más opciones de actualización",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard no encontrado o ha sido eliminado. Redirigiendo a la lista de dashboards.",
+       "failedToLoadDashboard": "Error al cargar el dashboard. Redirigiendo a la lista de dashboards.",
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index a11c07c168b..e699c24288c 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Actualiser pour appliquer les dernières modifications de variables",
+       "refresh": "Actualiser",
++      "refreshCacheReload": "Actualiser le cache et recharger",
++      "moreRefreshOptions": "Plus d'options d'actualisation",
+       "dashboard": "Tableau de bord",
+       "dashboardNotFound": "Tableau de bord introuvable ou supprimé. Redirection vers la liste des tableaux de bord.",
+       "failedToLoadDashboard": "Échec du chargement du tableau de bord. Redirection vers la liste des tableaux de bord.",
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index e134c5b35db..437cb228237 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Aggiorna per applicare le ultime modifiche alle variabili",
+       "refresh": "Aggiorna",
++      "refreshCacheReload": "Aggiorna cache e ricarica",
++      "moreRefreshOptions": "Altre opzioni di aggiornamento",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard non trovato o è stato eliminato. Reindirizzamento all'elenco dei dashboard.",
+       "failedToLoadDashboard": "Impossibile caricare il dashboard. Reindirizzamento all'elenco dei dashboard.",
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index acafa78f81b..394a2a6279c 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "最新の変数変更を適用するには更新してください",
+       "refresh": "更新",
++      "refreshCacheReload": "キャッシュを更新して再読み込み",
++      "moreRefreshOptions": "その他の更新オプション",
+       "dashboard": "ダッシュボード",
+       "dashboardNotFound": "ダッシュボードが見つからないか、削除されました。ダッシュボード一覧にリダイレクトします。",
+       "failedToLoadDashboard": "ダッシュボードの読み込みに失敗しました。ダッシュボード一覧にリダイレクトします。",
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index 6e9dd95bf92..e4fdee7d653 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "최신 변수 변경 사항을 적용하려면 새로고침하세요.",
+       "refresh": "새로고침",
++      "refreshCacheReload": "캐시 새로 고침 및 다시 로드",
++      "moreRefreshOptions": "추가 새로 고침 옵션",
+       "dashboard": "대시보드",
+       "dashboardNotFound": "대시보드를 찾을 수 없거나 삭제되었습니다. 대시보드 목록으로 이동합니다.",
+       "failedToLoadDashboard": "대시보드를 불러오지 못했습니다. 대시보드 목록으로 이동합니다.",
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 071c9baac57..04bf263f4dc 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Vernieuwen om de laatste variabelewijzigingen toe te passen",
+       "refresh": "Vernieuwen",
++      "refreshCacheReload": "Cache vernieuwen en herladen",
++      "moreRefreshOptions": "Meer vernieuwingsopties",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard niet gevonden of is verwijderd. Doorverwijzen naar dashboardlijst.",
+       "failedToLoadDashboard": "Kan dashboard niet laden. Doorverwijzen naar dashboardlijst.",
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index e72ac3e164e..6024107600a 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Odśwież, aby zastosować najnowsze zmiany zmiennych",
+       "refresh": "Odśwież",
++      "refreshCacheReload": "Odśwież pamięć podręczną i przeładuj",
++      "moreRefreshOptions": "Więcej opcji odświeżania",
+       "dashboard": "Pulpit nawigacyjny",
+       "dashboardNotFound": "Pulpit nawigacyjny nie został znaleziony lub został usunięty. Przekierowanie do listy pulpitów nawigacyjnych.",
+       "failedToLoadDashboard": "Nie udało się załadować pulpitu nawigacyjnego. Przekierowanie do listy pulpitów nawigacyjnych.",
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 332fbc0407d..386785871b6 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Atualize para aplicar as alterações mais recentes nas variáveis",
+       "refresh": "Atualizar",
++      "refreshCacheReload": "Atualizar cache e recarregar",
++      "moreRefreshOptions": "Mais opções de atualização",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Dashboard não encontrado ou foi excluído. Redirecionando para a lista de dashboards.",
+       "failedToLoadDashboard": "Falha ao carregar o dashboard. Redirecionando para a lista de dashboards.",
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 9cbb60dfa31..6d5b9709453 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Обновите, чтобы применить последние изменения переменных",
+       "refresh": "Обновить",
++      "refreshCacheReload": "Обновить кеш и перезагрузить",
++      "moreRefreshOptions": "Дополнительные параметры обновления",
+       "dashboard": "Панель мониторинга",
+       "dashboardNotFound": "Панель мониторинга не найдена или была удалена. Перенаправление в список панелей мониторинга.",
+       "failedToLoadDashboard": "Не удалось загрузить панель мониторинга. Перенаправление в список панелей мониторинга.",
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 01e6668559b..c8809289144 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "En son değişken değişikliklerini uygulamak için yenileyin",
+       "refresh": "Yenile",
++      "refreshCacheReload": "Önbelleği yenile ve yeniden yükle",
++      "moreRefreshOptions": "Daha fazla yenileme seçeneği",
+       "dashboard": "Pano",
+       "dashboardNotFound": "Pano bulunamadı veya silinmiş. Pano listesine yönlendiriliyor.",
+       "failedToLoadDashboard": "Pano yüklenemedi. Pano listesine yönlendiriliyor.",
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 3db63cfa3a7..ade9d243ffa 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "Làm mới để áp dụng các thay đổi biến mới nhất",
+       "refresh": "Làm mới",
++      "refreshCacheReload": "Làm mới cache & tải lại",
++      "moreRefreshOptions": "Thêm tùy chọn làm mới",
+       "dashboard": "Dashboard",
+       "dashboardNotFound": "Không tìm thấy dashboard hoặc đã bị xóa. Đang chuyển hướng đến danh sách dashboard.",
+       "failedToLoadDashboard": "Không thể tải dashboard. Đang chuyển hướng đến danh sách dashboard.",
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index 9f388fd56b8..f77415ac90a 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -5388,6 +5388,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "刷新以应用最新的变量更改",
+       "refresh": "刷新",
++      "refreshCacheReload": "刷新缓存并重新加载",
++      "moreRefreshOptions": "更多刷新选项",
+       "dashboard": "仪表盘",
+       "dashboardNotFound": "未找到仪表盘或已被删除。正在重定向到仪表盘列表。",
+       "failedToLoadDashboard": "加载仪表盘失败。正在重定向到仪表盘列表。",
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 8c41afc6f50..910dc29f4aa 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -5383,6 +5383,8 @@
+     "viewDashboard": {
+       "refreshToApplyVariables": "重新整理以套用最新變數變更",
+       "refresh": "重新整理",
++      "refreshCacheReload": "重新整理快取並重新載入",
++      "moreRefreshOptions": "更多重新整理選項",
+       "dashboard": "儀表板",
+       "dashboardNotFound": "找不到儀表板或已被刪除。正在重新導向至儀表板清單。",
+       "failedToLoadDashboard": "載入儀表板失敗。正在重新導向至儀表板清單。",
+diff --git a/web/src/views/Dashboards/RenderDashboardCharts.vue b/web/src/views/Dashboards/RenderDashboardCharts.vue
+index 1a74c0db67d..91b45d2b217 100644
+--- a/web/src/views/Dashboards/RenderDashboardCharts.vue
++++ b/web/src/views/Dashboards/RenderDashboardCharts.vue
+@@ -101,7 +101,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+               {}
+             "
+             :shouldRefreshWithoutCache="
+-              (panels?.[0]?.id ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id] : undefined) ||
++              (panels?.[0]?.id ? shouldRefreshWithoutCacheObj?.[panels?.[0]?.id] : undefined) ??
++              shouldRefreshWithoutCacheObj?.__global ??
+               false
+             "
+             :variablesData="getMergedVariablesForPanel(panels[0]?.id)"
+@@ -186,7 +187,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   :folderId="folderId"
+                   :reportId="reportId"
+                   :selectedTimeDate="currentTimeObj?.[item?.id] || currentTimeObj['__global'] || {}"
+-                  :shouldRefreshWithoutCache="shouldRefreshWithoutCacheObj?.[item?.id] || false"
++                  :shouldRefreshWithoutCache="
++                    shouldRefreshWithoutCacheObj?.[item?.id] ??
++                    shouldRefreshWithoutCacheObj?.__global ??
++                    false
++                  "
+                   :variablesData="getMergedVariablesForPanel(item.id)"
+                   :currentVariablesData="getLiveVariablesForPanel(item.id)"
+                   :width="getPanelLayout(item, 'w')"
+diff --git a/web/src/views/Dashboards/ViewDashboard.vue b/web/src/views/Dashboards/ViewDashboard.vue
+index 8d016ef92da..bb16e6144e2 100644
+--- a/web/src/views/Dashboards/ViewDashboard.vue
++++ b/web/src/views/Dashboards/ViewDashboard.vue
+@@ -104,37 +104,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+             size="sm"
+           />
+-          <OButton
+-            v-if="config.isEnterprise == 'true' && arePanelsLoading"
+-            v-show="store.state.printMode !== true"
+-            variant="outline-destructive"
+-            size="icon-toolbar"
+-            @click="cancelQuery"
+-            data-test="dashboard-cancel-btn"
+-            icon-left="cancel"
+-          >
+-            <OTooltip :content="t('panel.cancel')" />
+-          </OButton>
+-          <OButton
+-            v-else
+-            v-show="store.state.printMode !== true"
+-            :variant="isVariablesChanged ? 'warning' : 'outline'"
+-            size="icon-toolbar"
+-            @click="refreshData"
+-            :disabled="arePanelsLoading"
+-            :loading="arePanelsLoading"
+-            data-test="dashboard-refresh-btn"
+-            icon-left="refresh"
+-          >
+-            <OTooltip
+-              :content="
+-                isVariablesChanged
+-                  ? t('dashboard.viewDashboard.refreshToApplyVariables')
+-                  : t('dashboard.viewDashboard.refresh')
+-              "
+-              shortcut-id="dashboardRefresh"
+-            />
+-          </OButton>
++          <OButtonGroup v-show="store.state.printMode !== true">
++            <OButton
++              v-if="config.isEnterprise == 'true' && arePanelsLoading"
++              variant="outline-destructive"
++              size="icon-toolbar"
++              @click="cancelQuery"
++              data-test="dashboard-cancel-btn"
++              icon-left="cancel"
++            >
++              <OTooltip :content="t('panel.cancel')" />
++            </OButton>
++            <OButton
++              v-else
++              :variant="isVariablesChanged ? 'warning' : 'outline'"
++              size="icon-toolbar"
++              @click="refreshData()"
++              :disabled="arePanelsLoading"
++              :loading="arePanelsLoading"
++              data-test="dashboard-refresh-btn"
++              icon-left="refresh"
++            >
++              <OTooltip
++                :content="
++                  isVariablesChanged
++                    ? t('dashboard.viewDashboard.refreshToApplyVariables')
++                    : t('dashboard.viewDashboard.refresh')
++                "
++                shortcut-id="dashboardRefresh"
++              />
++            </OButton>
++            <ODropdown align="end" side="bottom">
++              <template #trigger>
++                <OButton
++                  :variant="refreshOptionsVariant"
++                  size="icon-toolbar"
++                  class="w-5"
++                  :disabled="arePanelsLoading"
++                  :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
++                  data-test="dashboard-refresh-options-btn"
++                  icon-left="arrow-drop-down"
++                />
++              </template>
++              <ODropdownItem
++                data-test="dashboard-refresh-without-cache-btn"
++                icon-left="cached"
++                @select="refreshData(true)"
++              >
++                {{ t("dashboard.viewDashboard.refreshCacheReload") }}
++              </ODropdownItem>
++            </ODropdown>
++          </OButtonGroup>
+         </template>
+ 
+         <template #actions-overflow>
+@@ -350,6 +370,9 @@ import config from "@/aws-exports";
+ import useCancelQuery from "@/composables/dashboard/useCancelQuery";
+ import PanelLayoutSettings from "./PanelLayoutSettings.vue";
+ import OButton from "@/lib/core/Button/OButton.vue";
++import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
++import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
++import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+ import OIcon from "@/lib/core/Icon/OIcon.vue";
+ import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+ import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+@@ -394,6 +417,9 @@ export default defineComponent({
+     PanelLayoutSettings,
+     DashboardJsonEditor,
+     OButton,
++    OButtonGroup,
++    ODropdown,
++    ODropdownItem,
+     OIcon,
+     OTooltip,
+   },
+@@ -1241,12 +1267,20 @@ export default defineComponent({
+       });
+     };
+ 
+-    const refreshData = async () => {
++    const refreshOptionsVariant = computed(() => {
++      if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
++      return isVariablesChanged.value ? "warning" : "outline";
++    });
++
++    const refreshData = async (withoutCache = false) => {
+       if (!arePanelsLoading.value) {
+         // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
+         // This allows all panels to refresh, not just the one previously refreshed
+         panelIdToBeRefreshed.value = null;
+ 
++        // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
++        shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
++
+         // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+         if (dashboardId.value) {
+           void queryClient.invalidateQueries({
+@@ -1828,6 +1862,7 @@ export default defineComponent({
+       refreshInterval,
+       // ----------------
+       refreshData,
++      refreshOptionsVariant,
+       isVariablesChanged,
+       refreshedVariablesDataUpdated,
+       onDeletePanel,

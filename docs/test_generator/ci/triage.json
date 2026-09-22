@@ -1,0 +1,26 @@
+{
+  "feature_slug": "dashboard-refresh-without-cache",
+  "feature_title": "Dashboard Refresh Without Cache",
+  "area": "Dashboards",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "dashboard-refresh-without-cache.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Dashboards/dashboard-refresh-without-cache.spec.js",
+  "playwright_group": "Dashboards-Core",
+  "source_files": [
+    "web/src/views/Dashboards/ViewDashboard.vue",
+    "web/src/views/Dashboards/RenderDashboardCharts.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives under web/src/ (web/src/views/Dashboards/ViewDashboard.vue, web/src/views/Dashboards/RenderDashboardCharts.vue, web/src/locales/languages/*.json) or scripts/translations/. No file is under enterprise/, o2_enterprise/, or any enterprise-owned directory, so this is an OSS change. The config.isEnterprise == 'true' conditionals in ViewDashboard.vue are runtime branches in shared OSS code, not enterprise-owned paths, so they do not change the edition call.",
+    "skip": "Not skipping. The diff has no explicit opt-out (no tests-added label; trigger_comment.txt and feature_hint.txt are empty) and the change is user-facing: it adds a new dropdown control and a 'Refresh cache & reload' action to the dashboard toolbar, with accompanying translations.",
+    "e2e": "E2E is warranted because this alters a user-facing dashboard interaction. The single refresh button becomes an OButtonGroup with an ODropdown offering a 'Refresh cache & reload' item that calls refreshData(true) and sets a __global shouldRefreshWithoutCache flag, which RenderDashboardCharts.vue then honors via nullish coalescing. That new control and its effect on panel refresh need verification.",
+    "area": "The bulk of the functional changes live in web/src/views/Dashboards/ (ViewDashboard.vue and RenderDashboardCharts.vue), and the new translation keys sit under the dashboard.viewDashboard namespace. The existing Dashboards E2E folder is the natural home.",
+    "group": "Dashboards-Core (actual_folder Dashboards) is the closest existing matrix shard: it holds the core dashboard viewing/refresh specs (dashboard.spec.js, dashboard2.spec.js, etc.), and this refresh-without-cache feature is a core dashboard-viewing behavior rather than a settings/chart/variables concern.",
+    "existing_tests": "No E2E specs in the diff. No file under tests/ui-testing/playwright-tests/ was changed, so existing_tests_in_diff is false. The changed files are locale JSONs, a translation-state file, and two Dashboard Vue components, none of which are Playwright E2E specs."
+  }
+}
