@@ -1,7 +1,0 @@
-[
-  {
-    "title": "TC-ZOOM-001: Dragging a brush switches the dashboard to an absolute range — not wired: updated:dataZoom (ChartRenderer.vue:472) ≠ @updated:data-zoom (PanelSchemaRenderer.vue:98)",
-    "action": "extend",
-    "verifies": "brush → absolute time range end-to-end chain (parked as fixme until the event-name mismatch is fixed)"
-  }
-]
