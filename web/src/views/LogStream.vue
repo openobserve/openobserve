@@ -342,17 +342,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <span class="max-md:hidden">
                   {{ t("logStream.streamsUnit", { count: scope.totalRows }) }}
                 </span>
-                <OButton
-                  v-if="selectedIds.length > 0"
-                  icon-left="delete"
-                  variant="outline-destructive"
-                  size="sm-action"
-                  class="ms-4"
-                  :disabled="isDeleting"
-                  @click="confirmBatchDeleteAction"
-                >
-                  {{ isDeleting ? t("common.deleting") : t("common.delete") }}
-                </OButton>
+                <template v-if="selectedIds.length > 0">
+                  <span class="text-text-secondary ms-4" data-test="log-stream-selected-count">
+                    {{ t("logStream.selectedCount", { count: selectedIds.length }) }}
+                    <template v-if="offPageCount > 0">
+                      ({{ t("logStream.selectedOffPage", { count: offPageCount }) }})
+                    </template>
+                  </span>
+                  <OButton
+                    variant="ghost"
+                    size="sm-action"
+                    class="ms-1"
+                    data-test="log-stream-clear-selection-btn"
+                    @click="clearSelection"
+                  >
+                    {{ t("logStream.clearSelection") }}
+                  </OButton>
+                  <OButton
+                    icon-left="delete"
+                    variant="outline-destructive"
+                    size="sm-action"
+                    class="ms-2"
+                    :disabled="isDeleting"
+                    @click="confirmBatchDeleteAction"
+                  >
+                    {{ isDeleting ? t("common.deleting") : t("common.delete") }}
+                  </OButton>
+                </template>
               </div>
             </div>
           </template>
@@ -419,6 +435,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div class="flex flex-col gap-3 py-1">
         <p class="text-sm">{{ t("logStream.confirmBatchDeleteMsg") }}</p>
+        <p
+          v-if="offPageCount > 0"
+          class="text-text-secondary text-xs"
+          data-test="log-stream-batch-delete-off-page"
+        >
+          {{
+            t("logStream.confirmBatchDeleteOffPage", {
+              count: selectedIds.length,
+              offPage: offPageCount,
+            })
+          }}
+        </p>
         <div class="text-text-secondary flex w-full items-center gap-2 text-sm">
           <OCheckbox v-model="deleteAssociatedAlertsPipelines" />
           <span class="text-text-secondary text-xs font-medium">
@@ -456,6 +484,7 @@ import segment from "../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus, formatSizeFromMB } from "../utils/zincutils";
 import config from "@/aws-exports";
 import useStreams from "@/composables/useStreams";
+import { usePersistedSelection } from "@/composables/usePersistedSelection";
 import AddStream from "@/components/logstream/AddStream.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
@@ -505,7 +534,6 @@ export default defineComponent({
     const confirmBatchDelete = ref<boolean>(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
-    const selectedIds = ref<string[]>([]);
     const orgData: any = ref(store.state.selectedOrganization);
     const previousOrgIdentifier = ref("");
     const filterQuery = ref("");
@@ -529,9 +557,20 @@ export default defineComponent({
     const sortOrder = ref<"asc" | "desc">("asc");
     const totalCount = ref(0);
 
-    const selectedItems = computed(() =>
-      logStream.value.filter((s: any) => selectedIds.value.includes(s._rowKey)),
-    );
+    const {
+      selectedIds,
+      selectedRows: selectedItems,
+      offPageCount,
+      remove: removeFromSelection,
+      clear: clearSelection,
+    } = usePersistedSelection<any, { name: string; stream_type: string }>({
+      tableId: "streams-log-stream-list",
+      scope: () => store.state.selectedOrganization?.identifier ?? "",
+      rows: logStream,
+      getRowId: (row) => row._rowKey,
+      mode: "server",
+      snapshot: (row) => ({ name: row.name, stream_type: row.stream_type }),
+    });
 
     const streamTabs: never[] = [];
     const { removeStream, getStream, addNewStreams } = useStreams(t);
@@ -1043,11 +1082,16 @@ export default defineComponent({
         (s: any) => !removedKeys.has(s._rowKey),
       );
 
-      const removedCount = before - logStream.value.length;
+      // Rows selected on other server pages never sat in logStream, yet still leave the total.
+      const keyword = filterQuery.value.toLowerCase();
+      const removedInView = items.filter(
+        (s) => s.stream_type === selectedStreamType.value && s.name.toLowerCase().includes(keyword),
+      ).length;
+      const removedCount = Math.max(before - logStream.value.length, removedInView);
       totalCount.value = Math.max(0, totalCount.value - removedCount);
       resultTotal.value = logStream.value.length;
 
-      selectedIds.value = [];
+      removeFromSelection([...removedKeys]);
 
       // Prune every cached page, not just the one on screen: navigation is
       // cache-first, so a page still holding the deleted row would paint it
@@ -1105,7 +1149,7 @@ export default defineComponent({
     };
     const deleteBatchStream = () => {
       isDeleting.value = true;
-      const items = selectedItems.value;
+      const items = [...selectedItems.value];
       const promises: Promise<any>[] = [];
 
       items.forEach((stream: any) => {
@@ -1358,6 +1402,8 @@ export default defineComponent({
       columns,
       selectedIds,
       selectedItems,
+      offPageCount,
+      clearSelection,
       orgData,
       getLogStream: getLogStream,
       refreshStreams,
