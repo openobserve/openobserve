@@ -26,15 +26,79 @@ use proto::cluster_rpc::{
 use tonic::{
     Request, Status,
     codec::CompressionEncoding,
+    codegen::http::{
+        self, HeaderValue,
+        header::HOST,
+        uri::{Authority, Scheme, Uri},
+    },
     metadata::{MetadataKey, MetadataValue},
     service::interceptor::InterceptedService,
     transport::{Certificate, Channel, ClientTlsConfig},
 };
-use tracing_opentelemetry::OpenTelemetrySpanExt;
+use tonic_tracing_opentelemetry::middleware::client::{OtelGrpcLayer, OtelGrpcService};
+use tower::{Layer, Service};
 
 use crate::errors::{Error, ErrorCodes};
 
 static CHANNELS: Lazy<RwAHashMap<String, Channel>> = Lazy::new(Default::default);
+
+/// Channel that records a CLIENT span per request and propagates its trace context.
+#[derive(Clone, Debug)]
+pub struct GrpcChannel {
+    inner: OtelGrpcService<Channel>,
+    origin: Option<(Scheme, Authority)>,
+    host: Option<HeaderValue>,
+}
+
+impl GrpcChannel {
+    fn new(channel: Channel, grpc_addr: &str) -> Self {
+        let parts = grpc_addr.parse::<Uri>().ok().map(Uri::into_parts);
+        let (scheme, authority) = parts.map_or((None, None), |p| (p.scheme, p.authority));
+        Self {
+            inner: OtelGrpcLayer.layer(channel),
+            host: authority
+                .as_ref()
+                .and_then(|a| HeaderValue::from_str(a.as_str()).ok()),
+            origin: scheme.zip(authority),
+        }
+    }
+}
+
+impl<B> Service<http::Request<B>> for GrpcChannel
+where
+    OtelGrpcService<Channel>: Service<http::Request<B>>,
+{
+    type Response = <OtelGrpcService<Channel> as Service<http::Request<B>>>::Response;
+    type Error = <OtelGrpcService<Channel> as Service<http::Request<B>>>::Error;
+    type Future = <OtelGrpcService<Channel> as Service<http::Request<B>>>::Future;
+
+    fn poll_ready(
+        &mut self,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx)
+    }
+
+    // tonic adds the peer authority inside Channel, after the tracing middleware has read it
+    fn call(&mut self, mut req: http::Request<B>) -> Self::Future {
+        if let Some((scheme, authority)) = &self.origin
+            && req.uri().authority().is_none()
+        {
+            let mut parts = req.uri().clone().into_parts();
+            parts.scheme = Some(scheme.clone());
+            parts.authority = Some(authority.clone());
+            if let Ok(uri) = Uri::from_parts(parts) {
+                *req.uri_mut() = uri;
+            }
+        }
+        if let Some(host) = &self.host {
+            req.headers_mut()
+                .entry(HOST)
+                .or_insert_with(|| host.clone());
+        }
+        self.inner.call(req)
+    }
+}
 
 pub struct MetadataMap<'a>(pub &'a mut tonic::metadata::MetadataMap);
 
@@ -80,7 +144,13 @@ impl ResponseCompression {
     }
 }
 
-pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
+pub async fn get_cached_channel(grpc_addr: &str) -> Result<GrpcChannel, tonic::Status> {
+    get_cached_plain_channel(grpc_addr)
+        .await
+        .map(|channel| GrpcChannel::new(channel, grpc_addr))
+}
+
+async fn get_cached_plain_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     // if channel cache is disabled, create a new channel for each request
     if get_config().grpc.channel_cache_disabled {
         return create_channel(grpc_addr).await;
@@ -99,7 +169,7 @@ pub async fn get_cached_channel(grpc_addr: &str) -> Result<Channel, tonic::Statu
     w.insert(grpc_addr.to_string(), channel.clone());
     drop(w);
 
-    Ok(channel.clone())
+    Ok(channel)
 }
 
 /// Whether a gRPC client connection to `grpc_addr` should use TLS.
@@ -153,7 +223,6 @@ pub async fn create_channel(grpc_addr: &str) -> Result<Channel, tonic::Status> {
     Ok(channel)
 }
 
-#[tracing::instrument(name = "grpc:search::make_client", skip_all)]
 pub async fn make_grpc_search_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
@@ -161,7 +230,10 @@ pub async fn make_grpc_search_client<T>(
     timeout: u64,
 ) -> Result<
     SearchClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+        InterceptedService<
+            GrpcChannel,
+            impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>,
+        >,
     >,
     Error,
 > {
@@ -172,13 +244,6 @@ pub async fn make_grpc_search_client<T>(
         cfg.limit.query_timeout
     };
     request.set_timeout(std::time::Duration::from_secs(timeout));
-
-    opentelemetry::global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(
-            &tracing::Span::current().context(),
-            &mut MetadataMap(request.metadata_mut()),
-        )
-    });
 
     let token: MetadataValue<_> = node
         .get_auth_token()
@@ -210,7 +275,6 @@ pub async fn make_grpc_search_client<T>(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
 }
 
-#[tracing::instrument(name = "promql:search:grpc:metrics:make_client", skip_all)]
 pub async fn make_grpc_metrics_client<T>(
     trace_id: &str,
     org_id: &str,
@@ -219,7 +283,10 @@ pub async fn make_grpc_metrics_client<T>(
     timeout: u64,
 ) -> Result<
     MetricsClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+        InterceptedService<
+            GrpcChannel,
+            impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>,
+        >,
     >,
     Error,
 > {
@@ -234,7 +301,6 @@ pub async fn make_grpc_metrics_client<T>(
     .await
 }
 
-#[tracing::instrument(name = "promql:search:grpc:metrics:make_client_with_policy", skip_all)]
 pub async fn make_grpc_metrics_client_with_policy<T>(
     trace_id: &str,
     org_id: &str,
@@ -244,7 +310,10 @@ pub async fn make_grpc_metrics_client_with_policy<T>(
     response_compression: ResponseCompression,
 ) -> Result<
     MetricsClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>>,
+        InterceptedService<
+            GrpcChannel,
+            impl Fn(Request<()>) -> Result<Request<()>, Status> + use<T>,
+        >,
     >,
     Error,
 > {
@@ -258,13 +327,6 @@ pub async fn make_grpc_metrics_client_with_policy<T>(
         cfg.limit.query_timeout
     };
     request.set_timeout(std::time::Duration::from_secs(timeout));
-
-    opentelemetry::global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(
-            &tracing::Span::current().context(),
-            &mut MetadataMap(request.metadata_mut()),
-        )
-    });
 
     let org_header_key: MetadataKey<_> = cfg
         .grpc
@@ -309,26 +371,18 @@ pub async fn make_grpc_metrics_client_with_policy<T>(
     Ok(client)
 }
 
-#[tracing::instrument(name = "grpc:node:make_client", skip_all)]
 pub async fn make_grpc_node_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
     NodeServiceClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+        InterceptedService<GrpcChannel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
     >,
     Error,
 > {
     let cfg = get_config();
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-    opentelemetry::global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(
-            &tracing::Span::current().context(),
-            &mut MetadataMap(request.metadata_mut()),
-        )
-    });
 
     let token: MetadataValue<_> = node
         .get_auth_token()
@@ -360,26 +414,18 @@ pub async fn make_grpc_node_client<T>(
         .max_encoding_message_size(cfg.grpc.max_message_size * 1024 * 1024))
 }
 
-#[tracing::instrument(name = "grpc:cluster_info:make_client", skip_all)]
 pub async fn make_grpc_cluster_info_client<T>(
     trace_id: &str,
     request: &mut Request<T>,
     node: &Arc<dyn NodeInfo>,
 ) -> Result<
     ClusterInfoServiceClient<
-        InterceptedService<Channel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
+        InterceptedService<GrpcChannel, impl Fn(Request<()>) -> Result<Request<()>, Status>>,
     >,
     Error,
 > {
     let cfg = get_config();
     request.set_timeout(std::time::Duration::from_secs(cfg.limit.query_timeout));
-
-    opentelemetry::global::get_text_map_propagator(|propagator| {
-        propagator.inject_context(
-            &tracing::Span::current().context(),
-            &mut MetadataMap(request.metadata_mut()),
-        )
-    });
 
     let token: MetadataValue<_> = node
         .get_auth_token()
@@ -773,5 +819,101 @@ mod tests {
         assert!(!super::grpc_addr_uses_tls(""));
         // A host that merely contains "https" without it being the scheme is not TLS.
         assert!(!super::grpc_addr_uses_tls("http://https.example.com:5081"));
+    }
+
+    #[tokio::test]
+    async fn test_cached_channel_records_client_span() {
+        use std::{
+            collections::HashMap,
+            sync::{Arc, Mutex},
+        };
+
+        use proto::cluster_rpc::{
+            self,
+            metrics_client::MetricsClient,
+            metrics_server::{Metrics, MetricsServer},
+        };
+        use tonic::{Request, Response, Status, transport::Server};
+        use tracing_subscriber::{Layer, layer::Context, prelude::*, registry::LookupSpan};
+
+        type Fields = HashMap<&'static str, String>;
+        struct Echo;
+        #[tonic::async_trait]
+        impl Metrics for Echo {
+            async fn query(
+                &self,
+                _: Request<cluster_rpc::MetricsQueryRequest>,
+            ) -> Result<Response<cluster_rpc::MetricsQueryResponse>, Status> {
+                Ok(Response::new(Default::default()))
+            }
+            type DataStream =
+                futures::stream::Empty<Result<cluster_rpc::MetricsQueryResponse, Status>>;
+            async fn data(
+                &self,
+                _: Request<cluster_rpc::MetricsQueryRequest>,
+            ) -> Result<Response<Self::DataStream>, Status> {
+                Ok(Response::new(futures::stream::empty()))
+            }
+        }
+        struct Visitor<'a>(&'a mut Fields);
+        impl tracing::field::Visit for Visitor<'_> {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                self.0.insert(field.name(), format!("{value:?}"));
+            }
+        }
+        struct Recorder(Arc<Mutex<Vec<Fields>>>);
+        impl<S: tracing::Subscriber + for<'a> LookupSpan<'a>> Layer<S> for Recorder {
+            fn on_new_span(
+                &self,
+                attrs: &tracing::span::Attributes<'_>,
+                _: &tracing::span::Id,
+                _: Context<'_, S>,
+            ) {
+                let mut fields = Fields::new();
+                attrs.record(&mut Visitor(&mut fields));
+                self.0.lock().unwrap().push(fields);
+            }
+        }
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port().to_string();
+        let addr = format!("http://127.0.0.1:{port}");
+        let incoming = futures::stream::unfold(listener, |listener| async {
+            Some((listener.accept().await.map(|(stream, _)| stream), listener))
+        });
+        let server = tokio::spawn(
+            Server::builder()
+                .add_service(MetricsServer::new(Echo))
+                .serve_with_incoming(incoming),
+        );
+        let spans = Arc::new(Mutex::new(Vec::new()));
+        let subscriber = tracing_subscriber::registry().with(Recorder(Arc::clone(&spans)));
+        // a lone dispatcher lets parallel tests cache this callsite as disabled
+        let _second = tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
+        let _guard = tracing::subscriber::set_default(subscriber);
+
+        let channel = super::get_cached_channel(&addr).await.unwrap();
+        MetricsClient::new(channel)
+            .query(cluster_rpc::MetricsQueryRequest::default())
+            .await
+            .unwrap();
+
+        let spans = spans.lock().unwrap().clone();
+        let client = spans
+            .iter()
+            .find(|fields| fields.get("otel.kind").map(String::as_str) == Some("Client"))
+            .expect("no CLIENT span recorded");
+        assert_eq!(
+            client.get("rpc.service").map(String::as_str),
+            Some("cluster.Metrics")
+        );
+        assert_eq!(client.get("rpc.method").map(String::as_str), Some("Query"));
+        assert_eq!(
+            client.get("server.address").map(String::as_str),
+            Some("127.0.0.1")
+        );
+        assert_eq!(client.get("server.port"), Some(&port));
+        super::CHANNELS.write().await.remove(&addr);
+        server.abort();
     }
 }
