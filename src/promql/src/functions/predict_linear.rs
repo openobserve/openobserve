@@ -21,8 +21,13 @@ use datafusion::error::Result;
 use crate::{common::linear_regression, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#predict_linear
-pub(crate) fn predict_linear(data: Value, duration: f64, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, PredictLinearFunc::new(duration), eval_ctx)
+pub(crate) fn predict_linear(
+    data: Value,
+    duration: f64,
+    eval_ctx: &EvalContext,
+    pinned: Option<i64>,
+) -> Result<Value> {
+    super::eval_range_at(data, PredictLinearFunc::new(duration), eval_ctx, pinned)
 }
 
 pub struct PredictLinearFunc {
@@ -63,7 +68,7 @@ mod tests {
     // Test helper
     fn predict_linear_test_helper(data: Value, duration: f64) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());
-        predict_linear(data, duration, &eval_ctx)
+        predict_linear(data, duration, &eval_ctx, None)
     }
 
     #[test]

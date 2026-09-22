@@ -49,6 +49,7 @@ import { IngestionPage } from "./generalPages/ingestionPage.js";
 import { CloudLoginPage } from "./cloudPages/cloudLoginPage.js";
 import { isCloudEnvironment } from "./cloudPages/cloud-env.js";
 import { IngestionConfigPage } from "./generalPages/ingestionConfigPage.js";
+import { SplunkHecPage } from "./generalPages/splunkHecPage.js";
 
 // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
 import { HomePage } from "./generalPages/homePage.js";
@@ -92,6 +93,7 @@ import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
+import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
 import { RegexPatternsFormValidationPage } from "./generalPages/regexPatternsFormValidationPage.js";
 import { CipherKeysFormValidationPage } from "./generalPages/cipherKeysFormValidationPage.js";
 import { SharedComponentsFormValidationPage } from "./generalPages/sharedComponentsFormValidationPage.js";
@@ -192,6 +194,7 @@ class PageManager {
     this.loginPage = isCloudEnvironment() ? new CloudLoginPage(page) : new LoginPage(page);
     this.ingestionPage = new IngestionPage(page);
     this.ingestionConfigPage = new IngestionConfigPage(page);
+    this.splunkHecPage = new SplunkHecPage(page);
 
     // ===== GENERAL TESTS ADDITIONAL PAGE OBJECTS =====
     this.homePage = new HomePage(page);
@@ -231,6 +234,7 @@ class PageManager {
     this.modelPricingPage = new ModelPricingPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
+    this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);
     this.regexPatternsFormValidation = new RegexPatternsFormValidationPage(page);
     this.sharedComponentsFormValidation = new SharedComponentsFormValidationPage(page);
     this.schemaPage = new SchemaPage(page);

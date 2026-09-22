@@ -3557,6 +3557,12 @@
     "joinSlack": "Participe do Slack",
     "maybeLater": "Talvez mais tarde"
   },
+  "connectDataSourcePopup": {
+    "title": "Para começar, vamos conectar a sua primeira fonte de dados.",
+    "description": "Temos muito para lhe mostrar, mas primeiro precisamos de conectar os seus dados. A maioria das equipas vê os primeiros logs em cerca de um minuto.",
+    "connectButton": "Conectar uma fonte de dados",
+    "slackLink": "Participe também da nossa comunidade no Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continuar de onde pausou",
     "startFromNow": "Começar a partir de agora.",
@@ -5893,6 +5899,9 @@
         "details": "Detalhes",
         "json": "JSON",
         "insights": "Insights",
+        "back": "Voltar aos resultados",
+        "prevEvent": "Evento anterior",
+        "nextEvent": "Próximo evento",
         "copyLink": "Copiar link",
         "copy": "Copiar",
         "copyValue": "Copiar valor",
@@ -9342,7 +9351,28 @@
     "listConjunctionAnd": "{list} e {last}",
     "runsIn": "Executa em",
     "recommendedByFieldCoverage": "Recomendado com base na cobertura de campos em seus fluxos.",
-    "listConjunctionAndTwo": "{first} e {last}"
+    "listConjunctionAndTwo": "{first} e {last}",
+    "domainOrgMappings": {
+      "title": "Mapeamentos de domínio para organização",
+      "subtitle": "Novos usuários que fazem login com um domínio de e-mail correspondente são adicionados à organização automaticamente.",
+      "addMapping": "Adicionar mapeamento",
+      "editMapping": "Editar mapeamento",
+      "empty": "Nenhum mapeamento ainda. Use “{addLabel}” para adicionar um.",
+      "domain": "Domínio de e-mail",
+      "domainHelp": "A parte após {at_sign} no endereço de e-mail do usuário.",
+      "organization": "Organização",
+      "organizationPlaceholder": "Identificador da organização",
+      "organizationHelp": "O identificador da organização à qual os usuários correspondentes são adicionados.",
+      "organizationRequired": "A organização é obrigatória",
+      "baseRole": "Função base",
+      "baseRoleHelp": "A função atribuída aos usuários correspondentes nessa organização.",
+      "userGroup": "Grupo de usuários",
+      "userGroupPlaceholder": "Nome do grupo",
+      "userGroupHelp": "Opcional. Os usuários correspondentes também entram nesse grupo nessa organização.",
+      "duplicateDomain": "Já existe um mapeamento para este domínio",
+      "confirmRemove": "Tem certeza de que deseja excluir o mapeamento para {domain}?",
+      "deleteTitle": "Excluir mapeamento"
+    }
   },
   "reports": {
     "frequencyUnits": {

@@ -32,7 +32,7 @@ use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{Offset, VectorSelector},
+    parser::VectorSelector,
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
@@ -41,7 +41,7 @@ use crate::{
     ast::rewrite::remove_filter_all,
     micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::metric_name,
+    utils::{metric_name, offset_micros},
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
@@ -53,7 +53,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
     ) -> (i64, i64, i64) {
-        let offset = get_offset_modifier(selector.offset.clone());
+        let offset = offset_micros(&selector.offset);
         (
             self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset,
             self.ctx.end - offset,
@@ -106,7 +106,7 @@ impl Engine {
             return Ok(vec![]);
         }
 
-        let offset_modifier = get_offset_modifier(selector.offset);
+        let offset_modifier = offset_micros(&selector.offset);
 
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
@@ -197,7 +197,7 @@ impl Engine {
         );
 
         // apply offset to samples
-        let offset_modifier = get_offset_modifier(selector.offset);
+        let offset_modifier = offset_micros(&selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
@@ -594,17 +594,6 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
     metrics
 }
 
-pub(super) fn get_offset_modifier(offset: Option<Offset>) -> i64 {
-    if let Some(offset) = offset {
-        match offset {
-            Offset::Pos(offset) => micros(offset),
-            Offset::Neg(offset) => -micros(offset),
-        }
-    } else {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
@@ -967,22 +956,5 @@ mod tests {
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
-    }
-
-    #[test]
-    fn test_get_offset_modifier_none() {
-        assert_eq!(get_offset_modifier(None), 0);
-    }
-
-    #[test]
-    fn test_get_offset_modifier_positive() {
-        let result = get_offset_modifier(Some(Offset::Pos(Duration::from_secs(60))));
-        assert_eq!(result, 60_000_000); // 60s in micros
-    }
-
-    #[test]
-    fn test_get_offset_modifier_negative() {
-        let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
-        assert_eq!(result, -30_000_000); // -30s in micros
     }
 }

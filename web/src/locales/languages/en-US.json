@@ -3621,6 +3621,12 @@
     "joinSlack": "Join the Slack",
     "maybeLater": "Maybe later"
   },
+  "connectDataSourcePopup": {
+    "title": "To get started, let's connect your first data source.",
+    "description": "We've got lots to show you, but we'll need to get your data connected first. Most teams see their first logs in about a minute.",
+    "connectButton": "Connect a data source",
+    "slackLink": "Also join our Slack community"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Continue from where it paused",
     "startFromNow": "Start from now.",
@@ -5957,6 +5963,9 @@
         "details": "Details",
         "json": "JSON",
         "insights": "Insights",
+        "back": "Back to results",
+        "prevEvent": "Previous event",
+        "nextEvent": "Next event",
         "copyLink": "Copy link",
         "copy": "Copy",
         "copyValue": "Copy value",
@@ -9406,7 +9415,28 @@
     "listConjunctionAnd": "{list}, and {last}",
     "runsIn": "Runs in",
     "recommendedByFieldCoverage": "Recommended based on field coverage in your streams.",
-    "listConjunctionAndTwo": "{first} and {last}"
+    "listConjunctionAndTwo": "{first} and {last}",
+    "domainOrgMappings": {
+      "title": "Domain to organization mappings",
+      "subtitle": "New users signing in with a matching email domain are added to the organization automatically.",
+      "addMapping": "Add mapping",
+      "editMapping": "Edit mapping",
+      "empty": "No mappings yet. Use “{addLabel}” to add one.",
+      "domain": "Email domain",
+      "domainHelp": "The part after {at_sign} in the user's email address.",
+      "organization": "Organization",
+      "organizationPlaceholder": "Organization identifier",
+      "organizationHelp": "The identifier of the organization matching users are added to.",
+      "organizationRequired": "Organization is required",
+      "baseRole": "Base role",
+      "baseRoleHelp": "The role matching users are given in that organization.",
+      "userGroup": "User group",
+      "userGroupPlaceholder": "Group name",
+      "userGroupHelp": "Optional. Matching users also join this group in that organization.",
+      "duplicateDomain": "A mapping for this domain already exists",
+      "confirmRemove": "Are you sure you want to delete the mapping for {domain}?",
+      "deleteTitle": "Delete Mapping"
+    }
   },
   "reports": {
     "frequencyUnits": {

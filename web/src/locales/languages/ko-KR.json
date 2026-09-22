@@ -3557,6 +3557,12 @@
     "joinSlack": "슬랙에 가입하세요",
     "maybeLater": "아마 나중에"
   },
+  "connectDataSourcePopup": {
+    "title": "시작하려면 먼저 첫 번째 데이터 소스를 연결하세요.",
+    "description": "보여드릴 것이 많지만, 먼저 데이터를 연결해야 합니다. 대부분의 팀은 약 1분 안에 첫 로그를 확인합니다.",
+    "connectButton": "데이터 소스 연결",
+    "slackLink": "저희 Slack 커뮤니티에도 참여해 주세요"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "일시 중지된 위치에서 계속",
     "startFromNow": "지금부터 시작합니다.",
@@ -5893,6 +5899,9 @@
         "details": "상세",
         "json": "JSON",
         "insights": "인사이트",
+        "back": "결과로 돌아가기",
+        "prevEvent": "이전 이벤트",
+        "nextEvent": "다음 이벤트",
         "copyLink": "링크 복사",
         "copy": "복사",
         "copyValue": "값 복사",
@@ -9342,7 +9351,28 @@
     "listConjunctionAnd": "{list}, 그리고 {last}",
     "runsIn": "실행 위치",
     "recommendedByFieldCoverage": "스트림의 필드 커버리지를 기반으로 추천됩니다.",
-    "listConjunctionAndTwo": "{first} 및 {last}"
+    "listConjunctionAndTwo": "{first} 및 {last}",
+    "domainOrgMappings": {
+      "title": "도메인-조직 매핑",
+      "subtitle": "일치하는 이메일 도메인으로 로그인하는 신규 사용자는 조직에 자동으로 추가됩니다.",
+      "addMapping": "매핑 추가",
+      "editMapping": "매핑 편집",
+      "empty": "아직 매핑이 없습니다. “{addLabel}”을 사용하여 매핑을 추가하세요.",
+      "domain": "이메일 도메인",
+      "domainHelp": "사용자 이메일 주소에서 {at_sign} 뒤에 오는 부분입니다.",
+      "organization": "조직",
+      "organizationPlaceholder": "조직 식별자",
+      "organizationHelp": "일치하는 사용자가 추가되는 조직의 식별자입니다.",
+      "organizationRequired": "조직은 필수입니다",
+      "baseRole": "기본 역할",
+      "baseRoleHelp": "해당 조직에서 일치하는 사용자에게 부여되는 역할입니다.",
+      "userGroup": "사용자 그룹",
+      "userGroupPlaceholder": "그룹 이름",
+      "userGroupHelp": "선택 사항입니다. 일치하는 사용자는 해당 조직에서 이 그룹에도 가입됩니다.",
+      "duplicateDomain": "이 도메인에 대한 매핑이 이미 존재합니다",
+      "confirmRemove": "{domain}에 대한 매핑을 삭제하시겠습니까?",
+      "deleteTitle": "매핑 삭제"
+    }
   },
   "reports": {
     "frequencyUnits": {

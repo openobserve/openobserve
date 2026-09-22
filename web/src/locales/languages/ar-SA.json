@@ -3557,6 +3557,12 @@
     "joinSlack": "انضم إلى السلاك",
     "maybeLater": "ربما لاحقا"
   },
+  "connectDataSourcePopup": {
+    "title": "للبدء، لنقم بتوصيل مصدر البيانات الأول الخاص بك.",
+    "description": "لدينا الكثير لنعرضه لك، لكننا نحتاج أولاً إلى توصيل بياناتك. تشاهد معظم الفرق أول سجلاتها خلال حوالي دقيقة واحدة.",
+    "connectButton": "توصيل مصدر بيانات",
+    "slackLink": "انضم أيضًا إلى مجتمعنا على Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "تابع من حيث توقف",
     "startFromNow": "ابدأ من الآن.",
@@ -5893,6 +5899,9 @@
         "details": "تفاصيل",
         "json": "JSON",
         "insights": "رؤى",
+        "back": "العودة إلى النتائج",
+        "prevEvent": "الحدث السابق",
+        "nextEvent": "الحدث التالي",
         "copyLink": "رابط النسخ",
         "copy": "نسخة",
         "copyValue": "قيمة النسخ",
@@ -9342,7 +9351,28 @@
     "listConjunctionAnd": "{list}، و {last}",
     "runsIn": "تشغيل في",
     "recommendedByFieldCoverage": "موصى به بناءً على تغطية الحقول في التدفقات الخاصة بك.",
-    "listConjunctionAndTwo": "{first} و {last}"
+    "listConjunctionAndTwo": "{first} و {last}",
+    "domainOrgMappings": {
+      "title": "تعيينات النطاق إلى المؤسسة",
+      "subtitle": "يُضاف المستخدمون الجدد الذين يسجّلون الدخول بنطاق بريد إلكتروني مطابق إلى المؤسسة تلقائيًا.",
+      "addMapping": "إضافة تعيين",
+      "editMapping": "تعديل التعيين",
+      "empty": "لا توجد تعيينات بعد. استخدم «{addLabel}» لإضافة تعيين.",
+      "domain": "نطاق البريد الإلكتروني",
+      "domainHelp": "الجزء الذي يلي {at_sign} في عنوان البريد الإلكتروني للمستخدم.",
+      "organization": "المؤسسة",
+      "organizationPlaceholder": "معرّف المؤسسة",
+      "organizationHelp": "معرّف المؤسسة التي يُضاف إليها المستخدمون المطابقون.",
+      "organizationRequired": "المؤسسة مطلوبة",
+      "baseRole": "الدور الأساسي",
+      "baseRoleHelp": "الدور الذي يُمنح للمستخدمين المطابقين في تلك المؤسسة.",
+      "userGroup": "مجموعة المستخدمين",
+      "userGroupPlaceholder": "اسم المجموعة",
+      "userGroupHelp": "اختياري. ينضم المستخدمون المطابقون أيضًا إلى هذه المجموعة في تلك المؤسسة.",
+      "duplicateDomain": "يوجد تعيين لهذا النطاق بالفعل",
+      "confirmRemove": "هل أنت متأكد من حذف التعيين الخاص بـ {domain}؟",
+      "deleteTitle": "حذف التعيين"
+    }
   },
   "reports": {
     "frequencyUnits": {

@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+pub mod at_modifier;
 pub(crate) mod label_usage;
 pub mod name_visitor;
+pub mod result_order;
 pub(crate) mod rewrite;
 pub(crate) mod selector_visitor;
 pub mod selector_window;

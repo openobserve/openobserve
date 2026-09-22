@@ -3557,6 +3557,12 @@
     "joinSlack": "加入 Slack",
     "maybeLater": "稍後再說"
   },
+  "connectDataSourcePopup": {
+    "title": "首先，讓我們連接您的第一個資料來源。",
+    "description": "我們有很多內容想向您展示，但首先需要連接您的資料。大多數團隊大約一分鐘內就能看到第一批日誌。",
+    "connectButton": "連接資料來源",
+    "slackLink": "也加入我們的 Slack 社群"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "從暫停處繼續",
     "startFromNow": "從現在開始。",
@@ -5888,6 +5894,9 @@
         "details": "詳細資料",
         "json": "JSON",
         "insights": "深入解析",
+        "back": "返回結果",
+        "prevEvent": "上一個事件",
+        "nextEvent": "下一個事件",
         "copyLink": "複製連結",
         "copy": "複製",
         "copyValue": "複製值",
@@ -9337,7 +9346,28 @@
     "listConjunctionAnd": "{list} 和 {last}",
     "runsIn": "執行於",
     "recommendedByFieldCoverage": "根據您串流中的欄位覆蓋率推薦。",
-    "listConjunctionAndTwo": "{first} 和 {last}"
+    "listConjunctionAndTwo": "{first} 和 {last}",
+    "domainOrgMappings": {
+      "title": "網域至組織的對應",
+      "subtitle": "使用符合電子郵件網域登入的新使用者會自動加入該組織。",
+      "addMapping": "新增對應",
+      "editMapping": "編輯對應",
+      "empty": "尚無對應。使用「{addLabel}」新增一筆。",
+      "domain": "電子郵件網域",
+      "domainHelp": "使用者電子郵件地址中 {at_sign} 之後的部分。",
+      "organization": "組織",
+      "organizationPlaceholder": "組織識別碼",
+      "organizationHelp": "符合的使用者所加入之組織的識別碼。",
+      "organizationRequired": "必須填寫組織",
+      "baseRole": "基本角色",
+      "baseRoleHelp": "符合的使用者在該組織中被賦予的角色。",
+      "userGroup": "使用者群組",
+      "userGroupPlaceholder": "群組名稱",
+      "userGroupHelp": "選填。符合的使用者也會加入該組織中的此群組。",
+      "duplicateDomain": "此網域的對應已存在",
+      "confirmRemove": "您確定要刪除 {domain} 的對應嗎？",
+      "deleteTitle": "刪除對應"
+    }
   },
   "reports": {
     "frequencyUnits": {

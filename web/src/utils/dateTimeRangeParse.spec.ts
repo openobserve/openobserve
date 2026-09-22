@@ -445,6 +445,43 @@ describe("parseSingleDateTime", () => {
   });
 
   describe("invalid input", () => {
+    it("rejects out-of-range clock values", () => {
+      expect(parseSingleDateTime("2026-01-01T25:00")).toBeNull();
+      expect(parseDateRangeString("2026-01-01T00:00 - 2026-01-01T25:00")).toBeNull();
+    });
+
+    it.each([
+      "2026-01-01T24:00",
+      "2026-01-01T12:60",
+      "2026-01-01T12:00:60",
+      "2026-13-01",
+      "2026-01-32",
+      "2026-02-30",
+      "2026-02-29",
+      "2026/01/01 24:00:00",
+      "2026/01/01 12:60:00",
+      "2026/01/01 12:00:60",
+      "2026/13/01",
+      "2026/01/32",
+      "2026/02/30",
+      "2026/02/29",
+      "Jan 01, 2026 24:00:00",
+      "Jan 01, 2026 12:60:00",
+      "Jan 01, 2026 12:00:60",
+      "Jan 32, 2026 12:00:00",
+      "Feb 30, 2026 12:00:00",
+      "Feb 29, 2026 12:00:00",
+    ])("rejects invalid semantic date/time value: %s", (value) => {
+      expect(parseSingleDateTime(value)).toBeNull();
+    });
+
+    it.each(["2026-01-01T25:00Z", "2026-02-30T00:00:00Z", "Feb 29, 2026 12:00:00 +0000"])(
+      "rejects invalid offset-bearing date/time value: %s",
+      (value) => {
+        expect(parseSingleDateTime(value)).toBeNull();
+      },
+    );
+
     it("returns null for ranges and unrecognized strings", () => {
       // A range string is not a single value.
       expect(parseSingleDateTime("2026/07/21 13:33:06 - 2026/07/21 15:33:06")).toBeNull();
@@ -454,4 +491,15 @@ describe("parseSingleDateTime", () => {
       expect(parseSingleDateTime("Past 2 Hours")).toBeNull();
     });
   });
+
+  it.each(["2024-02-29T12:00:00", "2024/02/29 12:00:00", "Feb 29, 2024 12:00:00"])(
+    "keeps valid leap-day values: %s",
+    (value) => {
+      expect(parseSingleDateTime(value)).toMatchObject({
+        type: "absolute",
+        date: "2024/02/29",
+        time: "12:00:00",
+      });
+    },
+  );
 });

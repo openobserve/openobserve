@@ -3557,6 +3557,12 @@
     "joinSlack": "Rejoignez le Slack",
     "maybeLater": "Peut-être plus tard"
   },
+  "connectDataSourcePopup": {
+    "title": "Pour commencer, connectons votre première source de données.",
+    "description": "Nous avons beaucoup à vous montrer, mais nous devons d'abord connecter vos données. La plupart des équipes voient leurs premiers logs en environ une minute.",
+    "connectButton": "Connecter une source de données",
+    "slackLink": "Rejoignez aussi notre communauté Slack"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Reprendre là où il s'est arrêté",
     "startFromNow": "Commencer maintenant.",
@@ -5893,6 +5899,9 @@
         "details": "Détails",
         "json": "JSON",
         "insights": "Analyses",
+        "back": "Retour aux résultats",
+        "prevEvent": "Événement précédent",
+        "nextEvent": "Événement suivant",
         "copyLink": "Copier le lien",
         "copy": "Copier",
         "copyValue": "Copier la valeur",
@@ -9342,7 +9351,28 @@
     "listConjunctionAnd": "{list}, et {last}",
     "runsIn": "S'exécute dans",
     "recommendedByFieldCoverage": "Recommandé en fonction de la couverture des champs dans vos flux.",
-    "listConjunctionAndTwo": "{first} et {last}"
+    "listConjunctionAndTwo": "{first} et {last}",
+    "domainOrgMappings": {
+      "title": "Domaines vers les organisations",
+      "subtitle": "Les nouveaux utilisateurs se connectant avec un domaine de messagerie correspondant sont ajoutés automatiquement à l'organisation.",
+      "addMapping": "Ajouter une correspondance",
+      "editMapping": "Modifier la correspondance",
+      "empty": "Aucune correspondance pour l'instant. Utilisez « {addLabel} » pour en ajouter une.",
+      "domain": "Domaine de messagerie",
+      "domainHelp": "La partie après {at_sign} dans l'adresse e-mail de l'utilisateur.",
+      "organization": "Organisation",
+      "organizationPlaceholder": "Identifiant de l'organisation",
+      "organizationHelp": "L'identifiant de l'organisation à laquelle les utilisateurs correspondants sont ajoutés.",
+      "organizationRequired": "L'organisation est requise",
+      "baseRole": "Rôle de base",
+      "baseRoleHelp": "Le rôle attribué aux utilisateurs correspondants dans cette organisation.",
+      "userGroup": "Groupe d'utilisateurs",
+      "userGroupPlaceholder": "Nom du groupe",
+      "userGroupHelp": "Facultatif. Les utilisateurs correspondants rejoignent également ce groupe dans cette organisation.",
+      "duplicateDomain": "Une correspondance pour ce domaine existe déjà",
+      "confirmRemove": "Êtes-vous sûr de vouloir supprimer la correspondance pour {domain} ?",
+      "deleteTitle": "Supprimer la correspondance"
+    }
   },
   "reports": {
     "frequencyUnits": {

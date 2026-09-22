@@ -3557,6 +3557,12 @@
     "joinSlack": "Slack'e Katılın",
     "maybeLater": "Belki daha sonra"
   },
+  "connectDataSourcePopup": {
+    "title": "Başlamak için ilk veri kaynağınızı bağlayalım.",
+    "description": "Size gösterecek çok şeyimiz var, ancak önce verilerinizi bağlamamız gerekiyor. Çoğu ekip ilk günlüklerini yaklaşık bir dakika içinde görür.",
+    "connectButton": "Bir veri kaynağı bağla",
+    "slackLink": "Ayrıca Slack topluluğumuza katılın"
+  },
   "confirmDialog": {
     "continueFromWherePaused": "Kaldığı yerden devam et",
     "startFromNow": "Şu andan itibaren başlat.",
@@ -5893,6 +5899,9 @@
         "details": "Ayrıntılar",
         "json": "JSON",
         "insights": "İçgörüler",
+        "back": "Sonuçlara dön",
+        "prevEvent": "Önceki olay",
+        "nextEvent": "Sonraki olay",
         "copyLink": "Bağlantıyı Kopyala",
         "copy": "Kopyala",
         "copyValue": "Değeri Kopyala",
@@ -9342,7 +9351,28 @@
     "listConjunctionAnd": "{list} ve {last}",
     "runsIn": "Çalışır",
     "recommendedByFieldCoverage": "Akışlarınızdaki alan kapsamına göre önerilir.",
-    "listConjunctionAndTwo": "{first} ve {last}"
+    "listConjunctionAndTwo": "{first} ve {last}",
+    "domainOrgMappings": {
+      "title": "Alan adı - organizasyon eşlemeleri",
+      "subtitle": "Eşleşen e-posta alan adıyla oturum açan yeni kullanıcılar organizasyona otomatik olarak eklenir.",
+      "addMapping": "Eşleme ekle",
+      "editMapping": "Eşlemeyi düzenle",
+      "empty": "Henüz eşleme yok. Eklemek için \"{addLabel}\" kullanın.",
+      "domain": "E-posta alan adı",
+      "domainHelp": "Kullanıcının e-posta adresinde {at_sign} sonrasındaki kısım.",
+      "organization": "Organizasyon",
+      "organizationPlaceholder": "Organizasyon tanımlayıcısı",
+      "organizationHelp": "Eşleşen kullanıcıların ekleneceği organizasyonun tanımlayıcısı.",
+      "organizationRequired": "Organizasyon gereklidir",
+      "baseRole": "Temel rol",
+      "baseRoleHelp": "Eşleşen kullanıcılara bu organizasyonda verilen rol.",
+      "userGroup": "Kullanıcı grubu",
+      "userGroupPlaceholder": "Grup adı",
+      "userGroupHelp": "İsteğe bağlı. Eşleşen kullanıcılar bu organizasyondaki bu gruba da katılır.",
+      "duplicateDomain": "Bu alan adı için bir eşleme zaten mevcut",
+      "confirmRemove": "{domain} için eşlemeyi silmek istediğinizden emin misiniz?",
+      "deleteTitle": "Eşlemeyi Sil"
+    }
   },
   "reports": {
     "frequencyUnits": {

@@ -2887,7 +2887,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_DATA_RETENTION_INTERVAL",
         default = 3600,
-        help = "Interval in seconds for the data retention job, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL"
+        help = "Interval in seconds for generating data retention jobs, default is 3600. Retention works at day granularity, so it doesn't need to run at ZO_COMPACT_INTERVAL; pending delete jobs are executed every ZO_COMPACT_INTERVAL"
     )] // seconds
     pub data_retention_interval: u64,
     #[env_config(name = "ZO_COMPACT_OLD_DATA_INTERVAL", default = 3600)] // seconds
@@ -4270,10 +4270,11 @@ fn default_mem_table_bucket_num(
 }
 
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
-    std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
+    std::fs::create_dir_all(&cfg.common.data_cache_dir)
+        .map_err(|e| anyhow::anyhow!("create cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_path = Path::new(&cfg.common.data_cache_dir)
         .canonicalize()
-        .unwrap();
+        .map_err(|e| anyhow::anyhow!("resolve cache dir {}: {e}", cfg.common.data_cache_dir))?;
     let cache_dir_owned = deverbatim(&cache_dir_path).into_owned();
     let cache_dir = cache_dir_owned.as_str();
 
