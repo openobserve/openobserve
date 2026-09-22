@@ -1954,6 +1954,7 @@
     "ok": "Tamam.",
     "sendInvite": "Davet Gönder",
     "inviteByEmail": "E-posta ile davet edin. Noktalı virgül (;) veya virgül (,) ile ayrılmış birden çok e-posta",
+    "inviteByEmailPlaceholder": "E-posta ile davet et",
     "changePassword": "Şifreyi Değiştir",
     "oldPassword": "Eski Şifre",
     "newPassword": "Yeni Şifre",

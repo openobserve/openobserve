@@ -1003,6 +1003,12 @@ async function getQueryData(isPagination: boolean = false, isSort: boolean = fal
           }
         },
         error: (_payload: any, err: any) => {
+          // Mirrors the `data` handler's guard: a missing entry means a newer
+          // search already superseded this one, so a late error for the
+          // cancelled request must not clobber the errorMsg a subsequent,
+          // successful search just cleared (o2-enterprise#2643).
+          if (!tracesRequestState[searchTraceId]) return;
+
           searchObj.loading = false;
 
           const errData = err?.content || err;
