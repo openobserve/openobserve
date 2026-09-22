@@ -3246,7 +3246,7 @@ pub struct Prometheus {
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
     pub ha_replica_label: String,
     /// Exponential histograms are stored at `min(producer schema, this)`, never count-driven.
-    #[env_config(name = "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA", default = 2)]
+    #[env_config(name = "ZO_METRICS_EXP_HISTOGRAM_TARGET_SCHEMA", default = 1)]
     pub exp_histogram_target_schema: i32,
     /// Safety valve, not a layout knob: past this many `le` labels a sample is downscaled.
     #[env_config(name = "ZO_PROMETHEUS_NATIVE_HISTOGRAM_MAX_BUCKETS", default = 512)]
@@ -5928,7 +5928,7 @@ mod tests {
     #[test]
     fn test_check_common_config_exp_histogram_target_schema_range() {
         let cfg = Config::init().unwrap();
-        assert_eq!(cfg.prom.exp_histogram_target_schema, 2);
+        assert_eq!(cfg.prom.exp_histogram_target_schema, 1);
         assert_eq!(cfg.prom.native_histogram_max_buckets, 512);
         // check_common_config scales sizes in place, so each call gets a fresh config
         for schema in [-4, 8] {
