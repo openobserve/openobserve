@@ -71,8 +71,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             <!-- Toolbar: type filter + search -->
             <template #toolbar>
-              <div class="flex w-full items-center gap-2">
+              <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
                 <OToggleGroup
+                  mobile-dropdown
                   :model-value="selectedFilter"
                   @update:model-value="
                     (v) => {
@@ -98,26 +99,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ms-auto w-64"
+                  class="ms-auto w-64 max-md:ms-0 max-md:w-auto max-md:min-w-40 max-md:flex-1"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
             </template>
             <template #toolbar-trailing>
-              <OButton
+              <ORefreshButton
+                layout="inline"
                 variant="outline"
-                size="icon-sm"
-                icon-left="refresh"
-                :loading="loading"
+                :last-run-at="lastUpdatedAt"
+                :loading="fetching"
+                shortcut-id="enrichmentTablesRefresh"
                 data-test="enrichment-tables-list-refresh-btn"
                 @click="refreshList"
-              >
-                <OTooltip
-                  side="bottom"
-                  :content="t('common.refresh')"
-                  shortcut-id="enrichmentTablesRefresh"
-                />
-              </OButton>
+              />
             </template>
             <template #empty>
               <OEmptyState
@@ -235,6 +231,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.explore')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="exploreEnrichmentTable(row)"
                   icon-left="search"
                   data-row-action="view"
@@ -249,6 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('logStream.schemaHeader')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="listSchema(row)"
                   icon-left="format-list-bulleted"
                   data-row-action="view"
@@ -266,6 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.enrichmentTables')"
                   variant="ghost"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showAddUpdateFn(row)"
                   icon-left="edit"
                   data-row-action="edit"
@@ -277,10 +276,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :title="t('function.delete')"
                   variant="ghost-destructive"
                   size="icon-sm"
+                  class="max-md:hidden"
                   @click="showDeleteDialogFn(row)"
                   icon-left="delete"
                   data-row-action="delete"
                 />
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="enrichment-table-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="search"
+                    class="md:hidden"
+                    :data-test="`${row.name}-explore-btn-menu`"
+                    @select="exploreEnrichmentTable(row)"
+                  >
+                    <span>{{ t("logStream.explore") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed'
+                    "
+                    icon-left="format-list-bulleted"
+                    class="md:hidden"
+                    :data-test="`${row.name}-schema-btn-menu`"
+                    @select="listSchema(row)"
+                  >
+                    <span>{{ t("logStream.schemaHeader") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    v-if="
+                      !row.urlJobs ||
+                      row.urlJobs.length === 0 ||
+                      row.aggregateStatus === 'completed' ||
+                      row.aggregateStatus === 'failed'
+                    "
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`${row.name}-edit-btn-menu`"
+                    @select="showAddUpdateFn(row)"
+                  >
+                    <span>{{ t("function.enrichmentTables") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`${row.name}-delete-btn-menu`"
+                    @select="showDeleteDialogFn(row)"
+                  >
+                    <span>{{ t("function.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </div>
             </template>
 
@@ -301,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div class="flex w-full items-center justify-between py-2">
-                <div class="me-4 flex items-center text-xs font-normal">
+                <div class="me-4 flex items-center text-xs font-normal max-md:hidden">
                   {{ resultTotal }} {{ t("function.enrichmentTables") }}
                 </div>
                 <OButton
@@ -417,6 +478,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { streamKeys } from "@/services/stream.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { enrichmentTableStatusesQuery } from "@/services/jstransform.queries";
 import { computed, defineComponent, onBeforeMount, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -433,11 +497,13 @@ import streamService from "@/services/stream";
 import useStreams from "@/composables/useStreams";
 import EnrichmentSchema from "./EnrichmentSchema.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import jsTransformService from "@/services/jstransform";
 import { useToast } from "@/lib/feedback/Toast/useToast";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
@@ -462,7 +528,10 @@ export default defineComponent({
     OToggleGroup,
     OToggleGroupItem,
     OButton,
+    ORefreshButton,
     ODrawer,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -488,7 +557,11 @@ export default defineComponent({
     const showUrlJobsDialogState = ref<boolean>(false);
     const selectedTableForUrlJobs = ref<any>(null);
     const filterQuery = ref("");
-    const loading = ref(true);
+    const loading = ref(false);
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
     const forbidden = ref(false);
     // Plain ref, not URL/store-backed: only the OTable v-if branch unmounts on add/edit, not EnrichmentTableList itself.
     const currentPage = ref(1);
@@ -580,7 +653,7 @@ export default defineComponent({
     };
 
     const perPageOptionsList = [20, 50, 100, 250, 500];
-    const { getStreams, resetStreamType, getStream } = useStreams(t);
+    const { getStreams, getStreamsFetchedAt, resetStreamType, getStream } = useStreams(t);
 
     onBeforeMount(() => {
       getLookupTables();
@@ -611,29 +684,49 @@ export default defineComponent({
     });
 
     const getLookupTables = async (force: boolean = false) => {
-      loading.value = true;
+      // The streams half is already a cached query, so on a revisit or a
+      // refresh there are rows to keep — only a cold read spins and toasts.
+      const warm =
+        jsTransforms.value.length > 0 ||
+        queryClient.getQueryData(
+          streamKeys.nameList(store.state.selectedOrganization.identifier, "enrichment_tables"),
+        ) !== undefined;
+      loading.value = !warm;
+      fetching.value = true;
       forbidden.value = false;
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
-        timeout: 0,
-      });
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.functions.pleaseWaitWhileLoadingEnrichmentTables"),
+            timeout: 0,
+          });
 
       try {
+        const opts = enrichmentTableStatusesQuery(store.state.selectedOrganization.identifier);
         // Fetch both streams and URL job statuses in parallel
         const [streamsRes, statusRes] = await Promise.all([
           getStreams("enrichment_tables", false, false, force),
-          jsTransformService
-            .get_all_enrichment_table_statuses(store.state.selectedOrganization.identifier)
-            .catch((err: any) => {
-              // If status API fails, continue with empty status map
-              console.warn("Error fetching URL statuses:", err);
-              return { data: {} };
-            }),
+          (force
+            ? queryClient
+                .invalidateQueries({
+                  queryKey: opts.queryKey,
+                  exact: true,
+                  refetchType: "none",
+                })
+                .then(() => queryClient.fetchQuery(opts))
+            : queryClient.fetchQuery(opts)
+          ).catch((err: any) => {
+            // If status API fails, continue with empty status map
+            console.warn("Error fetching URL statuses:", err);
+            return {};
+          }),
         ]);
+        // Read from the rows' own list query: the statuses read above swallows its failures.
+        lastUpdatedAt.value = (await getStreamsFetchedAt("enrichment_tables")) ?? Date.now();
 
         const res: any = streamsRes;
-        const urlJobMap = statusRes.data || {};
+        const urlJobMap: Record<string, any> = statusRes || {};
 
         // Create a map of stream names from the streams list
         const streamMap = new Map();
@@ -732,6 +825,7 @@ export default defineComponent({
         }
       } finally {
         loading.value = false;
+        fetching.value = false;
         restorePageIndex();
       }
     };
@@ -799,14 +893,17 @@ export default defineComponent({
     };
 
     const refreshList = () => {
-      router.push({
-        name: "enrichmentTables",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
-      });
+      // A surviving `action` re-opens the form on the next mount, hiding the list.
+      if (router.currentRoute.value.query.action) {
+        router.replace({
+          name: "enrichmentTables",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        });
+      }
       showAddJSTransformDialog.value = false;
-      resetStreamType("enrichment_tables");
+      // Not resetStreamType: it drops the cached list, leaving only the skeleton.
       getLookupTables(true);
     };
 
@@ -1075,6 +1172,8 @@ export default defineComponent({
       selectedDelete,
       getLookupTables,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       resultTotal,
       refreshList,

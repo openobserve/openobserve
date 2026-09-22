@@ -32,7 +32,7 @@ use hashbrown::HashMap;
 use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
-    parser::{Offset, VectorSelector},
+    parser::VectorSelector,
 };
 use rayon::iter::{IntoParallelIterator, IntoParallelRefMutIterator, ParallelIterator};
 
@@ -41,13 +41,51 @@ use crate::{
     ast::rewrite::remove_filter_all,
     micros,
     series_loader::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
-    utils::metric_name,
+    utils::{metric_name, offset_micros},
 };
 
 /// One context per selected schema with its scan stats and whether the matchers still apply.
 pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
 
 impl Engine {
+    pub(super) fn selector_time_range(
+        &self,
+        selector: &VectorSelector,
+        range: Option<Duration>,
+    ) -> (i64, i64, i64) {
+        let offset = offset_micros(&selector.offset);
+        (
+            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset,
+            self.ctx.end - offset,
+            offset,
+        )
+    }
+
+    pub(super) fn selector_labels(&self) -> hashbrown::HashSet<String> {
+        let mut labels = self.label_selector.clone();
+        labels.extend(self.ctx.label_selector.iter().cloned());
+        labels
+    }
+
+    pub(super) async fn create_selector_contexts(
+        &self,
+        selector: &VectorSelector,
+        time_range: (i64, i64),
+        labels: &hashbrown::HashSet<String>,
+    ) -> Result<SelectorContexts> {
+        self.ctx
+            .table_provider
+            .create_context(
+                &self.ctx.query_ctx.org_id,
+                selector.name.as_deref().unwrap(),
+                time_range,
+                selector.matchers.clone(),
+                labels.clone(),
+                &mut equal_matcher_filters(&selector.matchers),
+            )
+            .await
+    }
+
     /// Instant vector selector --- select a single sample at each evaluation
     /// timestamp.
     ///
@@ -63,19 +101,19 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None, ctxs).await?;
+        let metrics_cache = self.selector_load_data_owned(&selector, None, ctxs).await?;
+        if metrics_cache.is_empty() {
+            return Ok(vec![]);
+        }
 
-        let metrics_cache = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
-
-        let offset_modifier = get_offset_modifier(selector.offset);
+        let offset_modifier = offset_micros(&selector.offset);
 
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
 
         let lookback_delta = self.ctx.lookback_delta;
+        // exemplar series carry no samples, so they must survive an empty selection
+        let keep_sampleless = self.ctx.query_ctx.query_exemplars;
         // every series selects independently, so fan the selection out
         let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
@@ -93,7 +131,7 @@ impl Engine {
                 let match_sample = if end_index > 0 {
                     metric.samples.get(end_index - 1).and_then(|sample| {
                         let adjusted_ts = sample.timestamp + offset_modifier;
-                        if adjusted_ts >= start && adjusted_ts <= eval_ts {
+                        if adjusted_ts > start && adjusted_ts <= eval_ts {
                             Some(sample)
                         } else {
                             None
@@ -111,8 +149,7 @@ impl Engine {
                 }
             }
 
-            // Only include metrics that have at least one sample
-            (!selected_samples.is_empty()).then_some(RangeValue {
+            (keep_sampleless || !selected_samples.is_empty()).then_some(RangeValue {
                 labels: metric.labels,
                 samples: selected_samples,
                 exemplars: metric.exemplars,
@@ -142,25 +179,17 @@ impl Engine {
 
         let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
-        let data = self
+        let mut values = self
             .selector_load_data_owned(&selector, Some(range), ctxs)
             .await?;
-
-        let values = match data.get_range_values() {
-            Some(v) => v,
-            None => return Ok(vec![]),
-        };
+        if values.is_empty() {
+            return Ok(vec![]);
+        }
 
         let start = std::time::Instant::now();
-        let mut values = values
-            .into_par_iter()
-            .map(|rv| RangeValue {
-                labels: rv.labels,
-                samples: rv.samples,
-                exemplars: rv.exemplars,
-                time_window: Some(TimeWindow::new(range)),
-            })
-            .collect::<Vec<_>>();
+        values.par_iter_mut().for_each(|rv| {
+            rv.time_window = Some(TimeWindow::new(range));
+        });
 
         log::info!(
             "[trace_id: {}] [PromQL Timing] eval_matrix_selector() processing took: {:?}",
@@ -169,7 +198,7 @@ impl Engine {
         );
 
         // apply offset to samples
-        let offset_modifier = get_offset_modifier(selector.offset);
+        let offset_modifier = offset_micros(&selector.offset);
         if offset_modifier != 0 {
             values.par_iter_mut().for_each(|rv| {
                 rv.samples
@@ -187,7 +216,7 @@ impl Engine {
         selector: &VectorSelector,
         range: Option<Duration>,
         ctxs: Option<SelectorContexts>,
-    ) -> Result<Value> {
+    ) -> Result<Vec<RangeValue>> {
         let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
             Ok(v) => v,
             Err(e) => {
@@ -201,7 +230,7 @@ impl Engine {
 
         // no data, return immediately
         if metric_values.is_empty() {
-            return Ok(Value::None);
+            return Ok(metric_values);
         }
 
         let start = std::time::Instant::now();
@@ -213,17 +242,12 @@ impl Engine {
                 exemplars.sort_by_key(|k| k.timestamp);
             }
         });
-        let values = if metric_values.is_empty() {
-            Value::None
-        } else {
-            Value::Matrix(metric_values)
-        };
         log::info!(
             "[trace_id: {}] [PromQL] sort samples by timestamps took: {:?}",
             self.trace_id,
             start.elapsed()
         );
-        Ok(values)
+        Ok(metric_values)
     }
 
     #[tracing::instrument(name = "promql:engine:load_data", skip_all)]
@@ -235,12 +259,9 @@ impl Engine {
     ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
-        let offset_modifier = get_offset_modifier(selector.offset.clone());
         // Positive offset (e.g. `offset 10m`) looks into the past, so we shift
         // the data-load window backwards by `offset_modifier`.
-        let start =
-            self.ctx.start - range.map_or(self.ctx.lookback_delta, micros) - offset_modifier;
-        let end = self.ctx.end - offset_modifier;
+        let (start, end, offset_modifier) = self.selector_time_range(selector, range);
 
         // 1. Group by metrics (sets of label name-value pairs)
         let table_name = selector.name.as_ref().unwrap();
@@ -249,8 +270,6 @@ impl Engine {
             self.trace_id,
             selector.to_string(),
         );
-
-        let mut filters = equal_matcher_filters(&selector.matchers);
 
         // check for super cluster
         let trace_id = self.ctx.query_ctx.trace_id.clone();
@@ -287,22 +306,12 @@ impl Engine {
             drop(super_tx);
         }
 
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
+        let label_selector = self.selector_labels();
 
         let ctxs = match ctxs {
             Some(ctxs) => ctxs,
             None => {
-                self.ctx
-                    .table_provider
-                    .create_context(
-                        &self.ctx.query_ctx.org_id,
-                        table_name,
-                        (start, end),
-                        selector.matchers.clone(),
-                        label_selector.clone(),
-                        &mut filters,
-                    )
+                self.create_selector_contexts(selector, (start, end), &label_selector)
                     .await?
             }
         };
@@ -381,16 +390,16 @@ impl Engine {
                         for result in ret {
                             match result {
                                 Ok(Ok(data)) => unwrapped_results.push(data),
-                                Ok(Err(_)) => {
+                                Ok(Err(err)) => {
+                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search load data error: {err}");
+                                    return Err(err);
+                                }
+                                Err(_) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
                                     return Err(ErrorCodes::SearchTimeout(
                                         "[PromQL] grpc search load data task timeout".to_string(),
                                     )
                                     .into());
-                                }
-                                Err(err) => {
-                                    log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                                    return Err(ErrorCodes::ServerInternalError(err.to_string()).into());
                                 }
                             }
                         }
@@ -586,21 +595,11 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
     metrics
 }
 
-pub(super) fn get_offset_modifier(offset: Option<Offset>) -> i64 {
-    if let Some(offset) = offset {
-        match offset {
-            Offset::Pos(offset) => micros(offset),
-            Offset::Neg(offset) => -micros(offset),
-        }
-    } else {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{sync::Arc, time::Duration};
 
+    use config::meta::promql::{EXEMPLARS_LABEL, HASH_LABEL, VALUE_LABEL};
     use promql_parser::{
         label::{MatchOp, Matchers},
         parser::{Offset, VectorSelector},
@@ -961,20 +960,82 @@ mod tests {
         assert_eq!(values.len(), 0); // Mock provider returns empty data
     }
 
-    #[test]
-    fn test_get_offset_modifier_none() {
-        assert_eq!(get_offset_modifier(None), 0);
+    /// Serves one series that carries only an exemplar, as the exemplar loader produces.
+    struct ExemplarProvider;
+
+    #[async_trait::async_trait]
+    impl crate::TableProvider for ExemplarProvider {
+        async fn create_context(
+            &self,
+            _org_id: &str,
+            stream_name: &str,
+            _time_range: (i64, i64),
+            _matchers: Matchers,
+            _label_selector: hashbrown::HashSet<String>,
+            _filters: &mut [(String, Vec<String>)],
+        ) -> Result<Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>> {
+            use datafusion::arrow::{
+                array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+                datatypes::{DataType, Field},
+            };
+            let schema = Arc::new(Schema::new(vec![
+                Field::new(config::TIMESTAMP_COL_NAME, DataType::Int64, false),
+                Field::new(VALUE_LABEL, DataType::Float64, false),
+                Field::new(HASH_LABEL, DataType::UInt64, false),
+                Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+                Field::new("env", DataType::Utf8, false),
+            ]));
+            let ts = 1640995200000000i64 - 60_000_000;
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![
+                    Arc::new(Int64Array::from(vec![ts])),
+                    Arc::new(Float64Array::from(vec![1.0])),
+                    Arc::new(UInt64Array::from(vec![7])),
+                    Arc::new(StringArray::from(vec![Some(format!(
+                        r#"[{{"_timestamp":{ts},"value":1.5,"trace_id":"abc"}}]"#
+                    ))])),
+                    Arc::new(StringArray::from(vec!["prod"])),
+                ],
+            )
+            .unwrap();
+            let ctx = SessionContext::new();
+            ctx.register_batch(stream_name, batch).unwrap();
+            Ok(vec![(ctx, schema, ScanStats::default(), true)])
+        }
     }
 
-    #[test]
-    fn test_get_offset_modifier_positive() {
-        let result = get_offset_modifier(Some(Offset::Pos(Duration::from_secs(60))));
-        assert_eq!(result, 60_000_000); // 60s in micros
-    }
+    #[tokio::test]
+    async fn test_eval_vector_selector_keeps_sampleless_series_for_exemplars() {
+        let trace_id = "test_trace_exemplars";
+        let mut query_ctx = (*create_test_query_ctx(trace_id, "test_org_exemplars", 30)).clone();
+        query_ctx.query_exemplars = true;
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                Arc::new(query_ctx),
+                ExemplarProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
 
-    #[test]
-    fn test_get_offset_modifier_negative() {
-        let result = get_offset_modifier(Some(Offset::Neg(Duration::from_secs(30))));
-        assert_eq!(result, -30_000_000); // -30s in micros
+        let selector = VectorSelector {
+            name: Some("test_metric".to_string()),
+            matchers: Matchers::empty(),
+            offset: None,
+            at: None,
+        };
+
+        let values = engine.eval_vector_selector(&selector, None).await.unwrap();
+        assert_eq!(values.len(), 1);
+        assert!(values[0].samples.is_empty());
+        assert_eq!(values[0].exemplars.as_ref().unwrap().len(), 1);
+        assert!(
+            values[0]
+                .labels
+                .iter()
+                .any(|l| l.name == "env" && l.value == "prod")
+        );
     }
 }

@@ -45,6 +45,7 @@ import ChevronRight from "~icons/material-symbols/chevron-right";
 import Close from "~icons/material-symbols/close";
 import Backup from "~icons/material-symbols/backup-outline";
 import Cloud from "~icons/material-symbols/cloud-outline";
+import CloudOff from "~icons/material-symbols/cloud-off-outline";
 import Code from "~icons/material-symbols/code";
 import CompareArrows from "~icons/material-symbols/compare-arrows";
 import ContentCopy from "~icons/material-symbols/content-copy-outline";
@@ -52,6 +53,7 @@ import ContentPaste from "~icons/material-symbols/content-paste";
 import Delete from "~icons/material-symbols/delete-outline";
 import Download from "~icons/material-symbols/download";
 import Edit from "~icons/material-symbols/edit-outline";
+import EditNote from "~icons/material-symbols/edit-note-outline";
 import Error from "~icons/material-symbols/error-outline";
 import ErrorOutline from "~icons/material-symbols/error-outline";
 import Event from "~icons/material-symbols/event-outline";
@@ -90,6 +92,7 @@ import KeyboardDoubleArrowLeft from "~icons/material-symbols/keyboard-double-arr
 import KeyboardDoubleArrowRight from "~icons/material-symbols/keyboard-double-arrow-right";
 import Language from "~icons/material-symbols/language";
 import Link from "~icons/material-symbols/link";
+import LinkOff from "~icons/material-symbols/link-off";
 import LocationOn from "~icons/material-symbols/location-on-outline";
 import MoreVert from "~icons/material-symbols/more-vert";
 import MenuIcon from "~icons/material-symbols/menu";
@@ -106,6 +109,7 @@ import Replay from "~icons/material-symbols/replay";
 import Replay10 from "~icons/material-symbols/replay-10";
 import Forward10 from "~icons/material-symbols/forward-10";
 import Schedule from "~icons/material-symbols/schedule-outline";
+import Science from "~icons/material-symbols/science-outline";
 import Search from "~icons/material-symbols/search";
 import Send from "~icons/material-symbols/send-outline";
 import Share from "~icons/material-symbols/share-outline";
@@ -150,6 +154,7 @@ import Group from "~icons/material-symbols/group-outline";
 import HourglassEmpty from "~icons/material-symbols/hourglass-empty";
 import Label from "~icons/material-symbols/label-outline";
 import Layers from "~icons/material-symbols/layers-outline";
+import Public from "~icons/material-symbols/public";
 import Mail from "~icons/material-symbols/mail-outline";
 import ManageSearch from "~icons/material-symbols/manage-search";
 import Merge from "~icons/material-symbols/merge";
@@ -310,7 +315,6 @@ import PlayCircleFilled from "~icons/material-symbols/play-circle-outline";
 import Pets from "~icons/material-symbols/pets";
 import MonitorHeart from "~icons/material-symbols/monitor-heart-outline";
 import Dataset from "~icons/material-symbols/dataset-outline";
-import Science from "~icons/material-symbols/science-outline";
 import FolderOpen from "~icons/material-symbols/folder-open-outline";
 import Folder from "~icons/material-symbols/folder";
 import FolderOutline from "~icons/material-symbols/folder-outline";
@@ -389,6 +393,7 @@ export const iconRegistry = {
   "chevron-right": ChevronRight,
   close: Close,
   cloud: Cloud,
+  "cloud-off": CloudOff,
   code: Code,
   "compare-arrows": CompareArrows,
   "content-copy": ContentCopy,
@@ -396,6 +401,7 @@ export const iconRegistry = {
   delete: Delete,
   download: Download,
   edit: Edit,
+  "edit-note": EditNote,
   error: Error,
   "error-outline": ErrorOutline,
   event: Event,
@@ -434,6 +440,7 @@ export const iconRegistry = {
   "keyboard-double-arrow-right": KeyboardDoubleArrowRight,
   language: Language,
   link: Link,
+  "link-off": LinkOff,
   "location-on": LocationOn,
   "more-vert": MoreVert,
   menu: MenuIcon,
@@ -451,6 +458,7 @@ export const iconRegistry = {
   "replay-10": Replay10,
   "forward-10": Forward10,
   schedule: Schedule,
+  science: Science,
   search: Search,
   send: Send,
   share: Share,
@@ -526,6 +534,7 @@ export const iconRegistry = {
   "hourglass-empty": HourglassEmpty,
   label: Label,
   layers: Layers,
+  public: Public,
   mail: Mail,
   "manage-search": ManageSearch,
   merge: Merge,
@@ -704,7 +713,6 @@ export const iconRegistry = {
   // Batch 4: Alert Library (2026-08-20)
   // "no signal arriving" — the alert library's not-ingesting-this-stream state.
   "sensors-off": SensorsOff,
-  science: Science,
 } as const satisfies Record<string, Component>;
 
 export type IconName = keyof typeof iconRegistry;

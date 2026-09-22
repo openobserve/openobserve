@@ -193,7 +193,11 @@ pub struct AllOrgListDetails {
     #[cfg(feature = "cloud")]
     pub protocol_steps_used: u64,
     #[cfg(feature = "cloud")]
+    pub status_steps_used: u64,
+    #[cfg(feature = "cloud")]
     pub protocol_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub status_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -371,6 +375,8 @@ pub struct OrgIngestionToken {
     pub enabled: bool,
     pub created_by: String,
     pub created_at: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub splunk_token: Option<String>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -383,11 +389,26 @@ pub struct CreateOrgIngestionTokenRequest {
     pub name: String,
     #[serde(default)]
     pub description: Option<String>,
+    /// Also mint a Splunk HEC token for this credential.
+    #[serde(default)]
+    pub splunk_token: bool,
 }
 
+/// Requested change to a Splunk HEC token.
+#[derive(Serialize, Deserialize, ToSchema, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SplunkTokenAction {
+    Generate,
+    Revoke,
+}
+
+/// At least one of the two fields must be present.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct OrgIngestionTokenEnableRequest {
-    pub enabled: bool,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub splunk_token: Option<SplunkTokenAction>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -449,6 +470,14 @@ fn default_claim_parser_function() -> String {
     "".to_string()
 }
 
+#[derive(Deserialize, Serialize, Debug, Clone, ToSchema)]
+pub struct DomainOrgMapping {
+    pub domain: String,
+    pub org_id: String,
+    pub base_role: String,
+    pub user_group: Option<String>,
+}
+
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
 pub struct OrganizationSettingPayload {
     /// Ideally this should be the same as prometheus-scrape-interval (in
@@ -480,6 +509,8 @@ pub struct OrganizationSettingPayload {
     pub claim_parser_function: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cross_links: Option<Vec<config::meta::stream::CrossLink>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain_org_mappings: Option<Vec<DomainOrgMapping>>,
 }
 
 #[derive(Serialize, ToSchema, Deserialize, Debug, Clone)]
@@ -519,6 +550,9 @@ pub struct OrganizationSetting {
     pub cross_links: Vec<config::meta::stream::CrossLink>,
     #[serde(default)]
     pub org_storage_enabled: bool,
+    #[cfg(feature = "cloud")]
+    #[serde(default)]
+    pub domain_org_mappings: Vec<DomainOrgMapping>,
 }
 
 impl Default for OrganizationSetting {
@@ -552,6 +586,8 @@ impl Default for OrganizationSetting {
             claim_parser_function: default_claim_parser_function(),
             cross_links: Vec::new(),
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: Vec::new(),
         }
     }
 }
@@ -829,7 +865,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -893,7 +933,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -922,7 +966,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1006,7 +1054,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1045,7 +1097,11 @@ mod tests {
             #[cfg(feature = "cloud")]
             protocol_steps_used: 0,
             #[cfg(feature = "cloud")]
+            status_steps_used: 0,
+            #[cfg(feature = "cloud")]
             protocol_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            status_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -1401,6 +1457,7 @@ mod tests {
             #[cfg(feature = "enterprise")]
             claim_parser_function: None,
             cross_links: None,
+            domain_org_mappings: None,
         };
         let json = serde_json::to_value(&payload).unwrap();
         let obj = json.as_object().unwrap();
@@ -1477,6 +1534,8 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();
@@ -1505,6 +1564,8 @@ mod tests {
             claim_parser_function: String::new(),
             cross_links: vec![],
             org_storage_enabled: false,
+            #[cfg(feature = "cloud")]
+            domain_org_mappings: vec![],
         };
         let json = serde_json::to_value(&setting).unwrap();
         let obj = json.as_object().unwrap();

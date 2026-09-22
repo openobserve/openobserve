@@ -513,7 +513,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type PropType, onMounted, inject, type Ref } from "vue";
+import {
+  ref,
+  computed,
+  watch,
+  type PropType,
+  onMounted,
+  inject,
+  type Ref,
+  defineAsyncComponent,
+} from "vue";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -524,7 +533,6 @@ import { debounce } from "lodash-es";
 import { b64EncodeUnicode, getImageURL } from "@/utils/zincutils";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import searchService from "@/services/search";
-import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 import UnifiedQueryEditor from "@/components/QueryEditor.vue";
 import O2AIChat from "@/components/O2AIChat.vue";

@@ -13,76 +13,94 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::promql::value::Sample;
-use hashbrown::HashMap;
+use config::meta::promql::value::{Labels, RangeValue, Sample};
 
-use crate::{
-    aggregations::{Accumulate, AggFunc},
-    common::kahan_sum_increment,
-};
+use crate::aggregations::{Accumulate, AggFunc, SumState, group_series};
 
+#[derive(Clone, Copy)]
 pub struct Avg;
 
 impl AggFunc for Avg {
+    type Accumulator = AvgAccumulate;
+
     fn name(&self) -> &'static str {
         "avg"
     }
 
-    fn build(&self) -> Box<dyn super::Accumulate> {
-        Box::new(AvgAccumulate::new())
+    fn build(&self, slots: usize) -> Self::Accumulator {
+        AvgAccumulate {
+            states: vec![AvgState::default(); slots],
+        }
+    }
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct AvgState {
+    sum: SumState,
+    count: usize,
+}
+
+impl AvgState {
+    pub(crate) fn push(&mut self, value: f64) {
+        self.sum.push(value);
+        self.count += 1;
+    }
+
+    pub(crate) fn merge(&mut self, other: Self) {
+        if other.count == 0 {
+            return;
+        }
+        // Fold the other partial's sum and compensation in as two
+        // separate compensated increments: a plain `c + other_c` add
+        // rounds residuals away before the main sums get to cancel.
+        self.sum.merge(other.sum);
+        self.count += other.count;
+    }
+
+    pub(crate) fn value(&self) -> Option<f64> {
+        (self.count > 0).then(|| self.sum.value() / self.count as f64)
     }
 }
 
 pub struct AvgAccumulate {
-    sum: HashMap<i64, (f64, f64)>,
-    count: HashMap<i64, usize>,
+    states: Vec<AvgState>,
 }
 
 impl AvgAccumulate {
-    fn new() -> Self {
-        AvgAccumulate {
-            sum: HashMap::new(),
-            count: HashMap::new(),
-        }
+    fn push(&mut self, slot: usize, value: f64) {
+        self.states[slot].push(value);
     }
 }
 
 impl Accumulate for AvgAccumulate {
-    fn accumulate(&mut self, sample: &Sample) {
-        let (sum, c) = self.sum.entry(sample.timestamp).or_insert((0.0, 0.0));
-        (*sum, *c) = kahan_sum_increment(sample.value, *sum, *c);
-        let count_entry = self.count.entry(sample.timestamp).or_insert(0);
-        *count_entry += 1;
-    }
-
-    fn merge(&mut self, other: Box<dyn Accumulate>) {
-        let other = other.into_any().downcast::<Self>().expect("same type");
-        for (timestamp, (other_sum, other_c)) in other.sum {
-            let (sum, c) = self.sum.entry(timestamp).or_insert((0.0, 0.0));
-            // Fold the other partial's sum and compensation in as two
-            // separate compensated increments: a plain `c + other_c` add
-            // rounds residuals away before the main sums get to cancel.
-            (*sum, *c) = kahan_sum_increment(other_sum, *sum, *c);
-            (*sum, *c) = kahan_sum_increment(other_c, *sum, *c);
-        }
-        for (timestamp, count) in other.count {
-            *self.count.entry(timestamp).or_insert(0) += count;
+    fn push_series(
+        &mut self,
+        values: impl Iterator<Item = (usize, f64)>,
+        _labels: impl FnOnce() -> Labels,
+    ) {
+        for (slot, value) in values {
+            self.push(slot, value);
         }
     }
 
-    fn into_any(self: Box<Self>) -> Box<dyn std::any::Any> {
-        self
+    fn merge(&mut self, other: Self) {
+        for (state, other) in self.states.iter_mut().zip(other.states) {
+            state.merge(other);
+        }
     }
 
-    fn evaluate(self: Box<Self>) -> Vec<Sample> {
-        self.sum
+    fn evaluate(self, group_labels: Labels, timestamps: &[i64]) -> Vec<RangeValue> {
+        let samples = self
+            .states
             .into_iter()
-            .filter_map(|(timestamp, (sum, c))| {
-                self.count
-                    .get(&timestamp)
-                    .map(|&count| Sample::new(timestamp, (sum + c) / count as f64))
+            .enumerate()
+            .filter_map(|(slot, state)| {
+                state
+                    .value()
+                    .map(|value| Sample::new(timestamps[slot], value))
             })
-            .collect()
+            .collect();
+        group_series(group_labels, samples)
     }
 }
 

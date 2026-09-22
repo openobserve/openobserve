@@ -52,8 +52,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Toolbar: status toggle (All / Active / Resolved) + search — same
              shape as the Alerts page tabs. -->
         <template #toolbar>
-          <div class="flex w-full items-center gap-2">
+          <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
             <OToggleGroup
+              mobile-dropdown
               :model-value="statusFilter"
               @update:model-value="(v) => filterByStatus(v as string)"
               data-test="incident-status-filter-group"
@@ -77,7 +78,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OToggleGroup>
             <OSearchInput
               v-model="searchQuery"
-              class="min-w-0 flex-1"
+              class="min-w-0 flex-1 max-md:min-w-40"
               :placeholder="t('alerts.incidents.search')"
               data-test="incident-search-input"
               clearable
@@ -102,20 +103,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastUpdatedAt"
+            :loading="fetching"
+            shortcut-id="alertIncidentsRefresh"
             data-test="incident-list-refresh-btn"
             @click="refreshIncidents"
-          >
-            <OTooltip
-              side="bottom"
-              :content="t('common.refresh')"
-              shortcut-id="alertIncidentsRefresh"
-            />
-          </OButton>
+          />
         </template>
         <template #cell-status="{ row }">
           <OTag
@@ -142,7 +138,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </template>
         <template #cell-dimensions="{ row }">
-          <div class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden">
+          <div
+            v-if="getSortedDimensions(row.group_values).length"
+            class="flex min-w-0 flex-nowrap items-center gap-1 overflow-hidden"
+          >
             <ODimensionChip
               v-for="[key, value] in getSortedDimensions(row.group_values).slice(0, 2)"
               :key="key"
@@ -177,6 +176,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OTooltip>
             </OTag>
           </div>
+          <span v-else class="text-text-muted text-xs italic">
+            {{ t("alerts.incidents.noDimensionsAvailable") }}
+          </span>
         </template>
         <template #cell-alert_count="{ row }">
           <OTag type="countChip" value="neutral">{{ row.alert_count }}</OTag>
@@ -196,15 +198,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'open'"
               variant="ghost-warning"
               size="icon-sm"
+              :aria-label="t('alerts.incidents.acknowledgeAriaLabel')"
+              class="max-md:hidden"
               @click.stop="acknowledgeIncident(row)"
               data-test="incident-ack-btn"
-              ><OIcon name="visibility" size="sm" /><OTooltip
+              ><OIcon name="check-circle" size="sm" aria-hidden="true" /><OTooltip
                 :content="t('alerts.incidents.acknowledge')"
             /></OButton>
             <OButton
               v-if="row.status !== 'resolved'"
               variant="ghost-primary"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="resolveIncident(row)"
               data-test="incident-resolve-btn"
               ><OIcon name="task-alt" size="sm" /><OTooltip
@@ -214,11 +219,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="row.status === 'resolved'"
               variant="ghost-warning"
               size="icon-sm"
+              class="max-md:hidden"
               @click.stop="reopenIncident(row)"
               data-test="incident-reopen-btn"
               ><OIcon name="restart-alt" size="sm" /><OTooltip
                 :content="t('alerts.incidents.reopen')"
             /></OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="incident-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                v-if="row.status === 'open'"
+                icon-left="visibility"
+                class="md:hidden"
+                data-test="incident-ack-btn-menu"
+                @select="acknowledgeIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.acknowledge") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status !== 'resolved'"
+                icon-left="task-alt"
+                class="md:hidden"
+                data-test="incident-resolve-btn-menu"
+                @select="resolveIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.resolve") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="row.status === 'resolved'"
+                icon-left="restart-alt"
+                class="md:hidden"
+                data-test="incident-reopen-btn-menu"
+                @select="reopenIncident(row)"
+              >
+                <span>{{ t("alerts.incidents.reopen") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
 
@@ -238,7 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Bottom -->
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="flex w-25 items-center text-xs font-normal">
+            <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
               {{ visibleIncidents.length }}
               {{
                 visibleIncidents.length === 1
@@ -254,6 +300,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { incidentsQuery } from "@/services/incidents.queries";
 import { defineComponent, ref, shallowRef, computed, onMounted, watch, nextTick } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
@@ -263,6 +312,7 @@ import incidentsService, { Incident } from "@/services/incidents";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -276,9 +326,12 @@ import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
 import type { StatItem } from "@/lib/data/StatStrip/OStatStrip.types";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 
 export default defineComponent({
   name: "IncidentList",
@@ -286,6 +339,7 @@ export default defineComponent({
     OPageLayout,
     OEmptyState,
     OButton,
+    ORefreshButton,
     OSearchInput,
     OTooltip,
     OIcon,
@@ -296,17 +350,36 @@ export default defineComponent({
     OStatStrip,
     OToggleGroup,
     OToggleGroupItem,
+    ODropdown,
+    ODropdownItem,
   },
   setup() {
     const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
+    const { confirm } = useConfirmDialog();
 
     const qTableRef: any = ref(null);
-    // Starts true so the skeleton shows on first render and the once-off page-restore watch below fires on the real true→false transition.
-    const loading = ref(true);
-    const forbidden = ref(false);
+    const orgIdForList = useOrgId();
+    const incidentsList = useQuery(() =>
+      Object.assign(incidentsQuery(orgIdForList.value, undefined as unknown as string, 1000, 0), {
+        enabled: !!orgIdForList.value,
+      }),
+    );
+
+    // `isPending` also starts true on a cold read, so the page-restore watch below still sees a real true→false transition.
+    const loading = incidentsList.isPending;
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = incidentsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = incidentsList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = incidentsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
     // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
     watch(
       loading,
@@ -566,36 +639,37 @@ export default defineComponent({
       return { boxShadow: `var(--shadow-rail-geom) ${color}` };
     };
 
-    const loadIncidents = async () => {
-      loading.value = true;
-      forbidden.value = false;
-      try {
-        const org = store.state.selectedOrganization.identifier;
-        const limit = 1000;
-        const offset = 0;
-        const keyword = undefined;
+    // Freezing and the Vuex dispatch are both idempotent, so this is safe to
+    // run twice — the cached rows paint, then the server's.
+    const applyIncidents = (data: any) => {
+      const items: Incident[] = data?.incidents || [];
+      // Frozen objects are never made reactive, so Vue leaves the hundreds of
+      // rows raw both here and in the Vuex cache below.
+      for (const it of items) Object.freeze(it);
+      allIncidents.value = items;
+      store.dispatch("incidents/setCachedData", items);
+    };
 
-        const response = await incidentsService.list(org, undefined, limit, offset, keyword);
+    // The list is the query now: anything that invalidates the incidents scope
+    // repaints these rows without this component asking.
+    watch(
+      incidentsList.data,
+      (data: any) => {
+        if (data) applyIncidents(data);
+      },
+      { immediate: true },
+    );
+    watch(incidentsList.error, (error: any) => {
+      // The grouped access toast already reports a 403; a second red toast adds nothing.
+      if (!error || forbidden.value) return;
+      toast({ variant: "error", message: t("alerts.incidents.errorLoading") });
+      console.error("Failed to load incidents:", error);
+    });
 
-        // Freeze each row so Vue leaves it raw (frozen objects are never made
-        // reactive), both here and once it lands in the Vuex cache below.
-        const items: Incident[] = response.data.incidents || [];
-        for (const it of items) Object.freeze(it);
-        allIncidents.value = items;
-        store.dispatch("incidents/setCachedData", items);
-      } catch (error: any) {
-        forbidden.value = error?.response?.status === 403;
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
-        if (!forbidden.value) {
-          toast({
-            variant: "error",
-            message: t("alerts.incidents.errorLoading"),
-          });
-        }
-        console.error("Failed to load incidents:", error);
-      } finally {
-        loading.value = false;
-      }
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself.
+    const loadIncidents = async (force = false) => {
+      if (force) await incidentsList.refetch();
     };
 
     const viewIncident = (incident: Incident) => {
@@ -649,7 +723,8 @@ export default defineComponent({
           variant: "success",
           message: t("alerts.incidents.statusUpdated"),
         });
-        loadIncidents();
+        // Post-write reload: must reach the server.
+        loadIncidents(true);
         store.dispatch("incidents/setShouldRefresh", true);
       } catch (error: any) {
         toast({
@@ -660,7 +735,15 @@ export default defineComponent({
       }
     };
 
-    const acknowledgeIncident = (incident: Incident) => {
+    const acknowledgeIncident = async (incident: Incident) => {
+      const ok = await confirm({
+        title: t("alerts.incidents.acknowledgeConfirmTitle"),
+        message: t("alerts.incidents.acknowledgeConfirmMessage"),
+        confirmLabel: t("alerts.incidents.acknowledgeConfirmLabel"),
+        cancelLabel: t("alerts.incidents.acknowledgeConfirmCancelLabel"),
+        persistent: false,
+      });
+      if (!ok) return;
       updateStatus(incident, "acknowledged");
     };
 
@@ -801,6 +884,7 @@ export default defineComponent({
       const shouldRefresh = store.state.incidents?.shouldRefresh || false;
 
       if (allIncidents.value.length === 0 || shouldRefresh) {
+        // Not forced: the drawer's writes drop the cached list, so the observer refetches on its own and forcing here would repeat it.
         await loadIncidents();
         if (shouldRefresh) {
           store.dispatch("incidents/setShouldRefresh", false);
@@ -830,7 +914,8 @@ export default defineComponent({
     watch(() => searchQuery.value, savePageState);
 
     const refreshIncidents = async () => {
-      await loadIncidents();
+      // Explicit refresh: must reach the server.
+      await loadIncidents(true);
       toast({
         variant: "success",
         message: t("toastMessages.alerts.incidentsRefreshed"),
@@ -851,6 +936,8 @@ export default defineComponent({
       raw,
       t,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       allIncidents,
       visibleIncidents,

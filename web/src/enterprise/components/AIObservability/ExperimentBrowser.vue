@@ -40,16 +40,14 @@
             {{ t("aiObservability.experiments.compare") }}
           </OButton>
         </OTooltip>
-        <OButton
+        <ORefreshButton
+          layout="inline"
           variant="outline"
-          size="icon-sm"
-          icon-left="refresh"
+          :last-run-at="lastUpdatedAt"
           :loading="loading"
           data-test="ai-experiment-refresh"
           @click="$emit('refresh')"
-        >
-          <OTooltip side="bottom" :content="t('common.refresh')" />
-        </OButton>
+        />
       </div>
     </div>
 
@@ -230,6 +228,7 @@
                     : t('aiObservability.experiments.setBaseline')
                 "
                 :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                class="max-md:hidden"
                 :data-test="`ai-experiment-baseline-${row.id}`"
                 @click.stop="toggleBaseline(row)"
               />
@@ -240,11 +239,46 @@
               icon-left="content-copy"
               :disabled="cloningId === row.id"
               :aria-label="t('aiObservability.experiments.clone')"
+              class="max-md:hidden"
               :data-test="`ai-experiment-clone-${row.id}`"
               @click.stop="cloneExperiment(row)"
             >
               <OTooltip side="bottom" :content="t('aiObservability.experiments.clone')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-experiment-actions-menu-btn"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                class="md:hidden"
+                :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                :data-test="`ai-experiment-baseline-${row.id}-menu`"
+                @select="toggleBaseline(row)"
+              >
+                <span>{{
+                  isBaseline(row)
+                    ? t("aiObservability.experiments.clearBaseline")
+                    : t("aiObservability.experiments.setBaseline")
+                }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :disabled="cloningId === row.id"
+                :data-test="`ai-experiment-clone-${row.id}-menu`"
+                @select="cloneExperiment(row)"
+              >
+                <span>{{ t("aiObservability.experiments.clone") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -257,8 +291,11 @@ import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import OInput from "@/lib/forms/Input/OInput.vue";
@@ -269,6 +306,8 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
+import { cloneExperimentMutation } from "@/services/llm-experiments.queries";
+import { useMutation } from "@tanstack/vue-query";
 import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
@@ -293,8 +332,9 @@ const props = withDefaults(
     syncUrl?: boolean;
     /** Spins the refresh icon while the page re-fetches. */
     loading?: boolean;
+    lastUpdatedAt?: number | null;
   }>(),
-  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
+  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false, lastUpdatedAt: null },
 );
 
 const emit = defineEmits<{
@@ -568,6 +608,9 @@ function canSetBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline || experiment.status === "completed";
 }
 
+// The clone is a new row the list this returns to would otherwise miss.
+const cloneExperimentWrite = useMutation(() => cloneExperimentMutation(props.orgId));
+
 // Cloning opens the create form seeded from the source rather than starting a
 // run outright: a clone costs a full execution, and the reason for making one is
 // almost always to change something first.
@@ -578,7 +621,7 @@ async function cloneExperiment(experiment: LlmExperiment) {
   }
   cloningId.value = experiment.id;
   try {
-    const clone = await llmExperimentsService.clone(props.orgId, experiment.id);
+    const clone = await cloneExperimentWrite.mutateAsync({ experimentId: experiment.id });
     toast({ variant: "success", message: t("aiObservability.experiments.cloneSuccess") });
     void router.push(aiExperimentDetailRoute(props.orgId, clone.id));
   } catch (error: any) {

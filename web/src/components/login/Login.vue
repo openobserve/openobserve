@@ -15,7 +15,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-card-glass-bg h-[100vh] w-[100vw]">
+  <!-- dvh, not vh: mobile browser chrome overlaps a 100vh box. -->
+  <div
+    class="bg-card-glass-bg h-[100vh] w-[100vw] max-md:h-dvh max-md:w-full max-md:overflow-y-auto"
+  >
     <div style="max-width: 25rem; padding-top: 6.25rem" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
@@ -166,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 
@@ -182,7 +185,6 @@ import {
   getImageURL,
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
-import { computed } from "vue";
 import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";

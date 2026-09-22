@@ -566,8 +566,18 @@ async fn prepare_alert(
         });
     }
 
+    // Naming an on-call team IS naming somewhere for this to go. Paging is
+    // documented as additive to destinations, but the check only knew about
+    // destinations and workflows — so an alert whose whole purpose was to wake
+    // the owning team could not be saved without also nominating a webhook it
+    // did not want.
     #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty() && alert.workflows.is_empty();
+    let destination_missing = alert.destinations.is_empty()
+        && alert.workflows.is_empty()
+        && alert
+            .oncall_team
+            .as_deref()
+            .is_none_or(|t| t.trim().is_empty());
     #[cfg(not(feature = "enterprise"))]
     let destination_missing = alert.destinations.is_empty();
 
@@ -2016,6 +2026,13 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
         &[]
     };
     let rows = vec![manual_trigger_row(&alert)];
+    // The same condition the scheduled path pages on: triggering by hand is how
+    // somebody checks a new on-call alert pages before trusting it, and it only
+    // answers that question if it pages.
+    #[cfg(feature = "enterprise")]
+    if o2_enterprise::enterprise::oncall::is_enabled() && !incident_notified {
+        crate::alerts::scheduler::handlers::page_for_alert_firing(&trace_id, &alert, &rows).await;
+    }
     let outcome = alert
         .send_notification(
             &trace_id,
@@ -2469,10 +2486,10 @@ impl AlertExt for Alert {
         if !self.workflows.is_empty() {
             let data: Vec<_> = rows.iter().map(|v| Value::Object(v.clone())).collect();
 
-            let source_id = self
-                .id
-                .as_ref()
-                .map_or(format!("{}/{}", self.org_id, self.name), |v| v.to_string());
+            let source_id = self.id.as_ref().map_or_else(
+                || format!("{}/{}", self.org_id, self.name),
+                |v| v.to_string(),
+            );
 
             let metadata: HashMap<String, Value> = vec![
                 ("org_id", self.org_id.clone().into()),
@@ -2570,7 +2587,7 @@ impl AlertExt for Alert {
             Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
             })
-        } else if self.destinations.is_empty() && workflow_error == self.workflows.len() {
+        } else if all_workflows_failed(attempted, self.workflows.len(), workflow_error) {
             Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
             })
@@ -2578,6 +2595,14 @@ impl AlertExt for Alert {
             Ok(outcome)
         }
     }
+}
+
+fn all_workflows_failed(
+    attempted_destinations: usize,
+    workflow_count: usize,
+    workflow_errors: usize,
+) -> bool {
+    attempted_destinations == 0 && workflow_count > 0 && workflow_errors == workflow_count
 }
 
 /// Build the notification context for a send, resolving the row template
@@ -4176,7 +4201,14 @@ mod send_path_tests {
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
-    use super::{NotificationOutcome, choose_template};
+    use super::{NotificationOutcome, all_workflows_failed, choose_template};
+
+    #[test]
+    fn skipped_incident_destinations_do_not_hide_total_workflow_failure() {
+        assert!(all_workflows_failed(0, 1, 1));
+        assert!(!all_workflows_failed(0, 1, 0));
+        assert!(!all_workflows_failed(1, 1, 1));
+    }
 
     fn tpl(name: &str) -> Template {
         Template {

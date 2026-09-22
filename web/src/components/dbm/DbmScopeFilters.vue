@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           :aria-label="t('dbm.filters.removeScope')"
-          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1"
+          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 max-md:opacity-100"
           :data-test="`dbm-queries-scope-chip-${filter.key}-remove`"
           @click="filter.onChange(null)"
         >
@@ -135,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <button
           type="button"
           :aria-label="t('dbm.filters.removeScope')"
-          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1"
+          class="border-border-default bg-surface-base text-text-secondary hover:bg-surface-subtle-hover hover:text-text-heading focus-visible:ring-accent ring-offset-surface-base absolute -top-1 -right-1 z-10 inline-flex size-4 cursor-pointer items-center justify-center rounded-full border opacity-0 shadow-sm transition outline-none group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-offset-1 max-md:opacity-100"
           data-test="dbm-queries-scope-chip-insight-remove"
           @click="emit('clearInsight')"
         >

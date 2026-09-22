@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alerts.header')"
@@ -31,13 +32,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm"
-          @click="importDestination"
-          data-test="destination-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
-        <OButton
           data-test="alert-destination-list-add-alert-btn"
           variant="primary"
           size="sm"
@@ -46,6 +40,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_destinations.add`) }}</OButton
         >
       </template>
+      <template #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="importDestination"
+          data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1">
         <OTable
           ref="oTableRef"
@@ -73,8 +77,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="
                   (v) => {
@@ -99,30 +104,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OSearchInput
                 v-model="filterQuery"
                 data-test="destination-list-search-input"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('alert_destinations.search')"
               />
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="alertDestinationsRefresh"
               data-test="alert-destinations-list-refresh-btn"
-              @click="getDestinations"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertDestinationsRefresh"
-              />
-            </OButton>
+              @click="refreshDestinations"
+            />
           </template>
 
           <template #bottom="{ totalRows }">
-            <span class="text-xs font-normal">
+            <span class="text-xs font-normal max-md:hidden">
               {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
             </span>
             <OButton
@@ -222,6 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="export"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.exportDestination')"
                 @click.stop="exportDestination(row)"
               >
@@ -232,6 +233,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="edit"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.edit')"
                 @click="editDestination(row)"
               >
@@ -242,12 +244,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-row-action="delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('alert_destinations.delete')"
                 :loading="deletingDestinations.has(row.name)"
                 @click="conformDeleteDestination(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="alert-destination-list-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="download"
+                  class="md:hidden"
+                  data-test="destination-export-menu"
+                  @select="exportDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.exportDestination") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-update-destination-menu`"
+                  @select="editDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  :data-test="`alert-destination-list-${row.name}-delete-destination-menu`"
+                  @select="conformDeleteDestination(row)"
+                >
+                  <span>{{ t("alert_destinations.delete") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
 
@@ -267,14 +307,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :destination="editingDestination"
         :templates="templates"
         @cancel:hideform="toggleDestinationEditor"
-        @get:destinations="getDestinations"
+        @get:destinations="refreshDestinations"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
-        @update:destinations="getDestinations"
+        @update:destinations="refreshDestinations"
       />
     </div>
 
@@ -296,6 +336,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts">
+import { bulkDeleteDestinationsMutation } from "@/services/alert_destination.queries";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation } from "@tanstack/vue-query";
+import { destinationsQuery } from "@/services/alert_destination.queries";
+import { destinationKeys } from "@/services/alert_destination.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped } from "@/types/i18n";
@@ -303,7 +349,7 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
-import templateService from "@/services/alert_templates";
+import { templatesQuery } from "@/services/alert_templates.queries";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter, useRoute } from "vue-router";
@@ -322,7 +368,9 @@ import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -344,12 +392,14 @@ export default defineComponent({
   name: "PageAlerts",
   components: {
     OIcon,
+    ORefreshButton,
     AddDestination,
     OEmptyState,
     ConfirmDialog,
     ImportDestination,
     OButton,
-    OTooltip,
+    ODropdown,
+    ODropdownItem,
     OSearchInput,
     OTag,
     OTable,
@@ -513,6 +563,12 @@ export default defineComponent({
       // Anything that failed to delete stays selected, so a bulk retry is one click.
       selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
       const org = store.state.selectedOrganization.identifier;
+      // The rows above are a render of the cached list, not the cache itself —
+      // splice the names out of every cached module list too, or the row returns
+      // on the next visit inside staleTime.
+      queryClient.setQueriesData({ queryKey: destinationKeys.all(org) }, (list: any) =>
+        Array.isArray(list) ? list.filter((d: any) => !gone.has(d.name)) : list,
+      );
       for (const name of gone)
         depGraph.value = applyDependencyDeletion(
           org,
@@ -542,37 +598,67 @@ export default defineComponent({
       },
       { once: true },
     );
-    const getDestinations = () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
-        timeout: 0,
-      });
-      loading.value = true;
+    // Request in flight with rows still on screen — the refresh button's
+    // spinner. `loading` is the skeleton, for a cold read only.
+    const fetching = ref(false);
+    const lastUpdatedAt = ref<number | null>(null);
+    // Bound to refresh / post-write reloads: always reaches the server.
+    const refreshDestinations = () => getDestinations(true);
+
+    const getDestinations = (force = false) => {
+      const org = store.state.selectedOrganization.identifier;
+      // Only a cold read spins and toasts — the rows stay put on a refresh.
+      const warm = queryClient.getQueryData(destinationKeys.list(org, "alert")) !== undefined;
+      const dismiss = warm
+        ? () => {}
+        : toast({
+            variant: "loading",
+            message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+            timeout: 0,
+          });
+
+      const options = destinationsQuery(org, "alert");
+      const applyRows = (list: any[]) => {
+        const rows = list.filter(
+          (destination: any) => destination.type == "http" || destination.type == "email",
+        );
+        resultTotal.value = rows.length;
+        destinations.value = rows;
+        updateRoute();
+      };
+
+      // Paint the cached rows before the request goes out, so a refresh never
+      // blanks the table.
+      const cached = queryClient.getQueryData<any[]>(options.queryKey);
+      if (cached !== undefined) applyRows(cached);
+      loading.value = cached === undefined;
+      fetching.value = true;
       forbidden.value = false;
-      destinationService
-        .list({
-          page_num: 1,
-          page_size: 100000,
-          sort_by: "name",
-          desc: false,
-          org_identifier: store.state.selectedOrganization.identifier,
-          module: "alert",
+
+      // TODO: fold into `useQuery` — kept imperative for now because the
+      // surrounding toast/dependency-graph flow is sequenced by hand.
+      if (force) {
+        void queryClient.invalidateQueries({
+          queryKey: options.queryKey,
+          exact: true,
+          refetchType: "none",
+        });
+      }
+      return queryClient
+        .fetchQuery(options)
+        .then((list: any[]) => {
+          applyRows(list);
+          lastUpdatedAt.value =
+            queryClient.getQueryState(options.queryKey)?.dataUpdatedAt ?? Date.now();
+          // Kept out of `apply`, which runs again for the cached paint:
+          // rebuilding the graph is three more list calls. Only a forced read
+          // can have changed it — every add/edit/delete reloads with force — so
+          // a plain mount leaves the graph's own cache to answer, and the
+          // "Used by" counts still follow every write.
+          if (force) invalidateDependencyGraphCache();
+          loadDepGraph(org, force ? ["alerts", "templates"] : []);
         })
-        .then((res) => {
-          res.data = res.data.filter(
-            (destination: any) => destination.type == "http" || destination.type == "email",
-          );
-          resultTotal.value = res.data.length;
-          destinations.value = res.data;
-          // Any destination add/edit/delete lands here on refresh — drop the
-          // shared dependency-graph cache and rebuild it so the "Used by" counts
-          // (and the impact dialog) are current.
-          invalidateDependencyGraphCache();
-          loadDepGraph(store.state.selectedOrganization.identifier);
-          updateRoute();
-        })
-        .catch((err) => {
+        .catch((err: any) => {
           forbidden.value = err?.response?.status === 403;
           if (!forbidden.value) {
             toast({
@@ -585,14 +671,13 @@ export default defineComponent({
         .finally(() => {
           dismiss();
           loading.value = false;
+          fetching.value = false;
         });
     };
     const getTemplates = () => {
-      templateService
-        .list({
-          org_identifier: store.state.selectedOrganization.identifier,
-        })
-        .then((res) => (templates.value = res.data));
+      queryClient
+        .fetchQuery(templatesQuery(store.state.selectedOrganization.identifier))
+        .then((list: any) => (templates.value = list));
     };
     const updateRoute = () => {
       if (router.currentRoute.value.query.action === "add") editDestination(null);
@@ -780,6 +865,9 @@ export default defineComponent({
       return filterData(byTab, filterQuery.value);
     });
 
+    const orgIdForWrites = useOrgId();
+    const bulkDeleteWrite = useMutation(() => bulkDeleteDestinationsMutation(orgIdForWrites.value));
+
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
@@ -806,10 +894,7 @@ export default defineComponent({
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
-        const response = await destinationService.bulkDelete(
-          store.state.selectedOrganization.identifier,
-          payload,
-        );
+        const response = await bulkDeleteWrite.mutateAsync(payload.ids);
 
         dismiss();
 
@@ -855,7 +940,9 @@ export default defineComponent({
           dropDestinations(response.data.successful.map((entry: any) => entry?.name ?? entry));
         } else {
           selectedDestinations.value = [];
-          getDestinations();
+          // Forced: this branch exists to hear it from the server, and an unforced
+          // read inside staleTime answers from cache without asking.
+          getDestinations(true);
         }
       } catch (error: any) {
         dismiss();
@@ -895,7 +982,7 @@ export default defineComponent({
       {
         id: "alertDestinationsRefresh",
         handler: () => {
-          if (!isInputFocused()) getDestinations();
+          if (!isInputFocused()) refreshDestinations();
         },
       },
       {
@@ -907,6 +994,7 @@ export default defineComponent({
     ]);
     return {
       t,
+      lastUpdatedAt,
       depGraph,
       showDestinationEditor,
       destinations,
@@ -914,6 +1002,8 @@ export default defineComponent({
       editDestination,
       getImageURL,
       loading,
+      fetching,
+      refreshDestinations,
       forbidden,
       conformDeleteDestination,
       filterQuery,

@@ -33,14 +33,14 @@ use tokio::io::AsyncWriteExt;
 use vortex::{
     VortexSessionDefault,
     array::ArrayRef,
-    arrow::{FromArrowArray, FromArrowType},
+    arrow::ArrowSessionExt,
     dtype::DType,
     file::{VortexWriteOptions, Writer as VortexWriter},
     io::session::RuntimeSessionExt,
     session::VortexSession,
 };
 
-use super::{MergedFile, append_metadata};
+use super::{MergedFile, append_metadata, new_temp_file};
 use crate::datafusion::vortex::{VORTEX_RUNTIME, vortex_write_strategy};
 
 /// The files a hash-ordered merge is written into: their format, size bound and layout.
@@ -158,8 +158,8 @@ async fn write_vortex(
     let writer_task = VORTEX_RUNTIME.spawn_blocking(move || {
         VORTEX_RUNTIME.block_on(async move {
             let session = VortexSession::default().with_tokio();
-            let dtype = DType::from_arrow(schema.as_ref());
-            let strategy = vortex_write_strategy();
+            let dtype = session.arrow().from_arrow_schema(schema.as_ref())?;
+            let strategy = vortex_write_strategy(&session);
             let mut active: Option<ActiveMetricsVortexWriter> = None;
             let mut files = Vec::new();
 
@@ -187,7 +187,7 @@ async fn write_vortex(
                         )?)
                     }
                 };
-                writer.write(batch).await?;
+                writer.write(batch, &session).await?;
             }
 
             if let Some(active) = active {
@@ -353,9 +353,12 @@ impl ActiveMetricsVortexWriter {
         })
     }
 
-    async fn write(&mut self, batch: RecordBatch) -> anyhow::Result<()> {
+    async fn write(&mut self, batch: RecordBatch, session: &VortexSession) -> anyhow::Result<()> {
+        let schema = batch.schema();
         self.state.write(&batch)?;
-        let array: ArrayRef = ArrayRef::from_arrow(batch, false)?;
+        let array: ArrayRef = session
+            .arrow()
+            .from_arrow_record_batch(batch, schema.as_ref())?;
         self.writer.push(array).await?;
         Ok(())
     }
@@ -385,15 +388,6 @@ async fn merged_file(
         },
         None => MergedFile::MetricsHashMerged { data_path, meta },
     })
-}
-
-fn new_temp_file() -> Result<(tokio::fs::File, tempfile::TempPath)> {
-    // spool under data_tmp_dir, not the OS temp dir (often a RAM-backed
-    // tmpfs); it is wiped at startup, reclaiming files a crash orphaned
-    let tmp_dir = &config::get_config().common.data_tmp_dir;
-    std::fs::create_dir_all(tmp_dir)?;
-    let (file, path) = tempfile::NamedTempFile::new_in(tmp_dir)?.into_parts();
-    Ok((tokio::fs::File::from_std(file), path))
 }
 
 async fn write_temp_file(buf: Vec<u8>) -> Result<tempfile::TempPath> {

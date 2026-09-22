@@ -63,12 +63,15 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-vi.mock("@/services/synthetics", () => ({
-  default: {
-    getLocation: mockServiceGetLocation,
-    getAgentSetup: mockServiceGetAgentSetup,
-  },
-}));
+vi.mock("@/services/synthetics", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      getLocation: mockServiceGetLocation,
+      getAgentSetup: mockServiceGetAgentSetup,
+    },
+  });
+});
 
 vi.mock("@/utils/synthetics/format", () => ({
   formatTimeAgoUs: vi.fn(() => "2 hours ago"),

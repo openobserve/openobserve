@@ -18,12 +18,15 @@ vi.mock("@/aws-exports", () => ({
   default: { isEnterprise: "true", isCloud: "false" },
 }));
 
-vi.mock("@/services/incidents", () => ({
-  default: {
-    list: vi.fn(),
-    updateStatus: vi.fn(),
-  },
-}));
+vi.mock("@/services/incidents", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list: vi.fn(),
+      updateStatus: vi.fn(),
+    },
+  });
+});
 
 vi.mock("@/utils/date", () => ({
   formatToReadable: vi.fn((ts: number) => `ts-${ts}`),
@@ -32,6 +35,19 @@ vi.mock("@/utils/date", () => ({
 
 vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
+}));
+
+// acknowledgeIncident awaits a confirm dialog that only resolves via user
+// interaction with a rendered provider — unmocked, the call hangs until timeout.
+const mockConfirm = vi.fn().mockResolvedValue(true);
+vi.mock("@/composables/useConfirmDialog", () => ({
+  useConfirmDialog: () => ({
+    currentDialog: { value: null },
+    confirm: mockConfirm,
+    handleConfirm: vi.fn(),
+    handleCancel: vi.fn(),
+    handleUpdateOpen: vi.fn(),
+  }),
 }));
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -231,7 +247,9 @@ describe("IncidentList.vue", () => {
     it("calls list with correct org identifier", async () => {
       wrapper = createWrapper();
       await flushPromises();
-      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0, undefined);
+      // Reads through incidentsQuery now, which passes the four arguments its key
+      // is built from — the fifth was always undefined.
+      expect(incidentsService.list).toHaveBeenCalledWith("default", undefined, 1000, 0);
     });
 
     it("populates allIncidents after successful load", async () => {
@@ -557,6 +575,10 @@ describe("IncidentList.vue", () => {
 
       const incident = (wrapper.vm as any).allIncidents[0];
       (wrapper.vm as any).viewIncident(incident);
+      // Settle this test's own navigation here rather than leaving it pending —
+      // an un-awaited push resolves during a later test's flushPromises() and
+      // clobbers whatever route query that test set up.
+      await flushPromises();
 
       expect(pushSpy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -643,7 +665,8 @@ describe("IncidentList.vue", () => {
       (wrapper.vm as any).qTableRef.table = { setPageIndex };
 
       await flushPromises();
-      vi.runAllTimers();
+      // Pending only: the refresh button's age interval would make runAllTimers loop forever.
+      vi.runOnlyPendingTimers();
 
       expect(setPageIndex).toHaveBeenCalledWith(2);
       store.state.incidents = { incidents: {}, isInitialized: false };

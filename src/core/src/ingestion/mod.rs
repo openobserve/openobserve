@@ -22,6 +22,7 @@ use std::{
     },
 };
 
+use arrow_schema::{DataType, FieldRef, Schema};
 use chrono::{TimeZone, Utc};
 use config::{
     SIZE_IN_MB, TIMESTAMP_COL_NAME,
@@ -29,10 +30,16 @@ use config::{
     ider::SnowflakeIdGenerator,
     meta::{
         alerts::alert::Alert,
+        promql::HASH_LABEL,
         self_reporting::usage::{RequestStats, RunOutcome, TriggerData, TriggerDataType},
         stream::{PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
-    utils::{flatten, json::*, schema::format_partition_key},
+    utils::{
+        flatten,
+        json::*,
+        schema::format_partition_key,
+        time::{DAY_MICRO_SECS, HOUR_MICRO_SECS},
+    },
 };
 use db::{
     self,
@@ -40,10 +47,11 @@ use db::{
 };
 use infra::{
     errors::{Error, Result},
-    schema::STREAM_RECORD_ID_GENERATOR,
+    schema::{STREAM_RECORD_ID_GENERATOR, SchemaCache},
 };
 use ingestion_common::IngestionRequest;
 use proto::cluster_rpc::IngestionType;
+use schema::{check_for_schema, check_request_columns_limit};
 use usage_reporting::publish_triggers_usage;
 use vrl::compiler::runtime::Runtime;
 
@@ -53,9 +61,13 @@ use super::{
 };
 use crate::{
     alerts::alert::AlertExt,
-    common::{infra::config::STREAM_ALERTS, meta::stream::SchemaRecords},
+    common::{
+        infra::config::STREAM_ALERTS,
+        meta::stream::{SchemaEvolution, SchemaRecords},
+    },
 };
 
+pub mod columnar;
 pub mod grpc;
 pub mod ingestion_service;
 
@@ -64,6 +76,55 @@ pub type TriggerAlertData = Vec<(Alert, Vec<Map<String, Value>>)>;
 /// Global atomic counter for round-robin distribution of requests across memory table buckets.
 /// This ensures even distribution of ingestion load across multiple buckets in axum.
 static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+/// Memoizes the write partition per time bucket while no partition key is enabled.
+pub struct PartitionMemo<'a> {
+    partition_keys: &'a Vec<StreamPartition>,
+    time_level: PartitionTimeLevel,
+    keyed_by_time_only: bool,
+    bucket_micros: i64,
+    last: Option<(i64, String)>,
+}
+
+impl<'a> PartitionMemo<'a> {
+    pub fn new(partition_keys: &'a Vec<StreamPartition>, time_level: PartitionTimeLevel) -> Self {
+        Self {
+            partition_keys,
+            time_level,
+            keyed_by_time_only: partition_keys.iter().all(|key| key.disabled),
+            bucket_micros: partition_bucket_micros(time_level),
+            last: None,
+        }
+    }
+
+    /// The partition buffer for `timestamp`, computing the key only when the time bucket changes.
+    pub fn buffer<'p>(
+        &mut self,
+        timestamp: i64,
+        record: &Map<String, Value>,
+        suffix: &str,
+        partitions: &'p mut HashMap<String, SchemaRecords>,
+        new_partition: impl FnOnce() -> SchemaRecords,
+    ) -> &'p mut SchemaRecords {
+        let bucket = timestamp.div_euclid(self.bucket_micros);
+        if let Some((last_bucket, key)) = &self.last
+            && *last_bucket == bucket
+        {
+            return partitions.get_mut(key).unwrap();
+        }
+        let key = get_write_partition_key(
+            timestamp,
+            self.partition_keys,
+            self.time_level,
+            record,
+            Some(suffix),
+        );
+        if self.keyed_by_time_only {
+            self.last = Some((bucket, key.clone()));
+        }
+        partitions.entry(key).or_insert_with(new_partition)
+    }
+}
 
 /// Get the next thread_id using round-robin distribution.
 /// This replaces the thread-local approach from actix-web with a request-level distribution.
@@ -237,6 +298,173 @@ pub async fn evaluate_trigger(triggers: TriggerAlertData) {
     }
 }
 
+/// The column type this value infers to, `None` for a null, which contributes no field at all.
+pub fn inferred_column_type(key: &str, value: &Value) -> Option<DataType> {
+    match value {
+        Value::Null => None,
+        Value::String(_) => Some(DataType::Utf8),
+        Value::Bool(_) => Some(DataType::Boolean),
+        Value::Number(n) => Some(match key {
+            // `fix_schema` pins these two whatever the record carries
+            TIMESTAMP_COL_NAME => DataType::Int64,
+            HASH_LABEL => DataType::UInt64,
+            _ if n.is_i64() => DataType::Int64,
+            _ if n.is_u64() => DataType::UInt64,
+            _ if n.is_f64() => DataType::Float64,
+            _ => DataType::Utf8,
+        }),
+        // a nested value cannot be inferred at all, so it must reach check_for_schema
+        _ => Some(DataType::Null),
+    }
+}
+
+/// Whether a value of `inferred` type lands in an `existing` column without a cast or evolution.
+pub fn column_accepts(existing: &DataType, inferred: &DataType) -> bool {
+    existing == inferred
+        || matches!(
+            (existing, inferred),
+            (DataType::Float64, DataType::Int64 | DataType::UInt64)
+                | (DataType::UInt64, DataType::Int64)
+                | (DataType::LargeUtf8, DataType::Utf8)
+        )
+}
+
+/// The evolving-record filter behind `resolve_batch_schema`, for writers that use the whole stream
+/// schema.
+pub async fn check_batch_schema<'r>(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &'r [(i64, Map<String, Value>)],
+    is_derived: bool,
+    has_uds: bool,
+) -> Result<(
+    SchemaEvolution,
+    Option<Schema>,
+    Option<hashbrown::HashSet<&'r str>>,
+)> {
+    let min_timestamp = records.iter().map(|(ts, _)| *ts).min().unwrap_or_default();
+    // a user-defined schema is applied by check_for_schema itself, so it cannot be skipped
+    if has_uds {
+        let (evolution, inferred) = check_for_schema(
+            org_id,
+            stream_name,
+            stream_type,
+            stream_schema_map,
+            records.iter().map(|(_, record)| record).collect(),
+            min_timestamp,
+            is_derived,
+        )
+        .await?;
+        return Ok((evolution, inferred, None));
+    }
+    // probed once per field of every record, so it takes foldhash rather than SipHash
+    let schema_fields: hashbrown::HashMap<&str, &DataType> = stream_schema_map
+        .get(stream_name)
+        .map(|schema| {
+            schema
+                .schema()
+                .fields()
+                .iter()
+                .map(|f| (f.name().as_str(), f.data_type()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let schema_columns = schema_fields.len();
+    let mut seen: hashbrown::HashSet<&str> = hashbrown::HashSet::default();
+    let mut evolving: Vec<&Map<String, Value>> = Vec::new();
+    for (_, record) in records {
+        let mut evolves = false;
+        for (key, value) in record.iter() {
+            let Some(inferred) = inferred_column_type(key, value) else {
+                continue;
+            };
+            seen.insert(key.as_str());
+            evolves |= !schema_fields
+                .get(key.as_str())
+                .is_some_and(|existing| column_accepts(existing, &inferred));
+        }
+        if evolves {
+            evolving.push(record);
+        }
+    }
+    // the map has drop glue, so its borrow of stream_schema_map only ends with an explicit drop
+    drop(schema_fields);
+    // check_for_schema skips the limit only when the batch carries exactly the stream schema
+    if !(evolving.is_empty() && seen.len() == schema_columns) {
+        check_request_columns_limit(org_id, stream_type, stream_name, seen.len())?;
+    }
+    if evolving.is_empty() {
+        let evolution = SchemaEvolution {
+            is_schema_changed: false,
+            types_delta: None,
+        };
+        return Ok((evolution, None, Some(seen)));
+    }
+    let (evolution, inferred) = check_for_schema(
+        org_id,
+        stream_name,
+        stream_type,
+        stream_schema_map,
+        evolving,
+        min_timestamp,
+        is_derived,
+    )
+    .await?;
+    // the whole stream schema already covers every record in the batch
+    let seen = inferred.is_some().then_some(seen);
+    Ok((evolution, inferred, seen))
+}
+
+/// One schema check per batch, plus the batch schema: the seen columns typed from the stream
+/// schema.
+pub async fn resolve_batch_schema(
+    org_id: &str,
+    stream_name: &str,
+    stream_type: StreamType,
+    stream_schema_map: &mut HashMap<String, SchemaCache>,
+    records: &[(i64, Map<String, Value>)],
+    is_derived: bool,
+    has_uds: bool,
+) -> Result<(SchemaEvolution, Option<Schema>)> {
+    let (evolution, inferred, seen) = check_batch_schema(
+        org_id,
+        stream_name,
+        stream_type,
+        stream_schema_map,
+        records,
+        is_derived,
+        has_uds,
+    )
+    .await?;
+    let Some(seen) = seen else {
+        return Ok((evolution, inferred));
+    };
+    // batch schema = the evolving records' inferred fields plus every other seen field
+    let inferred_names: hashbrown::HashSet<&str> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter())
+        .map(|f| f.name().as_str())
+        .collect();
+    let latest = stream_schema_map.get(stream_name).unwrap().schema();
+    let mut fields: Vec<FieldRef> = inferred
+        .iter()
+        .flat_map(|s| s.fields().iter().cloned())
+        .collect();
+    fields.extend(
+        latest
+            .fields()
+            .iter()
+            .filter(|f| {
+                seen.contains(f.name().as_str()) && !inferred_names.contains(f.name().as_str())
+            })
+            .cloned(),
+    );
+    fields.sort_by(|a, b| a.name().cmp(b.name()));
+    Ok((evolution, Some(Schema::new(fields))))
+}
+
 pub fn get_write_partition_key(
     timestamp: i64,
     partition_keys: &Vec<StreamPartition>,
@@ -285,9 +513,17 @@ pub async fn write_file(
     buf: HashMap<String, SchemaRecords>,
     fsync: bool,
 ) -> Result<RequestStats> {
-    let mut req_stats = RequestStats::default();
-    let entries = buf
-        .into_iter()
+    let entries = schema_records_to_entries(org_id, stream_name, buf);
+    write_entries(writer, stream_name, entries, fsync).await
+}
+
+/// One WAL entry per non-empty partition of `buf`.
+pub fn schema_records_to_entries(
+    org_id: &str,
+    stream_name: &str,
+    buf: HashMap<String, SchemaRecords>,
+) -> Vec<ingester::Entry> {
+    buf.into_iter()
         .filter_map(|(hour_key, entry)| {
             if entry.records.is_empty() {
                 None
@@ -304,10 +540,35 @@ pub async fn write_file(
                 })
             }
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+/// Only a server fault is 500: a batch the client must fix is 400 and an overload is 503.
+pub fn write_error_status(e: &Error) -> http::StatusCode {
+    match e {
+        Error::ResourceError(_) => http::StatusCode::SERVICE_UNAVAILABLE,
+        e if e.is_columns_limit_exceeded() => http::StatusCode::BAD_REQUEST,
+        _ => http::StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+/// An entry carrying a `batch` counts its rows from the batch, not from `data`.
+pub async fn write_entries(
+    writer: &Arc<ingester::Writer>,
+    stream_name: &str,
+    entries: Vec<ingester::Entry>,
+    fsync: bool,
+) -> Result<RequestStats> {
+    let mut req_stats = RequestStats::default();
     let (entries_records, entries_size) = entries
         .iter()
-        .map(|entry| (entry.data.len(), entry.data_size))
+        .map(|entry| {
+            let rows = entry
+                .batch
+                .as_ref()
+                .map_or(entry.data.len(), |batch| batch.num_rows());
+            (rows, entry.data_size)
+        })
         .fold((0, 0), |(acc_records, acc_size), (records, size)| {
             (acc_records + records, acc_size + size)
         });
@@ -318,7 +579,11 @@ pub async fn write_file(
             stream_name,
             e
         );
-        return Err(Error::IngestionError(e.to_string()));
+        return Err(if e.is_overload() {
+            Error::ResourceError(e.to_string())
+        } else {
+            Error::IngestionError(e.to_string())
+        });
     }
 
     req_stats.size += entries_size as f64 / SIZE_IN_MB;
@@ -548,8 +813,18 @@ pub fn refactor_map(
     new_map
 }
 
+/// The span of one write partition, which a record's time bucket is counted in.
+fn partition_bucket_micros(time_level: PartitionTimeLevel) -> i64 {
+    match time_level {
+        PartitionTimeLevel::Daily => DAY_MICRO_SECS,
+        PartitionTimeLevel::Unset | PartitionTimeLevel::Hourly => HOUR_MICRO_SECS,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use arrow_schema::Field;
+    use config::get_config;
     use infra::schema::unwrap_stream_settings;
     use transform::compile_vrl_function;
 
@@ -1089,5 +1364,113 @@ mod tests {
         let data = bytes::Bytes::from("{}");
         let result = create_log_ingestion_req(99, data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_column_accepts_only_no_op_casts() {
+        assert!(column_accepts(&DataType::Utf8, &DataType::Utf8));
+        assert!(column_accepts(&DataType::Float64, &DataType::Int64));
+        assert!(column_accepts(&DataType::UInt64, &DataType::Int64));
+        assert!(column_accepts(&DataType::LargeUtf8, &DataType::Utf8));
+        // widening or a real cast must still reach check_for_schema
+        assert!(!column_accepts(&DataType::Int64, &DataType::UInt64));
+        assert!(!column_accepts(&DataType::Int64, &DataType::Float64));
+        assert!(!column_accepts(&DataType::Utf8, &DataType::Int64));
+        assert!(!column_accepts(&DataType::Boolean, &DataType::Int64));
+        assert!(!column_accepts(&DataType::Int64, &DataType::Boolean));
+        assert!(!column_accepts(&DataType::Utf8, &DataType::Null));
+    }
+
+    fn log_record(value: Value) -> (i64, Map<String, Value>) {
+        let Value::Object(value) = value else {
+            unreachable!()
+        };
+        (1, value)
+    }
+
+    fn cached_schema<S: Into<String>>(fields: Vec<(S, DataType)>) -> HashMap<String, SchemaCache> {
+        let fields = fields
+            .into_iter()
+            .map(|(name, ty)| Field::new(name, ty, true))
+            .collect::<Vec<_>>();
+        HashMap::from([("s".to_string(), SchemaCache::new(Schema::new(fields)))])
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_known_columns_skip_the_schema_check() {
+        let mut map = cached_schema(vec![
+            (TIMESTAMP_COL_NAME, DataType::Int64),
+            ("a", DataType::Utf8),
+            ("b", DataType::Float64),
+            ("c", DataType::Boolean),
+        ]);
+        let records = vec![
+            log_record(json!({"_timestamp": 1, "a": "x", "b": 2})),
+            log_record(json!({"_timestamp": 2, "a": "y", "c": null})),
+        ];
+        // no DB is reachable here, so a call into check_for_schema would fail
+        let (evolution, batch_schema) =
+            resolve_batch_schema("o", "s", StreamType::Logs, &mut map, &records, false, false)
+                .await
+                .unwrap();
+        assert!(!evolution.is_schema_changed);
+        assert!(evolution.types_delta.is_none());
+        let names = batch_schema
+            .unwrap()
+            .fields()
+            .iter()
+            .map(|f| (f.name().clone(), f.data_type().clone()))
+            .collect::<Vec<_>>();
+        // only the present non-null columns, sorted, typed from the stream schema
+        assert_eq!(
+            names,
+            vec![
+                (TIMESTAMP_COL_NAME.to_string(), DataType::Int64),
+                ("a".to_string(), DataType::Utf8),
+                ("b".to_string(), DataType::Float64),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_resolve_batch_schema_over_the_column_limit_is_rejected() {
+        let limit = get_config().limit.req_cols_per_record_limit;
+        // one more column than the batch carries, so this is not the exact-schema fast path
+        let mut map = cached_schema(
+            (0..=limit + 1)
+                .map(|i| (format!("f{i}"), DataType::Int64))
+                .collect(),
+        );
+        let mut value = Map::new();
+        for i in 0..limit {
+            value.insert(format!("f{i}"), Value::from(i));
+        }
+        let records = vec![log_record(Value::Object(value.clone())), {
+            value.insert(format!("f{limit}"), Value::from(1));
+            log_record(Value::Object(value))
+        }];
+        let err =
+            resolve_batch_schema("o", "s", StreamType::Logs, &mut map, &records, false, false)
+                .await
+                .err()
+                .expect("over the limit");
+        assert!(err.to_string().contains("columns"), "{err}");
+    }
+
+    #[test]
+    fn test_write_error_status() {
+        let columns = schema::get_request_columns_limit_error("o/logs/s", 243);
+        assert_eq!(
+            write_error_status(&Error::OtherError(columns)),
+            http::StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            write_error_status(&Error::ResourceError("write queue full".to_string())),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        assert_eq!(
+            write_error_status(&Error::IngestionError("disk failure".to_string())),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

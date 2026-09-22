@@ -21,12 +21,6 @@ use crate::functions::RangeFunc;
 
 pub struct AvgOverTimeFunc;
 
-impl AvgOverTimeFunc {
-    pub fn new() -> Self {
-        AvgOverTimeFunc {}
-    }
-}
-
 impl RangeFunc for AvgOverTimeFunc {
     fn name(&self) -> &'static str {
         "avg_over_time"
@@ -50,7 +44,7 @@ mod tests {
     use super::*;
 
     fn avg_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-        crate::functions::eval_range(data, AvgOverTimeFunc::new(), eval_ctx)
+        crate::functions::eval_range(data, AvgOverTimeFunc, eval_ctx)
     }
 
     // Test helper
@@ -73,7 +67,7 @@ mod tests {
 
     #[test]
     fn test_avg_over_time_exec_empty_samples_returns_none() {
-        let func = AvgOverTimeFunc::new();
+        let func = AvgOverTimeFunc;
         assert!(func.exec(&[], 0, &Duration::ZERO).is_none());
     }
 

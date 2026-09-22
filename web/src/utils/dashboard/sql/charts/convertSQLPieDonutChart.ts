@@ -23,6 +23,7 @@ import {
   calculatePieChartContainer,
 } from "../../legendConfiguration";
 import { type SQLContext } from "../shared/types";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Applies chart-specific options for: pie AND donut
@@ -69,12 +70,14 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
-          return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name?.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
+          return `${name?.marker} ${escapeHtml(name?.name)} : <b>${escapeHtml(
+            formatUnitValue(
+              getUnitValue(
+                name?.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
             ),
           )}</b>`;
         } catch (error) {
@@ -211,14 +214,16 @@ export function applyPieDonutChart(ctx: SQLContext): void {
             hoveredSeriesState?.value?.panelId != panelSchema.id
           )
             return "";
-          return `${name?.marker} ${name?.name} : <b>${formatUnitValue(
-            getUnitValue(
-              name?.value,
-              panelSchema.config?.unit,
-              panelSchema.config?.unit_custom,
-              panelSchema.config?.decimals,
+          return `${name?.marker} ${escapeHtml(name?.name)} : <b>${escapeHtml(
+            formatUnitValue(
+              getUnitValue(
+                name?.value,
+                panelSchema.config?.unit,
+                panelSchema.config?.unit_custom,
+                panelSchema.config?.decimals,
+              ),
             ),
-          )}<b/>`;
+          )}</b>`;
         } catch (error) {
           return "";
         }

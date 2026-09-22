@@ -35,16 +35,15 @@
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
-            :loading="loading"
+            :last-run-at="lastRunAt"
+            :loading="refreshing || loading"
+            shortcut-id="scorersRefresh"
             data-test="scorer-list-refresh-btn"
             @click="emit('refresh')"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" shortcut-id="scorersRefresh" />
-          </OButton>
+          />
         </template>
 
         <!-- Type breakdown (catalog signal) — doubles as a filter synced to the
@@ -109,7 +108,7 @@
         </template>
 
         <template #bottom="{ totalRows }">
-          <span class="text-xs font-normal">
+          <span class="text-xs font-normal max-md:hidden">
             {{ totalRows.toLocaleString() }} {{ t("onlineEvals.scorer.listTitle") }}
           </span>
           <OButton
@@ -150,6 +149,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.edit')"
               icon-left="edit"
+              class="max-md:hidden"
               @click.stop="$emit('edit', row)"
             />
             <OButton
@@ -158,6 +158,7 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.export')"
               icon-left="download"
+              class="max-md:hidden"
               @click.stop="$emit('export', row)"
             />
             <OButton
@@ -167,8 +168,46 @@
               size="icon-sm"
               :title="t('onlineEvals.actions.delete')"
               icon-left="delete"
+              class="max-md:hidden"
               @click.stop="$emit('delete', row)"
             />
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="scorer-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :data-test="`scorer-list-${row.name}-edit-btn-menu`"
+                @select="$emit('edit', row)"
+              >
+                <span>{{ t("onlineEvals.actions.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="download"
+                class="md:hidden"
+                :data-test="`scorer-list-${row.name}-export-btn-menu`"
+                @select="$emit('export', row)"
+              >
+                <span>{{ t("onlineEvals.actions.export") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`scorer-list-${row.name}-delete-btn-menu`"
+                @select="$emit('delete', row)"
+              >
+                <span>{{ t("onlineEvals.actions.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -180,7 +219,9 @@
 import { computed, ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
 import OTable from "@/lib/core/Table/OTable.vue";
@@ -210,6 +251,10 @@ const props = defineProps<{
   search: string;
   loading?: boolean;
   forbidden?: boolean;
+  /** Epoch-ms of the last list read, for the refresh button's age label. */
+  lastRunAt?: number | null;
+  /** A reload is in flight — spins the refresh button and blocks a second click. */
+  refreshing?: boolean;
 }>();
 
 const emit = defineEmits<{

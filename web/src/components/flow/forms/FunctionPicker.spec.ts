@@ -22,9 +22,12 @@ import FunctionPicker from "./FunctionPicker.vue";
 vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const mockList = vi.fn();
-vi.mock("@/services/jstransform", () => ({
-  default: { list: (...args: any[]) => mockList(...args) },
-}));
+vi.mock("@/services/jstransform", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: { list: (...args: any[]) => mockList(...args) },
+  });
+});
 
 // The live editor code AddFunction.getCode() returns — tests set it to simulate the
 // user typing / editing (the real editor is imperative; the picker reads it on demand).
@@ -113,6 +116,15 @@ describe("FunctionPicker", () => {
     expect(opts).toContain("alpha");
     expect(opts).toContain("beta");
     expect(opts).not.toContain("js_fn");
+  });
+
+  it("reuses the cached functions list when the picker opens again", async () => {
+    createWrapper().unmount();
+    await flushPromises();
+    const again = createWrapper({ language: "javascript" });
+    await flushPromises();
+    expect(mockList).toHaveBeenCalledTimes(1);
+    expect(again.find(".o-select-options").text()).toContain("js_fn");
   });
 
   it("language='vrl' (pipeline): offers only VRL functions", async () => {

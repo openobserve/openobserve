@@ -213,6 +213,7 @@ struct ConfigResponse<'a> {
     anomaly_detection_enabled: bool,
     composite_alerts_available: bool,
     synthetics_enabled: bool,
+    oncall_enabled: bool,
     /// Whether private locations — pools served by long-running agents deployed
     /// inside the customer's network — are available. Enterprise only, so the
     /// UI hides the private-locations views, the agent-setup drawer and the
@@ -237,6 +238,7 @@ struct ConfigResponse<'a> {
     show_fts_field_values: bool,
     search_inspector_enabled: bool,
     auto_query_enabled: bool,
+    profiling_enabled: bool,
     #[cfg(feature = "enterprise")]
     last_usage_report_ts: i64,
     #[cfg(feature = "enterprise")]
@@ -485,6 +487,7 @@ pub async fn zo_config(
     // cannot serve.
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
+    let oncall_enabled = enterprise_value!(false, o2cfg.oncall.enabled);
 
     #[cfg(feature = "cloud")]
     let build_type = "cloud";
@@ -598,6 +601,7 @@ pub async fn zo_config(
         anomaly_detection_enabled,
         composite_alerts_available,
         synthetics_enabled,
+        oncall_enabled,
         synthetics_private_locations_enabled,
         synthetics_recorder_extension_url: synthetics_recorder_extension_url.to_string(),
         database_monitoring_enabled: cfg.db_monitoring.enabled,
@@ -605,6 +609,7 @@ pub async fn zo_config(
         show_fts_field_values: cfg.common.show_fts_field_values,
         search_inspector_enabled,
         auto_query_enabled: cfg.common.auto_query_enabled,
+        profiling_enabled: cfg.common.profiling_enabled,
         #[cfg(feature = "enterprise")]
         last_usage_report_ts,
         #[cfg(feature = "enterprise")]

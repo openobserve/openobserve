@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:selected-ids="handleSelectedIdsUpdate"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('serviceAccounts.search')"
@@ -72,20 +72,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="iamServiceAccountsRefresh"
               data-test="iam-service-accounts-refresh-btn"
-              @click="getServiceAccountsUsers"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="iamServiceAccountsRefresh"
-              />
-            </OButton>
+              @click="refreshServiceAccounts"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -175,6 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="refresh"
+                class="max-md:hidden"
                 @click="confirmRefreshAction(row)"
               />
               <OButton
@@ -184,6 +180,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="edit"
+                class="max-md:hidden"
                 @click="addRoutePush(row)"
               />
               <OButton
@@ -193,13 +190,52 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 variant="ghost"
                 size="icon-sm"
                 icon-left="delete"
+                class="max-md:hidden"
                 @click="confirmDeleteAction(row)"
               />
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="service-accounts-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="refresh"
+                  class="md:hidden"
+                  data-test="service-accounts-refresh-menu"
+                  @select="confirmRefreshAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.rotate") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="service-accounts-edit-menu"
+                  @select="addRoutePush(row)"
+                >
+                  <span>{{ t("serviceAccounts.update") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="service-accounts-delete-menu"
+                  @select="confirmDeleteAction(row)"
+                >
+                  <span>{{ t("serviceAccounts.deleteServiceAccount") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </template>
           </template>
 
           <template #bottom>
-            <span class="text-xs font-normal"
+            <span class="text-xs font-normal max-md:hidden"
               >{{ serviceAccountsState.service_accounts_users.length }}
               {{ t("serviceAccounts.header") }}</span
             >
@@ -439,12 +475,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useQuery } from "@tanstack/vue-query";
+import { serviceAccountsQuery } from "@/services/service_accounts.queries";
+import { defineComponent, ref, onBeforeMount, computed, watch } from "vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
@@ -476,7 +518,6 @@ import { COL } from "@/lib/core/Table/OTable.types";
 
 // @ts-ignore
 import usePermissions from "@/composables/iam/usePermissions";
-import { computed } from "vue";
 import service_accounts from "@/services/service_accounts";
 import { useReo } from "@/services/reodotdev_analytics";
 import { toast } from "@/lib/feedback/Toast/useToast";
@@ -489,10 +530,13 @@ export default defineComponent({
     AddServiceAccount,
     ConfirmDialog,
     OButton,
+    ODropdown,
+    ODropdownItem,
     ODialog,
     OIcon,
     OPageLayout,
     OTooltip,
+    ORefreshButton,
     OTable,
     OTag,
     OCodeCell,
@@ -660,6 +704,8 @@ export default defineComponent({
     const bulkDeleteLoading = ref(false);
 
     onBeforeMount(async () => {
+      // Not forced: a route-change read stays cached. Only the refresh button
+      // and the post-write reloads below pass `true`.
       await getServiceAccountsUsers();
 
       // Only `action=update&email=…` auto-opens the edit dialog so a shared
@@ -748,49 +794,79 @@ export default defineComponent({
       deleteUserEmail = row.email;
       deleteUserEmailIdentifier.value = row.email;
     };
-    const loading = ref(false);
-    const forbidden = ref(false);
-    const getServiceAccountsUsers = async () => {
-      const dismiss = toast({
-        variant: "loading",
-        message: t("serviceAccounts.toast.loading"),
-        timeout: 0,
+    const orgIdForList = useOrgId();
+    const serviceAccountsList = useQuery(() =>
+      Object.assign(serviceAccountsQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+    );
+
+    const loading = serviceAccountsList.isPending;
+    // A request is in flight while rows stay on screen — the refresh button's
+    // spinner. `loading` is the skeleton, which only a cold read wants.
+    const fetching = serviceAccountsList.isFetching;
+    // Epoch ms of the last successful read — drives the button's "1m ago" label.
+    const lastUpdatedAt = serviceAccountsList.dataUpdatedAt;
+    // A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+    const forbidden = computed(() => {
+      const e: any = serviceAccountsList.error.value;
+      return e?.status === 403 || e?.response?.status === 403;
+    });
+    // Bound to refresh / post-write reloads: always hits the server.
+    const refreshServiceAccounts = () => getServiceAccountsUsers(true);
+
+    const applyServiceAccounts = (accounts: any[]) => {
+      resultTotal.value = accounts.length;
+      currentUserRole.value = "";
+      serviceAccountsState.service_accounts_users = accounts.map((data: any) => {
+        return {
+          email: data.email,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          token: data.token || "",
+          role: data.role || "ServiceAccount",
+          is_system: data.is_system || false,
+          description: data.description || null,
+          created_at: data.created_at || 0,
+        };
       });
+    };
 
-      loading.value = true;
-      forbidden.value = false;
-      return new Promise((resolve, reject) => {
-        service_accounts
-          .list(store.state.selectedOrganization.identifier)
-          .then((res) => {
-            resultTotal.value = res.data.data.length;
-            currentUserRole.value = "";
-            serviceAccountsState.service_accounts_users = res.data.data.map((data: any) => {
-              return {
-                email: data.email,
-                first_name: data.first_name,
-                last_name: data.last_name,
-                token: data.token || "",
-                role: data.role || "ServiceAccount",
-                is_system: data.is_system || false,
-                description: data.description || null,
-                created_at: data.created_at || 0,
-              };
-            });
+    // The table is the query now: a service-account write invalidates the scope
+    // and these rows repaint without this component asking.
+    watch(serviceAccountsList.data, (rows: any) => {
+      if (rows) applyServiceAccounts(rows);
+    });
 
-            dismiss();
-
-            resolve(true);
-          })
-          .catch((err: any) => {
-            forbidden.value = err?.response?.status === 403;
-            dismiss();
-            reject(false);
-          })
-          .finally(() => {
-            loading.value = false;
+    // The cold-read toast, kept: shown only while there is nothing on screen.
+    let dismissLoadingToast: (() => void) | null = null;
+    watch(
+      loading,
+      (isCold) => {
+        if (isCold && !dismissLoadingToast) {
+          dismissLoadingToast = toast({
+            variant: "loading",
+            message: t("serviceAccounts.toast.loading"),
+            timeout: 0,
           });
-      });
+        } else if (!isCold && dismissLoadingToast) {
+          dismissLoadingToast();
+          dismissLoadingToast = null;
+        }
+      },
+      { immediate: true },
+    );
+
+    watch(serviceAccountsList.error, (error: any) => {
+      if (!error) return;
+      dismissLoadingToast?.();
+      dismissLoadingToast = null;
+    });
+
+    // Only an explicit call reads: refresh, post-write reload, search. Mount and
+    // invalidation-driven repaints come from the query itself. The cold-read
+    // toast is driven by `loading` above, so it is not sequenced here.
+    const getServiceAccountsUsers = async (force = false) => {
+      if (force) await serviceAccountsList.refetch();
+      return true;
     };
     const addUser = (props: any, is_updated: boolean) => {
       isUpdated.value = is_updated;
@@ -957,7 +1033,7 @@ export default defineComponent({
               message: t("serviceAccounts.toast.deleted"),
               variant: "success",
             });
-            await getServiceAccountsUsers();
+            await getServiceAccountsUsers(true);
           }
         })
         .catch((err: any) => {
@@ -1008,7 +1084,7 @@ export default defineComponent({
 
         selectedAccounts.value = [];
         confirmBulkDelete.value = false;
-        await getServiceAccountsUsers();
+        await getServiceAccountsUsers(true);
       } catch (err: any) {
         if (err.response?.status != 403 || err?.status != 403) {
           toast({
@@ -1037,7 +1113,7 @@ export default defineComponent({
             variant: "success",
           });
 
-          getServiceAccountsUsers();
+          getServiceAccountsUsers(true);
         })
         .catch((err) => {
           if (err.response?.status != 403) {
@@ -1079,7 +1155,7 @@ export default defineComponent({
       {
         id: "iamServiceAccountsRefresh",
         handler: () => {
-          if (!isInputFocused()) getServiceAccountsUsers();
+          if (!isInputFocused()) refreshServiceAccounts();
         },
       },
       {
@@ -1090,6 +1166,7 @@ export default defineComponent({
       },
     ]);
     return {
+      refreshServiceAccounts,
       t,
       router,
       store,
@@ -1097,6 +1174,8 @@ export default defineComponent({
       serviceAccountsState,
       columns,
       loading,
+      fetching,
+      lastUpdatedAt,
       forbidden,
       orgData,
       confirmDelete,

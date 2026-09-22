@@ -35,16 +35,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
-      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
+      <div
+        data-test="report-list-splitter"
+        class="report-list-table flex min-h-0 flex-1 max-md:flex-col"
+      >
         <!-- Left: folder list -->
-        <div class="w-rail h-full shrink-0">
+        <div
+          class="w-rail max-md:border-border-default h-full shrink-0 max-md:h-auto max-md:w-full max-md:border-b"
+        >
           <div class="h-full">
             <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
           </div>
         </div>
 
         <!-- Right: report table -->
-        <div class="h-full min-w-0 flex-1">
+        <div class="h-full min-w-0 flex-1 max-md:h-auto max-md:min-h-0">
           <div class="bg-card-glass-bg h-full">
             <OTable
               data-test="report-list-table"
@@ -67,7 +72,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
               <template #toolbar>
-                <div class="flex w-full items-center gap-2">
+                <div
+                  class="@container/report-toolbar flex min-w-0 flex-1 flex-wrap items-center gap-2 gap-y-1.5 max-md:contents"
+                >
                   <div class="app-tabs-container">
                     <AppTabs
                       class="tabs-selection-container"
@@ -75,13 +82,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-model:active-tab="activeTab"
                       @update:active-tab="
                         () => {
-                          invalidateFolderCache(activeFolderId);
+                          invalidateFolderCache(activeFolderId, true);
                           loadReports(activeFolderId);
                         }
                       "
                     />
                   </div>
-                  <div class="min-w-0 flex-1">
+                  <!-- flex-1 is basis-0, so the min-w floor is what wraps the input before its scope chips spill. -->
+                  <div
+                    class="min-w-0 flex-1 max-md:order-last max-md:basis-full md:max-lg:min-w-80"
+                  >
                     <OInput
                       v-model="dynamicQueryModel"
                       :placeholder="
@@ -108,7 +118,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="folder-outline"
                             data-test="report-list-search-scope-current"
                             :title="t('reports.searchThisFolderTitle')"
-                            >{{ t("reports.searchThisFolder") }}</OToggleGroupItem
+                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
+                              t("reports.searchThisFolder")
+                            }}</span></OToggleGroupItem
                           >
                           <OToggleGroupItem
                             value="all"
@@ -116,7 +128,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             icon-left="search"
                             data-test="report-list-search-across-folders-toggle"
                             :title="t('reports.searchAllFoldersTitle')"
-                            >{{ t("reports.searchAllFolders") }}</OToggleGroupItem
+                            ><span class="max-md:hidden @max-[34rem]/report-toolbar:hidden">{{
+                              t("reports.searchAllFolders")
+                            }}</span></OToggleGroupItem
                           >
                         </OToggleGroup>
                       </template>
@@ -125,25 +139,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
               </template>
               <template #toolbar-trailing>
-                <OButton
+                <ORefreshButton
+                  layout="inline"
                   variant="outline"
-                  size="icon-sm"
-                  icon-left="refresh"
-                  :loading="isLoadingReports"
+                  :last-run-at="lastUpdatedAt"
+                  :loading="fetching"
+                  shortcut-id="reportsRefresh"
                   data-test="report-list-refresh-btn"
-                  @click="
-                    () => {
-                      invalidateFolderCache(activeFolderId);
-                      loadReports(activeFolderId);
-                    }
-                  "
-                >
-                  <OTooltip
-                    side="bottom"
-                    :content="t('reports.reloadReports')"
-                    shortcut-id="reportsRefresh"
-                  />
-                </OButton>
+                  @click="refreshReports"
+                />
               </template>
               <template #empty>
                 <OEmptyState
@@ -211,6 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-sm"
                   :icon-left="row.enabled ? 'pause' : 'play-arrow'"
                   :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  class="max-md:hidden"
                   @click="toggleReportState(row)"
                 />
 
@@ -222,6 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('alerts.edit')"
+                  class="max-md:hidden"
                   @click="editReport(row)"
                 />
 
@@ -232,6 +238,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost"
                   size="icon-sm"
                   :title="t('reports.moveToFolder')"
+                  class="max-md:hidden"
                   @click="openMoveDialog(row)"
                 />
 
@@ -243,8 +250,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   variant="ghost-destructive"
                   size="icon-sm"
                   :title="t('alerts.delete')"
+                  class="max-md:hidden"
                   @click="confirmDeleteReport(row)"
                 />
+
+                <ODropdown side="bottom" align="end">
+                  <template #trigger>
+                    <OButton
+                      icon-left="more-vert"
+                      :title="t('dashboard.moreActions')"
+                      variant="ghost"
+                      size="icon-xs-sq"
+                      class="md:hidden"
+                      data-test="report-list-row-more-actions"
+                      @click.stop
+                    />
+                  </template>
+                  <ODropdownItem
+                    v-if="!reportsStateLoadingMap[row.report_id]"
+                    :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-pause-start-report-menu`"
+                    @select="toggleReportState(row)"
+                  >
+                    <span>{{ row.enabled ? t("alerts.pause") : t("alerts.start") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="edit"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-edit-report-menu`"
+                    @select="editReport(row)"
+                  >
+                    <span>{{ t("alerts.edit") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="drive-file-move"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-move-report-menu`"
+                    @select="openMoveDialog(row)"
+                  >
+                    <span>{{ t("reports.moveToFolder") }}</span>
+                  </ODropdownItem>
+                  <ODropdownItem
+                    icon-left="delete"
+                    variant="destructive"
+                    class="md:hidden"
+                    :data-test="`report-list-${row.name}-delete-report-menu`"
+                    @select="confirmDeleteReport(row)"
+                  >
+                    <span>{{ t("alerts.delete") }}</span>
+                  </ODropdownItem>
+                </ODropdown>
               </template>
 
               <!-- Table footer: pagination + bulk actions -->
@@ -252,7 +308,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="flex h-12 w-full items-center justify-between">
                   <!-- Left: count + action buttons grouped together -->
                   <div class="flex items-center gap-2">
-                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
+                    <div
+                      class="flex items-center text-xs font-normal whitespace-nowrap max-md:hidden"
+                    >
                       {{ resultTotal }} {{ t("reports.header") }}
                     </div>
                     <OButton
@@ -316,7 +374,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
+import { useOrgId } from "@/composables/query/useOrgId";
+import type { ReportListFilters } from "@/services/reports";
+import { useQuery } from "@tanstack/vue-query";
+import { reportsQuery } from "@/services/reports.queries";
+import { reportKeys } from "@/services/reports.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
+import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent, nextTick } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -329,20 +393,22 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { useI18nTyped } from "@/types/i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import reports from "@/services/reports";
 import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
 import { getFoldersListByType } from "@/utils/commons";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OInput from "@/lib/forms/Input/OInput.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { COL } from "@/lib/core/Table/OTable.types";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
@@ -370,8 +436,35 @@ const reportsTableRows: Ref<any[]> = ref([]);
 const staticReportsList: Ref<any[]> = ref([]);
 // Start in the loading state so the table shows the skeleton on first render
 // instead of briefly flashing the empty state before the fetch completes.
+// What the current read is aimed at. Held reactively so the query key forks on
+// a folder/tab/search change — which is also what makes the old "is this
+// response stale?" guard unnecessary: a late response lands under its own key
+// and can no longer render into the current view.
+const orgIdForReports = useOrgId();
+const readFilters = ref<ReportListFilters>({
+  folder: undefined,
+  isCache: false,
+  nameQuery: undefined,
+});
+const readNameQuery = ref<string | undefined>(undefined);
+
+const hasRequestedReports = ref(false);
+
+const reportsList = useQuery(() =>
+  Object.assign(reportsQuery(orgIdForReports.value, readFilters.value), {
+    enabled: hasRequestedReports.value && !!orgIdForReports.value,
+  }),
+);
+
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = reportsList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
+
 const isLoadingReports = ref(true);
-const forbidden = ref(false);
+const fetching = reportsList.isFetching;
+const lastUpdatedAt = reportsList.dataUpdatedAt;
 const activeTab = ref("shared");
 const filterQuery = ref(""); // client-side filter within current folder
 const searchQuery = ref(""); // API search across all folders
@@ -485,82 +578,93 @@ const columns = computed<OTableColumnDef[]>(() => {
 });
 
 // ── Load reports ──────────────────────────────────────────────────────────────
-const loadReports = async (folderId: string, nameQuery?: string) => {
-  // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
-  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
-    const cached = store.state.organizationData.allReportsListByFolderId[folderId];
-    staticReportsList.value = cached;
-    cachedFolderReports.value = cached;
-    filterReports();
-    // Data is served synchronously from cache — clear the initial loading flag
-    // so the skeleton doesn't stay stuck on a cached (re)mount.
-    isLoadingReports.value = false;
-    return;
-  }
+const shapeReports = (rows: any[]) =>
+  rows.map((report: any) => ({
+    ...report,
+    last_triggered_at_raw: report.last_triggered_at || null,
+    last_triggered_at: report.last_triggered_at
+      ? convertUnixToDateFormat(report.last_triggered_at)
+      : "-",
+  }));
 
-  isLoadingReports.value = true;
-  forbidden.value = false;
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
-    timeout: 0,
-  });
+const renderReports = (rows: any[]) => {
+  const mapped = shapeReports(rows);
+  if (!readNameQuery.value) cachedFolderReports.value = mapped;
+  staticReportsList.value = mapped;
+  filterReports();
+};
+
+// The list is the query now: anything that invalidates the reports scope
+// repaints these rows without this component asking.
+watch(reportsList.data, (rows: any) => {
+  if (rows) renderReports(rows);
+});
+
+watch(reportsList.error, (err: any) => {
+  if (!err) return;
+  isLoadingReports.value = false;
+  if (err?.response?.status !== 403) {
+    toast({
+      variant: "error",
+      message: raw(err?.response?.data?.message) || t("reports.fetchReportsError"),
+    });
+  }
+});
+
+const loadReports = async (folderId: string, nameQuery?: string, force = false) => {
+  // The skeleton is for a cold read only — a refresh keeps its rows and spins
+  // the button instead.
+  const warm = staticReportsList.value.length > 0;
+  isLoadingReports.value = !warm;
+  const dismiss = warm
+    ? () => {}
+    : toast({
+        variant: "loading",
+        message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
+        timeout: 0,
+      });
 
   try {
-    const folder = searchAcrossFolders.value ? undefined : folderId;
-    const isCache = activeTab.value === "cached";
-    const res = await reports.listByFolderId(
-      store.state.selectedOrganization.identifier,
-      folder,
-      undefined,
-      isCache,
-      nameQuery || undefined,
-    );
+    readNameQuery.value = nameQuery;
+    readFilters.value = {
+      folder: searchAcrossFolders.value ? undefined : folderId,
+      isCache: activeTab.value === "cached",
+      nameQuery,
+    };
+    // Let the key pick up the new parameters before asking for the data.
+    await nextTick();
 
-    const mapped = (res.data ?? []).map((report: any) => ({
-      ...report,
-      last_triggered_at_raw: report.last_triggered_at || null,
-      last_triggered_at: report.last_triggered_at
-        ? convertUnixToDateFormat(report.last_triggered_at)
-        : "-",
-    }));
-
-    // Always cache the result — even if stale, so navigating back hits the cache
-    if (!nameQuery) {
-      store.dispatch("setAllReportsListByFolderId", {
-        ...store.state.organizationData.allReportsListByFolderId,
-        [folderId]: mapped,
-      });
+    if (!hasRequestedReports.value) {
+      hasRequestedReports.value = true;
+      await nextTick();
+      await reportsList.suspense();
+    } else if (force) {
+      await reportsList.refetch();
+    } else {
+      await reportsList.suspense();
     }
-
-    // Race condition guard: don't update UI if user moved to another folder,
-    // but data is already cached above for future use (mirrors AlertList.vue:1574)
-    if (folderId !== activeFolderId.value && !nameQuery) {
-      dismiss();
-      return;
-    }
-
-    if (!nameQuery) cachedFolderReports.value = mapped;
-    staticReportsList.value = mapped;
-    filterReports();
-  } catch (err: any) {
-    forbidden.value = err?.response?.status === 403;
-    if (!forbidden.value) {
-      toast({
-        variant: "error",
-        message: err?.data?.message || t("reports.fetchReportsError"),
-      });
-    }
+    await nextTick();
   } finally {
-    isLoadingReports.value = false;
     dismiss();
+    isLoadingReports.value = false;
   }
 };
 
-const invalidateFolderCache = (folderId: string) => {
-  const updated = { ...store.state.organizationData.allReportsListByFolderId };
-  delete updated[folderId];
-  store.dispatch("setAllReportsListByFolderId", updated);
+// Called after every write and by the refresh button. Prefix invalidation, so
+// the cached/scheduled tab and any active name search all refetch too.
+//
+// `siblingsOnly` when a `loadReports` follows. Invalidating the entry the table
+// is *observing* makes it refetch on the spot, and the load right after asks
+// for it a second time — two identical requests behind one click. Skipping the
+// observed entry leaves that one read to `loadReports`, while every inactive
+// sibling still goes stale.
+const invalidateFolderCache = (_folderId?: string, siblingsOnly = false) => {
+  queryClient.invalidateQueries({
+    queryKey: reportKeys.all(store.state.selectedOrganization.identifier),
+    ...(siblingsOnly
+      ? { refetchType: "none" as const, predicate: (q: any) => q.getObserversCount() === 0 }
+      : {}),
+  });
 };
 
 const filterReports = () => {
@@ -569,11 +673,8 @@ const filterReports = () => {
 };
 
 onBeforeMount(async () => {
-  // Ensure report folders are in the store before FolderList renders
-  if (!store.state.organizationData.foldersByType?.["reports"]) {
-    // A folder-list 403 must not abort the load below, or the skeleton never clears.
-    await getFoldersListByType(store, "reports").catch(() => null);
-  }
+  // A folder-list 403 must not abort the load below, or the skeleton never clears.
+  await getFoldersListByType(store, "reports").catch(() => null);
   await loadReports(activeFolderId.value);
 });
 
@@ -631,6 +732,14 @@ watch(searchAcrossFolders, (enabled) => {
     filterReports();
   }
 });
+
+// Named handler: a refresh keeps whatever the user is searching for. Passing
+// `undefined` here reset the name query, so the rows came back unfiltered while
+// the search box still showed the term.
+const refreshReports = () => {
+  invalidateFolderCache(activeFolderId.value, true);
+  return loadReports(activeFolderId.value, searchQuery.value || undefined, true);
+};
 
 const debouncedSearch = debounce(async (query: string) => {
   await loadReports(activeFolderId.value, query);
@@ -872,9 +981,11 @@ const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
   selectedReports.value = [];
   reportIdsToMove.value = [];
   // Invalidate both source and destination folder caches
-  invalidateFolderCache(fromFolder || activeFolderId.value);
-  invalidateFolderCache(toFolder);
-  await loadReports(activeFolderId.value);
+  invalidateFolderCache(fromFolder || activeFolderId.value, true);
+  invalidateFolderCache(toFolder, true);
+  // Forced: this is a post-write reload, and `siblingsOnly` above deliberately
+  // left the folder on screen untouched so it is refetched exactly once here.
+  await loadReports(activeFolderId.value, undefined, true);
 };
 
 // ── Keyboard shortcuts ────────────────────────────────────────────────────
@@ -889,9 +1000,8 @@ useShortcuts([
     id: "reportsRefresh",
     handler: () => {
       if (!isInputFocused()) {
-        // Match the refresh button: drop the cache first so it actually reloads.
-        invalidateFolderCache(activeFolderId.value);
-        loadReports(activeFolderId.value);
+        // The same handler the button uses: forces, and keeps the active search.
+        refreshReports();
       }
     },
   },

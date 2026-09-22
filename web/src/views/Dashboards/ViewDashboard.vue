@@ -87,7 +87,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="selectedDate"
             v-show="store.state.printMode === false"
             ref="dateTimePicker"
-            class="dashboard-icons h-7.5 [transition:all_0.2s_ease]"
+            class="dashboard-icons h-7.5 [transition:all_0.2s_ease] max-md:[&_.date-time-label]:hidden"
             size="sm"
             v-model="selectedDate"
             :initialTimezone="initialTimezone"
@@ -96,6 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-global-date-time-picker"
           />
           <AutoRefreshInterval
+            v-if="!isMobile"
             v-model="refreshInterval"
             trigger
             :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
@@ -103,38 +104,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
             size="sm"
           />
-          <OButton
-            v-if="config.isEnterprise == 'true' && arePanelsLoading"
-            v-show="store.state.printMode !== true"
-            variant="outline-destructive"
-            size="icon-toolbar"
-            @click="cancelQuery"
-            data-test="dashboard-cancel-btn"
-            icon-left="cancel"
-          >
-            <OTooltip :content="t('panel.cancel')" />
-          </OButton>
-          <OButton
-            v-else
-            v-show="store.state.printMode !== true"
-            :variant="isVariablesChanged ? 'warning' : 'outline'"
-            size="icon-toolbar"
-            @click="refreshData"
-            :disabled="arePanelsLoading"
-            :loading="arePanelsLoading"
-            data-test="dashboard-refresh-btn"
-            icon-left="refresh"
-          >
-            <OTooltip
-              :content="
-                isVariablesChanged
-                  ? t('dashboard.viewDashboard.refreshToApplyVariables')
-                  : t('dashboard.viewDashboard.refresh')
-              "
-              shortcut-id="dashboardRefresh"
-            />
-          </OButton>
+          <OButtonGroup v-show="store.state.printMode !== true">
+            <OButton
+              v-if="config.isEnterprise == 'true' && arePanelsLoading"
+              variant="outline-destructive"
+              size="icon-toolbar"
+              @click="cancelQuery"
+              data-test="dashboard-cancel-btn"
+              icon-left="cancel"
+            >
+              <OTooltip :content="t('panel.cancel')" />
+            </OButton>
+            <OButton
+              v-else
+              :variant="isVariablesChanged ? 'warning' : 'outline'"
+              size="icon-toolbar"
+              @click="refreshData()"
+              :disabled="arePanelsLoading"
+              :loading="arePanelsLoading"
+              data-test="dashboard-refresh-btn"
+              icon-left="refresh"
+            >
+              <OTooltip
+                :content="
+                  isVariablesChanged
+                    ? t('dashboard.viewDashboard.refreshToApplyVariables')
+                    : t('dashboard.viewDashboard.refresh')
+                "
+                shortcut-id="dashboardRefresh"
+              />
+            </OButton>
+            <ODropdown align="end" side="bottom">
+              <template #trigger>
+                <OButton
+                  :variant="refreshOptionsVariant"
+                  size="icon-toolbar"
+                  class="w-5"
+                  :disabled="arePanelsLoading"
+                  :aria-label="t('dashboard.viewDashboard.moreRefreshOptions')"
+                  data-test="dashboard-refresh-options-btn"
+                  icon-left="arrow-drop-down"
+                />
+              </template>
+              <ODropdownItem
+                data-test="dashboard-refresh-without-cache-btn"
+                icon-left="cached"
+                @select="refreshData(true)"
+              >
+                {{ t("dashboard.viewDashboard.refreshCacheReload") }}
+              </ODropdownItem>
+            </ODropdown>
+          </OButtonGroup>
+        </template>
 
+        <template #actions-overflow>
+          <AutoRefreshInterval
+            v-if="isMobile"
+            v-model="refreshInterval"
+            trigger
+            :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+            @trigger="refreshData"
+            class="dashboard-icons hideOnPrintMode h-7.5 [transition:all_0.2s_ease]"
+            size="sm"
+          />
           <ExportDashboard
             v-if="!isFullscreen"
             v-show="store.state.printMode !== true"
@@ -264,6 +296,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @searchRequestTraceIds="searchRequestTraceIds"
           :runId="runId"
           @update:runId="updateRunId"
+          @send-to-ai-chat="(value, append) => $emit('sendToAiChat', value, append)"
         />
         <DashboardSettings
           v-model:open="showDashboardSettingsDialog"
@@ -338,6 +371,9 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import PanelLayoutSettings from "./PanelLayoutSettings.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
@@ -351,6 +387,9 @@ import { useAiDashboardEvents } from "@/composables/useAiDashboardEvents";
 import type { AiDashboardEvent } from "@/composables/useAiDashboardEvents";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import { isInputFocused } from "@/utils/keyboardShortcuts";
+import useBreakpoint from "@/composables/useBreakpoint";
+import { queryClient } from "@/composables/query/queryClient";
+import { annotationKeys } from "@/services/dashboard_annotations.querykeys";
 
 const DashboardJsonEditor = defineAsyncComponent(() => {
   return import("./DashboardJsonEditor.vue");
@@ -366,7 +405,7 @@ const ScheduledDashboards = defineAsyncComponent(() => {
 
 export default defineComponent({
   name: "ViewDashboard",
-  emits: ["onDeletePanel"],
+  emits: ["onDeletePanel", "sendToAiChat"],
   components: {
     OPageLayout,
     DateTimePickerDashboard,
@@ -379,11 +418,15 @@ export default defineComponent({
     PanelLayoutSettings,
     DashboardJsonEditor,
     OButton,
+    OButtonGroup,
+    ODropdown,
+    ODropdownItem,
     OIcon,
     OTooltip,
   },
   setup() {
     const { t } = useI18nTyped();
+    const { isMobile } = useBreakpoint();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
@@ -637,9 +680,8 @@ export default defineComponent({
 
     onMounted(async () => {
       await loadDashboard();
-      if (!store.state.organizationData.folders.length) {
-        await getFoldersList(store);
-      }
+      // Caught: a folder-list failure must not abort the panel setup below.
+      await getFoldersList(store).catch(() => null);
 
       // Set up dashboard context provider
       const dashboardProvider = createDashboardsContextProvider(
@@ -924,6 +966,11 @@ export default defineComponent({
       );
     };
 
+    const spanOf = (time: any) =>
+      time?.start_time && time?.end_time
+        ? time.end_time.getTime() - time.start_time.getTime()
+        : null;
+
     // Compute times for all panels in all tabs
     // @param forceRefresh - If true, always create new time objects to force all panels to refresh
     const computeAllPanelTimes = (forceRefresh = false) => {
@@ -936,10 +983,13 @@ export default defineComponent({
         end_time: new Date(dateTimePicker.value.getConsumableDateTime().endTime),
       };
 
-      // CRITICAL FIX: Preserve existing __global reference if time hasn't changed
-      // This prevents unnecessary refreshes of panels that depend on global time
+      // A non-forced recompute must not advance a relative range: its resolved now drifts a few hundred ms between calls during load, refiring every global panel's time watcher (cache paint → spurious refetch).
       const existingGlobalTime = currentTimeObjPerPanel.value.__global;
-      const shouldUpdateGlobal = forceRefresh || !areTimesEqual(existingGlobalTime, globalTime);
+      const isRelativeGlobal = selectedDate.value?.valueType === "relative";
+      const globalTimeChanged = isRelativeGlobal
+        ? spanOf(existingGlobalTime) !== spanOf(globalTime)
+        : !areTimesEqual(existingGlobalTime, globalTime);
+      const shouldUpdateGlobal = forceRefresh || !existingGlobalTime || globalTimeChanged;
 
       // Build the new panel times object
       const newPanelTimes: Record<string, any> = {
@@ -1192,7 +1242,9 @@ export default defineComponent({
 
     // Fallback-only: a dashboard opened from the Favorites pseudo-folder carries the folder it lives in, so rebuilding from route.query.folder here (rather than Favorites) is only reached when there's no real history to go back to.
     const goBackToDashboardList = useListBackNavigation({
-      isListPath: (path) => path === "/dashboards" || path.endsWith("/dashboards"),
+      // The Infrastructure pages push into a dashboard the same way the listing does, so back belongs there rather than on a listing the user never saw.
+      isListPath: (path) =>
+        path === "/dashboards" || path.endsWith("/dashboards") || path.startsWith("/infra/"),
       fallback: () => ({
         path: "/dashboards",
         query: {
@@ -1216,11 +1268,30 @@ export default defineComponent({
       });
     };
 
-    const refreshData = async () => {
+    const refreshOptionsVariant = computed(() => {
+      if (config.isEnterprise == "true" && arePanelsLoading.value) return "outline-destructive";
+      return isVariablesChanged.value ? "warning" : "outline";
+    });
+
+    const refreshData = async (withoutCache = false) => {
       if (!arePanelsLoading.value) {
         // CRITICAL FIX: Clear panelIdToBeRefreshed for global refresh
         // This allows all panels to refresh, not just the one previously refreshed
         panelIdToBeRefreshed.value = null;
+
+        // A global refresh overrides every per-panel choice; panels read the flag when their query fires.
+        shouldRefreshWithoutCachePerPanel.value = { __global: withoutCache === true };
+
+        // Annotations added elsewhere never expire this tab's cache, and a fixed range keeps the same key.
+        if (dashboardId.value) {
+          void queryClient.invalidateQueries({
+            queryKey: annotationKeys.dashboard(
+              store.state.selectedOrganization.identifier,
+              String(dashboardId.value),
+            ),
+            refetchType: "none",
+          });
+        }
 
         // Generate new run ID for whole dashboard refresh
         generateNewDashboardRunId();
@@ -1444,6 +1515,23 @@ export default defineComponent({
         // Get global time params - ensure we always have time params
         const timeParams = getQueryParamsForDuration(selectedDate.value);
 
+        // Preserve the cell-explorer deep-link params so a shared "Copy link" reopens the drawer.
+        const cellParams: Record<string, any> = {};
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          if (route.query[k] !== undefined) cellParams[k] = route.query[k];
+        }
+
         const newQuery = {
           org_identifier: store.state.selectedOrganization.identifier,
           dashboard: route.query.dashboard,
@@ -1455,6 +1543,7 @@ export default defineComponent({
           ...panelTimeParams, // Panel time params (generated + preserved)
           print: store.state.printMode,
           searchtype: route.query.searchtype,
+          ...cellParams, // Keep cell-explorer deep link intact
         };
 
         // CRITICAL: Only update URL if query has actually changed
@@ -1769,6 +1858,7 @@ export default defineComponent({
     ]);
 
     return {
+      isMobile,
       currentDashboardData,
       dashboardRemountKey,
       toggleFullscreen,
@@ -1791,6 +1881,7 @@ export default defineComponent({
       refreshInterval,
       // ----------------
       refreshData,
+      refreshOptionsVariant,
       isVariablesChanged,
       refreshedVariablesDataUpdated,
       onDeletePanel,

@@ -71,16 +71,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
 
         <template #toolbar-trailing>
-          <OButton
+          <ORefreshButton
+            layout="inline"
             variant="outline"
-            size="icon-sm"
-            icon-left="refresh"
+            :last-run-at="lastUpdatedAt"
             :loading="loading"
             data-test="ai-remote-tasks-refresh-btn"
-            @click="refresh"
-          >
-            <OTooltip side="bottom" :content="t('common.refresh')" />
-          </OButton>
+            @click="refresh(true)"
+          />
         </template>
 
         <template #empty>
@@ -157,6 +155,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               size="icon-sm"
               icon-left="edit"
               :disabled="!canEdit(row)"
+              class="max-md:hidden"
               :data-test="`ai-remote-tasks-edit-${row.entityId}`"
               @click.stop="openEdit(row)"
             >
@@ -173,11 +172,42 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="ghost-destructive"
               size="icon-sm"
               icon-left="delete"
+              class="max-md:hidden"
               :data-test="`ai-remote-tasks-delete-${row.entityId}`"
               @click.stop="removeTask(row)"
             >
               <OTooltip side="bottom" :content="t('common.delete')" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="ai-remote-tasks-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="!canEdit(row)"
+                :data-test="`ai-remote-tasks-edit-${row.entityId}-menu`"
+                @select="openEdit(row)"
+              >
+                <span>{{ t("aiObservability.remoteTasks.edit") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :data-test="`ai-remote-tasks-delete-${row.entityId}-menu`"
+                @select="removeTask(row)"
+              >
+                <span>{{ t("common.delete") }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </div>
         </template>
       </OTable>
@@ -192,18 +222,23 @@ import { useRouter } from "vue-router";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import { useNumberedRows } from "@/enterprise/components/onlineEvals/composables/useNumberedRows";
 import remoteTasksService, { type RemoteTask } from "@/services/remote-tasks.service";
-import llmExperimentsService from "@/services/llm-experiments.service";
+import { remoteTasksListQuery, experimentsListQuery } from "@/services/llm-experiments.queries";
+import { remoteTaskKeys } from "@/services/llm-experiments.querykeys";
+import { queryClient } from "@/composables/query/queryClient";
 import {
   canEditRemoteTask,
   remoteTaskState,
@@ -231,6 +266,7 @@ const DEFAULT_COLUMN_VISIBILITY = { httpMethod: false };
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 
 const tasks = ref<RemoteTask[]>([]);
+const lastUpdatedAt = ref<number | null>(null);
 const loading = ref(false);
 const forbidden = ref(false);
 const search = ref("");
@@ -387,9 +423,17 @@ function onEmptyAction(id?: string) {
 
 /** Best-effort: a task list that renders without its reference counts is far
  *  better than one that fails because a second, unrelated request did. */
-async function loadReferenceCounts() {
+async function loadReferenceCounts(force = false) {
   try {
-    const experiments = await llmExperimentsService.list(orgId.value);
+    const options = experimentsListQuery(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({
+        queryKey: options.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    }
+    const experiments = await queryClient.fetchQuery(options);
     const counts: Record<string, number> = {};
     for (const experiment of experiments) {
       if (experiment.task?.type !== "remote") continue;
@@ -403,12 +447,18 @@ async function loadReferenceCounts() {
   }
 }
 
-async function refresh() {
+// `force` reaches the server: the mount may serve the cached list, but Refresh and the post-delete reload must not.
+async function refresh(force = false) {
   if (!orgId.value) return;
   loading.value = true;
   forbidden.value = false;
   try {
-    tasks.value = await remoteTasksService.list(orgId.value);
+    if (force) {
+      await queryClient.invalidateQueries({ queryKey: remoteTaskKeys.all(orgId.value) });
+    }
+    const opts = remoteTasksListQuery(orgId.value);
+    tasks.value = await queryClient.fetchQuery(opts);
+    lastUpdatedAt.value = queryClient.getQueryState(opts.queryKey)?.dataUpdatedAt ?? Date.now();
   } catch (error: any) {
     forbidden.value = error?.response?.status === 403;
     // The grouped access toast already reports a 403; a second red toast adds nothing.
@@ -421,7 +471,7 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
-  await loadReferenceCounts();
+  await loadReferenceCounts(force);
 }
 
 async function removeTask(row: RemoteTask) {
@@ -435,7 +485,7 @@ async function removeTask(row: RemoteTask) {
   try {
     await remoteTasksService.delete(orgId.value, row.entityId);
     toast({ variant: "success", message: t("aiObservability.remoteTasks.delete.success") });
-    await refresh();
+    await refresh(true);
   } catch (error: any) {
     toast({
       variant: "error",

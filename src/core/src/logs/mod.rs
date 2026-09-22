@@ -44,17 +44,19 @@ use infra::{
     schema::{SchemaCache, get_partition_time_level},
 };
 use ingestion_common::IngestionStatus;
-use schema::{
-    check_for_schema, get_future_discard_error, get_upto_discard_error, stream_schema_exists,
-};
+use schema::{get_future_discard_error, get_upto_discard_error, stream_schema_exists};
 
 use crate::{
     alerts::alert::AlertExt,
     common::meta::stream::SchemaRecords,
-    ingestion::{TriggerAlertData, evaluate_trigger, get_write_partition_key, write_file},
+    ingestion::{
+        PartitionMemo, TriggerAlertData, evaluate_trigger, resolve_batch_schema,
+        schema_records_to_entries, write_entries,
+    },
 };
 
 pub mod bulk;
+pub mod columnar;
 pub mod hec;
 pub mod ingest;
 pub mod loki;
@@ -62,7 +64,7 @@ pub mod otlp;
 
 static BULK_OPERATORS: [&str; 3] = ["create", "index", "update"];
 
-pub type O2IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
+pub type IngestJsonData = (Vec<(i64, Map<String, Value>)>, Option<usize>);
 
 fn parse_bulk_index(v: &Value) -> Option<(&str, &str, Option<&str>)> {
     let local_val = v.as_object()?;
@@ -188,6 +190,11 @@ fn set_parsing_error(parse_error: &mut String, field: &Field) {
     ));
 }
 
+/// Write each stream's prepared records, returning whether any stream was
+/// skipped because it started deleting after admission.
+///
+/// A skip loses those records silently, so the flag is the only way a caller
+/// that must not acknowledge lost data can tell it from a clean write.
 #[allow(clippy::too_many_arguments)]
 async fn write_logs_by_stream(
     thread_id: usize,
@@ -196,15 +203,18 @@ async fn write_logs_by_stream(
     time_stats: (i64, &Instant), // started_at
     usage_type: UsageType,
     status: &mut IngestionStatus,
-    json_data_by_stream: HashMap<String, O2IngestJsonData>,
+    json_data_by_stream: HashMap<String, IngestJsonData>,
     byte_size_by_stream: HashMap<String, usize>,
     derived_streams: HashSet<String>,
-) -> Result<()> {
+    mut columnar: Option<columnar::JsonColumnar>,
+) -> Result<bool> {
+    let mut stream_skipped = false;
     for (stream_name, (json_data, fn_num)) in json_data_by_stream {
         // check if we are allowed to ingest
         if db::compact::retention::is_deleting_stream(org_id, StreamType::Logs, &stream_name, None)
         {
             log::warn!("stream [{stream_name}] is being deleted");
+            stream_skipped = true;
             continue; // skip
         }
 
@@ -244,6 +254,7 @@ async fn write_logs_by_stream(
             &stream_name,
             status,
             json_data,
+            columnar.take_if(|c| c.stream_name() == stream_name),
             derived_streams.contains(&stream_name),
         )
         .await?;
@@ -295,7 +306,7 @@ async fn write_logs_by_stream(
             .await;
         }
     }
-    Ok(())
+    Ok(stream_skipped)
 }
 
 async fn write_logs(
@@ -304,6 +315,7 @@ async fn write_logs(
     stream_name: &str,
     status: &mut IngestionStatus,
     json_data: Vec<(i64, Map<String, Value>)>,
+    columnar: Option<columnar::JsonColumnar>,
     is_derived: bool,
 ) -> Result<RequestStats> {
     let cfg = get_config();
@@ -327,6 +339,7 @@ async fn write_logs(
         }
     };
     let stream_settings = infra::schema::unwrap_stream_settings(&schema).unwrap_or_default();
+    let has_uds = !stream_settings.defined_schema_fields.is_empty();
 
     let mut partition_keys: Vec<StreamPartition> = vec![];
     let partition_time_level = get_partition_time_level(StreamType::Logs);
@@ -334,32 +347,10 @@ async fn write_logs(
         partition_keys = stream_settings.partition_keys;
     }
 
-    // DBM read-path pruning: a stream receiving server-vantage DBM records gets
-    // `o2_dbm_kind` seeded as a SECONDARY INDEX (`index_fields`, a raw-tokenized
-    // tantivy column — explicitly not full-text search), so a DBM read filtering
-    // on one kind prunes rows via the index instead of scanning the stream. The
-    // reasoning, the selectivity risk, the migration case and the
-    // `time_index.rs` precedent this follows are all documented on
-    // `ensure_server_stream_index_field`.
-    //
-    // Placed here rather than in the rollup job because the settings must exist
-    // on the node about to write parquet (the index is built per-file at the
-    // WAL→parquet move), and because only the ingest path knows which stream the
-    // recipes actually export to (every DBM read endpoint takes a `stream`
-    // override; the seed is data-driven, not name-driven).
-    //
-    // Gated on the batch actually carrying a canonicalized DBM record, so the
-    // overwhelming majority of log ingests — which carry none — pay one
-    // short-circuiting scan and nothing else. `apply_to_record` has already run
-    // by this point (it is called per record on the way in), so the kind stamp
-    // is present to be seen.
-    //
-    // No settings re-read follows, unlike the partition-key implementation this
-    // replaces: partition keys had to be read back because THIS function
-    // computes the write path from them, whereas the secondary index is
-    // consumed later, by the parquet writer reading stream settings for itself.
     if config::get_config().db_monitoring.enabled
-        && crate::db_monitoring::server_vantage::batch_has_dbm_records(&json_data)
+        && crate::db_monitoring::server_vantage::batch_has_dbm_records(
+            json_data.iter().map(|(_, record)| record),
+        )
     {
         crate::db_monitoring::server_vantage::ensure_server_stream_index_field(org_id, stream_name)
             .await;
@@ -384,15 +375,14 @@ async fn write_logs(
     // End get stream alert
 
     // start check for schema
-    let min_timestamp = json_data.iter().map(|(ts, _)| ts).min().unwrap();
-    let (schema_evolution, infer_schema) = check_for_schema(
+    let (schema_evolution, infer_schema) = resolve_batch_schema(
         org_id,
         stream_name,
         StreamType::Logs,
         &mut stream_schema_map,
-        json_data.iter().map(|(_, v)| v).collect(),
-        *min_timestamp,
-        is_derived, // is_derived is true if the stream is derived
+        &json_data,
+        is_derived,
+        has_uds,
     )
     .await?;
 
@@ -414,6 +404,7 @@ async fn write_logs(
     };
 
     let mut write_buf: HashMap<String, SchemaRecords> = HashMap::new();
+    let mut partition_memo = PartitionMemo::new(&partition_keys, partition_time_level);
 
     for (timestamp, mut record_val) in json_data {
         let doc_id = record_val
@@ -520,25 +511,18 @@ async fn write_logs(
         }
         // end check for alert triggers
 
-        // get hour key
-        let hour_key = get_write_partition_key(
-            timestamp,
-            &partition_keys,
-            partition_time_level,
-            &record_val,
-            Some(&schema_key),
-        );
-
-        let hour_buf = write_buf.entry(hour_key).or_insert_with(|| SchemaRecords {
-            schema_key: schema_key.clone(),
-            schema: rec_schema.clone(),
-            records: vec![],
-            records_size: 0,
-        });
+        let hour_buf =
+            partition_memo.buffer(timestamp, &record_val, &schema_key, &mut write_buf, || {
+                SchemaRecords {
+                    schema_key: schema_key.clone(),
+                    schema: rec_schema.clone(),
+                    records: vec![],
+                    records_size: 0,
+                }
+            });
         let record_val = Value::Object(record_val);
-        let record_size = estimate_json_bytes(&record_val);
+        hour_buf.records_size += estimate_json_bytes(&record_val);
         hour_buf.records.push(Arc::new(record_val));
-        hour_buf.records_size += record_size;
 
         // update status(success)
         match status {
@@ -559,14 +543,16 @@ async fn write_logs(
         }
     }
 
-    // write data to wal
+    let mut entries = schema_records_to_entries(org_id, stream_name, write_buf);
+    if let Some(columnar) = columnar {
+        entries.extend(columnar_entries(org_id, status, columnar)?);
+    }
     let writer =
         ingester::get_writer(thread_id, org_id, StreamType::Logs.as_str(), stream_name).await;
-    let req_stats = write_file(
+    let req_stats = write_entries(
         &writer,
-        org_id,
         stream_name,
-        write_buf,
+        entries,
         !cfg.common.wal_fsync_disabled,
     )
     .await?;
@@ -577,6 +563,17 @@ async fn write_logs(
     }
 
     Ok(req_stats)
+}
+
+fn columnar_entries(
+    org_id: &str,
+    status: &mut IngestionStatus,
+    columnar: columnar::JsonColumnar,
+) -> Result<Vec<ingester::Entry>> {
+    if let IngestionStatus::Record(status) = status {
+        status.successful += columnar.rows() as u32;
+    }
+    columnar.into_entries(org_id)
 }
 
 async fn ingestion_log_enabled() -> bool {
@@ -605,12 +602,30 @@ fn handle_timestamp_for_map(
     min_ts: i64,
     max_ts: i64,
 ) -> Result<i64, anyhow::Error> {
-    let (mut timestamp, has_valid_timestamp) = match val.get(TIMESTAMP_COL_NAME) {
-        Some(v) if !v.is_null() => match parse_timestamp_micro_from_value(v) {
-            Ok(t) => t,
-            Err(_) => return Err(anyhow::Error::msg("Can't parse timestamp")),
-        },
-        _ => (0, false),
+    let parsed = val
+        .get(TIMESTAMP_COL_NAME)
+        .filter(|v| !v.is_null())
+        .map(parse_timestamp_micro_from_value);
+    let (timestamp, rewrite) = resolve_timestamp(parsed, min_ts, max_ts)?;
+    if rewrite {
+        val.insert(
+            TIMESTAMP_COL_NAME.to_string(),
+            Value::Number(timestamp.into()),
+        );
+    }
+    Ok(timestamp)
+}
+
+/// A record's timestamp from its parsed non-null `_timestamp`, and whether it must be rewritten.
+fn resolve_timestamp(
+    parsed: Option<Result<(i64, bool), anyhow::Error>>,
+    min_ts: i64,
+    max_ts: i64,
+) -> Result<(i64, bool), anyhow::Error> {
+    let (timestamp, has_valid_timestamp) = match parsed {
+        Some(Ok(t)) => t,
+        Some(Err(_)) => return Err(anyhow::Error::msg("Can't parse timestamp")),
+        None => (0, false),
     };
     // check ingestion time
     if timestamp > 0 && timestamp < min_ts {
@@ -619,18 +634,15 @@ fn handle_timestamp_for_map(
     if timestamp > max_ts {
         return Err(get_future_discard_error());
     }
-    if !has_valid_timestamp {
-        timestamp = if timestamp > 0 {
-            timestamp
-        } else {
-            Utc::now().timestamp_micros()
-        };
-        val.insert(
-            TIMESTAMP_COL_NAME.to_string(),
-            Value::Number(timestamp.into()),
-        );
+    if has_valid_timestamp {
+        return Ok((timestamp, false));
     }
-    Ok(timestamp)
+    let timestamp = if timestamp > 0 {
+        timestamp
+    } else {
+        Utc::now().timestamp_micros()
+    };
+    Ok((timestamp, true))
 }
 
 fn log_failed_record<T: std::fmt::Debug>(enabled: bool, record: &T, error: &str) {

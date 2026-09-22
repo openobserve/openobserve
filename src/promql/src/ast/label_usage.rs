@@ -34,7 +34,7 @@ const LABEL_DROPPING_AGGS: [u8; 8] = [
 /// Functions that neither read nor create label values — they only transform
 /// per-series samples. Anything label-sensitive (`label_replace`,
 /// `histogram_quantile`, `absent`, ...) must NOT be listed here.
-const LABEL_AGNOSTIC_FUNCS: [&str; 32] = [
+const LABEL_AGNOSTIC_FUNCS: [&str; 33] = [
     "rate",
     "irate",
     "increase",
@@ -49,6 +49,7 @@ const LABEL_AGNOSTIC_FUNCS: [&str; 32] = [
     "sum_over_time",
     "count_over_time",
     "last_over_time",
+    "present_over_time",
     "stddev_over_time",
     "stdvar_over_time",
     "quantile_over_time",
@@ -92,10 +93,12 @@ pub fn labels_dropped_at_root(expr: &PromExpr) -> bool {
 
 fn subtree_labels_unused(expr: &PromExpr) -> bool {
     match expr {
-        PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) => true,
-        PromExpr::NumberLiteral(_) => true,
-        PromExpr::Paren(ParenExpr { expr }) => subtree_labels_unused(expr),
-        PromExpr::Unary(UnaryExpr { expr }) => subtree_labels_unused(expr),
+        PromExpr::VectorSelector(_) | PromExpr::MatrixSelector(_) | PromExpr::NumberLiteral(_) => {
+            true
+        }
+        PromExpr::Paren(ParenExpr { expr }) | PromExpr::Unary(UnaryExpr { expr }) => {
+            subtree_labels_unused(expr)
+        }
         PromExpr::Subquery(subquery) => subtree_labels_unused(&subquery.expr),
         PromExpr::Call(Call { func, args }) => {
             LABEL_AGNOSTIC_FUNCS.contains(&func.name)

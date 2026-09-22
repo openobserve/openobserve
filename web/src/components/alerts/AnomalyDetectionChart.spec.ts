@@ -13,11 +13,25 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, afterEach } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { chartColor } from "@/utils/chartTheme";
+
+// The _anomalies schema decides which kind columns the queries may reference;
+// the fixture stands in for it, per test.
+const { anomaliesSchema } = vi.hoisted(() => ({
+  anomaliesSchema: { fields: [] as Array<{ name: string }>, fail: false },
+}));
+vi.mock("@/services/stream", () => ({
+  default: {
+    schema: vi.fn(async () => {
+      if (anomaliesSchema.fail) throw new Error("schema unavailable");
+      return { data: { schema: anomaliesSchema.fields } };
+    }),
+  },
+}));
 
 import AnomalyDetectionChart from "@/components/alerts/AnomalyDetectionChart.vue";
 
@@ -47,6 +61,11 @@ const schemaAt = (wrapper: any, index: number) =>
   wrapper.findAllComponents({ name: "PanelSchemaRenderer" })[index]?.props("panelSchema");
 
 let wrapper: any = null;
+
+beforeEach(() => {
+  anomaliesSchema.fields = [];
+  anomaliesSchema.fail = false;
+});
 
 afterEach(() => {
   wrapper?.unmount();
@@ -116,6 +135,77 @@ describe("AnomalyDetectionChart", () => {
     const schema = schemaAt(wrapper, 2);
     expect(schema.type).toBe("bar");
     expect(schema.config.unit).toBe("percent");
+  });
+
+  it("keeps the legacy single deviation series when the stream has no kind columns", async () => {
+    wrapper = await mountChart();
+    const schema = schemaAt(wrapper, 2);
+    expect(schema.queries[0].query).toContain("max(deviation_percent) AS deviation_value");
+    expect(schema.queries[0].fields.y).toHaveLength(1);
+  });
+
+  it("splits score deviation from drops and excludes the absence sentinel when the columns exist", async () => {
+    anomaliesSchema.fields = [
+      { name: "is_absence" },
+      { name: "is_partial_drop" },
+      { name: "expected_value" },
+    ];
+    wrapper = await mountChart();
+    const schema = schemaAt(wrapper, 2);
+    // Score-% and value-% never share a max().
+    expect(schema.queries[0].query).toContain(
+      "max(CASE WHEN is_absence IS NOT TRUE AND is_partial_drop IS NOT TRUE " +
+        "THEN deviation_percent END) AS deviation_value",
+    );
+    expect(schema.queries[0].query).toContain(
+      "max(CASE WHEN is_partial_drop IS TRUE THEN deviation_percent END) AS drop_value",
+    );
+    expect(schema.queries[0].fields.y).toHaveLength(2);
+  });
+
+  it("adds the expected-value line to the metric chart when the records carry one", async () => {
+    anomaliesSchema.fields = [{ name: "expected_value" }];
+    wrapper = await mountChart();
+    const schema = schemaAt(wrapper, 0);
+    expect(schema.queries[0].query).toContain("max(expected_value) AS expected_value");
+    expect(schema.queries[0].fields.y).toHaveLength(3);
+  });
+
+  it("falls back to the legacy queries when the schema fetch fails, instead of no chart", async () => {
+    anomaliesSchema.fail = true;
+    wrapper = await mountChart();
+    const schema = schemaAt(wrapper, 2);
+    expect(schema.queries[0].query).toContain("max(deviation_percent) AS deviation_value");
+    expect(schemaAt(wrapper, 0).queries[0].query).not.toContain("expected_value");
+  });
+
+  it("holds the first query behind the schema probe, showing loading meanwhile", async () => {
+    wrapper = mount(AnomalyDetectionChart, {
+      props: { alert: ANOMALY, anomalyId: "cfg1" },
+      global: { plugins: [i18n, store], stubs },
+    });
+    expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(0);
+    expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-loading"]').exists()).toBe(
+      true,
+    );
+    await flushPromises();
+    expect(wrapper.findAllComponents({ name: "PanelSchemaRenderer" })).toHaveLength(3);
+    expect(wrapper.find('[data-test="alerts-anomalydetectionchart-metric-loading"]').exists()).toBe(
+      false,
+    );
+  });
+
+  it("re-probes the schema when the anomaly id changes", async () => {
+    wrapper = await mountChart();
+    expect(schemaAt(wrapper, 0).queries[0].query).not.toContain("expected_value");
+
+    anomaliesSchema.fields = [{ name: "expected_value" }];
+    await wrapper.setProps({ anomalyId: "cfg2" });
+    await flushPromises();
+
+    const query = schemaAt(wrapper, 0).queries[0].query;
+    expect(query).toContain("max(expected_value) AS expected_value");
+    expect(query).toContain("WHERE anomaly_id = 'cfg2'");
   });
 
   it("buckets at the config's detection resolution", async () => {

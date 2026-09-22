@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 mod aggregate;
+mod at_modifier;
 mod call;
 mod columns;
 mod selector;
@@ -29,7 +30,14 @@ use promql_parser::parser::{
     UnaryExpr, value::ValueType,
 };
 
-use crate::{ast::label_usage::labels_dropped_at_root, binary, exec::PromqlContext};
+use crate::{
+    ast::{
+        at_modifier::{Pin, pin, uses_at},
+        label_usage::labels_dropped_at_root,
+    },
+    binary,
+    exec::PromqlContext,
+};
 
 pub struct Engine {
     trace_id: String,
@@ -50,6 +58,8 @@ pub struct Engine {
     skip_labels: bool,
     /// The result type of the query
     result_type: Option<String>,
+    /// Whether the expression may still carry an `@`; `exec_expr` skips the pin check without one.
+    has_at_modifier: bool,
 }
 
 impl Engine {
@@ -61,6 +71,7 @@ impl Engine {
             disable_label_selector: false,
             skip_labels: false,
             result_type: None,
+            has_at_modifier: true,
             trace_id: trace_id.to_string(),
         }
     }
@@ -73,12 +84,23 @@ impl Engine {
         self.skip_labels = !self.ctx.query_ctx.query_exemplars
             && !self.ctx.query_ctx.query_data
             && labels_dropped_at_root(prom_expr);
-        let value = self.exec_expr(prom_expr).await?;
+        self.has_at_modifier = uses_at(prom_expr);
+        let value = match self.exec_root_range_selector(prom_expr).await? {
+            Some(value) => value,
+            None => self.exec_expr(prom_expr).await?,
+        };
         Ok((value, self.result_type.clone()))
     }
 
     #[async_recursion]
     pub async fn exec_expr(&mut self, prom_expr: &PromExpr) -> Result<Value> {
+        // a range vector has no value to repeat, the call around it is what gets pinned
+        if self.has_at_modifier
+            && let Pin::At(at) = pin(prom_expr)?
+            && prom_expr.value_type() != ValueType::Matrix
+        {
+            return self.exec_pinned(prom_expr, at).await;
+        }
         Ok(match &prom_expr {
             PromExpr::Aggregate(AggregateExpr {
                 op,
@@ -90,24 +112,14 @@ impl Engine {
             PromExpr::Unary(UnaryExpr { expr }) => {
                 let val = self.exec_expr(expr).await?;
                 match val {
-                    Value::Matrix(m) => {
-                        let out = m
-                            .into_iter()
-                            .map(|mut range| RangeValue {
-                                labels: std::mem::take(&mut range.labels).without_metric_name(),
-                                samples: range
-                                    .samples
-                                    .into_iter()
-                                    .map(|s| Sample {
-                                        timestamp: s.timestamp,
-                                        value: -s.value,
-                                    })
-                                    .collect(),
-                                exemplars: range.exemplars,
-                                time_window: range.time_window,
-                            })
-                            .collect();
-                        Value::Matrix(out)
+                    Value::Matrix(mut matrix) => {
+                        for range in &mut matrix {
+                            range.labels = std::mem::take(&mut range.labels).without_metric_name();
+                            for sample in &mut range.samples {
+                                sample.value = -sample.value;
+                            }
+                        }
+                        Value::Matrix(matrix)
                     }
                     Value::Float(f) => Value::Float(-f),
                     _ => {
@@ -126,11 +138,24 @@ impl Engine {
 
                 let lhs = scalar_operand(lhs, &expr.lhs, &self.eval_ctx);
                 let rhs = scalar_operand(rhs, &expr.rhs, &self.eval_ctx);
+                let lhs_scalar = expr.lhs.value_type() == ValueType::Scalar;
+                let rhs_scalar = expr.rhs.value_type() == ValueType::Scalar;
                 match (lhs, rhs) {
                     (Value::Float(left), Value::Float(right)) => {
                         let value =
                             binary::scalar_binary_operations(token, left, right, return_bool, op)?;
                         Value::Float(value)
+                    }
+                    // a range-query scalar is one label-less series that label matching would drop
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if rhs_scalar && !lhs_scalar && right.len() == 1 =>
+                    {
+                        binary::vector_step_scalar_bin_op(expr, left, &right[0].samples, false)?
+                    }
+                    (Value::Matrix(left), Value::Matrix(right))
+                        if lhs_scalar && !rhs_scalar && left.len() == 1 =>
+                    {
+                        binary::vector_step_scalar_bin_op(expr, right, &left[0].samples, true)?
                     }
                     (Value::Matrix(left), Value::Matrix(right)) => {
                         binary::vector_bin_op(expr, left, right)?
@@ -163,15 +188,13 @@ impl Engine {
                 let val = self.exec_expr(&expr.expr).await?;
                 let range = expr.range;
                 let matrix = match val {
-                    Value::Matrix(vs) => {
+                    Value::Matrix(mut vs) => {
                         // For matrix type, update the time_window range
-                        vs.into_iter()
-                            .map(|mut rv| {
-                                // Update time_window with new range
-                                rv.time_window = Some(TimeWindow::new(range));
-                                rv
-                            })
-                            .collect()
+                        for rv in &mut vs {
+                            // Update time_window with new range
+                            rv.time_window = Some(TimeWindow::new(range));
+                        }
+                        vs
                     }
                     v => {
                         return Err(DataFusionError::NotImplemented(format!(
@@ -304,6 +327,7 @@ pub(crate) mod tests {
             regions: vec![],
             clusters: vec![],
             is_super_cluster: false,
+            search_event_context: None,
         })
     }
 
@@ -388,54 +412,6 @@ pub(crate) mod tests {
         assert_eq!(engine.trace_id, trace_id.to_string());
         assert!(engine.label_selector.is_empty());
         assert!(engine.result_type.is_none());
-    }
-
-    /// The `@` modifier PARSES (the fork supports the syntax) but nothing in the
-    /// engine ever reads `vs.at` — every selector is evaluated at the step's own
-    /// timestamp. So before this guard, `foo @ 1600000000` did not pin anything:
-    /// it silently returned UNPINNED results, and the user got a plausible wrong
-    /// number with no error. An unsupported feature must fail loudly; returning
-    /// the wrong data quietly is the worst outcome in a metrics engine.
-    ///
-    /// Rejected at both selector arms — a range selector carries its own `at`
-    /// (`foo[5m] @ end()`), and a subquery recurses through `exec_expr`, so a
-    /// nested `@` lands on one of these two.
-    #[tokio::test]
-    async fn test_exec_expr_rejects_at_modifier() {
-        let trace_id = "test_trace";
-        let org_id = "test_org";
-
-        // (query, what it exercises)
-        let cases = [
-            ("foo @ 1600000000", "instant selector, absolute @"),
-            ("foo @ start()", "instant selector, @ start()"),
-            ("foo @ end()", "instant selector, @ end()"),
-            ("rate(foo[5m] @ 1600000000)", "range selector inside a call"),
-            ("sum_over_time(foo[5m] @ end())", "range selector, @ end()"),
-        ];
-
-        for (query, what) in cases {
-            let mut engine = Engine::new(
-                trace_id,
-                Arc::new(PromqlContext::new(
-                    create_test_query_ctx(trace_id, org_id, 30),
-                    SimpleMockProvider,
-                    vec![],
-                )),
-                create_test_eval_ctx(),
-            );
-
-            let expr = promql_parser::parser::parse(query)
-                .unwrap_or_else(|e| panic!("{what}: `{query}` should parse: {e}"));
-            let err = engine.exec_expr(&expr).await.err().unwrap_or_else(|| {
-                panic!("{what}: `{query}` must be rejected, not silently ignored")
-            });
-
-            assert!(
-                err.to_string().contains("@ modifier is not supported"),
-                "{what}: `{query}` should fail with the @-modifier error, got: {err}",
-            );
-        }
     }
 
     /// The guard must not fire on a query that merely LOOKS adjacent — `offset`
@@ -574,6 +550,47 @@ pub(crate) mod tests {
             assert_eq!(val, -42.0);
         } else {
             panic!("Expected Value::Float");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_unary_matrix_preserves_timestamps_and_special_values() {
+        let ctx = EvalContext::new(1_000_000, 3_000_000, 1_000_000, "test".into());
+        for (input, expected) in [
+            ("0", -0.0_f64),
+            ("7", -7.0),
+            ("Inf", f64::NEG_INFINITY),
+            ("NaN", f64::NAN),
+        ] {
+            let mut engine = Engine::new(
+                "test",
+                Arc::new(PromqlContext::new(
+                    create_test_query_ctx("test", "test_org", 30),
+                    SimpleMockProvider,
+                    vec![],
+                )),
+                ctx.clone(),
+            );
+            let query = format!(
+                r#"-label_replace(label_replace(vector({input}), "job", "api", "", ""), "__name__", "m", "", "")"#
+            );
+            let expr = promql_parser::parser::parse(&query).unwrap();
+            let Value::Matrix(matrix) = engine.exec_expr(&expr).await.unwrap() else {
+                panic!("expected matrix");
+            };
+            assert_eq!(matrix.len(), 1);
+            assert_eq!(matrix[0].labels.len(), 1);
+            assert_eq!(matrix[0].labels[0].name, "job");
+            assert_eq!(matrix[0].labels[0].value, "api");
+            assert_eq!(matrix[0].samples.len(), 3);
+            for (sample, timestamp) in matrix[0].samples.iter().zip(ctx.timestamps()) {
+                assert_eq!(sample.timestamp, timestamp);
+                if expected.is_nan() {
+                    assert!(sample.value.is_nan());
+                } else {
+                    assert_eq!(sample.value.to_bits(), expected.to_bits());
+                }
+            }
         }
     }
 
@@ -738,10 +755,17 @@ pub(crate) mod tests {
             ] {
                 let series = matrix(eval_on_empty(&query, 3).await.unwrap());
                 assert_eq!(series.len(), 1, "{query}");
-                assert_eq!(series[0].samples.len(), 1, "{query}");
-                assert_eq!(series[0].samples[0].timestamp, timestamp, "{query}");
+                // a scalar holds a value at every step, so a rejected step is NaN, not absent
+                assert_eq!(series[0].samples.len(), 3, "{query}");
+                let matched: Vec<_> = series[0]
+                    .samples
+                    .iter()
+                    .filter(|sample| !sample.value.is_nan())
+                    .collect();
+                assert_eq!(matched.len(), 1, "{query}");
+                assert_eq!(matched[0].timestamp, timestamp, "{query}");
                 assert_eq!(
-                    series[0].samples[0].value,
+                    matched[0].value,
                     timestamp as f64 / 1_000_000.0 + 1.0,
                     "{query}"
                 );
@@ -769,6 +793,24 @@ pub(crate) mod tests {
                 );
                 assert_eq!(sample.value, 3.0, "{query}");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_scalar_operand_broadcasts_to_labelled_series() {
+        let labelled = r#"label_replace(vector(6), "job", "x", "", "")"#;
+        for (query, expected) in [
+            (format!("{labelled} / scalar(vector(3))"), 2.0),
+            (format!("scalar(vector(3)) / {labelled}"), 0.5),
+            (format!("{labelled} > scalar(vector(3))"), 6.0),
+            (format!("scalar(vector(3)) < {labelled}"), 6.0),
+        ] {
+            let series = matrix(eval_on_empty(&query, 3).await.unwrap());
+            assert_eq!(series.len(), 1, "{query}");
+            assert_eq!(series[0].labels.len(), 1, "{query}");
+            assert_eq!(series[0].labels[0].value, "x", "{query}");
+            let values: Vec<f64> = series[0].samples.iter().map(|s| s.value).collect();
+            assert_eq!(values, vec![expected; 3], "{query}");
         }
     }
 

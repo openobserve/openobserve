@@ -13,6 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+// On-call keeps its metrics in their own file: the set is a coherent story
+// about one subsystem, and reading it as a block is the only way to see that
+// the bad outcomes are all covered.
+pub mod oncall;
+
 use std::{collections::HashMap, sync::LazyLock as Lazy};
 
 use prometheus::{
@@ -370,6 +375,76 @@ pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::n
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// Service graph v4 edge resolutions by confidence tier; org only, never a stream label.
+pub static O2_SERVICE_GRAPH_RESOLVED_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_resolved_total",
+            "Service graph v4 edges resolved, by org and tier.".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "tier"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_RETAINED_EDGES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "o2_service_graph_retained_edges",
+            "Service graph v4 edge series retained in memory on this node, by org.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_RETAINED_NODES: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "o2_service_graph_retained_nodes",
+            "Service graph v4 node series retained in memory on this node, by org.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_evicted_edges_total",
+            "Service graph v4 series evicted, by org and reason (ttl, cap).".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "reason"],
+    )
+    .expect("Metric created")
+});
+
+pub static O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "o2_service_graph_dropped_requests_total",
+            "Service graph v4 requests dropped without a series, by org and reason.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["org", "reason"],
     )
     .expect("Metric created")
 });
@@ -1693,21 +1768,6 @@ pub static FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE: Lazy<IntGaugeVec> = Lazy::new(||
     .expect("Metric created")
 });
 
-// File access time bucket histogram
-pub static FILE_ACCESS_TIME: Lazy<HistogramVec> = Lazy::new(|| {
-    HistogramVec::new(
-        HistogramOpts::new(
-            "file_access_time",
-            "Histogram showing query counts within time windows from 1h to 1week (1h, 2h, 3h, 6h, 12h, 24h, 48h, 96h, 168h)"
-        )
-        .namespace(NAMESPACE)
-        .buckets(vec![1.0, 2.0, 3.0, 6.0, 12.0, 24.0, 48.0, 96.0, 168.0])
-        .const_labels(create_const_labels()),
-        &["stream_type"],
-    )
-    .expect("Metric created")
-});
-
 // Metrics for pipeline wal writer
 pub static PIPELINE_WAL_WRITER_DESTINATIONS: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
@@ -2495,6 +2555,53 @@ pub static EVAL_SCHEDULER_WATERMARK_LAG_SECONDS: Lazy<IntGaugeVec> = Lazy::new(|
     .expect("Metric created")
 });
 
+// Deliberate: spec §14.1 says `org_id` and four `result` values; `organization` is the house label.
+pub static HEC_AUTH_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_auth_total",
+            "Splunk HEC collector authentication attempts by outcome (success, unknown, disabled, malformed, org_blocked, store_unavailable)".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["result", "organization"],
+    )
+    .expect("Metric created")
+});
+
+// Deliberate: `organization`, not spec §14.1's `org_id`, as for HEC_AUTH_TOTAL.
+pub static HEC_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "hec_requests_total",
+            "Splunk HEC collector requests by response status".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["status", "organization"],
+    )
+    .expect("Metric created")
+});
+
+/// Count of records dropped by an ingestion policy on the write path, which still answers success.
+///
+/// Not labelled by stream: streams are auto-created from client-supplied names, and this fires on
+/// a path a client controls, so a per-stream label is unbounded cardinality. The warn log carries
+/// the name.
+pub static INGEST_RECORDS_DROPPED: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "ingest_records_dropped_total",
+            "Records discarded by an ingestion policy rather than stored".to_owned() + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &["organization", "stream_type", "reason"],
+    )
+    .expect("Metric created")
+});
+
 fn register_metrics(registry: &Registry) {
     // http latency
     registry
@@ -2510,6 +2617,17 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(GRPC_RESPONSE_TIME.clone()))
+        .expect("Metric registered");
+
+    // splunk hec collector
+    registry
+        .register(Box::new(HEC_AUTH_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(HEC_REQUESTS_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(INGEST_RECORDS_DROPPED.clone()))
         .expect("Metric registered");
 
     // ingester stats
@@ -2557,6 +2675,21 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RETAINED_EDGES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_RETAINED_NODES.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
@@ -2898,9 +3031,6 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone()))
         .expect("Metric registered");
     registry
-        .register(Box::new(FILE_ACCESS_TIME.clone()))
-        .expect("Metric registered");
-    registry
         .register(Box::new(PIPELINE_WAL_WRITER_DESTINATIONS.clone()))
         .expect("Metric registered");
     registry
@@ -3099,6 +3229,9 @@ fn register_metrics(registry: &Registry) {
     registry
         .register(Box::new(EVAL_SCHEDULER_WATERMARK_LAG_SECONDS.clone()))
         .expect("Metric registered");
+
+    // on-call paging and escalation
+    oncall::register(registry);
 }
 
 pub fn create_const_labels() -> HashMap<String, String> {
@@ -3345,6 +3478,12 @@ mod tests {
     }
 
     #[test]
+    fn test_statics_hec() {
+        let _ = HEC_AUTH_TOTAL.clone();
+        let _ = HEC_REQUESTS_TOTAL.clone();
+    }
+
+    #[test]
     fn test_statics_ingest() {
         let _ = INGEST_RECORDS.clone();
         let _ = INGEST_BYTES.clone();
@@ -3356,6 +3495,11 @@ mod tests {
         let _ = SYNTHETICS_ORPHANED_CHECKS.clone();
         let _ = SYNTHETICS_ORPHAN_SCANS_TOTAL.clone();
         let _ = SYNTHETICS_UNREADABLE_CHECKS_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_RESOLVED_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_RETAINED_EDGES.clone();
+        let _ = O2_SERVICE_GRAPH_RETAINED_NODES.clone();
+        let _ = O2_SERVICE_GRAPH_EVICTED_EDGES_TOTAL.clone();
+        let _ = O2_SERVICE_GRAPH_DROPPED_REQUESTS_TOTAL.clone();
         let _ = INGEST_PACK_FILES.clone();
         let _ = INGEST_PACK_SEGMENTS.clone();
         let _ = INGEST_WAL_SEARCHING_FILES.clone();
@@ -3499,7 +3643,6 @@ mod tests {
     fn test_statics_file_downloader_and_pipeline() {
         let _ = FILE_DOWNLOADER_NORMAL_QUEUE_SIZE.clone();
         let _ = FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE.clone();
-        let _ = FILE_ACCESS_TIME.clone();
         let _ = PIPELINE_WAL_WRITER_DESTINATIONS.clone();
         let _ = PIPELINE_WAL_WRITERS.clone();
         let _ = PIPELINE_WAL_FILES.clone();

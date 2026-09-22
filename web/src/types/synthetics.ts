@@ -659,6 +659,7 @@ export interface BrowserCheck {
     password: string;
   };
   variables?: { id?: string; name: string; value: string; secure?: boolean; example?: string }[];
+  environments?: string[];
   secrets?: { id?: string; name: string; value: string }[];
   headers?: { id?: string; key: string; value: string }[];
   cookies?: { id?: string; name: string; value: string; domain: string }[];
@@ -723,4 +724,39 @@ export interface SyntheticLocationDetail extends SyntheticLocation {
   agents: SyntheticLocationAgent[];
   checks: SyntheticLocationCheck[];
   install?: string;
+}
+
+// ── Shared variables and environments ────────────────────────────────────────
+
+export interface SyntheticsVariable {
+  id: string;
+  name: string;
+  kind: "plain" | "secret";
+  description: string;
+  example: string;
+  tags: string[];
+  value?: string;
+  /** Whether a value is stored, sent for both kinds. */
+  has_value?: boolean;
+  /** Checks whose definition references `{{NAME}}`. Drives the deletion guard. */
+  used_by_checks: number;
+  used_by?: string[];
+  owner?: string;
+  created_at: number;
+  updated_at: number;
+}
+
+/** One environment, with its variables inline - the list renders the whole tab. */
+export interface SyntheticsEnvironment {
+  id: string;
+  name: string;
+  description: string;
+  owner?: string;
+  /** The org's reserved `global` environment, whose variables apply everywhere. */
+  is_global: boolean;
+  created_at: number;
+  updated_at: number;
+  /** Checks pinned to this environment. Not derivable from this response. */
+  checks_count: number;
+  variables: SyntheticsVariable[];
 }

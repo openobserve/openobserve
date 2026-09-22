@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           table-id="iam-organizations-list"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OSearchInput
                 v-model="filterQuery"
                 :placeholder="t('organization.search')"
@@ -104,37 +104,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span v-else class="text-text-body">—</span>
           </template>
 
-          <template #cell-status="{ row }">
-            <OBadge
-              :variant="
-                row.status === 'pending_deletion'
-                  ? 'warning'
-                  : row.status === 'deleting'
-                    ? 'warning'
-                    : 'success-soft'
-              "
-              size="sm"
-            >
-              {{ row.status === "pending_deletion" ? pendingLabel(row) : row.status }}
-            </OBadge>
-          </template>
-
           <template #cell-actions="{ row }">
             <!-- Edit is pinned first so it stays column-aligned across every row,
-                 regardless of which trailing actions a row shows. It is disabled
-                 while the org is being deleted (editing a deleting org is a no-op). -->
+                 regardless of which trailing actions a row shows. -->
             <div class="flex items-center justify-start gap-1">
               <OButton
                 data-test="organization-name-edit"
                 variant="ghost"
                 size="icon-sm"
-                :disabled="row.status !== 'active'"
-                :title="
-                  row.status === 'deleting'
-                    ? t('iam.listOrganizations.cannotEditWhileDeleting')
-                    : t('iam.listOrganizations.edit')
-                "
-                @click="row.status === 'active' && renameOrganization(row)"
+                class="max-md:hidden"
+                :title="t('iam.listOrganizations.edit')"
+                @click="renameOrganization(row)"
               >
                 <OIcon name="edit" size="sm" />
               </OButton>
@@ -143,31 +123,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 data-test="organization-delete"
                 variant="ghost"
                 size="icon-sm"
+                class="max-md:hidden"
                 :title="t('iam.listOrganizations.deleteOrganization')"
                 @click="deleteOrganization(row)"
               >
                 <OIcon name="delete" size="sm" />
               </OButton>
-              <OButton
-                v-if="row.status === 'deleting'"
-                data-test="organization-cleanup-tasks"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('iam.listOrganizations.viewDeletionProgress')"
-                @click="viewCleanupTasks(row)"
-              >
-                <OIcon name="history" size="sm" />
-              </OButton>
-              <OButton
-                v-if="row.status === 'pending_deletion'"
-                data-test="organization-resurrect"
-                variant="ghost"
-                size="icon-sm"
-                :title="t('organization.resurrect')"
-                @click="resurrectOrganization(row)"
-              >
-                <OIcon name="undo" size="sm" />
-              </OButton>
+              <ODropdown side="bottom" align="end">
+                <template #trigger>
+                  <OButton
+                    icon-left="more-vert"
+                    :title="t('dashboard.moreActions')"
+                    variant="ghost"
+                    size="icon-xs-sq"
+                    class="md:hidden"
+                    data-test="organization-row-more-actions"
+                    @click.stop
+                  />
+                </template>
+                <ODropdownItem
+                  icon-left="edit"
+                  class="md:hidden"
+                  data-test="organization-name-edit-menu"
+                  @select="renameOrganization(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.edit") }}</span>
+                </ODropdownItem>
+                <ODropdownItem
+                  v-if="canDeleteOrg(row)"
+                  icon-left="delete"
+                  variant="destructive"
+                  class="md:hidden"
+                  data-test="organization-delete-menu"
+                  @select="deleteOrganization(row)"
+                >
+                  <span>{{ t("iam.listOrganizations.deleteOrganization") }}</span>
+                </ODropdownItem>
+              </ODropdown>
             </div>
           </template>
         </OTable>
@@ -178,12 +170,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:open="onDrawerOpenChange"
       @updated="updateOrganizationList"
       :model-value="toBeUpdatedOrganization"
-    />
-    <OrgCleanupTasksDialog
-      :open="showCleanupDialog"
-      :org-id="cleanupTargetOrg.id"
-      :org-name="cleanupTargetOrg.name"
-      @update:open="showCleanupDialog = $event"
     />
   </OPageLayout>
 </template>
@@ -198,15 +184,14 @@ import { useI18nTyped } from "@/types/i18n";
 
 import organizationsService from "@/services/organizations";
 import { useConfirmDialog } from "@/composables/useConfirmDialog";
-import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import AddUpdateOrganization from "@/components/iam/organizations/AddUpdateOrganization.vue";
-import OrgCleanupTasksDialog from "@/components/iam/organizations/OrgCleanupTasksDialog.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OCodeCell from "@/lib/core/Table/cells/OCodeCell.vue";
-import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
@@ -225,12 +210,12 @@ export default defineComponent({
   components: {
     OCodeCell,
     AddUpdateOrganization,
-    OrgCleanupTasksDialog,
     OEmptyState,
     OButton,
+    ODropdown,
+    ODropdownItem,
     OTooltip,
     OTag,
-    OBadge,
     OPageLayout,
     OIcon,
     OTable,
@@ -238,7 +223,6 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { isMetaOrg } = useIsMetaOrg();
     const router = useRouter();
     const { t } = useI18nTyped();
     const organizations = ref([]);
@@ -247,8 +231,6 @@ export default defineComponent({
     const showJoinOrganizationDialog = ref(false);
     const showOrgAPIKeyDialog = ref(false);
     const organizationAPIKey = ref("");
-    const showCleanupDialog = ref(false);
-    const cleanupTargetOrg = ref({ id: "", name: "" });
     const filterQuery = ref("");
     const toBeUpdatedOrganization = ref({
       id: "",
@@ -284,16 +266,6 @@ export default defineComponent({
         resizable: true,
         hideable: true,
         size: 150,
-        meta: { align: "left" },
-      },
-      {
-        id: "status",
-        header: t("iam.listOrganizations.status"),
-        accessorKey: "status",
-        sortable: true,
-        resizable: true,
-        hideable: true,
-        size: 120,
         meta: { align: "left" },
       },
     ];
@@ -364,16 +336,9 @@ export default defineComponent({
       });
       loading.value = true;
       forbidden.value = false;
-      // In the _meta admin context on cloud, use the admin endpoint so admins can
-      // track org deletion status; otherwise use the regular list. Access is always
-      // enforced server-side.
-      const useAdminEndpoint = isMetaOrg.value && config.isCloud === "true";
-      const request = useAdminEndpoint
-        ? organizationsService.get_admin_org("_meta")
-        : organizationsService.list(0, 1000000, "name", false, "");
-      request
+      organizationsService
+        .list(0, 1000000, "name", false, "")
         .then((res) => {
-          // Sync Vuex so the header org selector updates without a page reload.
           store.dispatch("setOrganizations", res.data.data);
 
           const billingPlans = {
@@ -389,9 +354,6 @@ export default defineComponent({
               identifier: data.identifier,
               type: convertToTitleCase(data.type),
               plan: billingPlans[data.plan] || "-",
-              status: data.status ?? "active",
-              deleted_at: data.deleted_at ?? null,
-              grace_period_days: data.grace_period_days ?? null,
               _userRole: data.role ?? data.user_role ?? "",
             };
 
@@ -516,7 +478,6 @@ export default defineComponent({
     // Only shown on cloud builds; user must be root or an admin of that org.
     const canDeleteOrg = (row: any): boolean => {
       if (config.isCloud !== "true") return false;
-      if (row.status === "deleting") return false;
       const role = row._userRole?.toLowerCase();
       return role === "root" || role === "admin";
     };
@@ -543,36 +504,7 @@ export default defineComponent({
       }
     };
 
-    const viewCleanupTasks = (row: any) => {
-      cleanupTargetOrg.value = { id: row.identifier, name: row.name };
-      showCleanupDialog.value = true;
-    };
-
-    const pendingLabel = (row: any): string => {
-      if (!row.deleted_at || !row.grace_period_days) return t("organization.pendingDeletion");
-      const deletedAtMs = row.deleted_at / 1000; // micros → ms
-      const windowMs = row.grace_period_days * 86400 * 1000;
-      const msLeft = deletedAtMs + windowMs - Date.now();
-      const daysLeft = Math.max(0, Math.ceil(msLeft / 86400000));
-      return `${t("organization.pendingDeletion")} — ${t("organization.daysLeft", { n: daysLeft })}`;
-    };
-
-    const resurrectOrganization = async (row: any) => {
-      try {
-        await organizationsService.resurrect_org("_meta", row.identifier);
-        toast({ variant: "success", message: t("iam.listOrganizations.organizationResurrected") });
-        getOrganizations();
-      } catch (e: any) {
-        toast({
-          variant: "error",
-          message: e?.response?.data?.message || t("iam.listOrganizations.failedToResurrect"),
-        });
-      }
-    };
-
     const renameOrganization = (row: any) => {
-      // Guard: an org being deleted cannot be edited (the UI button is also disabled).
-      if (row.status === "deleting") return;
       toBeUpdatedOrganization.value = {
         id: row.identifier,
         name: row.name,
@@ -583,8 +515,8 @@ export default defineComponent({
         query: {
           action: "update",
           org_identifier: store.state.selectedOrganization.identifier,
-          to_be_updated_org_id: props.row.identifier,
-          to_be_updated_org_name: props.row.name,
+          to_be_updated_org_id: row.identifier,
+          to_be_updated_org_name: row.name,
         },
       });
     };
@@ -612,8 +544,6 @@ export default defineComponent({
       showJoinOrganizationDialog,
       showOrgAPIKeyDialog,
       organizationAPIKey,
-      showCleanupDialog,
-      cleanupTargetOrg,
       addOrganization,
       getOrganizations,
       inviteTeam,
@@ -621,12 +551,9 @@ export default defineComponent({
       hideAddOrgDialog,
       onDrawerOpenChange,
       renameOrganization,
-      viewCleanupTasks,
       canDeleteOrg,
       deleteOrganization,
       toBeUpdatedOrganization,
-      pendingLabel,
-      resurrectOrganization,
     };
   },
   methods: {

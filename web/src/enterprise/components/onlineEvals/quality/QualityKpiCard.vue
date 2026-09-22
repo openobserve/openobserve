@@ -1,23 +1,24 @@
 <template>
   <div
     :class="[
-      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-0.5 overflow-hidden border px-3 pt-1.5 pb-1.5 transition-shadow duration-200 ease-in-out hover:shadow-sm',
+      'bg-card-glass-bg rounded-default border-border-default flex flex-col gap-0.5 overflow-hidden border px-3 pt-1.5 pb-1.5 transition-shadow duration-200 ease-in-out hover:shadow-sm max-lg:shrink-0 max-lg:basis-auto max-lg:px-1.5 max-lg:py-1',
       clickable &&
         'hover:border-accent focus-visible:ring-accent cursor-pointer focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none',
     ]"
     :data-test="`quality-kpi-${kpi.id}`"
+    :title="lgUp ? undefined : t(`onlineEvals.quality.kpis.${kpi.id}.title`)"
     :role="clickable ? 'button' : undefined"
     :tabindex="clickable ? 0 : undefined"
     @click="activate"
     @keydown.enter.prevent="activate"
     @keydown.space.prevent="activate"
   >
-    <div class="flex flex-col gap-0.5">
+    <div class="flex flex-col gap-0.5 max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5">
       <!-- Label + a metric icon in a soft corner tile — same KPI-card pattern
            as LLM Insights / Session Detail so every card reads the same. -->
       <div class="flex items-center justify-between gap-2">
         <div
-          class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold"
+          class="kpi-label text-2xs text-text-secondary min-w-0 truncate leading-normal font-semibold max-lg:hidden"
         >
           {{ t(`onlineEvals.quality.kpis.${kpi.id}.title`) }}
         </div>
@@ -29,7 +30,7 @@
       </div>
       <div class="flex items-baseline gap-[0.2rem]">
         <template v-if="kpi.value != null">
-          <span class="text-text-secondary text-2xl leading-none font-bold">
+          <span class="text-text-secondary text-2xl leading-none font-bold max-lg:text-lg">
             {{ bigNumber }}
           </span>
           <span v-if="unitLabel" class="text-compact text-text-secondary font-semibold">
@@ -42,7 +43,7 @@
       </div>
       <div
         v-if="kpi.id === 'scoreResults' && kpi.scopeCounts"
-        class="text-3xs text-text-tertiary flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium"
+        class="text-3xs text-text-tertiary flex flex-wrap items-center gap-x-2 gap-y-0.5 font-medium max-lg:hidden"
         data-test="quality-kpi-scope-breakdown"
       >
         <span
@@ -64,7 +65,7 @@
            short history) rather than zero. -->
       <div
         v-if="kpi.value != null"
-        class="text-3xs flex items-center gap-1 font-medium"
+        class="text-3xs flex items-center gap-1 font-medium max-lg:hidden"
         :class="{
           'text-status-success-text': (delta != null ? trendSentiment : 'neutral') === 'good',
           'text-error-600': (delta != null ? trendSentiment : 'neutral') === 'bad',
@@ -86,7 +87,7 @@
       :data="kpi.sparkline"
       :color="sparkColor"
       :height="20"
-      class="-mx-3 mt-auto -mb-1.5"
+      class="-mx-3 mt-auto -mb-1.5 max-lg:hidden"
     />
   </div>
 </template>
@@ -97,6 +98,9 @@ import { useI18nTyped } from "@/types/i18n";
 import KpiSparkline from "@/plugins/traces/KpiSparkline.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import type { KpiCard } from "../composables/useQualityData";
+import useBreakpoint from "@/composables/useBreakpoint";
+
+const { lgUp } = useBreakpoint();
 
 const props = defineProps<{
   kpi: KpiCard;

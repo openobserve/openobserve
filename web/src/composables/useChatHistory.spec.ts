@@ -324,6 +324,10 @@ function makeDB(): MockDB {
   return db;
 }
 
+// Last DB handed to the composable — lets beforeEach fire onclose so
+// useChatHistory.ts drops its memoised connection between tests.
+let _lastOpenedDb: MockDB | null = null;
+
 // Replace global indexedDB with the in-memory mock
 const mockIndexedDB = {
   open(name: string, version: number) {
@@ -364,6 +368,7 @@ const mockIndexedDB = {
       }
 
       req.result = db;
+      if (name === "o2ChatDB") _lastOpenedDb = db;
       if (req.onsuccess) req.onsuccess({ target: req } as unknown as Event);
     });
 
@@ -419,6 +424,10 @@ describe("useChatHistory", () => {
     // each test creates new instances, so no key cache leaks between tests.
     dbRegistry.clear();
     _autoIdCounter = 1;
+    // Fire onclose so useChatHistory.ts drops its memoised connection to the
+    // now-cleared registry's database and reopens fresh.
+    (_lastOpenedDb as { onclose?: () => void } | null)?.onclose?.();
+    _lastOpenedDb = null;
   });
 
   afterEach(() => {

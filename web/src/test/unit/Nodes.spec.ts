@@ -21,11 +21,14 @@ import { createI18n } from "vue-i18n";
 import CommonService from "../../services/common";
 
 // Mock services
-vi.mock("../../services/common", () => ({
-  default: {
-    list_nodes: vi.fn(),
-  },
-}));
+vi.mock("../../services/common", async (importOriginal) => {
+  const { overlayServiceMock } = await import("@/test/unit/helpers/mockService");
+  return overlayServiceMock(await importOriginal(), {
+    default: {
+      list_nodes: vi.fn(),
+    },
+  });
+});
 
 // Mock router
 const mockPush = vi.fn();

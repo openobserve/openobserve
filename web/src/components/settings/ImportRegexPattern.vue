@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #output-content>
         <div
-          class="border-border-default flex h-full w-full flex-col border-s"
+          class="border-border-default flex h-full w-full flex-col border-s max-md:min-w-0!"
           style="min-width: 25rem"
         >
           <div
@@ -341,6 +341,9 @@ export default defineComponent({
         }
       }
 
+      // A partial import still created rows, so the parent list reloads either way; only the navigation is reserved for a clean run.
+      if (successCount > 0) emit("update:list");
+
       if (successCount === totalCount) {
         toast({
           message: t("settings.importRegexPattern.importSuccess", { count: successCount }),
@@ -348,7 +351,6 @@ export default defineComponent({
         });
 
         setTimeout(() => {
-          emit("update:list");
           router.push({
             name: "regexPatterns",
             query: {

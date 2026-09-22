@@ -72,7 +72,7 @@ use crate::common::meta::{
         (status = 200, description = "Success", content_type = "application/json", body = inline(OrganizationResponse)),
     ),
     extensions(
-        ("x-o2-mcp" = json!({"description": "Get user organizations", "category": "users"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn organizations(
@@ -92,7 +92,8 @@ pub async fn organizations(
 
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
     let is_root_user = is_root_user(user_id);
@@ -172,6 +173,9 @@ pub async fn organizations(
     ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(AllOrganizationResponse)),
+    ),
+    extensions(
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn all_organizations(
@@ -187,7 +191,8 @@ pub async fn all_organizations(
     let mut org_names = HashSet::new();
     let limit = query
         .get("page_size")
-        .unwrap_or(&"100".to_string())
+        .map(String::as_str)
+        .unwrap_or("100")
         .parse::<i64>()
         .ok();
 
@@ -249,6 +254,8 @@ pub async fn all_organizations(
             browser_steps_limit: synthetics.browser_limit,
             protocol_steps_used: synthetics.protocol_used,
             protocol_steps_limit: synthetics.protocol_limit,
+            status_steps_used: synthetics.status_used,
+            status_steps_limit: synthetics.status_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -531,7 +538,7 @@ pub async fn create_user_rumtoken(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Organizations", "operation": "create"})),
-        ("x-o2-mcp" = json!({"description": "Create an organization", "category": "organizations"}))
+        ("x-o2-mcp" = json!({"enabled": false}))
     )
 )]
 pub async fn create_org(
@@ -670,7 +677,7 @@ async fn set_pool_limit(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(

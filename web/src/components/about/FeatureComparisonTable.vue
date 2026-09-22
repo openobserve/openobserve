@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
-    <div class="grid grid-cols-3 gap-5 pt-4">
+    <div class="grid grid-cols-3 gap-5 pt-4 max-md:grid-cols-1">
       <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
       <div
         v-for="ed in editionList"

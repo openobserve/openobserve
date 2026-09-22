@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showImportTemplate && !showTemplateEditor"
       :title="t('alerts.header')"
@@ -30,13 +31,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <template #actions>
         <OButton
-          variant="outline"
-          size="sm-action"
-          @click="importTemplate"
-          data-test="template-import"
-          >{{ t(`dashboard.import`) }}</OButton
-        >
-        <OButton
           data-test="template-list-add-btn"
           variant="primary"
           size="sm"
@@ -44,6 +38,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >{{ t(`alert_templates.add`) }}</OButton
         >
       </template>
+      <template #actions-overflow>
+        <OButton
+          variant="outline"
+          size="sm-action"
+          @click="importTemplate"
+          data-test="template-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+      </template>
+
       <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
         <OTable
           ref="oTableRef"
@@ -71,8 +75,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @update:current-page="onPageChange"
         >
           <template #toolbar>
-            <div class="flex w-full items-center gap-2">
+            <div class="flex w-full min-w-0 items-center gap-2 max-md:contents">
               <OToggleGroup
+                mobile-dropdown
                 :model-value="activeTab"
                 @update:model-value="
                   (v: any) => {
@@ -96,27 +101,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </OToggleGroup>
               <OSearchInput
                 v-model="filterQuery"
-                class="flex-1"
+                class="min-w-0 flex-1 max-md:min-w-40"
                 :placeholder="t('template.search')"
                 data-test="template-list-search-input"
               />
             </div>
           </template>
           <template #toolbar-trailing>
-            <OButton
+            <ORefreshButton
+              layout="inline"
               variant="outline"
-              size="icon-sm"
-              icon-left="refresh"
-              :loading="loading"
+              :last-run-at="lastUpdatedAt"
+              :loading="fetching"
+              shortcut-id="alertTemplatesRefresh"
               data-test="template-list-refresh-btn"
-              @click="getTemplates"
-            >
-              <OTooltip
-                side="bottom"
-                :content="t('common.refresh')"
-                shortcut-id="alertTemplatesRefresh"
-              />
-            </OButton>
+              @click="refreshTemplates"
+            />
           </template>
           <template #empty>
             <OEmptyState
@@ -168,7 +168,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               :title="t('alert_templates.exportTemplate')"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="t('alert_templates.clone')"
@@ -204,7 +204,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ms-1"
+              class="ms-1 max-md:hidden"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -219,6 +219,62 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <OIcon name="delete" size="sm" />
             </OButton>
+            <ODropdown side="bottom" align="end">
+              <template #trigger>
+                <OButton
+                  icon-left="more-vert"
+                  :title="t('dashboard.moreActions')"
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="md:hidden"
+                  data-test="alert-template-list-row-more-actions"
+                  @click.stop
+                />
+              </template>
+              <ODropdownItem
+                icon-left="download"
+                class="md:hidden"
+                data-test="destination-export-menu"
+                @select="exportTemplate(row)"
+              >
+                <span>{{ t("alert_templates.exportTemplate") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="edit"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-update-template-menu`"
+                @select="editTemplate(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyEdit")
+                    : t("alert_templates.edit")
+                }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="content-copy"
+                class="md:hidden"
+                :data-test="`alert-template-list-${row.name}-clone-template-menu`"
+                @select="cloneTemplate(row)"
+              >
+                <span>{{ t("alert_templates.clone") }}</span>
+              </ODropdownItem>
+              <ODropdownItem
+                icon-left="delete"
+                variant="destructive"
+                class="md:hidden"
+                :disabled="row.isPrebuilt"
+                :data-test="`alert-template-list-${row.name}-delete-template-menu`"
+                @select="conformDeleteDestination(row)"
+              >
+                <span>{{
+                  row.isPrebuilt
+                    ? t("alert_templates.systemReadOnlyDelete")
+                    : t("alert_templates.delete")
+                }}</span>
+              </ODropdownItem>
+            </ODropdown>
           </template>
           <template #cell-used_by="{ row }">
             <DependencyUsageCell
@@ -250,11 +306,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :template="editingTemplate"
         :is-clone="cloningTemplate"
         @cancel:hideform="toggleTemplateEditor"
-        @get:templates="getTemplates"
+        @get:templates="refreshTemplates"
       />
     </div>
     <div v-else class="min-h-0 flex-1">
-      <ImportTemplate :templates="templates" @update:templates="getTemplates" />
+      <ImportTemplate :templates="templates" @update:templates="refreshTemplates" />
     </div>
 
     <ConfirmDialog
@@ -275,23 +331,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </div>
 </template>
 <script lang="ts" setup>
-import { ref, onActivated, onMounted, watch, defineAsyncComponent, computed } from "vue";
+import {
+  bulkDeleteTemplatesMutation,
+  deleteTemplateMutation,
+  templatesQuery,
+} from "@/services/alert_templates.queries";
+import { queryClient } from "@/composables/query/queryClient";
+import { templateKeys } from "@/services/alert_templates.querykeys";
+import { useOrgId } from "@/composables/query/useOrgId";
+import { useMutation, useQuery } from "@tanstack/vue-query";
+import { ref, onActivated, watch, defineAsyncComponent, computed } from "vue";
 import type { Ref } from "vue";
 import { useI18nTyped, raw } from "@/types/i18n";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
-import templateService from "@/services/alert_templates";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import type { TemplateData, Template } from "@/ts/interfaces";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
-import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
@@ -315,7 +381,12 @@ const { t } = useI18nTyped();
 const router = useRouter();
 const { track } = useReo();
 const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
-const templates: Ref<Template[]> = ref([]);
+const orgIdForList = useOrgId();
+const templatesList = useQuery(() =>
+  Object.assign(templatesQuery(orgIdForList.value), { enabled: !!orgIdForList.value }),
+);
+// The rows are the query, not a copy: only an observer applies `staleTime` and revalidates on mount.
+const templates = computed<Template[]>(() => (templatesList.data.value ?? []) as Template[]);
 const columns: OTableColumnDef[] = [
   {
     id: "name",
@@ -392,10 +463,6 @@ const isTemplateRowSelectable = (row: any) => !row?.isPrebuilt;
 onActivated(() => {
   if (!templates.value.length) updateRoute();
 });
-onMounted(() => {
-  getTemplates();
-});
-
 watch(
   () => router.currentRoute.value.query.action,
   (action) => {
@@ -406,8 +473,19 @@ watch(
   },
 );
 
-const loading = ref(false);
-const forbidden = ref(false);
+const loading = templatesList.isPending;
+// Request in flight with rows still on screen — the refresh button's spinner.
+// `loading` is the skeleton, for a cold read only.
+const fetching = templatesList.isFetching;
+// Epoch ms of the last successful read — drives the button's "1m ago" label.
+const lastUpdatedAt = templatesList.dataUpdatedAt;
+// Bound to refresh / post-write reloads: always reaches the server.
+const refreshTemplates = () => getTemplates(true);
+// A 403 lands in the query's error rather than a loader's catch, so derive the no-access state from it.
+const forbidden = computed(() => {
+  const e: any = templatesList.error.value;
+  return e?.status === 403 || e?.response?.status === 403;
+});
 // The first real load lands after mount and races TanStack's own auto-reset-on-data-change, which resolves through its own deferred microtask queue — setTimeout(0) runs strictly after that queue drains, so the restored page reliably wins.
 watch(
   loading,
@@ -419,65 +497,61 @@ watch(
   },
   { once: true },
 );
-const getTemplates = () => {
-  const dismiss = toast({
-    variant: "loading",
-    message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
-    timeout: 0,
-  });
 
-  loading.value = true;
-  forbidden.value = false;
-  templateService
-    .list({
-      org_identifier: store.state.selectedOrganization.identifier,
-    })
-    .then((res) => {
-      resultTotal.value = res.data.length;
-      templates.value = res.data;
-      // Any template add/edit/delete lands here on refresh — drop the shared
-      // dependency-graph cache and rebuild it so the "Used by" counts (and the
-      // impact dialog) reflect the change.
-      invalidateDependencyGraphCache();
-      loadDepGraph(store.state.selectedOrganization.identifier);
-      updateRoute();
-    })
-    .catch((err) => {
-      dismiss();
-      forbidden.value = err?.response?.status === 403;
-      if (!forbidden.value) {
-        toast({
-          variant: "error",
-          message: t("toastMessages.alerts.errorWhilePullingTemplates"),
-        });
-      }
-    })
-    .finally(() => {
-      dismiss();
-      loading.value = false;
-    });
+// Read by the watcher below: the rebuild after a forced read must also re-read the lists this page does not own.
+let graphInputsStale = false;
+
+const getTemplates = async (force = false) => {
+  if (!force) return;
+  // Rebuilding the graph costs three more list calls, so only a forced read pays for it.
+  invalidateDependencyGraphCache();
+  graphInputsStale = true;
+  await templatesList.refetch();
 };
-// A delete is one row leaving a list the server has already confirmed. Splice it
-// out and prune the shared dependency graph rather than refetching: a refetch
-// blanks the table behind its spinner and a "please wait" toast, which reads as a
-// page reload, and drops the user's scroll and page position with it.
+
+let dismissLoading: (() => void) | null = null;
+watch(
+  loading,
+  (pending) => {
+    if (pending && !dismissLoading) {
+      dismissLoading = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingTemplates"),
+        timeout: 0,
+      });
+    } else if (!pending && dismissLoading) {
+      dismissLoading();
+      dismissLoading = null;
+    }
+  },
+  { immediate: true },
+);
+
+watch(templatesList.error, (err: any) => {
+  if (!err || err?.response?.status === 403) return;
+  toast({
+    variant: "error",
+    message: t("toastMessages.alerts.errorWhilePullingTemplates"),
+  });
+});
+// Splice the confirmed rows out at once; the mutation's background refetch only spins the refresh button.
 const dropTemplates = (names: string[]) => {
   if (!names.length) return;
   const gone = new Set(names);
-  templates.value = templates.value.filter((tpl: any) => !gone.has(tpl.name));
   // Anything that failed to delete stays selected, so a bulk retry is one click.
   selectedTemplates.value = selectedTemplates.value.filter((tpl: any) => !gone.has(tpl.name));
   const org = store.state.selectedOrganization.identifier;
+  // The rows render straight from the cache, so pruning it is what removes them.
+  queryClient.setQueriesData({ queryKey: templateKeys.all(org) }, (list: any) =>
+    Array.isArray(list) ? list.filter((tpl: any) => !gone.has(tpl.name)) : list,
+  );
   for (const name of gone)
     depGraph.value = applyDependencyDeletion(org, depNodeId("template", name), depGraph.value);
 };
 
-// Deleting an alert or a destination in the impact dialog leaves this list's rows
-// untouched, so re-read the (already pruned) shared graph for the Used by counts
-// instead of reloading the page's data.
-const onDependencyDeleted = (kind: DepNodeKind) => {
-  if (kind === "template") getTemplates();
-  else loadDepGraph(store.state.selectedOrganization.identifier);
+// Both kinds need only the shared graph now: the rows re-render from the cache.
+const onDependencyDeleted = (_kind: DepNodeKind) => {
+  loadDepGraph(store.state.selectedOrganization.identifier);
 };
 const updateRoute = () => {
   if (router.currentRoute.value.query.action === "add") editTemplate();
@@ -555,15 +629,19 @@ const cloneTemplate = (template: any) => {
     },
   });
 };
+// Mutations rather than direct service calls: their scope reaches every cache the list feeds, on disk too.
+const deleteTemplateWrite = useMutation(() =>
+  deleteTemplateMutation(store.state.selectedOrganization.identifier),
+);
+const bulkDeleteTemplatesWrite = useMutation(() =>
+  bulkDeleteTemplatesMutation(store.state.selectedOrganization.identifier),
+);
 const deleteTemplate = () => {
   const name = confirmDelete.value?.data?.name;
   if (!name) return;
   deletingTemplates.value.add(name);
-  templateService
-    .delete({
-      org_identifier: store.state.selectedOrganization.identifier,
-      template_name: name,
-    })
+  deleteTemplateWrite
+    .mutateAsync(name)
     .then(() => {
       toast({
         variant: "success",
@@ -649,6 +727,18 @@ const exportTemplate = (row: any) => {
   URL.revokeObjectURL(url);
 };
 
+// Keyed on `dataUpdatedAt`: an unchanged refetch shares its object and would never wake a value watcher.
+watch(
+  () => templatesList.dataUpdatedAt.value,
+  () => {
+    if (!templatesList.data.value) return;
+    updateRoute();
+    loadDepGraph(orgIdForList.value, graphInputsStale ? ["alerts", "destinations"] : []);
+    graphInputsStale = false;
+  },
+  { immediate: true },
+);
+
 const visibleRows = computed(() => {
   const base = templates.value || [];
   const byTab =
@@ -677,10 +767,8 @@ const bulkDeleteTemplates = () => {
   bulkDeleteLoading.value = true;
   const templateNames = selectedTemplates.value.map((template: any) => template.name);
 
-  templateService
-    .bulkDelete(store.state.selectedOrganization.identifier, {
-      ids: templateNames,
-    })
+  bulkDeleteTemplatesWrite
+    .mutateAsync(templateNames)
     .then((res) => {
       const { successful, unsuccessful } = res.data;
 
@@ -738,7 +826,7 @@ useShortcuts([
   {
     id: "alertTemplatesRefresh",
     handler: () => {
-      if (!isInputFocused()) getTemplates();
+      if (!isInputFocused()) refreshTemplates();
     },
   },
   {

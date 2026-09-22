@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use sea_orm::{
-    ColumnTrait, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
+    ColumnTrait, Condition, EntityTrait, FromQueryResult, QueryFilter, QuerySelect, Set, SqlErr,
     TransactionTrait, prelude::Expr,
 };
 use serde::{Deserialize, Serialize};
@@ -24,6 +24,9 @@ use crate::{
     db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+// Keeps each IN list under the sqlite and postgres bind-parameter limits.
+const DELETE_ID_BATCH: usize = 1000;
 
 #[derive(Clone, Serialize, Deserialize)]
 pub enum FileType {
@@ -136,6 +139,10 @@ struct Value {
     value: Option<String>,
 }
 
+pub fn get_file_path(org_id: &str, name: &str) -> String {
+    format!("files/{org_id}/sourcemaps/{name}")
+}
+
 pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
     let models = entries
         .into_iter()
@@ -179,36 +186,33 @@ pub async fn add_many(entries: Vec<SourceMap>) -> Result<(), errors::Error> {
     Ok(())
 }
 
+/// Deletes the exact group and returns the removed rows so callers can release their files.
 pub async fn delete_group(
     org: &str,
     service: Option<String>,
     env: Option<String>,
     version: Option<String>,
-) -> Result<(), errors::Error> {
+) -> Result<Vec<SourceMap>, errors::Error> {
     let client = get_orm_client_rw().await;
 
-    let mut stmt = Entity::delete_many().filter(Column::Org.eq(org));
+    let cond = Condition::all()
+        .add(Column::Org.eq(org))
+        .add(service.map_or(Column::Service.is_null(), |s| Column::Service.eq(s)))
+        .add(env.map_or(Column::Env.is_null(), |e| Column::Env.eq(e)))
+        .add(version.map_or(Column::Version.is_null(), |v| Column::Version.eq(v)));
 
-    if let Some(s) = service {
-        stmt = stmt.filter(Column::Service.eq(s));
-    } else {
-        stmt = stmt.filter(Column::Service.is_null());
+    let txn = client.begin().await?;
+    let rows = Entity::find().filter(cond).all(&txn).await?;
+    // Delete by id: rows committed concurrently stay instead of being removed unreturned.
+    for chunk in rows.chunks(DELETE_ID_BATCH) {
+        Entity::delete_many()
+            .filter(Column::Id.is_in(chunk.iter().map(|m| m.id)))
+            .exec(&txn)
+            .await?;
     }
+    txn.commit().await?;
 
-    if let Some(e) = env {
-        stmt = stmt.filter(Column::Env.eq(e));
-    } else {
-        stmt = stmt.filter(Column::Env.is_null());
-    }
-
-    if let Some(v) = version {
-        stmt = stmt.filter(Column::Version.eq(v));
-    } else {
-        stmt = stmt.filter(Column::Version.is_null());
-    }
-
-    stmt.exec(client).await?;
-    Ok(())
+    Ok(rows.into_iter().map(|model| model.into()).collect())
 }
 
 pub async fn get_sourcemap_file(

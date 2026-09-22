@@ -91,6 +91,9 @@ pub enum Error {
     ResourceError(String),
     #[error("Error# {0}")]
     IngestionError(String),
+    /// Carried inside an `anyhow::Error`, whose `OtherError` wrapper adds the `Error# ` prefix.
+    #[error("{0}")]
+    ColumnsLimitExceeded(String),
     #[error("Error# {0}")]
     WalFileError(String),
     #[error("Error# {0}")]
@@ -282,6 +285,17 @@ impl std::fmt::Display for ErrorCodes {
 }
 
 impl Error {
+    /// True when a batch was rejected for exceeding `ZO_COLS_PER_RECORD_LIMIT`.
+    pub fn is_columns_limit_exceeded(&self) -> bool {
+        match self {
+            Error::ColumnsLimitExceeded(_) => true,
+            Error::OtherError(e) => e
+                .downcast_ref::<Error>()
+                .is_some_and(Error::is_columns_limit_exceeded),
+            _ => false,
+        }
+    }
+
     /// The HTTP status code this error maps to. This is the single source of
     /// truth shared by the HTTP response mapping and audit logging.
     pub fn http_status(&self) -> u16 {
