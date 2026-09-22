@@ -147,12 +147,7 @@ impl EvidenceScope {
         self.patterns_configured = rules.len() as u64;
         self.pattern_names = rules.iter().map(|rule| rule.name.clone()).collect();
         self.pattern_rules = pattern_rule_labels(rules);
-        self.pattern_hash = pattern_rule_set_hash(
-            &rules
-                .iter()
-                .map(|rule| (rule.body.clone(), rule.policy.clone()))
-                .collect::<Vec<_>>(),
-        );
+        self.pattern_hash = pattern_rule_set_hash(rules);
         self.pattern_updated_at = pattern_updated_at;
         self
     }
@@ -527,9 +522,13 @@ pub fn is_self_reporting_stream(stream_name: &str) -> bool {
 
 /// Identity of the pattern set in effect, for callers that cannot yet supply per-pattern policies.
 pub fn pattern_set_hash(pattern_bodies: &[String]) -> String {
-    let rules: Vec<(String, String)> = pattern_bodies
+    let rules: Vec<PatternRule> = pattern_bodies
         .iter()
-        .map(|body| (body.clone(), String::new()))
+        .map(|body| PatternRule {
+            name: String::new(),
+            body: body.clone(),
+            policy: String::new(),
+        })
         .collect();
     pattern_rule_set_hash(&rules)
 }
@@ -544,10 +543,18 @@ pub fn pattern_rule_labels(rules: &[PatternRule]) -> Vec<String> {
 }
 
 /// What a body did, not just which body ran: the same regex under Redact and Detect differ.
-pub fn pattern_rule_set_hash(rules: &[(String, String)]) -> String {
+pub fn pattern_rule_set_hash(rules: &[PatternRule]) -> String {
+    // Name included: two rules can share a body, and a rename is a change an auditor can see.
     let mut digests: Vec<String> = rules
         .iter()
-        .map(|(body, policy)| sha256::digest(format!("{}:{policy}", sha256::digest(body))))
+        .map(|rule| {
+            sha256::digest(format!(
+                "{}:{}:{}",
+                rule.name,
+                sha256::digest(&rule.body),
+                rule.policy
+            ))
+        })
         .collect();
     digests.sort();
     digests.dedup();
@@ -818,25 +825,45 @@ mod tests {
     fn pattern_set_hash_never_contains_the_regex_body() {
         let body = "[0-9]{13,16}".to_string();
         assert!(!pattern_set_hash(std::slice::from_ref(&body)).contains("0-9"));
-        let rules = [("[0-9]{13,16}".to_string(), "Redact".to_string())];
+        let rules = [rule("card", "[0-9]{13,16}", "Redact")];
         assert!(!pattern_rule_set_hash(&rules).contains("0-9"));
     }
 
     #[test]
     fn the_same_body_under_redact_and_detect_hash_differently() {
-        let body = "[0-9]{13,16}".to_string();
-        let redact = pattern_rule_set_hash(&[(body.clone(), "Redact".to_string())]);
-        let detect = pattern_rule_set_hash(&[(body.clone(), "Detect".to_string())]);
-        let drop_field = pattern_rule_set_hash(&[(body, "DropField".to_string())]);
+        let redact = pattern_rule_set_hash(&[rule("card", "[0-9]{13,16}", "Redact")]);
+        let detect = pattern_rule_set_hash(&[rule("card", "[0-9]{13,16}", "Detect")]);
+        let drop_field = pattern_rule_set_hash(&[rule("card", "[0-9]{13,16}", "DropField")]);
         assert_ne!(redact, detect);
         assert_ne!(redact, drop_field);
         assert_ne!(detect, drop_field);
     }
 
     #[test]
+    fn two_rules_sharing_a_body_are_not_one_rule() {
+        let one = pattern_rule_set_hash(&[rule("card", "[0-9]{16}", "Redact")]);
+        let two = pattern_rule_set_hash(&[
+            rule("card", "[0-9]{16}", "Redact"),
+            rule("account", "[0-9]{16}", "Redact"),
+        ]);
+        assert_ne!(one, two);
+    }
+
+    #[test]
+    fn renaming_a_rule_moves_the_hash_with_the_labels() {
+        let before = [rule("card", "[0-9]{16}", "Redact")];
+        let after = [rule("pan", "[0-9]{16}", "Redact")];
+        assert_ne!(
+            pattern_rule_set_hash(&before),
+            pattern_rule_set_hash(&after)
+        );
+        assert_ne!(pattern_rule_labels(&before), pattern_rule_labels(&after));
+    }
+
+    #[test]
     fn a_rule_set_hash_is_order_independent_and_deduped() {
-        let a = ("aaa".to_string(), "Redact".to_string());
-        let b = ("bbb".to_string(), "Detect".to_string());
+        let a = rule("ra", "aaa", "Redact");
+        let b = rule("rb", "bbb", "Detect");
         assert_eq!(
             pattern_rule_set_hash(&[a.clone(), b.clone()]),
             pattern_rule_set_hash(&[b, a.clone()])
