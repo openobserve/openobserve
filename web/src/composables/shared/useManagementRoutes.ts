@@ -228,6 +228,18 @@ const useManagementRoutes = () => {
           },
         },
         {
+          path: "slack_app",
+          name: "slackApp",
+          component: () => import("@/components/settings/SlackAppInstall.vue"),
+          meta: {
+            keepAlive: true,
+            titleKey: "routeTitles.slackApp",
+          },
+          beforeEnter(to: any, from: any, next: any) {
+            routeGuard(to, from, next);
+          },
+        },
+        {
           path: "regex_patterns",
           name: "regexPatterns",
           component: () => import("@/components/settings/RegexPatternList.vue"),
