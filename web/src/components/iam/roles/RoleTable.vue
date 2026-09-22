@@ -6,6 +6,7 @@ import OTable from "@/lib/core/Table/OTable.vue";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
@@ -21,6 +22,14 @@ const props = defineProps<{
   actionLoading?: boolean;
   selectedIds?: string[];
   globalFilter?: string;
+  /** Member email being assigned to a role (from the "Assign a role" quick-link).
+   *  Presence alone turns on the Assign column — not gated separately. */
+  assignTarget?: string;
+  /** Role currently in flight for an assign click, so only that row spins. */
+  assigningRoleName?: string | null;
+  /** Roles assignTarget already belongs to — rendered as "Assigned" instead of
+   *  an actionable button. */
+  assignedRoleNames?: string[];
 }>();
 
 const emit = defineEmits<{
@@ -30,6 +39,7 @@ const emit = defineEmits<{
   delete: [row: any];
   "bulk-delete": [];
   create: [];
+  assign: [row: any];
 }>();
 
 const onEmptyStateAction = (id?: string) => {
@@ -70,6 +80,17 @@ const columns = computed<OTableColumnDef[]>(() => {
     });
   }
 
+  if (props.assignTarget) {
+    cols.push({
+      id: "assign",
+      header: t("iam.rolesPage.assignColumn"),
+      sortable: false,
+      resizable: false,
+      size: 130,
+      meta: { align: "center" },
+    });
+  }
+
   cols.push({
     id: "actions",
     header: t("common.actions"),
@@ -88,6 +109,9 @@ const columns = computed<OTableColumnDef[]>(() => {
 // fault. No summary strip: the count is already in the footer and "unused" is just
 // this column sorted ascending, so a strip would restate what the rows already say.
 const isUnusedRole = (row: any): boolean => row?.user_count === 0;
+
+const isAssigned = (row: any): boolean =>
+  (props.assignedRoleNames ?? []).includes(row?.role_name);
 </script>
 
 <template>
@@ -137,6 +161,29 @@ const isUnusedRole = (row: any): boolean => row?.user_count === 0;
     <template #toolbar-trailing>
       <slot name="toolbar-trailing" />
     </template>
+
+    <!-- Quick-assign column, only rendered when a member is being assigned
+         (arrived via the "Assign a role" link from the service-account token
+         popup). Lets the member be added to a role right here instead of
+         redirecting to a page that could not do anything with them. -->
+    <template #cell-assign="{ row }">
+      <div class="flex items-center justify-center">
+        <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+          {{ t("iam.rolesPage.assignedBadge") }}
+        </OBadge>
+        <OButton
+          v-else
+          :data-test="`iam-roles-assign-${row.role_name}-btn`"
+          variant="outline"
+          size="sm"
+          :loading="assigningRoleName === row.role_name"
+          @click="emit('assign', row)"
+        >
+          {{ t("iam.rolesPage.assignBtn") }}
+        </OButton>
+      </div>
+    </template>
+
     <!-- Row actions: edit + delete -->
     <template #cell-actions="{ row }">
       <div class="flex items-center justify-center">

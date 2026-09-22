@@ -26,6 +26,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("iam.addGroup") }}
       </OButton>
     </template>
+    <!-- Arrived via the service account token popup's "Add to a user group"
+         link (?member=<email>): that link used to just redirect here and
+         leave the user with no way to actually add the account to anything.
+         The Assign column below does the write directly. -->
+    <OBanner
+      v-if="assignTarget"
+      variant="info"
+      icon="group"
+      inline-actions
+      dense
+      data-test="iam-groups-assign-banner"
+      class="mb-3"
+    >
+      {{ t("iam.groupsPage.assignBannerText", { member: assignTarget }) }}
+      <template #actions>
+        <OButton
+          data-test="iam-groups-assign-banner-dismiss"
+          variant="ghost"
+          size="sm"
+          @click="clearAssignTarget"
+        >
+          {{ t("iam.groupsPage.assignBannerDone") }}
+        </OButton>
+      </template>
+    </OBanner>
     <div class="min-h-0 w-full flex-1 overflow-hidden">
       <div class="bg-card-glass-bg h-full">
         <OTable
@@ -70,6 +95,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="iam-groups-refresh-btn"
               @click="refreshGroups"
             />
+          </template>
+          <template #cell-assign="{ row }">
+            <div class="flex items-center justify-center">
+              <OBadge v-if="isAssigned(row)" variant="success" icon="check" size="sm">
+                {{ t("iam.groupsPage.assignedBadge") }}
+              </OBadge>
+              <OButton
+                v-else
+                :data-test="`iam-groups-assign-${row.group_name}-btn`"
+                variant="outline"
+                size="sm"
+                :loading="assigningGroupName === row.group_name"
+                @click="assignMemberToGroup(row)"
+              >
+                {{ t("iam.groupsPage.assignBtn") }}
+              </OButton>
+            </div>
           </template>
           <template #cell-actions="{ row }">
             <div class="flex items-center justify-center">
@@ -188,6 +230,8 @@ import { groupsQuery } from "@/services/iam.queries";
 import { ref, onBeforeMount, computed, watch } from "vue";
 import AddGroup from "./AddGroup.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
@@ -197,9 +241,10 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroup } from "@/services/iam";
+import { getGroup, updateGroup } from "@/services/iam";
+import users from "@/services/users";
 import usePermissions from "@/composables/iam/usePermissions";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
@@ -219,10 +264,75 @@ const { track } = useReo();
 const rows: any = ref([]);
 
 const router = useRouter();
+const route = useRoute();
 
 const store = useStore();
 
 const { groupsState } = usePermissions();
+
+// ── Quick-assign (arrived via ?member=<email>) ────────────────────────────
+// The service-account token popup's "Add to a user group" link lands here
+// with the account's email in the query. Previously nothing read it — this
+// now drives the Assign column below.
+const assignTarget = computed(() => (route.query.member as string) || "");
+const assigningGroupName = ref<string | null>(null);
+const assignedGroupNames = ref<string[]>([]);
+
+const loadAssignedGroupNames = async () => {
+  if (!assignTarget.value) {
+    assignedGroupNames.value = [];
+    return;
+  }
+  try {
+    const res = await users.getUserGroups(
+      store.state.selectedOrganization.identifier,
+      assignTarget.value,
+    );
+    assignedGroupNames.value = Array.isArray(res.data) ? res.data : [];
+  } catch {
+    // Silent: worst case a group the member already belongs to still shows an
+    // actionable "Add" button — a redundant add_users is a harmless no-op.
+    assignedGroupNames.value = [];
+  }
+};
+
+watch(assignTarget, loadAssignedGroupNames, { immediate: true });
+
+const isAssigned = (row: any): boolean => assignedGroupNames.value.includes(row?.group_name);
+
+const clearAssignTarget = () => {
+  const { member: _member, ...rest } = route.query;
+  router.replace({ name: "groups", query: rest });
+};
+
+const assignMemberToGroup = async (group: any) => {
+  if (!assignTarget.value || assigningGroupName.value) return;
+  assigningGroupName.value = group.group_name;
+  try {
+    await updateGroup({
+      group_name: group.group_name,
+      org_identifier: store.state.selectedOrganization.identifier,
+      payload: { add_roles: [], remove_roles: [], add_users: [assignTarget.value], remove_users: [] },
+    });
+    assignedGroupNames.value = [...assignedGroupNames.value, group.group_name];
+    toast({
+      message: t("iam.groupsPage.assignSuccess", {
+        member: assignTarget.value,
+        group: group.group_name,
+      }),
+      variant: "success",
+    });
+  } catch (err: any) {
+    if (err?.response?.status != 403) {
+      toast({
+        message: err?.response?.data?.message || t("iam.groupsPage.assignError"),
+        variant: "error",
+      });
+    }
+  } finally {
+    assigningGroupName.value = null;
+  }
+};
 
 const filterQuery = ref("");
 
@@ -242,15 +352,29 @@ const handleSelectedIdsUpdate = (ids: string[]) => {
 const confirmBulkDelete = ref(false);
 const bulkDeleteLoading = ref(false);
 
-const columns: OTableColumnDef[] = [
-  {
-    id: "group_name",
-    header: t("iam.groupName"),
-    accessorKey: "group_name",
-    sortable: true,
-    meta: { align: "left", autoWidth: true, isName: true },
-  },
-  {
+const columns = computed<OTableColumnDef[]>(() => {
+  const cols: OTableColumnDef[] = [
+    {
+      id: "group_name",
+      header: t("iam.groupName"),
+      accessorKey: "group_name",
+      sortable: true,
+      meta: { align: "left", autoWidth: true, isName: true },
+    },
+  ];
+
+  if (assignTarget.value) {
+    cols.push({
+      id: "assign",
+      header: t("iam.groupsPage.assignColumn"),
+      sortable: false,
+      resizable: false,
+      size: 130,
+      meta: { align: "center" },
+    });
+  }
+
+  cols.push({
     id: "actions",
     header: t("alerts.actions"),
     isAction: true,
@@ -259,8 +383,10 @@ const columns: OTableColumnDef[] = [
     minSize: 64,
     maxSize: 100,
     meta: { align: "center", actionCount: 2 },
-  },
-];
+  });
+
+  return cols;
+});
 
 onBeforeMount(() => {
   setupGroups();

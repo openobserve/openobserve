@@ -2190,7 +2190,14 @@
       },
       "bulkDelete": {
         "impact": "Any users and service accounts bound to these roles will lose access."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a role — click Add next to a role below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to role \"{role}\".",
+      "assignError": "Could not add the account to that role. Please try again."
     },
     "group": {
       "name": {
@@ -2221,7 +2228,14 @@
       },
       "bulkDelete": {
         "impact": "Members of these groups will lose the roles granted by them."
-      }
+      },
+      "assignColumn": "Assign",
+      "assignBtn": "Add",
+      "assignedBadge": "Assigned",
+      "assignBannerText": "Add {member} to a user group — click Add next to a group below.",
+      "assignBannerDone": "Done",
+      "assignSuccess": "Added {member} to group \"{group}\".",
+      "assignError": "Could not add the account to that group. Please try again."
     },
     "appGroups": {
       "deleteGroupTitle": "Delete Group",
