@@ -52,9 +52,6 @@ pub type ClassicHistogramRecord = (&'static str, Option<String>, f64);
 /// Prometheus's stale-marker bit pattern in `sum`; an ordinary NaN is NOT stale.
 const STALE_NAN_BITS: u64 = 0x7ff0_0000_0000_0002;
 
-/// Exponential-bucket histogram decoded to `(bucket index, count)` pairs, where bucket
-/// `idx` covers `(base^(idx-1), base^idx]` with `base = 2^(2^-schema)`, mirrored on the
-/// negative side. Both Prometheus native and OTLP exponential histograms reduce to this.
 pub struct ExponentialHistogram {
     pub schema: i32,
     pub count: f64,
@@ -67,9 +64,6 @@ pub struct ExponentialHistogram {
 }
 
 impl ExponentialHistogram {
-    /// Degrades the sample into classic records: cumulative `le` buckets closed by
-    /// `le="inf"`. A sample expanding to more than `max_buckets` `le` labels, or finer
-    /// than schema 8, is downscaled (adjacent buckets merged) until it fits.
     pub fn expand(self, max_buckets: usize) -> Vec<ClassicHistogramRecord> {
         let Self {
             mut schema,
@@ -82,6 +76,10 @@ impl ExponentialHistogram {
         } = self;
         // a NaN or negative threshold reads as no zero region
         let zero_threshold = zero_threshold.max(0.0);
+        // a NaN or negative zero count cannot cumulate, so it reads as an empty zero bucket
+        if zero_count.is_nan() || zero_count < 0.0 {
+            zero_count = 0.0;
+        }
 
         // schemas finer than 8 are merged down in one step, so any i32 schema is cheap
         if schema > MAX_SCHEMA {
@@ -89,9 +87,7 @@ impl ExponentialHistogram {
             negative = downscale(negative, (schema - MAX_SCHEMA) as u32);
             schema = MAX_SCHEMA;
         }
-        // every emitted `le` label becomes a series, so merge adjacent buckets (halving
-        // resolution) until the sample's le count fits the cardinality budget
-        while le_estimate(&positive, &negative, zero_count) > max_buckets.max(3)
+        while le_estimate(&positive, &negative, zero_threshold) > max_buckets.max(3)
             && schema > MIN_DOWNSCALE_SCHEMA
         {
             schema -= 1;
@@ -117,9 +113,8 @@ impl ExponentialHistogram {
                 buckets.push((lower, upper.min(-zero_threshold), c));
             }
         }
-        if zero_count > 0.0 {
-            buckets.push((-zero_threshold, zero_threshold, zero_count));
-        }
+        // the zero bucket is always reported, so its `le` series must exist before it fills
+        buckets.push((-zero_threshold, zero_threshold, zero_count));
 
         // classic buckets are cumulative in `le` order
         buckets.sort_by(|a, b| a.1.total_cmp(&b.1));
@@ -134,9 +129,6 @@ impl ExponentialHistogram {
         let mut cumulative = 0.0;
         let mut prev_upper = f64::NEG_INFINITY;
         for (lower, upper, c) in buckets {
-            // a zero-increment record at the lower bound of each bucket run pins sparse
-            // gaps, so quantile interpolation cannot smear counts across them.
-            // `lower < upper` skips the marker when clamping collapsed both bounds.
             if lower > prev_upper && lower < upper {
                 push_le_point(&mut points, format_le(lower), cumulative);
             }
@@ -152,8 +144,6 @@ impl ExponentialHistogram {
     }
 }
 
-/// Degrades one native histogram sample into classic records. Empty for unsupported
-/// schemas and stale markers.
 pub fn expand_native_histogram(
     hp: &prometheus_rpc::Histogram,
     max_buckets: usize,
@@ -222,10 +212,6 @@ fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
     }
 }
 
-/// Upper bound of bucket `idx`: `2^(idx * 2^-schema)` via `exp2`, so powers of two are
-/// exact and a boundary shared between schemas is the identical f64 (downscaling keeps
-/// surviving `le`s in the same series). Clamped finite so the last representable
-/// bucket cannot collide with `le="inf"`; subnormal bounds are kept as is.
 fn bucket_bound(schema: i32, idx: i64) -> f64 {
     if idx == 0 {
         return 1.0;
@@ -235,10 +221,7 @@ fn bucket_bound(schema: i32, idx: i64) -> f64 {
     ((idx as f64) * factor).exp2().min(f64::MAX)
 }
 
-/// Upper bound on the `le` labels a sample will emit: each populated bucket gets an
-/// upper record, each contiguous run a lower-bound gap marker, plus the zero bucket's
-/// two bounds and `inf`.
-fn le_estimate(pos: &[(i64, f64)], neg: &[(i64, f64)], zero_count: f64) -> usize {
+fn le_estimate(pos: &[(i64, f64)], neg: &[(i64, f64)], zero_threshold: f64) -> usize {
     let side = |b: &[(i64, f64)]| {
         let runs = b
             .iter()
@@ -248,11 +231,9 @@ fn le_estimate(pos: &[(i64, f64)], neg: &[(i64, f64)], zero_count: f64) -> usize
             + usize::from(!b.is_empty());
         b.len() + runs
     };
-    side(pos) + side(neg) + if zero_count > 0.0 { 2 } else { 0 } + 1
+    side(pos) + side(neg) + if zero_threshold > 0.0 { 2 } else { 1 } + 1
 }
 
-/// Merges runs of `2^steps` adjacent buckets: `idx` at schema `s` maps to
-/// `ceil(idx / 2^steps)` at schema `s - steps`.
 fn downscale(buckets: Vec<(i64, f64)>, steps: u32) -> Vec<(i64, f64)> {
     // indices are i32 offsets plus a length, so 2^62 already maps every bucket to 0 or 1
     let span = 1i64 << steps.min(62);
@@ -267,8 +248,6 @@ fn downscale(buckets: Vec<(i64, f64)>, steps: u32) -> Vec<(i64, f64)> {
     out
 }
 
-/// Decodes the sparse layout (spans + integer deltas or absolute float counts) into
-/// `(bucket index, absolute count)` pairs for every populated bucket.
 fn span_buckets(
     spans: &[prometheus_rpc::BucketSpan],
     deltas: &[i64],
@@ -295,8 +274,7 @@ fn span_buckets(
                 cumulative_delta as f64
             };
             pos += 1;
-            // skips zero-count buckets and NaN float counts
-            if count > 0.0 {
+            if count >= 0.0 {
                 buckets.push((idx, count));
             }
             idx += 1;
@@ -410,8 +388,9 @@ mod tests {
                 (-2.0, 0.0), // lower-bound marker of the negative run
                 (-1.0, 3.0), // negative idx 1: [-2, -1)
                 (-0.5, 5.0), // negative idx 0: [-1, -0.5)
-                (1.0, 5.0),  // lower-bound marker: (-0.5, 1] carries nothing
-                (2.0, 9.0),  // positive idx 1: (1, 2]
+                (0.0, 5.0),
+                (1.0, 5.0), // lower-bound marker: (-0.5, 1] carries nothing
+                (2.0, 9.0), // positive idx 1: (1, 2]
                 (f64::INFINITY, 9.0),
             ]
         );
@@ -453,7 +432,7 @@ mod tests {
         assert!(scalar_record(&recs, "_sum").is_nan());
         assert_eq!(
             bucket_records(&recs),
-            vec![(0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 7.0)]
+            vec![(0.0, 0.0), (0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 7.0)]
         );
     }
 
@@ -463,7 +442,10 @@ mod tests {
     fn test_expand_native_histogram_empty_and_short_count() {
         let empty = expand_native_histogram(&native_histogram_base(), 16);
         assert_eq!(scalar_record(&empty, "_count"), 0.0);
-        assert_eq!(bucket_records(&empty), vec![(f64::INFINITY, 0.0)]);
+        assert_eq!(
+            bucket_records(&empty),
+            vec![(0.0, 0.0), (f64::INFINITY, 0.0)]
+        );
 
         let hp = prometheus_rpc::Histogram {
             positive_spans: vec![prometheus_rpc::BucketSpan {
@@ -476,7 +458,7 @@ mod tests {
         let recs = expand_native_histogram(&hp, 16);
         assert_eq!(
             bucket_records(&recs),
-            vec![(0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 7.0)]
+            vec![(0.0, 0.0), (0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 7.0)]
         );
     }
 
@@ -540,14 +522,14 @@ mod tests {
         let recs = expand_native_histogram(&hp, 16);
         assert_bucket_invariants(&recs);
         let buckets = bucket_records(&recs);
-        // lower marker at idx 249's bound, uppers for idx 250 and 251, then inf
-        assert_eq!(buckets.len(), 4);
+        // zero bucket, lower marker at idx 249's bound, uppers for idx 250 and 251, then inf
+        assert_eq!(buckets.len(), 5);
         assert_eq!(
             buckets.iter().map(|(_, c)| *c).collect::<Vec<_>>(),
-            vec![0.0, 5.0, 8.0, 8.0]
+            vec![0.0, 0.0, 5.0, 8.0, 8.0]
         );
-        assert_eq!(buckets[1].0, 1.968);
-        assert_eq!(buckets[2].0, 1.973);
+        assert_eq!(buckets[2].0, 1.968);
+        assert_eq!(buckets[3].0, 1.973);
     }
 
     /// Power-of-two bounds are exact and a boundary shared between schemas is the
@@ -620,14 +602,15 @@ mod tests {
 
         // no limit pressure: 8 buckets stay at schema 2
         let full = expand_native_histogram(&hp, 64);
-        assert_eq!(bucket_records(&full).len(), 10); // 8 uppers + 1 lower marker + inf
+        assert_eq!(bucket_records(&full).len(), 11); // zero bucket + 8 uppers + 1 lower marker + inf
 
-        // limit 4 le labels: two halvings land on schema 0
-        let scaled = expand_native_histogram(&hp, 4);
+        // limit 5 le labels: two halvings land on schema 0
+        let scaled = expand_native_histogram(&hp, 5);
         assert_bucket_invariants(&scaled);
         assert_eq!(
             bucket_records(&scaled),
             vec![
+                (0.0, 0.0),
                 (1.0, 0.0),  // lower marker
                 (2.0, 10.0), // (1, 2]: 1+2+3+4
                 (4.0, 36.0), // (2, 4]: 5+6+7+8
@@ -655,11 +638,10 @@ mod tests {
             ..native_histogram_base()
         };
 
-        // 4 buckets + 4 markers + inf = 9 labels > 8: one halving makes them
-        // contiguous (idx 0..=3 at schema 2), 6 labels
+        // 4 buckets + 4 markers + zero bucket + inf = 10 > 8: one halving makes 7 contiguous labels
         let recs = expand_native_histogram(&hp, 8);
         assert_bucket_invariants(&recs);
-        assert_eq!(bucket_records(&recs).len(), 6);
+        assert_eq!(bucket_records(&recs).len(), 7);
         assert_eq!(scalar_record(&recs, "_count"), 4.0);
     }
 
@@ -710,8 +692,6 @@ mod tests {
         );
     }
 
-    /// Buckets fully inside the zero region fold into the zero bucket and partial
-    /// overlaps are clipped, on both sides, so `le` stays strictly increasing.
     #[test]
     fn test_expand_native_histogram_zero_threshold_folds_and_clips_both_sides() {
         let hp = prometheus_rpc::Histogram {
@@ -744,8 +724,6 @@ mod tests {
         );
     }
 
-    /// `expand` itself stays cheap for any i32 schema: the fine-schema merge is one
-    /// step, not one iteration per schema level.
     #[test]
     fn test_expand_extreme_schema_is_bounded() {
         let recs = ExponentialHistogram {
@@ -765,6 +743,7 @@ mod tests {
             vec![
                 (-1.003, 0.0),
                 (-1.0, 1.0),
+                (0.0, 1.0),
                 (1.0, 1.0),
                 (1.003, 3.0),
                 (f64::INFINITY, 3.0),
@@ -772,8 +751,6 @@ mod tests {
         );
     }
 
-    /// The coarsest schema does not overflow on negation: bucket 1 spans all of f64
-    /// and bucket -1 collapses to zero.
     #[test]
     fn test_bucket_bound_extreme_negative_schema() {
         assert_eq!(bucket_bound(i32::MIN, 0), 1.0);
@@ -792,8 +769,6 @@ mod tests {
         assert_bucket_invariants(&recs);
     }
 
-    /// Subnormal bounds stay representable instead of collapsing onto
-    /// `f64::MIN_POSITIVE`; a fully underflowed negated bound labels as "0", not "-0".
     #[test]
     fn test_bucket_bound_keeps_subnormals() {
         assert_eq!(bucket_bound(0, -1023), 2f64.powi(-1023));
@@ -861,7 +836,7 @@ mod tests {
         assert_bucket_invariants(&recs);
         assert_eq!(
             bucket_records(&recs),
-            vec![(0.5, 0.0), (1.0, 9.0), (f64::INFINITY, 9.0)]
+            vec![(0.0, 0.0), (0.5, 0.0), (1.0, 9.0), (f64::INFINITY, 9.0)]
         );
     }
 
@@ -882,7 +857,7 @@ mod tests {
         assert_eq!(scalar_record(&recs, "_count"), 10.0);
         assert_eq!(
             bucket_records(&recs),
-            vec![(0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 10.0)]
+            vec![(0.0, 0.0), (0.5, 0.0), (1.0, 7.0), (f64::INFINITY, 10.0)]
         );
     }
 
@@ -910,6 +885,7 @@ mod tests {
         assert_eq!(
             bucket_records(&recs),
             vec![
+                (0.0, 0.0),
                 (0.5, 0.0),
                 (1.0, 3.0),
                 // rounding f64::MAX to 4 digits would overflow to infinity and collide
@@ -920,38 +896,44 @@ mod tests {
         );
     }
 
-    /// NaN float counts are skipped; the remaining buckets keep their positions.
+    /// NaN and negative float counts are skipped while an explicit zero count is kept.
     #[test]
     fn test_expand_native_histogram_nan_float_count_skipped() {
         let hp = prometheus_rpc::Histogram {
             count: Some(prometheus_rpc::histogram::Count::CountFloat(5.0)),
             positive_spans: vec![prometheus_rpc::BucketSpan {
                 offset: 1,
-                length: 2,
+                length: 4,
             }],
-            positive_counts: vec![f64::NAN, 5.0],
+            positive_counts: vec![f64::NAN, 0.0, -1.0, 5.0],
             ..native_histogram_base()
         };
         let recs = expand_native_histogram(&hp, 16);
         assert_bucket_invariants(&recs);
-        // idx 1 (NaN) skipped; idx 2 -> (2, 4] with its lower-bound marker
+        // idx 1 (NaN) skipped, so le=2 is the gap marker; idx 2 empty but kept; idx 3 (-1) skipped
         assert_eq!(
             bucket_records(&recs),
-            vec![(2.0, 0.0), (4.0, 5.0), (f64::INFINITY, 5.0)]
+            vec![
+                (0.0, 0.0),
+                (2.0, 0.0),
+                (4.0, 0.0),
+                (8.0, 0.0),
+                (16.0, 5.0),
+                (f64::INFINITY, 5.0)
+            ]
         );
     }
 
-    /// An interior empty bucket is skipped; the gap marker pins the next bucket's
-    /// lower bound.
+    /// A negative integer delta run is skipped, so cumulative counts never decrease.
     #[test]
-    fn test_expand_native_histogram_interior_zero_bucket_gap() {
+    fn test_expand_native_histogram_negative_integer_count_skipped() {
         let hp = prometheus_rpc::Histogram {
-            count: Some(prometheus_rpc::histogram::Count::CountInt(5)),
+            count: Some(prometheus_rpc::histogram::Count::CountInt(7)),
             positive_spans: vec![prometheus_rpc::BucketSpan {
                 offset: 0,
                 length: 3,
             }],
-            positive_deltas: vec![3, -3, 2], // buckets 3, 0, 2
+            positive_deltas: vec![3, -4, 5], // buckets 3, -1, 4
             ..native_histogram_base()
         };
         let recs = expand_native_histogram(&hp, 16);
@@ -959,12 +941,130 @@ mod tests {
         assert_eq!(
             bucket_records(&recs),
             vec![
+                (0.0, 0.0),
                 (0.5, 0.0),
                 (1.0, 3.0),
-                (2.0, 3.0), // idx 1 empty: le=2 is the gap marker for (2, 4]
-                (4.0, 5.0),
-                (f64::INFINITY, 5.0),
+                (2.0, 3.0), // idx 1 (-1) skipped: le=2 is the gap marker for (2, 4]
+                (4.0, 7.0),
+                (f64::INFINITY, 7.0),
             ]
         );
+    }
+
+    #[test]
+    fn test_expand_native_histogram_interior_zero_bucket_kept() {
+        let hp = prometheus_rpc::Histogram {
+            count: Some(prometheus_rpc::histogram::Count::CountInt(7)),
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 0,
+                length: 3,
+            }],
+            positive_deltas: vec![3, -3, 4], // buckets 3, 0, 4
+            ..native_histogram_base()
+        };
+        let recs = expand_native_histogram(&hp, 16);
+        assert_bucket_invariants(&recs);
+        assert_eq!(
+            bucket_records(&recs),
+            vec![
+                (0.0, 0.0),
+                (0.5, 0.0),
+                (1.0, 3.0),
+                (2.0, 3.0), // idx 1 empty: its own upper record, not a gap marker
+                (4.0, 7.0),
+                (f64::INFINITY, 7.0),
+            ]
+        );
+    }
+
+    /// An explicitly empty bucket inside the zero region adds nothing and emits no record.
+    #[test]
+    fn test_expand_native_histogram_empty_bucket_in_zero_region() {
+        let hp = prometheus_rpc::Histogram {
+            count: Some(prometheus_rpc::histogram::Count::CountInt(2)),
+            zero_threshold: 4.0,
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 1,
+                length: 3,
+            }],
+            positive_deltas: vec![0, 0, 2], // buckets (1,2]=0, (2,4]=0, (4,8]=2
+            ..native_histogram_base()
+        };
+        let recs = expand_native_histogram(&hp, 16);
+        assert_bucket_invariants(&recs);
+        assert_eq!(
+            bucket_records(&recs),
+            vec![(-4.0, 0.0), (4.0, 0.0), (8.0, 2.0), (f64::INFINITY, 2.0)]
+        );
+    }
+
+    /// The zero bucket's `le` series exists before its first observation.
+    #[test]
+    fn test_expand_native_histogram_zero_bucket_series_stable_across_samples() {
+        let sample = |zero_count: u64| {
+            let hp = prometheus_rpc::Histogram {
+                count: Some(prometheus_rpc::histogram::Count::CountInt(3 + zero_count)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(
+                    zero_count,
+                )),
+                positive_spans: vec![prometheus_rpc::BucketSpan {
+                    offset: 0,
+                    length: 1,
+                }],
+                positive_deltas: vec![3],
+                ..native_histogram_base()
+            };
+            let recs = expand_native_histogram(&hp, 16);
+            assert_bucket_invariants(&recs);
+            bucket_records(&recs)
+        };
+        assert_eq!(
+            sample(0),
+            vec![(0.0, 0.0), (0.5, 0.0), (1.0, 3.0), (f64::INFINITY, 3.0)]
+        );
+        assert_eq!(
+            sample(1),
+            vec![(0.0, 1.0), (0.5, 1.0), (1.0, 4.0), (f64::INFINITY, 4.0)]
+        );
+    }
+
+    /// A negative or NaN float zero count reads as an empty zero bucket; neighbours are unaffected.
+    #[test]
+    fn test_expand_native_histogram_invalid_zero_count_reads_as_empty() {
+        for zero_count in [-1.0, f64::NAN] {
+            let hp = prometheus_rpc::Histogram {
+                count: Some(prometheus_rpc::histogram::Count::CountFloat(7.0)),
+                zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountFloat(
+                    zero_count,
+                )),
+                zero_threshold: 0.1,
+                positive_spans: vec![prometheus_rpc::BucketSpan {
+                    offset: 0,
+                    length: 1,
+                }],
+                positive_counts: vec![4.0],
+                negative_spans: vec![prometheus_rpc::BucketSpan {
+                    offset: 0,
+                    length: 1,
+                }],
+                negative_counts: vec![3.0],
+                ..native_histogram_base()
+            };
+            let recs = expand_native_histogram(&hp, 16);
+            assert_bucket_invariants(&recs);
+            assert_eq!(
+                bucket_records(&recs),
+                vec![
+                    (-1.0, 0.0),
+                    (-0.5, 3.0),
+                    (-0.1, 3.0),
+                    (0.1, 3.0),
+                    (0.5, 3.0),
+                    (1.0, 7.0),
+                    (f64::INFINITY, 7.0),
+                ],
+                "zero_count {zero_count}"
+            );
+        }
     }
 }
