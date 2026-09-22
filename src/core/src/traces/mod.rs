@@ -1131,14 +1131,8 @@ pub async fn handle_otlp_request(
     .await
     {
         log::error!("Error while writing traces: {e}");
-        // Check if this is a schema validation error (InvalidData)
-        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
-            http::StatusCode::BAD_REQUEST
-        } else {
-            http::StatusCode::INTERNAL_SERVER_ERROR
-        };
         return Ok(MetaHttpResponse::error_with_header(
-            status_code,
+            write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1492,14 +1486,8 @@ pub async fn ingest_json(
     .await
     {
         log::error!("Error while writing traces: {e}");
-        // Check if this is a schema validation error (InvalidData)
-        let status_code = if e.kind() == std::io::ErrorKind::InvalidData {
-            http::StatusCode::BAD_REQUEST
-        } else {
-            http::StatusCode::INTERNAL_SERVER_ERROR
-        };
         return Ok(MetaHttpResponse::error_with_header(
-            status_code,
+            write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1581,6 +1569,19 @@ fn format_response(
                 .into_response())
         }
     }
+}
+
+/// Schema rejections are tagged `InvalidData`; a failed WAL write carries the ingestion error.
+fn write_error_status(e: &Error) -> http::StatusCode {
+    if e.kind() == std::io::ErrorKind::InvalidData {
+        return http::StatusCode::BAD_REQUEST;
+    }
+    e.get_ref()
+        .and_then(|inner| inner.downcast_ref::<infra::errors::Error>())
+        .map_or(
+            http::StatusCode::INTERNAL_SERVER_ERROR,
+            crate::ingestion::write_error_status,
+        )
 }
 
 async fn write_traces_by_stream(
@@ -1787,7 +1788,7 @@ async fn write_traces(
     .await
     .map_err(|e| {
         log::error!("Error while writing traces: {e}");
-        std::io::Error::other(e.to_string())
+        std::io::Error::other(e)
     })?;
 
     // only one trigger per request; notification/db work must not block ingestion
@@ -3314,5 +3315,27 @@ mod tests {
         for kind in [0, 1] {
             assert!(super::derive_service_graph_fields(kind, lookup).is_empty());
         }
+    }
+
+    #[test]
+    fn test_write_error_status() {
+        use super::write_error_status;
+
+        let schema = std::io::Error::new(std::io::ErrorKind::InvalidData, "too many columns");
+        assert_eq!(write_error_status(&schema), http::StatusCode::BAD_REQUEST);
+        let overload = std::io::Error::other(infra::errors::Error::ResourceError(
+            "write queue full".to_string(),
+        ));
+        assert_eq!(
+            write_error_status(&overload),
+            http::StatusCode::SERVICE_UNAVAILABLE
+        );
+        let fault = std::io::Error::other(infra::errors::Error::IngestionError(
+            "disk failure".to_string(),
+        ));
+        assert_eq!(
+            write_error_status(&fault),
+            http::StatusCode::INTERNAL_SERVER_ERROR
+        );
     }
 }

@@ -805,7 +805,7 @@ pub async fn handle_request(
     if let Err(e) = write_result {
         log::error!("Error while writing logs: {e}");
         return Ok(MetaHttpResponse::error_with_header(
-            StatusCode::INTERNAL_SERVER_ERROR,
+            crate::ingestion::write_error_status(&e),
             format!("error while writing log data: {e}"),
         ));
     }
