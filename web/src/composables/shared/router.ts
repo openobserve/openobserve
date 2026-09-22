@@ -21,6 +21,7 @@ import {
   getPath,
 } from "@/utils/zincutils";
 import type { LocationQuery, LocationQueryRaw, RouteLocationRaw } from "vue-router";
+import { clearPersistedSelections } from "@/composables/usePersistedSelection";
 import config from "@/aws-exports";
 import { resolveTraceSearchMode, type TraceSearchMode } from "@/ts/interfaces/traces/trace.types";
 import store from "@/stores";
@@ -195,6 +196,7 @@ const useRoutes = () => {
           invalidateLoginData();
           useLocalCurrentUser("", true);
           useLocalUserInfo("", true);
+          clearPersistedSelections();
         } finally {
           window.location.href = `${getPath()}login`;
         }

@@ -16,6 +16,7 @@
 // @ts-ignore
 import { queryClient } from "@/composables/query/queryClient";
 import { beforeAll, afterEach, afterAll, vi } from "vitest";
+import { clearPersistedSelections } from "@/composables/usePersistedSelection";
 
 import { setupServer } from "msw/node";
 import { config } from "@vue/test-utils";
@@ -347,6 +348,8 @@ afterEach(() => {
   // not enough — persisted entries would be restored from IndexedDB.
   queryClient.clear();
   void purgeAllPersisted();
+  // A table selection saved by one test would be restored into the next mount of that page.
+  clearPersistedSelections();
 });
 
 // Stop the server when tests are done
