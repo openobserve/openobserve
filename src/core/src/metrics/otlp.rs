@@ -826,6 +826,9 @@ fn append_number_point(
 
 /// A gauge or sum point's value under the shared policy, `None` for one that writes no record.
 fn number_point_value(data_point: &NumberDataPoint) -> Option<f64> {
+    if no_recorded_value(data_point.flags) {
+        return None;
+    }
     get_metric_val(&data_point.value).and_then(super::sanitize_metric_value)
 }
 
@@ -917,10 +920,10 @@ fn process_summary(
 #[must_use]
 fn process_data_point(rec: &mut json::Value, data_point: &NumberDataPoint) -> bool {
     insert_attributes(rec, &data_point.attributes);
-    let Some(value) = get_metric_val(&data_point.value).and_then(super::metric_value) else {
+    let Some(value) = number_point_value(data_point) else {
         return false;
     };
-    rec[VALUE_LABEL] = value;
+    rec[VALUE_LABEL] = value.into();
     rec[TIMESTAMP_COL_NAME] = (data_point.time_unix_nano / 1000).into();
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
@@ -932,6 +935,9 @@ fn process_hist_data_point(
     rec: &mut json::Value,
     data_point: &HistogramDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
     insert_attributes(rec, &data_point.attributes);
@@ -990,6 +996,9 @@ fn process_exp_hist_data_point(
     rec: &mut json::Value,
     data_point: &ExponentialHistogramDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
     insert_attributes(rec, &data_point.attributes);
@@ -1046,6 +1055,9 @@ fn process_summary_data_point(
     rec: &mut json::Value,
     data_point: &SummaryDataPoint,
 ) -> Vec<serde_json::Value> {
+    if no_recorded_value(data_point.flags) {
+        return vec![];
+    }
     let mut bucket_recs = vec![];
 
     insert_attributes(rec, &data_point.attributes);
@@ -1138,11 +1150,16 @@ fn fill(slot: &mut (String, String), name: &str, value: &str) {
 }
 
 fn data_point_flag(flags: u32) -> &'static str {
-    if flags == 1 {
+    if no_recorded_value(flags) {
         DataPointFlags::NoRecordedValueMask.as_str_name()
     } else {
         DataPointFlags::DoNotUse.as_str_name()
     }
+}
+
+/// A point carrying `NO_RECORDED_VALUE` marks a gap (a staleness marker); it writes no record.
+fn no_recorded_value(flags: u32) -> bool {
+    flags & (DataPointFlags::NoRecordedValueMask as u32) != 0
 }
 
 fn process_aggregation_temporality(rec: &mut json::Value, val: i32) {
@@ -1917,7 +1934,7 @@ mod tests {
 
         assert_eq!(rejected, json_records[json_records.len() - 6..]);
         let accepted = &json_records[..json_records.len() - 6];
-        assert_eq!(written.len(), 5);
+        assert_eq!(written.len(), 4);
         for (row, record) in written.iter().zip(accepted) {
             assert_eq!(row, record.as_object().unwrap());
         }
@@ -2685,8 +2702,17 @@ mod tests {
                 ),
             };
 
-            assert!(process_data_point(&mut rec, &data_point_flag1));
-            assert_eq!(rec["flag"], "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK");
+            assert!(!process_data_point(&mut rec, &data_point_flag1));
+            assert!(rec.get(VALUE_LABEL).is_none());
+            assert_eq!(
+                data_point_flag(1),
+                "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
+            );
+            assert_eq!(
+                data_point_flag(3),
+                "DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK"
+            );
+            assert_eq!(data_point_flag(2), "DATA_POINT_FLAGS_DO_NOT_USE");
 
             // Test with flag 0 (DoNotUse)
             let data_point_flag0 = NumberDataPoint {
@@ -3309,22 +3335,86 @@ mod tests {
             );
         }
 
-        /// A staleness marker flips `flag` to `DATA_POINT_FLAGS_NO_RECORDED_VALUE_MASK` on a
-        /// stream that is otherwise the same series.
+        /// A staleness marker carries `NO_RECORDED_VALUE`; storing its value as a sample would
+        /// make a gap look like a real reading.
         #[test]
-        fn test_process_gauge_flag_does_not_fork_the_series() {
+        fn test_process_gauge_no_recorded_value_writes_no_record() {
             let stale = NumberDataPoint {
-                flags: 1,
+                flags: DataPointFlags::NoRecordedValueMask as u32,
                 ..number_dp(2.0, vec![attr("pod", "a")])
             };
             let records = gauge_records(vec![number_dp(1.0, vec![attr("pod", "a")]), stale]);
 
-            assert_eq!(records.len(), 2);
-            assert_ne!(records[0]["flag"], records[1]["flag"]);
-            assert_eq!(
-                records[0][HASH_LABEL], records[1][HASH_LABEL],
-                "a staleness marker must not fork the series"
-            );
+            assert_eq!(records.len(), 1);
+            assert_eq!(records[0][VALUE_LABEL], json!(1.0));
+        }
+
+        /// The flag is a bit mask, so it must be honoured when other bits are set too.
+        #[test]
+        fn test_process_sum_no_recorded_value_bit_is_tested_not_compared() {
+            let stale = NumberDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32 | 2,
+                ..number_dp(2.0, vec![])
+            };
+
+            assert!(sum_records(vec![stale]).is_empty());
+        }
+
+        /// A flagged histogram would otherwise write zero `_count`/`_sum`/bucket rows, which
+        /// `rate()` reads as a counter reset when the series resumes.
+        #[test]
+        fn test_process_hist_data_point_no_recorded_value_writes_no_records() {
+            let stale = HistogramDataPoint {
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                ..hist_dp(Some(1.0), None, None)
+            };
+
+            assert!(hist_records(stale).is_empty());
+        }
+
+        #[test]
+        fn test_process_exp_hist_data_point_no_recorded_value_writes_no_records() {
+            let mut rec = json!({"__name__": "test_metric"});
+            let stale = ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                count: 100,
+                sum: Some(1.0),
+                min: None,
+                max: None,
+                scale: 0,
+                zero_count: 0,
+                zero_threshold: 0.0,
+                positive: Some(Buckets {
+                    offset: 0,
+                    bucket_counts: vec![50, 50],
+                }),
+                negative: None,
+            };
+
+            assert!(process_exp_hist_data_point(&mut rec, &stale).is_empty());
+        }
+
+        #[test]
+        fn test_process_summary_data_point_no_recorded_value_writes_no_records() {
+            let mut rec = json!({"__name__": "test_metric"});
+            let stale = SummaryDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                flags: DataPointFlags::NoRecordedValueMask as u32,
+                count: 100,
+                sum: 1.0,
+                quantile_values: vec![ValueAtQuantile {
+                    quantile: 0.5,
+                    value: 1.0,
+                }],
+            };
+
+            assert!(process_summary_data_point(&mut rec, &stale).is_empty());
         }
 
         /// The columns are still written and still queryable; only their hold on series identity
