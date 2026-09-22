@@ -35,6 +35,7 @@ import { toast } from "@/lib/feedback/Toast/useToast";
 import CopyContent from "@/components/CopyContent.vue";
 import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 import SetupCardRenderer from "./SetupCardRenderer.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { CardSubstitutions } from "./types";
 import { getDataSourceCard } from "./registry";
 import { HOST_AGENT_SLUGS } from "./content/osAgent";
@@ -70,6 +71,14 @@ const subs = computed<CardSubstitutions>(() => {
 });
 
 const content = computed(() => getDataSourceCard(props.slug, subs.value, t));
+
+// The passcode read came back 403 — the org ingestion token is not this role's
+// to see. The card's commands embed it, so withhold them rather than hand the
+// user a snippet whose credential has an empty password. (The legacy
+// CopyContent fallback guards itself, so only the rich path needs this.)
+const passcodeForbidden = computed(
+  () => !!store.state.organizationData?.organizationPasscodeForbidden,
+);
 
 // Detection is forwarded so an embedding page (Hosts empty state) can react to it.
 const emit = defineEmits<{
@@ -136,8 +145,14 @@ const onStepAction = async (actionId: string) => {
   <!-- Mirrors AIIntegrationDetail's wrapper padding so data-source cards and AI
        integration cards sit identically in their panels. -->
   <div class="p-2">
+    <OBanner
+      v-if="passcodeForbidden && content"
+      variant="warning"
+      data-test="data-source-setup-card-passcode-forbidden"
+      :content="t('ingestion.passcodeForbiddenMessage')"
+    />
     <SetupCardRenderer
-      v-if="content"
+      v-else-if="content"
       :content="content"
       :subs="subs"
       data-test="data-source-setup-card"

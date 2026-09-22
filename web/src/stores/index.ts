@@ -39,6 +39,10 @@ const API_ENDPOINT = import.meta.env.VITE_OPENOBSERVE_ENDPOINT
 const organizationObj = {
   organizationPasscode: "",
   organizationPasscodeUser: "",
+  // true once a passcode read came back 403 — the caller lacks the Admin/Root
+  // role. Distinct from an empty passcode, which would otherwise render as a
+  // syntactically valid but non-functional credential in the ingestion snippets.
+  organizationPasscodeForbidden: false,
   allDashboardList: {},
   allDashboardData: {},
   allAlertsListByFolderId: {},
@@ -205,6 +209,9 @@ export default createStore({
     },
     setOrganizationPasscodeUser(state, payload) {
       state.organizationData.organizationPasscodeUser = payload;
+    },
+    setOrganizationPasscodeForbidden(state, payload) {
+      state.organizationData.organizationPasscodeForbidden = payload;
     },
     resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
@@ -470,6 +477,9 @@ export default createStore({
     },
     setOrganizationPasscodeUser(context, payload) {
       context.commit("setOrganizationPasscodeUser", payload);
+    },
+    setOrganizationPasscodeForbidden(context, payload) {
+      context.commit("setOrganizationPasscodeForbidden", payload);
     },
     resetOrganizationData(context, payload) {
       context.commit("resetOrganizationData", payload);

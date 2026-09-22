@@ -15,7 +15,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
+  <!-- A passcode read that came back 403 leaves the store value empty, which
+       would otherwise be substituted into [PASSCODE]/[BASIC_PASSCODE] and render
+       a syntactically valid but non-functional snippet. Say so instead. -->
+  <OBanner
+    v-if="passcodeForbidden && contentNeedsPasscode"
+    variant="warning"
+    data-test="copy-content-passcode-forbidden"
+    :content="t('ingestion.passcodeForbiddenMessage')"
+  />
+  <div v-else class="rounded-default copy-content-block bg-surface-subtle relative overflow-hidden">
     <div class="absolute top-2 right-2 z-10">
       <OButton
         data-test="rum-copy-btn"
@@ -44,10 +53,13 @@ import { maskText, b64EncodeStandard } from "../utils/zincutils";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+
+const PASSCODE_PLACEHOLDERS = ["[PASSCODE]", "[BASIC_PASSCODE]"];
 
 export default defineComponent({
   name: "CopyContent",
-  components: { OButton, OIcon, OTooltip },
+  components: { OButton, OIcon, OTooltip, OBanner },
   props: {
     content: {
       type: String as unknown as PropType<I18nText>,
@@ -114,6 +126,15 @@ export default defineComponent({
   computed: {
     computedData() {
       return this.store.state.organizationData.organizationPasscode;
+    },
+    passcodeForbidden() {
+      return !!this.store.state.organizationData.organizationPasscodeForbidden;
+    },
+    // Only snippets that actually embed the credential are withheld — plain
+    // content (endpoints, stream names) still renders for every role.
+    contentNeedsPasscode() {
+      const source = this.displayContent || this.content || "";
+      return PASSCODE_PLACEHOLDERS.some((token) => source.includes(token));
     },
   },
   watch: {

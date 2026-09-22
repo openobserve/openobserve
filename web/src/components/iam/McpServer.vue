@@ -55,6 +55,10 @@ onMounted(() => {
     .fetchQuery(orgPasscodeQuery(store.state.selectedOrganization.identifier))
     .then((res: any) => {
       if (res.data?.passcode) {
+        // Pair the reset with the setter, as Ingestion.vue does everywhere: a
+        // stale `true` left by an earlier forbidden read would otherwise hide a
+        // snippet whose credential we have just successfully loaded.
+        store.dispatch("setOrganizationPasscodeForbidden", false);
         store.dispatch("setOrganizationPasscode", res.data.passcode);
         store.dispatch("setOrganizationPasscodeUser", res.data.user);
       }

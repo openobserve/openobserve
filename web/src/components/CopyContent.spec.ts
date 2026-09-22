@@ -37,6 +37,9 @@ const mockI18n = createI18n({
         contentCopiedSuccessfully: "Content Copied Successfully!",
         copyContentError: "Error while copying content.",
       },
+      ingestion: {
+        passcodeForbiddenMessage: "Admin or Root role required to view the ingestion token.",
+      },
     },
   },
 });
@@ -333,6 +336,70 @@ describe("CopyContent.vue Branch Coverage", () => {
           timeout: 5000,
         },
       );
+    });
+  });
+
+  // A 403 on the passcode read leaves organizationPasscode empty. Substituting
+  // that would render a valid-looking snippet whose credential has no password,
+  // so the credential-bearing block is withheld and the reason is shown instead.
+  describe("Passcode Forbidden Branch Coverage", () => {
+    const forbiddenStore = createStore({
+      state: {
+        userInfo: { email: "test@example.com" },
+        organizationData: {
+          organizationPasscode: "",
+          organizationPasscodeForbidden: true,
+        },
+      },
+    });
+
+    const mountWith = (content: string) =>
+      mount(CopyContent, {
+        props: { content, displayContent: content },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: forbiddenStore },
+        },
+      });
+
+    it("should hide the snippet and explain the missing role when content needs a passcode", () => {
+      const wrapper = mountWith("curl -u [EMAIL]:[PASSCODE] https://example.com");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(false);
+      expect(wrapper.text()).toContain("Admin or Root role required to view the ingestion token.");
+    });
+
+    it("should hide the snippet for [BASIC_PASSCODE] content too", () => {
+      const wrapper = mountWith("Authorization: Basic [BASIC_PASSCODE]");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(false);
+    });
+
+    it("should still render content that does not embed the passcode", () => {
+      const wrapper = mountWith("Endpoint: https://example.com/api/default");
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-content-text"]').text()).toBe(
+        "Endpoint: https://example.com/api/default",
+      );
+    });
+
+    it("should render the snippet normally when the passcode is readable", () => {
+      const wrapper = mount(CopyContent, {
+        props: {
+          content: "curl -u [EMAIL]:[PASSCODE] https://example.com",
+          displayContent: "curl -u [EMAIL]:[PASSCODE] https://example.com",
+        },
+        global: {
+          plugins: [mockI18n],
+          provide: { store: mockStore },
+        },
+      });
+
+      expect(wrapper.find('[data-test="copy-content-passcode-forbidden"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="rum-content-text"]').exists()).toBe(true);
     });
   });
 });

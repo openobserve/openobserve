@@ -274,6 +274,64 @@ export default defineComponent({
     const ingestTabType = ref("recommended");
     const globalSearchQuery = ref("");
 
+    // Authoritative record of what GET /{org}/passcode answered for the org
+    // currently in `currentOrgIdentifier`. Only that endpoint can write it:
+    //
+    //   - `true`  — a 403 was observed. The org ingestion token is not this
+    //               role's to see, and nothing else on this page may contradict
+    //               that. GET /{org}/ingestion-tokens is NOT a second opinion:
+    //               both endpoints now share one server-side guard, so a token
+    //               arriving from the selector cannot mean the passcode 403 was
+    //               wrong — it can only mean that response was already in
+    //               flight, or is stale.
+    //   - `false` — a read or rotate succeeded, so the credential is this
+    //               role's to see.
+    //   - `null`  — not yet known (initial load, or the org just changed).
+    //
+    // Latching on the passcode answer is what makes the banner independent of
+    // which request happens to resolve last: previously whichever of the two
+    // concurrent onBeforeMount calls landed second won, so on enterprise the
+    // tokens response routinely cleared a 403 that had already been observed.
+    const passcodeReadForbidden = ref<boolean | null>(null);
+
+    // True while the active passcode is one the token SELECTOR published (from
+    // the /ingestion-tokens response) rather than one the passcode endpoint
+    // returned. Tracked so a 403 that lands afterwards can withdraw
+    // exactly that value and nothing else — a passcode obtained from a
+    // successful read or rotate is never touched.
+    const passcodeCameFromTokenSelector = ref(false);
+
+    // Publish a token chosen in the selector as the active passcode. Refuses
+    // once a 403 is latched: a 403 means the credential was never this role's
+    // to see, so neither the watcher nor an explicit dropdown pick may reveal
+    // it. Returns whether it published, so callers can keep their own state
+    // consistent.
+    const publishSelectedToken = (token: string) => {
+      if (passcodeReadForbidden.value === true) return false;
+      passcodeCameFromTokenSelector.value = true;
+      store.dispatch("setOrganizationPasscodeForbidden", false);
+      store.dispatch("setOrganizationPasscode", token);
+      return true;
+    };
+
+    // Mirror the latch into the store, which is what the setup cards read.
+    // Callers that merely *have* a token to show go through
+    // `publishSelectedToken` instead of dispatching the flag themselves.
+    const applyPasscodeForbidden = (forbidden: boolean) => {
+      passcodeReadForbidden.value = forbidden;
+      store.dispatch("setOrganizationPasscodeForbidden", forbidden);
+      if (forbidden) {
+        // The selector may already have published a token: /ingestion-tokens is
+        // a separate request and can resolve before this 403 does. Withdraw it:
+        // the banner must not sit above a working org-wide credential that this
+        // role was just refused.
+        if (passcodeCameFromTokenSelector.value) {
+          store.dispatch("setOrganizationPasscode", "");
+        }
+      }
+      passcodeCameFromTokenSelector.value = false;
+    };
+
     // Token selector — pick which ingestion token the curl examples use
     const selectedTokenName = ref("");
     const tokenOptions = computed(() => {
@@ -297,8 +355,10 @@ export default defineComponent({
           selectedTokenName.value = opts[0].value;
           const tokens = store.state.organizationData.orgTokens || [];
           const token = tokens.find((t: any) => t.name === opts[0].value);
+          // Keep the selector's own state in sync regardless, but only publish
+          // the token (and clear the banner) when no 403 has been latched.
           if (token?.token) {
-            store.dispatch("setOrganizationPasscode", token.token);
+            publishSelectedToken(token.token);
           }
         }
       },
@@ -307,8 +367,11 @@ export default defineComponent({
     const onTokenSelected = (name: SelectModelValue) => {
       const tokens = store.state.organizationData.orgTokens || [];
       const token = tokens.find((t: any) => t.name === name);
+      // User-initiated rather than a race, but the rule is the same: a 403 says
+      // the credential was never this role's to see, so choosing an entry from
+      // the dropdown must not reveal it either.
       if (token?.token) {
-        store.dispatch("setOrganizationPasscode", token.token);
+        publishSelectedToken(token.token);
       }
     };
 
@@ -345,6 +408,14 @@ export default defineComponent({
     onBeforeMount(() => {
       if (store.state.selectedOrganization.identifier != undefined) {
         fetchOrgTokens();
+        // The passcode read is what actually establishes whether this role may
+        // see an ingestion credential. GET /{org}/passcode is guarded
+        // unconditionally for non-Admin/Root, whereas GET /{org}/ingestion-tokens
+        // is guarded only on non-enterprise builds (and on enterprise the
+        // browser session path bypasses the RBAC middleware entirely), so a
+        // tokens 403 is NOT observable in the configuration that matters most.
+        // Keying the banner off this call keeps it correct in both builds.
+        getOrganizationPasscode();
         getRUMToken();
       }
     });
@@ -382,6 +453,19 @@ export default defineComponent({
 
     watch(() => route.name, syncTabFromRoute);
 
+    // Switching orgs makes the latch stale: whether the new org's ingestion
+    // token is readable is a fresh question, and MainLayout has already wiped
+    // organizationData (which resets the store flag). Drop back to "unknown" so
+    // the new org's passcode read — not the previous org's 403 — decides.
+    watch(
+      () => store.state.selectedOrganization.identifier,
+      (identifier, previous) => {
+        if (identifier === previous) return;
+        passcodeReadForbidden.value = null;
+        passcodeCameFromTokenSelector.value = false;
+      },
+    );
+
     onUpdated(() => {
       if (router.currentRoute.value.name === "ingestion") {
         router.push({
@@ -407,13 +491,22 @@ export default defineComponent({
               timeout: 5000,
             });
           } else {
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
           }
         })
-        .catch(() => {
-          // Silently fail — passcode is not critical for page render
+        .catch((e: any) => {
+          // 403 is not a failure to hide: the caller is below Admin/Root, so the
+          // org ingestion token is simply not theirs to read. Record that
+          // explicitly — an empty passcode would otherwise be substituted into
+          // the setup snippets, producing a valid-looking but non-functional
+          // credential. Every other error stays silent as before (the passcode
+          // is not critical for page render).
+          if (e?.response?.status === 403) {
+            applyPasscodeForbidden(true);
+          }
         });
     };
 
@@ -443,6 +536,7 @@ export default defineComponent({
               message: t("toastMessages.views.tokenResetSuccessfully"),
               timeout: 5000,
             });
+            applyPasscodeForbidden(false);
             store.dispatch("setOrganizationPasscode", res.data.data.passcode);
             store.dispatch("setOrganizationPasscodeUser", res.data.data.user);
             currentOrgIdentifier.value = store.state.selectedOrganization.identifier;
