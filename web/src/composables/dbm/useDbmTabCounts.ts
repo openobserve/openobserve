@@ -89,14 +89,7 @@
  * still blanks only its own badges instead of abandoning the rest, exactly as
  * the browser fan-out's `allSettled` did.
  *
- * ## Keyed on the window, not on a clock
- *
- * There is no TTL. A TTL caches stale truth — it hands back a number that may
- * genuinely have changed and hopes the interval was short enough. The claim
- * here is narrower and actually true: the same window over the same org with
- * the same filters is the same question, so it has the same answer. Move the
- * window and the key changes and everything refetches; that is the design
- * working, not a miss.
+ * ## Keyed on the window, expiring on the clock
  *
  * The key is built from the `DbmRange` — the window the reader CHOSE — and not
  * from resolved bounds. `useDbmScope.refresh()` re-pins its anchor at the top
@@ -104,6 +97,10 @@
  * single load (verified: two `refresh()` calls 5ms apart produce different
  * `endTime`s). A key built from those could never hit, and the cache would be
  * dead code that still looked correct.
+ *
+ * What the key cannot carry is the clock: "last hour" at 10:45 and at 10:00
+ * both spell `1h`, so an entry with no expiry answered the later question with
+ * the earlier count. Hence a tier per range type.
  */
 
 import {
@@ -116,13 +113,18 @@ import {
   type ShallowRef,
 } from "vue";
 
+import { hashKey, queryOptions } from "@tanstack/vue-query";
+
 import dbMonitoringService, {
   type ActivitySession,
   type ActivityStateBucket,
   type BadgesResponse,
   type BlockingSample,
 } from "@/services/db_monitoring";
+import { dbMonitoringKeys } from "@/services/db_monitoring.querykeys";
 import type { DbmRange } from "@/composables/dbm/useDbmScope";
+import { LIVE_STALE_TIME, NORMAL_STALE_TIME } from "@/composables/query/cachePolicy";
+import { queryClient } from "@/composables/query/queryClient";
 import { activitySampleTotal } from "@/utils/dbm/activity";
 import { dedupeServerInstanceRefs, type DbmServerInstanceRef } from "@/utils/dbm/fleetRows";
 import { countClaim, overlapClaim, type DbmCountClaim } from "@/utils/dbm/format";
@@ -251,32 +253,6 @@ interface DbmCountWindow {
   startTime: number;
   endTime: number;
 }
-
-/**
- * The identity of a fan-out: which org, over which window, under which filters.
- *
- * Relative and absolute are tagged distinctly so a `1h` period and an absolute
- * range that happens to span an hour never collide — the first slides with the
- * clock and the second does not, so they are different questions.
- *
- * Filters are part of the QUESTION, so they are part of the key: the counts are
- * fetched with `system` applied, and a key without it would serve the
- * unfiltered numbers after a filter change. Absent and empty fold together —
- * both mean "no filter". Client-side filtering (the search box, which narrows
- * rows already in hand) must never appear here: it changes nothing about what
- * was fetched, and keying on it would miss on every keystroke.
- */
-export const dbmTabCountsKey = (
-  org: string,
-  range: DbmRange,
-  filters: readonly (string | null | undefined)[] = [],
-): string => {
-  const window =
-    range.type === "absolute"
-      ? `abs|${range.startTime}|${range.endTime}`
-      : `rel|${range.relativeTimePeriod ?? ""}`;
-  return [org, window, ...filters.map((f) => f ?? "")].join("|");
-};
 
 /**
  * Issue the one `/badges` request and fold its envelope into one snapshot.
@@ -469,6 +445,42 @@ const worthKeeping = (counts: DbmTabCounts): boolean =>
   counts.blockedCount !== null ||
   counts.tableHealthCount !== null;
 
+/**
+ * The one `/badges` read. Declared beside its fold rather than in
+ * `db_monitoring.queries.ts`, so the two files never import each other.
+ *
+ * The search box must never reach this key: it narrows rows already in hand, so
+ * keying on it would miss on every keystroke. A snapshot that learned nothing
+ * gets `staleTime` 0, so blank badges are never served to the next tab.
+ */
+export const dbmBadgesQuery = (
+  org: string,
+  range: DbmRange,
+  window: DbmCountWindow,
+  filters: DbmCountFilters = {},
+) =>
+  queryOptions({
+    queryKey: dbMonitoringKeys.badges(org, range, filters),
+    queryFn: () => fetchDbmTabCounts(org, window, filters),
+    staleTime: (query) =>
+      query.state.data && worthKeeping(query.state.data)
+        ? range.type === "absolute"
+          ? NORMAL_STALE_TIME
+          : LIVE_STALE_TIME
+        : 0,
+    // Six pipelines ride one request: a retry against a struggling backend is the storm this strip exists to prevent.
+    retry: false,
+  });
+
+/** The held entry, only while its own tier still vouches for it — the test `fetchQuery` makes before refetching. */
+const freshBadges = (options: ReturnType<typeof dbmBadgesQuery>): DbmTabCounts | undefined => {
+  const query = queryClient.getQueryCache().find<DbmTabCounts>({ queryKey: options.queryKey });
+  if (!query || query.state.data === undefined) return undefined;
+  const staleTime =
+    typeof options.staleTime === "function" ? options.staleTime(query as any) : options.staleTime;
+  return query.isStaleByTime(staleTime) ? undefined : query.state.data;
+};
+
 /** The seven count fields, as distinct from the snapshot's array payloads. */
 const COUNT_KEYS = [
   "databaseCount",
@@ -512,23 +524,6 @@ const carryForward = (next: DbmTabCounts, previous: DbmTabCounts | null): DbmTab
     }
   }
   return merged;
-};
-
-/**
- * Snapshots already fetched, and fan-outs still in flight.
- *
- * Module scope, deliberately: `DbmShell` is not itself kept alive by anything,
- * so a full remount of the DBM section would otherwise re-fetch a window it had
- * already answered. Plain `Map`s rather than refs because nothing renders the
- * cache — the shell copies the resolved snapshot into its own reactive ref.
- */
-const settled = new Map<string, DbmTabCounts>();
-const inFlight = new Map<string, Promise<DbmTabCounts>>();
-
-/** Drop everything. For tests, so one cannot seed the next. */
-export const clearDbmTabCounts = () => {
-  settled.clear();
-  inFlight.clear();
 };
 
 export interface DbmTabCountsLoadOptions {
@@ -615,15 +610,19 @@ export function useDbmTabCounts(): DbmTabCountsSource {
     options: DbmTabCountsLoadOptions = {},
   ): Promise<void> => {
     if (!org) return;
-    const key = dbmTabCountsKey(
-      org,
-      range,
-      DBM_COUNT_FILTER_KEYS.map((k) => filters[k]),
-    );
+    const query = dbmBadgesQuery(org, range, window, filters);
+    const key = hashKey(query.queryKey);
     const token = (latest += 1);
 
-    if (!options.force) {
-      const held = settled.get(key);
+    if (options.force) {
+      // Expired, not bypassed: two clicks a moment apart still share one request.
+      await queryClient.invalidateQueries({
+        queryKey: query.queryKey,
+        exact: true,
+        refetchType: "none",
+      });
+    } else {
+      const held = freshBadges(query);
       if (held) {
         // Returning to a window we already answered. If the snapshot on screen
         // describes THIS window, it may carry counts a page published since —
@@ -640,34 +639,9 @@ export function useDbmTabCounts(): DbmTabCountsSource {
       }
     }
 
-    // A forced load still JOINS an in-flight fan-out for its key rather than
-    // starting a second one — two refresh clicks a moment apart are one
-    // question, and the `force` above has already bypassed the settled value.
-    let request = options.force ? undefined : inFlight.get(key);
-    if (!request) {
-      request = fetchDbmTabCounts(org, window, filters)
-        .then((value) => {
-          // Only a snapshot that learned SOMETHING is remembered, so a total
-          // outage is never cached as a row of blank badges. A forced load
-          // overwrites, so what a refresh superseded cannot be served next.
-          if (worthKeeping(value)) settled.set(key, value);
-          return value;
-        })
-        .finally(() => {
-          // Cleared on both paths, so a rejection leaves nothing behind — not a
-          // value, not a zero, not a poisoned promise. (`fetchDbmTabCounts`
-          // catches its own request failure and resolves with the empty
-          // snapshot, so it cannot reject; the rejection path guards
-          // transport-layer surprises only, and the cleanup must hold either
-          // way.)
-          if (inFlight.get(key) === request) inFlight.delete(key);
-        });
-      inFlight.set(key, request);
-    }
-
     loading.value = true;
     try {
-      const value = await request;
+      const value = await queryClient.fetchQuery(query);
       // A newer window already owns the snapshot. Writing here would paint the
       // superseded window's numbers beside the current window's table.
       if (token !== latest) return;

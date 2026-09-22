@@ -69,8 +69,7 @@ vi.mock("vuex", () => ({
 const { default: dbMonitoringService } = await import("@/services/db_monitoring");
 const service = dbMonitoringService as unknown as Record<string, ReturnType<typeof vi.fn>>;
 
-const { useDbmTabCounts, clearDbmTabCounts, fetchDbmTabCounts } =
-  await import("@/composables/dbm/useDbmTabCounts");
+const { useDbmTabCounts, fetchDbmTabCounts } = await import("@/composables/dbm/useDbmTabCounts");
 // The scope filters' instance picker reads the org's fleet through the query
 // cache, so one test's read would otherwise be served to the next.
 const { queryClient } = await import("@/composables/query/queryClient");
@@ -104,7 +103,6 @@ const WINDOW = { startTime: 1_000, endTime: 2_000 };
 describe("a failed fan-out must not blank badges that were already answered", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
   });
 
@@ -150,7 +148,6 @@ describe("a failed fan-out must not blank badges that were already answered", ()
 describe("the databases fallback counts the same refs the fleet union renders", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
   });
 
@@ -227,7 +224,6 @@ describe("the databases fallback counts the same refs the fleet union renders", 
 describe("one dead slice must not blank a badge the last window answered", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
   });
 
@@ -281,7 +277,6 @@ describe("one dead slice must not blank a badge the last window answered", () =>
 describe("what one page learns is visible from every tab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
   });
 
@@ -588,7 +583,6 @@ describe("a page withholds its badge until it has actually loaded", () => {
 describe("the badge fan-out is scoped by every filter the reader set", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
     service.getBadges.mockResolvedValue({ data: envelope() });
   });
@@ -654,7 +648,6 @@ describe("the badge fan-out is scoped by every filter the reader set", () => {
 describe("a capped table-health read is a claim, not a total", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    clearDbmTabCounts();
     queryClient.clear();
   });
 

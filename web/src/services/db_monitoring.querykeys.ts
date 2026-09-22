@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { orgKey } from "@/composables/query/keys";
-import { quantizeRange } from "@/composables/query/queryClient";
+import { quantizeRange, stableFilters } from "@/composables/query/queryClient";
 
 /**
  * Keys only, so a write in another domain can drop this scope without importing
@@ -34,17 +34,18 @@ export const dbMonitoringKeys = {
    */
   badges: (
     org: string,
-    range: { type: string; startTime?: number; endTime?: number; relativeTimePeriod?: string },
-    filters: Record<string, unknown>,
+    range: { type: string; startTime: number; endTime: number; relativeTimePeriod: string | null },
+    filters: object,
   ) =>
     orgKey(
       org,
       "db_monitoring",
       "badges",
       range.type === "absolute"
-        ? { abs: quantizeRange(range.startTime ?? 0, range.endTime ?? 0) }
+        ? { abs: quantizeRange(range.startTime, range.endTime) }
         : { rel: range.relativeTimePeriod ?? "" },
-      filters,
+      // Absent and empty fold together: both mean "no filter".
+      stableFilters(filters as Record<string, unknown>),
     ),
 
   /** Bucketed: the picker's window is re-pinned on every refresh, to the microsecond. */

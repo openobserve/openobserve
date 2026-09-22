@@ -390,7 +390,7 @@ add a request-count test: same window twice → 1 call; refresh → 2.
 - [x] Delayed-effect handling from §1.5; bulk actions invalidate once
 - [x] Feature probe still renders the unavailable state with no retry
 - [x] `db_monitoring.querykeys.ts` / `.queries.ts`; `/instances` migrated
-- [ ] Tab counts (`getBadges`): tier for relative ranges still to agree — §2.2
+- [x] Tab counts (`getBadges`): relative → LIVE 1 min, absolute → NORMAL 1 h (§2.2)
 - [ ] Dead reads deleted: `analyticsCauses`, `getQueryPlans`, `getQueryServerMetrics`,
       `getServerSamples`. Deliberately NOT done: three of them still carry specs (and two
       specs assert their *absence* from a page), so deleting them is a separate cleanup

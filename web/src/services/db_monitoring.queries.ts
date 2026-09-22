@@ -19,6 +19,8 @@ import dbMonitoringService, { type DbmInstanceHit } from "./db_monitoring";
 import { dbMonitoringKeys } from "./db_monitoring.querykeys";
 import { MEDIUM_STALE_TIME } from "@/composables/query/cachePolicy";
 
+// The `/badges` declaration lives beside its fold in composables/dbm/useDbmTabCounts.ts, or the two would import each other.
+
 /**
  * The org's engines, as `/instances` names them.
  *
