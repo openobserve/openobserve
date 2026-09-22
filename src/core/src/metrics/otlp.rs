@@ -68,6 +68,9 @@ use crate::{
     pipeline::batch_execution::ExecutablePipeline,
 };
 
+/// The OTLP spec's `scale` range for exponential histograms.
+const OTLP_EXP_HISTOGRAM_SCALE_RANGE: std::ops::RangeInclusive<i32> = -10..=20;
+
 /// A number point's labels, rebuilt per point on top of its metric's base labels.
 struct PointLabels {
     /// Slots past `len` are spare; their strings keep their capacity for the next point.
@@ -1000,6 +1003,15 @@ fn process_exp_hist_data_point(
     rec["start_time"] = data_point.start_time_unix_nano.to_string().into();
     rec["flag"] = data_point_flag(data_point.flags).into();
     process_exemplars(rec, &data_point.exemplars);
+
+    // an out-of-spec scale is a malformed point, not something to downscale into shape
+    if !OTLP_EXP_HISTOGRAM_SCALE_RANGE.contains(&data_point.scale) {
+        log::warn!(
+            "[METRICS:OTLP] dropping exponential histogram point with unsupported scale {}",
+            data_point.scale
+        );
+        return bucket_recs;
+    }
 
     // OTLP bucket `i` covers `(base^i, base^(i+1)]`, the native layout's bucket `i+1`
     let otlp_buckets = |b: &Option<exponential_histogram_data_point::Buckets>| -> Vec<(i64, f64)> {
@@ -2709,6 +2721,69 @@ mod tests {
                 ("1.414", 7.0),
                 ("inf", 7.0),
             ];
+            let expected: Vec<(String, f64)> = expected
+                .iter()
+                .map(|(le, v)| (le.to_string(), *v))
+                .collect();
+            assert_eq!(exp_hist_buckets(&result), expected);
+        }
+
+        /// A scale outside the OTLP spec range is a malformed point and is dropped.
+        #[test]
+        fn test_exponential_histogram_drops_out_of_spec_scale() {
+            for scale in [i32::MAX, 21, -11, i32::MIN] {
+                let mut rec = json!({"__name__": "h"});
+                let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                    attributes: vec![],
+                    start_time_unix_nano: 0,
+                    time_unix_nano: 1640995200000000000,
+                    exemplars: vec![],
+                    flags: 0,
+                    count: 1,
+                    sum: Some(1.0),
+                    min: None,
+                    max: None,
+                    scale,
+                    zero_count: 0,
+                    zero_threshold: 0.0,
+                    positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                        offset: 0,
+                        bucket_counts: vec![1],
+                    }),
+                    negative: None,
+                };
+                assert!(process_exp_hist_data_point(&mut rec, &data_point, 16).is_empty());
+            }
+        }
+
+        /// A bucket overlapping the zero region is clipped to `zero_threshold`, so the
+        /// gap marker sits at 1.5 and a quantile interpolates over (1.5, 2], not (1, 2].
+        #[test]
+        fn test_exponential_histogram_clips_bucket_to_zero_threshold() {
+            let mut rec = json!({"__name__": "h"});
+            let data_point = opentelemetry_proto::tonic::metrics::v1::ExponentialHistogramDataPoint {
+                attributes: vec![],
+                start_time_unix_nano: 0,
+                time_unix_nano: 1640995200000000000,
+                exemplars: vec![],
+                flags: 0,
+                count: 10,
+                sum: Some(17.5),
+                min: None,
+                max: None,
+                scale: 0,
+                zero_count: 0,
+                zero_threshold: 1.5,
+                positive: Some(opentelemetry_proto::tonic::metrics::v1::exponential_histogram_data_point::Buckets {
+                    offset: 0,
+                    bucket_counts: vec![10],
+                }),
+                negative: None,
+            };
+
+            let result = process_exp_hist_data_point(&mut rec, &data_point, 16);
+
+            let expected = [("1.5", 0.0), ("2", 10.0), ("inf", 10.0)];
             let expected: Vec<(String, f64)> = expected
                 .iter()
                 .map(|(le, v)| (le.to_string(), *v))

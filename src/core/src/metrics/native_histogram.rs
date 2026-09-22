@@ -36,6 +36,9 @@ pub const CLASSIC_HISTOGRAM_SUFFIXES: [&str; 3] = ["_bucket", "_count", "_sum"];
 /// schema -53 -- cannot be converted: our wire type does not decode `custom_values`.
 const SCHEMA_RANGE: std::ops::RangeInclusive<i32> = -4..=8;
 
+/// Finest schema ever emitted: label rounding keeps adjacent bounds distinct only up to here.
+const MAX_SCHEMA: i32 = *SCHEMA_RANGE.end();
+
 /// Downscaling may merge below the native schema floor -- the emitted `le` bounds are
 /// plain classic bounds, not required to form a valid native schema. At -10
 /// (base 2^1024) one bucket spans all of f64, so the loop always terminates. A sample
@@ -72,33 +75,47 @@ impl ExponentialHistogram {
             mut schema,
             count,
             sum,
-            zero_count,
+            mut zero_count,
             zero_threshold,
             mut positive,
             mut negative,
         } = self;
+        // a NaN or negative threshold reads as no zero region
+        let zero_threshold = zero_threshold.max(0.0);
 
+        // schemas finer than 8 are merged down in one step, so any i32 schema is cheap
+        if schema > MAX_SCHEMA {
+            positive = downscale(positive, (schema - MAX_SCHEMA) as u32);
+            negative = downscale(negative, (schema - MAX_SCHEMA) as u32);
+            schema = MAX_SCHEMA;
+        }
         // every emitted `le` label becomes a series, so merge adjacent buckets (halving
         // resolution) until the sample's le count fits the cardinality budget
-        while (schema > *SCHEMA_RANGE.end()
-            || le_estimate(&positive, &negative, zero_count) > max_buckets.max(3))
+        while le_estimate(&positive, &negative, zero_count) > max_buckets.max(3)
             && schema > MIN_DOWNSCALE_SCHEMA
         {
             schema -= 1;
-            positive = downscale(positive);
-            negative = downscale(negative);
+            positive = downscale(positive, 1);
+            negative = downscale(negative, 1);
         }
 
+        // buckets inside [-zero_threshold, zero_threshold] fold into the zero bucket, overlaps clip
         let mut buckets: Vec<(f64, f64, f64)> = Vec::new(); // (lower, upper, count)
         for &(idx, c) in &positive {
-            buckets.push((bucket_bound(schema, idx - 1), bucket_bound(schema, idx), c));
+            let (lower, upper) = (bucket_bound(schema, idx - 1), bucket_bound(schema, idx));
+            if upper <= zero_threshold {
+                zero_count += c;
+            } else {
+                buckets.push((lower.max(zero_threshold), upper, c));
+            }
         }
         for &(idx, c) in &negative {
-            buckets.push((
-                -bucket_bound(schema, idx),
-                -bucket_bound(schema, idx - 1),
-                c,
-            ));
+            let (lower, upper) = (-bucket_bound(schema, idx), -bucket_bound(schema, idx - 1));
+            if lower >= -zero_threshold {
+                zero_count += c;
+            } else {
+                buckets.push((lower, upper.min(-zero_threshold), c));
+            }
         }
         if zero_count > 0.0 {
             buckets.push((-zero_threshold, zero_threshold, zero_count));
@@ -182,6 +199,10 @@ pub fn expand_native_histogram(
 /// adjacent buckets -- the finest schema spaces bounds 0.271% apart vs the 0.1%
 /// worst-case label resolution.
 fn format_le(v: f64) -> String {
+    // a negated underflowed bound is -0.0, which must share the zero bucket's label
+    if v == 0.0 {
+        return "0".to_string();
+    }
     let rounded: f64 = format!("{v:.3e}").parse().unwrap();
     if rounded.is_finite() || !v.is_finite() {
         rounded.to_string()
@@ -204,10 +225,9 @@ fn push_le_point(points: &mut Vec<(String, f64)>, le: String, cumulative: f64) {
 /// Upper bound of bucket `idx`: `2^(idx * 2^-schema)` via `exp2`, so powers of two are
 /// exact and a boundary shared between schemas is the identical f64 (downscaling keeps
 /// surviving `le`s in the same series). Clamped finite so the last representable
-/// bucket cannot collide with `le="inf"`.
+/// bucket cannot collide with `le="inf"`; subnormal bounds are kept as is.
 fn bucket_bound(schema: i32, idx: i64) -> f64 {
-    let bound = ((idx as f64) * 2f64.powi(-schema)).exp2();
-    bound.clamp(f64::MIN_POSITIVE, f64::MAX)
+    ((idx as f64) * 2f64.powi(-schema)).exp2().min(f64::MAX)
 }
 
 /// Upper bound on the `le` labels a sample will emit: each populated bucket gets an
@@ -226,12 +246,14 @@ fn le_estimate(pos: &[(i64, f64)], neg: &[(i64, f64)], zero_count: f64) -> usize
     side(pos) + side(neg) + if zero_count > 0.0 { 2 } else { 0 } + 1
 }
 
-/// Merges adjacent bucket pairs: `idx` at schema `s` maps to `ceil(idx / 2)` at
-/// schema `s - 1`.
-fn downscale(buckets: Vec<(i64, f64)>) -> Vec<(i64, f64)> {
+/// Merges runs of `2^steps` adjacent buckets: `idx` at schema `s` maps to
+/// `ceil(idx / 2^steps)` at schema `s - steps`.
+fn downscale(buckets: Vec<(i64, f64)>, steps: u32) -> Vec<(i64, f64)> {
+    // indices are i32 offsets plus a length, so 2^62 already maps every bucket to 0 or 1
+    let span = 1i64 << steps.min(62);
     let mut out: Vec<(i64, f64)> = Vec::with_capacity(buckets.len() / 2 + 1);
     for (idx, c) in buckets {
-        let merged_idx = (idx + 1).div_euclid(2);
+        let merged_idx = (idx + span - 1).div_euclid(span);
         match out.last_mut() {
             Some((last_idx, last_c)) if *last_idx == merged_idx => *last_c += c,
             _ => out.push((merged_idx, c)),
@@ -558,7 +580,7 @@ mod tests {
     #[test]
     fn test_expand_native_histogram_merges_le_rounding_collisions() {
         let hp = prometheus_rpc::Histogram {
-            zero_threshold: 1.0001, // rounds to le="1", same as bucket idx 0's bound
+            zero_threshold: 0.99995, // rounds to le="1", same as bucket idx 0's bound
             count: Some(prometheus_rpc::histogram::Count::CountInt(5)),
             zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(2)),
             positive_spans: vec![prometheus_rpc::BucketSpan {
@@ -573,7 +595,7 @@ mod tests {
         // both uppers format to "1" and merge, keeping the full cumulative 5
         assert_eq!(
             bucket_records(&recs),
-            vec![(0.5, 0.0), (1.0, 5.0), (f64::INFINITY, 5.0)]
+            vec![(-1.0, 0.0), (1.0, 5.0), (f64::INFINITY, 5.0)]
         );
     }
 
@@ -681,6 +703,78 @@ mod tests {
             bucket_records(&recs),
             vec![(-0.5, 0.0), (0.5, 1.0), (1.0, 4.0), (f64::INFINITY, 4.0)]
         );
+    }
+
+    /// Buckets fully inside the zero region fold into the zero bucket and partial
+    /// overlaps are clipped, on both sides, so `le` stays strictly increasing.
+    #[test]
+    fn test_expand_native_histogram_zero_threshold_folds_and_clips_both_sides() {
+        let hp = prometheus_rpc::Histogram {
+            zero_threshold: 1.5, // (0.5, 1] lies inside, (1, 2] overlaps
+            count: Some(prometheus_rpc::histogram::Count::CountInt(9)),
+            zero_count: Some(prometheus_rpc::histogram::ZeroCount::ZeroCountInt(1)),
+            positive_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 0,
+                length: 2,
+            }],
+            positive_deltas: vec![2, 1], // idx 0: 2, idx 1: 3
+            negative_spans: vec![prometheus_rpc::BucketSpan {
+                offset: 0,
+                length: 2,
+            }],
+            negative_deltas: vec![1, 1], // idx 0: 1, idx 1: 2
+            ..native_histogram_base()
+        };
+        let recs = expand_native_histogram(&hp, 16);
+        assert_bucket_invariants(&recs);
+        assert_eq!(
+            bucket_records(&recs),
+            vec![
+                (-2.0, 0.0),
+                (-1.5, 2.0),
+                (1.5, 6.0), // zero 1 + inside buckets 2 + 1
+                (2.0, 9.0),
+                (f64::INFINITY, 9.0),
+            ]
+        );
+    }
+
+    /// `expand` itself stays cheap for any i32 schema: the fine-schema merge is one
+    /// step, not one iteration per schema level.
+    #[test]
+    fn test_expand_extreme_schema_is_bounded() {
+        let recs = ExponentialHistogram {
+            schema: i32::MAX,
+            count: 3.0,
+            sum: None,
+            zero_count: 0.0,
+            zero_threshold: 0.0,
+            positive: vec![(1, 1.0), (5, 1.0)],
+            negative: vec![(1, 1.0)],
+        }
+        .expand(16);
+        assert_bucket_invariants(&recs);
+        // every index collapses onto schema-8 bucket 1, (1, 2^(1/256)], on both sides
+        assert_eq!(
+            bucket_records(&recs),
+            vec![
+                (-1.003, 0.0),
+                (-1.0, 1.0),
+                (1.0, 1.0),
+                (1.003, 3.0),
+                (f64::INFINITY, 3.0),
+            ]
+        );
+    }
+
+    /// Subnormal bounds stay representable instead of collapsing onto
+    /// `f64::MIN_POSITIVE`; a fully underflowed negated bound labels as "0", not "-0".
+    #[test]
+    fn test_bucket_bound_keeps_subnormals() {
+        assert_eq!(bucket_bound(0, -1023), 2f64.powi(-1023));
+        assert!(bucket_bound(0, -1023) < f64::MIN_POSITIVE);
+        assert_eq!(bucket_bound(0, -1080), 0.0);
+        assert_eq!(format_le(-0.0), "0");
     }
 
     /// The gauge reset hint changes rate/reset semantics at query time, not the bucket
