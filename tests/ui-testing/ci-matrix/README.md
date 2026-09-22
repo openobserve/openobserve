@@ -100,3 +100,42 @@ A spec cannot be in both `run_files` and `disabled` — the build fails if it is
 
 The ENT overlay only ever carries the **delta** from OSS. It must not re-list any spec
 already in `ci_matrix.json`; `build-ci-matrix.js` fails the run if it does.
+
+---
+
+## The alpha1 cloud matrix (`ci_matrix_cloud.json`, ENT repo)
+
+Alpha1 runs nightly against a shared, deployed cloud env, so it is **deliberately a
+subset** of the PR gate — some specs need a boot-time server flag the deployment fixes,
+and some would wreck the shared orgs their sibling shards are using.
+
+Because that manifest is standalone (no OSS base, no merge), a spec added to
+`ci_matrix.json` never reaches alpha on its own. So the rule is:
+
+> **Every PR-gate spec needs a cloud verdict** — either it is in an alpha shard's
+> `run_files`, or it is in that shard's `disabled` array *with a reason*.
+
+`.github/scripts/check-alpha1-triage.js` (ENT) enforces this in the `alpha1 triage` job
+of `playwright_alpha1.yml`. It also fails on a manifest entry naming a spec that no
+longer exists — the failure that kept `logsQueryBuilder.spec.js` listed for ~4 months
+after it was split, silently costing that shard its coverage.
+
+That job is **not** a dependency of the shards: drift shows up red without costing the
+night's test results.
+
+### Recording a "no"
+
+Reasons worth stating, with the shape they take:
+
+- needs a boot flag the deployment fixes — `ZO_QUICK_MODE_ENABLED`, `ingest_allowed_upto`
+- mutates shared state other shards depend on — org users, the org RUM token
+- the spec already self-skips on cloud (`test.skip(isCloudEnvironment(), …)`) — say so,
+  and quote its reason, so the manifest and the spec do not drift apart
+- the product genuinely differs on cloud — no internal login form (Dex OIDC), tabs hidden
+
+### Modules with no alpha shard
+
+When every spec in a module is ruled out, there is no shard to hang the `disabled`
+entries on. Add a **documentation-only** entry: same shape, but `"run_files": []`.
+`generate_matrix` filters those out, so they never become a job — they exist only to
+record the verdict. See the `SLO`, `RUM` and `Logs-SelectStar` entries.

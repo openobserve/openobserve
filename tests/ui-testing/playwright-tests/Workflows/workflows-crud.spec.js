@@ -73,7 +73,7 @@ test.describe('Workflows CRUD & builder', { tag: ['@workflows', '@enterprise', '
     await pm.workflowsPage.buildTriggerToDestinationAndSave({
       name,
       destName: `wf_auto_dest_${id}`,
-      url: `http://localhost:5080/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
+      url: `${process.env.ZO_BASE_URL || 'http://localhost:5080'}/api/${process.env.ORGNAME || 'default'}/wf_auto_sink/_json`,
     });
     await pm.workflowsPage.goToList();
     expect(await pm.workflowsPage.isPresent(name)).toBeTruthy();
