@@ -224,10 +224,17 @@ export class AlertsFormValidationPage {
     // and neither renders a webhook field. This spec validates the webhook URL, so pick that
     // method rather than depending on which deployment's default is showing.
     const webhookMethod = this.page.locator('[data-test="slack-setup-method-webhook"]').first();
-    if (await webhookMethod.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await webhookMethod.click({ timeout: 10000 }).catch(() => {});
+    // isVisible() ignores its timeout option — it samples once and returns, so against a
+    // slow cloud org it reported false before the guided flow had rendered, the method was
+    // never switched to webhook, and the field wait below timed out instead.
+    const hasWebhookMethod = await webhookMethod
+      .waitFor({ state: 'visible', timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasWebhookMethod) {
+      await webhookMethod.click();
     }
-    await this.page.locator(this.slackWebhookField).waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.locator(this.slackWebhookField).waitFor({ state: 'visible', timeout: 15000 });
   }
 
   async clickDestinationSubmit() {
@@ -272,7 +279,21 @@ export class AlertsFormValidationPage {
 
   async clickTemplateSubmit() {
     testLogger.info('Clicking template submit button');
-    await this.page.locator(this.templateSubmitBtn).click();
+    // The dialog re-renders as its guided/custom tabs settle and replaces the submit node,
+    // so a single click keeps resolving into a node that detaches mid-action and burns the
+    // whole timeout. Retry so a re-render costs one attempt instead of the call.
+    const submitBtn = this.page.locator(this.templateSubmitBtn);
+    let lastError;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await submitBtn.click({ timeout: 15000 });
+        return;
+      } catch (error) {
+        lastError = error;
+        await this.page.waitForTimeout(500);
+      }
+    }
+    throw lastError;
   }
 
   async fillTemplateName(name) {
@@ -286,7 +307,12 @@ export class AlertsFormValidationPage {
     // the raw Monaco body editor does not exist — it lives under the "custom"
     // tab. Switch there first (no-op safety check for older UIs without tabs).
     const customTab = this.page.locator('[data-test="tab-custom"]');
-    if (await customTab.isVisible({ timeout: 5000 }).catch(() => false)) {
+    // isVisible() ignores its timeout — wait properly, or a slow render silently skips the tab.
+    const hasCustomTab = await customTab
+      .waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasCustomTab) {
       await customTab.click();
     }
     // Drive Monaco via window.monaco — typing char-by-char triggers Monaco's
