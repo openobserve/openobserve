@@ -154,5 +154,14 @@
       "slo-error-messages.spec.js"
     ],
     "disabled": []
+  },
+  {
+    "testfolder": "OnlineEvals-Regression",
+    "actual_folder": "RegressionSet/OnlineEvals",
+    "browser": "chrome",
+    "run_files": [
+      "llmProviderTypes.spec.js"
+    ],
+    "disabled": []
   }
 ]

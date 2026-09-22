@@ -15,9 +15,9 @@
 // builds (useManagementRoutes.ts pushes it when isEnterprise || isCloud). Each test
 // probes navigateToLlmProviders() and skips cleanly on the OSS binary.
 
-const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
-const testLogger = require('../utils/test-logger.js');
-const PageManager = require('../../pages/page-manager.js');
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
 
 // Per-test unique provider names (tests run --workers in parallel; a fixed name
 // would collide across runs). Timestamp + short random suffix is collision-safe.
