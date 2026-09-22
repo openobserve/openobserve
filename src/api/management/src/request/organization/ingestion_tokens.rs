@@ -36,7 +36,7 @@ use crate::common::meta::{
     tag = "Organizations",
     operation_id = "ListOrgIngestionTokens",
     summary = "List org-level ingestion tokens",
-    description = "Returns all org-level ingestion tokens for the organization. Any authenticated user in the organization can access this.",
+    description = "Returns all org-level ingestion tokens for the organization. Requires Admin or Root role.",
     security(
         ("Authorization"= [])
     ),
@@ -53,24 +53,21 @@ use crate::common::meta::{
     )
 )]
 pub async fn list_ingestion_tokens(
-    Headers(_user_email): Headers<UserEmail>,
+    Headers(user_email): Headers<UserEmail>,
     Path(org_id): Path<String>,
 ) -> Response {
-    #[cfg(not(feature = "enterprise"))]
+    // GET /{org}/ingestion-tokens -> the route table maps GET on this path to
+    // the "LIST" FGA permission on the "passcode" resource.
+    if let Err(resp) = super::require_credential_access(
+        &org_id,
+        user_email.user_id.as_str(),
+        "list ingestion tokens",
+        "passcode",
+        "LIST",
+    )
+    .await
     {
-        let user_id = _user_email.user_id.as_str();
-        if !db::user::is_root_user(user_id) {
-            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
-                Some(initiator)
-                    if initiator.role == config::meta::user::UserRole::Admin
-                        || initiator.role == config::meta::user::UserRole::Root => {}
-                _ => {
-                    return MetaHttpResponse::forbidden(
-                        "Admin or Root role required to list ingestion tokens",
-                    );
-                }
-            }
-        }
+        return resp;
     }
 
     match ingestion_tokens::list_tokens(&org_id).await {
@@ -114,20 +111,19 @@ pub async fn create_ingestion_token(
 ) -> Response {
     let user_id = user_email.user_id.as_str();
 
-    #[cfg(not(feature = "enterprise"))]
+    // POST /{org}/ingestion-tokens -> the route table declares
+    // `ofga_permission: None` for POST, and `resolve_permission` falls back to
+    // the HTTP method, so the effective permission is the literal "POST".
+    if let Err(resp) = super::require_credential_access(
+        &org_id,
+        user_id,
+        "create ingestion tokens",
+        "passcode",
+        "POST",
+    )
+    .await
     {
-        if !db::user::is_root_user(user_id) {
-            match openobserve_core::users::get_user(Some(&org_id), user_id).await {
-                Some(initiator)
-                    if initiator.role == config::meta::user::UserRole::Admin
-                        || initiator.role == config::meta::user::UserRole::Root => {}
-                _ => {
-                    return MetaHttpResponse::forbidden(
-                        "Admin or Root role required to create ingestion tokens",
-                    );
-                }
-            }
-        }
+        return resp;
     }
 
     let description = body.description.unwrap_or_default();
@@ -179,22 +175,23 @@ pub async fn enable_disable_ingestion_token(
     Path((org_id, name)): Path<(String, String)>,
     Json(body): Json<OrgIngestionTokenEnableRequest>,
 ) -> Response {
-    let _user_id = user_email.user_id.as_str();
+    let user_id = user_email.user_id.as_str();
 
-    #[cfg(not(feature = "enterprise"))]
+    // PATCH /{org}/ingestion-tokens/{name} -> the route table maps PATCH on this
+    // path to the "PUT" FGA permission on the "passcode" resource. (No type in
+    // model.fga defines a PATCH relation, so the route declares Some("PUT")
+    // explicitly rather than letting `resolve_permission` fall back to the HTTP
+    // method — asking OpenFGA for an undefined relation is a 400, which denies.)
+    if let Err(resp) = super::require_credential_access(
+        &org_id,
+        user_id,
+        "manage ingestion tokens",
+        "passcode",
+        "PUT",
+    )
+    .await
     {
-        if !db::user::is_root_user(_user_id) {
-            match openobserve_core::users::get_user(Some(&org_id), _user_id).await {
-                Some(initiator)
-                    if initiator.role == config::meta::user::UserRole::Admin
-                        || initiator.role == config::meta::user::UserRole::Root => {}
-                _ => {
-                    return MetaHttpResponse::forbidden(
-                        "Admin or Root role required to manage ingestion tokens",
-                    );
-                }
-            }
-        }
+        return resp;
     }
 
     if body.enabled.is_none() && body.splunk_token.is_none() {

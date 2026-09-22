@@ -332,6 +332,7 @@ pub async fn org_summary(Path(org_id): Path<String>) -> impl IntoResponse {
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -345,6 +346,19 @@ pub async fn get_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    // GET /{org}/passcode -> the route table maps GET on this path to the
+    // "LIST" FGA permission on the "passcode" resource.
+    if let Err(resp) = super::require_credential_access(
+        &org,
+        user_id,
+        "read the organization ingestion token",
+        "passcode",
+        "LIST",
+    )
+    .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
@@ -373,6 +387,7 @@ pub async fn get_user_passcode(
       ),
     responses(
         (status = 200, description = "Success", content_type = "application/json", body = inline(PasscodeResponse)),
+        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
     ),
     extensions(
@@ -386,6 +401,24 @@ pub async fn update_user_passcode(
 ) -> Response {
     let org = org_id;
     let user_id = user_email.user_id.as_str();
+    // PUT /{org}/passcode -> "PUT" on the "passcode" resource. Note the route
+    // table declares `ofga_permission: None` for PUT on this path rather than
+    // naming it; `resolve_permission` then does
+    // `ofga_permission.unwrap_or(http_method)`, so the effective permission is
+    // the literal "PUT". Matching that keeps this guard in step with the
+    // middleware — but it means a future edit setting an explicit
+    // `ofga_permission` here would silently desync this constant.
+    if let Err(resp) = super::require_credential_access(
+        &org,
+        user_id,
+        "rotate the organization ingestion token",
+        "passcode",
+        "PUT",
+    )
+    .await
+    {
+        return resp;
+    }
     let mut org_id = Some(org.as_str());
     if is_root_user(user_id) {
         org_id = None;
