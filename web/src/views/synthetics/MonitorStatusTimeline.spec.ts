@@ -131,6 +131,31 @@ describe("MonitorStatusTimeline", () => {
     wrapper?.unmount();
   });
 
+  describe("environment lanes", () => {
+    it("should render one labelled strip per lane, aligned by run", () => {
+      const segA = makeSegment({ runId: "run-1" });
+      const segB = makeSegment({ runId: "run-2", status: "all-fail" });
+      wrapper = makeWrapper({
+        segments: [segA, segB],
+        lanes: [
+          { label: "cloud", segments: [segA, segB] },
+          // ap1 never ran in run-2 — the slot stays empty so columns compare.
+          { label: "ap1", segments: [segA, null] },
+        ],
+      });
+      const labels = wrapper.find('[data-test="synthetics-timeline-lane-labels"]');
+      expect(labels.text()).toContain("cloud");
+      expect(labels.text()).toContain("ap1");
+      // 2 columns × 2 cells; the missing ap1 slot renders as the empty shade.
+      expect(wrapper.findAll(".bg-border-default\\/40")).toHaveLength(1);
+    });
+
+    it("should keep the single blended strip when no lanes are given", () => {
+      wrapper = makeWrapper({ segments: [makeSegment()] });
+      expect(wrapper.find('[data-test="synthetics-timeline-lane-labels"]').exists()).toBe(false);
+    });
+  });
+
   describe("initial render with segments", () => {
     it("should render the root container with data-test", () => {
       wrapper = makeWrapper({

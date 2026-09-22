@@ -21,7 +21,8 @@
       "alerts-composite-list.spec.js",
       "alerts-clone-dialog.spec.js",
       "alerts-composite-preview.spec.js",
-      "alerts-composite-detail.spec.js"
+      "alerts-composite-detail.spec.js",
+      "alerts-chart-error-state.spec.js"
     ],
     "disabled": [
       {
@@ -246,7 +247,8 @@
       "login-form-validation.spec.js",
       "datetime-picker-copy-paste.spec.js",
       "splunk-hec-ingestion-window.spec.js",
-      "connectDataSourcePopup.spec.js"
+      "connectDataSourcePopup.spec.js",
+      "theme.spec.js"
     ],
     "disabled": []
   },
@@ -290,7 +292,8 @@
       "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
       "logsVisualizePersistence.spec.js",
-      "streamNotFound.spec.js"
+      "streamNotFound.spec.js",
+      "logsRefreshCacheDropdown.spec.js"
     ],
     "disabled": [
       {

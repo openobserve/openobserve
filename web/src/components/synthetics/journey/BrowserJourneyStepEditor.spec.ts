@@ -562,3 +562,30 @@ describe("BrowserJourneyStepEditor click type", () => {
     expect(step.clickCount).toBeUndefined();
   });
 });
+
+describe("BrowserJourneyStepEditor unbound variables", () => {
+  const warning = test("synthetics-journey-step-unbound-warning");
+
+  it("warns about a placeholder nothing defines", () => {
+    const wrapper = render(
+      { action: "type", value: "{{USER}} {{BASE_URL}}" },
+      { knownVariables: new Set(["BASE_URL"]) },
+    );
+    expect(wrapper.find(warning).exists()).toBe(true);
+    expect(wrapper.find(warning).text()).toContain("USER");
+    expect(wrapper.find(warning).text()).not.toContain("BASE_URL");
+  });
+
+  it("stays quiet when every placeholder resolves", () => {
+    const wrapper = render(
+      { action: "type", value: "{{BASE_URL}}" },
+      { knownVariables: new Set(["BASE_URL"]) },
+    );
+    expect(wrapper.find(warning).exists()).toBe(false);
+  });
+
+  it("stays quiet when the host cannot tell what resolves", () => {
+    const wrapper = render({ action: "type", value: "{{USER}}" });
+    expect(wrapper.find(warning).exists()).toBe(false);
+  });
+});
