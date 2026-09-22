@@ -289,7 +289,8 @@
       "monaco-query-prefill.spec.js",
       "logsqueries.matchall.spec.js",
       "ftsDefaultColumn.spec.js",
-      "logsVisualizePersistence.spec.js"
+      "logsVisualizePersistence.spec.js",
+      "streamNotFound.spec.js"
     ],
     "disabled": [
       {
