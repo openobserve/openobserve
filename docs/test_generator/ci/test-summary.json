@@ -1,8 +1,0 @@
-[
-  { "title": "next shift button is disabled while the picker is in relative mode", "action": "new", "verifies": "Next shift is gated off in the default Relative mode while Prev stays enabled" },
-  { "title": "forward shift moves both boundaries forward by the window duration and stays absolute", "action": "new", "verifies": "a past absolute window advances forward by exactly its own duration and remains on the Absolute tab" },
-  { "title": "forward shift clamps the window so its end never passes the present", "action": "new", "verifies": "the forward shift delta is clamped so the window end never lands past now" },
-  { "title": "previous shift moves both boundaries backward by the window duration", "action": "new", "verifies": "backward shift still moves the window back by its own duration (only forward is capped)" },
-  { "title": "forward shift is disabled when the window end is at or past the present", "action": "new", "verifies": "Next is disabled when the absolute window already ends at now" },
-  { "title": "both previous and next shift buttons render with accessible labels", "action": "new", "verifies": "the Previous/Next shift buttons render with the correct aria-labels" }
-]
