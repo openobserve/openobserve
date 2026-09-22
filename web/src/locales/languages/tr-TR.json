@@ -15356,6 +15356,9 @@
       "multiSelect": "Çoklu seçim",
       "singleSelect": "Tekli seçim"
     },
+    "templateInput": {
+      "suggestions": "Değişken önerileri"
+    },
     "time": {
       "openTimePicker": "Zaman seçiciyi aç",
       "clear": "Temizle",

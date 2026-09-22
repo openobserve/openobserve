@@ -15344,6 +15344,9 @@
       "multiSelect": "다중 선택",
       "singleSelect": "단일 선택"
     },
+    "templateInput": {
+      "suggestions": "변수 제안"
+    },
     "time": {
       "openTimePicker": "시간 선택기 열기",
       "clear": "지우기",

@@ -15344,6 +15344,9 @@
       "multiSelect": "Wielokrotny wybór",
       "singleSelect": "Pojedynczy wybór"
     },
+    "templateInput": {
+      "suggestions": "Sugestie zmiennych"
+    },
     "time": {
       "openTimePicker": "Otwórz wybór czasu",
       "clear": "Wyczyść",

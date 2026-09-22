@@ -15351,6 +15351,9 @@
       "multiSelect": "多重選擇",
       "singleSelect": "單一選擇"
     },
+    "templateInput": {
+      "suggestions": "變數建議"
+    },
     "time": {
       "openTimePicker": "開啟時間選擇器",
       "clear": "清除",

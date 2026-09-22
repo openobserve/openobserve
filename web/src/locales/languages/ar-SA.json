@@ -15344,6 +15344,9 @@
       "multiSelect": "الاختيار المتعدد",
       "singleSelect": "اختيار فردي"
     },
+    "templateInput": {
+      "suggestions": "اقتراحات المتغيرات"
+    },
     "time": {
       "openTimePicker": "أداة اختيار الوقت المفتوح",
       "clear": "مسح",

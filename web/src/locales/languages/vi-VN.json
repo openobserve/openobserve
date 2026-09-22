@@ -15344,6 +15344,9 @@
       "multiSelect": "Chọn nhiều",
       "singleSelect": "Chọn một"
     },
+    "templateInput": {
+      "suggestions": "Gợi ý biến"
+    },
     "time": {
       "openTimePicker": "Mở bộ chọn thời gian",
       "clear": "Xóa",
