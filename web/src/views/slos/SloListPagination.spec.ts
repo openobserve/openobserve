@@ -121,6 +121,17 @@ describe("SloList pagination persistence", () => {
     expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(1);
   });
 
+  // The URL rewrite itself is onPageChange's job, covered below; the shared router's pending navigations make its call timing here unreliable.
+  it("falls back to page 1 when the URL's page is past the end of the list", async () => {
+    vi.mocked(sloService.list).mockResolvedValue({ data: { list: manyRows(5) } } as any);
+    (router as any).currentRoute.value.query = { page: "2" };
+    vi.spyOn(router, "replace").mockImplementation((() => Promise.resolve()) as any);
+    wrapper = await mountList();
+    await vi.waitFor(() => expect((wrapper.vm as any).currentPage).toBe(1));
+
+    expect((wrapper.vm as any).oTableRef.table.getState().pagination.pageIndex).toBe(0);
+  });
+
   it("onPageChange updates currentPage and replaces the URL, preserving other query params", async () => {
     vi.mocked(sloService.list).mockResolvedValue({ data: { list: [sloRow()] } } as any);
     (router as any).currentRoute.value.query = { org_identifier: "test-org" };
