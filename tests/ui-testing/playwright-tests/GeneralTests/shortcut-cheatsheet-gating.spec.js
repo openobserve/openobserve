@@ -7,12 +7,15 @@
  * config.isCloud) and runtime /config flags (ai_enabled, rbac_enabled,
  * incidents_enabled, online_evals_enabled, ...).
  *
- * This spec runs OSS only and asserts the OSS branch of those symmetric gates:
- * the AI Chat entry (aiChatToggle) is absent, fully-gated module chips are
- * absent, and flag-gated page rows inside otherwise-visible modules are absent,
- * while never-gated Global entries remain. Build type is detected from the live
- * /api/{org}/config response's build_type (StatusPagesPage.detectBuildType) so
- * a stray Enterprise/Cloud run skips cleanly instead of false-failing.
+ * The gate is symmetric, so the spec carries both branches: the OSS branch
+ * asserts the AI Chat entry (aiChatToggle), fully-gated module chips, and
+ * flag-gated page rows are absent, while the Enterprise branch asserts the same
+ * gates are present (except the meta-org-only surfaces, which stay absent in
+ * the default org). Exactly one branch runs per environment — the active build
+ * is detected from the live /api/{org}/config response's build_type
+ * (StatusPagesPage.detectBuildType), the same split the status-pages gating
+ * spec uses — so a stray build skips cleanly instead of false-failing. The
+ * open/close/search mechanics are edition-agnostic and run everywhere.
  */
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
@@ -31,7 +34,7 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     pm = new PageManager(page);
   });
 
-  test('OSS cheatsheet opens and the AI Chat entry is gated', {
+  test('OSS - cheatsheet opens and the AI Chat entry is gated', {
     tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
   }, async () => {
     const buildType = await pm.statusPagesPage.detectBuildType(orgId);
@@ -50,7 +53,7 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     testLogger.info('OSS cheatsheet AI Chat gating validation completed');
   });
 
-  test('Enterprise/cloud-only module chips are gated off on OSS', {
+  test('OSS - enterprise/cloud-only module chips are gated off', {
     tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
   }, async () => {
     const buildType = await pm.statusPagesPage.detectBuildType(orgId);
@@ -71,7 +74,7 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     testLogger.info('OSS cheatsheet module chip gating validation completed');
   });
 
-  test('Gated page rows are dropped from otherwise-visible modules on OSS', {
+  test('OSS - gated page rows are dropped from otherwise-visible modules', {
     tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
   }, async () => {
     const buildType = await pm.statusPagesPage.detectBuildType(orgId);
@@ -90,12 +93,72 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     testLogger.info('OSS cheatsheet page-level gating validation completed');
   });
 
-  test('Cheatsheet reopens via the shift+? toggle after being closed', {
-    tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
+  test('ENT - cheatsheet opens and the AI Chat entry is present', {
+    tag: ['@shortcut-cheatsheet-gating', '@all', '@enterprise'],
   }, async () => {
     const buildType = await pm.statusPagesPage.detectBuildType(orgId);
-    test.skip(buildType !== 'opensource', `Runs only on OSS build (detected: ${buildType})`);
+    test.skip(buildType !== 'enterprise', `Runs only on Enterprise build (detected: ${buildType})`);
 
+    testLogger.step('Opening the cheatsheet via the Help menu');
+    await pm.shortcutCheatsheetPage.openViaHelpMenu();
+
+    testLogger.step('Asserting never-gated Global rows are present');
+    await pm.shortcutCheatsheetPage.expectRowPresent('openCheatsheet');
+    await pm.shortcutCheatsheetPage.expectRowPresent('closeDialog');
+
+    testLogger.step('Asserting the AI Chat entry is present on Enterprise');
+    await pm.shortcutCheatsheetPage.expectRowPresent('aiChatToggle');
+
+    testLogger.info('Enterprise cheatsheet AI Chat gating validation completed');
+  });
+
+  test('ENT - enterprise/cloud-only module chips are present', {
+    tag: ['@shortcut-cheatsheet-gating', '@all', '@enterprise'],
+  }, async () => {
+    const buildType = await pm.statusPagesPage.detectBuildType(orgId);
+    test.skip(buildType !== 'enterprise', `Runs only on Enterprise build (detected: ${buildType})`);
+
+    testLogger.step('Opening the cheatsheet via the Help menu');
+    await pm.shortcutCheatsheetPage.openViaHelpMenu();
+
+    testLogger.step('Asserting fully-gated module chips are present');
+    await pm.shortcutCheatsheetPage.expectChipPresent('settings');
+    await pm.shortcutCheatsheetPage.expectChipPresent('online-evals');
+    await pm.shortcutCheatsheetPage.expectChipPresent('actions');
+
+    testLogger.step('Asserting the always-visible Global chip is present');
+    await pm.shortcutCheatsheetPage.expectChipPresent('global');
+
+    testLogger.step('Asserting the meta-org-only running-queries chip stays absent');
+    await pm.shortcutCheatsheetPage.expectChipAbsent('running-queries');
+
+    testLogger.info('Enterprise cheatsheet module chip gating validation completed');
+  });
+
+  test('ENT - gated page rows are present inside shared modules', {
+    tag: ['@shortcut-cheatsheet-gating', '@all', '@enterprise'],
+  }, async () => {
+    const buildType = await pm.statusPagesPage.detectBuildType(orgId);
+    test.skip(buildType !== 'enterprise', `Runs only on Enterprise build (detected: ${buildType})`);
+
+    testLogger.step('Opening the cheatsheet via the Help menu');
+    await pm.shortcutCheatsheetPage.openViaHelpMenu();
+
+    testLogger.step('Asserting edition-gated page rows are present inside shared modules');
+    await pm.shortcutCheatsheetPage.expectRowPresent('searchSchedulersRefresh');
+    await pm.shortcutCheatsheetPage.expectRowPresent('alertSourcesRefresh');
+    await pm.shortcutCheatsheetPage.expectRowPresent('actionsRefresh');
+
+    testLogger.step('Asserting flag-gated page rows (rbac) remain absent with rbac disabled');
+    await pm.shortcutCheatsheetPage.expectRowAbsent('iamRolesRefresh');
+    await pm.shortcutCheatsheetPage.expectRowAbsent('iamGroupsRefresh');
+
+    testLogger.info('Enterprise cheatsheet page-level gating validation completed');
+  });
+
+  test('Cheatsheet reopens via the shift+? toggle after being closed', {
+    tag: ['@shortcut-cheatsheet-gating', '@all'],
+  }, async () => {
     testLogger.step('Opening then closing the cheatsheet so no input holds focus');
     await pm.shortcutCheatsheetPage.openViaHelpMenu();
     await pm.shortcutCheatsheetPage.close();
@@ -106,15 +169,12 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     testLogger.step('Asserting the dialog content re-mounted');
     await pm.shortcutCheatsheetPage.expectRowPresent('openCheatsheet');
 
-    testLogger.info('OSS cheatsheet keyboard toggle validation completed');
+    testLogger.info('Cheatsheet keyboard toggle validation completed');
   });
 
   test('Nonsense search shows the empty state then rows reappear on clear', {
-    tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
+    tag: ['@shortcut-cheatsheet-gating', '@all'],
   }, async () => {
-    const buildType = await pm.statusPagesPage.detectBuildType(orgId);
-    test.skip(buildType !== 'opensource', `Runs only on OSS build (detected: ${buildType})`);
-
     testLogger.step('Opening the cheatsheet via the Help menu');
     await pm.shortcutCheatsheetPage.openViaHelpMenu();
 
@@ -127,21 +187,18 @@ test.describe('Keyboard Shortcut Cheatsheet Entry Gating (AI Chat)', () => {
     await pm.shortcutCheatsheetPage.expectNoResultsHidden();
     await pm.shortcutCheatsheetPage.expectRowPresent('openCheatsheet');
 
-    testLogger.info('OSS cheatsheet search empty-state validation completed');
+    testLogger.info('Cheatsheet search empty-state validation completed');
   });
 
   test('Close button hides the dialog', {
-    tag: ['@shortcut-cheatsheet-gating', '@all', '@oss'],
+    tag: ['@shortcut-cheatsheet-gating', '@all'],
   }, async () => {
-    const buildType = await pm.statusPagesPage.detectBuildType(orgId);
-    test.skip(buildType !== 'opensource', `Runs only on OSS build (detected: ${buildType})`);
-
     testLogger.step('Opening the cheatsheet via the Help menu');
     await pm.shortcutCheatsheetPage.openViaHelpMenu();
 
     testLogger.step('Closing via the close button and asserting the dialog is removed');
     await pm.shortcutCheatsheetPage.close();
 
-    testLogger.info('OSS cheatsheet close-button validation completed');
+    testLogger.info('Cheatsheet close-button validation completed');
   });
 });

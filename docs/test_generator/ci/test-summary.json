@@ -1,8 +1,0 @@
-[
-  { "title": "OSS cheatsheet opens and the AI Chat entry is gated", "action": "new", "verifies": "the cheatsheet opens via the Help menu and the aiChatToggle row is absent on OSS while never-gated Global rows remain" },
-  { "title": "Enterprise/cloud-only module chips are gated off on OSS", "action": "new", "verifies": "Settings, Online Evals, Actions, and Running Queries module chips are not rendered on OSS while the Global chip is" },
-  { "title": "Gated page rows are dropped from otherwise-visible modules on OSS", "action": "new", "verifies": "searchSchedulers/alertSources/iamRoles/iamGroups/actions refresh rows are absent inside shared modules" },
-  { "title": "Cheatsheet reopens via the shift+? toggle after being closed", "action": "new", "verifies": "the global shift+? binding reopens the dialog after it was closed via the close button" },
-  { "title": "Nonsense search shows the empty state then rows reappear on clear", "action": "new", "verifies": "a non-matching query shows the no-results empty state and clearing it restores the row list" },
-  { "title": "Close button hides the dialog", "action": "new", "verifies": "the ghost close button sets open=false and removes the dialog" }
-]

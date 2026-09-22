@@ -13,7 +13,8 @@ export class ShortcutCheatsheetPage {
     this.dialog = page.locator('[data-test="shortcut-cheatsheet-dialog"]');
     this.helpItem = page.locator('[data-test="menu-link-help-item"]');
     this.shortcutsItem = page.locator('[data-test="menu-link-shortcuts-item"]');
-    this.searchInput = page.locator('[data-test="shortcut-cheatsheet-search"]');
+    // OInput exposes the editable control under `-field`; the bare data-test is the non-editable wrapper.
+    this.searchInput = page.locator('[data-test="shortcut-cheatsheet-search-field"]');
     this.closeBtn = page.locator('[data-test="shortcut-cheatsheet-close-btn"]');
     this.noResults = page.locator('[data-test="shortcut-cheatsheet-no-results"]');
   }
