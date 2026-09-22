@@ -1,0 +1,2580 @@
+===== COMPLETE LIST OF CHANGED FILES (32 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+scripts/translations/.translation_state.json
+src/api/management/src/models/annotation_queues/mod.rs
+src/config/src/config.rs
+src/infra/src/table/entity/llm_annotation_queue_items.rs
+src/infra/src/table/migration/m20260921_000001_add_input_preview_to_llm_annotation_queue_items.rs
+src/infra/src/table/migration/mod.rs
+web/src/enterprise/components/onlineEvals/utils/jobMappings.spec.ts
+web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts
+web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.ts
+web/src/enterprise/views/AIObservability/QueueWorkbenchPage.nav.spec.ts
+web/src/enterprise/views/AIObservability/QueueWorkbenchPage.vue
+web/src/locales/languages/ar-SA.json
+web/src/locales/languages/de-DE.json
+web/src/locales/languages/en-US.json
+web/src/locales/languages/es-ES.json
+web/src/locales/languages/fr-FR.json
+web/src/locales/languages/it-IT.json
+web/src/locales/languages/ja-JP.json
+web/src/locales/languages/ko-KR.json
+web/src/locales/languages/nl-NL.json
+web/src/locales/languages/pl-PL.json
+web/src/locales/languages/pt-PT.json
+web/src/locales/languages/ru-RU.json
+web/src/locales/languages/tr-TR.json
+web/src/locales/languages/vi-VN.json
+web/src/locales/languages/zh-CN.json
+web/src/locales/languages/zh-TW.json
+web/src/services/llm-queues.service.spec.ts
+web/src/services/llm-queues.service.ts
+o2_enterprise/src/enterprise/llm_evaluations/annotation_queues.rs
+o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/async_executor.rs
+o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/tasks.rs
+===== END CHANGED FILES =====
+
+diff --git a/scripts/translations/.translation_state.json b/scripts/translations/.translation_state.json
+index 81b72bd0eaf..0c542b743ef 100644
+--- a/scripts/translations/.translation_state.json
++++ b/scripts/translations/.translation_state.json
+@@ -12397,10 +12397,12 @@
+           "title": "5a6743f87ca1085c",
+           "variables": {
+             "input": {
+-              "trace": "b6bec50de2750e82"
++              "session": "4a9571b392344252",
++              "trace": "1989045c93127363"
+             },
+             "output": {
+-              "trace": "078f80923419eb8e"
++              "session": "b3b25c889e3814e2",
++              "trace": "c4ae6bff9a4cc3d1"
+             },
+             "spans": {
+               "trace": "c3d361441ab0db75"
+@@ -12412,6 +12414,10 @@
+             "steps": {
+               "session": "6d11de0abbce4788",
+               "trace": "d59a422557bbb94c"
++            },
++            "tool_calls": {
++              "session": "cd0eae8459084422",
++              "trace": "88b26a078466ba1e"
+             }
+           }
+         },
+diff --git a/src/api/management/src/models/annotation_queues/mod.rs b/src/api/management/src/models/annotation_queues/mod.rs
+index 14ad26bba21..d3c1c17bc66 100644
+--- a/src/api/management/src/models/annotation_queues/mod.rs
++++ b/src/api/management/src/models/annotation_queues/mod.rs
+@@ -156,6 +156,8 @@ pub struct AnnotationQueueItemResponseBody {
+     pub ref_id: String,
+     pub ref_trace_id: Option<String>,
+     pub ref_trace_start_time: i64,
++    /// Bounded first-user-turn excerpt captured at enqueue; null when unavailable.
++    pub input_preview: Option<String>,
+     pub status: String,
+     pub reviewed_at: Option<i64>,
+     pub archived_at: Option<i64>,
+@@ -330,6 +332,7 @@ impl From<AnnotationQueueItem> for AnnotationQueueItemResponseBody {
+             ref_id: value.ref_id,
+             ref_trace_id: value.ref_trace_id,
+             ref_trace_start_time: value.ref_trace_start_time,
++            input_preview: value.input_preview,
+             status: value.status,
+             reviewed_at: value.reviewed_at,
+             archived_at: value.archived_at,
+@@ -485,6 +488,7 @@ mod tests {
+             ref_id: "trace-1".to_string(),
+             ref_trace_id: None,
+             ref_trace_start_time: 1,
++            input_preview: Some("How do I rotate keys?".to_string()),
+             status: status.to_string(),
+             reviewed_at: (status == "reviewed").then_some(42),
+             archived_at: None,
+@@ -514,6 +518,7 @@ mod tests {
+                 ref_id: "trace-1".to_string(),
+                 ref_trace_id: None,
+                 ref_trace_start_time: 100,
++                input_preview: None,
+                 status: "pending".to_string(),
+                 reviewed_at: None,
+                 archived_at: None,
+diff --git a/src/config/src/config.rs b/src/config/src/config.rs
+index 55ee83ce47e..326c3563e26 100644
+--- a/src/config/src/config.rs
++++ b/src/config/src/config.rs
+@@ -83,7 +83,8 @@ pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
+ // 84: add folder_id to workflow_drafts.
+ // 85: create llm_experiment_slot_retries.
+ // 86: create synthetics shared variables tables; add env to synthetics_jobs.
+-pub const DB_SCHEMA_VERSION: u64 = 86;
++// 87: add input_preview to llm_annotation_queue_items.
++pub const DB_SCHEMA_VERSION: u64 = 87;
+ pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
+ 
+ // global version variables
+diff --git a/src/infra/src/table/entity/llm_annotation_queue_items.rs b/src/infra/src/table/entity/llm_annotation_queue_items.rs
+index fd435e4d704..79fbff3748a 100644
+--- a/src/infra/src/table/entity/llm_annotation_queue_items.rs
++++ b/src/infra/src/table/entity/llm_annotation_queue_items.rs
+@@ -18,6 +18,8 @@ pub struct Model {
+     pub ref_id: String,
+     pub ref_trace_id: Option<String>,
+     pub ref_trace_start_time: i64,
++    /// Bounded plain-text excerpt of the first user turn, captured at enqueue.
++    pub input_preview: Option<String>,
+     pub status: String,
+     pub reviewed_at: Option<i64>,
+     pub archived_at: Option<i64>,
+diff --git a/src/infra/src/table/migration/m20260921_000001_add_input_preview_to_llm_annotation_queue_items.rs b/src/infra/src/table/migration/m20260921_000001_add_input_preview_to_llm_annotation_queue_items.rs
+new file mode 100644
+index 00000000000..eca6e7f55e3
+--- /dev/null
++++ b/src/infra/src/table/migration/m20260921_000001_add_input_preview_to_llm_annotation_queue_items.rs
+@@ -0,0 +1,137 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++//! `llm_annotation_queue_items.input_preview`: a bounded plain-text excerpt of
++//! the item's first user turn, captured when the item is enqueued so the
++//! Workbench item list can label items without one trace search per row.
++//! NULL means no preview was captured; the Workbench falls back to the ref id.
++
++use sea_orm_migration::prelude::*;
++
++const TABLE: &str = "llm_annotation_queue_items";
++const COLUMN: &str = "input_preview";
++
++#[derive(DeriveMigrationName)]
++pub struct Migration;
++
++#[derive(DeriveIden, Clone)]
++enum LlmAnnotationQueueItems {
++    #[sea_orm(iden = "llm_annotation_queue_items")]
++    Table,
++    InputPreview,
++}
++
++#[async_trait::async_trait]
++impl MigrationTrait for Migration {
++    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
++        // A has_column guard: add_column_if_not_exists renders IF NOT EXISTS, which MySQL rejects.
++        if manager.has_column(TABLE, COLUMN).await? {
++            return Ok(());
++        }
++        manager.alter_table(add_column_stmt()).await?;
++        Ok(())
++    }
++
++    /// Nothing to restore: the preview is derived from the trace stream and is
++    /// recaptured the next time an item is opened.
++    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
++        if !manager.has_column(TABLE, COLUMN).await? {
++            return Ok(());
++        }
++        manager.alter_table(drop_column_stmt()).await?;
++        Ok(())
++    }
++}
++
++/// Nullable text: the service bounds the excerpt before writing it.
++fn add_column_stmt() -> TableAlterStatement {
++    Table::alter()
++        .table(LlmAnnotationQueueItems::Table)
++        .add_column(
++            ColumnDef::new(LlmAnnotationQueueItems::InputPreview)
++                .text()
++                .null(),
++        )
++        .to_owned()
++}
++
++fn drop_column_stmt() -> TableAlterStatement {
++    Table::alter()
++        .table(LlmAnnotationQueueItems::Table)
++        .drop_column(LlmAnnotationQueueItems::InputPreview)
++        .to_owned()
++}
++
++#[cfg(test)]
++mod tests {
++    use collapse::*;
++
++    use super::*;
++
++    #[test]
++    fn postgres() {
++        collapsed_eq!(
++            &add_column_stmt().to_string(PostgresQueryBuilder),
++            r#"ALTER TABLE "llm_annotation_queue_items" ADD COLUMN "input_preview" text NULL"#
++        );
++    }
++
++    #[test]
++    fn mysql() {
++        collapsed_eq!(
++            &add_column_stmt().to_string(MysqlQueryBuilder),
++            r#"ALTER TABLE `llm_annotation_queue_items` ADD COLUMN `input_preview` text NULL"#
++        );
++    }
++
++    #[test]
++    fn sqlite() {
++        collapsed_eq!(
++            &add_column_stmt().to_string(SqliteQueryBuilder),
++            r#"ALTER TABLE "llm_annotation_queue_items" ADD COLUMN "input_preview" text NULL"#
++        );
++    }
++
++    #[test]
++    fn postgres_down() {
++        collapsed_eq!(
++            &drop_column_stmt().to_string(PostgresQueryBuilder),
++            r#"ALTER TABLE "llm_annotation_queue_items" DROP COLUMN "input_preview""#
++        );
++    }
++
++    /// up() and down() must name the same column, or a rollback silently drops the wrong one.
++    #[test]
++    fn up_and_down_agree_on_the_column() {
++        let up = add_column_stmt().to_string(SqliteQueryBuilder);
++        let down = drop_column_stmt().to_string(SqliteQueryBuilder);
++        assert!(up.contains(COLUMN));
++        assert!(down.contains(COLUMN));
++        assert_eq!(down.matches("DROP COLUMN").count(), 1);
++    }
++
++    /// SQLite panics on an ALTER carrying more than one option, so this must stay a single ADD.
++    #[test]
++    fn adds_exactly_one_column() {
++        let sql = add_column_stmt().to_string(SqliteQueryBuilder);
++        assert_eq!(sql.matches("ADD COLUMN").count(), 1);
++        assert_eq!(
++            COLUMN,
++            LlmAnnotationQueueItems::InputPreview
++                .into_iden()
++                .to_string()
++        );
++    }
++}
+diff --git a/src/infra/src/table/migration/mod.rs b/src/infra/src/table/migration/mod.rs
+index d4fad5b73b9..908e118f6df 100644
+--- a/src/infra/src/table/migration/mod.rs
++++ b/src/infra/src/table/migration/mod.rs
+@@ -195,6 +195,7 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
+ mod m20260917_000001_add_env_to_synthetics_jobs;
+ mod m20260917_000001_create_llm_experiment_slot_retries;
+ mod m20260917_000001_create_synthetics_shared_variables;
++mod m20260921_000001_add_input_preview_to_llm_annotation_queue_items;
+ /// Shared body of the two `folder_id` migrations above; not a migration itself.
+ mod workflow_folder_id;
+ 
+@@ -475,6 +476,7 @@ impl MigratorTrait for Migrator {
+             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+             Box::new(m20260917_000001_create_synthetics_shared_variables::Migration),
+             Box::new(m20260917_000001_add_env_to_synthetics_jobs::Migration),
++            Box::new(m20260921_000001_add_input_preview_to_llm_annotation_queue_items::Migration),
+         ]
+     }
+ }
+@@ -517,6 +519,10 @@ mod tests {
+         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
+         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+         (86, "m20260917_000001_create_synthetics_shared_variables"),
++        (
++            87,
++            "m20260921_000001_add_input_preview_to_llm_annotation_queue_items",
++        ),
+     ];
+ 
+     #[test]
+diff --git a/web/src/enterprise/components/onlineEvals/utils/jobMappings.spec.ts b/web/src/enterprise/components/onlineEvals/utils/jobMappings.spec.ts
+index d6914802251..ed92d00ffab 100644
+--- a/web/src/enterprise/components/onlineEvals/utils/jobMappings.spec.ts
++++ b/web/src/enterprise/components/onlineEvals/utils/jobMappings.spec.ts
+@@ -85,7 +85,10 @@ describe("defaultJobMappingValue", () => {
+     expect(defaultJobMappingValue("spans", "trace")).toBe("{{spans}}");
+     expect(defaultJobMappingValue("statistics", "session")).toBe("{{statistics}}");
+     expect(defaultJobMappingValue("steps", "session")).toBe("{{steps}}");
+-    expect(defaultJobMappingValue("input", "session")).toBe("{{gen_ai_input_messages}}");
++    expect(defaultJobMappingValue("input", "session")).toBe("{{input}}");
++    expect(defaultJobMappingValue("output", "session")).toBe("{{output}}");
++    expect(defaultJobMappingValue("tool_calls", "trace")).toBe("{{tool_calls}}");
++    expect(defaultJobMappingValue("tool_calls", "session")).toBe("{{tool_calls}}");
+   });
+ });
+ 
+diff --git a/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts b/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts
+index a54774a706a..06f92d99b4b 100644
+--- a/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts
++++ b/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts
+@@ -15,13 +15,17 @@ describe("systemProvidedVariablesForScope", () => {
+       "statistics",
+       "spans",
+       "steps",
++      "tool_calls",
+     ]);
+   });
+ 
+-  it("provides statistics and steps for session targets", () => {
++  it("provides the conversation, statistics, steps and tool calls for session targets", () => {
+     expect(systemProvidedVariablesForScope("session").map(({ name }) => name)).toEqual([
++      "input",
++      "output",
+       "statistics",
+       "steps",
++      "tool_calls",
+     ]);
+   });
+ });
+diff --git a/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.ts b/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.ts
+index 5d29d5bf24e..89b3b6aec84 100644
+--- a/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.ts
++++ b/web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.ts
+@@ -1,7 +1,7 @@
+ import type { EvalTargetScope } from "@/services/online-evals.service";
+ 
+ export interface SystemProvidedVariable {
+-  name: "input" | "output" | "statistics" | "spans" | "steps";
++  name: "input" | "output" | "statistics" | "spans" | "steps" | "tool_calls";
+ }
+ 
+ const TRACE_VIEW_COMPONENTS: SystemProvidedVariable[] = [
+@@ -10,11 +10,15 @@ const TRACE_VIEW_COMPONENTS: SystemProvidedVariable[] = [
+   { name: "statistics" },
+   { name: "spans" },
+   { name: "steps" },
++  { name: "tool_calls" },
+ ];
+ 
+ const SESSION_VIEW_COMPONENTS: SystemProvidedVariable[] = [
++  { name: "input" },
++  { name: "output" },
+   { name: "statistics" },
+   { name: "steps" },
++  { name: "tool_calls" },
+ ];
+ 
+ export function systemProvidedVariablesForScope(
+diff --git a/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.nav.spec.ts b/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.nav.spec.ts
+new file mode 100644
+index 00000000000..74defe99fde
+--- /dev/null
++++ b/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.nav.spec.ts
+@@ -0,0 +1,170 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++//
++// @vitest-environment jsdom
++//
++// The item navigator has to let a reviewer tell items apart before opening
++// them. A bare target id cannot do that, so each entry leads with the stored
++// first-user-turn preview and demotes the id to secondary text; an item whose
++// trace carried no recognizable input keeps the id as its only label.
++
++import { beforeEach, describe, expect, it, vi } from "vitest";
++import { flushPromises, mount } from "@vue/test-utils";
++
++const mockGetQueue = vi.fn();
++const mockListItems = vi.fn();
++const mockListScoreConfigs = vi.fn();
++const mockGetItemDetail = vi.fn();
++
++vi.mock("@/services/llm-queues.service", () => ({
++  default: {
++    get: (...args: any[]) => mockGetQueue(...args),
++    listItems: (...args: any[]) => mockListItems(...args),
++    listScoreConfigOptions: (...args: any[]) => mockListScoreConfigs(...args),
++    getItemDetail: (...args: any[]) => mockGetItemDetail(...args),
++    listReviews: vi.fn().mockResolvedValue([]),
++  },
++}));
++
++vi.mock("@/services/llm-datasets.service", () => ({ default: { list: vi.fn() } }));
++vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
++
++vi.mock("vuex", () => ({
++  useStore: vi.fn(() => ({ state: { selectedOrganization: { identifier: "test-org" } } })),
++}));
++
++vi.mock("vue-router", () => ({
++  useRouter: vi.fn(() => ({ push: vi.fn() })),
++  useRoute: vi.fn(() => ({ params: { id: "q1" }, query: {} })),
++}));
++
++vi.mock("@/types/i18n", async (importOriginal) => {
++  const actual: any = await importOriginal();
++  return { ...actual, useI18nTyped: () => ({ t: (key: string) => key }) };
++});
++
++vi.mock("vue-i18n", () => ({
++  useI18n: vi.fn(() => ({ t: (key: string) => key })),
++}));
++
++vi.mock("@/lib/core/PageLayout/OPageLayout.vue", () => ({
++  default: { name: "OPageLayout", template: `<div><slot /></div>` },
++}));
++
++import QueueWorkbenchPage from "./QueueWorkbenchPage.vue";
++
++function item(overrides: Record<string, unknown>) {
++  return {
++    id: "item",
++    queueId: "q1",
++    queueName: "Helpfulness review",
++    refType: "trace",
++    refId: "01a0af9a082773719d708c1a8f000000",
++    refTraceId: null,
++    refTraceStartTime: 1_700_000_000_000_000,
++    inputPreview: null,
++    status: "pending",
++    reviewedAt: null,
++    archivedAt: null,
++    createdAt: 1,
++    updatedAt: 1,
++    ...overrides,
++  };
++}
++
++async function mountPage() {
++  const wrapper = mount(QueueWorkbenchPage, {
++    global: {
++      stubs: {
++        OTabs: { template: `<div><slot /></div>` },
++        OTab: { template: `<div class="o-tab"><slot /></div>` },
++        OButton: true,
++        OIcon: true,
++        OTag: true,
++        OSpinner: true,
++        OProgressBar: true,
++        OSlider: true,
++        ORadioGroup: true,
++        ORadio: true,
++        OTextarea: true,
++        OTagInput: true,
++        OSelect: true,
++        OTooltip: true,
++        ODrawer: true,
++        ReviewContentBox: true,
++        "i18n-t": true,
++      },
++    },
++  });
++  await flushPromises();
++  return wrapper;
++}
++
++beforeEach(() => {
++  mockGetQueue.mockReset().mockResolvedValue({
++    id: "q1",
++    name: "Helpfulness review",
++    scoreConfigs: [],
++    targetDatasetId: null,
++  });
++  mockListScoreConfigs.mockReset().mockResolvedValue([]);
++  mockListItems.mockReset();
++  mockGetItemDetail.mockReset().mockRejectedValue(new Error("no detail"));
++});
++
++describe("QueueWorkbenchPage item navigator", () => {
++  it("leads with the input preview and demotes the target id", async () => {
++    mockListItems.mockResolvedValue([
++      item({ id: "a", refId: "trace-a", inputPreview: "How do I rotate keys?" }),
++      item({ id: "b", refId: "trace-b", inputPreview: "Why is the chart flat?" }),
++    ]);
++    const wrapper = await mountPage();
++
++    const first = wrapper.find('[data-test="ai-queue-workbench-nav-item-0"]');
++    expect(first.find('[data-test="ai-queue-workbench-nav-preview-0"]').text()).toBe(
++      "How do I rotate keys?",
++    );
++    expect(first.text()).toContain("trace-a");
++    expect(wrapper.find('[data-test="ai-queue-workbench-nav-preview-1"]').text()).toBe(
++      "Why is the chart flat?",
++    );
++  });
++
++  it("falls back to the target id when no preview was captured", async () => {
++    mockListItems.mockResolvedValue([item({ id: "a", refId: "trace-a", inputPreview: null })]);
++    const wrapper = await mountPage();
++
++    const first = wrapper.find('[data-test="ai-queue-workbench-nav-item-0"]');
++    expect(first.find('[data-test="ai-queue-workbench-nav-preview-0"]').exists()).toBe(false);
++    expect(first.text()).toContain("trace-a");
++  });
++
++  it("adopts the preview the detail endpoint backfills for an older item", async () => {
++    const older = item({ id: "a", refId: "trace-a", inputPreview: null });
++    mockListItems.mockResolvedValue([older]);
++    mockGetItemDetail.mockResolvedValue({
++      item: { ...older, inputPreview: "Why is the chart flat?" },
++      sourceStream: "traces",
++      content: { input: null, output: null, trace: [] },
++      machineScores: [],
++      reviews: [],
++    });
++    const wrapper = await mountPage();
++
++    expect(wrapper.find('[data-test="ai-queue-workbench-nav-preview-0"]').text()).toBe(
++      "Why is the chart flat?",
++    );
++  });
++});
+diff --git a/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.vue b/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.vue
+index d176111eab2..df969aa577b 100644
+--- a/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.vue
++++ b/web/src/enterprise/views/AIObservability/QueueWorkbenchPage.vue
+@@ -108,6 +108,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+             :data-test="`ai-queue-workbench-nav-item-${i}`"
+             @click="selectItem(i)"
+           >
++            <!-- Preview first, id second: the reviewer needs to tell items apart
++                 before opening them, and a bare target id cannot do that. -->
+             <div class="flex w-full min-w-0 items-center gap-1.5 text-xs">
+               <OIcon
+                 :name="item.status === 'reviewed' ? 'check-circle' : 'fiber-manual-record'"
+@@ -117,7 +119,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+                   item.status === 'reviewed' ? 'text-status-success-text' : 'text-text-disabled'
+                 "
+               />
+-              <span class="min-w-0 flex-1 truncate text-left font-mono">{{ item.refId }}</span>
++              <span
++                v-if="item.inputPreview"
++                class="flex min-w-0 flex-1 flex-col text-left"
++                :title="item.inputPreview"
++              >
++                <span
++                  class="text-text-body truncate"
++                  :data-test="`ai-queue-workbench-nav-preview-${i}`"
++                  >{{ item.inputPreview }}</span
++                >
++                <span class="text-text-secondary text-2xs truncate font-mono">{{
++                  item.refId
++                }}</span>
++              </span>
++              <span v-else class="min-w-0 flex-1 truncate text-left font-mono">{{
++                item.refId
++              }}</span>
+             </div>
+           </OTab>
+         </OTabs>
+@@ -989,6 +1007,11 @@ async function loadCurrentItem() {
+     if (request !== detailRequest) return;
+     currentDetail.value = detail;
+     currentReviews.value = detail.reviews;
++    // Items enqueued before previews existed get theirs backfilled on open;
++    // reflect that in the navigator without refetching the whole list.
++    if (!item.inputPreview && detail.item?.inputPreview) {
++      item.inputPreview = detail.item.inputPreview;
++    }
+   } catch {
+     if (request !== detailRequest) return;
+     toast({ variant: "error", message: t("aiObservability.queues.detail.loadError") });
+diff --git a/web/src/locales/languages/ar-SA.json b/web/src/locales/languages/ar-SA.json
+index 36f57978dbf..ff0f90b7ad4 100644
+--- a/web/src/locales/languages/ar-SA.json
++++ b/web/src/locales/languages/ar-SA.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "إدخال من امتداد جذر الأثر."
++              "trace": "الإدخال من Span الجذر للمحادثة في الأثر.",
++              "session": "السؤال الافتتاحي: الإدخال من Span الجذر للمحادثة في الأثر الأول."
+             },
+             "output": {
+-              "trace": "خرج من امتداد جذر الأثر."
++              "trace": "الإخراج من Span الجذر للمحادثة في الأثر.",
++              "session": "الإجابة النهائية: الإخراج من Span الجذر للمحادثة في الأثر الأخير."
+             },
+             "statistics": {
+               "trace": "مقاييس التتبع: عدد الامتدادات، المدة، استدعاءات LLM والأدوات، الأخطاء، الرموز، والتكلفة.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "الامتداد حسب الترتيب الزمني؛ يطوي الوسط عندما يكون المسار طويلا جدا.",
+               "session": "آثار في ترتيب زمني، ممثلة كتحولات محادثة."
++            },
++            "tool_calls": {
++              "trace": "كل استدعاء أداة في الأثر، بترتيب زمني، مع اسمه وإدخاله وإخراجه وحالته.",
++              "session": "كل استدعاء أداة عبر آثار الجلسة، بترتيب زمني، مع اسمه وإدخاله وإخراجه وحالته."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/de-DE.json b/web/src/locales/languages/de-DE.json
+index c17e149634b..c0ee240cd2e 100644
+--- a/web/src/locales/languages/de-DE.json
++++ b/web/src/locales/languages/de-DE.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Eingabe vom Root-Span des Traces."
++              "trace": "Eingabe aus dem Root-Chat-Span des Traces.",
++              "session": "Die Einstiegsfrage: Eingabe aus dem Root-Chat-Span des ersten Traces."
+             },
+             "output": {
+-              "trace": "Ausgabe vom Root-Span des Traces."
++              "trace": "Ausgabe aus dem Root-Chat-Span des Traces.",
++              "session": "Die abschließende Antwort: Ausgabe aus dem Root-Chat-Span des letzten Traces."
+             },
+             "statistics": {
+               "trace": "Trace-Metriken: Span-Anzahl, Dauer, LLM- und Tool-Aufrufe, Fehler, Token und Kosten.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans in zeitlicher Reihenfolge; die Mitte wird eingeklappt, wenn der Trace sehr lang ist.",
+               "session": "Traces in zeitlicher Reihenfolge, dargestellt als Gesprächsrunden."
++            },
++            "tool_calls": {
++              "trace": "Jeder Tool-Aufruf im Trace, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status.",
++              "session": "Jeder Tool-Aufruf über die Traces der Sitzung hinweg, in zeitlicher Reihenfolge, mit Name, Eingabe, Ausgabe und Status."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/en-US.json b/web/src/locales/languages/en-US.json
+index 533cc951c40..88a5e846fc9 100644
+--- a/web/src/locales/languages/en-US.json
++++ b/web/src/locales/languages/en-US.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Input from the trace's root span."
++              "trace": "Input from the trace's root chat span.",
++              "session": "The opening question: input from the first trace's root chat span."
+             },
+             "output": {
+-              "trace": "Output from the trace's root span."
++              "trace": "Output from the trace's root chat span.",
++              "session": "The final answer: output from the last trace's root chat span."
+             },
+             "statistics": {
+               "trace": "Trace metrics: span count, duration, LLM and tool calls, errors, tokens, and cost.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans in time order; the middle is folded when the trace is very long.",
+               "session": "Traces in time order, represented as conversation turns."
++            },
++            "tool_calls": {
++              "trace": "Every tool call in the trace, in time order, with its name, input, output, and status.",
++              "session": "Every tool call across the session's traces, in time order, with its name, input, output, and status."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/es-ES.json b/web/src/locales/languages/es-ES.json
+index 6b3e7d66ce1..9403edffc5f 100644
+--- a/web/src/locales/languages/es-ES.json
++++ b/web/src/locales/languages/es-ES.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Entrada del span raíz del trace."
++              "trace": "Entrada desde el span raíz de chat de la traza.",
++              "session": "La pregunta inicial: entrada desde el span raíz de chat de la primera traza."
+             },
+             "output": {
+-              "trace": "Salida del span raíz del trace."
++              "trace": "Salida desde el span raíz de chat de la traza.",
++              "session": "La respuesta final: salida desde el span raíz de chat de la última traza."
+             },
+             "statistics": {
+               "trace": "Métricas del trace: número de spans, duración, llamadas a LLM y herramientas, errores, tokens y coste.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans en orden cronológico; el centro se pliega cuando el trace es muy largo.",
+               "session": "Traces en orden cronológico, representados como turnos de conversación."
++            },
++            "tool_calls": {
++              "trace": "Cada llamada a herramienta en la traza, en orden temporal, con su nombre, entrada, salida y estado.",
++              "session": "Cada llamada a herramienta en las trazas de la sesión, en orden temporal, con su nombre, entrada, salida y estado."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/fr-FR.json b/web/src/locales/languages/fr-FR.json
+index 5c25f495085..2f0c6de0854 100644
+--- a/web/src/locales/languages/fr-FR.json
++++ b/web/src/locales/languages/fr-FR.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Entrée provenant du span racine de la trace."
++              "trace": "Entrée provenant du span de chat racine de la trace.",
++              "session": "La question d'ouverture : entrée provenant du span de chat racine de la première trace."
+             },
+             "output": {
+-              "trace": "Sortie provenant du span racine de la trace."
++              "trace": "Sortie provenant du span de chat racine de la trace.",
++              "session": "La réponse finale : sortie provenant du span de chat racine de la dernière trace."
+             },
+             "statistics": {
+               "trace": "Métriques de trace : nombre de spans, durée, appels LLM et d'outils, erreurs, tokens et coût.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans dans l'ordre chronologique ; le milieu est replié lorsque la trace est très longue.",
+               "session": "Traces dans l'ordre chronologique, représentées comme des tours de conversation."
++            },
++            "tool_calls": {
++              "trace": "Chaque appel d'outil dans la trace, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut.",
++              "session": "Chaque appel d'outil dans les traces de la session, par ordre chronologique, avec son nom, son entrée, sa sortie et son statut."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/it-IT.json b/web/src/locales/languages/it-IT.json
+index 15b23c826e1..cb1fc57f293 100644
+--- a/web/src/locales/languages/it-IT.json
++++ b/web/src/locales/languages/it-IT.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Input dallo span radice della traccia."
++              "trace": "Input dallo Span chat radice della traccia.",
++              "session": "La domanda iniziale: input dallo Span chat radice della prima traccia."
+             },
+             "output": {
+-              "trace": "Output dallo span radice della traccia."
++              "trace": "Output dallo Span chat radice della traccia.",
++              "session": "La risposta finale: output dallo Span chat radice dell'ultima traccia."
+             },
+             "statistics": {
+               "trace": "Metriche della traccia: numero di span, durata, chiamate LLM e strumenti, errori, token e costo.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Span in ordine temporale; la parte centrale viene compressa quando la traccia è molto lunga.",
+               "session": "Tracce in ordine temporale, rappresentate come turni di conversazione."
++            },
++            "tool_calls": {
++              "trace": "Ogni chiamata di strumento nella traccia, in ordine temporale, con nome, input, output e stato.",
++              "session": "Ogni chiamata di strumento nelle tracce della sessione, in ordine temporale, con nome, input, output e stato."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/ja-JP.json b/web/src/locales/languages/ja-JP.json
+index feadf149a00..2dba80cc75c 100644
+--- a/web/src/locales/languages/ja-JP.json
++++ b/web/src/locales/languages/ja-JP.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "トレースのルートスパンからの入力。"
++              "trace": "トレースのルートチャット Span からの入力。",
++              "session": "最初の質問: 最初のトレースのルートチャット Span からの入力。"
+             },
+             "output": {
+-              "trace": "トレースのルートスパンからの出力。"
++              "trace": "トレースのルートチャット Span からの出力。",
++              "session": "最終回答: 最後のトレースのルートチャット Span からの出力。"
+             },
+             "statistics": {
+               "trace": "トレースメトリクス: スパン数、期間、LLM とツール呼び出し、エラー、トークン、コスト。",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "時間順のスパン。トレースが非常に長い場合は中間が折りたたまれます。",
+               "session": "時間順のトレース。会話のターンとして表現されます。"
++            },
++            "tool_calls": {
++              "trace": "トレース内のすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。",
++              "session": "セッションのトレース全体にわたるすべてのツール呼び出しを、名前、入力、出力、ステータスとともに時系列順に示します。"
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/ko-KR.json b/web/src/locales/languages/ko-KR.json
+index f1c50af176f..a1a383a7b39 100644
+--- a/web/src/locales/languages/ko-KR.json
++++ b/web/src/locales/languages/ko-KR.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "트레이스의 루트 스팬에서 입력."
++              "trace": "트레이스의 루트 채팅 스팬에서 가져온 입력입니다.",
++              "session": "시작 질문: 첫 번째 트레이스의 루트 채팅 스팬에서 가져온 입력입니다."
+             },
+             "output": {
+-              "trace": "트레이스의 루트 스팬에서 출력."
++              "trace": "트레이스의 루트 채팅 스팬에서 가져온 출력입니다.",
++              "session": "최종 답변: 마지막 트레이스의 루트 채팅 스팬에서 가져온 출력입니다."
+             },
+             "statistics": {
+               "trace": "트레이스 메트릭: 스팬 수, 기간, LLM 및 도구 호출, 오류, 토큰 및 비용.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "시간 순서의 스팬, 트레이스가 매우 길면 중간이 접힙니다.",
+               "session": "대화 턴으로 표현된 시간 순서의 트레이스."
++            },
++            "tool_calls": {
++              "trace": "트레이스의 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다.",
++              "session": "세션의 트레이스 전반에 걸친 모든 도구 호출을 시간 순서대로 나열하며, 이름, 입력, 출력, 상태를 포함합니다."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/nl-NL.json b/web/src/locales/languages/nl-NL.json
+index 59c2ed3583f..e522747969a 100644
+--- a/web/src/locales/languages/nl-NL.json
++++ b/web/src/locales/languages/nl-NL.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Invoer van de root-span van de trace."
++              "trace": "Invoer van de root chat-span van de trace.",
++              "session": "De openingsvraag: invoer van de root chat-span van de eerste trace."
+             },
+             "output": {
+-              "trace": "Uitvoer van de root-span van de trace."
++              "trace": "Uitvoer van de root chat-span van de trace.",
++              "session": "Het uiteindelijke antwoord: uitvoer van de root chat-span van de laatste trace."
+             },
+             "statistics": {
+               "trace": "Trace-metrieken: span-aantal, duur, LLM- en toolcalls, fouten, tokens en kosten.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans in tijdsvolgorde; het midden wordt samengevouwen wanneer de trace erg lang is.",
+               "session": "Traces in tijdsvolgorde, weergegeven als gespreksbeurten."
++            },
++            "tool_calls": {
++              "trace": "Elke toolaanroep in de trace, in tijdvolgorde, met de naam, invoer, uitvoer en status.",
++              "session": "Elke toolaanroep in alle traces van de sessie, in tijdvolgorde, met de naam, invoer, uitvoer en status."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/pl-PL.json b/web/src/locales/languages/pl-PL.json
+index d63e476ca9a..ddf6a965e3f 100644
+--- a/web/src/locales/languages/pl-PL.json
++++ b/web/src/locales/languages/pl-PL.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Dane wejściowe z głównego spanu trace."
++              "trace": "Dane wejściowe z głównego spanu czatu w trace.",
++              "session": "Pytanie otwierające: dane wejściowe z głównego spanu czatu pierwszego trace."
+             },
+             "output": {
+-              "trace": "Dane wyjściowe z głównego spanu trace."
++              "trace": "Dane wyjściowe z głównego spanu czatu w trace.",
++              "session": "Odpowiedź końcowa: dane wyjściowe z głównego spanu czatu ostatniego trace."
+             },
+             "statistics": {
+               "trace": "Metryki trace: liczba spanów, czas trwania, wywołania LLM i narzędzi, błędy, tokeny i koszt.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spany w kolejności chronologicznej; środkowa część jest zwijana, gdy trace jest bardzo długi.",
+               "session": "Trace'y w kolejności chronologicznej, reprezentowane jako tury rozmowy."
++            },
++            "tool_calls": {
++              "trace": "Każde wywołanie narzędzia w trace, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem.",
++              "session": "Każde wywołanie narzędzia we wszystkich trace'ach sesji, w kolejności chronologicznej, wraz z nazwą, danymi wejściowymi, danymi wyjściowymi i statusem."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/pt-PT.json b/web/src/locales/languages/pt-PT.json
+index 0b373f7b483..1f65d1a2181 100644
+--- a/web/src/locales/languages/pt-PT.json
++++ b/web/src/locales/languages/pt-PT.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Entrada do span raiz do trace."
++              "trace": "Entrada do span de chat raiz do rastro.",
++              "session": "A pergunta inicial: entrada do span de chat raiz do primeiro rastro."
+             },
+             "output": {
+-              "trace": "Saída do span raiz do trace."
++              "trace": "Saída do span de chat raiz do rastro.",
++              "session": "A resposta final: saída do span de chat raiz do último rastro."
+             },
+             "statistics": {
+               "trace": "Métricas do trace: contagem de spans, duração, chamadas de LLM e ferramentas, erros, tokens e custo.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Spans em ordem de tempo; o meio é recolhido quando o trace é muito longo.",
+               "session": "Traces em ordem de tempo, representados como turnos de conversa."
++            },
++            "tool_calls": {
++              "trace": "Todas as chamadas de ferramenta no rastro, em ordem cronológica, com seu nome, entrada, saída e status.",
++              "session": "Todas as chamadas de ferramenta nos rastros da sessão, em ordem cronológica, com seu nome, entrada, saída e status."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/ru-RU.json b/web/src/locales/languages/ru-RU.json
+index 46f3c794543..73535ef456e 100644
+--- a/web/src/locales/languages/ru-RU.json
++++ b/web/src/locales/languages/ru-RU.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Входные данные из корневого спана трейса."
++              "trace": "Входные данные из корневого чат-спана трейса.",
++              "session": "Начальный вопрос: входные данные из корневого чат-спана первого трейса."
+             },
+             "output": {
+-              "trace": "Выходные данные из корневого спана трейса."
++              "trace": "Выходные данные из корневого чат-спана трейса.",
++              "session": "Итоговый ответ: выходные данные из корневого чат-спана последнего трейса."
+             },
+             "statistics": {
+               "trace": "Метрики трейса: количество спанов, длительность, вызовы LLM и инструментов, ошибки, токены и стоимость.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Спаны в хронологическом порядке; средняя часть сворачивается, когда трейс очень длинный.",
+               "session": "Трейсы в хронологическом порядке, представленные как ходы разговора."
++            },
++            "tool_calls": {
++              "trace": "Каждый вызов инструмента в трейсе, в хронологическом порядке, с именем, входными и выходными данными и статусом.",
++              "session": "Каждый вызов инструмента по всем трейсам сессии, в хронологическом порядке, с именем, входными и выходными данными и статусом."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/tr-TR.json b/web/src/locales/languages/tr-TR.json
+index 0ddfe7a3979..bc45c7304e3 100644
+--- a/web/src/locales/languages/tr-TR.json
++++ b/web/src/locales/languages/tr-TR.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Trace'in kök span'inden girdi."
++              "trace": "İz'in kök sohbet span'inden gelen girdi.",
++              "session": "Açılış sorusu: ilk iz'in kök sohbet span'inden gelen girdi."
+             },
+             "output": {
+-              "trace": "Trace'in kök span'inden çıktı."
++              "trace": "İz'in kök sohbet span'inden gelen çıktı.",
++              "session": "Nihai yanıt: son iz'in kök sohbet span'inden gelen çıktı."
+             },
+             "statistics": {
+               "trace": "Trace metrikleri: span sayısı, süre, LLM ve araç çağrıları, hatalar, token'lar ve maliyet.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Zaman sırasına göre span'ler; trace çok uzun olduğunda orta kısım katlanır.",
+               "session": "Zaman sırasına göre trace'ler, konuşma turları olarak temsil edilir."
++            },
++            "tool_calls": {
++              "trace": "İz'deki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte.",
++              "session": "Oturumun izleri genelindeki her araç çağrısı, zaman sırasına göre adı, girdisi, çıktısı ve durumuyla birlikte."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/vi-VN.json b/web/src/locales/languages/vi-VN.json
+index 4ee9970c416..6870c6942f1 100644
+--- a/web/src/locales/languages/vi-VN.json
++++ b/web/src/locales/languages/vi-VN.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "Đầu vào từ span gốc của trace."
++              "trace": "Đầu vào từ span chat gốc của trace.",
++              "session": "Câu hỏi mở đầu: đầu vào từ span chat gốc của trace đầu tiên."
+             },
+             "output": {
+-              "trace": "Đầu ra từ span gốc của trace."
++              "trace": "Đầu ra từ span chat gốc của trace.",
++              "session": "Câu trả lời cuối cùng: đầu ra từ span chat gốc của trace cuối cùng."
+             },
+             "statistics": {
+               "trace": "Số liệu trace: số span, thời lượng, số lần gọi LLM và công cụ, lỗi, token và chi phí.",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "Các span theo thứ tự thời gian; phần giữa được thu gọn khi trace rất dài.",
+               "session": "Các trace theo thứ tự thời gian, được biểu diễn dưới dạng các lượt hội thoại."
++            },
++            "tool_calls": {
++              "trace": "Mọi lệnh gọi công cụ trong trace, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái.",
++              "session": "Mọi lệnh gọi công cụ trong các trace của phiên, theo thứ tự thời gian, kèm tên, đầu vào, đầu ra và trạng thái."
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/zh-CN.json b/web/src/locales/languages/zh-CN.json
+index ced65c508de..cf4458b0cc3 100644
+--- a/web/src/locales/languages/zh-CN.json
++++ b/web/src/locales/languages/zh-CN.json
+@@ -13041,10 +13041,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "来自追踪根 Span 的输入。"
++              "trace": "来自追踪根聊天 Span 的输入。",
++              "session": "开场问题：来自第一个追踪根聊天 Span 的输入。"
+             },
+             "output": {
+-              "trace": "来自追踪根 Span 的输出。"
++              "trace": "来自追踪根聊天 Span 的输出。",
++              "session": "最终答案：来自最后一个追踪根聊天 Span 的输出。"
+             },
+             "statistics": {
+               "trace": "追踪指标：Span 数量、时长、LLM 与工具调用、错误、Token 数和成本。",
+@@ -13056,6 +13058,10 @@
+             "steps": {
+               "trace": "按时间顺序排列的 Span；当追踪很长时，中间部分会被折叠。",
+               "session": "按时间顺序排列的追踪，以对话轮次表示。"
++            },
++            "tool_calls": {
++              "trace": "追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。",
++              "session": "会话的所有追踪中的每个工具调用，按时间顺序排列，包含其名称、输入、输出和状态。"
+             }
+           }
+         }
+diff --git a/web/src/locales/languages/zh-TW.json b/web/src/locales/languages/zh-TW.json
+index 6c7e7791858..9c00c1b4888 100644
+--- a/web/src/locales/languages/zh-TW.json
++++ b/web/src/locales/languages/zh-TW.json
+@@ -13036,10 +13036,12 @@
+           },
+           "variables": {
+             "input": {
+-              "trace": "來自追蹤根 Span 的輸入。"
++              "trace": "來自追蹤根聊天 Span 的輸入。",
++              "session": "開場問題：來自第一個追蹤之根聊天 Span 的輸入。"
+             },
+             "output": {
+-              "trace": "來自追蹤根 Span 的輸出。"
++              "trace": "來自追蹤根聊天 Span 的輸出。",
++              "session": "最終答案：來自最後一個追蹤之根聊天 Span 的輸出。"
+             },
+             "statistics": {
+               "trace": "追蹤指標：Span 計數、持續時間、LLM 與工具呼叫、錯誤、Token 和成本。",
+@@ -13051,6 +13053,10 @@
+             "steps": {
+               "trace": "Span 依時間順序排列；當追蹤很長時，中間部分會被摺疊。",
+               "session": "按時間順序排列的追蹤，表示為對話輪次。"
++            },
++            "tool_calls": {
++              "trace": "追蹤中的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。",
++              "session": "工作階段中所有追蹤的每個工具呼叫，依時間順序，包含其名稱、輸入、輸出與狀態。"
+             }
+           }
+         }
+diff --git a/web/src/services/llm-queues.service.spec.ts b/web/src/services/llm-queues.service.spec.ts
+index 33da7a087f1..ae3e9f8bdf3 100644
+--- a/web/src/services/llm-queues.service.spec.ts
++++ b/web/src/services/llm-queues.service.spec.ts
+@@ -80,6 +80,7 @@ describe("llmQueuesService queue and item contracts", () => {
+             refType: "trace",
+             refId: "trace-1",
+             refTraceStartTime: 1_700_000_000_000_000,
++            inputPreview: "How do I rotate keys?",
+             status: "pending",
+             archivedAt: null,
+             createdAt: 10,
+@@ -110,6 +111,7 @@ describe("llmQueuesService queue and item contracts", () => {
+       id: "item-1",
+       queueId: "queue-1",
+       refTraceStartTime: 1_700_000_000_000_000,
++      inputPreview: "How do I rotate keys?",
+     });
+   });
+ });
+diff --git a/web/src/services/llm-queues.service.ts b/web/src/services/llm-queues.service.ts
+index fed5c11b279..9c04de704e3 100644
+--- a/web/src/services/llm-queues.service.ts
++++ b/web/src/services/llm-queues.service.ts
+@@ -83,6 +83,12 @@ export interface LlmQueueItem {
+   refTraceId: string | null;
+   /** Lower bound for trace hydration and Score lookup, in microseconds. */
+   refTraceStartTime: number;
++  /**
++   * Bounded excerpt of the first user turn, captured server-side at enqueue so
++   * the Workbench list can label items without a trace search per row. Null
++   * when the source trace carried no recognizable input.
++   */
++  inputPreview: string | null;
+   status: LlmQueueItemStatus;
+   reviewedAt: number | null;
+   archivedAt: number | null;
+@@ -232,6 +238,7 @@ function normalizeItem(item: any): LlmQueueItem {
+     refId: item.ref_id ?? item.refId,
+     refTraceId: item.ref_trace_id ?? item.refTraceId ?? null,
+     refTraceStartTime: Number(item.ref_trace_start_time ?? item.refTraceStartTime ?? 0),
++    inputPreview: item.input_preview ?? item.inputPreview ?? null,
+     status: (item.status ?? "pending") as LlmQueueItemStatus,
+     reviewedAt: item.reviewed_at ?? item.reviewedAt ?? null,
+     archivedAt: item.archived_at ?? item.archivedAt ?? null,
+
+
+===== LINKED / SISTER PR: openobserve/o2-enterprise #2678 (combined for full feature context) =====
+
+diff --git a/o2_enterprise/src/enterprise/llm_evaluations/annotation_queues.rs b/o2_enterprise/src/enterprise/llm_evaluations/annotation_queues.rs
+index c223b5518..f8cad29a1 100644
+--- a/o2_enterprise/src/enterprise/llm_evaluations/annotation_queues.rs
++++ b/o2_enterprise/src/enterprise/llm_evaluations/annotation_queues.rs
+@@ -55,7 +55,7 @@ use super::{
+     eval_jobs::{
+         hydration,
+         search::EvalSearchRequest,
+-        tasks::{EvaluationQueryWindow, EvaluationTargetScope},
++        tasks::{self, EvaluationQueryWindow, EvaluationTargetScope},
+     },
+     llm_scores_search,
+ };
+@@ -63,6 +63,8 @@ use super::{
+ const DEFAULT_ALLOWED_REF_TYPES: [&str; 3] = ["session", "trace", "span"];
+ const MAX_WORKBENCH_SCORE_ROWS: usize = 10_000;
+ const WORKBENCH_HYDRATION_PAGE_SIZE: usize = 1_000;
++/// Upper bound on the stored first-user-turn excerpt shown in the Workbench item list.
++const MAX_INPUT_PREVIEW_CHARS: usize = 240;
+ const INPUT_FIELDS: &[&str] = &[
+     "gen_ai_input_messages",
+     "gen_ai.input.messages",
+@@ -222,6 +224,10 @@ pub struct AnnotationQueueItem {
+     pub ref_id: String,
+     pub ref_trace_id: Option<String>,
+     pub ref_trace_start_time: i64,
++    /// Bounded plain-text excerpt of the first user turn, captured at enqueue
++    /// (or backfilled the first time an older item is opened). `None` when the
++    /// source trace carried no recognizable input.
++    pub input_preview: Option<String>,
+     pub status: String,
+     pub reviewed_at: Option<i64>,
+     pub archived_at: Option<i64>,
+@@ -455,6 +461,7 @@ fn queue_item_from_model(
+         ref_id: row.ref_id,
+         ref_trace_id: row.ref_trace_id,
+         ref_trace_start_time: row.ref_trace_start_time,
++        input_preview: row.input_preview,
+         status: row.status,
+         reviewed_at: row.reviewed_at,
+         archived_at: row.archived_at,
+@@ -1032,27 +1039,55 @@ fn ensure_enqueue_machine_score_source_stream(
+         })
+ }
+ 
+-fn item_hydration_target(
+-    item: &queue_items::Model,
+-) -> Result<(EvaluationTargetScope, &str), AnnotationQueueError> {
+-    match item.ref_type.as_str() {
+-        "span" => item
+-            .ref_trace_id
+-            .as_deref()
++fn item_hydration_target<'a>(
++    ref_type: &str,
++    ref_id: &'a str,
++    ref_trace_id: Option<&'a str>,
++) -> Result<(EvaluationTargetScope, &'a str), AnnotationQueueError> {
++    match ref_type {
++        "span" => ref_trace_id
+             .map(|trace_id| (EvaluationTargetScope::Trace, trace_id))
+             .ok_or_else(|| {
+                 AnnotationQueueError::InvalidQueueItemReference(
+                     "span Queue Item has no owning trace ID".to_string(),
+                 )
+             }),
+-        "trace" => Ok((EvaluationTargetScope::Trace, &item.ref_id)),
+-        "session" => Ok((EvaluationTargetScope::Session, &item.ref_id)),
++        "trace" => Ok((EvaluationTargetScope::Trace, ref_id)),
++        "session" => Ok((EvaluationTargetScope::Session, ref_id)),
+         value => Err(AnnotationQueueError::InvalidQueueItemScope(
+             value.to_string(),
+         )),
+     }
+ }
+ 
++/// Loads the trace rows behind one Queue Item target from its source stream.
++async fn hydrate_item_rows(
++    org_id: &str,
++    source_stream: &str,
++    ref_type: &str,
++    ref_id: &str,
++    ref_trace_id: Option<&str>,
++    start_time: i64,
++    end_time: i64,
++) -> Result<Vec<Value>, AnnotationQueueError> {
++    let (target_scope, target_id) = item_hydration_target(ref_type, ref_id, ref_trace_id)?;
++    hydration::hydrate_target(
++        org_id,
++        source_stream,
++        StreamType::Traces.as_str(),
++        target_scope,
++        target_id,
++        EvaluationQueryWindow {
++            start_us: start_time,
++            end_us: end_time,
++            ingest_cutoff_us: None,
++        },
++        WORKBENCH_HYDRATION_PAGE_SIZE,
++    )
++    .await
++    .map_err(AnnotationQueueError::Hydration)
++}
++
+ fn value_for_path<'a>(row: &'a Value, path: &str) -> Option<&'a Value> {
+     if let Some(value) = row.get(path) {
+         return Some(value);
+@@ -1164,6 +1199,238 @@ fn session_boundary_rows(rows: &[Value]) -> Vec<&Value> {
+         .collect()
+ }
+ 
++fn row_timestamp(row: &Value) -> (i64, i64) {
++    let int = |field: &str| {
++        value_for_path(row, field)
++            .and_then(Value::as_i64)
++            .unwrap_or(i64::MAX)
++    };
++    (int("_timestamp"), int("_o2_ingest_ts"))
++}
++
++/// The row whose input labels the item in the Workbench list: the target span
++/// itself, the trace's root chat span, or, for a session, the earliest chat
++/// span that is not a tool execution. Tool spans reuse the generic input
++/// fields for their arguments, so they never provide the preview.
++fn preview_input_value(ref_type: &str, ref_id: &str, rows: &[Value]) -> Option<Value> {
++    match ref_type {
++        "span" => rows
++            .iter()
++            .find(|row| row.get("span_id").and_then(Value::as_str) == Some(ref_id))
++            .and_then(|row| first_content_value(row, INPUT_FIELDS)),
++        "session" => {
++            let mut chat_rows = rows
++                .iter()
++                .filter(|row| !tasks::is_tool_row(row))
++                .filter(|row| {
++                    INPUT_FIELDS
++                        .iter()
++                        .any(|field| value_for_path(row, field).is_some_and(is_non_empty_json))
++                })
++                .collect::<Vec<_>>();
++            chat_rows.sort_by_key(|row| row_timestamp(row));
++            chat_rows
++                .into_iter()
++                .find_map(|row| first_content_value(row, INPUT_FIELDS))
++        }
++        _ => trace_boundary_row(rows).and_then(|row| first_content_value(row, INPUT_FIELDS)),
++    }
++}
++
++fn is_user_role(value: &Value) -> bool {
++    value
++        .as_str()
++        .is_some_and(|role| matches!(role.trim().to_ascii_lowercase().as_str(), "user" | "human"))
++}
++
++/// Plain text of one chat message body: a string, a multimodal part list
++/// (OpenAI `text` parts or OTel GenAI `content` parts), or a nested object.
++fn message_text(content: &Value) -> Option<String> {
++    match content {
++        Value::String(text) => Some(text.clone()),
++        Value::Array(parts) => {
++            let texts = parts
++                .iter()
++                .filter(|part| {
++                    part.get("type")
++                        .and_then(Value::as_str)
++                        .is_none_or(|kind| kind == "text" || kind == "input_text")
++                })
++                .filter_map(message_text)
++                .filter(|text| !text.trim().is_empty())
++                .collect::<Vec<_>>();
++            (!texts.is_empty()).then(|| texts.join(" "))
++        }
++        Value::Object(map) => ["text", "content", "parts", "input_text"]
++            .iter()
++            .find_map(|key| map.get(*key).and_then(message_text)),
++        _ => None,
++    }
++}
++
++/// Which user turn of an input payload the preview shows.
++#[derive(Clone, Copy)]
++enum TurnPick {
++    First,
++    Last,
++}
++
++/// A user turn of an input payload, in the shapes ingested traces carry: a
++/// message array, an object wrapping one, a prompt-like object, or a plain
++/// string. Anything unrecognized falls back to its compact JSON so two items
++/// with different inputs still look different in the list.
++fn user_turn_text(input: &Value, pick: TurnPick) -> Option<String> {
++    match input {
++        Value::String(text) => match serde_json::from_str::<Value>(text) {
++            Ok(parsed) if parsed.is_array() || parsed.is_object() => user_turn_text(&parsed, pick),
++            _ => Some(text.clone()),
++        },
++        Value::Array(messages) => {
++            let mut users = messages
++                .iter()
++                .filter(|message| message.get("role").is_some_and(is_user_role));
++            let mut roleless = messages
++                .iter()
++                .filter(|message| message.get("role").is_none());
++            let turn = match pick {
++                TurnPick::First => users.next().or_else(|| roleless.next()),
++                TurnPick::Last => users.next_back().or_else(|| roleless.next_back()),
++            }?;
++            match turn {
++                Value::String(text) => Some(text.clone()),
++                Value::Object(_) => message_text(turn).or_else(|| Some(turn.to_string())),
++                other => Some(other.to_string()),
++            }
++        }
++        Value::Object(map) => {
++            if let Some(messages) = map.get("messages").filter(|value| value.is_array()) {
++                return user_turn_text(messages, pick);
++            }
++            if map.get("role").is_some() {
++                return message_text(input).or_else(|| Some(input.to_string()));
++            }
++            for key in [
++                "input", "inputs", "question", "query", "prompt", "content", "text",
++            ] {
++                if let Some(value) = map.get(key).filter(|value| is_non_empty_json(value)) {
++                    return user_turn_text(value, pick);
++                }
++            }
++            Some(input.to_string())
++        }
++        Value::Null => None,
++        other => Some(other.to_string()),
++    }
++}
++
++/// Collapses whitespace and bounds the excerpt to [`MAX_INPUT_PREVIEW_CHARS`].
++/// The collapse is lazy: a prompt carrying a pasted document must not be
++/// copied whole just to keep its first couple of hundred characters.
++fn bounded_preview(text: &str) -> Option<String> {
++    let mut chars = text
++        .split_whitespace()
++        .enumerate()
++        .flat_map(|(index, word)| {
++            std::iter::once(' ')
++                .take(usize::from(index > 0))
++                .chain(word.chars())
++        });
++    let mut preview = chars
++        .by_ref()
++        .take(MAX_INPUT_PREVIEW_CHARS)
++        .collect::<String>();
++    if preview.is_empty() {
++        return None;
++    }
++    if chars.next().is_some() {
++        preview = preview.trim_end().to_string();
++        preview.push('…');
++    }
++    Some(preview)
++}
++
++/// Bounded first-user-turn excerpt for one Queue Item, or `None` when its
++/// rows carry no recognizable input.
++pub(crate) fn input_preview(ref_type: &str, ref_id: &str, rows: &[Value]) -> Option<String> {
++    // A session is previewed from its opening call, so its first user turn is
++    // the question. A trace or span replays the conversation so far, so the
++    // turn it answered is the last one.
++    let pick = match ref_type {
++        "session" => TurnPick::First,
++        _ => TurnPick::Last,
++    };
++    preview_input_value(ref_type, ref_id, rows)
++        .as_ref()
++        .and_then(|value| user_turn_text(value, pick))
++        .as_deref()
++        .and_then(bounded_preview)
++}
++
++/// Best-effort preview capture at enqueue: a hydration failure is logged and
++/// leaves the preview empty rather than blocking the enqueue, since the
++/// Workbench falls back to the ref id and backfills on first open.
++async fn capture_input_preview(
++    org_id: &str,
++    source_stream: &str,
++    ref_type: &str,
++    ref_id: &str,
++    ref_trace_id: Option<&str>,
++    start_time: i64,
++    end_time: i64,
++) -> Option<String> {
++    match hydrate_item_rows(
++        org_id,
++        source_stream,
++        ref_type,
++        ref_id,
++        ref_trace_id,
++        start_time,
++        end_time,
++    )
++    .await
++    {
++        Ok(rows) => input_preview(ref_type, ref_id, &rows),
++        Err(error) => {
++            log::warn!(
++                "[ANNOTATION_QUEUE] org={org_id} {ref_type}={ref_id}: input preview not captured: {error}"
++            );
++            None
++        }
++    }
++}
++
++/// Stores a preview for an item enqueued before previews existed. Failures
++/// are logged: the detail response already carries the preview in memory.
++async fn backfill_input_preview(org_id: &str, queue_item_id: &str, preview: &str) {
++    let db = get_orm_client_rw().await;
++    if let Err(error) = write_input_preview(db, org_id, queue_item_id, preview).await {
++        log::warn!(
++            "[ANNOTATION_QUEUE] org={org_id} item={queue_item_id}: input preview backfill failed: {error}"
++        );
++    }
++}
++
++/// Writes the excerpt only while the column is still null, so a re-derived
++/// preview never overwrites the one captured at enqueue.
++async fn write_input_preview<C: ConnectionTrait>(
++    db: &C,
++    org_id: &str,
++    queue_item_id: &str,
++    preview: &str,
++) -> Result<(), sea_orm::DbErr> {
++    queue_items::Entity::update_many()
++        .col_expr(
++            queue_items::Column::InputPreview,
++            Expr::value(Some(preview.to_string())),
++        )
++        .filter(queue_items::Column::OrgId.eq(org_id))
++        .filter(queue_items::Column::Id.eq(queue_item_id))
++        .filter(queue_items::Column::InputPreview.is_null())
++        .exec(db)
++        .await
++        .map(|_| ())
++}
++
+ fn item_content(item: &queue_items::Model, rows: &[Value]) -> AnnotationQueueItemContent {
+     let (input, output) = match item.ref_type.as_str() {
+         "span" => rows
+@@ -1220,23 +1487,24 @@ pub async fn get_item_detail(
+         list_reviews_for_item(org_id, queue_id, &item),
+     )?;
+     let source_stream = source_stream_from_scores(&machine_scores)?;
+-    let (target_scope, target_id) = item_hydration_target(&item)?;
+-    let rows = hydration::hydrate_target(
++    let rows = hydrate_item_rows(
+         org_id,
+         &source_stream,
+-        StreamType::Traces.as_str(),
+-        target_scope,
+-        target_id,
+-        EvaluationQueryWindow {
+-            start_us: start_time,
+-            end_us: end_time,
+-            ingest_cutoff_us: None,
+-        },
+-        WORKBENCH_HYDRATION_PAGE_SIZE,
++        &item.ref_type,
++        &item.ref_id,
++        item.ref_trace_id.as_deref(),
++        start_time,
++        end_time,
+     )
+-    .await
+-    .map_err(AnnotationQueueError::Hydration)?;
++    .await?;
+     let content = item_content(&item, &rows);
++    let mut item = item;
++    if item.input_preview.is_none()
++        && let Some(preview) = input_preview(&item.ref_type, &item.ref_id, &rows)
++    {
++        backfill_input_preview(org_id, &item.id, &preview).await;
++        item.input_preview = Some(preview);
++    }
+     Ok(AnnotationQueueItemDetail {
+         item: queue_item_from_model(item, Some(queue.name)),
+         source_stream,
+@@ -1256,6 +1524,7 @@ pub async fn enqueue_item(
+     let machine_scores =
+         list_machine_scores(org_id, scope.as_str(), &ref_id, start_time, end_time).await?;
+     ensure_enqueue_machine_score_source_stream(&machine_scores)?;
++    let source_stream = source_stream_from_scores(&machine_scores)?;
+     let db = get_orm_client_rw().await;
+     let txn = db.begin().await?;
+     let queue = queues::Entity::find_by_id(queue_id)
+@@ -1286,6 +1555,7 @@ pub async fn enqueue_item(
+             ref_id: Set(ref_id.clone()),
+             ref_trace_id: Set(ref_trace_id),
+             ref_trace_start_time: Set(ref_trace_start_time),
++            input_preview: Set(None),
+             status: Set("pending".to_string()),
+             reviewed_at: Set(None),
+             archived_at: Set(None),
+@@ -1311,6 +1581,26 @@ pub async fn enqueue_item(
+             ))
+         })?;
+     txn.commit().await?;
++
++    // Captured only once the queue, ref type and duplicate checks have passed,
++    // so a rejected enqueue never pays for a hydration search. A miss here
++    // leaves the preview null and the Workbench backfills on first open.
++    let mut item = item;
++    if item.input_preview.is_none()
++        && let Some(preview) = capture_input_preview(
++            org_id,
++            &source_stream,
++            &item.ref_type,
++            &item.ref_id,
++            item.ref_trace_id.as_deref(),
++            start_time,
++            end_time,
++        )
++        .await
++    {
++        backfill_input_preview(org_id, &item.id, &preview).await;
++        item.input_preview = Some(preview);
++    }
+     Ok(queue_item_from_model(item, Some(queue.name)))
+ }
+ 
+@@ -2044,6 +2334,7 @@ mod tests {
+             ref_id: ref_id.to_string(),
+             ref_trace_id: ref_trace_id.map(str::to_string),
+             ref_trace_start_time: 100,
++            input_preview: None,
+             status: "pending".to_string(),
+             reviewed_at: None,
+             archived_at: None,
+@@ -2250,6 +2541,261 @@ mod tests {
+         );
+     }
+ 
++    #[test]
++    fn input_preview_reads_the_user_turn_from_a_message_array() {
++        let rows = vec![serde_json::json!({
++            "trace_id": "trace-1",
++            "span_id": "root",
++            "parent_span_id": "",
++            "gen_ai_input_messages": "[{\"role\":\"system\",\"content\":\"be terse\"},\
++                {\"role\":\"user\",\"content\":\"How do I  rotate\\n keys?\"},\
++                {\"role\":\"assistant\",\"content\":\"Use the cipher page\"}]",
++            "gen_ai_output_messages": "[{\"role\":\"assistant\",\"content\":\"Use the cipher page\"}]"
++        })];
++        assert_eq!(
++            input_preview("trace", "trace-1", &rows).as_deref(),
++            Some("How do I rotate keys?")
++        );
++    }
++
++    #[test]
++    fn input_preview_takes_the_turn_the_call_answered_not_the_conversation_opener() {
++        // A mid-conversation prompt replays every earlier turn, so the opening
++        // question is present on every trace of the session.
++        let replayed = "[{\"role\":\"system\",\"content\":\"be terse\"},\
++            {\"role\":\"user\",\"content\":\"How do I rotate keys?\"},\
++            {\"role\":\"assistant\",\"content\":\"Use the cipher page\"},\
++            {\"role\":\"user\",\"content\":\"And revoke the old one?\"}]";
++        let rows = vec![serde_json::json!({
++            "_timestamp": 1_000,
++            "trace_id": "trace-7",
++            "span_id": "root",
++            "parent_span_id": "",
++            "gen_ai_input_messages": replayed
++        })];
++
++        assert_eq!(
++            input_preview("trace", "trace-7", &rows).as_deref(),
++            Some("And revoke the old one?")
++        );
++        assert_eq!(
++            input_preview("span", "root", &rows).as_deref(),
++            Some("And revoke the old one?")
++        );
++        // A session is previewed from its opening call, so it keeps the opener.
++        assert_eq!(
++            input_preview("session", "session-7", &rows).as_deref(),
++            Some("How do I rotate keys?")
++        );
++    }
++
++    #[test]
++    fn input_preview_bounds_multibyte_text_on_a_character_boundary() {
++        let rows = vec![serde_json::json!({
++            "trace_id": "trace-1",
++            "span_id": "root",
++            "parent_span_id": "",
++            "llm_input": "\u{1f9ea}\u{6e2c}\u{8a66}".repeat(200)
++        })];
++        let preview = input_preview("trace", "trace-1", &rows).unwrap();
++        assert!(preview.ends_with('\u{2026}'), "{preview}");
++        assert_eq!(preview.chars().count(), MAX_INPUT_PREVIEW_CHARS + 1);
++        // Char-bounded, so the stored excerpt stays well under a text column.
++        assert!(
++            preview.len() <= (MAX_INPUT_PREVIEW_CHARS + 1) * 4,
++            "{}",
++            preview.len()
++        );
++    }
++
++    #[tokio::test]
++    async fn input_preview_write_does_not_overwrite_an_existing_preview() {
++        let db = sea_orm::Database::connect("sqlite::memory:").await.unwrap();
++        let schema = sea_orm::Schema::new(sea_orm::DatabaseBackend::Sqlite);
++        db.execute(
++            db.get_database_backend()
++                .build(&schema.create_table_from_entity(queue_items::Entity)),
++        )
++        .await
++        .unwrap();
++        queue_items::ActiveModel {
++            id: Set("item-1".to_string()),
++            org_id: Set("org-1".to_string()),
++            queue_id: Set("queue-1".to_string()),
++            ref_type: Set("trace".to_string()),
++            ref_id: Set("trace-1".to_string()),
++            ref_trace_id: Set(None),
++            ref_trace_start_time: Set(1),
++            input_preview: Set(None),
++            status: Set("pending".to_string()),
++            reviewed_at: Set(None),
++            archived_at: Set(None),
++            created_at: Set(1),
++            updated_at: Set(1),
++        }
++        .insert(&db)
++        .await
++        .unwrap();
++
++        write_input_preview(&db, "org-1", "item-1", "captured at enqueue")
++            .await
++            .unwrap();
++        write_input_preview(&db, "org-1", "item-1", "re-derived later")
++            .await
++            .unwrap();
++
++        let stored = queue_items::Entity::find_by_id("item-1")
++            .one(&db)
++            .await
++            .unwrap()
++            .unwrap();
++        assert_eq!(stored.input_preview.as_deref(), Some("captured at enqueue"));
++
++        // Another org's write must not reach this row either.
++        write_input_preview(&db, "org-2", "item-1", "wrong org")
++            .await
++            .unwrap();
++        let stored = queue_items::Entity::find_by_id("item-1")
++            .one(&db)
++            .await
++            .unwrap()
++            .unwrap();
++        assert_eq!(stored.input_preview.as_deref(), Some("captured at enqueue"));
++    }
++
++    #[test]
++    fn input_preview_reads_otel_genai_parts_and_plain_strings() {
++        let parts = vec![serde_json::json!({
++            "span_id": "s1",
++            "trace_id": "trace-1",
++            "parent_span_id": "",
++            "gen_ai.input.messages": [
++                {"role": "user", "parts": [
++                    {"type": "text", "content": "Summarize"},
++                    {"type": "image", "content": "data:..."},
++                    {"type": "text", "content": "this incident"}
++                ]}
++            ]
++        })];
++        assert_eq!(
++            input_preview("span", "s1", &parts).as_deref(),
++            Some("Summarize this incident")
++        );
++
++        let plain = vec![serde_json::json!({
++            "span_id": "s1",
++            "trace_id": "trace-1",
++            "parent_span_id": "",
++            "llm_input": "  plain   question "
++        })];
++        assert_eq!(
++            input_preview("span", "s1", &plain).as_deref(),
++            Some("plain question")
++        );
++    }
++
++    #[test]
++    fn span_input_preview_uses_the_target_span_not_the_root() {
++        let rows = vec![
++            serde_json::json!({
++                "trace_id": "trace-1",
++                "span_id": "root",
++                "parent_span_id": "",
++                "llm_input": "root question"
++            }),
++            serde_json::json!({
++                "trace_id": "trace-1",
++                "span_id": "child",
++                "parent_span_id": "root",
++                "llm_input": "child question"
++            }),
++        ];
++        assert_eq!(
++            input_preview("span", "child", &rows).as_deref(),
++            Some("child question")
++        );
++    }
++
++    /// Shaped like the introspect incident: a chat span holds the real
++    /// question and a later child tool span reuses the generic input field
++    /// for its arguments. The session preview must come from the chat span
++    /// regardless of row order.
++    #[test]
++    fn session_input_preview_uses_the_earliest_chat_span_not_a_later_tool_span() {
++        let rows = vec![
++            serde_json::json!({
++                "_timestamp": 177_000,
++                "trace_id": "trace-1",
++                "span_id": "tool",
++                "parent_span_id": "chat",
++                "gen_ai_tool_name": "documentation_lookup",
++                "gen_ai_input_messages": "{\"path\":\"custom-charts-flat\"}",
++                "gen_ai_output_messages": "HTTP 404 Not Found"
++            }),
++            serde_json::json!({
++                "_timestamp": 5_000,
++                "trace_id": "trace-2",
++                "span_id": "chat-2",
++                "parent_span_id": "",
++                "gen_ai_input_messages": "[{\"role\":\"user\",\"content\":\"second turn\"}]"
++            }),
++            serde_json::json!({
++                "_timestamp": 1_000,
++                "trace_id": "trace-1",
++                "span_id": "chat",
++                "parent_span_id": "",
++                "gen_ai_input_messages": "[{\"role\":\"user\",\"content\":\"Why is the chart flat?\"}]",
++                "gen_ai_output_messages": "[{\"role\":\"assistant\",\"content\":\"Because...\"}]"
++            }),
++        ];
++        assert_eq!(
++            input_preview("session", "session-1", &rows).as_deref(),
++            Some("Why is the chart flat?")
++        );
++    }
++
++    #[test]
++    fn input_preview_is_bounded_and_absent_without_input() {
++        let long = "word ".repeat(200);
++        let rows = vec![serde_json::json!({
++            "trace_id": "trace-1",
++            "span_id": "root",
++            "parent_span_id": "",
++            "llm_input": long
++        })];
++        let preview = input_preview("trace", "trace-1", &rows).unwrap();
++        assert!(preview.ends_with('…'), "{preview}");
++        // The cut lands after a trailing space here, which is trimmed before the ellipsis.
++        assert_eq!(preview.chars().count(), MAX_INPUT_PREVIEW_CHARS);
++        assert!(preview.chars().count() <= MAX_INPUT_PREVIEW_CHARS + 1);
++        assert!(!preview.ends_with(" …"), "{preview}");
++
++        let no_input = vec![serde_json::json!({
++            "trace_id": "trace-1",
++            "span_id": "root",
++            "parent_span_id": "",
++            "gen_ai_output_messages": "[{\"role\":\"assistant\",\"content\":\"hi\"}]"
++        })];
++        assert_eq!(input_preview("trace", "trace-1", &no_input), None);
++    }
++
++    #[test]
++    fn input_preview_falls_back_to_compact_json_for_unrecognized_objects() {
++        let rows = vec![serde_json::json!({
++            "trace_id": "trace-1",
++            "span_id": "root",
++            "parent_span_id": "",
++            "llm_input": {"ticket": 42, "severity": "high"}
++        })];
++        let preview = input_preview("trace", "trace-1", &rows).unwrap();
++        assert!(
++            preview.starts_with('{') && preview.ends_with('}'),
++            "{preview}"
++        );
++        assert!(preview.contains(r#""ticket":42"#), "{preview}");
++        assert!(preview.contains(r#""severity":"high""#), "{preview}");
++    }
++
+     #[test]
+     fn normalizes_enqueue_context_by_scope() {
+         let (scope, ref_id, ref_trace_id, ref_trace_start_time) =
+@@ -2355,6 +2901,7 @@ mod tests {
+             ref_id: Set("trace-1".to_string()),
+             ref_trace_id: Set(None),
+             ref_trace_start_time: Set(ref_trace_start_time),
++            input_preview: Set(None),
+             status: Set("pending".to_string()),
+             reviewed_at: Set(None),
+             archived_at: Set(None),
+@@ -2400,6 +2947,7 @@ mod tests {
+                     ref_id: Set(id.to_string()),
+                     ref_trace_id: Set(None),
+                     ref_trace_start_time: Set(100),
++                    input_preview: Set(None),
+                     status: Set(status.to_string()),
+                     reviewed_at: Set((status == "reviewed").then_some(10)),
+                     archived_at: Set(archived_at),
+diff --git a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/async_executor.rs b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/async_executor.rs
+index 5993cf522..743247eb2 100644
+--- a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/async_executor.rs
++++ b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/async_executor.rs
+@@ -53,7 +53,8 @@ use crate::enterprise::llm_evaluations::{
+             EVAL_TASK_SESSION_TOPIC, EVAL_TASK_SPAN_TOPIC, EVAL_TASK_TRACE_TOPIC,
+             EvaluationTargetScope, EvaluationTaskMessage, EvaluationTaskProducer,
+             EvaluationTimeRangeHint, EvaluationTraceContext, SpanEvaluationContextEnvelope,
+-            SpanEvaluationTaskPayload, variables_with_target_view_components_and_selector,
++            SpanEvaluationTaskPayload, overlay_target_io_fields,
++            variables_with_target_view_components_and_selector,
+         },
+     },
+     evaluator_trace::{EvaluatorTrace, EvaluatorTraceInput, create_evaluator_trace},
+@@ -1034,6 +1035,10 @@ fn hydrated_task_context_from_rows(
+             );
+         }
+     }
++    // Rows merge last-wins, so a tool span that reuses the conversation field
++    // names would replace the chat turn. Put the target's question and final
++    // answer back on top; tool spans remain reachable through `tool_calls`.
++    overlay_target_io_fields(&mut source_attributes, &task.target_scope, rows);
+     source_attributes.extend(
+         system_variables
+             .iter()
+@@ -2443,4 +2448,99 @@ mod tests {
+ 
+         assert_eq!(observed, vec![1, 2, 4, 8, 16, 32, 60, 60]);
+     }
++
++    // Regression for the 2026-09-19 session evaluation run: a documentation
++    // tool span started after its parent chat span and reused the generic
++    // conversation fields, so last-wins merging fed the judge the tool's
++    // arguments and its 404 as the question and answer.
++    #[test]
++    fn session_mapping_reads_chat_turn_not_later_tool_span() {
++        let task = EvaluationTaskMessage {
++            task_id: "task-1".to_string(),
++            eval_run_id: "run-1".to_string(),
++            evaluator_trace_id: "11111111111111111111111111111111".to_string(),
++            evaluator_root_span_id: "2222222222222222".to_string(),
++            emit_evaluator_root: true,
++            trace_context: None,
++            org_id: "org".to_string(),
++            job_id: "job-1".to_string(),
++            job_version: Some(5),
++            scorer_id: "scorer-1".to_string(),
++            scorer_version: Some(2),
++            target_scope: EvaluationTargetScope::Session,
++            target_id: "session-1".to_string(),
++            producer: EvaluationTaskProducer::EvalScheduler,
++            event_time_hint: None,
++            ingest_time_hint: None,
++            manual: None,
++            view: Some(super::super::tasks::EvaluationViewSpec {
++                source_stream: "traces".to_string(),
++                source_stream_type: "traces".to_string(),
++                query_window: Some(super::super::tasks::EvaluationQueryWindow {
++                    start_us: 1,
++                    end_us: 1_000_000_000,
++                    ingest_cutoff_us: None,
++                }),
++                input_mapping: BTreeMap::from([
++                    ("input".to_string(), "{{gen_ai_input_messages}}".to_string()),
++                    (
++                        "output".to_string(),
++                        "{{gen_ai_output_messages}}".to_string(),
++                    ),
++                    ("tools".to_string(), "{{tool_calls}}".to_string()),
++                    ("tool".to_string(), "{{gen_ai_tool_name}}".to_string()),
++                ]),
++                span_selector: None,
++            }),
++            target: None,
++            span: None,
++        };
++        // Chat span starts 02:18:11, tool child starts 02:21:07.
++        let rows = vec![
++            serde_json::json!({
++                "trace_id": "trace-1",
++                "span_id": "chat",
++                "operation_name": "chat gpt-4o",
++                "gen_ai_conversation_id": "session-1",
++                "gen_ai_input_messages": "[{\"role\":\"user\",\"content\":\"Why did the ingester restart?\"}]",
++                "gen_ai_output_messages": "[{\"role\":\"assistant\",\"content\":\"Because the pod hit its memory limit.\"}]",
++                "_timestamp": 1_000,
++                "_o2_ingest_ts": 2_000,
++            }),
++            serde_json::json!({
++                "trace_id": "trace-1",
++                "span_id": "tool",
++                "parent_span_id": "chat",
++                "operation_name": "execute_tool documentation",
++                "gen_ai_tool_name": "documentation",
++                "gen_ai_conversation_id": "session-1",
++                "gen_ai_input_messages": "{\"path\":\"custom-charts-flat\"}",
++                "gen_ai_output_messages": "HTTP 404 Not Found",
++                "_timestamp": 177_000,
++                "_o2_ingest_ts": 178_000,
++            }),
++        ];
++
++        let ctx = hydrated_task_context_from_rows(&task, &rows).unwrap();
++
++        let input = ctx.attributes["input"].as_str().unwrap();
++        let output = ctx.attributes["output"].as_str().unwrap();
++        assert!(
++            input.contains("Why did the ingester restart?"),
++            "input was: {input}"
++        );
++        assert!(output.contains("memory limit"), "output was: {output}");
++
++        // Tool evidence is still there for scorers that ask for it.
++        assert_eq!(ctx.attributes["tool"], serde_json::json!("documentation"));
++        let tool_calls = ctx.attributes["tool_calls"].as_array().unwrap();
++        assert_eq!(tool_calls.len(), 1);
++        assert_eq!(tool_calls[0]["name"], serde_json::json!("documentation"));
++        assert_eq!(
++            tool_calls[0]["output"],
++            serde_json::json!("HTTP 404 Not Found")
++        );
++        let tools = ctx.attributes["tools"].as_str().unwrap();
++        assert!(tools.contains("custom-charts-flat"), "tools was: {tools}");
++    }
+ }
+diff --git a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/tasks.rs b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/tasks.rs
+index 9fd155532..442876738 100644
+--- a/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/tasks.rs
++++ b/o2_enterprise/src/enterprise/llm_evaluations/eval_jobs/tasks.rs
+@@ -13,7 +13,7 @@
+ // You should have received a copy of the GNU Affero General Public License
+ // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-use std::collections::{BTreeMap, BTreeSet};
++use std::collections::{BTreeMap, BTreeSet, HashMap};
+ 
+ use anyhow::{Result, anyhow};
+ use infra::table::online_eval_jobs::{
+@@ -33,6 +33,7 @@ const TARGET_VIEW_COMPONENT_INPUT: &str = "input";
+ const TARGET_VIEW_COMPONENT_OUTPUT: &str = "output";
+ const TARGET_VIEW_COMPONENT_SPANS: &str = "spans";
+ const TARGET_VIEW_COMPONENT_STEPS: &str = "steps";
++const TARGET_VIEW_COMPONENT_TOOL_CALLS: &str = "tool_calls";
+ const MAX_TARGET_VIEW_STEPS: usize = 50;
+ const MAX_TARGET_VIEW_SPANS: usize = 5;
+ const MAX_VIEW_FIELD_CHARS: usize = 4_000;
+@@ -296,18 +297,30 @@ pub(crate) fn variables_with_target_view_components_and_selector(
+         rows.to_vec()
+     };
+ 
+-    if matches!(target_scope, EvaluationTargetScope::Trace) {
+-        if let Some(input) = target_input(&view_rows) {
+-            variables.insert(TARGET_VIEW_COMPONENT_INPUT.to_string(), input);
++    if let Some((input_row, output_row)) = target_io_rows(target_scope, &view_rows) {
++        if let Some(input) = first_field_value(input_row, INPUT_FIELDS) {
++            variables.insert(
++                TARGET_VIEW_COMPONENT_INPUT.to_string(),
++                bounded_value(input),
++            );
+         }
+-        if let Some(output) = target_output(&view_rows) {
+-            variables.insert(TARGET_VIEW_COMPONENT_OUTPUT.to_string(), output);
++        if let Some(output) = first_field_value(output_row, OUTPUT_FIELDS) {
++            variables.insert(
++                TARGET_VIEW_COMPONENT_OUTPUT.to_string(),
++                bounded_value(output),
++            );
+         }
++    }
++    if matches!(target_scope, EvaluationTargetScope::Trace) {
+         variables.insert(
+             TARGET_VIEW_COMPONENT_SPANS.to_string(),
+             Value::Array(target_spans(&view_rows, span_selector)?),
+         );
+     }
++    variables.insert(
++        TARGET_VIEW_COMPONENT_TOOL_CALLS.to_string(),
++        Value::Array(target_tool_calls(&view_rows)),
++    );
+     variables.insert(
+         TARGET_VIEW_COMPONENT_STATISTICS.to_string(),
+         target_statistics(target_scope, &view_rows),
+@@ -319,19 +332,91 @@ pub(crate) fn variables_with_target_view_components_and_selector(
+     Ok(variables)
+ }
+ 
+-fn target_input(rows: &[Value]) -> Option<Value> {
+-    target_root_row(rows).and_then(|row| first_field_value(row, INPUT_FIELDS).map(bounded_value))
++/// The rows whose conversation fields stand for the target's question and
++/// final answer. Tool spans often carry the generic input/output fields too,
++/// so a chat turn is chosen explicitly instead of trusting whichever span the
++/// stream returned last.
++///
++/// A trace answers from its root chat span. A session answers from the first
++/// trace's chat root (the opening question) and the last trace's chat root
++/// (the final answer). Tool spans stay available in `tool_calls`, `steps`
++/// and `spans`.
++fn target_io_rows<'a>(
++    target_scope: &EvaluationTargetScope,
++    rows: &'a [Value],
++) -> Option<(&'a Value, &'a Value)> {
++    match target_scope {
++        EvaluationTargetScope::Span => None,
++        EvaluationTargetScope::Trace => target_root_row(rows).map(|row| (row, row)),
++        EvaluationTargetScope::Session => {
++            let roots = session_trace_roots(rows)
++                .into_iter()
++                .map(|(_, _, root)| root)
++                .filter(|root| is_chat_row(root))
++                .collect::<Vec<_>>();
++            Some((*roots.first()?, *roots.last()?))
++        }
++    }
+ }
+ 
+-fn target_output(rows: &[Value]) -> Option<Value> {
+-    target_root_row(rows).and_then(|row| first_field_value(row, OUTPUT_FIELDS).map(bounded_value))
++/// Copies the target's question and final answer over the raw conversation
++/// fields of a flattened attribute map, so `{{gen_ai_input_messages}}`-style
++/// mappings resolve to the chat turn rather than to a later tool span that
++/// reused the same field names. Tool-specific fields are left untouched. A
++/// target without any chat row is left as is.
++pub(crate) fn overlay_target_io_fields(
++    attributes: &mut HashMap<String, Value>,
++    target_scope: &EvaluationTargetScope,
++    rows: &[Value],
++) {
++    let Some((input_row, output_row)) = target_io_rows(target_scope, rows) else {
++        return;
++    };
++    overlay_field_group(attributes, input_row, INPUT_FIELDS);
++    overlay_field_group(attributes, output_row, OUTPUT_FIELDS);
++}
++
++/// Replaces one side of the conversation wholesale, but only when the chosen
++/// row can supply it. Input and output often sit on different spans, and
++/// clearing a side the row does not carry would feed the judge an empty
++/// string instead of the value the mapping resolved to before.
++fn overlay_field_group(attributes: &mut HashMap<String, Value>, row: &Value, fields: &[&str]) {
++    let Some(object) = row.as_object() else {
++        return;
++    };
++    if !fields.iter().any(|field| object.contains_key(*field)) {
++        return;
++    }
++    for field in fields {
++        attributes.remove(*field);
++    }
++    copy_present_fields(attributes, row, fields);
++}
++
++fn copy_present_fields(attributes: &mut HashMap<String, Value>, row: &Value, fields: &[&str]) {
++    let Some(object) = row.as_object() else {
++        return;
++    };
++    for field in fields {
++        if let Some(value) = object.get(*field) {
++            attributes.insert((*field).to_string(), value.clone());
++        }
++    }
+ }
+ 
+ fn target_root_row(rows: &[Value]) -> Option<&Value> {
+-    sorted_rows(rows)
+-        .into_iter()
+-        .find(|row| is_root_row(row) && has_llm_io(row))
+-        .or_else(|| sorted_rows(rows).into_iter().find(|row| has_llm_io(row)))
++    let sorted = sorted_rows(rows);
++    sorted
++        .iter()
++        .copied()
++        .find(|row| is_root_row(row) && is_chat_row(row))
++        .or_else(|| sorted.iter().copied().find(|row| is_chat_row(row)))
++        .or_else(|| sorted.iter().copied().find(|row| has_llm_io(row)))
++}
++
++/// A span that carries conversation fields and is not a tool execution.
++fn is_chat_row(row: &Value) -> bool {
++    has_llm_io(row) && !is_tool_row(row)
+ }
+ 
+ fn has_llm_io(row: &Value) -> bool {
+@@ -497,22 +582,25 @@ fn insert_normalized_status(target: &mut Map<String, Value>, row: &Value) {
+     }
+ }
+ 
++/// Span duration in milliseconds.
++///
++/// An explicit `duration_ms` field is already in milliseconds. The traces
++/// stream's `duration` field is stored in microseconds (see
++/// `span_duration_micros` in the OSS traces ingestion), so it is converted.
+ fn duration_ms(row: &Value) -> Option<i64> {
+-    first_field_value(
+-        row,
+-        &[
+-            "duration_ms",
+-            "llm.duration_ms",
+-            "llm_duration_ms",
+-            "duration",
+-        ],
+-    )
+-    .and_then(|value| {
+-        value
+-            .as_i64()
+-            .or_else(|| value.as_u64().map(|value| value as i64))
+-            .or_else(|| value.as_f64().map(|value| value as i64))
+-    })
++    if let Some(value) = first_field_value(row, &["duration_ms"]) {
++        return integer_value(value);
++    }
++    first_field_value(row, &["duration"])
++        .and_then(integer_value)
++        .map(|micros| micros / 1_000)
++}
++
++fn integer_value(value: &Value) -> Option<i64> {
++    value
++        .as_i64()
++        .or_else(|| value.as_u64().map(|value| value as i64))
++        .or_else(|| value.as_f64().map(|value| value as i64))
+ }
+ 
+ fn insert_duration_ms(target: &mut Map<String, Value>, row: &Value) {
+@@ -604,15 +692,12 @@ fn fold_summary(rows: &[&Value]) -> Value {
+     })
+ }
+ 
+-fn target_session_steps(rows: &[Value]) -> Vec<Value> {
+-    let sorted_rows = sorted_rows(rows);
+-    let first_ts = sorted_rows
+-        .iter()
+-        .filter_map(|row| int_field(row, "_timestamp"))
+-        .min()
+-        .unwrap_or(0);
++/// Groups a session's rows by trace, in trace start order, and picks each
++/// trace's representative row: its root chat span, else its first chat span,
++/// else its first span with conversation fields, else its first span.
++fn session_trace_roots(rows: &[Value]) -> Vec<(i64, Vec<&Value>, &Value)> {
+     let mut traces = BTreeMap::<String, Vec<&Value>>::new();
+-    for row in sorted_rows {
++    for row in sorted_rows(rows) {
+         if let Some(trace_id) = string_field(row, "trace_id") {
+             traces.entry(trace_id).or_default().push(row);
+         }
+@@ -625,7 +710,8 @@ fn target_session_steps(rows: &[Value]) -> Vec<Value> {
+             let root = rows
+                 .iter()
+                 .copied()
+-                .find(|row| is_root_row(row) && has_llm_io(row))
++                .find(|row| is_root_row(row) && is_chat_row(row))
++                .or_else(|| rows.iter().copied().find(|row| is_chat_row(row)))
+                 .or_else(|| rows.iter().copied().find(|row| has_llm_io(row)))
+                 .unwrap_or(first_row);
+             (
+@@ -636,9 +722,17 @@ fn target_session_steps(rows: &[Value]) -> Vec<Value> {
+         })
+         .collect::<Vec<_>>();
+     trace_rows.sort_by_key(|(ts, ..)| *ts);
++    trace_rows
++}
+ 
++fn target_session_steps(rows: &[Value]) -> Vec<Value> {
++    let first_ts = rows
++        .iter()
++        .filter_map(|row| int_field(row, "_timestamp"))
++        .min()
++        .unwrap_or(0);
+     bounded_sequence(
+-        trace_rows,
++        session_trace_roots(rows),
+         |idx, (_, rows, root)| session_step(idx, &rows, root, first_ts),
+         |omitted| {
+             fold_summary(
+@@ -719,6 +813,59 @@ where
+     steps
+ }
+ 
++/// Every tool execution in the target, in start order, as separate context a
++/// scorer can opt into with `{{tool_calls}}`. Tool spans that store their
++/// arguments and result in the generic conversation fields are read from
++/// those as a fallback.
++fn target_tool_calls(rows: &[Value]) -> Vec<Value> {
++    let tool_rows = sorted_rows(rows)
++        .into_iter()
++        .filter(|row| is_tool_row(row))
++        .collect::<Vec<_>>();
++    bounded_sequence(
++        tool_rows,
++        |idx, row| tool_call(row, idx),
++        |omitted| fold_summary(&omitted),
++    )
++}
++
++fn tool_call(row: &Value, idx: usize) -> Value {
++    let mut call = Map::new();
++    call.insert("seq".to_string(), json!(idx + 1));
++    insert_string_field(&mut call, row, "trace_id", &["trace_id"]);
++    insert_string_field(&mut call, row, "span_id", &["span_id"]);
++    insert_string_field(
++        &mut call,
++        row,
++        "parent_span_id",
++        &["reference_parent_span_id", "parent_span_id", "parentSpanId"],
++    );
++    if let Some(value) = first_field_value(row, TOOL_NAME_FIELDS) {
++        call.insert("name".to_string(), bounded_value(value));
++    } else {
++        insert_string_field(
++            &mut call,
++            row,
++            "name",
++            &["operation_name", "span_name", "name"],
++        );
++    }
++    insert_normalized_status(&mut call, row);
++    insert_duration_ms(&mut call, row);
++    insert_int_field(&mut call, row, "timestamp", &["_timestamp", "start_time"]);
++    if let Some(value) =
++        first_field_value(row, TOOL_INPUT_FIELDS).or_else(|| first_field_value(row, INPUT_FIELDS))
++    {
++        call.insert("input".to_string(), bounded_value(value));
++    }
++    if let Some(value) =
++        first_field_value(row, TOOL_OUTPUT_FIELDS).or_else(|| first_field_value(row, OUTPUT_FIELDS))
++    {
++        call.insert("output".to_string(), bounded_value(value));
++    }
++    Value::Object(call)
++}
++
+ fn target_statistics(_target_scope: &EvaluationTargetScope, rows: &[Value]) -> Value {
+     let mut trace_ids = BTreeSet::new();
+     let mut session_ids = BTreeSet::new();
+@@ -875,8 +1022,11 @@ fn is_llm_row(row: &Value) -> bool {
+         || first_field_value(row, &["gen_ai.system", "gen_ai_system"]).is_some()
+ }
+ 
+-fn is_tool_row(row: &Value) -> bool {
++pub(crate) fn is_tool_row(row: &Value) -> bool {
+     first_field_value(row, TOOL_NAME_FIELDS).is_some()
++        || first_field_value(row, &["gen_ai.operation.name", "gen_ai_operation_name"])
++            .and_then(Value::as_str)
++            .is_some_and(|operation| operation.trim() == "execute_tool")
+         || string_field(row, "operation_name").is_some_and(|operation| {
+             operation.starts_with("execute_tool ") || operation.starts_with("tool.")
+         })
+@@ -1088,6 +1238,21 @@ mod tests {
+         assert!(!context.contains_key("target_id"));
+     }
+ 
++    #[test]
++    fn duration_ms_treats_traces_duration_as_microseconds() {
++        // Traces stream rows store `duration` in microseconds.
++        assert_eq!(duration_ms(&json!({"duration": 4_000_000})), Some(4000));
++        assert_eq!(duration_ms(&json!({"duration": 4_000_000.0})), Some(4000));
++        assert_eq!(duration_ms(&json!({"duration": 999})), Some(0));
++        // An explicit `duration_ms` is already milliseconds and wins.
++        assert_eq!(duration_ms(&json!({"duration_ms": 4000})), Some(4000));
++        assert_eq!(
++            duration_ms(&json!({"duration_ms": 4000, "duration": 9_000_000})),
++            Some(4000)
++        );
++        assert_eq!(duration_ms(&json!({"name": "x"})), None);
++    }
++
+     #[test]
+     fn trace_view_components_generate_each_prebuilt_variable() {
+         let rows = vec![
+@@ -1097,7 +1262,7 @@ mod tests {
+                 "operation_name": "invoke_agent",
+                 "llm_input": "I need a refund",
+                 "llm_output": "Please provide your order number",
+-                "duration_ms": 1200,
++                "duration": 1_200_000,
+                 "gen_ai_usage_total_tokens": 120,
+                 "cost_usd": 0.01,
+                 "_timestamp": 10,
+@@ -1111,7 +1276,7 @@ mod tests {
+                 "gen_ai_tool_name": "search_orders",
+                 "gen_ai_tool_input": {"order": "A123"},
+                 "gen_ai_tool_output": "Order found",
+-                "duration_ms": 800,
++                "duration": 800_000,
+                 "span_status": "Error",
+                 "_timestamp": 20,
+                 "_o2_ingest_ts": 200,
+@@ -1144,12 +1309,14 @@ mod tests {
+         let spans = variables["spans"].as_array().unwrap();
+         assert_eq!(spans.len(), 2);
+         assert_eq!(spans[0]["name"], json!("invoke_agent"));
++        assert_eq!(spans[0]["ms"], json!(1200));
+         assert_eq!(
+             spans[0]["output"],
+             json!("Please provide your order number")
+         );
+         assert_eq!(spans[1]["name"], json!("tool.search_orders"));
+         assert_eq!(spans[1]["tool_name"], json!("search_orders"));
++        assert_eq!(spans[1]["ms"], json!(800));
+ 
+         let steps = variables["steps"].as_array().unwrap();
+         assert_eq!(steps.len(), 2);
+@@ -1158,10 +1325,22 @@ mod tests {
+         assert_eq!(steps[0]["out"], json!("Please provide your order number"));
+         assert_eq!(steps[1]["type"], json!("TOOL"));
+         assert_eq!(steps[1]["status"], json!("error"));
++        assert_eq!(steps[0]["ms"], json!(1200));
++        assert_eq!(steps[1]["ms"], json!(800));
++
++        let tool_calls = variables["tool_calls"].as_array().unwrap();
++        assert_eq!(tool_calls.len(), 1);
++        assert_eq!(tool_calls[0]["seq"], json!(1));
++        assert_eq!(tool_calls[0]["span_id"], json!("tool-1"));
++        assert_eq!(tool_calls[0]["ms"], json!(800));
++        assert_eq!(tool_calls[0]["name"], json!("search_orders"));
++        assert_eq!(tool_calls[0]["input"], json!("{\"order\":\"A123\"}"));
++        assert_eq!(tool_calls[0]["output"], json!("Order found"));
++        assert_eq!(tool_calls[0]["status"], json!("error"));
+     }
+ 
+     #[test]
+-    fn session_view_components_generate_statistics_and_trace_steps_only() {
++    fn session_view_components_take_question_and_final_answer_from_chat_roots() {
+         let rows = vec![
+             json!({
+                 "trace_id": "trace-1",
+@@ -1169,7 +1348,7 @@ mod tests {
+                 "span_id": "root-1",
+                 "llm_input": "I want a refund",
+                 "llm_output": "Please provide your order number",
+-                "duration_ms": 1500,
++                "duration": 1_500_000,
+                 "_timestamp": 1_000_000,
+                 "_o2_ingest_ts": 1_100_000,
+             }),
+@@ -1202,9 +1381,13 @@ mod tests {
+             &rows,
+         );
+ 
+-        assert!(!variables.contains_key("input"));
+-        assert!(!variables.contains_key("output"));
++        assert_eq!(variables["input"], json!("I want a refund"));
++        assert_eq!(variables["output"], json!("Order found, amount $299"));
+         assert!(!variables.contains_key("spans"));
++        let tool_calls = variables["tool_calls"].as_array().unwrap();
++        assert_eq!(tool_calls.len(), 1);
++        assert_eq!(tool_calls[0]["name"], json!("lookup_order"));
++        assert_eq!(tool_calls[0]["trace_id"], json!("trace-1"));
+ 
+         let statistics = variables["statistics"].as_object().unwrap();
+         assert!(statistics.get("target_scope").is_none());
+@@ -1458,6 +1641,189 @@ mod tests {
+         assert_eq!(variables["spans"], json!([]));
+     }
+ 
++    #[test]
++    fn later_tool_span_does_not_replace_the_chat_turn_in_view_or_raw_fields() {
++        // Chat span starts first; its child tool span starts later and stores
++        // its arguments and result in the same generic conversation fields.
++        let rows = vec![
++            json!({
++                "trace_id": "trace-1",
++                "span_id": "chat",
++                "operation_name": "chat gpt-4o",
++                "gen_ai_input_messages": "[{\"role\":\"user\",\"content\":\"Why did the ingester restart?\"}]",
++                "gen_ai_output_messages": "[{\"role\":\"assistant\",\"content\":\"It hit its memory limit.\"}]",
++                "_timestamp": 1_000,
++            }),
++            json!({
++                "trace_id": "trace-1",
++                "span_id": "tool",
++                "parent_span_id": "chat",
++                "operation_name": "execute_tool documentation",
++                "gen_ai_operation_name": "execute_tool",
++                "gen_ai_input_messages": "{\"path\":\"custom-charts-flat\"}",
++                "gen_ai_output_messages": "HTTP 404 Not Found",
++                "_timestamp": 177_000,
++            }),
++        ];
++
++        for scope in [EvaluationTargetScope::Trace, EvaluationTargetScope::Session] {
++            let variables = variables_with_target_view_components(BTreeMap::new(), &scope, &rows);
++            assert!(
++                variables["input"]
++                    .as_str()
++                    .unwrap()
++                    .contains("Why did the ingester restart?"),
++                "{scope:?} input: {}",
++                variables["input"]
++            );
++            assert!(
++                variables["output"]
++                    .as_str()
++                    .unwrap()
++                    .contains("memory limit"),
++                "{scope:?} output: {}",
++                variables["output"]
++            );
++            let tool_calls = variables["tool_calls"].as_array().unwrap();
++            assert_eq!(tool_calls.len(), 1, "{scope:?}");
++            assert_eq!(tool_calls[0]["name"], json!("execute_tool documentation"));
++            assert_eq!(
++                tool_calls[0]["input"],
++                json!("{\"path\":\"custom-charts-flat\"}")
++            );
++            assert_eq!(tool_calls[0]["output"], json!("HTTP 404 Not Found"));
++
++            // Flat last-wins merge, as the executor builds it, then the overlay.
++            let mut flat = HashMap::new();
++            for row in &rows {
++                flat.extend(
++                    row.as_object()
++                        .unwrap()
++                        .iter()
++                        .map(|(k, v)| (k.clone(), v.clone())),
++                );
++            }
++            assert_eq!(
++                flat["gen_ai_output_messages"],
++                json!("HTTP 404 Not Found"),
++                "precondition: raw merge is last-wins"
++            );
++            overlay_target_io_fields(&mut flat, &scope, &rows);
++            assert!(
++                flat["gen_ai_input_messages"]
++                    .as_str()
++                    .unwrap()
++                    .contains("Why did the ingester restart?"),
++                "{scope:?}"
++            );
++            assert!(
++                flat["gen_ai_output_messages"]
++                    .as_str()
++                    .unwrap()
++                    .contains("memory limit"),
++                "{scope:?}"
++            );
++            // Tool-specific fields and the tool span's other fields survive.
++            assert_eq!(flat["gen_ai_operation_name"], json!("execute_tool"));
++        }
++    }
++
++    #[test]
++    fn overlay_keeps_a_raw_field_the_chosen_row_cannot_replace() {
++        // Input on the root agent span, the answer on a child llm span: the
++        // overlay must not clear an output it has nothing to put back.
++        let rows = vec![
++            json!({
++                "trace_id": "trace-1",
++                "span_id": "root",
++                "parent_span_id": "",
++                "gen_ai_input_messages": "[{\"role\":\"user\",\"content\":\"Why flat?\"}]",
++                "_timestamp": 1,
++            }),
++            json!({
++                "trace_id": "trace-1",
++                "span_id": "child",
++                "parent_span_id": "root",
++                "gen_ai_output_messages": "the series has no data",
++                "_timestamp": 2,
++            }),
++        ];
++
++        let mut flat = HashMap::new();
++        for row in &rows {
++            flat.extend(
++                row.as_object()
++                    .unwrap()
++                    .iter()
++                    .map(|(k, v)| (k.clone(), v.clone())),
++            );
++        }
++        overlay_target_io_fields(&mut flat, &EvaluationTargetScope::Trace, &rows);
++
++        assert!(
++            flat["gen_ai_input_messages"]
++                .as_str()
++                .unwrap()
++                .contains("Why flat?")
++        );
++        assert_eq!(
++            flat.get("gen_ai_output_messages"),
++            Some(&json!("the series has no data")),
++            "an output the chosen row does not carry must survive"
++        );
++    }
++
++    #[test]
++    fn session_io_ignores_a_tool_root_using_generic_llm_field_names() {
++        // `llm_input`/`llm_output` are accepted for both chat and tool spans,
++        // so a tool-only trace must not become the session's question.
++        let rows = vec![json!({
++            "trace_id": "trace-1",
++            "span_id": "tool",
++            "parent_span_id": "",
++            "gen_ai_tool_name": "search",
++            "llm_input": "{\"q\":\"flat chart\"}",
++            "llm_output": "3 results",
++            "_timestamp": 1,
++        })];
++
++        let variables = variables_with_target_view_components(
++            BTreeMap::new(),
++            &EvaluationTargetScope::Session,
++            &rows,
++        );
++        assert!(!variables.contains_key("input"), "{variables:?}");
++        assert!(!variables.contains_key("output"), "{variables:?}");
++
++        let mut flat = HashMap::from([("llm_input".to_string(), json!("kept"))]);
++        overlay_target_io_fields(&mut flat, &EvaluationTargetScope::Session, &rows);
++        assert_eq!(flat["llm_input"], json!("kept"));
++    }
++
++    #[test]
++    fn session_without_chat_rows_keeps_raw_fields_and_has_no_io_components() {
++        let rows = vec![json!({
++            "trace_id": "trace-1",
++            "span_id": "tool",
++            "gen_ai_tool_name": "search",
++            "gen_ai_tool_input": "q",
++            "gen_ai_tool_output": "r",
++            "_timestamp": 1,
++        })];
++        let variables = variables_with_target_view_components(
++            BTreeMap::new(),
++            &EvaluationTargetScope::Session,
++            &rows,
++        );
++        assert!(!variables.contains_key("input"));
++        assert!(!variables.contains_key("output"));
++        assert_eq!(variables["tool_calls"][0]["input"], json!("q"));
++
++        let mut flat = HashMap::from([("llm_output".to_string(), json!("kept"))]);
++        overlay_target_io_fields(&mut flat, &EvaluationTargetScope::Session, &rows);
++        assert_eq!(flat["llm_output"], json!("kept"));
++    }
++
+     #[test]
+     fn span_scope_does_not_generate_prebuilt_view_components() {
+         let variables = variables_with_target_view_components(

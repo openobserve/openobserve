@@ -92,6 +92,7 @@ import { CorrelationSettingsPage } from "./generalPages/correlationSettingsPage.
 import { CorrelationDrawerPage } from "./generalPages/correlationDrawerPage.js";
 import { CrossLinkPage } from "./generalPages/crossLinkPage.js";
 import { ModelPricingPage } from "./generalPages/modelPricingPage.js";
+import { QueueWorkbenchPage } from "./generalPages/queueWorkbenchPage.js";
 import { EditionFeaturesPage } from "./generalPages/editionFeaturesPage.js";
 import { StatusPagesPage } from "./generalPages/statusPagesPage.js";
 import { ConnectDataSourcePopupPage } from "./generalPages/connectDataSourcePopupPage.js";
@@ -234,6 +235,7 @@ class PageManager {
     this.correlationDrawerPage = new CorrelationDrawerPage(page);
     this.crossLinkPage = new CrossLinkPage(page);
     this.modelPricingPage = new ModelPricingPage(page);
+    this.queueWorkbenchPage = new QueueWorkbenchPage(page);
     this.editionFeaturesPage = new EditionFeaturesPage(page);
     this.statusPagesPage = new StatusPagesPage(page);
     this.connectDataSourcePopupPage = new ConnectDataSourcePopupPage(page);

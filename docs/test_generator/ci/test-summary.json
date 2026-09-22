@@ -1,0 +1,6 @@
+[
+  { "title": "renders the input preview as the primary label with the ref id demoted to secondary text", "action": "new", "verifies": "the navigator leads with input_preview and demotes the ref id to secondary text" },
+  { "title": "falls back to the ref id when no input preview was captured", "action": "new", "verifies": "a null-preview item shows only the ref id and no preview span" },
+  { "title": "backfills the navigator with the preview returned by the detail endpoint for an older item", "action": "new", "verifies": "opening an older null-preview item adopts the detail endpoint's preview in place" },
+  { "title": "renders the empty state when the queue has no items", "action": "new", "verifies": "a zero-item queue shows the empty state and no navigator items" }
+]

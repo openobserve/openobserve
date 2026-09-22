@@ -1,0 +1,12 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/annotationQueueInputPreview.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/model-pricing.spec.js",
+    "web/src/enterprise/views/AIObservability/QueueWorkbenchPage.nav.spec.ts",
+    "web/src/services/llm-queues.service.spec.ts",
+    "web/src/enterprise/components/onlineEvals/utils/systemProvidedVariables.spec.ts"
+  ],
+  "needs_registration": true,
+  "rationale": "No Playwright spec covers the AI Observability Queue Workbench item navigator. The only in-diff tests are Vitest unit specs (QueueWorkbenchPage.nav.spec.ts, llm-queues.service.spec.ts, systemProvidedVariables.spec.ts), which mock the service layer and provide no E2E coverage of the real rendered DOM. model-pricing.spec.js is the sole enterprise-LLM spec in GeneralTests but tests a different feature (model pricing). The new input-preview behavior is a distinct area and its own spec; it must be registered under the GeneralTests run_files (ENT overlay home, alongside model-pricing) because no AIObservability shard exists in the base ci_matrix.json."
+}
