@@ -38,9 +38,6 @@ use crate::datafusion::optimizer::physical_optimizer::{
     utils::{get_column_name, is_column, is_count_rows_aggregate},
 };
 
-/// 2001-01-01T00:00:00Z in microseconds: the origin `rewrite_histogram` passes to `date_bin`.
-const DATE_BIN_ORIGIN_MICROS: i64 = 978_307_200_000_000;
-
 #[rustfmt::skip]
 /// SimpleHistogram(i64, u64, usize, i64): select histogram(_timestamp, '1m') as ts, count(*) as cnt from table where match_all() group by ts;
 /// histogram() with a timezone rewrites to date_bin over `_timestamp@0 + offset`; the
@@ -107,7 +104,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
                         let (start_time, end_time) = self.time_range;
                         // round the bucket edges to even start
                         let rounding_by = histogram_interval as i64;
-                        let min_value = align_to_date_bin_origin(start_time, rounding_by);
+                        let min_value = start_time - start_time % rounding_by;
                         let max_value = end_time;
                         let num_buckets = ((max_value - min_value) as f64
                             / histogram_interval as f64)
@@ -139,19 +136,6 @@ impl<'n> TreeNodeVisitor<'n> for SimpleHistogramVisitor {
         }
         Ok(TreeNodeRecursion::Continue)
     }
-}
-
-/// Floor `ts` onto the same bucket grid `date_bin` uses, so the tantivy fast path and the
-/// unoptimized plan agree at intervals that do not divide the origin (7m, 11m, 5h, ...).
-fn align_to_date_bin_origin(ts: i64, interval: i64) -> i64 {
-    if interval <= 0 {
-        return ts;
-    }
-    // rem_euclid is always non-negative, so this floors rather than truncating toward zero
-    ts.checked_sub(DATE_BIN_ORIGIN_MICROS)
-        .map(|delta| delta - delta.rem_euclid(interval))
-        .and_then(|floored| floored.checked_add(DATE_BIN_ORIGIN_MICROS))
-        .unwrap_or(ts)
 }
 
 fn get_data_bin(expr: &Arc<dyn PhysicalExpr>) -> Option<&ScalarFunctionExpr> {
@@ -283,7 +267,7 @@ impl<'n> TreeNodeVisitor<'n> for SimpleMultiHistogramVisitor {
                             if let Some(histogram_interval) = get_histogram_interval(&args[0]) {
                                 let (start_time, end_time) = self.time_range;
                                 let rounding_by = histogram_interval as i64;
-                                let min_value = align_to_date_bin_origin(start_time, rounding_by);
+                                let min_value = start_time - start_time % rounding_by;
                                 let max_value = end_time;
                                 self.simple_multi_histogram = Some((
                                     min_value,
@@ -552,148 +536,5 @@ mod tests {
         let visitor = SimpleMultiHistogramVisitor::new((1000, 2000), HashSet::new());
         assert!(visitor.simple_multi_histogram.is_none());
         assert!(visitor.index_fields.is_empty());
-    }
-
-    /// The epoch-floored expression this file used before the fix, kept so the tests below can
-    /// state exactly where the two grids agree and where they diverge.
-    fn epoch_floor(ts: i64, interval: i64) -> i64 {
-        ts - ts % interval
-    }
-
-    const MIN: i64 = 60 * 1_000_000;
-    const HOUR: i64 = 60 * MIN;
-
-    /// The 15 intervals that divide 978,307,200 s, where the two grids must stay identical.
-    const DIVIDING_INTERVALS: [i64; 15] = [
-        MIN,
-        5 * MIN,
-        10 * MIN,
-        15 * MIN,
-        20 * MIN,
-        30 * MIN,
-        45 * MIN,
-        HOUR,
-        2 * HOUR,
-        3 * HOUR,
-        4 * HOUR,
-        6 * HOUR,
-        8 * HOUR,
-        12 * HOUR,
-        24 * HOUR,
-    ];
-
-    /// Real timestamps, all at or after the epoch, where the fix must change nothing.
-    const SAMPLE_TIMESTAMPS: [i64; 5] = [
-        1_757_401_694_060_000,
-        1_700_000_000_000_000,
-        978_307_200_000_000,
-        978_307_200_000_001,
-        0,
-    ];
-
-    #[test]
-    fn origin_alignment_is_a_no_op_at_every_dividing_interval() {
-        for interval in DIVIDING_INTERVALS {
-            assert_eq!(
-                DATE_BIN_ORIGIN_MICROS % interval,
-                0,
-                "interval {interval}us was listed as dividing but does not divide the origin"
-            );
-            for ts in SAMPLE_TIMESTAMPS {
-                assert_eq!(
-                    align_to_date_bin_origin(ts, interval),
-                    epoch_floor(ts, interval),
-                    "origin alignment changed an existing bucket edge at ts={ts}, \
-                     interval={interval}us"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn origin_alignment_differs_from_the_epoch_floor_at_non_dividing_intervals() {
-        let ts = 1_757_401_694_060_000;
-        for (interval, expected_skew) in [
-            (7 * MIN, 6 * MIN),
-            (11 * MIN, 7 * MIN),
-            (5 * HOUR, 2 * HOUR),
-        ] {
-            assert_ne!(
-                DATE_BIN_ORIGIN_MICROS % interval,
-                0,
-                "interval {interval}us was listed as non-dividing but divides the origin"
-            );
-            let aligned = align_to_date_bin_origin(ts, interval);
-            assert_ne!(
-                aligned,
-                epoch_floor(ts, interval),
-                "the epoch floor and the origin floor must disagree at interval={interval}us"
-            );
-            assert_eq!(
-                (aligned - epoch_floor(ts, interval)).rem_euclid(interval),
-                expected_skew,
-                "unexpected grid skew at interval={interval}us"
-            );
-        }
-    }
-
-    #[test]
-    fn origin_alignment_matches_date_bin_at_non_dividing_intervals() {
-        // the reference date_bin floor, independent of the implementation under test
-        let date_bin = |ts: i64, interval: i64| {
-            let delta = ts - DATE_BIN_ORIGIN_MICROS;
-            DATE_BIN_ORIGIN_MICROS + (delta - delta.rem_euclid(interval))
-        };
-        for interval in [7 * MIN, 11 * MIN, 5 * HOUR] {
-            for ts in SAMPLE_TIMESTAMPS {
-                assert_eq!(
-                    align_to_date_bin_origin(ts, interval),
-                    date_bin(ts, interval),
-                    "fast path disagrees with date_bin at ts={ts}, interval={interval}us"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn origin_alignment_floors_below_the_origin_instead_of_truncating() {
-        // `%` truncates toward zero, so a pre-2001 timestamp would round up without rem_euclid
-        let interval = 7 * MIN;
-        let ts = DATE_BIN_ORIGIN_MICROS - 1;
-        let aligned = align_to_date_bin_origin(ts, interval);
-        assert!(
-            aligned <= ts,
-            "alignment must never move a timestamp forward"
-        );
-        assert_eq!(aligned, DATE_BIN_ORIGIN_MICROS - interval);
-    }
-
-    #[test]
-    fn origin_alignment_fixes_the_epoch_floor_rounding_pre_epoch_timestamps_up() {
-        let interval = MIN;
-        let ts = -1_000_000_000_000;
-        assert!(
-            epoch_floor(ts, interval) > ts,
-            "if `%` ever floored, this test has stopped meaning anything"
-        );
-        assert!(
-            align_to_date_bin_origin(ts, interval) < ts,
-            "a pre-epoch timestamp must floor down, not truncate toward zero"
-        );
-    }
-
-    #[test]
-    fn origin_alignment_never_overflows_or_moves_forward() {
-        for interval in [MIN, 7 * MIN, 5 * HOUR] {
-            for ts in [i64::MIN, i64::MIN + 1, i64::MAX, i64::MAX - 1, 0] {
-                let aligned = align_to_date_bin_origin(ts, interval);
-                assert!(
-                    aligned <= ts,
-                    "alignment moved ts={ts} forward at interval={interval}us"
-                );
-            }
-        }
-        assert_eq!(align_to_date_bin_origin(12_345, 0), 12_345);
-        assert_eq!(align_to_date_bin_origin(12_345, -1), 12_345);
     }
 }

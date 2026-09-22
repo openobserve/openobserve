@@ -88,6 +88,7 @@ impl RemoteScanNodes {
         let index_info = IndexInfo {
             equal_keys: self.equal_keys.get(table_name).unwrap_or(&vec![]).clone(),
             index_optimize_mode: None, // set in LeaderIndexOptimizerule
+            bypass_index_optimizer: self.req.bypass_index_optimizer,
         };
 
         let super_cluster_info = SuperClusterInfo {
@@ -252,6 +253,27 @@ mod tests {
         let info = nodes.get_remote_node(&TableReference::from("logs"));
         assert_eq!(info.search_infos.start_time, 1_700_000_017_000_000);
         assert_eq!(info.search_infos.end_time, 1_700_000_900_000_000);
+    }
+
+    #[test]
+    fn test_get_remote_node_carries_bypass_index_optimizer_to_flight_request() {
+        let req = Request {
+            bypass_index_optimizer: true,
+            ..Default::default()
+        };
+        let nodes = RemoteScanNodes::new(
+            req,
+            vec![],
+            HashMap::new(),
+            HashMap::new(),
+            false,
+            opentelemetry::Context::new(),
+            None,
+        );
+        let node = nodes.get_remote_node(&TableReference::from("logs"));
+        assert!(node.index_info.bypass_index_optimizer);
+        let flight_req = node.get_flight_search_request(0);
+        assert!(flight_req.index_info.bypass_index_optimizer);
     }
 
     #[test]

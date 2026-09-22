@@ -191,6 +191,11 @@ pub struct Query {
     /// that don't carry their own 3rd timezone argument. None / "UTC" / "" => UTC.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
+    // anomaly queries bin via date_bin; the tantivy fast path bins on the epoch grid
+    // Internal-only: an API caller must not be able to disable the index optimizer.
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub bypass_index_optimizer: bool,
 }
 
 fn default_size() -> i64 {
@@ -217,6 +222,7 @@ impl Default for Query {
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            bypass_index_optimizer: false,
         }
     }
 }
@@ -767,6 +773,7 @@ impl SearchHistoryRequest {
                 streaming_id: None,
                 histogram_interval: 0,
                 timezone: None,
+                bypass_index_optimizer: false,
             },
             encoding: RequestEncoding::Empty,
             regions: Vec::new(),
@@ -1395,6 +1402,7 @@ impl MultiStreamRequest {
                     streaming_id: None,
                     histogram_interval: 0,
                     timezone: None,
+                    bypass_index_optimizer: false,
                 },
                 regions: self.regions.clone(),
                 clusters: self.clusters.clone(),
@@ -3726,6 +3734,27 @@ mod tests {
         assert!(obj.contains_key("alert_name"));
         assert!(obj.contains_key("report_id"));
         assert!(obj.contains_key("dashboard_id"));
+    }
+
+    #[test]
+    fn test_bypass_index_optimizer_is_not_settable_over_the_wire() {
+        let q: Query = serde_json::from_str(
+            r#"{"sql":"select 1","start_time":0,"end_time":1,"bypass_index_optimizer":true}"#,
+        )
+        .unwrap();
+        assert!(!q.bypass_index_optimizer);
+        let internal = Query {
+            bypass_index_optimizer: true,
+            ..Default::default()
+        };
+        assert!(internal.bypass_index_optimizer);
+        let json = serde_json::to_value(&internal).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("bypass_index_optimizer")
+        );
     }
 
     #[test]

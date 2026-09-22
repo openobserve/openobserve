@@ -201,6 +201,7 @@ pub async fn search(
         index_fields,
         index_condition_ref.clone(),
         index_optimizer_rule_ref.clone(),
+        req.index_info.bypass_index_optimizer,
     )?;
     let index_condition = { index_condition_ref.lock().clone() };
     let idx_optimize_rule = { index_optimizer_rule_ref.lock().clone() };
@@ -632,20 +633,22 @@ fn optimizer_physical_plan(
     index_fields: Vec<String>,
     index_condition_ref: Arc<Mutex<Option<IndexCondition>>>,
     index_optimizer_rule_ref: Arc<Mutex<Option<IndexOptimizeMode>>>,
+    bypass_index_optimizer: bool,
 ) -> Result<Arc<dyn ExecutionPlan>, Error> {
     let index_fields: HashSet<String> = index_fields.iter().cloned().collect();
     let index_rule = IndexRule::new(index_fields.clone(), index_condition_ref.clone());
     let original_plan = Arc::clone(&plan);
     let plan = index_rule.optimize(plan, ctx.state().config_options())?;
 
-    // if the index rule can't optimize, we should take the index optimizer rule
-    if !index_rule.can_optimize() {
+    // Guard here: an installed fast path also drops indexed files, silently losing buckets.
+    if bypass_index_optimizer || !index_rule.can_optimize() {
         index_optimizer_rule_ref.lock().take();
     }
 
     // if the index condition is some, and the index optimizer rule is none,
     // and filter only have _timestamp filter, we can try to optimize the plan
-    if index_condition_ref.lock().is_some()
+    if !bypass_index_optimizer
+        && index_condition_ref.lock().is_some()
         && index_optimizer_rule_ref.lock().is_none()
         && index_rule.can_optimize()
     {
@@ -1028,6 +1031,7 @@ mod tests {
             vec!["kubernetes_namespace_name".to_string()],
             index_condition_ref.clone(),
             index_optimizer_rule_ref.clone(),
+            false,
         )
         .unwrap();
 
@@ -1044,6 +1048,63 @@ mod tests {
             index_optimizer_rule_ref.lock().clone(),
             Some(IndexOptimizeMode::SimpleHistogram(..))
         ));
+    }
+
+    #[tokio::test]
+    async fn test_optimizer_physical_plan_bypass_never_installs_optimizer_rule() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("_timestamp", DataType::Int64, false),
+            Field::new("kubernetes_namespace_name", DataType::Utf8, false),
+        ]));
+        let start_time = 1757401694060000;
+        let end_time = 1757402594060000;
+        let state = SessionStateBuilder::new()
+            .with_config(SessionConfig::new().with_target_partitions(12))
+            .with_runtime_env(Arc::new(RuntimeEnvBuilder::new().build().unwrap()))
+            .with_default_features()
+            .with_optimizer_rule(Arc::new(RewriteHistogram::new(
+                start_time, end_time, 60, None,
+            )))
+            .build();
+        let ctx = SessionContext::new_with_state(state);
+        let provider = NewEmptyTable::new("default", schema.clone());
+        ctx.register_table("default", Arc::new(provider)).unwrap();
+        ctx.register_udf(histogram_udf::HISTOGRAM_UDF.clone());
+
+        let logical_plan = ctx
+            .state()
+            .create_logical_plan(
+                "SELECT histogram(_timestamp) as ts, count(*) as cnt \
+                 FROM default \
+                 WHERE kubernetes_namespace_name = 'ziox' \
+                 GROUP BY ts ORDER BY ts",
+            )
+            .await
+            .unwrap();
+        let physical_plan = ctx
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await
+            .unwrap();
+        let index_condition_ref = Arc::new(Mutex::new(None));
+        // a leader-seeded mode must also die at this choke point, not only local detection
+        let index_optimizer_rule_ref = Arc::new(Mutex::new(Some(IndexOptimizeMode::SimpleCount)));
+
+        let _plan = optimizer_physical_plan(
+            physical_plan,
+            &ctx,
+            &schema,
+            StreamType::Logs,
+            (start_time, end_time),
+            vec![],
+            vec!["kubernetes_namespace_name".to_string()],
+            index_condition_ref.clone(),
+            index_optimizer_rule_ref.clone(),
+            true,
+        )
+        .unwrap();
+
+        assert!(index_optimizer_rule_ref.lock().is_none());
     }
 
     #[test]
@@ -1114,6 +1175,7 @@ mod tests {
                 vec![],
                 index_condition_ref.clone(),
                 index_optimizer_rule_ref.clone(),
+                false,
             )
             .unwrap();
 
