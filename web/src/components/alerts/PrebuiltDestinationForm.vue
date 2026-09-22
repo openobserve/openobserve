@@ -225,7 +225,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 import { computed, onMounted, ref, watch } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
@@ -315,9 +315,12 @@ watch(
 // One flat list: a non-selectable header per account kind, then its emails.
 // OSelect renders `header: true` entries as group labels.
 const emailRecipientOptions = computed<SelectOption[]>(() => {
-  const users = emailUserEmails.value.map((email) => ({ label: email, value: email }));
+  const users = emailUserEmails.value.map((email) => ({
+    label: raw(email),
+    value: email,
+  }));
   const serviceAccounts = emailServiceAccountEmails.value.map((email) => ({
-    label: email,
+    label: raw(email),
     value: email,
   }));
   const options: SelectOption[] = [];
