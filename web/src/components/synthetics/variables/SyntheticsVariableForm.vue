@@ -121,6 +121,7 @@ import { useStore } from "vuex";
 import { useI18nTyped } from "@/types/i18n";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OForm from "@/lib/forms/Form/OForm.vue";
+import type { OFormExposed } from "@/lib/forms/Form/OForm.types";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
@@ -162,7 +163,7 @@ export default defineComponent({
     const { t } = useI18nTyped();
     const store = useStore();
     const { confirm } = useConfirmDialog();
-    const formRef = ref<InstanceType<typeof OForm> | null>(null);
+    const formRef = ref<OFormExposed | null>(null);
     const replacing = ref(false);
     const kindValue = ref<"plain" | "secret">("plain");
 
@@ -177,8 +178,12 @@ export default defineComponent({
     );
 
     const hasStoredValue = computed(() => Boolean(props.isEdit && props.data?.has_value));
+    // The form never sees a secret's value, so only an unreplaced stored secret may stay blank.
+    const keepsStoredSecret = computed(
+      () => hasStoredValue.value && props.data?.kind === "secret" && !replacing.value,
+    );
     const schema = computed(() =>
-      makeSyntheticsVariableFormSchema(t as (_k: string) => string, hasStoredValue.value),
+      makeSyntheticsVariableFormSchema(t as (_k: string) => string, keepsStoredSecret.value),
     );
 
     const defaults = computed(() => ({

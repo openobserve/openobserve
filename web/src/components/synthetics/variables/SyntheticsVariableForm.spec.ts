@@ -224,6 +224,64 @@ describe("SyntheticsVariableForm — value field", () => {
   });
 });
 
+describe("SyntheticsVariableForm — an edit still needs a value", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+  });
+
+  const valueIssue = (values: Record<string, unknown>) => {
+    const schema = (wrapper.vm as any).schema as { safeParse: (_v: unknown) => any };
+    const result = schema.safeParse({ example: "", description: "", ...values });
+    return result.success
+      ? undefined
+      : result.error.issues.find((i: { path: string[] }) => i.path[0] === "value")?.message;
+  };
+
+  it("rejects clearing a plain variable's value on edit", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "URL", kind: "plain", value: "https://a.test", has_value: true },
+    });
+
+    expect(valueIssue({ name: "URL", kind: "plain", value: "" })).toBe("Value is required");
+  });
+
+  it("rejects a blank replacement for a stored secret", async () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "TOKEN", kind: "secret", has_value: true },
+    });
+    (wrapper.vm as any).replacing = true;
+    await nextTick();
+
+    expect(valueIssue({ name: "TOKEN", kind: "secret", value: "" })).toBe("Value is required");
+  });
+
+  it("lets a stored secret keep its value when nothing is typed", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "TOKEN", kind: "secret", has_value: true },
+    });
+
+    expect(valueIssue({ name: "TOKEN", kind: "secret", value: "" })).toBeUndefined();
+  });
+
+  it("requires a value for a secret that has none stored", () => {
+    wrapper = mountForm({
+      environment: "staging",
+      isEdit: true,
+      data: { id: "v1", name: "TOKEN", kind: "secret", has_value: false },
+    });
+
+    expect(valueIssue({ name: "TOKEN", kind: "secret", value: "" })).toBe("Value is required");
+  });
+});
+
 describe("SyntheticsVariableForm — saving an edit", () => {
   let wrapper: VueWrapper;
 

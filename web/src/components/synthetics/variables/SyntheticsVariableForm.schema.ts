@@ -22,7 +22,7 @@ export const RESERVED_VARIABLE_PREFIX = "_AUTH_";
 
 export const makeSyntheticsVariableFormSchema = (
   t: (_key: string) => string,
-  hasStoredValue: boolean,
+  keepsStoredSecret: boolean,
 ) =>
   z
     .object({
@@ -45,8 +45,8 @@ export const makeSyntheticsVariableFormSchema = (
           message: t("synthetics.variables.nameReserved"),
         });
       }
-      // A new variable needs a value; an existing one may keep the stored one.
-      if (!hasStoredValue && !val.value?.length) {
+      // Only a stored secret the author is not replacing may leave the value blank.
+      if (!keepsStoredSecret && !val.value?.length) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["value"],
