@@ -56,6 +56,10 @@ const SERVER_ERROR_BAND: std::ops::Range<i64> = 500..600;
 const WINDOW_FLOOR_RULE: &str =
     "detection_window_seconds must be at least schedule_interval plus histogram_interval";
 
+/// The non-epoch origin `rewrite_histogram` passes to `date_bin`, 2001-01-01T00:00:00Z. The
+/// tantivy fast path floors to the epoch, so the two grids agree only at intervals dividing it.
+const DATE_BIN_ORIGIN_SECS: i64 = 978_307_200;
+
 /// Value column names tried when a config declares none. Kept so configs created before
 /// `value_column` existed keep resolving exactly as they did.
 #[cfg(feature = "enterprise")]
@@ -2204,6 +2208,24 @@ fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
     enabled && !globally_disabled
 }
 
+/// The two time grids agree only where the interval divides the origin; everywhere else the
+/// indexed and unindexed paths bucket the same rows differently.
+fn validate_origin_aligned_interval(histogram_interval: &str, histogram_secs: i64) -> Result<()> {
+    let skew = DATE_BIN_ORIGIN_SECS % histogram_secs;
+    if skew != 0 {
+        anyhow::bail!(
+            "histogram_interval ({}) must divide the date_bin origin of {}s (2001-01-01): it \
+             leaves a remainder of {}s, so indexed and unindexed runs would bucket the same rows \
+             onto grids {}s apart",
+            histogram_interval,
+            DATE_BIN_ORIGIN_SECS,
+            skew,
+            histogram_secs - skew,
+        );
+    }
+    Ok(())
+}
+
 /// The pure interval rule create and update share, so the two cannot drift apart.
 fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
     let schedule_secs = parse_interval(schedule_interval)?;
@@ -2217,6 +2239,8 @@ fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> 
             histogram_interval
         );
     }
+
+    validate_origin_aligned_interval(histogram_interval, histogram_secs)?;
 
     // A short schedule scores a partial bucket against a full-bucket baseline, forever.
     if schedule_secs < histogram_secs {
@@ -2985,6 +3009,8 @@ pub async fn execute_anomaly_query(
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
+            // Origin-blind binning diverges from date_bin at 7m/11m/5h, all validator-legal.
+            bypass_index_optimizer: true,
             ..Default::default()
         },
         encoding: config::meta::search::RequestEncoding::Empty,
@@ -4434,6 +4460,121 @@ mod tests {
     mod interval_pair_rule {
         use super::*;
 
+        /// The bucket widths an operator can plausibly pick that divide the origin. Adding a
+        /// value here that does not divide it fails the pin below, which is the point.
+        const ACCEPTED_INTERVALS: [(&str, i64); 14] = [
+            ("30s", 30),
+            ("1m", 60),
+            ("5m", 300),
+            ("10m", 600),
+            ("15m", 900),
+            ("30m", 1800),
+            ("90m", 5400),
+            ("1h", 3600),
+            ("2h", 7200),
+            ("3h", 10800),
+            ("4h", 14400),
+            ("6h", 21600),
+            ("12h", 43200),
+            ("1d", 86400),
+        ];
+
+        /// Off-grid widths `parse_interval` accepts, each with the skew it would introduce.
+        const REJECTED_INTERVALS: [(&str, i64); 6] = [
+            ("7m", 420),
+            ("11m", 660),
+            ("5h", 18000),
+            ("7h", 25200),
+            ("10h", 36000),
+            ("2d", 172_800),
+        ];
+
+        /// The anomaly analogue of `slo::window`'s origin pin. The agreement between the
+        /// tantivy grid and `date_bin` is a coincidence of the constant, not a guarantee, so
+        /// the constant is pinned rather than assumed: this fails if the origin ever moves.
+        #[test]
+        fn the_origin_is_the_one_date_bin_anchors_on() {
+            assert_eq!(
+                DATE_BIN_ORIGIN_SECS, 978_307_200,
+                "2001-01-01T00:00:00Z, from rewrite_histogram.rs"
+            );
+            assert_eq!(
+                DATE_BIN_ORIGIN_SECS % 86_400,
+                0,
+                "the origin must be a whole number of days for any day-multiple to align"
+            );
+            assert_eq!(DATE_BIN_ORIGIN_SECS / 86_400, 11_323);
+        }
+
+        /// The behavioural half of the pin: for an accepted interval the epoch-floored grid
+        /// the tantivy path uses and `date_bin`'s origin-floored grid land on the same edge.
+        #[test]
+        fn an_accepted_interval_puts_both_grids_on_the_same_bucket_edge() {
+            let epoch_floor = |ts: i64, step: i64| ts.div_euclid(step) * step;
+            let date_bin = |ts: i64, step: i64| {
+                DATE_BIN_ORIGIN_SECS + (ts - DATE_BIN_ORIGIN_SECS).div_euclid(step) * step
+            };
+            for (interval, secs) in ACCEPTED_INTERVALS {
+                assert!(
+                    validate_origin_aligned_interval(interval, secs).is_ok(),
+                    "{interval} divides the origin and must be accepted"
+                );
+                for ts in [0, 1_000_000_000, 1_753_000_000, 2_000_000_123] {
+                    assert_eq!(
+                        epoch_floor(ts, secs),
+                        date_bin(ts, secs),
+                        "the two grids disagree at ts={ts}, interval={interval}"
+                    );
+                }
+            }
+        }
+
+        /// The negative control, so the test above cannot pass vacuously: a rejected interval
+        /// really does put the two grids on different edges.
+        #[test]
+        fn a_rejected_interval_really_would_drift() {
+            let epoch_floor = |ts: i64, step: i64| ts.div_euclid(step) * step;
+            let date_bin = |ts: i64, step: i64| {
+                DATE_BIN_ORIGIN_SECS + (ts - DATE_BIN_ORIGIN_SECS).div_euclid(step) * step
+            };
+            for (interval, secs) in REJECTED_INTERVALS {
+                assert!(
+                    validate_origin_aligned_interval(interval, secs).is_err(),
+                    "{interval} skews the grids and must be rejected"
+                );
+                assert_ne!(
+                    epoch_floor(1_753_000_000, secs),
+                    date_bin(1_753_000_000, secs),
+                    "{interval} was put on the rejected list but does not actually drift"
+                );
+            }
+        }
+
+        /// 2d is the trap: every smaller day-multiple divides the origin, but 11,323 is odd.
+        #[test]
+        fn a_two_day_bucket_is_rejected_even_though_one_day_is_not() {
+            assert!(validate_origin_aligned_interval("1d", 86_400).is_ok());
+            let err = validate_origin_aligned_interval("2d", 172_800)
+                .expect_err("11323 is odd, so 2d leaves a full day of skew");
+            assert!(
+                err.to_string().contains("86400s"),
+                "the message must state the remainder: {err}"
+            );
+        }
+
+        /// The rule reaches create through `validate_interval_pair`, so an off-grid bucket is
+        /// refused even when the schedule/histogram ratio itself is perfectly legal.
+        #[test]
+        fn an_off_grid_bucket_is_rejected_through_the_shared_pair_rule() {
+            assert_eq!(2940 % 420, 0, "49m is a whole multiple of 7m");
+            let err = validate_interval_pair("49m", "7m")
+                .expect_err("a clean ratio must not launder an off-grid bucket");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
+
         #[test]
         fn accepts_equal_intervals() {
             assert!(validate_interval_pair("5m", "5m").is_ok());
@@ -4913,6 +5054,72 @@ mod tests {
                 validated_detection_window(&req, &stored).is_err(),
                 "400 clears 300+60 but not 300+300"
             );
+        }
+
+        /// A row stored before the origin rule existed keeps its off-grid bucket and stays
+        /// administrable; only an edit that actually moves an interval is held to the rule.
+        #[test]
+        fn a_stored_off_grid_interval_survives_an_edit_that_leaves_it_alone() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "7m".to_string();
+            stored.histogram_interval = "7m".to_string();
+            assert!(
+                validate_interval_pair("7m", "7m").is_err(),
+                "the row must be one create would now refuse"
+            );
+
+            let elsewhere = UpdateAnomalyConfigRequest {
+                description: Some("untouched".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&elsewhere, &stored).is_ok());
+
+            assert!(
+                validated_intervals(&full_body_replay(&stored), &stored).is_ok(),
+                "a full-body PUT resends the interval unchanged and must not strand the row"
+            );
+
+            let respelled = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("420s".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_intervals(&respelled, &stored).is_ok(),
+                "420s is the same duration as 7m, so the row is untouched, not repaired"
+            );
+        }
+
+        /// The other half: moving an off-grid row to another off-grid bucket is a real edit
+        /// and is refused, so grandfathering cannot become a back door to new bad values.
+        #[test]
+        fn moving_a_stored_interval_to_another_off_grid_value_is_rejected() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("11m".to_string()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&req, &stored)
+                .expect_err("11m is a new off-grid value, not the stored one");
+            assert!(
+                err.to_string().contains("date_bin origin"),
+                "the origin rule must be the one that fired: {err}"
+            );
+        }
+
+        /// Repairing an off-grid row onto the grid must be allowed, or the rule traps the
+        /// very rows it exists to fix.
+        #[test]
+        fn repairing_an_off_grid_interval_onto_the_grid_is_accepted() {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "7m".to_string();
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored).is_ok());
         }
 
         /// The other side of the same rule: a row that already violates the coverage floor

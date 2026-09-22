@@ -185,6 +185,7 @@ pub async fn get_trace_dag(
             streaming_id: None,
             histogram_interval: 0,
             timezone: None,
+            bypass_index_optimizer: false,
         },
         encoding: config::meta::search::RequestEncoding::Empty,
         regions: vec![],
