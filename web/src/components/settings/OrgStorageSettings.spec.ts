@@ -202,4 +202,28 @@ describe("OrgStorageSettings", () => {
     expect(wrapper.text()).toContain("us-east-1");
     expect(wrapper.text()).toContain("arn:aws:iam::123456789:role/test-role");
   });
+
+  it("shows GcpServiceAccount details in summary", async () => {
+    mockGetStorage.mockResolvedValue({
+      data: {
+        provider: "GcpServiceAccount",
+        data: {
+          bucket_name: "gcp-bucket",
+          project_name: "my-project",
+          service_account_name: "sa@my-project.iam.gserviceaccount.com",
+        },
+        created_at: 1777361152043890,
+        updated_at: 1777361152043891,
+      },
+    });
+
+    const wrapper = createWrapper();
+    await nextTick();
+    await nextTick();
+
+    expect(wrapper.text()).toContain("Google Cloud Storage");
+    expect(wrapper.text()).toContain("gcp-bucket");
+    expect(wrapper.text()).toContain("my-project");
+    expect(wrapper.text()).toContain("sa@my-project.iam.gserviceaccount.com");
+  });
 });
