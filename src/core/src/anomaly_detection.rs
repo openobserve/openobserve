@@ -66,6 +66,11 @@ const VALUE_COLUMN_TTL: Duration = Duration::from_secs(60);
 static VALUE_COLUMN_CACHE: LazyLock<RwLock<ValueColumnCache>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Lowercased aggregations the trainer's `DetectionFunction` can deserialize. A name
+/// accepted here but unknown there persists a config that can never train.
+const SUPPORTED_DETECTION_FUNCTIONS: [&str; 8] =
+    ["count", "avg", "sum", "min", "max", "p50", "p95", "p99"];
+
 /// Lowercased operators the enterprise query builder can express, mirroring its
 /// `build_single_filter` arms and the UI's `ANOMALY_FILTER_OPERATORS`. All three must move
 /// together: an operator accepted here but unknown there yields an unfiltered query.
@@ -701,6 +706,7 @@ pub async fn update_config(
 
     validated_intervals(&req, &existing).map_err(validation_error)?;
     validated_detection_window(&req, &existing).map_err(validation_error)?;
+    validated_detection_function(&req, &existing).map_err(validation_error)?;
     validated_denominator(&req, &existing).map_err(validation_error)?;
     validated_budget_update(
         req.percentile,
@@ -1621,17 +1627,67 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     validate_interval_pair(&req.schedule_interval, &req.histogram_interval)?;
     validate_detection_window(&req.schedule_interval, req.detection_window_seconds)?;
 
-    // G4 reads the COMBINED form, which is what the row stores and what update sees.
+    // The COMBINED form is what the row stores, what update sees, and what the trainer reads,
+    // so both rules below are spelled against it rather than the two raw fields.
+    let combined = combine_detection_fn(
+        &req.detection_function,
+        req.detection_function_field.as_deref(),
+    );
+
     validate_denominator(
-        &combine_detection_fn(
-            &req.detection_function,
-            req.detection_function_field.as_deref(),
-        ),
+        &combined,
         &req.stream_name,
         &req.query_mode,
         req.filters.as_ref(),
         req.custom_sql.as_deref(),
-    )
+    )?;
+
+    // Last, because G4 reads a count case-insensitively: `COUNT(*)` has to reach the
+    // denominator verdict before this stricter spelling rule can short-circuit it.
+    validate_detection_function(&combined)
+}
+
+/// Splits a combined `fn(field)` into its parts; a bare name yields no field.
+fn split_combined_detection_fn(combined: &str) -> Result<(&str, Option<&str>)> {
+    let combined = combined.trim();
+    let Some((name, rest)) = combined.split_once('(') else {
+        return Ok((combined, None));
+    };
+    let Some(field) = rest.strip_suffix(')') else {
+        anyhow::bail!("detection_function is malformed: {combined}");
+    };
+    Ok((name.trim(), Some(field.trim())))
+}
+
+/// Rejects an aggregation the trainer cannot deserialize, and a non-count one with no field:
+/// both persist a config that saves with a 200 and then fails every training run.
+///
+/// Matched case-SENSITIVELY on purpose. The trainer does
+/// `serde_json::from_str("\"{name}\"")` into its `DetectionFunction`, and serde matches
+/// variants exactly, so `AVG` is as untrainable as `p75`. Lowercasing here would widen this
+/// gate past the one it is mirroring and re-open the bug for a different spelling.
+fn validate_detection_function(combined: &str) -> Result<()> {
+    let (name, field) = split_combined_detection_fn(combined)?;
+    if !SUPPORTED_DETECTION_FUNCTIONS.contains(&name) {
+        if SUPPORTED_DETECTION_FUNCTIONS.contains(&name.to_ascii_lowercase().as_str()) {
+            anyhow::bail!(
+                "detection_function is case-sensitive: use '{}', not '{name}'",
+                name.to_ascii_lowercase()
+            );
+        }
+        anyhow::bail!(
+            "unsupported detection_function: {name}. Supported: {}",
+            SUPPORTED_DETECTION_FUNCTIONS.join(", ")
+        );
+    }
+    // `count` is the one aggregation with no operand; every other reads a column.
+    if name == "count" {
+        return Ok(());
+    }
+    match field {
+        Some(f) if !f.is_empty() && f != "*" => Ok(()),
+        _ => anyhow::bail!("detection_function {name} requires detection_function_field"),
+    }
 }
 
 /// A budget the meter arithmetic cannot enforce (0, negative, NaN, inf) must never be stored.
@@ -2145,6 +2201,20 @@ fn validated_denominator(
         merged.filters.as_ref(),
         merged.custom_sql.as_deref(),
     )
+}
+
+/// Validates the merged function only when it differs from the persisted one, so a row
+/// already carrying an unusable function stays administrable — it can still be renamed,
+/// moved, disabled or repaired, exactly as the denominator rule allows.
+fn validated_detection_function(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let merged = merged_series_definition(req, existing);
+    if merged.detection_function == existing.detection_function {
+        return Ok(());
+    }
+    validate_detection_function(&merged.detection_function)
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
@@ -4303,6 +4373,215 @@ mod tests {
     /// separate 20 errors in 330,000 requests from 20 errors in 200, so no forest and no
     /// thresholder can rescue it -- only refusing the config can. The rate form of the same
     /// signal, `nginx_5xx_rate_1h`, is servable and did detect the same platform outage.
+    mod detection_function_rule {
+        use super::*;
+
+        fn req_with(function: &str, field: Option<&str>) -> CreateAnomalyConfigRequest {
+            let mut req = make_valid_filters_req();
+            req.detection_function = function.to_string();
+            req.detection_function_field = field.map(str::to_string);
+            req
+        }
+
+        fn stored_with(function: &str) -> infra::table::entity::anomaly_detection_config::Model {
+            let mut model = update_interval_validation::stored_config();
+            model.detection_function = function.to_string();
+            model
+        }
+
+        #[test]
+        fn every_supported_function_is_accepted() {
+            for function in ["avg", "sum", "min", "max", "p50", "p95", "p99"] {
+                assert!(
+                    validate_config_request(&req_with(function, Some("latency_ms"))).is_ok(),
+                    "{function} is a supported aggregation and must be accepted"
+                );
+            }
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+        }
+
+        #[test]
+        fn the_retired_percentiles_are_refused_at_create() {
+            for function in ["p75", "p90"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer cannot deserialize this name");
+                assert!(
+                    err.to_string().contains("unsupported detection_function"),
+                    "{function} must name itself in the refusal, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn a_function_the_trainer_cannot_read_is_refused_even_with_runnable_sql() {
+            // `median` is real DataFusion, so only the trainer's enum rejects it: the gap that
+            // let it save with a 200 and then fail every run.
+            let err = validate_config_request(&req_with("median", Some("latency_ms")))
+                .expect_err("median is not a DetectionFunction variant");
+            assert!(err.to_string().contains("median"), "got: {err}");
+        }
+
+        #[test]
+        fn an_arbitrary_name_is_refused() {
+            assert!(validate_config_request(&req_with("totally_made_up", Some("x"))).is_err());
+        }
+
+        #[test]
+        fn the_refusal_lists_what_is_supported() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            let msg = err.to_string();
+            for supported in SUPPORTED_DETECTION_FUNCTIONS {
+                assert!(msg.contains(supported), "{supported} missing from: {msg}");
+            }
+        }
+
+        #[test]
+        fn a_non_count_function_without_a_field_is_refused() {
+            // `combine_detection_fn` leaves this bare as `avg`, which reads as a column name.
+            let err = validate_config_request(&req_with("avg", None))
+                .expect_err("avg has no operand to aggregate");
+            assert!(
+                err.to_string()
+                    .contains("requires detection_function_field"),
+                "got: {err}"
+            );
+        }
+
+        #[test]
+        fn an_empty_field_is_not_a_field() {
+            assert!(validate_config_request(&req_with("avg", Some(""))).is_err());
+            assert!(validate_config_request(&req_with("avg", Some("   "))).is_err());
+        }
+
+        #[test]
+        fn count_needs_no_field_in_either_spelling() {
+            assert!(validate_config_request(&req_with("count", None)).is_ok());
+            assert!(validate_config_request(&req_with("count(*)", None)).is_ok());
+        }
+
+        #[test]
+        fn a_pre_combined_request_reaches_the_same_verdict() {
+            assert!(validate_config_request(&req_with("p95(latency_ms)", None)).is_ok());
+            assert!(validate_config_request(&req_with("p75(latency_ms)", None)).is_err());
+        }
+
+        #[test]
+        fn an_uppercase_spelling_of_a_supported_function_is_refused() {
+            // Measured: `AVG`, `Avg`, `P95` and `COUNT` all save with a 200 today and then fail
+            // training with `unknown variant`. serde matches enum variants exactly, so a
+            // case-insensitive gate here would leave the bug open under a different spelling.
+            for function in ["AVG", "Avg", "P95", "COUNT", "Sum"] {
+                let err = validate_config_request(&req_with(function, Some("latency_ms")))
+                    .expect_err("the trainer deserializes variants case-sensitively");
+                assert!(
+                    err.to_string().contains("case-sensitive"),
+                    "{function} must be told it is a case problem, got: {err}"
+                );
+            }
+        }
+
+        #[test]
+        fn the_case_refusal_names_the_spelling_that_works() {
+            let err = validate_config_request(&req_with("AVG", Some("latency_ms")))
+                .expect_err("AVG is refused");
+            assert!(err.to_string().contains("'avg'"), "got: {err}");
+        }
+
+        #[test]
+        fn an_uppercase_unsupported_function_is_refused_as_unsupported() {
+            let err = validate_config_request(&req_with("P75", Some("latency_ms")))
+                .expect_err("p75 is refused in any spelling");
+            assert!(
+                err.to_string().contains("unsupported detection_function"),
+                "case is not the reason p75 fails, got: {err}"
+            );
+        }
+
+        #[test]
+        fn a_malformed_combined_form_is_named_not_ignored() {
+            let err = validate_config_request(&req_with("avg(latency_ms", None))
+                .expect_err("an unclosed paren is not a function");
+            assert!(err.to_string().contains("malformed"), "got: {err}");
+        }
+
+        #[test]
+        fn the_rule_is_reported_as_a_400_not_a_500() {
+            let err = validate_config_request(&req_with("p75", Some("latency_ms")))
+                .expect_err("p75 is refused");
+            assert!(
+                validation_error(err)
+                    .to_string()
+                    .starts_with("validation error: "),
+                "the HTTP layer answers 400 only on this prefix"
+            );
+        }
+
+        #[test]
+        fn changing_a_stored_function_into_an_unusable_one_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_err());
+        }
+
+        #[test]
+        fn a_row_already_carrying_an_unusable_function_stays_administrable() {
+            // The mirror of the denominator rule's grandfathering: a config stored before this
+            // gate existed must still be renamable, movable and disableable.
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "an untouched function must not be re-litigated by an unrelated edit"
+            );
+        }
+
+        #[test]
+        fn a_replay_of_the_stored_unusable_function_is_not_a_change() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p75".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_ok(),
+                "a full-body replay re-sends the stored value and changes nothing"
+            );
+        }
+
+        #[test]
+        fn repairing_a_broken_row_is_allowed() {
+            let existing = stored_with("p75(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("p95".to_string()),
+                detection_function_field: Some("latency_ms".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_detection_function(&req, &existing).is_ok());
+        }
+
+        #[test]
+        fn dropping_the_field_from_a_stored_function_is_refused() {
+            let existing = stored_with("avg(latency_ms)");
+            let req = UpdateAnomalyConfigRequest {
+                detection_function: Some("avg".to_string()),
+                ..Default::default()
+            };
+            assert!(
+                validated_detection_function(&req, &existing).is_err(),
+                "an edit that strips the operand must not save a bare aggregation"
+            );
+        }
+    }
+
     mod denominator_rule {
         use super::*;
 
