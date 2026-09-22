@@ -112,7 +112,7 @@ jobs:
           mv target/x86_64-unknown-linux-gnu/release/openobserve bin/openobserve
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-region: ${{ env.AWS_REGION }}
           role-to-assume: arn:aws:iam::058694856476:role/GitHubActionsRole
