@@ -1132,7 +1132,7 @@ pub async fn handle_otlp_request(
     {
         log::error!("Error while writing traces: {e}");
         return Ok(MetaHttpResponse::error_with_header(
-            write_error_status(&e),
+            trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1487,7 +1487,7 @@ pub async fn ingest_json(
     {
         log::error!("Error while writing traces: {e}");
         return Ok(MetaHttpResponse::error_with_header(
-            write_error_status(&e),
+            trace_write_error_status(&e),
             format!("error while writing trace data: {e}"),
         ));
     }
@@ -1572,7 +1572,7 @@ fn format_response(
 }
 
 /// Schema rejections are tagged `InvalidData`; a failed WAL write carries the ingestion error.
-fn write_error_status(e: &Error) -> http::StatusCode {
+fn trace_write_error_status(e: &Error) -> http::StatusCode {
     if e.kind() == std::io::ErrorKind::InvalidData {
         return http::StatusCode::BAD_REQUEST;
     }
@@ -3318,23 +3318,26 @@ mod tests {
     }
 
     #[test]
-    fn test_write_error_status() {
-        use super::write_error_status;
+    fn test_trace_write_error_status() {
+        use super::trace_write_error_status;
 
         let schema = std::io::Error::new(std::io::ErrorKind::InvalidData, "too many columns");
-        assert_eq!(write_error_status(&schema), http::StatusCode::BAD_REQUEST);
+        assert_eq!(
+            trace_write_error_status(&schema),
+            http::StatusCode::BAD_REQUEST
+        );
         let overload = std::io::Error::other(infra::errors::Error::ResourceError(
             "write queue full".to_string(),
         ));
         assert_eq!(
-            write_error_status(&overload),
+            trace_write_error_status(&overload),
             http::StatusCode::SERVICE_UNAVAILABLE
         );
         let fault = std::io::Error::other(infra::errors::Error::IngestionError(
             "disk failure".to_string(),
         ));
         assert_eq!(
-            write_error_status(&fault),
+            trace_write_error_status(&fault),
             http::StatusCode::INTERNAL_SERVER_ERROR
         );
     }
