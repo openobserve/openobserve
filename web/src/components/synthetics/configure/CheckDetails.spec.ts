@@ -17,6 +17,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import i18n from "@/locales";
 import CheckDetails from "./CheckDetails.vue";
+import OTemplateInput from "@/lib/forms/TemplateInput/OTemplateInput.vue";
+import type { VariableSuggestion } from "../variables/suggestions";
 import { mockMonitorHttp } from "@/test/unit/mockData/synthetics";
 import type { BrowserCheck, SyntheticsFolder } from "@/types/synthetics";
 
@@ -109,6 +111,7 @@ function mountCheckDetails(
     validationErrors: Record<string, string>;
     targetLabel: string;
     targetPlaceholder: string;
+    variableSuggestions: VariableSuggestion[];
   }> = {},
 ) {
   return mount(CheckDetails, {
@@ -306,6 +309,27 @@ describe("CheckDetails", () => {
       const lastEmit = emitted[emitted.length - 1][0];
       expect(lastEmit.url).toBe("https://new.example.com/check");
       expect(lastEmit.name).toBe(mockMonitorHttp.name);
+    });
+  });
+
+  describe("URL variable suggestions", () => {
+    const urlField = '[data-test="synthetics-check-details-url-input"]';
+
+    it("renders the URL field as a plain input without the prop", () => {
+      wrapper = mountCheckDetails();
+      expect(wrapper.find(`${urlField} input`).exists()).toBe(true);
+      expect(wrapper.findComponent(OTemplateInput).props("suggestions")).toBeUndefined();
+    });
+
+    it("hands the rows to the URL field when the host passes them", () => {
+      const variableSuggestions: VariableSuggestion[] = [
+        { name: "BASE_URL", envs: ["prod"], global: false, secret: false, gap: [] },
+      ];
+      wrapper = mountCheckDetails({ variableSuggestions });
+      expect(wrapper.find(`${urlField} input`).exists()).toBe(true);
+      expect(wrapper.findComponent(OTemplateInput).props("suggestions")).toEqual(
+        variableSuggestions,
+      );
     });
   });
 
