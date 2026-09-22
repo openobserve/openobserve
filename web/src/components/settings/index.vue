@@ -337,7 +337,7 @@ export default defineComponent({
           description: t("settings.slackAppDesc"),
           icon: "chat",
           to: { name: "slackApp", query: { org_identifier: org } },
-          visible: isEnt,
+          visible: isCloud,
           dataTest: "slack-app-tab",
           group: "Integrations",
         },
