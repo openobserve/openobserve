@@ -1,10 +1,10 @@
-const { test, expect, navigateToBase } = require("../utils/enhanced-baseFixtures.js");
-const testLogger = require("../utils/test-logger.js");
-import { ingestion } from "./utils/dashIngestion.js";
-import PageManager from "../../pages/page-manager.js";
-import { waitForDashboardPage, addSimplePanel } from "./utils/dashCreation.js";
-import { cleanupDashboard } from "./utils/panelTimeSetup.js";
-const { safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
+const { test, expect, navigateToBase } = require("../../utils/enhanced-baseFixtures.js");
+const testLogger = require("../../utils/test-logger.js");
+import { ingestion } from "../../Dashboards/utils/dashIngestion.js";
+import PageManager from "../../../pages/page-manager.js";
+import { waitForDashboardPage, addSimplePanel } from "../../Dashboards/utils/dashCreation.js";
+import { cleanupDashboard } from "../../Dashboards/utils/panelTimeSetup.js";
+const { safeWaitForNetworkIdle } = require("../../utils/wait-helpers.js");
 
 test.describe.configure({ mode: "parallel" });
 
