@@ -18926,7 +18926,7 @@
     "routingSaysPlace": "Toutes les alertes et incidents liés à {value} ({noun})",
     "routingSaysPlaces": "Toutes les alertes et incidents de {scope}",
     "routingSaysAnything": "Toutes les alertes et incidents",
-    "routingNoLadder": "pas encore d'échelle d'escalade",
+    "routingNoLadder": "Pas encore de chaîne d'escalade",
     "routingPagesTeam": "prévient {team}",
     "routingCaughtLast": "{count} notification · dernier {when} | {count} notifications · dernier {when}",
     "routingEmptyBodyNamed": "{team} ne sera pas notifié tant qu'aucune règle n'aura correspondu à une alerte entrante.",
